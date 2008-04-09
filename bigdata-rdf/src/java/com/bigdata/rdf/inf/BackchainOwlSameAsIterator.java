@@ -6,8 +6,18 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 public abstract class BackchainOwlSameAsIterator implements ISPOIterator {
+    
+    /**
+     * The database.
+     */
     protected AbstractTripleStore db;
 
+    /**
+     * This flag is <code>true</code> since we do NOT want statement
+     * identifiers to be generated for inferences produced by the backchainer.
+     */
+    protected final boolean copyOnly = true;
+    
     protected long sameAs;
 
     protected ISPOIterator src;

@@ -2105,6 +2105,16 @@ abstract public class Rule {
              * rule generates an entailment, then we are going to do another
              * round anyway so maybe it is best to defer to the end of the
              * round?
+             * 
+             * FIXME each round can use a historical read from the timestamp
+             * associated with the commit point of the prior round. in an
+             * extended transaction model those could be "save points" such
+             * that the total result was either committed or aborted.  If a
+             * transaction is used, then the closure actually takes place within
+             * the transaction so the commit for the tx is always atomic and the
+             * rounds in which we compute the closure are "committed" against the
+             * tx's write set (either for the focus store or for the database if
+             * we are doing database at once closure).
              */
             buffer.flush();
 

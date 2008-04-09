@@ -98,7 +98,7 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
     @Override
     protected IDataSerializer getKeySerializer() {
 
-        return new FastRDFKeyCompression(AbstractTripleStore.N);
+        return new FastRDFKeyCompression(IRawTripleStore.N);
 
     }
 
@@ -185,7 +185,7 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
              * The current statement type in this index partition (iff the
              * stmt is defined.
              */
-            final byte[] oldval = (byte[]) ndx.lookup(key);
+            final byte[] oldval = ndx.lookup(key);
 
             if (oldval == null) {
 

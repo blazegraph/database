@@ -376,7 +376,7 @@ public class TokenBuffer {
         
         final IntegerAggregator resultHandler = new IntegerAggregator();
         
-        textIndexer.ndx.submit(0, //fromIndex
+        textIndexer.getIndex().submit(0, //fromIndex
                 n, // toIndex
                 keys,//
                 vals,//

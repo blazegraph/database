@@ -33,20 +33,18 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -62,22 +60,27 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.Justification;
@@ -87,6 +90,7 @@ import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
+import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
@@ -100,25 +104,24 @@ import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
-import com.bigdata.rdf.spo.SPOIterator;
+import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AddIds.AddIdsConstructor;
 import com.bigdata.rdf.store.AddTerms.AddTermsConstructor;
-import com.bigdata.rdf.store.IndexWriteProc.IndexWriteProcConstructor;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.store.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 import com.bigdata.search.TokenBuffer;
+import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedDataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.ibm.icu.text.Collator;
-import com.ibm.icu.text.RuleBasedCollator;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -133,37 +136,31 @@ import cutthecrap.utils.striterators.Striterator;
  * with the {@link ScaleOutTripleStore} since it uses the {@link IBigdataClient}
  * API.
  * 
- * @todo term prefix scan. write prefix scan procedure (aka distinct term scan).
- *       possible use for both the {@link SparseRowStore} and the triple store?
- *       do efficent merge join of two such iterators to support backchaining.
- *       do term prefix scan in key range so that it can be restricted to just
- *       the URIs for backchaining.
+ * FIXME term prefix scan. write prefix scan procedure (aka distinct term scan).
+ * possible use for both the {@link SparseRowStore} and the triple store? do
+ * efficent merge join of two such iterators to support backchaining. do term
+ * prefix scan in key range so that it can be restricted to just the URIs for
+ * backchaining. See {@link AccessPath}.
  * 
- * @todo performance improvements:
- *       <p>
- *       Custom joins for the {@link LocalDataServiceFederation} deployment
- *       scenario.
- *       <p>
- *       Tune inference - when computing closure on a store that supports
- *       concurrent read/write, for each SPO[] chunk from the 1st triple
- *       pattern, create an array of binding[]s and process each binding in
- *       parallel.
+ * FIXME Custom joins for the {@link LocalDataServiceFederation} deployment
+ * scenario.
+ * <p>
+ * Tune inference - when computing closure on a store that supports concurrent
+ * read/write, for each SPO[] chunk from the 1st triple pattern, create an array
+ * of binding[]s and process each binding in parallel.
  * 
- * @todo {@link BNode} SHOULD NOT be entered into the reverse (id->term) index.
- *       We can decide that a termId is a {@link BNode} by direct inspection of
- *       the term identifier using {@link #isBNode(long)}. We know whether or
- *       not it is the same {@link BNode} by simply comparing the term
- *       identifier. In fact, the only reason to enter {@link BNode} into the
- *       foward (term->id) index is during data load. We can do without bnodes
- *       in the forward index also as long as we (a) keep a hash or btree whose
- *       scope is the data load (a btree would be required for very large
- *       files); and (b) we hand the {@link BNode}s to {@link AddTerms}s but
- *       it only assigns a one up term identifier and does NOT enter the bnode
- *       into the index. The local (file load scope only) bnode resolution is
- *       the only context in which it is possible for two {@link BNode}
- *       {@link BNode#getID() ID}s to be interpreted as the ID and therefore
- *       assigned the same term identifier. In all other cases we will assign a
- *       new term identifier.
+ * @todo The only reason to enter {@link BNode} into the foward (term->id) index
+ *       is during data load. We can do without bnodes in the forward index also
+ *       as long as we (a) keep a hash or btree whose scope is the data load (a
+ *       btree would be required for very large files); and (b) we hand the
+ *       {@link BNode}s to {@link AddTerms}s but it only assigns a one up term
+ *       identifier and does NOT enter the bnode into the index. The local (file
+ *       load scope only) bnode resolution is the only context in which it is
+ *       possible for two {@link BNode} {@link BNode#getID() ID}s to be
+ *       interpreted as the same ID and therefore assigned the same term
+ *       identifier. In all other cases we will assign a new term identifier.
+ *       The assignment of the term identifier for a BNode ID can be from ANY
+ *       key-range partition of the term:id index.
  * 
  * @todo Do the quad store. Make some of the indices optional such that we still
  *       have good access patterns but store less data when the quad is used as
@@ -186,11 +183,52 @@ import cutthecrap.utils.striterators.Striterator;
  *       indices.
  * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
- *       order to reduce unicode conversions.
+ *       order to reduce unicode conversions and index access.
  * 
  * @todo examine role for semi joins (join indices) - these can be declared for
  *       various predicate combinations and then maintained, effectively by
  *       rules using the existing TM mechanisms.
+ * 
+ * @todo There are two basic ways in which we are considering extending the
+ *       platform to make statement identifiers useful.
+ *       <ol>
+ *       <li>Transparently convert ontology and data that uses RDF style
+ *       reification such that it uses statement identifiers instead. There are
+ *       a few drawbacks with this approach. One is that you still have to write
+ *       high level queries in terms of RDF style reification, which means that
+ *       we have not reduced the burden on the user significantly. There is also
+ *       the possibility that the change would effect the semantics of RDF
+ *       containers, or at least the relationship between the semantics of RDF
+ *       containers and RDF style reification. The plus side of this approach is
+ *       that the change could be completely transparent, but I am not sure that
+ *       keeping RDF reification in any form - and especially in the queries -
+ *       is a good idea.</li>
+ *       <li>The other approach is to provide an extension of RDF/XML in which
+ *       statements may be made and a high-level query language extension in
+ *       which statement identifiers may be exploited to efficiently recover
+ *       statements about statements. This approach has the advantage of being
+ *       completely decoupled from the RDF reification semantics - it is a pure
+ *       superset of the RDF data model and query language. Also, in this
+ *       approach we can guarentee that the statement identifiers are purely an
+ *       internal convenience of the database - much like blank nodes. In fact,
+ *       statement identifiers can be created lazily - when there is a need to
+ *       actually make a statement about a specific statement. </li>
+ *       </ol>
+ *       The second is where we are putting our effort right now. We are looking
+ *       at doing this as a "database mode" which understands that there is a
+ *       1:1 correspondence between a triple and a BNode used to identify the
+ *       source in a named graph interchange syntax and that the default graph
+ *       exposed via SPARQL is the RDF merge of the named graphs, and is
+ *       leanified under that 1:1 correspondence assumption. All of which is to
+ *       say that graph identifiers must be bnodes and have the semantics of
+ *       statement identifiers in that database mode. You can then write a
+ *       SPARQL query which uses a graph variable binding to recover statement
+ *       metadata with resort to RDF style reification (aka statement models).
+ *       <p>
+ *       Statement identifiers are assigned when you add statements to the
+ *       database, whether the statements are read from some RDF interchange
+ *       syntax or added directly using
+ *       {@link #addStatements(ISPOIterator, ISPOFilter)} and friends.  
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -221,6 +259,21 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final protected boolean oneAccessPath;
 
+    /**
+     * The branching factor for indices registered by this class.
+     * 
+     * @see com.bigdata.journal.Options#BRANCHING_FACTOR
+     */
+    final private int branchingFactor;
+    
+    /**
+     * The #of term identifiers in the key for a statement index (3 is a triple
+     * store, 4 is a quad store).
+     * 
+     * @see #statementIdentifiers
+     */
+    final public int N = IRawTripleStore.N;
+    
     /**
      * When <code>true</code> the database will support statement identifiers.
      * A statement identifier is a unique 64-bit integer taken from the same
@@ -255,13 +308,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     /**
      * Configuration options.
      * 
-     * @todo {@link AbstractTripleStore#readService} capacity.
-     * 
      * @todo add property for the prefix so that you can have more than on
-     *       triple/quad store in the same database.
+     *       triple/quad store in the same database (the {@link ScaleOutTripleStore} 
+     *       ctor already accepts a namespace parameter.)
      * 
-     * @todo add property for triple vs quad variants. Statement identifiers are
-     *       always possible by adding the statements into the lexicon.
+     * @todo add property for triple vs quad variants.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -279,9 +330,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * {@link TempTripleStore} when only the statement indices are to be
          * used.
          */
-        public static final String LEXICON = "lexicon"; 
+        String LEXICON = "lexicon"; 
 
-        public static final String DEFAULT_LEXICON = "true"; 
+        String DEFAULT_LEXICON = "true"; 
 
         /**
          * Boolean option (default <code>false</code>) disables all but a
@@ -292,18 +343,18 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * this option is NOT compatible with either the application of the
          * {@link InferenceEngine} or high-level query.
          */
-        public static final String ONE_ACCESS_PATH = "oneAccessPath";
+        String ONE_ACCESS_PATH = "oneAccessPath";
 
-        public static final String DEFAULT_ONE_ACCESS_PATH = "false";
+        String DEFAULT_ONE_ACCESS_PATH = "false";
         
         /**
          * Boolean option (default <code>true</code>) enables support for a
          * full text index that may be used to lookup literals by tokens found
          * in the text of those literals.
          */
-        public static final String TEXT_INDEX = "textIndex";
+        String TEXT_INDEX = "textIndex";
 
-        public static final String DEFAULT_TEXT_INDEX = "true";
+        String DEFAULT_TEXT_INDEX = "true";
 
         /**
          * Boolean option (default <code>false</code>) enables support for
@@ -311,38 +362,56 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * <em>triple</em> (regardless of the graph in which that triple may
          * be found). Statement identifiers may be used to make statements about
          * statements without using RDF style reification.
+         * <p>
+         * Statement identifers are assigned consistently when {@link Statement}s
+         * are mapped into the database. This is done using an extension of the
+         * <code>term:id</code> index to map the statement as if it were a
+         * term onto a unique statement identifier. That statement identifier is
+         * in fact a term identifier, and the identified statement may be
+         * resolved against the <code>id:term</code> index. While the
+         * statement identifier is assigned canonically by the
+         * <code>term:id</code> index, it is stored redundently in the value
+         * position for each of the statement indices.
+         * <p>
+         * Statement identifiers add latency when loading data since it
+         * increases the size of the writes on the terms index (and also its
+         * space requirements since all statements are also replicated in the
+         * terms index). However, if you are doing concurrent data load then the
+         * added latency is nicely offset by the parallelism.
          * 
-         * FIXME This is a work in progress. There are two basic ways in which
-         * we are considering extending the platform to make statement
-         * identifiers useful.
-         * <ol>
-         * <li>Transparently convert ontology and data that uses RDF style
-         * reification such that it uses statement identifiers instead. There
-         * are a few drawbacks with this approach. One is that you still have to
-         * write high level queries in terms of RDF style reification, which
-         * means that we have not reduced the burden on the user significantly.
-         * There is also the possibility that the change would effect the
-         * semantics of RDF containers, or at least the relationship between the
-         * semantics of RDF containers and RDF style reification. The plus side
-         * of this approach is that the change could be completely transparent,
-         * but I am not sure that keeping RDF reification in any form - and
-         * especially in the queries - is a good idea.</li>
-         * <li>The other approach is to provide an extension of RDF/XML in
-         * which statements may be made and a high-level query language
-         * extension in which statement identifiers may be exploited to
-         * efficiently recover statements about statements. This approach has
-         * the advantage of being completely decoupled from the RDF reification
-         * semantics - it is a pure superset of the RDF data model and query
-         * language. Also, in this approach we can guarentee that the statement
-         * identifiers are purely an internal convenience of the database - much
-         * like blank nodes. In fact, statement identifiers can be created
-         * lazily - when there is a need to actually make a statement about a
-         * specific statement. </li>
-         * </ol>
+         * @see ITermIndexCodes#TERM_CODE_STMT
+         * 
+         * @todo A design alternative is to use the SPO index to assign
+         *       statement identifiers and to NOT store them in the value
+         *       positions on the other indices (POS, OSP). The advantage of
+         *       this approach is less redundency (the statement is not present
+         *       in the forward and reverse indices for the lexicon is not
+         *       present in the other statement indices) - the drawback is not
+         *       having the statement identifier "on hand" regardless of the
+         *       index on which you are reading.
+         *       <p>
+         *       Regardless of whether the statement identifier is assigned by
+         *       the lexicon or the SPO index, the presence of source markers in
+         *       RDF/XML necessitates a two stage process to (a) resolve the
+         *       source Resource {URI or BNode} to the statement identifier; and
+         *       (b) utilize that statement identifier as the resolved "term
+         *       identifier" for other statements in the RDF/XML document with a
+         *       reference to the same Resource.
+         *       <p>
+         *       For example:
+         * 
+         * <pre>
+         *            (joe, loves, mary):_a.
+         *            (_a, reportedBy, tom).
+         * </pre>
+         * 
+         * where _a is a BNode identifying the source for (joe, loves, mary).
+         * The second statement uses _a to add provenance for the assertion
+         * (joe, loves, mary) - namely that the assertion was reported by tom.
          */
-        public static final String STATEMENT_IDENTIFIERS = "statementIdentifiers";
+        String STATEMENT_IDENTIFIERS = "statementIdentifiers";
 
-        public static final String DEFAULT_STATEMENT_IDENTIFIERS = "false";
+        String DEFAULT_STATEMENT_IDENTIFIERS = "true";
         
     }
     
@@ -405,6 +474,26 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         log.info(Options.STATEMENT_IDENTIFIERS+"="+statementIdentifiers);
 
+        /*
+         * branchingFactor.
+         */
+        {
+         
+            branchingFactor = Integer
+                    .parseInt(properties.getProperty(Options.BRANCHING_FACTOR,
+                            Options.DEFAULT_BRANCHING_FACTOR));
+
+            if (branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+
+                throw new IllegalArgumentException(Options.BRANCHING_FACTOR
+                        + " must be at least " + BTree.MIN_BRANCHING_FACTOR);
+
+            }
+
+            log.info(Options.BRANCHING_FACTOR + "=" + branchingFactor);
+            
+        }
+        
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
         addNamespace(RDFS.NAMESPACE, "rdfs");
@@ -448,33 +537,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     /**
-     * Terminates the {@link #readService} and the {@link #writeService}.
+     * Default is a NOP - invoked by {@link #close()} and {@link #closeAndDelete()}
      */
     protected void shutdown() {
-        
-        writeService.shutdown();
-        
-        try {
-
-            writeService.awaitTermination(2, TimeUnit.SECONDS);
-            
-        } catch(InterruptedException ex) {
-            
-            log.warn("Write service did not terminate within timeout.");
-            
-        }
-        
-        readService.shutdown();
-        
-        try {
-
-            readService.awaitTermination(2, TimeUnit.SECONDS);
-            
-        } catch(InterruptedException ex) {
-            
-            log.warn("Read service did not terminate within timeout.");
-            
-        }
         
     }
     
@@ -516,81 +581,30 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     };
 
     /**
-     * Create and return a new collator object responsible for encoding unicode
-     * strings into sort keys.
-     * 
-     * @return A new collator object.
-     * 
-     * @todo define the means to configure the key builder for desired unicode
-     *       support. the configuration should be restart-safe and must be
-     *       shared by all clients for the same triple store. (Actually, I think
-     *       that the {@link KeyBuilder} needs to be able to use different
-     *       collation sequences for different keys - the main example here is
-     *       of course a language code literal where the key contains the
-     *       langauge code in order to partition literals using different
-     *       language families, and possible different collation sequences, into
-     *       different parts of the key space).
-     */
-    final protected RuleBasedCollator createCollator() {
-        
-        // choose a collator for the default locale.
-        RuleBasedCollator collator = (RuleBasedCollator) Collator
-                .getInstance(Locale.getDefault());
-
-        /*
-         * Primary uses case folding and produces smaller sort strings.
-         * 
-         * Secondary does not fold case.
-         * 
-         * Tertiary is the default.
-         * 
-         * Identical is also allowed.
-         * 
-         * @todo handle case folding - currently the indices complain, e.g., for
-         * wordnet that a term already exists with a given id "Yellow Pages" vs
-         * "yellow pages". Clearly the logic to fold case needs to extend
-         * further if it is to work.
-         */
-//        collator.setStrength(Collator.PRIMARY);
-//        collator.setStrength(Collator.SECONDARY);
-
-        return collator;
-        
-    }
-    
-    /**
-     * Executor service for read parallelism.
-     * 
-     * @deprecated We do not need the read vs write distinction for this service -
-     *             that is enforced by the concurrency control mechanisms when
-     *             the store supports such.
+     * A service used to run operations in parallel.
      * 
      * @todo use for parallel execution of map of new vs old+new over the terms
      *       of a rule.
      * 
      * @todo use for parallel execution of sub-queries.
      * 
-     * @todo {@link SPOAssertionBuffer} must be thread-safe. {@link Rule}
-     *       bindings must be per-thread.
+     * @todo {@link SPOAssertionBuffer} must be thread-safe (or writes must
+     *       occur after threads join at a barrier). {@link Rule} bindings must
+     *       be per-thread (e.g., up to a chunk at a time processing with a
+     *       thread per SPO in the chunk).
      * 
-     * @todo Note that rules that write entailments on the database statement
-     *       MUST coordinate to avoid concurrent modification during traversal
-     *       of the statement indices. The chunked iterators go a long way to
-     *       addressing this.
+     * @todo Note that rules that write entailments on the database MUST
+     *       coordinate to avoid concurrent modification during traversal of the
+     *       statement indices. The chunked iterators go a long way to
+     *       addressing this. The issue is completely resolved by the
+     *       {@link ConcurrencyManager} bundled in the {@link Journal} or
+     *       {@link DataService} (any federation), but you have to submit index
+     *       procedures or tasks for the {@link ConcurrencyManager} to work
+     *       rather than directly accessing the unisolated indices on the
+     *       {@link Journal}.
      */
-    final public ExecutorService readService = Executors
-            .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
-
-    /**
-     * A service used to run index write operations in parallel.
-     * 
-     * @todo we do not really need different services for reads and writes.
-     * 
-     * @todo configure capacity.
-     */
-    public ExecutorService writeService = Executors.newFixedThreadPool(20,
-            DaemonThreadFactory.defaultThreadFactory());
-
+    abstract public ExecutorService getThreadPool();
+    
     /**
      * Generate the sort keys for the terms.
      * 
@@ -621,6 +635,85 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
 
+    /**
+     * Shared {@link IndexMetadata} configuration.
+     * 
+     * @param name
+     *            The index name.
+     *            
+     * @return A new {@link IndexMetadata} object for that index.
+     */
+    protected IndexMetadata getIndexMetadata(String name) {
+        
+        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+        
+        metadata.setBranchingFactor(branchingFactor);
+        
+        return metadata;
+            
+    }
+
+    /**
+     * Overrides for the {@link IRawTripleStore#getTermIdIndex()}.
+     */
+    protected IndexMetadata getTermIdIndexMetadata(String name) {
+
+        final IndexMetadata metadata = getIndexMetadata(name);
+
+        return metadata;
+
+    }
+    
+    /**
+     * Overrides for the {@link IRawTripleStore#getIdTermIndex()}.
+     */
+    protected IndexMetadata getIdTermIndexMetadata(String name) {
+            
+        final IndexMetadata metadata = getIndexMetadata(name);
+
+        return metadata;
+        
+    }
+    
+    /**
+     * Overrides for the statement indices.
+     */
+    protected IndexMetadata getStatementIndexMetadata(String name) {
+
+        final IndexMetadata metadata = getIndexMetadata(name);
+
+        metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
+
+        if(!statementIdentifiers) {
+
+            /*
+             * @todo this value serializer does not know about statement
+             * identifiers. Therefore it is turned off if statement identifiers
+             * are enabled. Examine some options for value compression for the
+             * statement indices when statement identifiers are enabled.
+             */
+            
+            metadata.setValueSerializer(new FastRDFValueCompression());
+            
+        }
+
+        return metadata;
+        
+    }
+
+    /**
+     * Overrides for the {@link IRawTripleStore#getJustificationIndex()}.
+     */
+    protected IndexMetadata getJustIndexMetadata(String name) {
+            
+        final IndexMetadata metadata = getIndexMetadata(name);
+        
+        metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+
+        return metadata;
+        
+    }
+    
     final public IIndex getStatementIndex(KeyOrder keyOrder) {
 
         switch (keyOrder) {
@@ -642,6 +735,50 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
+    final public long getStatementCount(boolean exact) {
+        
+        final IIndex ndx = getSPOIndex();
+        
+        if( exact && ndx.getIndexMetadata().getDeleteMarkers() ) {
+            
+            /*
+             * The use of delete markers means that index entries are not
+             * removed immediately but rather a delete flag is set. This is
+             * always true for the scale-out indices because delete markers are
+             * used to support index partition views. It is also true for
+             * indices that can support transactions regardless or whether or
+             * not the database is using scale-out indices. In any case, if you
+             * want an exact range count when delete markers are in use then you
+             * need to actually visit every tuple in the index, which is what
+             * this code does. Note that the [flags] are 0 since we do not need
+             * either the KEYS or VALS. We are just interested in the #of tuples
+             * that the iterator is willing to visit.
+             */
+            
+            long n = 0L;
+            
+            final Iterator itr = ndx.rangeIterator(null/* fromKey */, null/* toKey */,
+                    0/* capacity */, 0/* flags */, null/* filter */);
+            
+            while(itr.hasNext()) {
+                
+                n++;
+                
+            }
+            
+            return n;
+            
+        }
+        
+        /*
+         * Either an exact count is not required or delete markers are not in
+         * use and therefore rangeCount() will report the exact count.
+         */
+        
+        return ndx.rangeCount(null, null);
+        
+    }
+    
     final public long getJustificationCount() {
         
         if(justify) {
@@ -655,8 +792,16 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
     
     final public long getTermCount() {
-        
-        return getTermIdIndex().rangeCount(null,null);
+
+        byte[] fromKey = new byte[] { KeyBuilder.encodeByte(RdfKeyBuilder.TERM_CODE_URI) };
+
+        /*
+         * Note: the term count deliberately excludes the statement identifiers
+         * which follow the bnodes in the lexicon.
+         */
+        byte[] toKey = new byte[] { KeyBuilder.encodeByte((byte)(RdfKeyBuilder.TERM_CODE_BND+1)) };
+
+        return getTermIdIndex().rangeCount(fromKey,toKey);
         
     }
     
@@ -708,7 +853,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         };
     
-        addTerms(getKeyBuilder(), terms, 1);
+        addTerms(terms, 1);
             
         return terms[0].termId;
             
@@ -726,6 +871,17 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     protected LRUCache<Long, _Value> termCache = new LRUCache<Long, _Value>(10000);
        
     /**
+     * Note: {@link BNode}s are not stored in the reverse lexicon and are
+     * recognized using {@link #isBNode(long)}.
+     * <p>
+     * Note: Statement identifiers (when enabled) are not stored in the reverse
+     * lexicon and are recognized using {@link #isStatement(long)}. If the term
+     * identifier is recognized as being, in fact, a statement identifier, then
+     * it is externalized as a {@link BNode}. This fits rather well with the
+     * notion in a quad store that the context position may be either a
+     * {@link URI} or a {@link BNode} and the fact that you can use
+     * {@link BNode}s to "stamp" statement identifiers.
+     * <p>
      * Note: This specializes the return to {@link _Value}. This keeps the
      * {@link ITripleStore} interface cleaner while imposes the actual semantics
      * on all implementation of this class.
@@ -735,10 +891,45 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * Note: Sets {@link _Value#termId} and {@link _Value#known} as
      * side-effects.
      * 
-     * @todo add a batch variant accepting long[] termIds.
+     * @todo this always mints a new {@link BNode} instance when the term
+     *       identifier is identifies a {@link BNode} or a statement. Should
+     *       there be some cache effect to provide the same instance?
+     * 
+     * @todo add a batch variant accepting long[] termIds or an IChunkedIterator
+     *       whose generic type is Long.
      */
     final public _Value getTerm(long id) {
 
+        if (id == NULL)
+            throw new IllegalArgumentException("NULL");
+
+        if (isStatement(id)) {
+
+            /*
+             * Statement identifiers are not stored in the reverse lexicon (or
+             * the cache).
+             * 
+             * A statement identifier is externalized as a BNode. The "_S"
+             * prefix is a syntactic marker for those in the know to indicate
+             * that the BNode corresponds to a statement identifier.
+             */
+
+            return (_BNode) OptimizedValueFactory.INSTANCE
+                    .createBNode("_S"+ id);
+
+        }
+
+        if (isBNode(id)) {
+
+            /*
+             * BNodes are not stored in the reverse lexicon (or the cache).
+             */
+
+            return (_BNode) OptimizedValueFactory.INSTANCE
+                    .createBNode("_" + id);
+            
+        }
+        
         _Value value = termCache.get(id);
         
         if (value != null) {
@@ -749,7 +940,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
         final IIndex ndx = getIdTermIndex();
         
-        final KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
+        final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;//new KeyBuilder(Bytes.SIZEOF_LONG);
         
         // Note: shortcut for keyBuilder.id2key(id)
         final byte[] key = keyBuilder.reset().append(id).getKey();
@@ -874,7 +1065,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * see if perhaps it can be retrofitted to use {@link ConcurrentHashMap} and
      * to support full concurrency).
      */
-    public void addTerms(RdfKeyBuilder keyBuilder,final _Value[] terms, final int numTerms) {
+    public void addTerms(final _Value[] terms, final int numTerms) {
         
         if (numTerms == 0)
             return;
@@ -899,6 +1090,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 long _begin = System.currentTimeMillis();
                 
+                // per-thread key builder.
+                final RdfKeyBuilder keyBuilder = getKeyBuilder();
+
                 generateSortKeys(keyBuilder, terms, numTerms);
                 
                 keyGenTime = System.currentTimeMillis() - _begin;
@@ -1017,56 +1211,73 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
              * Create a key buffer to hold the keys generated from the term
              * identifers and then generate those keys. The terms are already in
              * sorted order by their term identifiers from the previous step.
+             * 
+             * Note: We DO NOT write BNodes on the reverse index.
              */
             final byte[][] keys = new byte[numTerms][];
             final byte[][] vals = new byte[numTerms][];
-            
+            int nonBNodeCount = 0; // #of non-bnodes.
             {
 
-                // Private key builder removes single-threaded constraint.
-                final KeyBuilder tmp = new KeyBuilder(Bytes.SIZEOF_LONG); 
+                // thread-local key builder removes single-threaded constraint.
+                final IKeyBuilder tmp = getKeyBuilder().keyBuilder; //new KeyBuilder(Bytes.SIZEOF_LONG); 
 
                 // buffer is reused for each serialized term.
                 final DataOutputBuffer out = new DataOutputBuffer();
                 
                 for(int i=0; i<numTerms; i++) {
                     
-                    keys[i] = tmp.reset().append(terms[i].termId).getKey();
+                    if(terms[i] instanceof BNode) {
+                        
+                        terms[i].known = true;
+                        
+                        continue;
+                        
+                    }
+                    
+                    keys[nonBNodeCount] = tmp.reset().append(terms[i].termId).getKey();
                     
                     // Serialize the term.
-                    vals[i] = terms[i].serialize(out.reset());                    
+                    vals[nonBNodeCount] = terms[i].serialize(out.reset());
 
+                    nonBNodeCount++;
+                    
                 }
                 
             }
 
             // run the procedure on the index.
-            idTermIndex.submit(0/* fromIndex */, numTerms/* toIndex */, keys,
-                    vals, AddIdsConstructor.INSTANCE,
-                    new IResultHandler<Void, Void>() {
+            if (nonBNodeCount > 0) {
+                
+                idTermIndex.submit(0/* fromIndex */,
+                        nonBNodeCount/* toIndex */, keys, vals,
+                        AddIdsConstructor.INSTANCE,
+                        new IResultHandler<Void, Void>() {
 
-                /**
-                 * Since the unisolated write succeeded the client knows that
-                 * the term is now in both the forward and reverse indices. We
-                 * codify that knowledge by setting the [known] flag on the
-                 * term.
-                 */
-                public void aggregate(Void result, Split split) {
+                            /**
+                             * Since the unisolated write succeeded the client
+                             * knows that the term is now in both the forward
+                             * and reverse indices. We codify that knowledge by
+                             * setting the [known] flag on the term.
+                             */
+                            public void aggregate(Void result, Split split) {
 
-                    for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
+                                for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
 
-                        terms[i].known = true;
+                                    terms[i].known = true;
 
-                    }
+                                }
 
-                }
+                            }
 
-                public Void getResult() {
+                            public Void getResult() {
 
-                    return null;
+                                return null;
 
-                }
-            });
+                            }
+                        });
+
+            }
             
             insertTime += System.currentTimeMillis() - _begin;
 
@@ -1097,6 +1308,175 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    /**
+     * Assign unique statement identifiers to triples.
+     * <p>
+     * Each distinct {s,p,o} is assigned a unique statement identifier using the
+     * {@link IRawTripleStore#getTermIdIndex()}. The assignment of statement
+     * identifiers is <i>consistent</i> using an unisolated atomic write
+     * operation similar to {@link #addTerms(_Value[], int)}.
+     * <p>
+     * Note: Statement identifiers are NOT inserted into the reverse (id:term)
+     * index. Instead, they are written into the values associated with the
+     * {s,p,o} in each of the statement indices. That is handled by
+     * {@link #addStatements(AbstractTripleStore, ISPOIterator, ISPOFilter)},
+     * which is also responsible for invoking this method in order to have the
+     * statement identifiers on hand before it writes on the statement indices.
+     * <p>
+     * Note: The caller's {@link SPO}[] is sorted into SPO order as a
+     * side-effect.
+     * <p>
+     * Note: The statement identifiers are assigned to the {@link SPO}s as a
+     * side-effect.
+     * 
+     * @throws UnsupportedOperationException
+     *             if {@link Options#STATEMENT_IDENTIFIERS} was not specified.
+     * 
+     * @todo use #termCache to shortcut recently used statements?
+     */
+    protected void addStatementIdentifiers(final SPO[] a, final int n) {
+
+        if (!statementIdentifiers)
+            throw new UnsupportedOperationException();
+
+        if (n == 0)
+            return;
+
+        final long begin = System.currentTimeMillis();
+        final long keyGenTime; // time to convert {s,p,o} to byte[] sort keys.
+        final long sortTime; // time to sort terms by assigned byte[] keys.
+        final long insertTime; // time to insert terms into the term:id index.
+
+        /*
+         * Sort the caller's array into SPO order. This order will correspond to
+         * the total order of the term:id index.
+         * 
+         * Note: the advantage of sorting before we generate the keys is that
+         * the keys and the SPO[] remain in a correlated order. This makes it
+         * trivial to assign the statement identifier to the correct SPO below.
+         * 
+         * Note: This depends critically on SPOComparator producing the same
+         * total order as we would obtain by an unsigned byte[] sort of the
+         * generated sort keys.
+         * 
+         * Note: the keys for the term:id index are NOT precisely the keys used
+         * by the SPO index since there is a prefix code used to mark the keys
+         * are Statements (vs Literals, BNodes, or URIs).
+         */
+        {
+
+            final long _begin = System.currentTimeMillis();
+
+            Arrays.sort(a, 0, n, SPOComparator.INSTANCE);
+            
+            sortTime = System.currentTimeMillis() - _begin;
+            
+        }
+        
+        /*
+         * Insert into the forward index (term -> id). This will either assign a
+         * statement identifier or return the existing statement identifier if
+         * the statement is already in the lexicon (the statement identifier is
+         * in a sense a term identifier since it is assigned by the term:id
+         * index).
+         */
+        final byte[][] keys = new byte[n][];
+            
+        /*
+         * Generate the sort keys for the term:id index.
+         */
+        {
+
+            final long _begin = System.currentTimeMillis();
+
+            // per-thread key builder.
+            final RdfKeyBuilder keyBuilder = getKeyBuilder();
+
+            for (int i = 0; i < n; i++) {
+
+                SPO spo = a[i];
+
+                keys[i] = keyBuilder.keyBuilder.reset() //
+                        .append(ITermIndexCodes.TERM_CODE_STMT)//
+                        .append(spo.s).append(spo.p).append(spo.o)//
+                        .getKey()//
+                        ;
+                
+            }
+
+            keyGenTime = System.currentTimeMillis() - _begin;
+
+        }
+
+//            /*
+//             * Sort by the assigned sort keys. This places the data into the
+//             * natural order for the term:id index.
+//             */
+//            {
+//
+//                long _begin = System.currentTimeMillis();
+//
+//                Arrays.sort(keys, 0, numTerms,
+//                        UnsignedByteArrayComparator.INSTANCE);
+//
+//                sortTime += System.currentTimeMillis() - _begin;
+//
+//            }
+
+        /*
+         * Execute a remote unisolated batch operation that assigns the
+         * statement identifier.
+         */
+        {
+
+            final long _begin = System.currentTimeMillis();
+
+            final IIndex termIdIndex = getTermIdIndex();
+
+            // run the procedure.
+            termIdIndex.submit(0/* fromIndex */, n/* toIndex */, keys,
+                    null/* vals */, AddTermsConstructor.INSTANCE,
+                    new IResultHandler<AddTerms.Result, Void>() {
+
+                        /**
+                         * Copy the assigned/discovered statement identifiers
+                         * onto the corresponding elements of the SPO[].
+                         */
+                        public void aggregate(AddTerms.Result result,
+                                Split split) {
+
+                            for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
+
+                                a[i].setStatementIdentifier(result.ids[j]);
+
+                            }
+
+                        }
+
+                        public Void getResult() {
+
+                            return null;
+
+                        }
+
+                    });
+
+            insertTime = System.currentTimeMillis() - _begin;
+
+        }
+
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        if (n > 1000 || elapsed > 3000) {
+
+            log.info("Wrote " + n + " in " + elapsed + "ms; keygen="
+                    + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
+                    + insertTime + "ms");
+            
+        }
+
+    }
+    
     /*
      * singletons.
      */
@@ -1173,10 +1553,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
-        // @todo thread-safety for the key builder.
-        byte[] key = getKeyBuilder().statement2Key(s, p, o);
+        final byte[] key = getKeyBuilder().statement2Key(s, p, o);
 
-        byte[] val = (byte[]) getStatementIndex(KeyOrder.SPO).lookup(key);
+        final byte[] val = getStatementIndex(KeyOrder.SPO).lookup(key);
 
         if (val == null) {
 
@@ -1186,7 +1565,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         // The statement is known to the database.
 
-        StatementEnum type = StatementEnum.deserialize(val);
+        final StatementEnum type = StatementEnum.deserialize(val);
 
         return new SPO(s, p, o, type);
 
@@ -1349,820 +1728,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     final public IAccessPath getAccessPath(long s, long p, long o) {
         
-        return new AccessPath(KeyOrder.get(s,p,o),s,p,o);
+        return new AccessPath(this,KeyOrder.get(s,p,o),s,p,o);
         
     }
     
     final public IAccessPath getAccessPath(KeyOrder keyOrder) {
         
-        return new AccessPath(keyOrder,NULL,NULL,NULL);
-        
-    }
-    
-    /**
-     * An access path that is known to be empty. There is a single instance of
-     * this class. Various methods will return that object if you request an
-     * access path using the Sesame {@link Value} objects and one of the
-     * {@link Value}s is not known to the database. In such cases we know that
-     * nothing can be read from the database for the given triple pattern.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public class EmptyAccessPath implements IAccessPath {
-        
-        /**
-         * @throws UnsupportedOperationException
-         */
-        public long[] getTriplePattern() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-//        public IIndex getStatementIndex() {
-//            
-//            return AbstractTripleStore.this.getStatementIndex(getKeyOrder());
-//            
-//        }
-
-        public KeyOrder getKeyOrder() {
-            
-            // arbitrary.
-            return KeyOrder.SPO;
-            
-        }
-
-        /**
-         * Always returns <code>true</code>.
-         */
-        public boolean isEmpty() {
-            
-            return true;
-            
-        }
-
-        /**
-         * Always returns ZERO(0).
-         */
-        public long rangeCount() {
-            
-            return 0;
-            
-        }
-
-        /**
-         * @throws UnsupportedOperationException
-         */
-        public ITupleIterator rangeQuery() {
-
-            throw new UnsupportedOperationException();
-            
-        }
-
-        public ISPOIterator iterator() {
-
-            return new SPOArrayIterator(new SPO[]{},0);
-            
-        }
-
-        public ISPOIterator iterator(ISPOFilter filter) {
-
-            return new SPOArrayIterator(new SPO[]{},0);
-            
-        }
-
-        public ISPOIterator iterator(int limit, int capacity) {
-
-            return new SPOArrayIterator(new SPO[]{},0);
-            
-        }
-
-        public ISPOIterator iterator(int limit, int capacity, ISPOFilter filter) {
-
-            return new SPOArrayIterator(new SPO[]{},0);
-            
-        }
-
-        public Iterator<Long> distinctTermScan() {
-            
-            return Arrays.asList(new Long[]{}).iterator();
-            
-        }
-
-        public int removeAll() {
-
-            return 0;
-            
-        }
-        
-        public int removeAll(ISPOFilter filter) {
-
-            return 0;
-            
-        }
-        
-    }
-    
-    /**
-     * Basic implementation resolves indices dynamically against the outer
-     * class.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class AccessPath implements IAccessPath {
-
-        /** The triple pattern. */
-        final long s, p, o;
-        
-        final KeyOrder keyOrder;
-
-        /**
-         * A private key builder for thread-safety whose initial capacity is
-         * sufficient for the statement index keys.
-         */
-        final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(N
-                * Bytes.SIZEOF_LONG));
-        
-        final byte[] fromKey;
-        
-        final byte[] toKey;
-
-        /** true iff the triple pattern is fully bound. */
-        final boolean allBound;
-             
-        public long[] getTriplePattern() {
-            
-            return new long[]{s,p,o};
-            
-        }
-        
-        private IIndex getStatementIndex() {
-            
-            return AbstractTripleStore.this.getStatementIndex( keyOrder );
-            
-        }
-
-        public KeyOrder getKeyOrder() {
-
-            return keyOrder;
-            
-        }
-
-        public boolean isEmpty() {
-
-            /*
-             * Note: empty iff the iterator can not visit anything.
-             */
-            
-            return !iterator(1/* limit */, 1/* capacity */).hasNext();
-            
-        }
-        
-        public long rangeCount() {
-            
-            return getStatementIndex().rangeCount(fromKey,toKey);
-            
-        }
-
-        public ITupleIterator rangeQuery() {
-            
-            return getStatementIndex().rangeIterator(fromKey, toKey);
-            
-        }
-
-        public ISPOIterator iterator() {
-            
-            return iterator(null/*filter*/);
-            
-        }
-
-        public ISPOIterator iterator(ISPOFilter filter) {
-
-            if (allBound) {
-
-                // Optimization for point test.
-
-                return new SPOArrayIterator(AbstractTripleStore.this, this,
-                        1/* limit */, filter);
-
-            }
-
-            if (isConcurrent()) {
-
-                /*
-                 * This is an async incremental iterator that buffers some but not
-                 * necessarily all statements.
-                 */
-                
-                return iterator(0/* limit */, 0/* capacity */, filter);
-
-            } else {
-                
-                /*
-                 * This is a synchronous read that buffers all statements.
-                 * 
-                 * Note: This limits the capacity of index scans to the
-                 * available memory. This is primarily a problem during
-                 * inference, where it imposes a clear upper bound on the size
-                 * of the store whose closure can be computed. It is also a
-                 * problem in high level query if any access path is relatively
-                 * unselective, e.g., 1-bound.
-                 */
-
-                return new SPOArrayIterator(AbstractTripleStore.this, this,
-                        0/* no limit */, filter);
-
-            }
-
-        }
-
-        /**
-         * Note: Return an iterator that will use transparent read-ahead when no
-         * limit is specified (limit is zero) or the limit is "small".
-         * 
-         * @see SPOIterator
-         */
-        public ISPOIterator iterator(int limit, int capacity) {
-
-            return iterator(limit, capacity, null/*filter*/);
-            
-        }
-
-        /**
-         * Note: Return an iterator that will use transparent read-ahead when no
-         * limit is specified (limit is zero) or the limit is "small".
-         * 
-         * @see SPOIterator
-         */
-        public ISPOIterator iterator(int limit, int capacity, ISPOFilter filter) {
-
-            if (allBound) {
-
-                // Optimization for point test.
-
-                return new SPOArrayIterator(AbstractTripleStore.this, this,
-                        1/* limit */, filter);
-
-            }
-
-            if (limit > 0 && limit < 100) {
-
-                /*
-                 * Use a light-weight synchronous fully buffered variant when
-                 * the limit is small, especially when all that you are doing is
-                 * an existence test (limit := 1).
-                 */
-
-                return new SPOArrayIterator(AbstractTripleStore.this, this,
-                        limit, filter);
-
-            }
-
-            boolean async = true;
-
-            return new SPOIterator(this, limit, capacity, async, filter);
-
-        }
-        
-        /**
-         * Chooses the best access path for the given triple pattern.
-         * 
-         * @param s
-         *            The term identifier for the subject -or-
-         *            {@link IRawTripleStore#NULL}.
-         * @param p
-         *            The term identifier for the predicate -or-
-         *            {@link IRawTripleStore#NULL}.
-         * @param o
-         *            The term identifier for the object -or-
-         *            {@link IRawTripleStore#NULL}.
-         */
-        AccessPath(final KeyOrder keyOrder, long s, long p, long o) {
-
-            if (keyOrder == null)
-                throw new IllegalArgumentException();
-            
-            this.keyOrder = keyOrder;
-            
-            this.s = s;
-            
-            this.p = p;
-            
-            this.o = o;
-            
-            this.allBound = (s != NULL && p != NULL & o != NULL);
-            
-            if (s != NULL && p != NULL && o != NULL) {
-        
-                assert keyOrder == KeyOrder.SPO;
-                
-                fromKey = keyBuilder.statement2Key(s, p, o);
-
-                toKey = keyBuilder.statement2Key(s, p, o + 1);
-
-            } else if (s != NULL && p != NULL) {
-
-                assert keyOrder == KeyOrder.SPO;
-                
-                fromKey = keyBuilder.statement2Key(s, p, NULL);
-
-                toKey = keyBuilder.statement2Key(s, p + 1, NULL);
-
-            } else if (s != NULL && o != NULL) {
-
-                assert keyOrder == KeyOrder.OSP;
-                
-                fromKey = keyBuilder.statement2Key(o, s, NULL);
-
-                toKey = keyBuilder.statement2Key(o, s + 1, NULL);
-
-            } else if (p != NULL && o != NULL) {
-
-                assert keyOrder == KeyOrder.POS;
-                
-                fromKey = keyBuilder.statement2Key(p, o, NULL);
-
-                toKey = keyBuilder.statement2Key(p, o + 1, NULL);
-
-            } else if (s != NULL) {
-
-                assert keyOrder == KeyOrder.SPO;
-                
-                fromKey = keyBuilder.statement2Key(s, NULL, NULL);
-
-                toKey = keyBuilder.statement2Key(s + 1, NULL, NULL);
-
-            } else if (p != NULL) {
-
-                assert keyOrder == KeyOrder.POS;
-                
-                fromKey = keyBuilder.statement2Key(p, NULL, NULL);
-
-                toKey = keyBuilder.statement2Key(p + 1, NULL, NULL);
-
-            } else if (o != NULL) {
-
-                assert keyOrder == KeyOrder.OSP;
-                
-                fromKey = keyBuilder.statement2Key(o, NULL, NULL);
-
-                toKey = keyBuilder.statement2Key(o + 1, NULL, NULL);
-
-            } else {
-
-                /*
-                 * Note: The KeyOrder does not matter when you are fully
-                 * unbound.
-                 */
-                
-                fromKey = toKey = null;
-
-            }
-
-        }
-
-        /**
-         * Representation of the state for the access path (key order, triple
-         * pattern, and from/to keys).
-         */
-        public String toString() {
-            
-            return super.toString() + ": " + keyOrder + ", {" + s + "," + p
-                    + "," + o + "}, fromKey=" + (fromKey==null?"n/a":Arrays.toString(fromKey))
-                    + ", toKey=" + (toKey==null?"n/a":Arrays.toString(toKey));
-            
-        }
-        
-        /**
-         * This materializes a set of {@link SPO}s at a time and then submits
-         * tasks to parallel threads to remove those statements from each of the
-         * statement indices. This continues until all statements selected by
-         * the triple pattern have been removed.
-         */
-        public int removeAll() {
-            
-            return removeAll(null/*filter*/);
-            
-        }
-        
-        /**
-         * This materializes a set of {@link SPO}s at a time and then submits
-         * tasks to parallel threads to remove those statements from each of the
-         * statement indices. This continues until all statements selected by
-         * the triple pattern have been removed.
-         */
-        public int removeAll(ISPOFilter filter) {
-
-            // @todo try with an asynchronous read-ahead iterator.
-//            ISPOIterator itr = iterator(0,0);
-            
-            // synchronous fully buffered iterator.
-            ISPOIterator itr = iterator(filter);
-            
-            int nremoved = 0;
-            
-            try {
-
-                while(itr.hasNext()) {
-                    
-                    final SPO[] stmts = itr.nextChunk();
-                    
-                    // The #of statements that will be removed.
-                    final int numStmts = stmts.length;
-                    
-                    final long begin = System.currentTimeMillis();
-
-                    // The time to sort the data.
-                    final AtomicLong sortTime = new AtomicLong(0);
-                    
-                    // The time to delete the statements from the indices.
-                    final AtomicLong writeTime = new AtomicLong(0);
-                    
-                    /**
-                     * Class writes on a statement index, removing the specified
-                     * statements.
-                     * 
-                     * @author <a
-                     *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
-                     *         Thompson</a>
-                     * @version $Id$
-                     */
-                    class IndexWriter implements Callable<Long> {
-
-                        final KeyOrder keyOrder;
-                        final SPO[] a;
-
-                        /*
-                         * Private key builder for the SPO, POS, or OSP keys (one instance
-                         * per thread).
-                         */
-                        final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(
-                                new KeyBuilder(N * Bytes.SIZEOF_LONG));
-
-                        IndexWriter(KeyOrder keyOrder, boolean clone) {
-                            
-                            this.keyOrder = keyOrder;
-
-                            if(clone) {
-                                
-                                a = new SPO[numStmts];
-                                
-                                System.arraycopy(stmts, 0, a, 0, numStmts);
-                                
-                            } else {
-                                
-                                this.a = stmts;
-                                
-                            }
-                            
-                        }
-                        
-                        public Long call() throws Exception {
-
-                            final long begin = System.currentTimeMillis();
-                            
-                            IIndex ndx = AbstractTripleStore.this.getStatementIndex(keyOrder);
-
-                            // Place statements in index order.
-                            Arrays.sort(a, 0, numStmts, keyOrder.getComparator());
-
-                            final long beginWrite = System.currentTimeMillis();
-                            
-                            sortTime.addAndGet(beginWrite - begin);
-                            
-                            // remove statements from the index.
-                            for (int i = 0; i < numStmts; i++) {
-
-                                SPO spo = a[i];
-
-                                if(DEBUG) {
-                                    
-                                    /*
-                                     * Note: the externalized terms will be NOT
-                                     * FOUND when removing a statement from a
-                                     * temp store since the term identifiers for
-                                     * the temp store are generally only stored
-                                     * in the database.
-                                     */
-                                    log.debug("Removing "
-                                                    + spo.toString(AbstractTripleStore.this)
-                                                    + " from " + keyOrder);
-                                    
-                                }
-                                
-                                byte[] key = keyBuilder.statement2Key(keyOrder, spo);
-
-                                if(ndx.remove( key )==null) {
-                                    
-                                    throw new AssertionError(
-                                            "Missing statement: keyOrder="
-                                                    + keyOrder + ", spo=" + spo
-                                                    + ", key=" + Arrays.toString(key));
-                                    
-                                }
-
-                            }
-
-                            final long endWrite = System.currentTimeMillis();
-                            
-                            writeTime.addAndGet(endWrite - beginWrite);
-                            
-                            return endWrite - begin;
-                            
-                        }
-                        
-                    }
-
-                    /**
-                     * Class writes on the justification index, removing all
-                     * justifications for each statement that is being removed.
-                     * <p>
-                     * Note: There is only one index for justifications. The
-                     * keys all use the SPO of the entailed statement as their
-                     * prefix, so given a statement it is trivial to do a range
-                     * scan for its justifications.
-                     * 
-                     * @todo if we supported remove() on the IEntryIterator then
-                     *       we would not have to buffer the justifications that
-                     *       we want to delete.
-                     * 
-                     * @author <a
-                     *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
-                     *         Thompson</a>
-                     * @version $Id$
-                     */
-                    class JustificationWriter implements Callable<Long> {
-
-                        final SPO[] a;
-
-//                        /*
-//                         * Private key builder.
-//                         * 
-//                         * Note: This capacity estimate is based on N longs per SPO, one head,
-//                         * and 2-3 SPOs in the tail. The capacity will be extended automatically
-//                         * if necessary.
-//                         */
-//                        KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3) * Bytes.SIZEOF_LONG);
-
-                        JustificationWriter(boolean clone) {
-                            
-                            if(clone) {
-                                
-                                a = new SPO[numStmts];
-                                
-                                System.arraycopy(stmts, 0, a, 0, numStmts);
-                                
-                            } else {
-                                
-                                this.a = stmts;
-                                
-                            }
-                            
-                        }
-
-                        public Long call() throws Exception {
-                            
-                            final long begin = System.currentTimeMillis();
-                            
-                            IIndex ndx = AbstractTripleStore.this.getJustificationIndex();
-
-                            /*
-                             * Place statements in index order (SPO since all
-                             * justifications begin with the SPO of the entailed
-                             * statement.
-                             */
-                            Arrays.sort(a, 0, numStmts, KeyOrder.SPO.getComparator());
-
-                            final long beginWrite = System.currentTimeMillis();
-                            
-                            sortTime.addAndGet(beginWrite - begin);
-
-                            // remove statements from the index.
-                            for (int i = 0; i < numStmts; i++) {
-
-                                SPO spo = a[i];
-
-                                // will visit justifications for that statement.
-                                // FIXME use chunks.
-                                FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(
-                                        AbstractTripleStore.this, spo);
-                                
-                                if(DEBUG) {
-                                    
-                                    log.debug("Removing "
-                                                    + ndx.rangeCount(fromKey,toKey)
-                                                    + " justifications for "
-                                                    + spo.toString(AbstractTripleStore.this));
-                                    
-                                }
-
-                                while(itr.hasNext()) {
-                                    
-                                    itr.next();
-                                    
-                                    itr.remove();
-                                    
-                                }
-
-                            }
-
-                            final long endWrite = System.currentTimeMillis();
-                            
-                            writeTime.addAndGet(endWrite - beginWrite);
-                            
-                            return endWrite - begin;
-
-                        }
-                        
-                    }
-                    
-                    List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
-
-                    tasks.add(new IndexWriter(KeyOrder.SPO, false/* clone */));
-                    
-                    if(!oneAccessPath) {
-
-                        tasks.add(new IndexWriter(KeyOrder.POS, true/* clone */));
-                        
-                        tasks.add(new IndexWriter(KeyOrder.OSP, true/* clone */));
-                        
-                    }
-                    
-                    if(justify) {
-
-                        /*
-                         * Also retract the justifications for the statements.
-                         */
-                        
-                        tasks.add(new JustificationWriter(true/* clone */));
-                        
-                    }
-
-                    final List<Future<Long>> futures;
-                    final long elapsed_SPO;
-                    final long elapsed_POS;
-                    final long elapsed_OSP;
-                    final long elapsed_JST;
-
-                    try {
-
-                        futures = writeService.invokeAll(tasks);
-
-                        elapsed_SPO = futures.get(0).get();
-                        
-                        if(!oneAccessPath) {
-                        
-                            elapsed_POS = futures.get(1).get();
-                            
-                            elapsed_OSP = futures.get(2).get();
-                            
-                        } else {
-                            
-                            elapsed_POS = 0;
-                            
-                            elapsed_OSP = 0;
-                            
-                        }
-                        
-                        if(justify) {
-                        
-                            elapsed_JST = futures.get(3).get();
-                            
-                        } else {
-                            
-                            elapsed_JST = 0;
-                            
-                        }
-
-                    } catch (InterruptedException ex) {
-
-                        throw new RuntimeException(ex);
-
-                    } catch (ExecutionException ex) {
-
-                        throw new RuntimeException(ex);
-
-                    }
-
-                    long elapsed = System.currentTimeMillis() - begin;
-
-                    if(numStmts>1000) {
-
-                        log.info("Removed "+numStmts+" in " + elapsed + "ms; sort=" + sortTime
-                            + "ms, keyGen+delete=" + writeTime + "ms; spo="
-                            + elapsed_SPO + "ms, pos=" + elapsed_POS + "ms, osp="
-                            + elapsed_OSP + "ms, jst="+elapsed_JST);
-                        
-                    }
-
-                    // removed all statements in this chunk.
-                    nremoved += numStmts;
-                    
-                }
-                
-            } finally {
-                
-                itr.close();
-                
-            }
-            
-            return nremoved;
-
-        }
-
-        /**
-         * The implementation uses a key scan to find the first term identifer
-         * for the given index. It then forms a fromKey that starts at the next
-         * possible term identifier and does another scan, thereby obtaining the
-         * 2nd distinct term identifier for that position on that index. This
-         * process is repeated iteratively until the key scan no longer
-         * identifies a match. This approach skips quickly over regions of the
-         * index which have many statements for the same term and makes N+1
-         * queries to identify N distinct terms. Note that there is no way to
-         * pre-compute the #of distinct terms that will be identified short of
-         * running the queries.
-         * 
-         * @todo This will need to be modified to return a chunked iterator that
-         *       encapsulates the logic so that the distinct term scan may be
-         *       applied when very large #s of terms would be visited.
-         *       <p>
-         *       If the indices are range partitioned and the iterator only
-         *       guarentee "distinct" (and not also ordered) then those steps be
-         *       parallelized. The only possibility for conflict is when the
-         *       last distinct term identifier is read from one index before the
-         *       right sibling index partition has reported its first distinct
-         *       term identifier.  We could withhold the first result from each
-         *       partition until the partition that proceeds it in the metadata
-         *       index has completed, which would give nearly full parallelism.
-         *       <p>
-         *       If the indices are range partitioned and distinct + ordered is
-         *       required, then the operation can not be parallelized, or if it
-         *       is parallelized then a merge sort must be done before returning
-         *       the first result.
-         *       <p>
-         *       Likewise, if the indices are hash partitioned, then we can do
-         *       parallel index scans and a merge sort but the caller will have
-         *       to wait for the merge sort to complete before obtaining the 1st
-         *       result.
-         */
-        public Iterator<Long> distinctTermScan() {
-
-            int capacity = 10000;
-            
-            ArrayList<Long> ids = new ArrayList<Long>(capacity);
-            
-            byte[] fromKey = null;
-            
-            final byte[] toKey = null;
-            
-            IIndex ndx = getStatementIndex();
-            
-            ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
-                    IRangeQuery.KEYS, null/* filter */);
-            
-//            long[] tmp = new long[IRawTripleStore.N];
-            
-            while(itr.hasNext()) {
-                
-                ITuple tuple = itr.next();
-                
-                // clone of the key.
-//                final byte[] key = itr.getKey();
-                
-                // copy of the key in a reused buffer.
-//                final byte[] key = tuple.getKeyBuffer().array();
-                
-                // extract the term ids from the key. 
-//                RdfKeyBuilder.key2Statement( key , tmp);
-//                
-//                final long id = tmp[0];
-                
-                final long id = KeyBuilder.decodeLong( tuple.getKeyBuffer().array(), 0);
-                
-                // append tmp[0] to the output list.
-                ids.add(id);
-
-//                log.debug(ids.size() + " : " + id + " : "+ toString(id));
-                
-                // restart scan at the next possible term id.
-
-                final long nextId = id + 1;
-                
-                fromKey = keyBuilder.statement2Key(nextId, NULL, NULL);
-                
-                // new iterator.
-                itr = ndx.rangeIterator(fromKey, toKey, capacity,
-                        IRangeQuery.KEYS, null/* filter */);
-                
-            }
-            
-//            log.debug("Distinct key scan: KeyOrder=" + keyOrder + ", #terms=" + ids.size());
-            
-            return ids.iterator();
-            
-        }
+        return new AccessPath(this,keyOrder,NULL,NULL,NULL);
         
     }
     
@@ -2276,11 +1848,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     /**
-     * Return true iff the term identifier is associated with a RDF Literal in
-     * the database.
+     * Return true iff the term identifier is marked as a RDF {@link Literal}.
      * <p>
      * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is a literal.
+     * marks whether or not the term identifier is a {@link Literal}.
      * <p>
      * Note: Some entailments require the ability to filter based on whether or
      * not a term is a literal. For example, literals may not be entailed into
@@ -2292,21 +1863,45 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @param termId
      *            The term identifier.
      * 
-     * @return <code>true</code> iff the term identifier is an RDF literal.
+     * @return <code>true</code> iff the term identifier is marked as an RDF {@link Literal}.
      */
-    final public boolean isLiteral( long termId ) {
+    static final public boolean isLiteral( long termId ) {
         
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_LITERAL;
         
     }
 
-    final public boolean isBNode( long termId ) {
+    /**
+     * Return true iff the term identifier is marked as a RDF {@link BNode}.
+     * <p>
+     * Note: This simply examines the low bits of the term identifier, which
+     * marks whether or not the term identifier is a {@link BNode}.
+     * 
+     * @param termId
+     *            The term identifier.
+     * 
+     * @return <code>true</code> iff the term identifier is marked as an RDF
+     *         {@link BNode}.
+     */
+    static final public boolean isBNode( long termId ) {
         
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_BNODE;
         
     }
 
-    final public boolean isURI( long termId ) {
+    /**
+     * Return true iff the term identifier is marked as a RDF {@link URI}.
+     * <p>
+     * Note: This simply examines the low bits of the term identifier, which
+     * marks whether or not the term identifier is a {@link URI}.
+     * 
+     * @param termId
+     *            The term identifier.
+     * 
+     * @return <code>true</code> iff the term identifier is marked as an RDF
+     *         {@link URI}.
+     */
+    static final public boolean isURI( long termId ) {
         
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_URI;
         
@@ -2315,13 +1910,18 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     /**
      * Return true iff the term identifier identifies a statement (this feature
      * is enabled with {@link Options#STATEMENT_IDENTIFIERS}).
+     * <p>
+     * Note: This simply examines the low bits of the term identifier, which
+     * marks whether or not the term identifier is actually a statement
+     * identifier.
      * 
      * @param termId
      *            The term identifier.
-     *            
-     * @return <code>true</code> iff the term identifier identifies a statement.
+     * 
+     * @return <code>true</code> iff the term identifier identifies a
+     *         statement.
      */
-    final public boolean isStatement( long termId ) {
+    static final public boolean isStatement( long termId ) {
         
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_STATEMENT;
         
@@ -2329,10 +1929,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     final public String toString( long termId ) {
 
-        if (termId == 0)
-            return "0";
+        if (termId == NULL)
+            return "NULL";
 
-        _Value v = (_Value)getTerm(termId);
+        final _Value v = getTerm(termId);
 
         if (v == null)
             return "<NOT_FOUND#" + termId + ">";
@@ -2708,7 +2308,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * <p>
      * Note: This method MUST NOT be used unless it is known in advance that the
      * statements in <i>this</i> store use term identifiers that are consistent
-     * with (term for term identical to) those in the destination store.
+     * with (term for term identical to) those in the destination store.  If
+     * statement identifiers are enabled, then they MUST be enabled for both
+     * stores (statement identifiers are stored in the foward lexicon).
      * <p>
      * Note: The statements in <i>this</i> store are NOT removed.
      * 
@@ -2731,12 +2333,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             throw new IllegalArgumentException();
 
         // obtain a chunked iterator reading from any access path.
-        ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator(filter);
+        final ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator(filter);
         
         if (!copyJustifications) {
             
             // add statements to the target store.
-            return dst.addStatements(itr, null/*filter*/);
+            return dst.addStatements(dst,true/*copyOnly*/,itr, null/*filter*/);
 
         } else {
             
@@ -2746,7 +2348,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
              * latency when also writing justifications.
              */
 
-            List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
+            final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
             
             /*
              * Note: we reject using the filter before stmts or
@@ -2755,17 +2357,18 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
              */
            
             // set as a side-effect.
-            AtomicInteger nwritten = new AtomicInteger();
+            final AtomicInteger nwritten = new AtomicInteger();
 
             // task will write SPOs on the statement indices.
-            tasks.add(new StatementWriter(dst, itr, nwritten));
+            tasks.add(new StatementWriter(this, dst, true/* copyOnly */, itr,
+                    nwritten));
             
             // task will write justifications on the justifications index.
-            AtomicLong nwrittenj = new AtomicLong();
+            final AtomicLong nwrittenj = new AtomicLong();
             
             if(justify) {
 
-                IJustificationIterator jitr = new JustificationIterator(
+                final IJustificationIterator jitr = new JustificationIterator(
                         getJustificationIndex(), 0/* capacity */, true/* async */);
                 
                 tasks.add(new JustificationWriter(dst, jitr, nwrittenj ));
@@ -2778,7 +2381,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             try {
 
-                futures = writeService.invokeAll( tasks );
+                futures = getThreadPool().invokeAll( tasks );
 
                 elapsed_SPO = futures.get(0).get();
                 
@@ -2814,124 +2417,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
-    }
-    
-    /**
-     * Writes statements on the statement indices.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class StatementWriter implements Callable<Long>{
-
-        private final AbstractTripleStore dst;
-        private final ISPOIterator itr;
-        
-        /**
-         * Incremented by the #of statements written on the statements indices.
-         */
-        public final AtomicInteger nwritten;
-
-        /**
-         * 
-         * @param dst
-         *            The database on which the statements will be written.
-         * @param itr
-         *            The source iterator for the {@link SPO}s to be written.
-         * @param nwritten
-         *            Incremented by the #of statements written on the statement
-         *            indices as a side-effect.
-         */
-        public StatementWriter(AbstractTripleStore dst, ISPOIterator itr,
-                AtomicInteger nwritten) {
-        
-            this.dst = dst;
-            
-            this.itr = itr;
-            
-            this.nwritten = nwritten;
-
-        }
-        
-        /**
-         * Writes on the statement indices (parallel, batch api).
-         * 
-         * @return The elapsed time for the operation.
-         */
-        public Long call() throws Exception {
-            
-            final long begin = System.currentTimeMillis();
-            
-            nwritten.addAndGet(dst.addStatements(itr,null/*filter*/));
-            
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            return elapsed;
-
-        }
-        
-    }
-    
-    /**
-     * Writes {@link Justification}s on the justification index.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class JustificationWriter implements Callable<Long>{
-
-        /**
-         * The database on which to write the justifications.
-         */
-        private final AbstractTripleStore dst;
-
-        /**
-         * The source iterator.
-         */
-        private final IChunkedIterator<Justification> src;
-
-        /**
-         * The #of justifications that were written on the justifications index.
-         */
-        private final AtomicLong nwritten;
-        
-        /**
-         * 
-         * @param dst
-         *            The database on which the statements will be written.
-         * @param src
-         *            The source iterator.
-         * @param nwritten
-         *            Incremented as a side-effect for each justification
-         *            actually written on the justification index.
-         */
-        public JustificationWriter(AbstractTripleStore dst, IChunkedIterator<Justification> src, AtomicLong nwritten) {
-        
-            this.dst = dst;
-            
-            this.src = src;
-            
-            this.nwritten = nwritten;
-            
-        }
-        
-        /**
-         * Write justifications on the justifications index.
-         * 
-         * @return The elapsed time.
-         */
-        public Long call() throws Exception {
-            
-            final long begin = System.currentTimeMillis();
-            
-            nwritten.addAndGet(dst.addJustifications(src));
-            
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            return elapsed;
-
-        }
-        
     }
     
     /**
@@ -3059,29 +2544,85 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         }
 
     }
-    
-    public int addStatements(SPO[] stmts, int numStmts ) {
-       
-        if( numStmts == 0 ) return 0;
 
-        return addStatements( new SPOArrayIterator(stmts,numStmts), null /*filter*/);
+    public int addStatements(SPO[] stmts, int numStmts) {
+
+        if (numStmts == 0)
+            return 0;
+
+        return addStatements(new SPOArrayIterator(stmts, numStmts), null /* filter */);
 
     }
-    
-    public int addStatements(SPO[] stmts, int numStmts, ISPOFilter filter ) {
-    
-        if( numStmts == 0 ) return 0;
 
-        return addStatements( new SPOArrayIterator(stmts,numStmts), filter);
+    public int addStatements(SPO[] stmts, int numStmts, ISPOFilter filter) {
+
+        if (numStmts == 0)
+            return 0;
+
+        return addStatements(new SPOArrayIterator(stmts, numStmts), filter);
         
     }
     
-    public int addStatements(ISPOIterator itr, final ISPOFilter filter) {
+    public int addStatements(final ISPOIterator itr, final ISPOFilter filter) {
+        
+        return addStatements(this/* statementStore */, false/* copyOnly */, itr,
+                filter);
+        
+    }
 
+    /**
+     * Add statements to the <i>statementStore</i>.
+     * <p>
+     * Note: If {@link Options#STATEMENT_IDENTIFIERS} was specified, then
+     * statement identifiers are assigned using the lexicon associated with
+     * <i>this</i> database. This is done in a pre-procerssing stage for each
+     * "chunk" reported by the source <i>itr</i>. This step sets the statement
+     * identifier on the {@link SPO} so that it is present when we write on the
+     * statement indices.
+     * 
+     * @param statementStore
+     *            Either <i>this</i> database or the focusStore (the latter
+     *            option is used only during truth maintenance).
+     * @param copyOnly
+     *            When <code>true</code>, it is assumed that the {@link SPO}s
+     *            are being copied from another store using a consistent lexicon
+     *            (or onto a store that uses the same lexicon). The flag only
+     *            has an effect when statement identifiers are enabled, since it
+     *            is then presume that {@link SPO#getStatementIdentifier()} will
+     *            return a pre-assigned statement identifier and that we do NOT
+     *            need to invoke {@link #addStatementIdentifiers(SPO[], int)}.
+     *            This is only an optimization - the value <code>false</code>
+     *            is always safe for this flag, but it will do some extra work
+     *            in the case described here. See {@link StatementWriter},
+     *            which uses this flag and
+     *            {@link #copyStatements(AbstractTripleStore, ISPOFilter, boolean)}
+     *            which always specifies <code>true</code> for this flag.
+     * @param itr
+     *            The source from which the {@link SPO}s are read.
+     * @param filter
+     *            An optional filter.
+     * 
+     * @return The #of statements that were written on the indices (a statement
+     *         that was previously an axiom or inferred and that is converted to
+     *         an explicit statement by this method will be reported in this
+     *         count as well as any statement that was not pre-existing in the
+     *         database).
+     */
+    public int addStatements(final AbstractTripleStore statementStore,
+            final boolean copyOnly, final ISPOIterator itr,
+            final ISPOFilter filter) {
+
+        if (statementStore == null)
+            throw new IllegalArgumentException();
+        
+        if (itr == null)
+            throw new IllegalArgumentException();
+        
         try {
-        
-            if(!itr.hasNext()) return 0;
-        
+
+            if (!itr.hasNext())
+                return 0;
+
             final AtomicLong numWritten = new AtomicLong(0);
 
             /*
@@ -3096,13 +2637,35 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 final int numStmts = a.length;
 
+                final long statementIdentifierTime;
+                
+                if(statementIdentifiers && ! copyOnly) {
+                    
+                    final long begin = System.currentTimeMillis();
+                    
+                    /*
+                     * Note: the statement identifiers are always assigned by
+                     * the database. During truth maintenance, the
+                     * [statementStore] is NOT the database but the statement
+                     * identifiers are still assigned by the database. The
+                     * situation is exactly parallel to the manner in which term
+                     * identifiers are always assigned by the database. This is
+                     * done to ensure that they remain consistent between the
+                     * focusStore using by truth maintenance and the database.
+                     */
+                    addStatementIdentifiers( a, numStmts );
+                    
+                    statementIdentifierTime = System.currentTimeMillis() - begin;
+                    
+                } else statementIdentifierTime = 0L;
+                
                 /*
                  * Note: The statements are inserted into each index in
                  * parallel. We clone the statement[] and sort and bulk load
-                 * each index in parallel using a thread pool.
+                 * each statement index in parallel using a thread pool.
                  */
 
-                long begin = System.currentTimeMillis();
+                final long begin = System.currentTimeMillis();
 
                 // time to sort the statements.
                 final AtomicLong sortTime = new AtomicLong(0);
@@ -3111,213 +2674,22 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 // indices.
                 final AtomicLong insertTime = new AtomicLong(0);
 
-                /**
-                 * Writes an {@link SPO}[] on one of the statement indices.
-                 * 
-                 * @author <a
-                 *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
-                 *         Thompson</a>
-                 * @version $Id$
-                 */
-                class IndexWriter implements Callable<Long> {
+                final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
-                    private final SPO[] stmts;
+                tasks.add(new SPOIndexWriter(statementStore, a, numStmts,
+                        false/* clone */, KeyOrder.SPO, filter, sortTime,
+                        insertTime, numWritten));
 
-                    private final Comparator<SPO> comparator;
+                if (!statementStore.oneAccessPath) {
 
-                    private final IIndex ndx;
+                    tasks.add(new SPOIndexWriter(statementStore, a, numStmts,
+                            true/* clone */, KeyOrder.POS, filter, sortTime,
+                            insertTime, numWritten));
 
-                    private final KeyOrder keyOrder;
-
-                    /**
-                     * Private key builder for the SPO, POS, or OSP keys (one
-                     * instance per thread).
-                     */
-                    private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(
-                            new KeyBuilder(N * Bytes.SIZEOF_LONG));
-
-                    /**
-                     * Writes statements on a statement index (batch api).
-                     * 
-                     * @param clone
-                     *            When true the statements are cloned.
-                     *            <p>
-                     *            Note:One of the {@link IndexWriter}s gets to
-                     *            use the caller's array. The others MUST be
-                     *            instructed to clone the caller's array so that
-                     *            they can impose their distinct sort orders.
-                     * @param keyOrder
-                     *            Identifies the statement index on which to
-                     *            write.
-                     * @param filter
-                     *            An optional filter.
-                     */
-                    IndexWriter(boolean clone, KeyOrder keyOrder,
-                            ISPOFilter filter) {
-
-                        if (clone) {
-
-                            // copy the caller's data.
-                            
-                            this.stmts = new SPO[numStmts];
-
-                            System.arraycopy(a, 0, this.stmts, 0, numStmts);
-
-                        } else {
-
-                            // use the callers reference.
-                            
-                            this.stmts = a;
-
-                        }
-
-                        this.comparator = keyOrder.getComparator();
-
-                        this.ndx = getStatementIndex(keyOrder);
-
-//                        this.keys = new byte[numStmts][];
-
-                        // this.vals = new byte[numStmts][];
-
-                        this.keyOrder = keyOrder;
-
-                    }
-
-                    /**
-                     * Write the statements on the appropriate statement index.
-                     * <p>
-                     * Note: This method is designed to NOT write on the index
-                     * unless either the statement is new or the value
-                     * associated with the statement has been changed. This
-                     * helps to keep down the IO costs associated with index
-                     * writes when the data are already in the index.
-                     * 
-                     * @return The elapsed time for the operation.
-                     */
-                    public Long call() throws Exception {
-
-                        final long beginIndex = System.currentTimeMillis();
-
-                        { // sort
-
-                            final long _begin = System.currentTimeMillis();
-
-                            Arrays.sort(stmts, 0, numStmts, comparator);
-
-                            sortTime.addAndGet(System.currentTimeMillis()
-                                    - _begin);
-
-                        }
-
-                        /*
-                         * Generate keys for the statements to be added.
-                         * 
-                         * Note: This also filters out duplicate statements
-                         * (since the data are sorted duplicates will be grouped
-                         * together) and, if a filter has been specified, that
-                         * filter is used to filter out any matching statements.
-                         * 
-                         * The outcome is that both keys[] and vals[] are dense
-                         * and encode only the statements to be written on the
-                         * index. Only the 1st [numToAdd] entries in those
-                         * arrays contain valid data.
-                         * 
-                         * @todo write a unit test in which we verify: (a) the
-                         * correct elimination of duplicate statements; (b) the
-                         * correct filtering of statements; and (c) the correct
-                         * application of the override flag.
-                         */
-
-                        int numToAdd = 0;
-
-                        SPO last = null;
-
-                        final byte[][] keys = new byte[numStmts][];
-
-                        final byte[][] vals = new byte[numStmts][];
-
-                        for (int i = 0; i < numStmts; i++) {
-
-                            final SPO spo = stmts[i];
-
-                            // skip statements that match the filter.
-                            if (filter != null && filter.isMatch(spo))
-                                continue;
-
-                            // skip duplicate records.
-                            if (last != null && last.equals(spo))
-                                continue;
-
-                            // generate key for the index.
-                            keys[numToAdd] = keyBuilder.statement2Key(keyOrder, spo);
-                            
-                            // generate value for the index.
-                            vals[numToAdd] = spo.type.serialize();
-                            
-                            if(spo.override) {
-                                
-                                // set the override bit on the value.
-                                vals[numToAdd][0] |= StatementEnum.MASK_OVERRIDE;
-                                
-                            }
-
-                            last = spo;
-
-                            numToAdd++;
-
-                        }
-                        
-                        /*
-                         * Run the batch insert/update logic as a procedure.
-                         * 
-                         * @todo use efficient compression on the serialized
-                         * form when the index is remote (bit coded longs based
-                         * on frequency, e.g., hamming or hu-tucker).
-                         */
-                        final long _begin = System.currentTimeMillis();
-                        
-                        final LongAggregator aggregator = new LongAggregator();
-                        
-                        ndx.submit(0/* fromIndex */, numToAdd/* toIndex */,
-                                keys, vals, IndexWriteProcConstructor.INSTANCE,
-                                aggregator);
-                        
-                        final long writeCount = aggregator.getResult();
-
-                        insertTime.addAndGet(System.currentTimeMillis()
-                                - _begin);
-                        
-                        if (keyOrder == KeyOrder.SPO) {
-
-                            /*
-                             * One task takes responsibility for reporting
-                             * the #of statements that were written on the
-                             * indices.
-                             */
-
-                            numWritten.addAndGet(writeCount);
-
-                        }
-
-                        long elapsed = System.currentTimeMillis() - beginIndex;
-
-                        return elapsed;
-
-                    }
-
-                } // class IndexWriter
-                
-                List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
-
-                tasks.add(new IndexWriter(false/* clone */, KeyOrder.SPO,
-                        filter));
-
-                if(!oneAccessPath) {
-                    tasks.add(new IndexWriter(true/* clone */, KeyOrder.POS,
-                            filter));
-    
-                    tasks.add(new IndexWriter(true/* clone */, KeyOrder.OSP,
-                            filter));
+                    tasks.add(new SPOIndexWriter(statementStore, a, numStmts,
+                            true/* clone */, KeyOrder.OSP, filter, sortTime,
+                            insertTime, numWritten));
+                    
                 }
 
 //                if(numStmts>1000) {
@@ -3333,10 +2705,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 try {
 
-                    futures = writeService.invokeAll(tasks);
+                    futures = getThreadPool().invokeAll(tasks);
 
                     elapsed_SPO = futures.get(0).get();
-                    if(!oneAccessPath) {
+                    if (!statementStore.oneAccessPath) {
                         elapsed_POS = futures.get(1).get();
                         elapsed_OSP = futures.get(2).get();
                     } else {
@@ -3358,15 +2730,19 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 if (numStmts > 1000) {
                 
-                    log.info("Wrote " + numStmts + " statements in " + elapsed
-                            + "ms; sort=" + sortTime + "ms, keyGen+insert="
-                            + insertTime + "ms; spo=" + elapsed_SPO
-                            + "ms, pos=" + elapsed_POS + "ms, osp="
-                            + elapsed_OSP + "ms");
+                    log.info("Wrote " + numStmts + " statements in " + elapsed + "ms" //
+                            + (statementStore != this ? "; truthMaintenance":"") //
+                            + (statementIdentifiers ? "; sid="+ statementIdentifierTime + "ms" : "") //
+                            + "; sort=" + sortTime + "ms" //
+                            + ", keyGen+insert="+ insertTime + "ms" //
+                            + "; spo=" + elapsed_SPO + "ms" //
+                            + ", pos=" + elapsed_POS + "ms" //
+                            + ", osp=" + elapsed_OSP + "ms" //
+                            );
                     
                 }
 
-            }
+            } // nextChunk
 
             return (int) numWritten.get();
 
@@ -3471,45 +2847,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
-    /**
-     * Return true iff there is a grounded justification chain in the database
-     * for the {@link SPO}.
-     * <p>
-     * Note: A grounded justification chain demonstrates the existence of a
-     * proof for the {@link SPO}. During truth maintenance, if there is a
-     * request to remove an explicit statement from the store AND a grounded
-     * justification chain can be identified, then the statement will be
-     * converted to an inference rather than being deleted from the store.
-     * <p>
-     * If justifications are being saved, then each entailed {@link SPO} will
-     * have one or more justifications in the {@link #getJustificationIndex()}.
-     * An SPO has a grounded justification chain IFF there exists a chain of
-     * justifications that grounds out in explicit {@link SPO}s NOT including
-     * itself.
-     * 
-     * @param spo
-     *            An {@link StatementEnum#Explicit} SPO.
-     * 
-     * @return true if there is a grounded justification chain for that
-     *         {@link SPO}.
-     * 
-     * @todo if an explicit statement being removed is an Axiom (test against
-     *       the set of RDFS axioms) then it is always converted to an Axiom
-     *       rather than searching for a grounded justification chain.
-     * 
-     * @todo if at all possible make this a set at a time operation.
-     * 
-     * @todo if we can prove that only grounded justifications are generated by
-     *       the "fast" closure method then we do not need to chase the chain.
-     *       In this case a statement is grounded if it there are any
-     *       justification(s) in the index.
-     */
-    public boolean getGroundedJustification(SPO spo) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-    
     /**
      * The optional index on which {@link Justification}s are stored.
      */

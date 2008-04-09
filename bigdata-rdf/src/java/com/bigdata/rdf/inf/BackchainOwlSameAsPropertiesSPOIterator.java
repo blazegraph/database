@@ -126,7 +126,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
                             boolean present = false; // filter for not present
                             ISPOIterator absent = db.bulkFilterStatements(spos,
                                     numSPOs, present);
-                            sameAs2and3.addStatements(absent, null);
+                            db.addStatements(sameAs2and3,copyOnly,absent, null);
                             numSPOs = 0;
                         }
                         spos[numSPOs++] = new SPO(s, p1, o,
@@ -138,7 +138,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             boolean present = false; // filter for not present
             ISPOIterator absent = db.bulkFilterStatements(spos, numSPOs,
                     present);
-            sameAs2and3.addStatements(absent, null);
+            db.addStatements(sameAs2and3,copyOnly,absent, null);
         }
         sameAs2and3It = sameAs2and3.getAccessPath(KeyOrder.SPO).iterator();
     }

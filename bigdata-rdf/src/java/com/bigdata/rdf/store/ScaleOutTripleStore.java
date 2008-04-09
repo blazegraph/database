@@ -31,13 +31,11 @@ import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
@@ -97,7 +95,7 @@ import com.bigdata.sparse.SparseRowStore;
  *       loaded based on map/reduce would naturally provide a robust mechanism
  *       using a redo model.
  * 
- * @todo Tune up inference for remote data services.
+ * FIXME Tune up inference for remote data services.
  * 
  * @todo provide batching and synchronization for database at once and TM update
  *       scenarios with a distributed {@link ITripleStore}.
@@ -245,62 +243,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
     }
     
-    protected IndexMetadata getIndexMetadata(String name) {
-            
-        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-        
-        return metadata;
-            
-    }
-
-    protected IndexMetadata getTermIdIndexMetadata(String name) {
-
-        final IndexMetadata metadata = getIndexMetadata(name);
-
-        return metadata;
-
-    }
-    
-    protected IndexMetadata getIdTermIndexMetadata(String name) {
-            
-        final IndexMetadata metadata = getIndexMetadata(name);
-
-        return metadata;
-        
-    }
-    
-    protected IndexMetadata getFreeTextIndexMetadata(String name) {
-            
-        final IndexMetadata metadata = getIndexMetadata(name);
-        
-        metadata.setValueSerializer(NoDataSerializer.INSTANCE);
-
-        return metadata;
-        
-    }
-    
-    protected IndexMetadata getStatementIndexMetadata(String name) {
-
-        final IndexMetadata metadata = getIndexMetadata(name);
-
-        metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
-
-        metadata.setValueSerializer(new FastRDFValueCompression());
-
-        return metadata;
-        
-    }
-        
-    protected IndexMetadata getJustIndexMetadata(String name) {
-            
-        final IndexMetadata metadata = getIndexMetadata(name);
-        
-        metadata.setValueSerializer(NoDataSerializer.INSTANCE);
-
-        return metadata;
-        
-    }
-
     /**
      * Register the indices.
      * 
@@ -332,19 +274,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
              * dataService0: terms, spo
              * 
              * dataService1: ids, pos, osp, just (if used)
-             * 
-             * @todo This appears to slow things down slightly when loading
-             * Thesaurus.owl. Try again with a concurrent load scenario and see
-             * what interaction may be occurring with group commit. Also look at
-             * the effect of check pointing indices (rather than doing a commit)
-             * and of either check pointing nor committing groups (a special
-             * procedure could be used to do a commit) in order to simulate the
-             * best case scenario for continuous index load. (Both check point
-             * and commit may help to keep down GC since they will limit the
-             * life span of a mutable btree node, but they will mean more IO
-             * unless we retain nodes on a read retention queue for the index
-             * and in any case it will mean more conversion of immutable nodes
-             * back to mutable nodes.)
              */
 
             log.warn("Special case allocation for two data services");
@@ -389,14 +318,10 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
                     new byte[][] { new byte[] {} }, new UUID[] { uuids[1] });
             
             if(justify) {
-                /*
-                 * @todo review this decision when tuning the scale-out store
-                 * for inference.  also, consider the use of bloom filters for
-                 * inference since there appears to be a large number of queries
-                 * resulting in small result sets (0 to 5 statements).
-                 */
+
                 fed.registerIndex(justMetadata, new byte[][] { new byte[] {} },
                         new UUID[] { uuids[1] });
+                
             }
 
         } else {
@@ -502,6 +427,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
             
             fed.dropIndex(name+name_termId); terms = null;
         
+            if(textIndex) {
+                
+                getSearchEngine().clear();
+                
+            }
+            
         }
         
         if(oneAccessPath) {
@@ -593,6 +524,15 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     }
 
+    /**
+     * This uses the {@link ExecutorService} returned by {@link IBigdataFederation#getThreadPool()}
+     */
+    public ExecutorService getThreadPool() {
+        
+        return fed.getThreadPool();
+        
+    }
+    
     /**
      * NOP since the client uses unisolated writes which auto-commit.
      */

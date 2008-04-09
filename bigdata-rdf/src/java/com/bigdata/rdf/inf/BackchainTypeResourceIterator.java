@@ -319,7 +319,11 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
         } else {
 
             final long s = resourceIds.next();
-            // FIXME should have member field of last visiting posItr and scan from that until GTE [s].  if GT then emit inference else emit explicit.  and write unit test for this.
+            /*
+             * FIXME should have member field of last visiting posItr and scan
+             * from that until GTE [s]. if GT then emit inference else emit
+             * explicit. and write unit test for this.
+             */
             final SPO tmp = (posItr.hasNext() ? posItr.next() : null);
             
             if (tmp != null) {

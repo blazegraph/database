@@ -148,7 +148,7 @@ public class RDFSHelper {
                 
         };
         
-        store.addTerms(store.getKeyBuilder(),terms, terms.length);
+        store.addTerms(terms, terms.length);
 
         this.rdfType = new Id(rdfType.termId);
         this.rdfProperty = new Id(rdfProperty.termId);

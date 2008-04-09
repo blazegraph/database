@@ -186,7 +186,7 @@ public class ConcurrentDataLoader {
 
         protected synchronized StatementBuffer initialValue() {
 
-            StatementBuffer buffer = new StatementBuffer(null, db, bufferCapacity);
+            StatementBuffer buffer = new StatementBuffer(db, bufferCapacity);
             
             if (buffers != null) {
 

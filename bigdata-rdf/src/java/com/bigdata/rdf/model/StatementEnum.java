@@ -141,10 +141,12 @@ public enum StatementEnum {
 //    }
 
     static public StatementEnum deserialize(byte[] val) {
-        
-        if(val.length!=1) {
-        
-            throw new RuntimeException("Expecting one byte, not "+val.length);
+
+        if (val.length != 1 && val.length != (1 + 8)) {
+
+            throw new RuntimeException(
+                    "Expecting either one byte or nine bytes, not "
+                            + val.length);
             
         }
         

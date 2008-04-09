@@ -118,7 +118,7 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
                         boolean present = false; // filter for not present
                         ISPOIterator absent = db.bulkFilterStatements(spos,
                                 numSPOs, present);
-                        sameAs3.addStatements(absent, null);
+                        db.addStatements(sameAs3,copyOnly,absent, null);
                         numSPOs = 0;
                     }
                     // attach the s and p to the original o
@@ -130,7 +130,7 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             boolean present = false; // filter for not present
             ISPOIterator absent = db.bulkFilterStatements(spos, numSPOs,
                     present);
-            sameAs3.addStatements(absent, null);
+            db.addStatements(sameAs3,copyOnly,absent, null);
         }
         sameAs3It = sameAs3.getAccessPath(KeyOrder.SPO).iterator();
     }
@@ -207,7 +207,7 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
                 boolean present = false; // filter for not present
                 ISPOIterator absent = db.bulkFilterStatements(spos, numSPOs,
                         present);
-                sameAs2.addStatements(absent, null);
+                db.addStatements(sameAs2,copyOnly,absent, null);
                 numSPOs = 0;
             }
             // attach the new s to the original p and o
@@ -217,7 +217,7 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
         // final flush of the buffer
         boolean present = false; // filter for not present
         ISPOIterator absent = db.bulkFilterStatements(spos, numSPOs, present);
-        sameAs2.addStatements(absent, null);
+        db.addStatements(sameAs2,copyOnly,absent, null);
     }
 
     public SPO[] nextChunk() {

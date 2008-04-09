@@ -28,16 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.util.Properties;
-import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data
@@ -149,7 +144,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 
                 if(textIndex) {
                     
-//                    ndx_freeText.removeAll();
+                    getSearchEngine().clear();
                     
                 }
                 
@@ -270,93 +265,42 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     }
 
     private void createIndices() {
-        
-        // @todo make this an Option on the TemporaryStore and use it here.
-//        final int branchingFactor = store.getDefaultBranchingFactor();
-        final int branchingFactor = BTree.DEFAULT_BRANCHING_FACTOR;
 
-        if(lexicon) {
+        if (lexicon) {
 
-            {
+            ndx_termId = (BTree) store.registerIndex(name_termId, BTree.create(
+                    store, getTermIdIndexMetadata(name_termId)));
 
-                IndexMetadata metadata = new IndexMetadata(name_termId, UUID
-                        .randomUUID());
+            ndx_idTerm = (BTree) store.registerIndex(name_idTerm, BTree.create(
+                    store, getIdTermIndexMetadata(name_idTerm)));
 
-                metadata.setBranchingFactor(branchingFactor);
-
-                ndx_termId = (BTree) store.registerIndex(name_termId, BTree
-                        .create(store, metadata));
-
-            }
-
-            {
-                
-                IndexMetadata metadata = new IndexMetadata(name_idTerm, UUID
-                        .randomUUID());
-
-                metadata.setBranchingFactor(branchingFactor);
-
-                ndx_idTerm = (BTree) store.registerIndex(name_idTerm, BTree
-                        .create(store, metadata));
-
-            }
-            
-            if(textIndex) {
-
-                log.warn("Full text search not supported by: "
-                                + getClass().getName());
-                
-//                IndexMetadata metadata = new IndexMetadata(name_freeText, UUID
-//                        .randomUUID());
-//
-//                metadata.setBranchingFactor(branchingFactor);
-//
-//                metadata.setValueSerializer(NoDataSerializer.INSTANCE);
-//                
-//                ndx_freeText = (BTree) store.registerIndex(name_freeText, BTree
-//                        .create(store, metadata));
-
-            }
-            
         }
 
-        ndx_spo = registerStatementIndex(name_spo);
+        if (oneAccessPath) {
 
-        if(!oneAccessPath) {
+            ndx_spo = (BTree) store.registerIndex(name_spo, BTree.create(store,
+                    getStatementIndexMetadata(name_spo)));
 
-            ndx_pos = registerStatementIndex(name_pos);
+        } else {
 
-            ndx_osp = registerStatementIndex(name_osp);
-            
-        }
-        
-        if(justify) {
-        
-            IndexMetadata metadata = new IndexMetadata(name_just,UUID.randomUUID());
-            
-            metadata.setBranchingFactor(BTree.DEFAULT_BRANCHING_FACTOR);
+            ndx_spo = (BTree) store.registerIndex(name_spo, BTree.create(store,
+                    getStatementIndexMetadata(name_spo)));
 
-            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
-            
-            ndx_just = (BTree) store.registerIndex(name_just, 
-                    BTree.create(store, metadata));
-            
+            ndx_pos = (BTree) store.registerIndex(name_pos, BTree.create(store,
+                    getStatementIndexMetadata(name_pos)));
+
+            ndx_osp = (BTree) store.registerIndex(name_osp, BTree.create(store,
+                    getStatementIndexMetadata(name_osp)));
+
         }
 
-    }
+        if (justify) {
 
-    private BTree registerStatementIndex(String name) {
-        
-        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-        
-        metadata.setBranchingFactor(BTree.DEFAULT_BRANCHING_FACTOR);
+            ndx_just = (BTree) store.registerIndex(name_just, BTree.create(
+                    store, getJustIndexMetadata(name_just)));
 
-        metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
-        
-        metadata.setValueSerializer(new FastRDFValueCompression());
+        }
 
-        return BTree.create(store, metadata);
-        
     }
     
     public String usage(){

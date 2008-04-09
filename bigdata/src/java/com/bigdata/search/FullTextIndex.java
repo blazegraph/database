@@ -64,6 +64,7 @@ import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
@@ -262,7 +263,7 @@ public class FullTextIndex {
     /**
      * The backing index.
      */
-    final IIndex ndx;
+    private IIndex ndx;
 
     /**
      * The index used to associate term identifiers with tokens parsed from
@@ -286,6 +287,8 @@ public class FullTextIndex {
         
     }
 
+    final private IIndexManager indexManager;
+    
     final private ExecutorService threadPool;
     
     /**
@@ -371,6 +374,25 @@ public class FullTextIndex {
     private final long timeout;
     
     /**
+     * <code>true</code> unless {{@link #getTimestamp()} is {@link ITx#UNISOLATED}.
+     */
+    final public boolean isReadOnly() {
+        
+        return timestamp != ITx.UNISOLATED;
+        
+    }
+
+    protected void assertWritable() {
+        
+        if(isReadOnly()) {
+            
+            throw new IllegalStateException("READ_ONLY");
+            
+        }
+        
+    }
+    
+    /**
      * @param client
      *            The client. Configuration information is obtained from the
      *            client. See {@link Options}.
@@ -400,16 +422,21 @@ public class FullTextIndex {
         if (namespace == null)
             throw new IllegalArgumentException();
         
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+        
         if (threadPool == null)
             throw new IllegalArgumentException();
         
+        this.properties = (Properties) properties.clone();
+        
         this.namespace = namespace;
+        
+        this.indexManager = indexManager;
         
         this.threadPool = threadPool;
 
         this.timestamp = ITx.UNISOLATED;
-        
-        this.properties = (Properties) properties.clone();
         
         // indexer.overwrite
         {
@@ -431,28 +458,69 @@ public class FullTextIndex {
 
         }
         
-        {
+        setupIndices();
         
+    }
+
+    /**
+     * Conditionally registers the necessary index(s).
+     * 
+     * @throws IllegalStateException
+     *             if the client does not have write access.
+     */
+    private void setupIndices() {
+
+        final String name = namespace + "search";
+
+        IIndex ndx = indexManager.getIndex(name, timestamp);
+
+        if (ndx == null) {
+
+            assertWritable();
+            
+            IndexMetadata indexMetadata = new IndexMetadata(name, UUID
+                    .randomUUID());
+
+            indexManager.registerIndex(indexMetadata);
+
+        }
+
+        ndx = indexManager.getIndex(name, timestamp);
+
+        this.ndx = ndx;
+        
+    }
+
+    /**
+     * Clears all indexed data.
+     * 
+     * @todo While this method is synchronized, that only serializes concurent
+     *       invocations of this method. When multiple clients have write access
+     *       to the {@link FullTextIndex} the caller MUST ensure that no
+     *       concurrent client has write access.
+     */
+    synchronized public void clear() {
+    
+        log.info("");
+        
+        assertWritable();
+
+        if(ndx instanceof BTree && !ndx.getIndexMetadata().getDeleteMarkers()) {
+            
+            ((BTree)ndx).removeAll();
+            
+        } else {
+
             final String name = namespace + "search";
 
-            IIndex ndx = indexManager.getIndex(name, timestamp);
-
-            if (ndx == null) {
-
-                IndexMetadata indexMetadata = new IndexMetadata(name, UUID.randomUUID());
-                
-                indexManager.registerIndex(indexMetadata);
-
-            }
-
-            ndx = indexManager.getIndex(name, timestamp);
-
-            this.ndx = ndx;
+            indexManager.dropIndex(name);
+            
+            setupIndices();
             
         }
         
     }
-
+    
     /**
      * Return the token analyzer to be used for the given language code.
      * 
@@ -820,6 +888,8 @@ public class FullTextIndex {
     public void index(TokenBuffer buffer, long docId, int fieldId,
             String languageCode, Reader r) {
 
+        assertWritable();
+        
         int n = 0;
         
         // tokenize (note: docId,fieldId are not on the tokenStream, but the field could be).

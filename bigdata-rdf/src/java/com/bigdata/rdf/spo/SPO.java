@@ -25,9 +25,10 @@ package com.bigdata.rdf.spo;
 
 import java.util.Arrays;
 
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -45,17 +46,77 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
 public class SPO implements Comparable {
     
     private transient static final long NULL = IRawTripleStore.NULL;
-    
-//    /**
-//     * @see RdfKeyBuilder#CODE_STMT
-//     * @see RdfKeyBuilder#CODE_PRED
-//     * @see RdfKeyBuilder#CODE_RULE
-//     */
-//    public final byte code;
+
+    /** The term identifier for the subject position. */
     public final long s;
+
+    /** The term identifier for the predicate position. */
     public final long p;
+    
+    /** The term identifier for the object position. */
     public final long o;
+    
+    /**
+     * Statement type (inferred, explicit, or axiom).
+     */
     public final StatementEnum type;
+    
+    /**
+     * Statement identifier (optional).
+     * <p>
+     * Note: this is not final since we have to set it lazily when adding an
+     * {@link SPO} to the database. However, when reading {@link SPO}s from the
+     * database the statement identifier is aleady on hand and is set
+     * immediately.
+     * 
+     * @see #SPO(KeyOrder, ITupleIterator)
+     */
+    private long id = NULL;
+
+    /**
+     * Set the statement identifier.
+     * 
+     * @param id
+     *            The statement identifier.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>id</i> is {@link #NULL}.
+     * @throws IllegalStateException
+     *             if the statement identifier is already set.
+     */
+    public final void setStatementIdentifier(long id) {
+
+        if (id == NULL)
+            throw new IllegalArgumentException();
+
+        if (this.id != NULL)
+            throw new IllegalStateException();
+
+        if (!AbstractTripleStore.isStatement(id))
+            throw new IllegalArgumentException("Not a statement identifier: "
+                    + toString(id));
+            
+        this.id = id;
+        
+    }
+    
+    /**
+     * Statement identifier (optional). Statement identifiers are a unique
+     * per-triple identifier assigned when a statement is first asserted against
+     * the database and are are defined iff
+     * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} was specified.
+     * 
+     * @throws IllegalStateException
+     *             if the statement identifier was not assigned.
+     */
+    public final long getStatementIdentifier() {
+
+        if (id == NULL)
+            throw new IllegalStateException();
+
+        return id;
+        
+    }
     
     /**
      * When this field is set the statement will be written onto the database
@@ -81,16 +142,23 @@ public class SPO implements Comparable {
      *            The statement type.
      */
     public SPO(long s, long p, long o, StatementEnum type) {
-        assert type != null;
-//        this.code = RdfKeyBuilder.CODE_STMT;
+
+        if (type == null)
+            throw new IllegalArgumentException();
+        
         this.s = s;
         this.p = p;
         this.o = o;
+        
         this.type = type;
+        
     }
 
     /**
      * Construct a triple from the sort key.
+     * <p>
+     * Note: If statement identifiers are enabled, then the statement identifier
+     * will be read from the tuple and set on this {@link SPO}.
      * 
      * @param keyOrder
      *            Indicates the permutation of the subject, predicate and object
@@ -103,19 +171,18 @@ public class SPO implements Comparable {
      * 
      * @see RdfKeyBuilder#key2Statement(byte[], long[])
      * 
-     * @todo If we kept and recycled the SPO instances then we could further
-     *       reduce the heap churn for the SPO (this will require that the
-     *       fields are no longer declared final).
-     * 
-     * @todo This decodes the key directly. It {@link RdfKeyBuilder} is to
+     * @todo This decodes the key directly. If {@link RdfKeyBuilder} is to
      *       decode the key then the fields on this class can not be final.
      */
     public SPO(KeyOrder keyOrder, ITupleIterator itr) {
         
-        assert keyOrder != null;
-        assert itr != null;
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+        
+        if (itr == null)
+            throw new IllegalArgumentException();
 
-        ITuple tuple = itr.next();
+        final ITuple tuple = itr.next();
 
 //      // clone of the key.
 //      final byte[] key = itr.getKey();
@@ -125,8 +192,6 @@ public class SPO implements Comparable {
 
 //        long[] ids = new long[IRawTripleStore.N];
         
-//      code = RdfKeyBuilder.key2Statement(key, ids); 
-        
         /*
          * Note: GTE since the key is typically a reused buffer which may be
          * larger than the #of bytes actually holding valid data.
@@ -134,8 +199,6 @@ public class SPO implements Comparable {
         assert key.length >= 8 * IRawTripleStore.N;
 //      assert key.length == 8 * IRawTripleStore.N + 1;
         
-//        code = KeyBuilder.decodeByte(key[0]);
-//        
 //        final long _0 = KeyBuilder.decodeLong(key, 1);
 //      
 //        final long _1 = KeyBuilder.decodeLong(key, 1+8);
@@ -176,9 +239,26 @@ public class SPO implements Comparable {
         
 //        type = StatementEnum.deserialize(tuple.getValue());
         
-        final byte code = tuple.getValueBuffer().getByte(0);
+        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
+        
+        final byte code = vbuf.getByte(0);
         
         type = StatementEnum.decode( code ); 
+        
+        if (vbuf.limit() == 1 + 8) {
+
+            /*
+             * The value buffer appears to contain a statement identifier, so we
+             * read it.
+             */
+            
+            id = vbuf.getLong(1);
+        
+            if (!AbstractTripleStore.isStatement(id))
+                throw new IllegalArgumentException("Not a statement identifier: "
+                        + toString(id));
+
+        }
         
     }
 
@@ -285,10 +365,9 @@ public class SPO implements Comparable {
     }
     
     /**
-     * True iff the statements are the same object or if they have the code, the
-     * same term identifiers assigned for the subject, predicate and object
-     * positions, and either the same {@link StatementEnum} or <code>null</code>
-     * for the {@link StatementEnum}.
+     * True iff the statements are the same object or if the same term
+     * identifiers are assigned for the subject, predicate and object positions,
+     * and the same {@link StatementEnum} are the same.
      */
     public boolean equals(SPO stmt2) {
 
@@ -296,12 +375,13 @@ public class SPO implements Comparable {
             return true;
 
         return
-//              this.code == stmt2.code && //
                 this.s == stmt2.s && //
                 this.p == stmt2.p && //
                 this.o == stmt2.o && //
                 this.type == stmt2.type
                 ;
+        
+        // @todo statementId comparison?
 
     }
 
@@ -313,7 +393,33 @@ public class SPO implements Comparable {
      */
     public String toString() {
         
-        return ("<"+s+","+p+","+o)+(type==null?"":" : "+type)+">";
+        return ("<" + toString(s) + "," + toString(p) + "," + toString(o))
+                + (type == null ? "" : " : " + type
+                        + (id == NULL ? "" : ", id=" + id)) + ">";
+        
+    }
+    
+    /**
+     * Reprents the term identifier together with its type (literal, bnode, uri,
+     * or statement identifier).
+     * 
+     * @param id
+     *            The term identifier.
+     * @return
+     */
+    private String toString(long id) {
+        
+        if(id==NULL) return "NULL";
+        
+        if(AbstractTripleStore.isLiteral(id)) return "L"+id;
+
+        if(AbstractTripleStore.isURI(id)) return "U"+id;
+        
+        if(AbstractTripleStore.isBNode(id)) return "_"+id;
+        
+        if(AbstractTripleStore.isStatement(id)) return "S"+id;
+        
+        throw new AssertionError("id="+id);
         
     }
 
@@ -330,7 +436,7 @@ public class SPO implements Comparable {
      */
     public String toString(AbstractTripleStore store) {
         
-        if(store!=null) {
+        if (store != null) {
 
             String t = null;
             
@@ -342,7 +448,10 @@ public class SPO implements Comparable {
             default: throw new AssertionError();
             }
             
-            return t +" : " + store.toString(s, p, o);
+            // Note: the statement [id] is not stored in the reverse lexicon.
+            final String idStr = (id==NULL?"":" : id="+id);
+            
+            return t +" : " + store.toString(s, p, o) + idStr;
             
         } else {
             

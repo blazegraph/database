@@ -136,16 +136,20 @@ public class TestSerialization extends TestCase2 {
         
     }
 
-    /**
-     * Test round trip of some bnodes.
+    /*
+     * Note: BNode serialization has been disabled since we never write
+     * them on the database.
      */
-    public void test_bnodes() {
-
-        _BNode a = new _BNode(UUID.randomUUID().toString());
-        
-        assertEquals(a, roundTrip_externalizable(a));
-        assertEquals(a, roundTrip_tuned(a));
-        
-    }
+//    /**
+//     * Test round trip of some bnodes.
+//     */
+//    public void test_bnodes() {
+//
+//        _BNode a = new _BNode(UUID.randomUUID().toString());
+//        
+//        assertEquals(a, roundTrip_externalizable(a));
+//        assertEquals(a, roundTrip_tuned(a));
+//        
+//    }
 
 }

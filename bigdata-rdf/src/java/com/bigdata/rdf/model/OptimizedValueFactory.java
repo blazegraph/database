@@ -771,17 +771,37 @@ public class OptimizedValueFactory implements ValueFactory {
         protected void serialize(short version, byte termCode, DataOutput out)
                 throws IOException {
             
+            if(true) {
+                
+                /*
+                 * Note: disabled since we never write the BNode as a value in
+                 * the id:term index because BNodes IDs are only consistent, not
+                 * stable.
+                 */ 
+                
+                throw new UnsupportedOperationException();
+                
+            }
+            
             assert termCode == RdfKeyBuilder.TERM_CODE_BND;
             
             out.writeUTF(term);
             
         }
 
-        /*
-         * @todo review choice of BNode identifier data type (String vs UUID or
-         * int) and use cases for (de-)serialization.
-         */
         protected void deserialize(short version, byte termCode, DataInput in) throws IOException {
+
+            if(true) {
+                
+                /*
+                 * Note: disabled since we never write the BNode as a value in
+                 * the id:term index because BNodes IDs are only consistent, not
+                 * stable.
+                 */ 
+                
+                throw new UnsupportedOperationException();
+                
+            }
 
             assert termCode == RdfKeyBuilder.TERM_CODE_BND;
 

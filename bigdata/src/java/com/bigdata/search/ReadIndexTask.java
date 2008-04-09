@@ -83,7 +83,7 @@ public class ReadIndexTask implements Callable<Object> {
                 true/* successor */, 0L, 0);
 
         // @todo filter by field
-        itr = searchEngine.ndx
+        itr = searchEngine.getIndex()
                 .rangeIterator(fromKey, toKey, 0/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/*filter*/);
 

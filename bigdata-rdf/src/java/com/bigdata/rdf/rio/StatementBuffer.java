@@ -47,9 +47,10 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
@@ -72,7 +73,8 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * writers.
  * 
  * @todo try retaining the top N most frequent terms across resets of the buffer
- *       in order to reduce time on the terms indices.
+ *       in order to reduce time on the terms indices, e.g., with
+ *       {@link AbstractTripleStore#termCache}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -80,8 +82,6 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
 public class StatementBuffer implements IStatementBuffer {
 
     protected static final Logger log = Logger.getLogger(StatementBuffer.class);
-    
-    protected final RdfKeyBuilder keyBuilder;
     
     /**
      * Buffer for parsed RDF {@link Value}s.
@@ -175,7 +175,8 @@ public class StatementBuffer implements IStatementBuffer {
     }
 
     /**
-     * Create a buffer that maintains only the distinct {@link Value}s and {@link Statement}s.
+     * Create a buffer that maintains only the distinct {@link Value}s and
+     * {@link Statement}s.
      * 
      * @param database
      *            The database into which the terma and statements will be
@@ -186,13 +187,18 @@ public class StatementBuffer implements IStatementBuffer {
      *            corresponds to a single triple where all terms are URIs.
      */
     public StatementBuffer(AbstractTripleStore database, int capacity) {
-        
-        this(null,database,capacity);
-        
+
+        this(null, database, capacity);
+
     }
 
     /**
-     * Create a buffer.
+     * Create a buffer that maintains only the distinct {@link Value}s and
+     * {@link Statement}s.
+     * <p>
+     * Note: This variant is used during truth maintenance since the terms are
+     * written on the database but the statements are asserted against the
+     * focusStore.
      * 
      * @param statementStore
      *            The store into which the statements will be inserted
@@ -218,9 +224,6 @@ public class StatementBuffer implements IStatementBuffer {
 
         if (capacity < 0)
             throw new IllegalArgumentException();
-
-        // private instance to remove threading constraints.
-        this.keyBuilder = database.getKeyBuilder();
         
         this.statementStore = statementStore; // MAY be null.
         
@@ -240,7 +243,7 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
         
-        values = new _Value[capacity * IRawTripleStore.N];
+        values = new _Value[capacity * database.N];
         
         stmts = new _Statement[capacity];
 
@@ -256,7 +259,7 @@ public class StatementBuffer implements IStatementBuffer {
              * hash map.
              */
             
-            distinctTermMap = new HashMap<_Value, _Value>(capacity * IRawTripleStore.N);
+            distinctTermMap = new HashMap<_Value, _Value>(capacity * database.N);
             
         } else {
             
@@ -386,7 +389,7 @@ public class StatementBuffer implements IStatementBuffer {
          * insert terms (batch operation).
          */
         
-        database.addTerms(keyBuilder, values, numValues);
+        database.addTerms(values, numValues);
 
         /*
          * insert statements (batch operation).
@@ -438,40 +441,44 @@ public class StatementBuffer implements IStatementBuffer {
      * 
      * @return The #of statements written on the database.
      * 
-     * @see IRawTripleStore#addStatements(SPO[], int)
+     * @see AbstractTripleStore#addStatements(AbstractTripleStore, ISPOIterator, com.bigdata.rdf.spo.ISPOFilter)
      */
-    protected int writeSPOs( SPO[] stmts, int numStmts ) {
+    protected int writeSPOs(SPO[] stmts, int numStmts) {
+
+        final ISPOIterator itr = new SPOArrayIterator(stmts, numStmts);
         
-        if(statementStore!=null) {
+        if (statementStore != null) {
 
             // Writing statements on the secondary store.
-            
-            return statementStore.addStatements(stmts, numStmts);
-            
+
+            return database.addStatements(statementStore, false/*copyOnly*/, itr, null /*filter*/);
+
         } else {
-            
+
             // Write statements on the primary database.
-            
-            return database.addStatements(stmts, numStmts);
-            
+
+            return database.addStatements(database, false/*copyOnly*/, itr, null /*filter*/);
+
         }
 
     }
 
     /**
      * Returns true if the bufferQueue has less than three slots remaining for
-     * any of the value arrays (URIs, Literals, or BNodes) or if there are
-     * no slots remaining in the statements array. Under those conditions
-     * adding another statement to the bufferQueue could cause an overflow.
+     * any of the value arrays (URIs, Literals, or BNodes) or if there are no
+     * slots remaining in the statements array. Under those conditions adding
+     * another statement to the bufferQueue could cause an overflow.
      * 
      * @return True if the bufferQueue might overflow if another statement were
      *         added.
      */
     public boolean nearCapacity() {
 
-        if(numStmts+1>capacity) return true;
+        if (numStmts + 1 > capacity)
+            return true;
 
-        if(numValues+IRawTripleStore.N>values.length) return true;
+        if (numValues + database.N > values.length)
+            return true;
 
         return false;
         
