@@ -778,7 +778,7 @@ Short term tasks:
    
      - Lazy creation of the backing file.
 
-     - An LRU read cache for records.
+     - (***) An LRU read cache for records.
 
        This could be a big win for the DiskOnlyStrategy.  Either make
        this its own layer that can be interposed between the journal
@@ -812,7 +812,7 @@ Short term tasks:
        - Try out an mg4j integration for an alternative text indexer
          and search.
 
-   - (*) Try front compression for nodes and leaf keys using
+   - (***) Try front compression for nodes and leaf keys using
      it.unimi.dsi.fastutil.bytes#ByteArrayFrontCodedList.  Compare the
      "FastRDFKeyCompression" with NO compression and
      front-compression.
@@ -839,23 +839,60 @@ Short term tasks:
 
     - ** Sesame 2 TCL (integration tests)
 
-    - Two database modes: named-graph mode (quads with all 6 indices)
-      and provenance mode (3+1 where the context position holding a
-      bnode with a 1:1 relationship to the triple and therefore
-      serving as a statement identifier and is stored as the value
-      associated to the triple in the index; The source extension for
-      RDF/XML needs to be supported such that the given BNode or URI
-      for the source is correlated to the use of that same Resource
-      elsewhere in the same RDF/XML document - we need to extend RIO
-      for this).
+    - ***** Two database modes: named-graph mode (quads with all 6
+      indices) and provenance mode (3+1 where the context position
+      holding a bnode with a 1:1 relationship to the triple and
+      therefore serving as a statement identifier and is stored as the
+      value associated to the triple in the index; The source
+      extension for RDF/XML needs to be supported such that the given
+      BNode or URI for the source is correlated to the use of that
+      same Resource elsewhere in the same RDF/XML document - we need
+      to extend RIO for this).
 
       1. 3+1
+
+	 - Done. value serializer must be different when using sids
+
+	 - Note: any partition of the term:id index may be used to
+           assign term identifiers for bnodes since the bnode ID is
+           only required to be distinct, but not stable.
+
+	 - (*) TMStatementBuffer needs to recursively wipe out
+           statements using a statement identifier.  this should be
+           part of truth maintenance.  when we get the original set of
+           explicit statements to be removed we collect their
+           statement identifiers and then collect all statements using
+           those statement identifiers in either the subject or object
+           position and add them to the original set of statements to
+           be removed.
+
+	   at the database level (AccessPath#removeAll()), we also
+	   need to collect the set of statements using a statement
+	   identifier and delete them as well.  this will wind up
+	   being a double test for the original set of statements if
+	   TM is being used, but it is required when TM is not in use.
+
+	   Do not generate statement identifiers if the SPO is marked
+	   as an inference (an optimization).  Modify the procedure
+	   that actually writes on the statement index to write a ZERO
+	   (0L) statement identifier if the statement is (in fact at
+	   the time that we examine the statement index) an inference
+	   or an axiom.  If an explicit statement is later asserted
+	   for the same SPO, then we need to overwrite that 0L with
+	   the assigned statement identifier.
+
+	   add documentation on statement identifiers and TM.
+
+	   write unit tests for TM and non-TM cases when using
+	   statement identifiers to make metadata statements.
+
+	 - (*) prefix compression and apply to the lexicon.
       
-      2. RDF/XML w/ source in.
+      2. *** RDF/XML w/ source in.
 
       3. High level query for reading variable bindings out.
 
-      4. RDF/XML w/ source out from variable bindings.
+      4. *** RDF/XML w/ source out for use with CONSTRUCT.
 
       5. JOIN optimization.
 

@@ -87,7 +87,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      * The value provided to the constructor.  This is only used to
      * resolve term identifers for log messages.
      */
-    private final AbstractTripleStore _store;
+    private final AbstractTripleStore _db;
     
     /**
      * The database in which the term identifiers are defined - this is
@@ -95,7 +95,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      */
     protected AbstractTripleStore getTermDatabase() {
         
-        return _store;
+        return _db;
         
     }
     
@@ -130,7 +130,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
         if (capacity <= 0)
             throw new IllegalArgumentException();
         
-        this._store = store;
+        this._db = store;
 
         this.filter = filter;
         
@@ -228,7 +228,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
              * the database).
              */
 
-            log.debug(stmt.toString(_store));
+            log.debug(stmt.toString(_db));
         
         }
 

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 /**
- * Common base class for rdfs5 and rdfs11.
+ * Common base class for rdfs5 and rdfs11 using an in-memory self-join.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

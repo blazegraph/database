@@ -26,14 +26,13 @@ package com.bigdata.rdf.inf;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Fully buffers and then visits all {@link Justification}s for a given
@@ -57,7 +56,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
      * and 2-3 SPOs in the tail. The capacity will be extended automatically
      * if necessary.
      */
-    private KeyBuilder keyBuilder = new KeyBuilder(IRawTripleStore.N * (1 + 3) * Bytes.SIZEOF_LONG);
+    private final KeyBuilder keyBuilder;
 
     /** the index in which the justifications are stored. */
     private final IIndex ndx;
@@ -84,6 +83,8 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
         this.head = head;
         
         this.ndx = db.getJustificationIndex();
+        
+        keyBuilder = new KeyBuilder(db.N * (1 + 3) * Bytes.SIZEOF_LONG);
         
         byte[] fromKey = keyBuilder.reset().append(head.s).append(head.p)
                 .append(head.o).getKey();

@@ -312,9 +312,15 @@ abstract public class AbstractTestCase
      */
     void dumpTerms(AbstractTripleStore store) {
 
-        // Same #of terms in the forward and reverse indices.
-        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
-                store.getTermIdIndex().rangeCount(null, null));
+        /*
+         * Note: it is no longer true that all terms are stored in the reverse
+         * index (BNodes are not). Also, statement identifiers are stored in the
+         * forward index, so we can't really write the following assertion
+         * anymore.
+         */
+//        // Same #of terms in the forward and reverse indices.
+//        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
+//                store.getTermIdIndex().rangeCount(null, null));
         
         /**
          * Dumps the forward mapping.

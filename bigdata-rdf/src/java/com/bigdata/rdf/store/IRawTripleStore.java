@@ -37,7 +37,6 @@ import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Low-level API directly using long term identifiers rather than an RDF Value
@@ -102,6 +101,8 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     abstract public IIndex getPOSIndex();
 
     abstract public IIndex getOSPIndex();
+    
+    abstract public IIndex getJustificationIndex();
 
     /**
      * Return the statement index identified by the {@link KeyOrder}.
@@ -127,9 +128,6 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     /**
      * Batch insert of terms into the database.
      * 
-     * @param keyBuilder
-     *            Used to generate the compressed sort keys for the
-     *            {@link #getTermIdIndex()}.
      * @param terms
      *            An array whose elements [0:nterms-1] will be inserted.
      * @param numTerms
@@ -145,7 +143,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *       effects (note that an LRU term cache is already being used to
      *       reduce latency).
      */
-    public void addTerms(RdfKeyBuilder keyBuilder,_Value[] terms, int numTerms);
+    public void addTerms(_Value[] terms, int numTerms);
 
     /**
      * Return the RDF {@link Value} given a term identifier (non-batch api).

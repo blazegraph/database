@@ -224,7 +224,9 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
                 case RdfKeyBuilder.TERM_CODE_BND:
                     id |= ITermIdCodes.TERMID_CODE_BNODE;
                     break;
-                // @todo handle statements here.
+                case RdfKeyBuilder.TERM_CODE_STMT:
+                    id |= ITermIdCodes.TERMID_CODE_STATEMENT;
+                    break;
                 default: 
                     throw new AssertionError("Unknown term type: code=" + code);
                 }

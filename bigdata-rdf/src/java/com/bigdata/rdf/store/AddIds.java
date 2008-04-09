@@ -103,25 +103,34 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
         
         for(int i=0; i<n; i++) {
     
+            // Note: the key is the term identifier.
             final byte[] key = getKey(i);
             
+            // Note: the value is the serialized term (and never a BNode).
             final byte[] val;
 
             /*
              * Note: Validation SHOULD be disabled except for testing.
              * 
-             * FIXME turn off validation for release or performance testing.
+             * FIXME turn off validation for release or performance testing (its
+             * not really that much overhead).
              */
-            final boolean validate = false;
+            final boolean validate = true;
             
             if (validate) {
 
+                // The term identifier.
+                final long id = KeyBuilder.decodeLong(key, 0);
+                
+                // Note: BNodes are not allowed in the reverse index.
+                assert ! AbstractTripleStore.isBNode(id);
+                
                 /*
                  * When the term identifier is found in the reverse mapping
                  * this code path validates that the serialized term is the
                  * same.
                  */
-                byte[] oldval = (byte[]) ndx.lookup(key);
+                final byte[] oldval = ndx.lookup(key);
                 
                 val = getValue(i);
                 
@@ -149,7 +158,7 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
 
                         throw new RuntimeException(
                                 "Consistency problem: id="
-                                        + KeyBuilder.decodeLong(key, 0));
+                                + id);
                         
                     }
                     

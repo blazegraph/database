@@ -46,6 +46,10 @@ import com.bigdata.rdf.util.KeyOrder;
  */
 public interface IAccessPath extends Iterable<SPO> {
 
+    long NULL = IRawTripleStore.NULL;
+    
+    int N = IRawTripleStore.N;
+    
     /**
      * The triple pattern (s, p, o).
      * <p>

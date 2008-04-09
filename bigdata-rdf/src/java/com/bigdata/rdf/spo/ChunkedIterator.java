@@ -89,7 +89,7 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
 
         if(src instanceof IChunkedIterator) {
             
-            ((IChunkedIterator)src).close();
+            ((IChunkedIterator<T>)src).close();
             
         }
 

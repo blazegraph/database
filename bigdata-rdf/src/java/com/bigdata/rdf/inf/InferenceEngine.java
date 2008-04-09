@@ -27,11 +27,9 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -40,10 +38,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
-import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule.IConstraint;
 import com.bigdata.rdf.inf.Rule.Var;
@@ -1606,7 +1601,7 @@ public class InferenceEngine extends RDFSHelper {
             final SPOBlockingBuffer buffer = new SPOBlockingBuffer(db,
                     null /* filter */, 10000/* capacity */);
             
-            db.readService.submit(new Runnable() {
+            db.getThreadPool().submit(new Runnable() {
 
                 public void run() {
 
@@ -1737,7 +1732,7 @@ public class InferenceEngine extends RDFSHelper {
             final SPOBlockingBuffer buffer = new SPOBlockingBuffer(db,
                     null /* filter */, 10000/* capacity */);
             
-            db.readService.submit(new Runnable() {
+            db.getThreadPool().submit(new Runnable() {
 
                 public void run() {
 

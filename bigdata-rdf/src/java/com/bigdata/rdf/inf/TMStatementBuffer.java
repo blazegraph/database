@@ -48,7 +48,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * An class that facilitates maintaining the RDF(S)+ closure on a database as
@@ -62,14 +61,7 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * the RDF(S)+ closure over the database. Whether statements are asserted or
  * retracted depends on a constructor parameter.
  * 
- * @todo for concurrent data writers, this class should probably allocate an
- *       {@link RdfKeyBuilder} provisioned according to the target database and
- *       attach it to the {@link StatementBuffer}. Alternatively, have the
- *       {@link StatementBuffer} do that. In either case, the batch API on the
- *       {@link AbstractTripleStore} should then use the {@link RdfKeyBuilder}
- *       attached to the {@link StatementBuffer}.
- * 
- * @todo refactor to TMSPOBuffer with only a wrapper for converting from the
+ * FIXME refactor to TMSPOBuffer with only a wrapper for converting from the
  *       Sesame object model into the SPO model.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

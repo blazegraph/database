@@ -137,7 +137,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
         try {
 
-            store.addTerms(store.getKeyBuilder(), terms, terms.length);
+            store.addTerms(terms, terms.length);
 
             store.commit();
 

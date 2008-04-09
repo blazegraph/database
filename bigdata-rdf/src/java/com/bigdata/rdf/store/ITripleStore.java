@@ -38,7 +38,6 @@ import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
 import com.bigdata.rdf.store.DataLoader.Options;
 
 /**
@@ -88,10 +87,29 @@ public interface ITripleStore {
 
     /**
      * The #of triples in the store.
-     * <p>
-     * This may be an estimate when using partitioned indices.
+     * 
+     * @return The #of statements in the database. When either transactions or
+     *         key-range partitioned indices are being used, then this will be
+     *         an upper bound.
+     * 
+     * @see #getStatementCount(boolean)
      */
     public long getStatementCount();
+
+    /**
+     * The #of triples in the store.
+     * 
+     * @param exact
+     *            When <code>true</code> the result will be an exact count,
+     *            which may require a full key-range scan of one of the
+     *            statement indices.
+     * 
+     * @return The #of statements in the database. When <i>exact</i> is
+     *         <code>false</code> and either transactions or key-range
+     *         partitioned indices are being used, then this will be an upper
+     *         bound.
+     */
+    public long getStatementCount(boolean exact);
 
     /**
      * The #of terms in the store.

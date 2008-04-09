@@ -40,8 +40,8 @@ import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStore.JustificationWriter;
-import com.bigdata.rdf.store.AbstractTripleStore.StatementWriter;
+import com.bigdata.rdf.store.JustificationWriter;
+import com.bigdata.rdf.store.StatementWriter;
 
 /**
  * A buffer for {@link SPO}s and optional {@link Justification}s that is
@@ -103,8 +103,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
      *            will be written. This may be either the database or a
      *            temporary focusStore used during incremental TM.
      * @param db
-     *            The database in which the terms are defined (optional - this
-     *            is used to resolve term identifiers in log messages).
+     *            The database in which the terms are defined (required).
      * @param filter
      *            Option filter. When present statements matched by the filter
      *            are NOT retained by the {@link SPOAssertionBuffer} and will
@@ -123,6 +122,9 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         super(db, filter, capacity);
 
         if (focusStore == null)
+            throw new IllegalArgumentException();
+        
+        if (db == null)
             throw new IllegalArgumentException();
         
         this.focusStore = focusStore;
@@ -192,8 +194,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             AtomicInteger nwritten = new AtomicInteger();
 
             // task will write SPOs on the statement indices.
-            tasks.add(new StatementWriter(focusStore, new SPOArrayIterator(
-                    stmts, numStmts), nwritten));
+            tasks.add(new StatementWriter(getTermDatabase(), focusStore, false/* copyOnly */,
+                    new SPOArrayIterator(stmts, numStmts), nwritten));
             
             // task will write justifications on the justifications index.
             AtomicLong nwrittenj = new AtomicLong();
@@ -207,7 +209,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             
             try {
 
-                futures = focusStore.writeService.invokeAll( tasks );
+                futures = focusStore.getThreadPool().invokeAll( tasks );
 
                 elapsed_SPO = futures.get(0).get();
                 elapsed_JST = futures.get(1).get();

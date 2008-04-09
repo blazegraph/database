@@ -122,6 +122,7 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.EmptyAccessPath;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -130,7 +131,6 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.StatementIterator;
 import com.bigdata.rdf.store.StatementWithType;
-import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -1079,7 +1079,13 @@ public class BigdataSail extends SailBase implements Sail {
                 ISPOIterator itr = database.getAccessPath(s,p,o).iterator(ExplicitSPOFilter.INSTANCE);
                 
                 // copy explicit statements to retraction buffer.
-                n = retractBuffer.getStatementStore().addStatements(itr,null/*filter*/);
+                {
+
+                    final AbstractTripleStore tmp = retractBuffer.getStatementStore();
+
+                    n = tmp.addStatements(tmp, true/* copyOnly */, itr, null/* filter */);
+                    
+                }
                 
             } else {
 

@@ -27,12 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.lang.ref.SoftReference;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.search.FullTextIndex;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -41,12 +44,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <p>
  * This implementation presumes unisolated writes on local indices and a single
  * client writing on a local database. Unlike the {@link ScaleOutTripleStore}
- * this implementation does NOT feature auto-commit for unisolated writes. The
- * implication of this is that the client controls the commit points which means
- * that it is easier to guarentee that the KB is fully consistent since partial
- * writes can be abandoned.
- * 
- * @deprecated Is this class still required?
+ * this implementation does NOT feature auto-commit for unisolated writes.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -59,6 +57,47 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
     }
 
+    /**
+     * Note: The local triple stores do not {@link IBigdataClient} and therefore
+     * do not have access to the {@link IBigdataFederation#getThreadPool()}.
+     * Therefore a local {@link ExecutorService} is created on a per-{@link AbstractLocalTripleStore}
+     * basis.
+     * 
+     * @todo configure capacity using {@link IBigdataClient.Options#DEFAULT_CLIENT_THREAD_POOL_SIZE}
+     * semantics.
+     */
+//    private ExecutorService writeService = Executors.newFixedThreadPool(20,
+//            DaemonThreadFactory.defaultThreadFactory());
+    private ExecutorService threadPool = Executors
+            .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+    
+    public ExecutorService getThreadPool() {
+        
+        return threadPool;
+        
+    }
+
+    /**
+     * Terminates the {@link #threadPool}.
+     */
+    protected void shutdown() {
+            
+        threadPool.shutdown();
+
+        try {
+
+            threadPool.awaitTermination(2, TimeUnit.SECONDS);
+
+        } catch (InterruptedException ex) {
+
+            log.warn("Write service did not terminate within timeout.");
+
+        }
+            
+        super.shutdown();
+        
+    }
+    
     /**
      * A factory returning the singleton for the {@link FullTextIndex}.
      */

@@ -132,7 +132,7 @@ public class TestTermAndIdsIndex extends AbstractEmbeddedTripleStoreTestCase {
                 new _BNode("a12") //
         };
 
-        store.addTerms(store.getKeyBuilder(), terms, terms.length);
+        store.addTerms(terms, terms.length);
         
         for( int i=0; i<terms.length; i++) {
 

@@ -30,6 +30,7 @@ package com.bigdata.rdf.store;
 
 import java.util.UUID;
 
+import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -100,11 +101,21 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         assertNotSame(NULL, id);
 
-        assertEquals(id, store.getTermId(term));
+        assertEquals("forward mapping",id, store.getTermId(term));
 
-        assertEquals(term, store.getTerm(id));
+        // check the reverse mapping (id -> term)
+        if(term instanceof BNode) {
 
-        assertEquals(id, store.addTerm(term));
+            // the bnode ID is not preserved.
+            assertTrue("reverse mapping", store.getTerm(id) instanceof BNode);
+            
+        } else {
+            
+            assertEquals("reverse mapping",term, store.getTerm(id));
+            
+        }
+        
+        assertEquals("add is not stable?", id, store.addTerm(term));
 
     }
 
@@ -137,19 +148,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * verify that we can detect literals by examining the term identifier.
              */
 
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc"))));
             
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
             
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc", "en"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc", "en"))));
 
-            assertFalse(store.isLiteral(store.getTermId(new _URI("http://www.bigdata.com"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI("http://www.bigdata.com"))));
 
-            assertFalse(store.isLiteral(store.getTermId(new _URI(RDF.TYPE))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI(RDF.TYPE))));
 
-            assertFalse(store.isLiteral(store.getTermId(new _BNode(UUID.randomUUID().toString()))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode(UUID.randomUUID().toString()))));
             
-            assertFalse(store.isLiteral(store.getTermId(new _BNode("a12"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode("a12"))));
             
         } finally {
             
@@ -184,7 +195,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     new _BNode("a12") //
             };
     
-            store.addTerms(store.getKeyBuilder(), terms, terms.length);
+            store.addTerms(terms, terms.length);
     
             store.commit();
             
@@ -209,7 +220,16 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 assertNotNull(terms[i].key);
     
                 // check the reverse mapping (id -> term)
-                assertEquals("reverse mapping", terms[i], store.getTerm(termId));
+                if(terms[i] instanceof BNode) {
+
+                    // the bnode ID is not preserved.
+                    assertTrue(store.getTerm(termId) instanceof BNode);
+                    
+                } else {
+                    
+                    assertEquals("reverse mapping", terms[i], store.getTerm(termId));
+                    
+                }
     
             }
     
@@ -219,19 +239,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * verify that we can detect literals by examining the term identifier.
              */
 
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc"))));
             
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
             
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc", "en"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc", "en"))));
 
-            assertFalse(store.isLiteral(store.getTermId(new _URI("http://www.bigdata.com"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI("http://www.bigdata.com"))));
 
-            assertFalse(store.isLiteral(store.getTermId(new _URI(RDF.TYPE))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI(RDF.TYPE))));
 
-            assertFalse(store.isLiteral(store.getTermId(new _BNode(UUID.randomUUID().toString()))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode(UUID.randomUUID().toString()))));
             
-            assertFalse(store.isLiteral(store.getTermId(new _BNode("a12"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode("a12"))));
 
         } finally {
 

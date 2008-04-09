@@ -123,7 +123,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             final SPOBlockingBuffer buffer = new SPOBlockingBuffer(store,
                     null /* filter */, 100/* capacity */);
             
-            store.readService.submit(new Runnable() {
+            store.getThreadPool().submit(new Runnable() {
 
                 public void run() {
 

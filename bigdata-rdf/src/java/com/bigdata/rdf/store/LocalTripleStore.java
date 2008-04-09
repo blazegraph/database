@@ -29,23 +29,17 @@ package com.bigdata.rdf.store;
 
 import java.lang.ref.WeakReference;
 import java.util.Properties;
-import java.util.UUID;
 
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.service.DataService;
 import com.bigdata.service.LocalDataServiceClient;
 
@@ -73,8 +67,6 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
     }
     
-    protected final boolean deleteMarkers;
-    
     /*
      * At this time is is valid to hold onto a reference during a given load or
      * query operation but not across commits (more accurately, not across
@@ -84,7 +76,6 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      */
     private IIndex ndx_termId;
     private IIndex ndx_idTerm;
-    private IIndex ndx_freeText;
     private IIndex ndx_spo;
     private IIndex ndx_pos;
     private IIndex ndx_osp;
@@ -104,17 +95,10 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         IIndex ndx = store.getIndex(name_termId);
         
-        if(ndx==null) {
+        if (ndx == null) {
             
-                IndexMetadata metadata = new IndexMetadata(name_termId,UUID.randomUUID());
-                
-                metadata.setDeleteMarkers(deleteMarkers);
-
-                metadata.setBranchingFactor(store.getDefaultBranchingFactor());
-                
-                ndx_termId = ndx = store.registerIndex(name_termId,
-                        BTree.create(store, metadata)
-                );
+            ndx_termId = ndx = store.registerIndex(name_termId, BTree.create(
+                    store, getTermIdIndexMetadata(name_termId)));
             
         }
         
@@ -133,14 +117,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         if (ndx == null) {
 
-            IndexMetadata metadata = new IndexMetadata(name_idTerm,UUID.randomUUID());
-
-            metadata.setDeleteMarkers(deleteMarkers);
-
-            metadata.setBranchingFactor(store.getDefaultBranchingFactor());
-
             ndx_idTerm = ndx = store.registerIndex(name_idTerm, BTree.create(
-                    store, metadata));
+                    store, getIdTermIndexMetadata(name_idTerm)));
 
         }
 
@@ -167,17 +145,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         if (ndx == null) {
                 
-                IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-                
-                metadata.setDeleteMarkers(deleteMarkers);
-
-                metadata.setBranchingFactor(store.getDefaultBranchingFactor());
-                
-                metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
-                
-                metadata.setValueSerializer(new FastRDFValueCompression());
-                
-                ndx = store.registerIndex(name, BTree.create(store, metadata));
+                ndx = store.registerIndex(name, BTree.create(store,
+                    getStatementIndexMetadata(name)));
 
         }
 
@@ -217,17 +186,9 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         IIndex ndx = store.getIndex(name_just);
 
         if (ndx == null) {
-
-            IndexMetadata metadata = new IndexMetadata(name_just,UUID.randomUUID());
-
-            metadata.setDeleteMarkers(deleteMarkers);
-
-            metadata.setBranchingFactor(store.getDefaultBranchingFactor());
-
-            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
             
             ndx_just = ndx = store.registerIndex(name_just, BTree.create(store,
-                    metadata));
+                    getJustIndexMetadata(name_just)));
 
         }
 
@@ -275,7 +236,6 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         ndx_termId = null;
         ndx_idTerm = null;
-        ndx_freeText = null;
         ndx_spo = null;
         ndx_pos = null;
         ndx_osp = null;
@@ -297,19 +257,32 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     final public void clear() {
         
-        store.dropIndex(name_idTerm); ndx_termId = null;
-        store.dropIndex(name_termId); ndx_idTerm = null;
-        if(store.getIndex(name_freeText)!=null) {
+        if(lexicon) {
+        
+            store.dropIndex(name_idTerm); ndx_termId = null;
+            store.dropIndex(name_termId); ndx_idTerm = null;
             
-            store.dropIndex(name_freeText); ndx_freeText = null;
+            if(textIndex) {
+                
+                getSearchEngine().clear();
+                
+            }
+            
+        }
+
+        if(oneAccessPath) {
+        
+            store.dropIndex(name_spo); ndx_spo = null;
+            
+        } else {
+            
+            store.dropIndex(name_spo); ndx_spo = null;
+            store.dropIndex(name_pos); ndx_pos = null;
+            store.dropIndex(name_osp); ndx_osp = null;
             
         }
         
-        store.dropIndex(name_spo); ndx_spo = null;
-        store.dropIndex(name_pos); ndx_pos = null;
-        store.dropIndex(name_osp); ndx_osp = null;
-        
-        if(store.getIndex(name_just)!=null) {
+        if (justify) {
 
             store.dropIndex(name_just); ndx_just = null;
             
@@ -334,20 +307,15 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         store.closeAndDelete();
         
     }
-    
-    public static interface Options extends AbstractTripleStore.Options {
-        
-        /**
-         * When <code>true</code>, delete markers will be enabled for the
-         * terms, ids, and statement indices.
-         * 
-         * @deprecated This is only interesting if you want to measure the
-         *             performance impact of delete markers on the index.
-         */
-        public static final String DELETE_MARKERS = "isolatableIndices";
 
-        public static final String DEFAULT_DELETE_MARKERS = "false";
-        
+    /**
+     * Options understood by the {@link LocalTripleStore}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface Options extends AbstractTripleStore.Options {
+       
     }
     
     /**
@@ -359,13 +327,6 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         store = new /*Master*/Journal(properties);
 
-        deleteMarkers = Boolean
-                .parseBoolean(properties.getProperty(
-                        Options.DELETE_MARKERS,
-                        Options.DEFAULT_DELETE_MARKERS));
-
-        log.info(Options.DELETE_MARKERS+"="+deleteMarkers);
-        
         registerIndices();
         
     }
@@ -554,9 +515,9 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
          * @throws UnsupportedOperationException
          *             if there is an attempt to write on an index.
          */
-        public void addTerms(RdfKeyBuilder keyBuilder, _Value[] terms, int numTerms) {
+        public void addTerms(_Value[] terms, int numTerms) {
 
-            super.addTerms(keyBuilder, terms, numTerms);
+            super.addTerms(terms, numTerms);
             
         }
 
@@ -572,6 +533,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             
 //            if (ndx_termId == null) {
 
+            // @todo cache hard reference to each of these views.
             return db.store.getIndex(name_termId, ITx.READ_COMMITTED);
 
 //            }
