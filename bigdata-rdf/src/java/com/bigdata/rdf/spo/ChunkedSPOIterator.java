@@ -42,7 +42,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo todo refactor to extend {@link ChunkedIterator}. The filter will have
+ * @todo Refactor to extend {@link ChunkedIterator}. The filter will have
  *       to be applied during the super() in the ctor.
  */
 public class ChunkedSPOIterator implements ISPOIterator {

@@ -50,11 +50,6 @@ package com.bigdata.rdf.store;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -64,13 +59,9 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
-import com.bigdata.rdf.inf.TMStatementBuffer;
 import com.bigdata.rdf.spo.ChunkedIterator;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOIterator;
 import com.bigdata.rdf.util.KeyOrder;
@@ -80,10 +71,13 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * Basic implementation resolves indices dynamically against the outer
  * class.
  * 
+ * @see AbstractTripleStore#getAccessPath(KeyOrder)
+ * @see AbstractTripleStore#getAccessPath(long, long, long)
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class AccessPath implements IAccessPath {
+public class AccessPath implements IAccessPath {
 
     final public Logger log = Logger.getLogger(IAccessPath.class);
 
@@ -367,353 +361,15 @@ class AccessPath implements IAccessPath {
         
     }
     
-    /**
-     * This materializes a set of {@link SPO}s at a time and then submits
-     * tasks to parallel threads to remove those statements from each of the
-     * statement indices. This continues until all statements selected by
-     * the triple pattern have been removed.
-     */
     public int removeAll() {
-        
-        return removeAll(null/*filter*/);
-        
+
+        return removeAll(null/* filter */);
+
     }
-    
-    /**
-     * This materializes a set of {@link SPO}s at a time and then submits tasks
-     * to parallel threads to remove those statements from each of the statement
-     * indices. This continues until all statements selected by the triple
-     * pattern have been removed.
-     * <p>
-     * When {@link AbstractTripleStore#statementIdentifiers} are in use and an
-     * explicit statement is removed then we remove any statements made using
-     * that statement identifier in either the subject or object positions (the
-     * subject identifier is essentially a BNode and is restricted from entering
-     * the predicate position).
-     * 
-     * @todo {@link TMStatementBuffer} does something similar when statements
-     *       are retracted. There is no point doing double the work, so add a
-     *       boolean parameter that can be used to avoid the extra effort.
-     * 
-     * @todo If you are using statement identifiers but you are NOT using truth
-     *       maintenance then this method does NOT guarentee consistency when
-     *       removing statements in the face of concurrent writers on the
-     *       statement indices. The problem is that we collect the statement
-     *       identifiers in one unisolated operation, then collect the
-     *       statements that use those statement identifiers two other
-     *       operations, and finally we remove those statements. In order to be
-     *       consistent {@link #removeAll()} needs to obtain an exclusive lock
-     *       (which is difficult to do with distributed clients) or be
-     *       encompassed by a transaction. (This is the same constraint that
-     *       applies when truth maintenance is enabled since you have to
-     *       serialize incremental TM operations anyway.)
-     */
+
     public int removeAll(ISPOFilter filter) {
 
-        // @todo try with an asynchronous read-ahead iterator.
-//        ISPOIterator itr = iterator(0,0);
-        
-        // synchronous fully buffered iterator.
-        final ISPOIterator itr = iterator(filter);
-        
-        int nremoved = 0;
-        
-        try {
-
-            while(itr.hasNext()) {
-                
-                final SPO[] stmts = itr.nextChunk();
-                
-                // The #of statements that will be removed.
-                final int numStmts = stmts.length;
-                
-                final long begin = System.currentTimeMillis();
-
-                // The time to sort the data.
-                final AtomicLong sortTime = new AtomicLong(0);
-                
-                // The time to delete the statements from the indices.
-                final AtomicLong writeTime = new AtomicLong(0);
-                
-                /**
-                 * Class writes on a statement index, removing the specified
-                 * statements.
-                 * 
-                 * @author <a
-                 *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
-                 *         Thompson</a>
-                 * @version $Id$
-                 */
-                class IndexWriter implements Callable<Long> {
-
-                    final KeyOrder keyOrder;
-                    final SPO[] a;
-
-                    /*
-                     * Private key builder for the SPO, POS, or OSP keys (one instance
-                     * per thread).
-                     */
-                    final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(
-                            new KeyBuilder(N * Bytes.SIZEOF_LONG));
-
-                    IndexWriter(KeyOrder keyOrder, boolean clone) {
-                        
-                        this.keyOrder = keyOrder;
-
-                        if(clone) {
-                            
-                            a = new SPO[numStmts];
-                            
-                            System.arraycopy(stmts, 0, a, 0, numStmts);
-                            
-                        } else {
-                            
-                            this.a = stmts;
-                            
-                        }
-                        
-                    }
-                    
-                    public Long call() throws Exception {
-
-                        final long begin = System.currentTimeMillis();
-                        
-                        IIndex ndx = db.getStatementIndex(keyOrder);
-
-                        // Place statements in index order.
-                        Arrays.sort(a, 0, numStmts, keyOrder.getComparator());
-
-                        final long beginWrite = System.currentTimeMillis();
-                        
-                        sortTime.addAndGet(beginWrite - begin);
-                        
-                        // remove statements from the index.
-                        for (int i = 0; i < numStmts; i++) {
-
-                            SPO spo = a[i];
-
-                            if(DEBUG) {
-                                
-                                /*
-                                 * Note: the externalized terms will be NOT
-                                 * FOUND when removing a statement from a
-                                 * temp store since the term identifiers for
-                                 * the temp store are generally only stored
-                                 * in the database.
-                                 */
-                                log.debug("Removing " + spo.toString(db)
-                                        + " from " + keyOrder);
-                                
-                            }
-                            
-                            byte[] key = keyBuilder.statement2Key(keyOrder, spo);
-
-                            if(ndx.remove( key )==null) {
-                                
-                                throw new AssertionError(
-                                        "Missing statement: keyOrder="
-                                                + keyOrder + ", spo=" + spo
-                                                + ", key=" + Arrays.toString(key));
-                                
-                            }
-
-                        }
-
-                        final long endWrite = System.currentTimeMillis();
-                        
-                        writeTime.addAndGet(endWrite - beginWrite);
-                        
-                        return endWrite - begin;
-                        
-                    }
-                    
-                }
-
-                /**
-                 * Class writes on the justification index, removing all
-                 * justifications for each statement that is being removed.
-                 * <p>
-                 * Note: There is only one index for justifications. The keys
-                 * all use the SPO of the entailed statement as their prefix, so
-                 * given a statement it is trivial to do a range scan for its
-                 * justifications.
-                 * 
-                 * @author <a
-                 *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
-                 *         Thompson</a>
-                 * @version $Id$
-                 */
-                class JustificationWriter implements Callable<Long> {
-
-                    final SPO[] a;
-
-                    JustificationWriter(boolean clone) {
-                        
-                        if(clone) {
-                            
-                            a = new SPO[numStmts];
-                            
-                            System.arraycopy(stmts, 0, a, 0, numStmts);
-                            
-                        } else {
-                            
-                            this.a = stmts;
-                            
-                        }
-                        
-                    }
-
-                    public Long call() throws Exception {
-                        
-                        final long begin = System.currentTimeMillis();
-                        
-                        IIndex ndx = db.getJustificationIndex();
-
-                        /*
-                         * Place statements in index order (SPO since all
-                         * justifications begin with the SPO of the entailed
-                         * statement.
-                         */
-                        Arrays.sort(a, 0, numStmts, KeyOrder.SPO.getComparator());
-
-                        final long beginWrite = System.currentTimeMillis();
-                        
-                        sortTime.addAndGet(beginWrite - begin);
-
-                        // remove statements from the index.
-                        for (int i = 0; i < numStmts; i++) {
-
-                            SPO spo = a[i];
-
-                            // will visit justifications for that statement.
-                            /*
-                             * FIXME use chunks and don't fully buffer since
-                             * ITupleIterator supports remove and there is also
-                             * a REMOVEALL flag.
-                             */
-                            FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(
-                                    db, spo);
-                            
-                            if(DEBUG) {
-                                
-                                log.debug("Removing "
-                                                + ndx.rangeCount(fromKey,toKey)
-                                                + " justifications for "
-                                                + spo.toString(db));
-                                
-                            }
-
-                            while(itr.hasNext()) {
-                                
-                                itr.next();
-                                
-                                itr.remove();
-                                
-                            }
-
-                        }
-
-                        final long endWrite = System.currentTimeMillis();
-                        
-                        writeTime.addAndGet(endWrite - beginWrite);
-                        
-                        return endWrite - begin;
-
-                    }
-                    
-                }
-                
-                List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
-
-                tasks.add(new IndexWriter(KeyOrder.SPO, false/* clone */));
-                
-                if(!db.oneAccessPath) {
-
-                    tasks.add(new IndexWriter(KeyOrder.POS, true/* clone */));
-                    
-                    tasks.add(new IndexWriter(KeyOrder.OSP, true/* clone */));
-                    
-                }
-                
-                if(db.justify) {
-
-                    /*
-                     * Also retract the justifications for the statements.
-                     */
-                    
-                    tasks.add(new JustificationWriter(true/* clone */));
-                    
-                }
-
-                final List<Future<Long>> futures;
-                final long elapsed_SPO;
-                final long elapsed_POS;
-                final long elapsed_OSP;
-                final long elapsed_JST;
-
-                try {
-
-                    futures = db.getThreadPool().invokeAll(tasks);
-
-                    elapsed_SPO = futures.get(0).get();
-                    
-                    if(!db.oneAccessPath) {
-                    
-                        elapsed_POS = futures.get(1).get();
-                        
-                        elapsed_OSP = futures.get(2).get();
-                        
-                    } else {
-                        
-                        elapsed_POS = 0;
-                        
-                        elapsed_OSP = 0;
-                        
-                    }
-                    
-                    if(db.justify) {
-                    
-                        elapsed_JST = futures.get(3).get();
-                        
-                    } else {
-                        
-                        elapsed_JST = 0;
-                        
-                    }
-
-                } catch (InterruptedException ex) {
-
-                    throw new RuntimeException(ex);
-
-                } catch (ExecutionException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-                long elapsed = System.currentTimeMillis() - begin;
-
-                if(numStmts>1000) {
-
-                    log.info("Removed "+numStmts+" in " + elapsed + "ms; sort=" + sortTime
-                        + "ms, keyGen+delete=" + writeTime + "ms; spo="
-                        + elapsed_SPO + "ms, pos=" + elapsed_POS + "ms, osp="
-                        + elapsed_OSP + "ms, jst="+elapsed_JST);
-                    
-                }
-
-                // removed all statements in this chunk.
-                nremoved += numStmts;
-                
-            }
-            
-        } finally {
-            
-            itr.close();
-            
-        }
-        
-        return nremoved;
+        return db.removeStatements(iterator(filter));
 
     }
 
@@ -755,15 +411,15 @@ class AccessPath implements IAccessPath {
      */
     public Iterator<Long> distinctTermScan() {
 
-        int capacity = 10000;
+        final int capacity = 10000;
         
-        ArrayList<Long> ids = new ArrayList<Long>(capacity);
+        final ArrayList<Long> ids = new ArrayList<Long>(capacity);
         
         byte[] fromKey = null;
         
         final byte[] toKey = null;
         
-        IIndex ndx = getStatementIndex();
+        final IIndex ndx = getStatementIndex();
         
         ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
                 IRangeQuery.KEYS, null/* filter */);
@@ -812,5 +468,5 @@ class AccessPath implements IAccessPath {
         return ids.iterator();
         
     }
-    
+
 }

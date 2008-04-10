@@ -423,6 +423,9 @@ public class InferenceEngine extends RDFSHelper {
          */
         public static final String BUFFER_CAPACITY = "bufferCapacity";
 
+        /**
+         * @todo experiment with different values for this capacity.
+         */
         public static final String DEFAULT_BUFFER_CAPACITY = ""+200*Bytes.kilobyte32;
         
     }

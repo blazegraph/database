@@ -270,7 +270,7 @@
   <dd>http://couchdb.org/CouchDB/CouchDBWeb.nsf/Home?OpenForm</dd>
 
   <dt>bigtable</dt>
-  <dd>http://labs.google.com/papers/bigtable.html</dd>
+  <dd>http://labs.google.com/papers/bigtable.html, http://www.techcrunch.com/2008/04/04/source-google-to-launch-bigtable-as-web-service/</dd>
 
   <dt>map/reduce</dt>
   <dd>http://labs.google.com/papers/mapreduce.html</dd>
@@ -286,6 +286,15 @@
 
   <dt>Boxwood</dt>
   <dd>http://research.microsoft.com/research/sv/Boxwood/</dd>
+
+  <dt>Blue Cloud</dt>
+  <dd>http://www.techcrunch.com/2007/11/15/ibms-blue-cloud-is-web-computng-by-another-name/</dd>
+
+  <dt>SimpleDB</dt>
+  <dd>http://www.techcrunch.com/2007/12/14/amazon-takes-on-oracle-and-ibm-with-simple-db-beta/</dd>
+
+  <dt>mg4j</dt>
+  <dd>http://mg4j.dsi.unimi.it/</dd>
 
   </dl>
 

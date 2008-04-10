@@ -56,9 +56,14 @@ import com.bigdata.rdf.store.StatementWriter;
 public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAssertionBuffer {
 
     /**
+     * The database on which the lexicon is stored.
+     */
+    final private AbstractTripleStore db;
+    
+    /**
      * The focusStore on which the entailments computed by closure will be
-     * written. This may be either the database or a temporary focusStore used during
-     * incremental TM.
+     * written. This may be either the database or a temporary focusStore used
+     * during incremental TM.
      */
     final private AbstractTripleStore focusStore;
 
@@ -100,7 +105,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
      * 
      * @param focusStore
      *            The focusStore on which the entailments computed by closure
-     *            will be written. This may be either the database or a
+     *            will be written (required). This is either the database or a
      *            temporary focusStore used during incremental TM.
      * @param db
      *            The database in which the terms are defined (required).
@@ -112,8 +117,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
      *            The maximum {@link SPO}s that the buffer can hold before it
      *            is {@link #flush()}ed.
      * @param justified
-     *            true iff the Truth Maintenance strategy requires that we focusStore
-     *            {@link Justification}s for entailments.
+     *            true iff the Truth Maintenance strategy requires that we
+     *            focusStore {@link Justification}s for entailments.
      */
     public SPOAssertionBuffer(AbstractTripleStore focusStore,
             AbstractTripleStore db, ISPOFilter filter, int capacity,
@@ -126,6 +131,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         
         if (db == null)
             throw new IllegalArgumentException();
+        
+        this.db = db;
         
         this.focusStore = focusStore;
         
@@ -172,7 +179,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         if (numJustifications == 0) {
             
             // batch insert statements into the focusStore.
-            n = focusStore.addStatements(stmts, numStmts);
+            n = db.addStatements(focusStore, true/* copyOnly */,
+                    new SPOArrayIterator(stmts, numStmts), null/*filter*/);
 
         } else {
             

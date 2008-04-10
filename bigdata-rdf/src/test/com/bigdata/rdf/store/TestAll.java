@@ -65,11 +65,15 @@ public class TestAll extends TestCase {
         /*
          * Run each of the kinds of triple stores through both their specific
          * and shared unit tests.
+         * 
+         * FIXME add variants to test with and without statement identifiers
+         * (each of the database modes: tripleStore, provenance, and quadStore).
          */
 
         suite.addTest( com.bigdata.rdf.store.TestTempTripleStore.suite() );
         
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStore.suite() );
+        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithoutStatementIdentifiers.suite() );
 
 //        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithIsolatableIndices.suite() );
 

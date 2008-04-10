@@ -48,6 +48,8 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -60,6 +62,7 @@ import com.bigdata.rdf.store.SesameStatementIterator;
 import com.bigdata.rdf.store.StatementIterator;
 import com.bigdata.rdf.store.StatementWithType;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -98,23 +101,47 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         try {
 
             /*
+             * Setup some terms.
+             * 
+             * Note: we need the store to assign the term identifiers since they
+             * are bit marked as to their type (uri, literal, bnode, or
+             * statement identifier).
+             */
+
+            _URI x = new _URI("http://www.foo.org/x1");
+            _URI y = new _URI("http://www.foo.org/y2");
+            _URI z = new _URI("http://www.foo.org/z3");
+    
+            _Value[] terms = new _Value[] {
+              
+                    x,y,z,//                
+            };
+            
+            store.addTerms(terms, terms.length);
+            
+            final long x1 = x.termId;
+            final long y2 = y.termId;
+            final long z3 = z.termId;
+            
+            /*
              * Setup the database.
              */
             {
+
                 SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store,
                         null/* filter */, 100/* capacity */, false/* justified */);
 
-                buf.add(new SPO(1, 2, 3, StatementEnum.Inferred));
+                buf.add(new SPO(x1, y2, z3, StatementEnum.Inferred));
                 
-                buf.add(new SPO(2, 2, 3, StatementEnum.Explicit));
+                buf.add(new SPO(y2, y2, z3, StatementEnum.Explicit));
 
                 buf.flush();
 
-                assertTrue(store.hasStatement(1, 2, 3));
-                assertTrue(store.getStatement(1, 2, 3).isInferred());
+                assertTrue(store.hasStatement(x1, y2, z3));
+                assertTrue(store.getStatement(x1, y2, z3).isInferred());
                 
-                assertTrue(store.hasStatement(2, 2, 3));
-                assertTrue(store.getStatement(2, 2, 3).isExplicit());
+                assertTrue(store.hasStatement(y2, y2, z3));
+                assertTrue(store.getStatement(y2, y2, z3).isExplicit());
 
                 assertEquals(2,store.getStatementCount());
 
@@ -123,31 +150,36 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             /*
              * Setup a temporary store.
              */
-            TempTripleStore focusStore = new TempTripleStore(store.getProperties());
+            final TempTripleStore focusStore;
             {
-            
+                Properties properties = store.getProperties();
+                
+                properties.setProperty(Options.LEXICON, "false");
+                
+                focusStore = new TempTripleStore( properties );
+                
                 SPOAssertionBuffer buf = new SPOAssertionBuffer(focusStore, store,
                         null/* filter */, 100/* capacity */, false/* justified */);
 
                 // should be applied to the database since already there as inferred.
-                buf.add(new SPO(1, 2, 3, StatementEnum.Explicit));
+                buf.add(new SPO(x1, y2, z3, StatementEnum.Explicit));
                 
                 // should be applied to the database since already there as explicit.
-                buf.add(new SPO(2, 2, 3, StatementEnum.Explicit));
+                buf.add(new SPO(y2, y2, z3, StatementEnum.Explicit));
 
                 // should not be applied to the database since not there at all.
-                buf.add(new SPO(3, 2, 3, StatementEnum.Explicit));
+                buf.add(new SPO(z3, y2, z3, StatementEnum.Explicit));
 
                 buf.flush();
 
-                assertTrue(focusStore.hasStatement(1, 2, 3));
-                assertTrue(focusStore.getStatement(1, 2, 3).isExplicit());
+                assertTrue(focusStore.hasStatement(x1, y2, z3));
+                assertTrue(focusStore.getStatement(x1, y2, z3).isExplicit());
                 
-                assertTrue(focusStore.hasStatement(2, 2, 3));
-                assertTrue(focusStore.getStatement(2, 2, 3).isExplicit());
+                assertTrue(focusStore.hasStatement(y2, y2, z3));
+                assertTrue(focusStore.getStatement(y2, y2, z3).isExplicit());
                 
-                assertTrue(focusStore.hasStatement(3, 2, 3));
-                assertTrue(focusStore.getStatement(3, 2, 3).isExplicit());
+                assertTrue(focusStore.hasStatement(z3, y2, z3));
+                assertTrue(focusStore.getStatement(z3, y2, z3).isExplicit());
 
                 assertEquals(3,focusStore.getStatementCount());
 
@@ -160,15 +192,16 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
              * from the focusStore.
              */
             
-            int nremoved = TMStatementBuffer.applyExistingStatements(focusStore, store, null/*filter*/);
+            final int nremoved = TMStatementBuffer.applyExistingStatements(
+                    focusStore, store, null/*filter*/);
 
             // statement was pre-existing and was converted from inferred to explicit.
-            assertTrue(store.hasStatement(1, 2, 3));
-            assertTrue(store.getStatement(1, 2, 3).isExplicit());
+            assertTrue(store.hasStatement(x1, y2, z3));
+            assertTrue(store.getStatement(x1, y2, z3).isExplicit());
             
             // statement was pre-existing as "explicit" so no change.
-            assertTrue(store.hasStatement(2, 2, 3));
-            assertTrue(store.getStatement(2, 2, 3).isExplicit());
+            assertTrue(store.hasStatement(y2, y2, z3));
+            assertTrue(store.getStatement(y2, y2, z3).isExplicit());
 
             assertEquals(2,focusStore.getStatementCount());
             
@@ -569,6 +602,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      */
     public void test_infiniteloop() {
      
+        if(true) fail("re-enable this test");
+        
         URI a = new URIImpl("http://www.bigdata.com/a");
         URI b = new URIImpl("http://www.bigdata.com/b");
         URI entity = new URIImpl("http://www.bigdata.com/Entity");
