@@ -101,9 +101,6 @@ public interface IAccessPath extends Iterable<SPO> {
      * selected for the triple pattern.
      * 
      * @return The iterator.
-     * 
-     * @todo modify the iterator to support {@link ISPOIterator#remove()} and
-     *       state here that it will do so.
      */
     public ISPOIterator iterator();
 
@@ -132,9 +129,6 @@ public interface IAccessPath extends Iterable<SPO> {
      *            is specified, the capacity will never exceed the <i>limit</i>.
      * 
      * @return The iterator.
-     * 
-     * @todo modify the iterator to support {@link ISPOIterator#remove()} and
-     *       state here that it will do so.
      */
     public ISPOIterator iterator(int limit, int capacity);
 
@@ -155,9 +149,6 @@ public interface IAccessPath extends Iterable<SPO> {
      *            statements matching this filter will be visited.
      * 
      * @return The iterator.
-     * 
-     * @todo modify the iterator to support {@link ISPOIterator#remove()} and
-     *       state here that it will do so.
      */
     public ISPOIterator iterator(int limit, int capacity, ISPOFilter filter);
 
@@ -196,9 +187,9 @@ public interface IAccessPath extends Iterable<SPO> {
      * Note: This does NOT perform truth maintenance. Statements are removed
      * regardless of their {@link StatementEnum} value.
      * 
-     * @param An
-     *            optional filter. When non-<code>null</code>, only matching
-     *            statements are removed.
+     * @param filter
+     *            An optional filter. When non-<code>null</code>, only
+     *            matching statements are removed.
      * 
      * @return The #of statements that were removed.
      */

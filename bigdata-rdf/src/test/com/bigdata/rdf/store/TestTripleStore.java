@@ -31,6 +31,7 @@ package com.bigdata.rdf.store;
 import java.util.UUID;
 
 import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -97,10 +98,36 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         assertEquals(NULL, store.getTermId(term));
 
+        // add to the database.
         final long id = store.addTerm(term);
 
+        // verify that we did not assign NULL (0L).
         assertNotSame(NULL, id);
 
+        if(term instanceof Literal) {
+         
+            assertTrue("isLiteral()",AbstractTripleStore.isLiteral(id));
+            assertFalse("isBNode()",AbstractTripleStore.isBNode(id));
+            assertFalse("isURI()",AbstractTripleStore.isURI(id));
+            assertFalse("isStatement()",AbstractTripleStore.isStatement(id));
+            
+        } else if( term instanceof BNode) {
+
+            assertFalse("isLiteral()",AbstractTripleStore.isLiteral(id));
+            assertTrue("isBNode()",AbstractTripleStore.isBNode(id));
+            assertFalse("isURI()",AbstractTripleStore.isURI(id));
+            assertFalse("isStatement()",AbstractTripleStore.isStatement(id));
+
+        } else if( term instanceof URI) {
+
+            assertFalse("isLiteral()",AbstractTripleStore.isLiteral(id));
+            assertFalse("isBNode()",AbstractTripleStore.isBNode(id));
+            assertTrue("isURI()",AbstractTripleStore.isURI(id));
+            assertFalse("isStatement()",AbstractTripleStore.isStatement(id));
+
+        }
+        
+        // test lookup in the forward mapping.
         assertEquals("forward mapping",id, store.getTermId(term));
 
         // check the reverse mapping (id -> term)
@@ -115,6 +142,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
         }
         
+        // re-assert the term and verify that the same id is assigned.
         assertEquals("add is not stable?", id, store.addTerm(term));
 
     }
@@ -429,7 +457,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         }
 
     }
-
+    
     /**
      * Verify that we can locate a statement that we add to the database using
      * each statement index.
@@ -655,7 +683,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     }
 
     /**
-     * Test using the nation API of adding explicit, inferred, and axiom
+     * Test using the native API of adding explicit, inferred, and axiom
      * {@link SPO}s.
      */
     public void test_addInferredExplicitAxiom() {
@@ -754,6 +782,29 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
         try {
 
+            /*
+             * Setup some terms.
+             * 
+             * Note: we need the store to assign the term identifiers since they
+             * are bit marked as to their type (uri, literal, bnode, or
+             * statement identifier).
+             */
+
+            _URI x = new _URI("http://www.foo.org/x1");
+            _URI y = new _URI("http://www.foo.org/y2");
+            _URI z = new _URI("http://www.foo.org/z3");
+    
+            _Value[] terms = new _Value[] {
+              
+                    x,y,z,//                
+            };
+            
+            store.addTerms(terms, terms.length);
+            
+            final long x1 = x.termId;
+            final long y2 = y.termId;
+            final long z3 = z.termId;
+            
             // verify nothing in the store.
             assertSameIterator(new Statement[]{},
                     store.getAccessPath(null,null,null).iterator());
@@ -761,20 +812,21 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
                     null/* filter */, 100/* capacity */, false/*justify*/);
             
-            buffer.add(new SPO(1, 2, 3,StatementEnum.Explicit));
-            buffer.add(new SPO(2, 2, 3,StatementEnum.Explicit));
+            buffer.add(new SPO(x1, y2, z3,StatementEnum.Explicit));
+            buffer.add(new SPO(y2, y2, z3,StatementEnum.Explicit));
             
             buffer.flush();
 
-            assertTrue(store.hasStatement(1,2,3));
-            assertTrue(store.hasStatement(2,2,3));
+            assertTrue(store.hasStatement(x1,y2,z3));
+            assertTrue(store.hasStatement(y2,y2,z3));
             assertEquals(2,store.getStatementCount());
             
             assertEquals(1, store.removeStatements(new SPOArrayIterator(
-                    new SPO[] { new SPO(1, 2, 3, StatementEnum.Explicit) }, 1)));
+                    new SPO[] { new SPO(x1, y2, z3, StatementEnum.Explicit) },
+                    1)));
 
-            assertFalse(store.hasStatement(1,2,3));
-            assertTrue(store.hasStatement(2,2,3));
+            assertFalse(store.hasStatement(x1,y2,z3));
+            assertTrue(store.hasStatement(y2,y2,z3));
 
         } finally {
             

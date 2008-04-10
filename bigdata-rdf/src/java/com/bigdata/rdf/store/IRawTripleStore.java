@@ -213,7 +213,8 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * truth maintenance).
      * 
      * @param stmts
-     *            The statements.
+     *            The statements (sorted into {@link KeyOrder#SPO} order as a
+     *            side-effect).
      * 
      * @param numStmts
      *            The #of entries in <i>stmts</i> that are valid.
@@ -266,6 +267,21 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *         database).
      */
     public int addStatements(ISPOIterator itr, ISPOFilter filter);
+
+    /**
+     * Removes the statements from the statement indices (batch, parallel, NO
+     * truth maintenance).
+     * <p>
+     * Note: The {@link StatementEnum} on the {@link SPO}s is ignored by this
+     * method. It will delete all statements having the same bindings regardless
+     * of whether they are inferred, explicit, or axioms.
+     * 
+     * @param itr
+     *            The iterator
+     * 
+     * @return The #of statements that were removed from the indices.
+     */
+    public int removeStatements(SPO[] stmts, int numStmts);
 
     /**
      * Removes the statements from the statement indices (batch, parallel, NO

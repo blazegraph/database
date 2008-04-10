@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
@@ -281,17 +280,6 @@ public class SPOArrayIterator implements ISPOIterator {
      * @throws UnsupportedOperationException
      *             if a ctor variant was used that did not convey the database
      *             reference.
-     * 
-     * FIXME modify this to collect up statements to be removed and to batch
-     * remove them no later than when the iterator is exhausted (rather than
-     * closed since we close the iterator in finally clauses and we only need to
-     * insure removal if the itr completes normally). Do the same for
-     * {@link SPOIterator}. However, note that this method is only useful if
-     * you are using the iterator in its one-at-a-time mode. If you are using
-     * the chunked mode of the iterator then we need a remove(SPO) method here.
-     * It should just write on an interal {@link SPOAssertionBuffer} which removes the
-     * statements from the database when it is flushed. The buffer should be
-     * flushed when the iterator is exhausted.
      */
     public void remove() {
 
@@ -309,7 +297,7 @@ public class SPOArrayIterator implements ISPOIterator {
             
         }
        
-        db.getAccessPath(current.s, current.p, current.o).removeAll();
+        db.removeStatements(new SPO[] { current }, 1);
         
         // clear the reference.
         current = null;

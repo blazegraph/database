@@ -29,10 +29,13 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
+import org.openrdf.model.vocabulary.RDF;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data
@@ -64,6 +67,8 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     private BTree ndx_just;
     
     private TemporaryStore store;
+    
+    private final AbstractTripleStore db;
     
     public TemporaryStore getStore() {
         
@@ -220,6 +225,19 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     }
     
     /**
+     * Uses the thread-local {@link RdfKeyBuilder} on the
+     * {@link AbstractTripleStore} supplied to the ctor if defined and otherwise
+     * creates its own thread-local {@link RdfKeyBuilder}s.
+     */
+    final public RdfKeyBuilder getKeyBuilder() {
+        
+        if(db != null) return db.getKeyBuilder();
+        
+        return super.getKeyBuilder();
+        
+    }
+    
+    /**
      * 
      * @todo define options for {@link TemporaryStore} and then extend them
      *       here.
@@ -248,9 +266,26 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
      *            See {@link Options}.
      */
     public TempTripleStore(Properties properties) {
-
+       
+        this(properties, null);
+        
+    }
+    
+    /**
+     * Variant that will reuse the same thread-local {@link RdfKeyBuilder}s
+     * exposed by the optional <i>db</i>.
+     * 
+     * @param properties
+     * @param db
+     *            A database to which requests for a thread-local
+     *            {@link RdfKeyBuilder} will be delegated (optional).
+     */
+    public TempTripleStore(Properties properties,AbstractTripleStore db) {
+        
         super(properties);
 
+        this.db = db;
+        
         /*
          * @todo property for how large the temporary store can get in memory
          * before it overflows (Question is how to minimize the time to create

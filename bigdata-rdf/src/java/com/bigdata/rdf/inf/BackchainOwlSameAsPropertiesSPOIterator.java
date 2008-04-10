@@ -90,7 +90,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
         // only store the SPO index
         props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-        sameAs2and3 = new TempTripleStore(props);
+        sameAs2and3 = new TempTripleStore(props,db);
         /*
          * We are essentially taking a cross product of the two sets {s, ?
          * sameAs s} and {o, ? sameAs o}, then doing a query for all the links

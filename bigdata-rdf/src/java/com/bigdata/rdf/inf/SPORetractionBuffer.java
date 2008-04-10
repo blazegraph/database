@@ -42,6 +42,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class SPORetractionBuffer extends AbstractSPOBuffer {
 
     private final AbstractTripleStore store;
+    private final boolean computeClosureForStatementIdentifiers;
     
     /**
      * @param store
@@ -49,8 +50,12 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
      *            buffer is {@link #flush()}ed.
      * @param capacity
      *            The capacity of the retraction buffer.
+     * @param computeClosureForStatementIdentifiers
+     *            See
+     *            {@link AbstractTripleStore#removeStatements(com.bigdata.rdf.spo.ISPOIterator, boolean)}
      */
-    public SPORetractionBuffer(AbstractTripleStore store, int capacity) {
+    public SPORetractionBuffer(AbstractTripleStore store, int capacity,
+            boolean computeClosureForStatementIdentifiers) {
         
         super(store, null/*filter*/, capacity);
         
@@ -59,13 +64,16 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
 
         this.store = store;
         
+        this.computeClosureForStatementIdentifiers = computeClosureForStatementIdentifiers;
+        
     }
 
     public int flush() {
 
         if (isEmpty()) return 0;
         
-        int nremoved = store.removeStatements(new SPOArrayIterator(stmts,numStmts));
+        int nremoved = store.removeStatements(new SPOArrayIterator(stmts,
+                numStmts), computeClosureForStatementIdentifiers);
 
         // reset the counter.
         numStmts = 0;

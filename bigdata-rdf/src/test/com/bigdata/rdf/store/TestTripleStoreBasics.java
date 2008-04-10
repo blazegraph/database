@@ -60,6 +60,9 @@ public class TestTripleStoreBasics extends TestCase2 {
         // test adding terms and statements is restart safe.
         suite.addTestSuite(TestRestartSafe.class);
 
+        // test of the statement identifier semantics.
+        suite.addTestSuite(TestStatementIdentifiers.class);
+        
         // test suite for the access path api.
         suite.addTestSuite(TestAccessPath.class);
 

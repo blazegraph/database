@@ -71,7 +71,7 @@ public class SPO implements Comparable {
      * 
      * @see #SPO(KeyOrder, ITupleIterator)
      */
-    private long id = NULL;
+    private long sid = NULL;
 
     /**
      * Set the statement identifier.
@@ -89,14 +89,23 @@ public class SPO implements Comparable {
         if (id == NULL)
             throw new IllegalArgumentException();
 
-        if (this.id != NULL)
-            throw new IllegalStateException();
+        if (this.sid != NULL && id != this.sid)
+            throw new IllegalStateException(
+                    "Different statement identifier already defined: "
+                            + toString() + ", new=" + id);
 
+        if( type != StatementEnum.Explicit)  {
+
+            // Only allowed for explicit statements.
+            throw new IllegalStateException();
+            
+        }
+        
         if (!AbstractTripleStore.isStatement(id))
             throw new IllegalArgumentException("Not a statement identifier: "
                     + toString(id));
             
-        this.id = id;
+        this.sid = id;
         
     }
     
@@ -111,10 +120,10 @@ public class SPO implements Comparable {
      */
     public final long getStatementIdentifier() {
 
-        if (id == NULL)
-            throw new IllegalStateException();
+        if (sid == NULL)
+            throw new IllegalStateException("No statement identifier: "+toString());
 
-        return id;
+        return sid;
         
     }
     
@@ -252,16 +261,115 @@ public class SPO implements Comparable {
              * read it.
              */
             
-            id = vbuf.getLong(1);
+            sid = vbuf.getLong(1);
         
-            if (!AbstractTripleStore.isStatement(id))
-                throw new IllegalArgumentException("Not a statement identifier: "
-                        + toString(id));
+            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
+                    + toString(sid);
+
+            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
+                    + toString();
+
+            assert sid != NULL : "statement identifier is NULL for explicit statement: "
+                    + toString();
+
+//                if (id == NULL) {
+//
+//                    /*
+//                     * Must be non-NULL for an explicit statement.
+//                     */
+//                    
+//                    throw new AssertionError(
+//                            "Statement identifier NULL but statement is explicit: "
+//                                    + toString());
+//                    
+//                }
+//                
+//            } else {
+//
+//                /*
+//                 * Must be NULL for an Axiom or Inferred statement.
+//                 * 
+//                 * Note: the statement identifier set to NULL when a statement
+//                 * is downgraded from Explicit during truth maintenance.
+//                 */
+//                
+//                throw new AssertionError(
+//                        "Statement identifier not NULL but statement is not explicit: "
+//                                + toString());
+//                
+//            }
 
         }
         
     }
 
+    /**
+     * Return the byte[] that would be written into a statement index for this
+     * {@link SPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
+     * bit. If the {@link #sid statement identifier} is non-{@link #NULL} then
+     * it will be included in the returned byte[].
+     * 
+     * @param buf
+     *            A buffer supplied by the caller. The buffer will be reset
+     *            before the value is written on the buffer.
+     * 
+     * @return The value that would be written into a statement index for this
+     *         {@link SPO}.
+     */
+    public byte[] serializeValue(ByteArrayBuffer buf) {
+
+        return serializeValue(buf, override, type, sid);
+        
+    }
+    
+    /**
+     * Return the byte[] that would be written into a statement index for this
+     * {@link SPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
+     * bit. If the statement identifier is non-{@link #NULL} then it will be
+     * included in the returned byte[].
+     * 
+     * @param buf
+     *            A buffer supplied by the caller. The buffer will be reset
+     *            before the value is written on the buffer.
+     * 
+     * @param override
+     *            <code>true</code> iff you want the
+     *            {@link StatementEnum#MASK_OVERRIDE} bit set (this is only set
+     *            when serializing values for a remote procedure that will write
+     *            on the index, it is never set in the index itself).
+     * @param type
+     *            The {@link StatementEnum}.
+     * @param sid
+     *            The statement identifier iff this is
+     *            {@link StatementEnum#Explicit} statement AND statement
+     *            identifiers are enabled and otherwise {@link #NULL}.
+     * 
+     * @return The value that would be written into a statement index for this
+     *         {@link SPO}.
+     */
+    static public byte[] serializeValue(ByteArrayBuffer buf, boolean override, StatementEnum type, long sid) {
+
+        buf.reset();
+        
+        // optionally set the override bit on the value.
+        final byte b = (byte) (override ? (type.code() | StatementEnum.MASK_OVERRIDE)
+                : type.code());
+        
+        buf.putByte( b );
+        
+        if (sid != NULL) {
+            
+            assert type == StatementEnum.Explicit : "Statement identifier not allowed: type="
+                    + type;
+            
+            buf.putLong(sid);
+            
+        }
+        
+        return buf.toByteArray();
+
+    }
+    
     /**
      * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Explicit}. 
      */
@@ -392,13 +500,13 @@ public class SPO implements Comparable {
      * @see ITripleStore#toString(long, long, long)
      */
     public String toString() {
-        
-        return ("<" + toString(s) + "," + toString(p) + "," + toString(o))
+
+        return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o))
                 + (type == null ? "" : " : " + type
-                        + (id == NULL ? "" : ", id=" + id)) + ">";
-        
+                        + (sid == NULL ? "" : ", sid=" + sid)) + " >";
+
     }
-    
+
     /**
      * Reprents the term identifier together with its type (literal, bnode, uri,
      * or statement identifier).
@@ -408,17 +516,22 @@ public class SPO implements Comparable {
      * @return
      */
     private String toString(long id) {
-        
-        if(id==NULL) return "NULL";
-        
-        if(AbstractTripleStore.isLiteral(id)) return "L"+id;
 
-        if(AbstractTripleStore.isURI(id)) return "U"+id;
-        
-        if(AbstractTripleStore.isBNode(id)) return "_"+id;
-        
-        if(AbstractTripleStore.isStatement(id)) return "S"+id;
-        
+        if (id == NULL)
+            return "NULL";
+
+        if (AbstractTripleStore.isLiteral(id))
+            return id + "L";
+
+        if (AbstractTripleStore.isURI(id))
+            return id + "U";
+
+        if (AbstractTripleStore.isBNode(id))
+            return id + "B";
+
+        if (AbstractTripleStore.isStatement(id))
+            return id + "S";
+
         throw new AssertionError("id="+id);
         
     }
@@ -449,7 +562,7 @@ public class SPO implements Comparable {
             }
             
             // Note: the statement [id] is not stored in the reverse lexicon.
-            final String idStr = (id==NULL?"":" : id="+id);
+            final String idStr = (sid==NULL?"":" : id="+sid);
             
             return t +" : " + store.toString(s, p, o) + idStr;
             

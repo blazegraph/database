@@ -54,11 +54,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.LongAggregator;
-import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.IndexWriteProc.IndexWriteProcConstructor;
+import com.bigdata.rdf.store.SPOIndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -240,10 +240,16 @@ public class SPOIndexWriter implements Callable<Long> {
 
         final byte[][] vals = new byte[numStmts][];
 
+        final ByteArrayBuffer vbuf = new ByteArrayBuffer(1+8/*max length*/);
+        
         for (int i = 0; i < numStmts; i++) {
 
             final SPO spo = stmts[i];
 
+            if (!spo.isFullyBound())
+                throw new IllegalArgumentException("Not fully bound: "
+                        + spo.toString());
+            
             // skip statements that match the filter.
             if (filter != null && filter.isMatch(spo))
                 continue;
@@ -256,14 +262,7 @@ public class SPOIndexWriter implements Callable<Long> {
             keys[numToAdd] = keyBuilder.statement2Key(keyOrder, spo);
             
             // generate value for the index.
-            vals[numToAdd] = spo.type.serialize();
-            
-            if(spo.override) {
-                
-                // set the override bit on the value.
-                vals[numToAdd][0] |= StatementEnum.MASK_OVERRIDE;
-                
-            }
+            vals[numToAdd] = spo.serializeValue(vbuf);
 
             last = spo;
 

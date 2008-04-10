@@ -138,7 +138,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             // turn off the lexicon since we will only use the statement indices.
             properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.LEXICON, "false");
             
-            tempStore = new TempTripleStore(properties);
+            tempStore = new TempTripleStore(properties,database);
             
         }
         
@@ -406,11 +406,17 @@ public class TMStatementBuffer implements IStatementBuffer {
             /*
              * This buffer will retract statements from the tempStore that are
              * already present as explicit statements in the database.
+             * 
+             * Note: The retraction buffer will not compute the closure over the
+             * statement identifiers since we are just reducing the amount of
+             * data to which we have to apply the rules, not really removing
+             * statements. If the focusStore contains statements about
+             * statements that are already in the database then we MUST NOT
+             * remove those metadata statements from the focus store here!
              */
             
             final SPORetractionBuffer retractionBuffer = new SPORetractionBuffer(
-                    focusStore, capacity);
-
+                    focusStore, capacity, false/* computeClosureForStatementIdentifiers */);
 
             while (itr.hasNext()) {
 
@@ -601,12 +607,21 @@ public class TMStatementBuffer implements IStatementBuffer {
             throw new AssertionError();
             
         }
-
+        
         // #of given statements to retract.
         final long ngiven = tempStore.getStatementCount();
         
         log.info("Computing closure of the temporary store with "
                 + ngiven+ " statements");
+
+        if(database.getStatementIdentifiers()) {
+            
+            AbstractTripleStore.fixPointStatementIdentifiers(database, tempStore);
+
+            log.info("Computing closure of the temporary store with " + ngiven
+                    + " statements (after fix point of statement identifiers)");
+            
+        }
 
         // do truth maintenance.
         retractAll(stats,tempStore,0);
@@ -709,10 +724,10 @@ public class TMStatementBuffer implements IStatementBuffer {
          */
 
         TempTripleStore focusStore = new TempTripleStore(database
-                .getProperties());
+                .getProperties(),database);
         
         // consider each statement in the tempStore.
-        ISPOIterator itr = tempStore.getAccessPath(KeyOrder.SPO).iterator();
+        final ISPOIterator itr = tempStore.getAccessPath(KeyOrder.SPO).iterator();
 
         final long nretracted;
         try {
@@ -721,7 +736,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              * Buffer writing on the [focusStore] removes any statements that are no longer grounded.
              */
 
-            SPOAssertionBuffer ungroundedBuffer = new SPOAssertionBuffer( 
+            final SPOAssertionBuffer ungroundedBuffer = new SPOAssertionBuffer( 
                     focusStore, database, null/* filter */, bufferCapacity, false/* justified */);
 
             /*
@@ -732,7 +747,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              * inferred then this will NOT write on the statement index.
              */
 
-            SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer( 
+            final SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer( 
                     focusStore, database, inferenceEngine.doNotAddFilter,
                     10000/* capacity */, false/* justify */);
 
@@ -741,10 +756,17 @@ public class TMStatementBuffer implements IStatementBuffer {
              * determined that those statements are no longer provable from the
              * database without relying on the statements that the caller
              * originally submitted for retraction.
+             * 
+             * Note: [computeClosureForStatementIdentifiers] is false because we
+             * handle this before we begin to compute the closure of the
+             * explicit statements handed to us by the caller. Truth maintenance
+             * will never identify more explicit statements to be deleted so we
+             * do not need to re-compute the closure over the statement
+             * identifiers.
              */
 
-            SPORetractionBuffer retractionBuffer = new SPORetractionBuffer(
-                    database, 10000/* capacity */);
+            final SPORetractionBuffer retractionBuffer = new SPORetractionBuffer(
+                    database, 10000/* capacity */, false/* computeClosureForStatementIdentifiers */);
 
             /*
              * Note: when we enter this method recursively statements in the
@@ -769,7 +791,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
             while (itr.hasNext()) {
 
-                SPO[] chunk = itr.nextChunk();
+                final SPO[] chunk = itr.nextChunk();
 
                 for (SPO spo : chunk) {
 
@@ -981,7 +1003,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              * Suck everything in the focusStore into an SPO[].
              */
             
-            SPOArrayIterator tmp = new SPOArrayIterator(focusStore, focusStore
+            final SPOArrayIterator tmp = new SPOArrayIterator(focusStore, focusStore
                     .getAccessPath(KeyOrder.SPO), 0/* limit */, null/* filter */);
             
             if(DEBUG && database.getStatementCount()<200) {
@@ -1005,7 +1027,8 @@ public class TMStatementBuffer implements IStatementBuffer {
             }
             
             // subtract out the statements we used to start the closure.
-            int nremoved = focusStore.removeStatements(tmp);
+            final int nremoved = focusStore
+                    .removeStatements(tmp, false/* computeClosureForStatementIdentifiers */);
             
             if(DEBUG && database.getStatementCount()<200) {
                 

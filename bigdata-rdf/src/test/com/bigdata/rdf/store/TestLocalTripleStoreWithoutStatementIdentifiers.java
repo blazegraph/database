@@ -44,28 +44,28 @@ import com.bigdata.journal.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLocalTripleStore extends AbstractTestCase {
+public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTestCase {
 
     /**
      * 
      */
-    public TestLocalTripleStore() {
+    public TestLocalTripleStoreWithoutStatementIdentifiers() {
     }
 
-    public TestLocalTripleStore(String name) {
+    public TestLocalTripleStoreWithoutStatementIdentifiers(String name) {
         super(name);
     }
     
     public static Test suite() {
 
-        final TestLocalTripleStore delegate = new TestLocalTripleStore(); // !!!! THIS CLASS !!!!
+        final TestLocalTripleStoreWithoutStatementIdentifiers delegate = new TestLocalTripleStoreWithoutStatementIdentifiers(); // !!!! THIS CLASS !!!!
 
         /*
          * Use a proxy test suite and specify the delegate.
          */
 
         ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "Local Triple Store Test Suite");
+                "Local Triple Store Without Statement Identifiers");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
@@ -98,7 +98,12 @@ public class TestLocalTripleStore extends AbstractTestCase {
          * default configuration for the LocalTripleStore.
          */
         
-        return super.getProperties();
+        Properties properties = super.getProperties();
+        
+        // turn off statement identifiers.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,"false");
+
+        return properties;
         
     }
     

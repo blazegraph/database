@@ -57,9 +57,10 @@ public class DataInputBuffer extends InputStream implements DataInput {
     protected int off;
     
     /**
-     * The index of the last byte in the buffer having valid data.
+     * The exclusive index of the last byte in the buffer having valid date (up
+     * to limit-1 is valid).
      */
-    protected int len;
+    protected int limit;
     
     /**
      * Prepare for reading from the byte[].
@@ -75,7 +76,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
         
         this.off = 0;
         
-        this.len = buf.length;
+        this.limit = buf.length;
         
     }
     
@@ -104,7 +105,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
         
         this.off = off;
         
-        this.len = len;
+        this.limit = off + len;
         
     }
 
@@ -125,7 +126,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
         
         this.off = buf.pos;
         
-        this.len = buf.limit;
+        this.limit = buf.limit;
         
     }
     
@@ -153,19 +154,19 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @param off
      * @param len
      */
-    public void setBuffer(byte[] buf,int off,int len) {
-        
+    public void setBuffer(byte[] buf, int off, int len) {
+
         if (buf == null)
             throw new IllegalArgumentException();
 
         if (off + len > buf.length)
             throw new IllegalArgumentException();
-        
+
         this.buf = buf;
-        
+
         this.off = off;
-        
-        this.len = len;;
+
+        this.limit = off + len;
         
     }
     
@@ -192,7 +193,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
     
     public boolean readBoolean() throws IOException {
 
-        if (off >= len)
+        if (off >= limit)
             throw new EOFException();
 
         return buf[off++] == 0 ? false : true;
@@ -202,7 +203,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
     @Override
     public int read() throws IOException {
 
-        if (off >= len)
+        if (off >= limit)
             return -1; // EOF
         
         return buf[off++];
@@ -211,7 +212,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
     
     public byte readByte() throws IOException {
 
-        if (off >= len)
+        if (off >= limit)
             throw new EOFException();
         
         return buf[off++];
@@ -220,7 +221,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     public char readChar() throws IOException {
 
-        if (off + 2 > len)
+        if (off + 2 > limit)
             throw new EOFException();
 
         int ch1 = buf[off++];
@@ -251,7 +252,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     final public void readFully(byte[] b, final  int off, final int len) throws IOException {
 
-        if (this.off + len > this.len)
+        if (this.off + len > this.limit)
             throw new EOFException();
         
         System.arraycopy(buf, this.off, b, off, len);
@@ -262,7 +263,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     public int readInt() throws IOException {
 
-        if(off+4>len) throw new EOFException();
+        if(off+4>limit) throw new EOFException();
         
         int v = 0;
         
@@ -284,7 +285,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     public long readLong() throws IOException {
 
-        if(off+8>len) throw new EOFException();
+        if(off+8>limit) throw new EOFException();
         
         long v = 0L;
         
@@ -304,7 +305,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     public short readShort() throws IOException {
         
-        if (off + 2 > len)
+        if (off + 2 > limit)
             throw new EOFException();
 
         int ch1 = buf[off++];
@@ -323,7 +324,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     public int readUnsignedByte() throws IOException {
         
-        if (off >= len)
+        if (off >= limit)
             throw new EOFException();
         
         return buf[off++];
@@ -332,7 +333,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     public int readUnsignedShort() throws IOException {
 
-        if (off + 2 > len)
+        if (off + 2 > limit)
             throw new EOFException();
 
         int a = buf[off++];
@@ -349,7 +350,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
         off += n;
         
-        if(off>len) throw new IOException();
+        if(off>limit) throw new IOException();
         
         return n;
         
@@ -367,7 +368,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @throws IOException
      */
     final public long unpackLong() throws IOException {
-        if (off + 1 > len)
+        if (off + 1 > limit)
             throw new EOFException();
         int b = buf[off++];
         int nbytes;
@@ -384,7 +385,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
             l = b & 0x0f; // starting value is lower nibble (clear the upper
                             // nibble).
         }
-        if (off + nbytes - 1 > len)
+        if (off + nbytes - 1 > limit)
             throw new EOFException();
         for (int i = 1; i < nbytes; i++) {
             // Read the next byte.
@@ -411,7 +412,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @throws IOException
      */
     final public short unpackShort() throws IOException {
-        if (off + 1 > len)
+        if (off + 1 > limit)
             throw new EOFException();
         short b = (short) buf[off++];
         short v;
@@ -420,7 +421,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
              * clear the high bit and shift over one byte.
              */
             v = (short) ((b & 0x7f) << 8);
-            if (off + 1 > len)
+            if (off + 1 > limit)
                 throw new EOFException();
             b = buf[off++]; // read the next byte.
             v |= (b & 0xff); // and combine it together with the high byte.

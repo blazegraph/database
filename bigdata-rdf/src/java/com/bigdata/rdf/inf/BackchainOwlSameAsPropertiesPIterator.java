@@ -81,7 +81,7 @@ public class BackchainOwlSameAsPropertiesPIterator extends
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
         // only store the SPO index
         props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-        sameAs2and3 = new TempTripleStore(props);
+        sameAs2and3 = new TempTripleStore(props,db);
     }
 
     public KeyOrder getKeyOrder() {

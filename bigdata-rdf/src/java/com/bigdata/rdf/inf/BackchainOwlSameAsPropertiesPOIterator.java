@@ -84,8 +84,8 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
         // only store the SPO index
         props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-        sameAs3 = new TempTripleStore(props);
-        sameAs2 = new TempTripleStore(props);
+        sameAs3 = new TempTripleStore(props,db);
+        sameAs2 = new TempTripleStore(props,db);
         /*
          * Collect up additional reverse properties (s and p values) for the
          * known o value by examining the values which are owl:sameAs o. The p

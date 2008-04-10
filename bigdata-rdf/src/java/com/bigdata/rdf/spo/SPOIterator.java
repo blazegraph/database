@@ -635,21 +635,7 @@ public class SPOIterator implements ISPOIterator {
     }
     
     /**
-     * 
-     * FIXME Once the problems with traversal with concurrent modification of
-     * the BTree have been resolved this method should be modified such that
-     * this class will buffer no more than some maximum #of statements and
-     * {@link #remove()} should be implemented.
-     * <p>
-     * Note: Traversal with concurrent modification MUST declare semantics that
-     * isolate the reader from the writer in order for clients to be able to
-     * read ahead and buffer results from the iterator. Otherwise the buffered
-     * statements would have to be discarded in there was a concurrent
-     * modification somewhere in the future visitation of the iterator.
-     * <p>
-     * The one simple case is removal of the current statement, especially when
-     * that statement has already been buffered.
-     * <p>
+     * See {@link IChunkedIterator#remove()}
      * 
      * @throws UnsupportedOperationException
      */

@@ -671,9 +671,18 @@ public class Justification implements Comparable<Justification> {
             /*
              * Examine all justifications for the statement. If any of them are
              * grounded then the statement is still entailed by the database.
+             * 
+             * FIXME add the 'head' parameter to the JustificationIterator and
+             * then use it here so that we do not have to fully buffer the
+             * justifications for a given statement (how bad this is really
+             * depends on how many justifications we find for a given statement
+             * since the asynchronous read-ahead iterator will buffer a chunk
+             * anyway for efficiency and if that chunk spans all justifications
+             * for a given head then it is all the same thing).
              */
             
-            FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(db,head);
+            final IJustificationIterator itr =
+                new FullyBufferedJustificationIterator(db,head);
             
             while(itr.hasNext()) {
                 
