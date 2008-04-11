@@ -47,6 +47,7 @@ import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.store.IStatementWithType;
 import com.bigdata.rdf.store.StatementWithType;
 
 /**
@@ -239,7 +240,7 @@ public class TestBigdataSail extends TestCase {
 
                 while (itr.hasNext()) {
 
-                    StatementWithType stmt = (StatementWithType) itr.next();
+                    IStatementWithType stmt = (IStatementWithType) itr.next();
 
                     assertEquals("subject", s, stmt.getSubject());
                     assertEquals("predicate", p, stmt.getPredicate());
@@ -287,7 +288,7 @@ public class TestBigdataSail extends TestCase {
 
                 while (itr.hasNext()) {
 
-                    StatementWithType stmt = (StatementWithType) itr.next();
+                    IStatementWithType stmt = (IStatementWithType) itr.next();
 
                     assertEquals("subject", s, stmt.getSubject());
                     assertEquals("predicate", p, stmt.getPredicate());

@@ -1696,7 +1696,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * @param o
      * @return
      */
-    public StatementWithType getStatement(Resource s, URI p, Value o)
+    public IStatementWithType getStatement(Resource s, URI p, Value o)
             throws SailException {
 
         if (s == null || p == null || o == null) {
@@ -1715,7 +1715,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             }
 
-            return (StatementWithType) itr.next();
+            return (IStatementWithType) itr.next();
 
         } finally {
 
@@ -1753,11 +1753,16 @@ abstract public class AbstractTripleStore implements ITripleStore,
         final _Resource s = (_Resource) getTerm(spo.s);
         final _URI p = (_URI) getTerm(spo.p);
         final _Value o = (_Value) getTerm(spo.o);
+        final _Resource c = (_Resource) (spo.hasStatementIdentifier()//
+                ? getTerm(spo.getStatementIdentifier()) // Note: will look like a bnode.
+                : null //
+            );
 
         return new StatementWithType( //
                 (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(s),//
                 (URI) OptimizedValueFactory.INSTANCE.toSesameObject(p), //
                 (Value) OptimizedValueFactory.INSTANCE.toSesameObject(o), //
+                (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(c),//
                 spo.type//
         );
 

@@ -128,6 +128,15 @@ public class SPO implements Comparable {
     }
     
     /**
+     * <code>true</code> iff this {@link SPO} has a statement identifier.
+     */
+    public boolean hasStatementIdentifier() {
+        
+        return sid != NULL;
+        
+    }
+    
+    /**
      * When this field is set the statement will be written onto the database
      * with exactly its current {@link #type}. This feature is used during
      * Truth Maintenance when we need to downgrade an {@link SPO} from

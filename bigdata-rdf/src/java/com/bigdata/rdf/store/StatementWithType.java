@@ -30,9 +30,6 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.StatementImpl;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Also reports whether the statement is explicit, inferred or an axiom.
@@ -40,31 +37,58 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StatementWithType extends StatementImpl {
+public class StatementWithType extends StatementImpl implements IStatementWithType {
 
     /**
      * 
      */
     private static final long serialVersionUID = 6739949195958368365L;
 
-    private StatementEnum type;
+    private final StatementEnum type;
+    private final Resource context;
     
     /**
+     * Assumes that the context is <code>null</code>.
+     * 
      * @param subject
      * @param predicate
      * @param object
+     * @param type
      */
     public StatementWithType(Resource subject, URI predicate, Value object,StatementEnum type) {
         
+        this(subject, predicate, object, null, type);
+        
+    }
+
+    /**
+     * Constructor accepting an optional context.
+     * 
+     * @param subject
+     * @param predicate
+     * @param object
+     * @param context (optional)
+     * @param type
+     */
+    public StatementWithType(Resource subject, URI predicate, Value object,Resource context,StatementEnum type) {
+        
         super(subject, predicate, object);
+        
+        this.context = context;
+        
+        if (type == null)
+            throw new IllegalArgumentException();
         
         this.type = type;
         
     }
 
-    /**
-     * Whether the statement is explicit, inferred or an axiom.
-     */
+    public Resource getContext() {
+        
+        return context;
+        
+    }
+    
     public StatementEnum getStatementType() {
         
         return type;

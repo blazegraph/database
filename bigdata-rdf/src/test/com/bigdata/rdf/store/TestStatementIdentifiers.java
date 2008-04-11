@@ -47,11 +47,17 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.Arrays;
 import java.util.UUID;
 
+import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.rdfxml.RDFXMLWriter;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
@@ -66,16 +72,6 @@ import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Test of the statement identifier semantics.
- * 
- * FIXME test retraction of statements that use statement identifiers in their
- * bindings when the statement with that statement identifier is retracted.
- * 
- * FIXME add inference and then add explicit statements with the same bindings
- * and verify that the statement identifier is assigned when the explicit
- * statement is added. verify that retracting the inference does not cause the
- * statement identifier to be removed. re-add the inference and verify that
- * retracting the explicit statement causes the statement identifier to be
- * removed (or test with two different statements).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -266,6 +262,42 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             }
 
+            StatementIterator itr = store.getStatements(null, null, null);
+            
+            try {
+
+                Writer w = new StringWriter();
+                
+                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+                
+                rdfWriter.startRDF();
+
+                while(itr.hasNext()) {
+                
+                    Statement stmt = itr.next();
+                    
+                    rdfWriter.handleStatement(stmt);
+                    
+                }
+                
+                rdfWriter.endRDF();
+                
+                System.err.println(w.toString());
+                
+            } catch(Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            } finally {
+                
+                try {
+                    itr.close();
+                } catch (SailException e) {
+                    throw new RuntimeException(e);
+                }
+                
+            }
+            
             /*
              * Verify after restart.
              */
@@ -624,145 +656,139 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
     }
     
-//    /**
-//     * Test the ability to add and remove statements using both fully bound and
-//     * partly bound triple patterns using the native API.
-//     */
-//    public void test_addRemove_nativeAPI() {
-//        
-//        AbstractTripleStore store = getStore();
-//        
-//        try {
-//
-//            // verify nothing in the store.
-//            assertSameIterator(new SPO[]{},
-//                    store.getAccessPath(NULL,NULL,NULL).iterator());
-//            
-//            URIImpl A = new URIImpl("http://www.bigdata.com/A");
-//            URIImpl B = new URIImpl("http://www.bigdata.com/B");
-//            URIImpl C = new URIImpl("http://www.bigdata.com/C");
-//            
-//            IStatementBuffer buffer = new StatementBuffer(store,100);
-//            
-//            buffer.add(A, RDF.TYPE, B);
-//            buffer.add(A, RDF.TYPE, C);
-//            
-//            buffer.flush();
-//
-//            store.commit();
-//            
-//            assertSameSPOs(new SPO[] {
-//                    new SPO(store.getTermId(A), store
-//                            .getTermId(RDF.TYPE), store.getTermId(B),
-//                            StatementEnum.Explicit),
-//                    new SPO(store.getTermId(A), store
-//                            .getTermId(RDF.TYPE), store.getTermId(C),
-//                            StatementEnum.Explicit), },
-//                    store.getAccessPath(NULL,NULL,NULL).iterator()
-//                    );
-//
-//            store.dumpStore();
-//            
-//            assertEquals(1, store.getAccessPath(NULL, NULL, store.getTermId(B))
-//                    .removeAll());
-//
-////            store.dumpStore();
-//            
-//            store.commit();
-//            
-//            store.dumpStore();
-//            
-//            assertSameSPOs(new SPO[] {
-//                    new SPO(store.getTermId(A), store
-//                            .getTermId(RDF.TYPE), store.getTermId(C),
-//                            StatementEnum.Explicit), },
-//                    store.getAccessPath(NULL,NULL,NULL).iterator()
-//                    );
-//
-//        } finally {
-//            
-//            store.closeAndDelete();
-//            
-//        }
-//        
-//    }
-//
-//    /**
-//     * Test using the native API of adding explicit, inferred, and axiom
-//     * {@link SPO}s.
-//     */
-//    public void test_addInferredExplicitAxiom() {
-//
-//        AbstractTripleStore store = getStore();
-//        
-//        try {
-//            
-//            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
-//                    null/* filter */, 100/* capacity */, false/*justified*/);
-//            
-//            buffer.add(new SPO(1, 2, 3, StatementEnum.Explicit));
-//            buffer.add(new SPO(2, 2, 3, StatementEnum.Inferred));
-//            buffer.add(new SPO(3, 2, 3, StatementEnum.Axiom));
-//
-//            buffer.flush();
-//
-//            store.commit();
-//            
-//            assertSameSPOs(new SPO[] {//
-//                    new SPO(1, 2, 3, StatementEnum.Explicit),//
-//                    new SPO(2, 2, 3, StatementEnum.Inferred),//
-//                    new SPO(3, 2, 3, StatementEnum.Axiom),//
-//                    },//
-//                    store.getAccessPath(NULL,NULL,NULL).iterator()
-//                    );
-//
-//            store.dumpStore();
-//            
-//        } finally {
-//            
-//            store.closeAndDelete();
-//            
-//        }
-//        
-//    }
-//        
-//    /**
-//     * Test of {@link IRawTripleStore#removeStatements(com.bigdata.rdf.spo.ISPOIterator)}
-//     */
-//    public void test_removeStatements() {
-//        
-//        AbstractTripleStore store = getStore();
-//        
-//        try {
-//
-//            // verify nothing in the store.
-//            assertSameIterator(new Statement[]{},
-//                    store.getAccessPath(null,null,null).iterator());
-//            
-//            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
-//                    null/* filter */, 100/* capacity */, false/*justify*/);
-//            
-//            buffer.add(new SPO(1, 2, 3,StatementEnum.Explicit));
-//            buffer.add(new SPO(2, 2, 3,StatementEnum.Explicit));
-//            
-//            buffer.flush();
-//
-//            assertTrue(store.hasStatement(1,2,3));
-//            assertTrue(store.hasStatement(2,2,3));
-//            assertEquals(2,store.getStatementCount());
-//            
-//            assertEquals(1, store.removeStatements(new SPOArrayIterator(
-//                    new SPO[] { new SPO(1, 2, 3, StatementEnum.Explicit) }, 1)));
-//
-//            assertFalse(store.hasStatement(1,2,3));
-//            assertTrue(store.hasStatement(2,2,3));
-//
-//        } finally {
-//            
-//            store.closeAndDelete();
-//            
-//        }
-//
-//    }
-    
+    /**
+     * Test case for the interchange of the statement identifiers using a
+     * private extension for the interchange of RDF/XML.
+     * 
+     * @throws SailException
+     * @throws RDFHandlerException
+     */
+    public void test_rdfXmlInterchange() throws SailException, RDFHandlerException {
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            if (!store.statementIdentifiers) {
+
+                log.warn("Statement identifiers are not enabled");
+
+                return;
+
+            }
+
+            _URI x = new _URI("http://www.foo.org/x");
+            _URI y = new _URI("http://www.foo.org/y");
+            _URI z = new _URI("http://www.foo.org/z");
+
+            _URI A = new _URI("http://www.foo.org/A");
+            _URI B = new _URI("http://www.foo.org/B");
+            _URI C = new _URI("http://www.foo.org/C");
+
+            _URI rdfType = new _URI(RDF.TYPE);
+            _URI rdfsLabel = new _URI(RDFS.LABEL);
+            _URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+
+            _Literal lit1 = new _Literal("abc");
+            _Literal lit2 = new _Literal("abc", A);
+            _Literal lit3 = new _Literal("abc", "en");
+
+            _BNode bn1 = new _BNode(UUID.randomUUID().toString());
+            _BNode bn2 = new _BNode("a12");
+
+            _Value[] terms = new _Value[] {
+
+            x, y, z,//
+                    A, B, C,//
+                    rdfType,//
+                    rdfsLabel,//
+                    rdfsSubClassOf,//
+                    lit1, lit2, lit3,//
+                    bn1, bn2 //
+
+            };
+
+            store.addTerms(terms, terms.length);
+
+            SPO[] stmts = new SPO[] {
+
+                    new SPO(x.termId, rdfType.termId, C.termId,
+                            StatementEnum.Explicit),
+                    new SPO(y.termId, rdfType.termId, B.termId,
+                            StatementEnum.Explicit),
+                    new SPO(z.termId, rdfType.termId, A.termId,
+                            StatementEnum.Explicit),
+
+                    new SPO(A.termId, rdfsLabel.termId, lit1.termId,
+                            StatementEnum.Explicit),
+                    new SPO(B.termId, rdfsLabel.termId, lit2.termId,
+                            StatementEnum.Explicit),
+                    new SPO(C.termId, rdfsLabel.termId, lit3.termId,
+                            StatementEnum.Explicit),
+
+                    new SPO(B.termId, rdfsSubClassOf.termId, A.termId,
+                            StatementEnum.Explicit),
+                    new SPO(C.termId, rdfsSubClassOf.termId, B.termId,
+                            StatementEnum.Explicit),
+
+                    new SPO(bn1.termId, rdfsLabel.termId, lit1.termId,
+                            StatementEnum.Explicit),
+                    new SPO(bn2.termId, rdfsLabel.termId, lit2.termId,
+                            StatementEnum.Explicit),
+
+            };
+
+            /*
+             * Add the statements to the KB.
+             * 
+             * Note: sorts into SPO order as a side-effect.
+             */
+            store.addStatements(stmts, stmts.length);
+
+            final StatementIterator itr = store.getStatements(null, null, null);
+            final String rdfXml;
+            try {
+
+                Writer w = new StringWriter();
+
+                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+
+                rdfWriter.startRDF();
+
+                while (itr.hasNext()) {
+
+                    Statement stmt = itr.next();
+
+                    rdfWriter.handleStatement(stmt);
+
+                }
+
+                rdfWriter.endRDF();
+
+                rdfXml = w.toString();
+                
+            } finally {
+
+                try {
+                    itr.close();
+                } catch (SailException e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+
+            // write the rdf/xml on the console.
+            System.err.println(rdfXml);
+
+            fail("modify DataLoader to read it back in.");
+//            store.getDataLoader().loadData(resource, baseURL, rdfFormat)
+            
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
 }

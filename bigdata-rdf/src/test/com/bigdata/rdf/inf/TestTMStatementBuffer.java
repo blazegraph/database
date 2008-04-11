@@ -57,10 +57,10 @@ import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
+import com.bigdata.rdf.store.IStatementWithType;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.SesameStatementIterator;
 import com.bigdata.rdf.store.StatementIterator;
-import com.bigdata.rdf.store.StatementWithType;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -452,7 +452,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                 // verify that stmt c is marked as explicit in the kb.
 
-                StatementWithType stmtC = (StatementWithType) store
+                IStatementWithType stmtC = (IStatementWithType) store
                         .getStatement(foo, rdftype, graph);
                 
                 assertNotNull(stmtC);
@@ -487,7 +487,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                 // verify that stmt c is marked as explicit in the kb.
 
-                StatementWithType stmtC = (StatementWithType) store
+                IStatementWithType stmtC = (IStatementWithType) store
                         .getStatement(foo, rdftype, graph);
                 
                 assertNotNull(stmtC);
