@@ -443,7 +443,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 assertionBuffer.doClosure();
 
                 // dump after closure.
-                store.dumpStore(true,true,false);
+                System.err.println(store.dumpStore(true,true,false));
 
                 // explicit.
                 assertTrue(store.hasStatement(user, currentGraph, foo ));
@@ -478,7 +478,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 retractionBuffer.doClosure();
 
                 // dump after re-closure.
-                store.dumpStore(true,true,false);
+                System.err.println(store.dumpStore(true,true,false));
 
                 // test the kb.
                 assertFalse(store.hasStatement(user, currentGraph, foo));
@@ -541,8 +541,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 // perform closure and write on the database.
                 assertionBuffer.doClosure();
 
-                System.err.println("dump after closure.");
-                store.dumpStore(store,true,true,false,true);
+                System.err.println("dump after closure:\n"
+                        + store.dumpStore(store, true, true, false, true));
 
             }
             
@@ -558,8 +558,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 // update the closure.
                 retractionBuffer.doClosure();
 
-                System.err.println("dump after retraction and re-closure");
-                store.dumpStore(true,true,false);
+                System.err.println("dump after retraction and re-closure:\n"
+                        + store.dumpStore(true,true,false));
                 
             }
             
@@ -580,8 +580,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 // perform closure and write on the database.
                 assertionBuffer.doClosure();
 
-                System.err.println("dump comparison store after closure.");
-                tempStore.dumpStore(true,true,false);
+                System.err.println("dump comparison store after closure:\n"
+                        + tempStore.dumpStore(true, true, false));
 
             }
             
@@ -598,16 +598,21 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     }
     
     /**
-     * This test demonstrates an infinite loop in TM.
+     * This test demonstrates an infinite loop in TM arising from owl:sameAs.
      */
     public void test_infiniteloop() {
      
-        if(true) fail("re-enable this test");
+//        if(true) fail("re-enable this test");
         
         URI a = new URIImpl("http://www.bigdata.com/a");
         URI b = new URIImpl("http://www.bigdata.com/b");
         URI entity = new URIImpl("http://www.bigdata.com/Entity");
         URI sameAs = OWL.SAMEAS;
+//        /*
+//         * Note: not using rdf:type to avoid entailments about (x rdf:type
+//         * Class) and (x rdfs:subClassOf y) that are not required by this test.
+//         */
+//      URI rdfType = new URIImpl("http://www.bigdata.com/type");
         URI rdfType = RDF.TYPE;
 
         AbstractTripleStore store = getStore();
@@ -636,7 +641,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 assertionBuffer.doClosure();
 
                 // dump after closure.
-                store.dumpStore(store,true,true,false,true);
+                System.err.println("dump after closure:\n"
+                        + store.dumpStore(store, true, true, false, true));
 
             }
             
@@ -658,7 +664,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 retractionBuffer.doClosure();
 
                 // dump after re-closure.
-                store.dumpStore(store,true,true,false,true);
+                System.err.println("dump after re-closure:\n"
+                        + store.dumpStore(store, true, true, false, true));
                 
             }
             
@@ -859,8 +866,6 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      *            of recursion for retraction from the database.
      * 
      * @todo update logic to use TMSPOBuffer.
-     * 
-     * 
      */
     private void retractAndAssert(InferenceEngine inf, AbstractTripleStore db,
             int depth, final int D, final int N) throws SailException {
@@ -873,17 +878,6 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
          */
         
         SPO[] stmts = selectRandomExplicitStatements(db, N);
-
-        // shows an error in direct byte buffer.
-//        SPO[] stmts = new SPO[] {
-//                new SPO(
-////                        #entity-103  #telephoneNumber-10144  "436-7482"
-//                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#entity-103")),
-//                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#telephoneNumber-10144")),
-//                        db.getTermId(new LiteralImpl("436-7482")),
-//                        StatementEnum.Explicit
-//                        )
-//        };
         
         log.info("Selected "+stmts.length+" statements at random: depth="+depth);
 

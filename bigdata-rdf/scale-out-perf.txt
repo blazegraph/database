@@ -857,7 +857,7 @@ Short term tasks:
            assign term identifiers for bnodes since the bnode ID is
            only required to be distinct, but not stable.
 
-	 - (*) TMStatementBuffer needs to recursively wipe out
+	 - Done. TMStatementBuffer needs to recursively wipe out
            statements using a statement identifier.  this should be
            part of truth maintenance.  when we get the original set of
            explicit statements to be removed we collect their
@@ -866,27 +866,57 @@ Short term tasks:
            position and add them to the original set of statements to
            be removed.
 
-	   at the database level (AccessPath#removeAll()), we also
-	   need to collect the set of statements using a statement
-	   identifier and delete them as well.  this will wind up
-	   being a double test for the original set of statements if
-	   TM is being used, but it is required when TM is not in use.
+	   Done. AccessPath#removeAll() we also need to collect the
+	   set of statements using a statement identifier and delete
+	   them as well.  this will wind up being a double test for
+	   the original set of statements if TM is being used, but it
+	   is required when TM is not in use.
 
-	   Do not generate statement identifiers if the SPO is marked
-	   as an inference (an optimization).  Modify the procedure
-	   that actually writes on the statement index to write a ZERO
-	   (0L) statement identifier if the statement is (in fact at
-	   the time that we examine the statement index) an inference
-	   or an axiom.  If an explicit statement is later asserted
-	   for the same SPO, then we need to overwrite that 0L with
-	   the assigned statement identifier.
+	   Done. Do not generate statement identifiers if the SPO is
+	   marked as an inference (an optimization).
+	   
+	   Done. Modify the procedure that actually writes on the
+	   statement index to write a ZERO (0L) statement identifier
+	   if the statement is (in fact at the time that we examine
+	   the statement index) an inference or an axiom.  If an
+	   explicit statement is later asserted for the same SPO, then
+	   we need to overwrite that 0L with the assigned statement
+	   identifier.
 
-	   add documentation on statement identifiers and TM.
+	   Done. override ISPOIterator#close() when returning an
+	   iterator backed by a temporary store.
 
-	   write unit tests for TM and non-TM cases when using
-	   statement identifiers to make metadata statements.
+	   Done. infinite loop test case fails when sids NOT used. I'm
+	   not sure how the test was succeeding before, but the
+	   problem was failing to verify that a statement was in the
+	   database before adding it to the focusStore.
 
-	 - (*) prefix compression and apply to the lexicon.
+	   Done. TestTripleStore#removeStatements() has problem with
+	   sids.  The problem is that the sid is not getting placed
+	   onto the SPO by the unit test, but it highlights the fact
+	   that with sids you need to either have the SID on hand
+	   before calling removeStatements() or I need to modify the
+	   code to resolve the sids as a first step when I compute
+	   their fixed point (at which point I could also discard any
+	   statements that were not actually in the database).
+	   (addStatements already resolves sids so as to always make
+	   them consistent).
+
+	   - add documentation on statement identifiers and TM.
+
+	   Done. write unit tests for TM cases when using statement
+	   identifiers to make metadata statements.
+
+	 - (*) implement prefix compression and apply to the lexicon.
+           test it out also on the statement indices and see how it
+           stacks up against the "fast rdf key" compression and
+           compare with huffman encoding of the decoded long
+           identifiers as well.
+
+	 - add [URI osa sid] if a URI is used rather than a BNode in a
+           named graph interchange?
+
+	 - (*) direct term scan.
       
       2. *** RDF/XML w/ source in.
 
@@ -896,7 +926,38 @@ Short term tasks:
 
       5. JOIN optimization.
 
-      6. Defer "named-graph" style quad store for now.
+	 - Map the first triple pattern over its index, and for each
+           mapped key-range of the index collect intermediate results
+           and map them over the next index.  This must use
+           read-historical or read-committed access to avoid locking
+           up the unisolated index, but that's going to be automatic
+           since the join operator itself does not write on an index.
+           the buffer in which we accumulate the join results needs to
+           write somewhere, and the choices either back to the client,
+           onto the focusStore, or onto the database.  All of those
+           can be handled since the read-only procedure will be either
+           returning a result or submitting a write procedure.  A join
+           variable buffer should accumulate those results and then
+           write only the selected variables into any of the
+           appropriate locations on overflow (via subclassing or a
+           ctor parameter for the writer).
+
+	 - Any SPARQL query which can be directly mapped onto a series
+           of JOINS can be directly translated into a rule and run by
+           the existing rule engine.  If it has filters that need to
+           be applied then they should be handled by a filter applied
+           to the buffered join results.  That filter can even handle
+	   batch filtering by inspection of datatyped literals.
+
+	 - A further optimization is possible for the local data
+           service since all indices are known to be local and the
+           index lookups do not need to be batched since they will
+           always be continuous unbuffered local reads.
+      
+      6. Publish on statement level provenance and truth maintenance
+         for SPARQL end points.
+
+      7. Defer "named-graph" style quad store for now.
 
     - Need examples for the proposed provenance mode/architecture.
 

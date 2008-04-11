@@ -125,7 +125,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
             final long property = noClosure.getTermId(RDF.PROPERTY);
             final long subpropof = noClosure.getTermId(RDFS.SUBPROPERTYOF);
             
-            noClosure.dumpStore(true, true, false);
+            System.err.println(noClosure.dumpStore(true, true, false));
   
             { // test S
             
