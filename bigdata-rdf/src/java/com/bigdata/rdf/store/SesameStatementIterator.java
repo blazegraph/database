@@ -69,7 +69,7 @@ public class SesameStatementIterator implements StatementIterator {
     }
 
     /**
-     * Note: Returns instances of {@link StatementWithType}.
+     * Note: Returns instances of {@link IStatementWithType}.
      * 
      * FIXME Modify to do batch resolution of the termIds to the terms a chunk
      * at at time. This will probably be a huge performance win for

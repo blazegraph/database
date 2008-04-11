@@ -222,7 +222,7 @@ public interface ITripleStore {
     /**
      * Convert an internal {@link SPO} into a Sesame {@link Statement}.
      * <p>
-     * Note: The object returned will be a {@link StatementWithType}
+     * Note: The object returned will be a {@link IStatementWithType}
      * 
      * @param spo
      *            The {@link SPO}.

@@ -526,7 +526,7 @@ public class DataLoader {
      * @todo change to use correct Parser method depending on Reader vs
      *       InputStream (SAX Source)
      * 
-     * @todo support reading from a URL.
+     * @todo support reading from a URL, a Reader, or an InputStream.
      */
     protected LoadStats loadData2(String resource, String baseURL,
             RDFFormat rdfFormat, boolean endOfBatch) throws IOException {

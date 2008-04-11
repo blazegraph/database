@@ -126,11 +126,11 @@ import com.bigdata.rdf.store.EmptyAccessPath;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.IStatementWithType;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.StatementIterator;
-import com.bigdata.rdf.store.StatementWithType;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -1282,7 +1282,7 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * Returns an iterator that visits {@link StatementWithType} objects.
+         * Returns an iterator that visits {@link IStatementWithType} objects.
          * 
          * @todo modify IAccessPath to accept a filter for inferences or no.
          */
