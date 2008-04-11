@@ -454,7 +454,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
          */
         String STATEMENT_IDENTIFIERS = "statementIdentifiers";
 
-        String DEFAULT_STATEMENT_IDENTIFIERS = "false";
+        String DEFAULT_STATEMENT_IDENTIFIERS = "true";
 
     }
 
