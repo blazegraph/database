@@ -105,7 +105,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             final long y = store.getTermId(Y);
             final long z = store.getTermId(Z);
             
-            store.dumpStore(true, true, false);
+            System.err.println(store.dumpStore(true, true, false));
 
             SPO[] stmts = new SPO[] {
                 new SPO(x,a,y,StatementEnum.Explicit),

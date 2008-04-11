@@ -498,7 +498,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             System.err.println(store.usage());
             
-            store.dumpStore();
+            System.err.println(store.dumpStore());
 
             // verify range count on each of the statement indices.
             assertEquals(2,store.getStatementIndex(KeyOrder.SPO).rangeCount(null, null));
@@ -549,7 +549,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             System.err.println(store.usage());
             
-            store.dumpStore();
+            System.err.println(store.dumpStore());
 
             /*
              * verify that the statement is gone from each of the statement
@@ -609,7 +609,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             System.err.println(store.usage());
             
-            store.dumpStore();
+            System.err.println(store.dumpStore());
             
         } finally {
             
@@ -656,7 +656,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
-            store.dumpStore();
+            System.err.println(store.dumpStore());
             
             assertEquals(1, store.getAccessPath(NULL, NULL, store.getTermId(B))
                     .removeAll());
@@ -665,7 +665,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             store.commit();
             
-            store.dumpStore();
+            System.err.println(store.dumpStore());
             
             assertSameSPOs(new SPO[] {
                     new SPO(store.getTermId(A), store
@@ -711,7 +711,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
-            store.dumpStore();
+            System.err.println(store.dumpStore());
             
         } finally {
             
@@ -753,11 +753,11 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getStatements(null,null,null)
                     );
 
-            store.dumpStore();
+            System.err.println(store.dumpStore());
             
             assertEquals(1,store.removeStatements(null, null, B));
 
-            store.dumpStore();
+            System.err.println(store.dumpStore());
             
             assertSameStatements(new Statement[]{
                     new StatementImpl(A,RDF.TYPE,C),

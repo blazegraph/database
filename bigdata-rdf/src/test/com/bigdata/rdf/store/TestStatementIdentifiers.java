@@ -338,6 +338,11 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
     }
 
+    /**
+     * Test creates a statement (a) and then a statement (b) about statement (a)
+     * using the statement identifier for (a) and then retracts (a) and verifies
+     * that (b) is also retracted.
+     */
     public void test_retractionOfStatementsAboutStatements() {
         
         AbstractTripleStore store = getStore();
@@ -441,6 +446,137 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
     }
     
     /**
+     * Test creates a statement (a), a statement (b) about statement (a), and a
+     * statement (c) about statement (b) and then retracts (a) and verifies that
+     * both (b) and (c) are also retracted.
+     */
+    public void test_retractionOfStatementsAboutStatements2() {
+        
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            if(!store.statementIdentifiers) {
+                
+                log.warn("Statement identifiers are not enabled");
+
+                return;
+                
+            }
+
+            _URI x = new _URI("http://www.foo.org/x");
+            _URI y = new _URI("http://www.foo.org/y");
+            _URI z = new _URI("http://www.foo.org/z");
+    
+            _URI A = new _URI("http://www.foo.org/A");
+            _URI B = new _URI("http://www.foo.org/B");
+            _URI C = new _URI("http://www.foo.org/C");
+    
+            _URI rdfType = new _URI(RDF.TYPE);
+            _URI dcCreator = new _URI("http://purl.org/dc/terms/creator");
+    
+            _Literal lit1 = new _Literal("bryan");
+            _Literal lit2 = new _Literal("mike");
+    
+            _Value[] terms = new _Value[] {
+              
+                    x,y,z,//
+                    A,B,C,//
+                    rdfType,//
+                    dcCreator,//
+                    lit1,lit2,//
+                    
+            };
+            
+            store.addTerms(terms, terms.length);
+            
+            /*
+             * create the original statement.
+             */
+            SPO[] stmts1 = new SPO[] {
+
+                new SPO(x.termId, rdfType.termId, A.termId, StatementEnum.Explicit),
+                
+            };
+            
+            // insert into the database.
+            assertEquals(1,store.addStatements(stmts1, stmts1.length));
+            
+            // the statement identifier for the original stmt. 
+            final long sid1 = stmts1[0].getStatementIdentifier();
+            
+            /*
+             * create a statement about that statement.
+             */
+            
+            SPO[] stmts2 = new SPO[] {
+                    
+                    new SPO(sid1, dcCreator.termId, lit1.termId, StatementEnum.Explicit),
+                    
+            };
+
+            // insert the metadata statement into the database.
+            assertEquals(1,store.addStatements(stmts2, stmts2.length));
+
+            assertEquals(2,store.getStatementCount(true/*exact*/));
+
+            // the stmt identifier for the statement about the original stmt.
+            final long sid2 = stmts2[0].getStatementIdentifier();
+
+            /*
+             * create a statement about the statement about the original statement.
+             */
+
+            SPO[] stmts3 = new SPO[] {
+                    
+                    new SPO(sid2, dcCreator.termId, lit2.termId, StatementEnum.Explicit),
+                    
+            };
+
+            // insert the metadata statement into the database.
+            assertEquals(1,store.addStatements(stmts3, stmts3.length));
+
+            assertEquals(3,store.getStatementCount(true/*exact*/));
+
+            /*
+             * Verify read back.
+             */
+            {
+            
+                SPO[] all = new SPO[] {
+                  
+                        stmts1[0],
+                        stmts2[0],
+                        stmts3[0],
+                        
+                };
+                
+                assertSameSPOArray(store, all, all.length);
+                            
+            }
+
+            /*
+             * Retract the original statement and verify that the statement
+             * about the original statement and the statement about the
+             * statement about the original statement are also retracted.
+             */
+            {
+                
+                store.removeStatements(new SPOArrayIterator(stmts1,stmts1.length));
+
+                assertSameSPOArray(store, new SPO[]{}, 0/*numStmts*/);
+
+            }
+            
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+        
+    }
+    
+    /**
      * Verify read back from the KB. Note that the SPO[] MUST be in SPO order
      * and we are reading in SPO order so the array and the iterator should be
      * aligned and should visit the same #of statements (since there is no truth
@@ -449,7 +585,10 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
      * 
      * @param store
      * @param all
+     *            The expected statemetns (sorted into SPO order as a
+     *            side-effect).
      * @param numStmts
+     *            The #of statements <i>all</i>.
      */
     private void assertSameSPOArray(AbstractTripleStore store, SPO[] all, int numStmts) {
         

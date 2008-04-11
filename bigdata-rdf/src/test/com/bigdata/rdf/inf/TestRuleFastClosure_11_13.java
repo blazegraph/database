@@ -93,7 +93,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
 
             store.commit();
 
-            store.dumpStore();
+            System.err.println(store.dumpStore());
 
             /*
              * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->
@@ -174,7 +174,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
 
             store.commit();
 
-            store.dumpStore();
+            System.err.println(store.dumpStore());
 
             /*
              * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->

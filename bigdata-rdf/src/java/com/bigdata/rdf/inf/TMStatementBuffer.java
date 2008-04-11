@@ -624,7 +624,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         }
 
         // do truth maintenance.
-        retractAll(stats,tempStore,0);
+        retractAll(stats, tempStore, 0);
         
         MDC.remove("depth");
         
@@ -657,7 +657,7 @@ public class TMStatementBuffer implements IStatementBuffer {
      * However, when this is invoked recursively the tempStore will contain only
      * inferred statements -- these are statements that are part of the closure
      * of the original statements that were retracted and whose grounded
-     * justifications we are now seeking. Regardless of whether this is invoke
+     * justifications we are now seeking. Regardless of whether this is invoked
      * with the explicitly given set of statements to retracted or (recursively)
      * with inferences that may need to be retracted, the statements in the
      * tempStore MUST still in the database (they should have been copied to the
@@ -715,16 +715,22 @@ public class TMStatementBuffer implements IStatementBuffer {
         
         final long tempStoreCount = tempStore.getStatementCount();
 
+        /*
+         * Note: The buffer capacity does not need to be any larger than the #of
+         * triples in the temp store.
+         */
+        final int capacity = (int) Math.min(10000L, tempStoreCount);
+
         log.info("Doing truth maintenance with " + tempStoreCount
-                + " statements : depth="+depth);
+                + " statements : depth=" + depth);
         
         /*
          * Temp store used to absorb statements for which no grounded
          * justification chain could be discovered.
          */
 
-        TempTripleStore focusStore = new TempTripleStore(database
-                .getProperties(),database);
+        final TempTripleStore focusStore = new TempTripleStore(database
+                .getProperties(), database);
         
         // consider each statement in the tempStore.
         final ISPOIterator itr = tempStore.getAccessPath(KeyOrder.SPO).iterator();
@@ -733,11 +739,11 @@ public class TMStatementBuffer implements IStatementBuffer {
         try {
 
             /*
-             * Buffer writing on the [focusStore] removes any statements that are no longer grounded.
+             * Buffer writing on the [focusStore] adds any statements that are
+             * no longer grounded.
              */
-
-            final SPOAssertionBuffer ungroundedBuffer = new SPOAssertionBuffer( 
-                    focusStore, database, null/* filter */, bufferCapacity, false/* justified */);
+            final SPOAssertionBuffer ungroundedBuffer = new SPOAssertionBuffer(
+                    focusStore, database, null/* filter */, capacity, false/* justified */);
 
             /*
              * Buffer used to downgrade explicit statements that are still
@@ -746,10 +752,9 @@ public class TMStatementBuffer implements IStatementBuffer {
              * Note: If the statement is already present AND it is marked as
              * inferred then this will NOT write on the statement index.
              */
-
-            final SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer( 
+            final SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer(
                     focusStore, database, inferenceEngine.doNotAddFilter,
-                    10000/* capacity */, false/* justify */);
+                    capacity, false/* justify */);
 
             /*
              * Buffer used to retract statements from the database after we have
@@ -764,9 +769,8 @@ public class TMStatementBuffer implements IStatementBuffer {
              * do not need to re-compute the closure over the statement
              * identifiers.
              */
-
             final SPORetractionBuffer retractionBuffer = new SPORetractionBuffer(
-                    database, 10000/* capacity */, false/* computeClosureForStatementIdentifiers */);
+                    database, capacity, false/* computeClosureForStatementIdentifiers */);
 
             /*
              * Note: when we enter this method recursively statements in the
@@ -808,51 +812,50 @@ public class TMStatementBuffer implements IStatementBuffer {
                         
                     }
 
-                    if (DEBUG) {
-
-                        SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
-
-                        if (tmp == null) {
-
-                            throw new IllegalArgumentException(
-                                    "Given statement not in database: "
-                                            + spo.toString(database));
-
-                        }
-
-                        if(depth==0) {
-
-                            if (tmp.type != StatementEnum.Explicit) {
-
-                                throw new IllegalArgumentException(
-                                    "Given statement not explicit in database: "
-                                            + tmp.toString(database));
-                            
-                            }
-                            
-                        }
-
-                    }
+//                    if (DEBUG) {
+//
+//                        final SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
+//
+//                        if (tmp == null) {
+//
+//                            throw new IllegalArgumentException(
+//                                    "Given statement not in database: "
+//                                            + spo.toString(database));
+//
+//                        }
+//
+//                        if (depth == 0) {
+//
+//                            if (tmp.type != StatementEnum.Explicit) {
+//
+//                                throw new IllegalArgumentException(
+//                                    "Given statement not explicit in database: "
+//                                            + tmp.toString(database));
+//                            
+//                            }
+//                            
+//                        }
+//
+//                    }
                     
-                    if( spo.type==StatementEnum.Axiom ) {
+                    if (spo.type == StatementEnum.Axiom) {
 
                         /*
                          * Ignore.
                          */
-                        log.info("Ignoring axiom in the tempStore: "+spo);
+                        if (INFO)
+                            log.info("Ignoring axiom in the tempStore: "+spo);
                         
                     } else if( depth>0 && spo.type==StatementEnum.Explicit ) {
                         
                         /*
-                         * Ignore. If an explicit statement is discover by
-                         * closure then we do nothing.
-                         * 
-                         * @todo since closure produces inferences (rather than
-                         * explicit statements) this block is probably never
-                         * executed.
+                         * Closure produces inferences (rather than explicit
+                         * statements) so this block should never be executed.
                          */
-                        log.info("Ignoring explicit statement in the tempStore at depth="+depth+", "+spo);
-                        throw new AssertionError(); // verify that we never execute this block.
+
+                        throw new AssertionError(
+                                "Explicit statement in the tempStore at depth="
+                                        + depth + ", " + spo.toString(database));
                         
                     } else if (inferenceEngine.isAxiom(spo.s, spo.p, spo.o)) {
                         
@@ -867,42 +870,45 @@ public class TMStatementBuffer implements IStatementBuffer {
                          * in the DoNotAddFilter.
                          */
                         
-                        SPO tmp = new SPO(spo.s, spo.p, spo.o,
+                        final SPO tmp = new SPO(spo.s, spo.p, spo.o,
                                 StatementEnum.Axiom);
 
                         tmp.override = true;
 
                         downgradeBuffer.add(tmp, null);                        
 
-                        log.info("Downgrading to axiom: "+spo.toString(database));
+                        if (INFO)
+                            log.info("Downgrading to axiom: "
+                                    + spo.toString(database));
 
                     } else if (depth == 0
                             && Justification.isGrounded(inferenceEngine, tempStore, database, spo, testHead, testFocusStore)) {
 
                         /*
                          * Add a variant of the statement that is marked as
-                         * "inferred" rather than as "explicit" to the
-                         * buffer. When the buffer is flushed the statement
-                         * will be written onto the database.
+                         * "inferred" rather than as "explicit" to the buffer.
+                         * When the buffer is flushed the statement will be
+                         * written onto the database.
                          * 
-                         * @todo consider returning the grounded
-                         * justification and then writing it onto the
-                         * database where. This will essentially "memoize"
-                         * grounded justifications. Of course, you still
-                         * have to verify that there is support for the
-                         * justification (the statements in the tail of the
-                         * justification still exist in the database).
+                         * @todo consider returning the grounded justification
+                         * and then writing it onto the database where. This
+                         * will essentially "memoize" grounded justifications.
+                         * Of course, you still have to verify that there is
+                         * support for the justification (the statements in the
+                         * tail of the justification still exist in the
+                         * database).
                          */
 
-                        SPO tmp = new SPO(spo.s, spo.p, spo.o,
+                        final SPO tmp = new SPO(spo.s, spo.p, spo.o,
                                 StatementEnum.Inferred);
 
                         tmp.override = true;
 
                         downgradeBuffer.add(tmp, null);
 
-                        log.info("Downgrading to inferred: "
-                                + spo.toString(database));
+                        if (INFO)
+                            log.info("Downgrading to inferred: "
+                                    + spo.toString(database));
                         
                     } else if (depth > 0
                             && Justification.isGrounded(inferenceEngine, tempStore, database, spo, testHead, testFocusStore)) {
@@ -911,6 +917,25 @@ public class TMStatementBuffer implements IStatementBuffer {
                          * Ignore.
                          */
                         
+                        if (INFO)
+                            log.info(spo.toString(database) + " is grounded");
+                        
+                    } else if(!database.hasStatement(spo.s, spo.p, spo.o)) {
+                        
+                        /*
+                         * Ignore.
+                         * 
+                         * @todo this should be done as a bulk filter on the
+                         * focusStore below rather than a set of point tests in
+                         * this if-then-else block.
+                         */
+                        
+                        if(INFO) {
+                            
+                            log.info("Statement not in database: "+spo.toString(database));
+                            
+                        }
+
                     } else {
 
                         /*
@@ -921,7 +946,8 @@ public class TMStatementBuffer implements IStatementBuffer {
 
                         retractionBuffer.add(spo);
                         
-                        log.info("Retracting: "+spo.toString(database));
+                        if (INFO)
+                            log.info("Retracting: "+spo.toString(database));
 
                         /*
                          * The ungrounded statement will be added to the
@@ -944,14 +970,12 @@ public class TMStatementBuffer implements IStatementBuffer {
             }
 
             // flush buffers, logging counters.
+            final int ndowngraded = downgradeBuffer.flush();
+                       nretracted = retractionBuffer.flush();
+            final int nungrounded = ungroundedBuffer.flush();
 
-            log.info("#downgraded="+downgradeBuffer.flush());
-
-            nretracted = retractionBuffer.flush();
-            
-            log.info("#retracted="+nretracted);
-
-            log.info("#ungrounded="+ungroundedBuffer.flush());
+            log.info("#downgraded=" + ndowngraded + ", #retracted="
+                    + nretracted + ", #ungrounded=" + nungrounded);
 
         } finally {
 
@@ -962,7 +986,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         // drop the tempStore.
         tempStore.closeAndDelete();
 
-        if(nretracted==0) {
+        if (nretracted == 0) {
             
             log.info("Done - nothing was retracted from the database");
             
@@ -972,9 +996,13 @@ public class TMStatementBuffer implements IStatementBuffer {
         
         if(DEBUG && database.getStatementCount()<200) {
             
-            System.err.println("dumping database after retraction: depth="+depth);
-
-            database.dumpStore(true, true, false);
+            log.debug("dumping database after retraction: depth="
+                            + depth
+                            + "\n"
+                            + database
+                                    .dumpStore(database, true/* explicit */,
+                                            true/* inferred */,
+                                            false/* axioms */, true/* just */));
             
         }
         
@@ -1008,9 +1036,13 @@ public class TMStatementBuffer implements IStatementBuffer {
             
             if(DEBUG && database.getStatementCount()<200) {
                 
-                System.err.println("focusStore before closure: depth="+depth);
-                
-                focusStore.dumpStore(database,true,true,false);
+                log.debug("focusStore before closure: depth="
+                        + depth
+                        + "\n"
+                        + focusStore
+                                .dumpStore(database, true/*explicit*/,
+                                        true/*inferred*/, false/*axioms*/,
+                                        true/*just*/));
             
             }
 
@@ -1020,9 +1052,13 @@ public class TMStatementBuffer implements IStatementBuffer {
 
             if(DEBUG && database.getStatementCount()<200) {
                 
-                System.err.println("focusStore after closure: depth="+depth);
-                
-                focusStore.dumpStore(database,true,true,false);
+                log.debug("focusStore after closure: depth="
+                        + depth
+                        + "\n"
+                        + focusStore
+                                .dumpStore(database, true/*explicit*/,
+                                        true/*inferred*/, false/*axioms*/,
+                                        true/*just*/));
             
             }
             
@@ -1032,9 +1068,13 @@ public class TMStatementBuffer implements IStatementBuffer {
             
             if(DEBUG && database.getStatementCount()<200) {
                 
-                System.err.println("focusStore after subtracting out tmp: depth="+depth);
-                
-                focusStore.dumpStore(database,true,true,false);
+                log.debug("focusStore after subtracting out tmp: depth="
+                        + depth
+                        + "\n"
+                        + focusStore
+                                .dumpStore(database, true/*explicit*/,
+                                        true/*inferred*/, false/*axioms*/,
+                                        true/*just*/));
             
             }
             

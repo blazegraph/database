@@ -101,8 +101,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
                 capacity, justified);
         
         // dump the database on the console.
-        System.err.println("database::");
-        db.dumpStore();
+        System.err.println("database::" + db.dumpStore());
         
         State state = rule.newState(justified, db, buffer);
         
@@ -117,8 +116,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 //        final int nwritten = 
             buffer.flush();
         
-        System.err.println("after write on the database");
-        db.dumpStore();
+        System.err.println("after write on the database: " + db.dumpStore());
 
         /*
          * Verify the #of entailments computed. 

@@ -454,7 +454,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
          */
         String STATEMENT_IDENTIFIERS = "statementIdentifiers";
 
-        String DEFAULT_STATEMENT_IDENTIFIERS = "true";
+        String DEFAULT_STATEMENT_IDENTIFIERS = "false";
 
     }
 
@@ -2096,23 +2096,23 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * Utility method dumps the statements in the store onto {@link System#err}
      * using the SPO index (subject order).
      */
-    final public void dumpStore() {
+    final public String dumpStore() {
 
-        dumpStore(true, true, true);
+        return dumpStore(true, true, true);
 
     }
 
-    final public void dumpStore(boolean explicit, boolean inferred,
+    final public String dumpStore(boolean explicit, boolean inferred,
             boolean axioms) {
 
-        dumpStore(this, explicit, inferred, axioms);
+        return dumpStore(this, explicit, inferred, axioms);
 
     }
 
-    final public void dumpStore(AbstractTripleStore resolveTerms,
+    final public String dumpStore(AbstractTripleStore resolveTerms,
             boolean explicit, boolean inferred, boolean axioms) {
 
-        dumpStore(resolveTerms, explicit, inferred, axioms, false);
+        return dumpStore(resolveTerms, explicit, inferred, axioms, false);
 
     }
 
@@ -2133,10 +2133,12 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * @param justifications
      *            Dump the justifications index also.
      */
-    final public void dumpStore(AbstractTripleStore resolveTerms,
+    final public String dumpStore(AbstractTripleStore resolveTerms,
             boolean explicit, boolean inferred, boolean axioms,
             boolean justifications) {
 
+        StringBuilder sb = new StringBuilder();
+        
         final long nstmts = getStatementCount();
 
         long nexplicit = 0;
@@ -2181,8 +2183,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                 }
 
-                System.err.println("#" + (i + 1) + "\t"
-                        + spo.toString(resolveTerms));
+                sb.append("#" + (i + 1) + "\t" + spo.toString(resolveTerms)
+                        + "\n");
 
                 i++;
 
@@ -2202,8 +2204,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                 Justification jst = new Justification(itrj);
 
-                System.err.println("#" + (njust + 1) + "\t"
-                        + jst.toString(resolveTerms));
+                sb.append("#" + (njust + 1) + "\t"
+                        + jst.toString(resolveTerms)+"\n");
 
                 njust++;
 
@@ -2211,10 +2213,12 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
-        System.err.println("dumpStore: #statements=" + nstmts + ", #explicit="
+        sb.append("dumpStore: #statements=" + nstmts + ", #explicit="
                 + nexplicit + ", #inferred=" + ninferred + ", #axioms="
-                + naxioms + (justifications ? ", #just=" + njust : ""));
+                + naxioms + (justifications ? ", #just=" + njust : "")+"\n");
 
+        return sb.toString();
+        
     }
 
     /**
