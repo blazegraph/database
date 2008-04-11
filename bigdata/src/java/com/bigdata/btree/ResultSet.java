@@ -431,8 +431,8 @@ public class ResultSet implements Externalizable {
          */
         ITuple tuple = null;
         
-        if((flags&IRangeQuery.REMOVEALL)!=0) {
-            
+        if ((flags & IRangeQuery.REMOVEALL) != 0) {
+
             log.info("Iterator will remove up to " + capacity
                     + " entries (capacity=" + capacity + ", rangeCount="
                     + rangeCount + ")");
