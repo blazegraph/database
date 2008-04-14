@@ -799,10 +799,11 @@ public class InferenceEngine extends RDFSHelper {
      * If you are loading data from some kind of resource, then see
      * {@link DataLoader} which already knows how to do this.
      * <p>
-     * See {@link TMStatementBuffer#assertAll()}, which first handles
-     * statements already in the database, then calls this method, and finally
-     * copies the remaining explicit statements in the focusStore and the
-     * entailments into the database.
+     * See
+     * {@link TruthMaintenance#assertAll(com.bigdata.rdf.store.TempTripleStore)},
+     * which first handles statements already in the database, then calls this
+     * method, and finally copies the remaining explicit statements in the
+     * focusStore and the entailments into the database.
      * 
      * @param focusStore
      *            The data set that will be closed against the database
@@ -819,10 +820,10 @@ public class InferenceEngine extends RDFSHelper {
     
     /**
      * This variant allows you to explicitly NOT generate {@link Justification}s
-     * for the computed entailments. It is used by the {@link TMStatementBuffer}
-     * as part of the algorithm for truth maintenance when retracting statements
-     * from the database. It SHOULD NOT be used for any other purpose or you may
-     * risk failing to generate justifications.
+     * for the computed entailments. It is used by the {@link TruthMaintenance}
+     * class as part of the algorithm for truth maintenance when retracting
+     * statements from the database. It SHOULD NOT be used for any other purpose
+     * or you may risk failing to generate justifications.
      * 
      * @param focusStore
      *            The data set that will be closed against the database.

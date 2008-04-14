@@ -51,6 +51,10 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * when configured to generate entailments for {@link RuleOwlSameAs2} and
  * {@link RuleOwlSameAs3}.
  * 
+ * @deprecated This test suite is for a feature which has been implemented using
+ *             a different approach. It is keep around purely for reasons of
+ *             interest if we eventually revisit this approach.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

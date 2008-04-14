@@ -67,6 +67,7 @@ import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
@@ -786,6 +787,40 @@ abstract public class AbstractTripleStore implements ITripleStore,
     final public long getExactStatementCount() {
         
         return getStatementCount(true/*exact*/);
+        
+    }
+
+    /**
+     * The #of explicit statements in the database (exact count based on
+     * key-range scan).
+     * <p>
+     * Note: In order to get the #of explicit statements in the repository we
+     * have to actually do a range scan and figure out for each statement
+     * whether or not it is explicit.
+     * 
+     * @todo modify IAccessPath so that we can send the filter to the data and
+     *       just do a rangeCount(). That way we can avoid sending back the keys
+     *       or values. In fact, this operation could be parallelized, just like
+     *       the standard {@link IRangeQuery#rangeCount(byte[], byte[])}, so
+     *       perhaps just add an optional {@link ITupleFilter} to the latter and
+     *       then it.
+     */
+    public long getExplicitStatementCount() {
+        
+        final ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator(
+                ExplicitSPOFilter.INSTANCE);
+
+        long n = 0;
+
+        while (itr.hasNext()) {
+
+            SPO[] chunk = itr.nextChunk();
+            
+            n += chunk.length;
+            
+        }
+        
+        return n;
         
     }
     
@@ -3264,10 +3299,11 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * 
      * @param db
      *            The database.
-     * @param tmp
+     * @param tempStore
      *            The temporary store.
      */
-    static public void fixPointStatementIdentifiers(AbstractTripleStore db, TempTripleStore tmp) {
+    static public void fixPointStatementIdentifiers(
+            final AbstractTripleStore db, final AbstractTripleStore tempStore) {
         
         /*
          * Fix point the temp triple store.
@@ -3277,7 +3313,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
          * avoid a re-scan for the use of that statement identifier in the
          * database.
          * 
-         * FIXME The TempTripleStore does not support concurrent readers and
+         * FIXME A TempTripleStore does not support concurrent readers and
          * writers because it is backed by a TemporaryStore and not a Journal
          * (with its concurrency controls). This is handled in AccessPath by
          * always using a fully buffered iterator(), so we do not really gain
@@ -3293,10 +3329,10 @@ abstract public class AbstractTripleStore implements ITripleStore,
             nrounds++;
 
             // note: count will be exact.
-            statementCount0 = tmp.getStatementCount();
+            statementCount0 = tempStore.getStatementCount();
 
             // visit the explicit statements since only they can have statement identifiers.
-            final ISPOIterator itr = tmp.getAccessPath(KeyOrder.SPO).iterator(ExplicitSPOFilter.INSTANCE);
+            final ISPOIterator itr = tempStore.getAccessPath(KeyOrder.SPO).iterator(ExplicitSPOFilter.INSTANCE);
 
             try {
                 
@@ -3307,7 +3343,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
                     if(sids.contains(sid)) continue;
                     
                     // sid in the subject position.
-                    tmp.addStatements(tmp, true/* copyOnly */, db
+                    tempStore.addStatements(tempStore, true/* copyOnly */, db
                                     .getAccessPath(sid, NULL, NULL).iterator(),
                                     null/* filter */);
 
@@ -3317,12 +3353,12 @@ abstract public class AbstractTripleStore implements ITripleStore,
                      * Note: this case is not allowed by RDF but a TMGraph model
                      * might use it.
                      */
-                    tmp.addStatements(tmp, true/* copyOnly */, db
+                    tempStore.addStatements(tempStore, true/* copyOnly */, db
                                     .getAccessPath(NULL, sid, NULL).iterator(),
                                     null/* filter */);
 
                     // sid in the object position.
-                    tmp.addStatements(tmp, true/*copyOnly*/, db
+                    tempStore.addStatements(tempStore, true/*copyOnly*/, db
                                     .getAccessPath(NULL, NULL, sid).iterator(),
                                     null/* filter */);
 
@@ -3338,7 +3374,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
             }
             
             // note: count will be exact.
-            statementCount1 = tmp.getStatementCount();
+            statementCount1 = tempStore.getStatementCount();
 
             log.warn("Finished " + nrounds + " rounds: statementBefore="
                     + statementCount0 + ", statementsAfter=" + statementCount1);

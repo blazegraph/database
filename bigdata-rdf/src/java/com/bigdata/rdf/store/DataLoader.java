@@ -33,27 +33,31 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
-import com.bigdata.rdf.inf.TMStatementBuffer;
-import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
-import com.bigdata.rdf.rio.IStatementBuffer;
+import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * A utility class to efficiently load RDF data into an
  * {@link AbstractTripleStore} without using Sesame API.
+ * 
+ * FIXME it should be easier to configure the underlying parsers in order to
+ * enable or disable various features which they support, e.g., preserving BNode
+ * IDs, validation, etc.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -92,6 +96,12 @@ public class DataLoader {
     private final InferenceEngine inferenceEngine;
     
     /**
+     * The object used to maintain the closure for the database iff incremental
+     * truth maintenance is enabled.
+     */
+    private final TruthMaintenance tm;
+    
+    /**
      * The object used to compute entailments for the database.
      */
     public InferenceEngine getInferenceEngine() {
@@ -101,21 +111,56 @@ public class DataLoader {
     }
     
     /**
-     * Used to buffer writes. This will be a {@link TMStatementBuffer} iff we
-     * are using {@link ClosureEnum#Incremental} and a {@link StatementBuffer}
-     * otherwise.
+     * Used to buffer writes.
+     * 
+     * @see #getAssertionBuffer()
+     */
+    private StatementBuffer buffer;
+    
+    /**
+     * Return the assertion buffer.
+     * <p>
+     * The assertion buffer is used to buffer statements that are being asserted
+     * so as to maximize the opportunity for batch writes. Truth maintenance (if
+     * enabled) will be performed no later than the commit of the transaction.
      * <p>
      * Note: The same {@link #buffer} is reused by each loader so that we can on
      * the one hand minimize heap churn and on the other hand disable auto-flush
-     * when loading a series of small documents.
+     * when loading a series of small documents. However, we obtain a new buffer
+     * each time we perform incremental truth maintenance.
      * <p>
-     * Note: When truth maintenance is enabled the {@link #buffer} will write
-     * onto a local {@link TemporaryStore} and writes will be accumulated until
-     * the {@link #doClosure()} is invoked, which will update the database as
-     * appropriate. Otherwise the {@link #buffer} will write onto the database.
+     * Note: When non-<code>null</code> and non-empty, the buffer MUST be
+     * flushed (a) if a transaction completes (otherwise writes will not be
+     * stored on the database); or (b) if there is a read against the database
+     * during a transaction (otherwise reads will not see the unflushed
+     * statements).
+     * <p>
+     * Note: if {@link #truthMaintenance} is enabled then this buffer is backed
+     * by a temporary store which accumulates the {@link SPO}s to be asserted.
+     * Otherwise it will write directly on the database each time it is flushed,
+     * including when it overflows.
      */
-    protected final IStatementBuffer buffer;
-    
+    synchronized protected StatementBuffer getAssertionBuffer() {
+
+        if (buffer == null) {
+
+            if (tm != null) {
+
+                buffer = new StatementBuffer(tm.getTempStore(),
+                        database, bufferCapacity);
+
+            } else {
+
+                buffer = new StatementBuffer(database, bufferCapacity);
+
+            }
+
+        }
+        
+        return buffer;
+        
+    }
+
     private final CommitEnum commitEnum;
     
     private final ClosureEnum closureEnum;
@@ -133,7 +178,7 @@ public class DataLoader {
 //    }
     
     /**
-     * When <code>true</code> (the default) the {@link IStatementBuffer} is
+     * When <code>true</code> (the default) the {@link StatementBuffer} is
      * flushed by each {@link #loadData(String, String, RDFFormat)} or
      * {@link #loadData(String[], String[], RDFFormat[])} operation and when
      * {@link #doClosure()} is requested. When <code>false</code> the caller
@@ -157,7 +202,7 @@ public class DataLoader {
     }
     
     /**
-     * Flush the {@link IStatementBuffer} to the backing store.
+     * Flush the {@link StatementBuffer} to the backing store.
      * <p>
      * Note: If you disable auto-flush AND you are not using truth maintenance
      * then you MUST explicitly invoke this method once you are done loading
@@ -168,9 +213,13 @@ public class DataLoader {
      */
     public void flush() {
 
-        log.info("");
-        
-        buffer.flush();
+        if (buffer != null) {
+
+            log.info("");
+            
+            buffer.flush();
+            
+        }
         
     }
     
@@ -323,7 +372,7 @@ public class DataLoader {
         
         /**
          * 
-         * When <code>true</code> (the default) the {@link IStatementBuffer}
+         * When <code>true</code> (the default) the {@link StatementBuffer}
          * is flushed by each
          * {@link DataLoader#loadData(String, String, RDFFormat)} or
          * {@link DataLoader#loadData(String[], String[], RDFFormat[])}
@@ -403,15 +452,22 @@ public class DataLoader {
         this.database = database;
         
         inferenceEngine = database.getInferenceEngine();
-
+        
         if (closureEnum != ClosureEnum.None) {
+
+            /*
+             * Truth maintenance: buffer will write on a tempStore.
+             */
             
-            buffer = new TMStatementBuffer(inferenceEngine, bufferCapacity,
-                    BufferEnum.AssertionBuffer);
+            tm = new TruthMaintenance(inferenceEngine);
             
         } else {
             
-            buffer = new StatementBuffer(database, bufferCapacity);
+            /*
+             * No truth maintenance: buffer will write on the database.
+             */
+            
+            tm = null;
             
         }
         
@@ -493,11 +549,12 @@ public class DataLoader {
             
         }
 
-        if(flush) {
-            /*
-             * Flush the buffer after the document(s) have been loaded.
-             */
-            buffer.flush();
+        if (flush) {
+
+            // Flush the buffer after the document(s) have been loaded.
+            
+            flush();
+            
         }
         
         if (commitEnum==CommitEnum.Batch) {
@@ -521,21 +578,185 @@ public class DataLoader {
     }
 
     /**
+     * Load from a reader.
+     * 
+     * @param reader
+     * @param baseURL
+     * @param rdfFormat
+     * @return
+     * @throws IOException
+     */
+    public LoadStats loadData(Reader reader, String baseURL, RDFFormat rdfFormat) throws IOException  {
+
+        try {
+
+            return loadData3(reader, baseURL, rdfFormat, true/*endOfBatch*/);
+        
+        } finally {
+            
+            reader.close();
+            
+        }
+        
+    }
+
+    /**
+     * Load from an input stream.
+     * 
+     * @param is
+     * @param baseURL
+     * @param rdfFormat
+     * @return
+     * @throws IOException
+     */
+    public LoadStats loadData(InputStream is, String baseURL,
+            RDFFormat rdfFormat) throws IOException {
+
+        try {
+
+            return loadData3(is, baseURL, rdfFormat, true/* endOfBatch */);
+            
+        } finally {
+            
+            is.close();
+            
+        }
+
+    }
+
+    /**
+     * Load from a {@link URL}.
+     * 
+     * @param url
+     * @param baseURL
+     * @param rdfFormat
+     * @return
+     * @throws IOException
+     */
+    public LoadStats loadData(URL url, String baseURL, RDFFormat rdfFormat)
+            throws IOException {
+
+        if (url == null)
+            throw new IllegalArgumentException();
+        
+        log.info("loading: " + url);
+
+        final InputStream is = url.openStream();
+        
+        try {
+        
+            return loadData3(is, baseURL, rdfFormat, true/*endOfBatch*/);
+        
+        } finally {
+            
+            is.close();
+            
+        }
+        
+    }
+
+    /**
      * Load an RDF resource into the database.
      * 
-     * @todo change to use correct Parser method depending on Reader vs
-     *       InputStream (SAX Source)
+     * @param resource
+     *            Either the name of a resource which can be resolved using the
+     *            CLASSPATH, or the name of a resource in the local file system,
+     *            or a URL.
+     * @param baseURL
+     * @param rdfFormat
+     * @param endOfBatch
+     * @return
      * 
-     * @todo support reading from a URL, a Reader, or an InputStream.
+     * @throws IOException
+     *             if the <i>resource</i> can not be resolved or loaded.
      */
     protected LoadStats loadData2(String resource, String baseURL,
+            RDFFormat rdfFormat, boolean endOfBatch) throws IOException {
+
+        log.info("loading: " + resource);
+
+        // try the classpath
+        InputStream rdfStream = getClass().getResourceAsStream(resource);
+
+        if (rdfStream == null) {
+
+            /*
+             * If we do not find as a Resource then try the file system.
+             */
+            
+            rdfStream = new FileInputStream(resource);
+//            rdfStream = new BufferedInputStream(new FileInputStream(resource));
+
+            if (rdfStream == null) {
+                
+                // try as a URL
+                URL url;
+                try {
+
+                    url = new URL(resource);
+                    
+                } catch(MalformedURLException ex) {
+                    
+                    throw new IOException(
+                            "Could not find {classpath, file, URL}: "
+                                    + resource);
+                    
+                }
+                
+                rdfStream = url.openStream();
+                
+            }
+            
+        }
+        
+        /* 
+         * Obtain a buffered reader on the input stream.
+         */
+
+        // @todo reuse the backing buffer to minimize heap churn. 
+        Reader reader = new BufferedReader(
+                new InputStreamReader(rdfStream)
+//               , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
+                );
+
+        try {
+
+            return loadData3(reader, baseURL, rdfFormat, endOfBatch);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException("While loading: " + resource, ex);
+
+        } finally {
+
+            reader.close();
+
+            rdfStream.close();
+
+        }
+        
+    }
+    
+    /**
+     * Loads data from the <i>source</i>. The caller is responsible for closing
+     * the <i>source</i> if there is an error.
+     * 
+     * @param source
+     *            A {@link Reader} or {@link InputStream}.
+     * @param baseURL
+     * @param rdfFormat
+     * @param endOfBatch
+     * @return
+     */
+    protected LoadStats loadData3(Object source, String baseURL,
             RDFFormat rdfFormat, boolean endOfBatch) throws IOException {
 
         final long begin = System.currentTimeMillis();
         
         LoadStats stats = new LoadStats();
         
-        log.info( "loading: " + resource );
+        // Note: allocates a new buffer iff the [buffer] is null.
+        getAssertionBuffer();
         
         PresortRioLoader loader = new PresortRioLoader(buffer);
 
@@ -558,32 +779,17 @@ public class DataLoader {
             
         });
         
-        InputStream rdfStream = getClass().getResourceAsStream(resource);
-
-        if (rdfStream == null) {
-
-            /*
-             * If we do not find as a Resource then try the file system.
-             */
-            
-            rdfStream = new FileInputStream(resource);
-//            rdfStream = new BufferedInputStream(new FileInputStream(resource));
-
-        }
-
-        /* 
-         * Obtain a buffered reader on the input stream.
-         */
-
-        // @todo reuse the backing buffer to minimize heap churn. 
-        Reader reader = new BufferedReader(
-                new InputStreamReader(rdfStream)
-//               , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
-                );
-        
         try {
             
-            loader.loadRdf(reader, baseURL, rdfFormat, verifyData);
+            if(source instanceof Reader) {
+                
+                loader.loadRdf((Reader)source, baseURL, rdfFormat, verifyData);
+                
+            } else if(source instanceof InputStream) {
+                
+                loader.loadRdf((InputStream)source, baseURL, rdfFormat, verifyData);
+                
+            } else throw new AssertionError();
             
             long nstmts = loader.getStatementsAdded();
             
@@ -639,15 +845,27 @@ public class DataLoader {
              * (that is, by calling abort()).
              */
 
-            buffer.clear();
+            if(buffer != null) {
             
-            throw new RuntimeException("While loading: "+resource, ex);
+                // clear any buffer statements.
+                buffer.clear();
+
+                if (tm != null) {
+                    
+                    // delete the tempStore if truth maintenance is enabled.
+                    buffer.getStatementStore().closeAndDelete();
+                    
+                }
+
+                buffer = null;
+                
+            }
+                        
+            final IOException ex2 = new IOException("Problem loading data?");
             
-        } finally {
+            ex2.initCause(ex);
             
-            reader.close();
-            
-            rdfStream.close();
+            throw ex2;
             
         }
 
@@ -658,11 +876,17 @@ public class DataLoader {
      * then this MAY be used to (re-)compute the full closure of the database.
      * 
      * @see #removeEntailments()
+     * 
+     * @throws IllegalStateException
+     *             if assertion buffer is <code>null</code>
      */
     public ClosureStats doClosure() {
         
+        if (buffer == null)
+            throw new IllegalStateException();
+        
         // flush anything in the buffer.
-        buffer.flush();
+        flush();
         
         final ClosureStats stats;
         
@@ -671,16 +895,26 @@ public class DataLoader {
         case Incremental:
         case Batch: {
 
-            assert buffer != null;
+            /*
+             * Incremental truth maintenance.
+             */
             
-            stats = ((TMStatementBuffer)buffer).assertAll();
+            stats = new TruthMaintenance(inferenceEngine)
+                    .assertAll((TempTripleStore) buffer.getStatementStore());
             
+            /*
+             * Discard the buffer since the backing tempStore was closed when
+             * we performed truth maintenance.
+             */
+            
+            buffer = null;
+
             break;
-            
+
         }
-        
+
         case None: {
-            
+
             /*
              * Close the database against itself.
              * 
@@ -688,8 +922,8 @@ public class DataLoader {
              * ANY any explicit statements have been deleted then the caller
              * needs to first delete all entailments from the database.
              */
-            
-            stats = inferenceEngine.computeClosure(null);
+
+            stats = inferenceEngine.computeClosure(null/* focusStore */);
             
             break;
             
