@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rio;
 
+import java.io.InputStream;
 import java.io.Reader;
 import java.util.Iterator;
 import java.util.Vector;
@@ -39,10 +40,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
 
 /**
  * Parses data but does not load it into the indices.
- * 
- * @todo do a variant that uses the non-batch, non-bulk apis to load each term
- *       and statement as it is parsed into the indices. this will be
- *       interesting as a point of comparison with the other loaders.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -127,43 +124,36 @@ public class BasicRioLoader implements IRioLoader {
         
         final RDFParser parser = Rio.createParser(rdfFormat, valFactory);
         
+        // FIXME disable bnode preservation!
+        log.error("disable bnode preservation");
+        parser.setPreserveBNodeIDs(true);
+        
         return parser;
 
     }
-    
-//        InputStream rdfStream = getClass().getResourceAsStream(ontology);
-//
-//    if (rdfStream == null) {
-//
-//        /*
-//         * If we do not find as a Resource then try as a URL.
-//         * 
-//         */
-//        try {
-//            
-//            rdfStream = new URL(ontology).openConnection().getInputStream();
-//            
-//        } catch (IOException ex) {
-//            
-//            ex.printStackTrace(System.err);
-//            
-//            return false;
-//            
-//        }
-//        
-//    }
-//
-//    rdfStream = new BufferedInputStream(rdfStream);
-//
-//    ...
-//    
-//    finally {
-//    rdfStream.close();
-//    }
-//    
 
-    final public void loadRdf(Reader reader, String baseURI,
+    /**
+     * Core implementation.
+     * 
+     * @param source
+     *            A {@link Reader} or {@link InputStream}.
+     * @param baseURI
+     * @param rdfFormat
+     * @param verifyData
+     * 
+     * @throws Exception
+     */
+    protected void loadRdf2(Object source, String baseURI,
             RDFFormat rdfFormat, boolean verifyData) throws Exception {
+        
+        if (source == null)
+            throw new IllegalArgumentException();
+
+        if (!(source instanceof Reader) && !(source instanceof InputStream)) {
+
+            throw new IllegalArgumentException();
+            
+        }
         
         log.info("format="+rdfFormat+", verify="+verifyData);
         
@@ -187,7 +177,15 @@ public class BasicRioLoader implements IRioLoader {
             log.info("Starting parse.");
 
             // Parse the data.
-            parser.parse(reader, baseURI);
+            if(source instanceof Reader) {
+
+                parser.parse((Reader)source, baseURI);
+                
+            } else if( source instanceof InputStream){
+                
+                parser.parse((InputStream)source, baseURI);
+                
+            } else throw new AssertionError();
 
             insertTime = System.currentTimeMillis() - insertStart;
 
@@ -210,6 +208,20 @@ public class BasicRioLoader implements IRioLoader {
             cleanUp();
             
         }
+        
+    }
+
+    final public void loadRdf(InputStream is, String baseURI,
+            RDFFormat rdfFormat, boolean verifyData) throws Exception {
+
+        loadRdf2(is, baseURI, rdfFormat, verifyData);
+        
+    }
+    
+    final public void loadRdf(Reader reader, String baseURI,
+            RDFFormat rdfFormat, boolean verifyData) throws Exception {
+        
+        loadRdf2(reader, baseURI, rdfFormat, verifyData);
         
     }
 

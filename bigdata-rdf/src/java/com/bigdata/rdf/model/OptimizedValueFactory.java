@@ -37,6 +37,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Comparator;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
@@ -55,7 +56,10 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -174,9 +178,14 @@ public class OptimizedValueFactory implements ValueFactory {
     
     public BNode createBNode() {
 
-        return new _BNode("_"+UUID.randomUUID());
+//        String id = "_"+UUID.randomUUID();
+        
+        String id = "_"+_ID.incrementAndGet();
+        
+        return new _BNode(id);
         
     }
+    private final AtomicLong _ID = new AtomicLong(0L); 
 
     public BNode createBNode(String id) {
 
@@ -707,13 +716,34 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
 
+    /**
+     * A blank node.
+     * <p>
+     * Note: When {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} is
+     * enabled blank nodes in the context position of a statement are recognized
+     * as statement identifiers by {@link StatementBuffer}. It coordinates with
+     * this class in order to detect when a blank node is a statement identifier
+     * and to defer the assertion of statements made using a statement
+     * identifier until that statement identifier becomes defined by being
+     * paired with a statement.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     final public static class _BNode extends _Resource implements BNode {
 
         /**
          * 
          */
         private static final long serialVersionUID = 8835732082253951776L;
-
+        
+        /**
+         * Boolean flag is set during conversion from an RDF interchange syntax
+         * into the internal {@link SPO} model if the blank node is a statement
+         * identifier.
+         */
+        public boolean statementIdentifier;
+        
         /**
          * De-serialization constructor.
          */
@@ -1480,6 +1510,12 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        public String toString() {
+            
+            return "<"+s+", "+p+", "+o+(c==null?"":", "+c)+">"+(type==null?"":" : "+type);
+            
+        }
+        
     }
 
     /**

@@ -1,28 +1,48 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
 
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+License:
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+  http://www.CognitiveWeb.org/legal/license/
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
 */
 /*
- * Created on Nov 1, 2007
+ * Created on Apr 13, 2008
  */
 
 package com.bigdata.rdf.inf;
@@ -32,47 +52,59 @@ import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
-import org.openrdf.model.Resource;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
-import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IAccessPath;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
- * An class that facilitates maintaining the RDF(S)+ closure on a database as
- * statements are asserted or retracted. One instance of this class should be
- * created for statements to be asserted against the database. Another instance
- * should be created for statements to be retracted from the database. In each
- * case, the caller writes on the {@link IStatementBuffer} interface, which will
- * overflow into a {@link TempTripleStore} maintained by this class. When all
- * data have been buffered, the caller invokes {@link #doClosure()}, which will
- * either assert or retract the statements from the database while maintaining
- * the RDF(S)+ closure over the database. Whether statements are asserted or
- * retracted depends on a constructor parameter.
+ * The {@link TruthMaintenance} class facilitates maintaining the RDF(S)+
+ * closure on a database as {@link SPO}s are asserted or retracted. This is a
+ * flyweight class that accepts a reference to the database and provides a
+ * factory for a {@link TempTripleStore} on which {@link SPO}s may be written.
+ * The caller writes {@link SPO}s on the {@link TempTripleStore} and then
+ * invokes either {@link #assertAll(TempTripleStore)} or
+ * {@link #retractAll(TempTripleStore)} as appropriate to update the closure of
+ * the database, at which point the {@link TempTripleStore} is discarded (closed
+ * and deleted). An instance of this class may be reused, but you need to obtain
+ * a new {@link TempTripleStore} using {@link #getTempStore()} each time you
+ * want to buffer more {@link SPO}s after updating the closure.
+ * <p>
+ * Note: Neither this class nor updating closure is thread-safe. In particular,
+ * clients MUST NOT write on either the database or the {@link TempTripleStore}
+ * when the closure is being updated. The truth maintenance algorithm assumes
+ * that the database and tempStore are unchanging outside of the actions taken
+ * by the algorithm itself. Concurrent writers would violate this assumption and
+ * lead to incorrect truth maintenance at the best.
  * 
- * FIXME refactor to TMSPOBuffer with only a wrapper for converting from the
- *       Sesame object model into the SPO model.
+ * @todo make sure that we always closeAndDelete the tempStore, even on error?
+ * 
+ * @todo Provide a means for creating a with-tx tempStore.
+ * 
+ * @todo handle update of closure for scale-out.
+ * 
+ * FIXME integrate with <a href="http://iris-reasoner.org/">IRIS</a> (magic
+ * sets) to avoid the necessity for truth maintenance and recover the space and
+ * time lost to the justification chains as well. See
+ * http://sourceforge.net/projects/iris-reasoner/ as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TMStatementBuffer implements IStatementBuffer {
+public class TruthMaintenance {
 
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger(TMStatementBuffer.class);
+    public static final Logger log = Logger.getLogger(TruthMaintenance.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
@@ -85,8 +117,6 @@ public class TMStatementBuffer implements IStatementBuffer {
      */
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
-
-    private final int bufferCapacity;
     
     /**
      * The target database.
@@ -99,255 +129,75 @@ public class TMStatementBuffer implements IStatementBuffer {
     protected final InferenceEngine inferenceEngine;
 
     /**
-     * The {@link StatementBuffer}.
+     * Return a {@link TempTripleStore} that may be used to buffer {@link SPO}s
+     * to be either asserted or retracted from the database. It is recommended
+     * to use this factory method to provision the tempStore as it disables the
+     * lexicon (it will not be used) but leaves other features enabled (such as
+     * all access paths) which support truth maintenance.
+     * <p>
+     * You can wrap this with an {@link IStatementBuffer} using:
+     * 
+     * <pre>
+     * new StatementBuffer(getTempStore(), database, bufferCapacity);
+     * </pre>
+     * 
+     * and then write on the {@link IStatementBuffer}, which will periodically
+     * perform batch writes on the tempStore.
+     * <p>
+     * Likewise, you can use
+     * {@link IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)} and it
+     * will automatically perform batch writes.
+     * <p>
+     * Regardless, when you have written all data on the tempStore, use
+     * {@link #assertAll(TempTripleStore)} or
+     * {@link #retractAll(TempTripleStore)} to update the closure of the
+     * database.
+     * 
+     * @todo max in memory size for the temporary store?
      */
-    private IStatementBuffer buffer;
+    public TempTripleStore getTempStore() {
 
-    /**
-     * Returns the {@link StatementBuffer} used to buffer statements.
-     */
-    public IStatementBuffer getStatementBuffer() {
+        Properties properties = database.getProperties();
 
-        if (buffer == null) {
+        // // turn off justifications for the tempStore.
+        // properties.setProperty(Options.JUSTIFY, "false");
 
-            buffer = new StatementBuffer(getTempStore(), database,
-                    bufferCapacity);
+        // turn off the lexicon since we will only use the statement indices.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.LEXICON,
+                "false");
 
-        }
+        TempTripleStore tempStore = new TempTripleStore(properties, database);
 
-        return buffer;
-
-    }
-    
-    private TempTripleStore tempStore;
-
-    /**
-     * Return the {@link TempTripleStore} that will be used to buffer
-     * assertions. The {@link TempTripleStore} is lazily allocated since it may
-     * have been released by {@link #clear()}.
-     */
-    protected TempTripleStore getTempStore() {
-
-        if (tempStore == null) {
-
-            Properties properties = database.getProperties();
-            
-//            // turn off justifications for the tempStore.
-//            properties.setProperty(Options.JUSTIFY, "false");
-        
-            // turn off the lexicon since we will only use the statement indices.
-            properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.LEXICON, "false");
-            
-            tempStore = new TempTripleStore(properties,database);
-            
-        }
-        
         return tempStore;
         
     }
 
-    public AbstractTripleStore getStatementStore() {
-        
-        return getTempStore();
-        
-    }
-
+    /**
+     * The database whose closure will be updated.
+     */
     public AbstractTripleStore getDatabase() {
 
         return database;
         
     }
-
-    public boolean isEmpty() {
-
-        if (buffer != null && !buffer.isEmpty())
-            return false;
-
-        if (tempStore != null && tempStore.getStatementCount() > 0)
-            return false;
-
-        return true;
-        
-    }
-
-    public int size() {
-
-        int n = 0;
-        
-        if (buffer != null) n += buffer.size();
-
-        if (tempStore != null) n+=tempStore.getStatementCount();
-        
-        return n;
-        
-    }
-
-    /**
-     * Adds a statement to the buffer.
-     * <p>
-     * Note: You MUST NOT submit a statement that is not an explicit statement
-     * in the database to the retraction buffer! This error is NOT checked.
-     * Correctness here is easy to achieve when the statements to be removed are
-     * drawn from a triple pattern. Simply add an {@link ExplicitSPOFilter} to
-     * the {@link IAccessPath#iterator(ISPOFilter)} reading on the triple
-     * pattern and you will NOT see anything except explicit statements. Those
-     * statements can then be added to the {@link BufferEnum#RetractionBuffer}
-     * safely using this method.
-     * 
-     * @param s
-     * @param p
-     * @param o
-     */
-    public void add(Resource s, URI  p, Value o) {
-    
-        add(s,p,o,null);
-        
-    }
-
-    public void add(Resource s, URI  p, Value o,Resource c) {
-        
-        if(buffer==null) {
-            
-            buffer = getStatementBuffer();
-            
-        }
-        
-        buffer.add(s, p, o, c);
-        
-    }
-    
-    public static enum BufferEnum {
-        
-        /**
-         * A buffer that is used to support incremental truth maintenance of the
-         * database as new statements are asserted. The buffer contains explicit
-         * statements.  When the closure is computed, the entailments of those
-         * statements are computed and are stored in the buffer.  Finally, the
-         * contents of the buffer are copied into the database, thereby adding
-         * both the explicitly asserted statements and their entailments.
-         */
-        AssertionBuffer,
-        
-        /**
-         * A buffer that is used to support incremental truth maintenance of the
-         * database as statements are retracted. Explicit statements that are to
-         * be retracted from the database are written onto this buffer NOT
-         * directly deleted on the database. When the closure is computed, each
-         * statement is examined to determine whether or not it is still
-         * entailed by the data remaining in the buffer NOT considering the
-         * statements that were explicitly retracted. Statements that are still
-         * provable are converted to inferences.
-         * <p>
-         * Statements which can no longer be proven are (a) retracted from the
-         * database along with their {@link Justification}s and (b) inserted
-         * into a {@link #TruthMaintenanceBuffer} for further processing.
-         */
-        RetractionBuffer;
-        
-    }
     
     /**
-     * 
      * 
      * @param inferenceEngine
      *            The inference engine for the database.
-     * @param bufferCapacity
-     *            The capacity of the buffer.
-     * @param bufferType
-     *            When <code>true</code> the buffer contains statements that
-     *            are being asserted against the database. When
-     *            <code>false</code> it contains statements that are being
-     *            retracted from the database. This flag determines how truth
-     *            maintenance is performed when the buffer is {@link #flush()}.
-     * 
-     * @todo max in memory size for the temporary store?
      */
-    public TMStatementBuffer(InferenceEngine inferenceEngine, int bufferCapacity, BufferEnum bufferType) {
-                
-        log.info("bufferCapacity="+bufferCapacity);
+    public TruthMaintenance(InferenceEngine inferenceEngine) {
+        
+        if (inferenceEngine == null)
+            throw new IllegalArgumentException();
 
         this.database = inferenceEngine.database;
 
         this.inferenceEngine = inferenceEngine;
 
-        this.bufferCapacity = bufferCapacity;
-        
-        this.bufferType = bufferType;
-
     }
 
-    private final BufferEnum bufferType;
-
-    /**
-     * When <code>true</code> the buffer contains statements that are being
-     * asserted against the database. When <code>false</code> it contains
-     * statements that are being retracted from the database. This flag
-     * determines how truth maintenance is performed by {@link #doClosure()}.
-     */
-    public boolean isAssertionBuffer() {
-        
-        return bufferType == BufferEnum.AssertionBuffer;
-        
-    }
-    
-    /**
-     * Flushes statements to the {@link TempTripleStore}. 
-     */
-    public void flush() {
-
-        if (buffer != null) {
-
-            buffer.flush();
-            
-        }
-        
-    }
-    
-    /**
-     * The buffered statements are asserted on (retracted from) the database
-     * along with their entailments (truth maintenance). Whether statements and
-     * their entailments are asserted or retracted depends on
-     * {@link #isAssertionBuffer()}.
-     */
-    public ClosureStats doClosure() {
-
-        if(isAssertionBuffer()) {
-            
-            return assertAll();
-            
-        } else {
-            
-            return retractAll();
-            
-        }
-
-    }
-    
-    /**
-     * Discards all buffered statements.
-     */
-    public void clear() {
-
-        if (tempStore != null && tempStore.getStore().isOpen()) {
-
-            try {
-
-                tempStore.close();
-                
-            } catch (Throwable t) {
-             
-                log.warn("Problem closing temp store: " + t);
-                
-            }
-
-        }
-
-        tempStore = null;
-
-        buffer = null;
-
-    }
-    
     /**
      * Any statements in the <i>fousStore</i> that are already in the database
      * are converted to explicit statements (iff they are not already explicit)
@@ -484,18 +334,31 @@ public class TMStatementBuffer implements IStatementBuffer {
     }
     
     /**
-     * Perform truth maintenance for incremental data load.
+     * Perform truth maintenance for statement assertion.
      * <p>
      * This method computes the closure of the temporary store against the
      * database, writing entailments into the temporary store. Once all
      * entailments have been computed, it then copies the all statements in the
      * temporary store into the database and deletes the temporary store.
-     */    
-    public ClosureStats assertAll() {
-        
-        final ClosureStats stats;
+     * 
+     * @param tempStore
+     *            A temporary store containing statements to be asserted. The
+     *            tempStore will be closed and deleted as a post-condition.
+     */
+    public ClosureStats assertAll(TempTripleStore tempStore) {
 
-        if(isEmpty()) {
+        if (tempStore == null) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        final long begin = System.currentTimeMillis();
+        
+        // #of given statements to retract.
+        final long ngiven = tempStore.getStatementCount();
+        
+        if (ngiven == 0) {
             
             // nothing to assert.
             
@@ -503,17 +366,6 @@ public class TMStatementBuffer implements IStatementBuffer {
             
         }
         
-        // flush anything to the temporary store.
-        flush();
-        
-        if (tempStore == null) {
-
-            // Should exist since flushed and not empty.
-         
-            throw new AssertionError();
-            
-        }
-
         final long nbeforeClosure = tempStore.getStatementCount();
 
         log.info("Computing closure of the temporary store with "
@@ -540,16 +392,12 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         applyExistingStatements(tempStore, database, inferenceEngine.doNotAddFilter);
 
-        stats = inferenceEngine.computeClosure(tempStore);
+        final ClosureStats stats = inferenceEngine.computeClosure(tempStore);
 
         final long nafterClosure = tempStore.getStatementCount();
 
         log.info("There are " + nafterClosure
                 + " statements in the temporary store after closure");
-
-        // measure time for these other operations as well.
-
-        final long begin = System.currentTimeMillis();
 
         /*
          * copy statements from the temporary store to the database.
@@ -565,14 +413,13 @@ public class TMStatementBuffer implements IStatementBuffer {
         log.info("Copied " + ncopied
                 + " statements that were new to the database.");
 
-        // discard everything.
-        clear();
-
         final long elapsed = System.currentTimeMillis() - begin;
         
         stats.elapsed += elapsed;
 
         log.info("Computed closure in "+elapsed+"ms");
+        
+        tempStore.closeAndDelete();
         
         return stats;
 
@@ -580,36 +427,47 @@ public class TMStatementBuffer implements IStatementBuffer {
 
     /**
      * Perform truth maintenance for statement retraction.
+     * <p>
+     * When the closure is computed, each statement to be retracted is examined
+     * to determine whether or not it is still entailed by the database without
+     * the support of the statements that were explicitly retracted. Statements
+     * that were explicit in the database that are still provable are converted
+     * to inferences. Statements which can no longer be proven (i.e., that are
+     * not supported by a grounded {@link Justification} chain) are retracted
+     * from the database and added into another temporary store and their
+     * justifications are deleted from the database. This process repeats with
+     * the new temporary store until no fixed point (no more ungrounded
+     * statements are identified).
+     * 
+     * @param tempStore
+     *            A temporary store containing explicit statements to be
+     *            retracted from the database. The tempStore will be closed and
+     *            deleted as a post-condition.
      * 
      * @return statistics about the closure operation.
      */
-    public ClosureStats retractAll() {
+    public ClosureStats retractAll(TempTripleStore tempStore) {
 
         final long begin = System.currentTimeMillis();
         
         final ClosureStats stats = new ClosureStats();
         
-        if(isEmpty()) {
+        if (tempStore == null) {
             
-            // nothing to retract.
+            throw new IllegalArgumentException();
+            
+        }
+
+        // #of given statements to retract.
+        final long ngiven = tempStore.getStatementCount();
+        
+        if (ngiven == 0) {
+            
+            // nothing to assert.
             
             return stats;
             
         }
-        
-        // flush anything to the temporary store.
-        flush();
-        
-        if (tempStore == null) {
-
-            // Should exist since flushed and not empty.
-         
-            throw new AssertionError();
-            
-        }
-        
-        // #of given statements to retract.
-        final long ngiven = tempStore.getStatementCount();
         
         log.info("Computing closure of the temporary store with "
                 + ngiven+ " statements");
@@ -628,15 +486,8 @@ public class TMStatementBuffer implements IStatementBuffer {
         
         MDC.remove("depth");
         
-        assert ! tempStore.getStore().isOpen();
-        
-        /*
-         * The tempStore will have been closed, but also release our hard
-         * references.
-         */
-        
-        clear();
-
+        assert ! tempStore.isOpen();
+       
         final long elapsed = System.currentTimeMillis() - begin;
         
         log.info("Retracted " + ngiven
@@ -709,7 +560,7 @@ public class TMStatementBuffer implements IStatementBuffer {
      *            called. At depth ZERO(0) the tempStore MUST contain only the
      *            explicit statements to be retracted.
      */
-    private void retractAll(ClosureStats stats, TempTripleStore tempStore, int depth) {
+    private void retractAll(final ClosureStats stats, final TempTripleStore tempStore, int depth) {
 
         MDC.put("depth", "depth="+depth);
         
@@ -812,32 +663,6 @@ public class TMStatementBuffer implements IStatementBuffer {
                         
                     }
 
-//                    if (DEBUG) {
-//
-//                        final SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
-//
-//                        if (tmp == null) {
-//
-//                            throw new IllegalArgumentException(
-//                                    "Given statement not in database: "
-//                                            + spo.toString(database));
-//
-//                        }
-//
-//                        if (depth == 0) {
-//
-//                            if (tmp.type != StatementEnum.Explicit) {
-//
-//                                throw new IllegalArgumentException(
-//                                    "Given statement not explicit in database: "
-//                                            + tmp.toString(database));
-//                            
-//                            }
-//                            
-//                        }
-//
-//                    }
-                    
                     if (spo.type == StatementEnum.Axiom) {
 
                         /*

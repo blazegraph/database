@@ -32,7 +32,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -51,6 +53,7 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
@@ -82,6 +85,18 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
 public class StatementBuffer implements IStatementBuffer {
 
     protected static final Logger log = Logger.getLogger(StatementBuffer.class);
+   
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
     
     /**
      * Buffer for parsed RDF {@link Value}s.
@@ -139,10 +154,9 @@ public class StatementBuffer implements IStatementBuffer {
     }
     
     /**
-     * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
-     * object is signaling that no more buffers will be placed onto the
-     * queue by the producer and that the consumer should therefore
-     * terminate.
+     * The maximum #of Statements, URIs, Literals, or BNodes that the buffer can
+     * hold. The minimum capacity is three (3) since that corresponds to a
+     * single triple where all terms are URIs.
      */
     protected final int capacity;
 
@@ -197,8 +211,8 @@ public class StatementBuffer implements IStatementBuffer {
      * {@link Statement}s.
      * <p>
      * Note: This variant is used during truth maintenance since the terms are
-     * written on the database but the statements are asserted against the
-     * focusStore.
+     * written on the database lexicon but the statements are asserted against
+     * the statementStore.
      * 
      * @param statementStore
      *            The store into which the statements will be inserted
@@ -217,7 +231,7 @@ public class StatementBuffer implements IStatementBuffer {
      *            buffer can hold. The minimum capacity is three (3) since that
      *            corresponds to a single triple where all terms are URIs.
      */
-    public StatementBuffer(AbstractTripleStore statementStore, AbstractTripleStore database, int capacity) {
+    public StatementBuffer(TempTripleStore statementStore, AbstractTripleStore database, int capacity) {
             
         if (database == null)
             throw new IllegalArgumentException();
@@ -580,6 +594,24 @@ public class StatementBuffer implements IStatementBuffer {
      * @see #nearCapacity()
      */
     public void handleStatement( Resource s, URI p, Value o, Resource c, StatementEnum type ) {
+        
+        if(database.getStatementIdentifiers() && c != null && c instanceof BNode) {
+            
+            /*
+             * Flag the blank node as a statement identifier.
+             * 
+             * Note: Conversion of a BNodeImpl to a _BNode would loose the
+             * utility of a reference to a shared object. However the
+             * StatementBuffer ensures that RDF Values that are "equals" are
+             * mapped onto the same optimized RDF _Value, including the case of
+             * blank nodes where "equal" is defined by their ID.
+             */
+            
+            if(INFO) log.info("provenance statement: <"+s+", "+p+", "+o+", "+c+">");
+            
+            ((_BNode)c).statementIdentifier = true;
+            
+        }
 
         s = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(s);
         p = (URI)      OptimizedValueFactory.INSTANCE.toNativeValue(p);

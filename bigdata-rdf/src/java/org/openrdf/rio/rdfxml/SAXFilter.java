@@ -25,6 +25,8 @@ import org.openrdf.rio.ParseLocationListener;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.rdf.store.BNS;
+
 /**
  * A filter on SAX events to make life easier on the RDF parser itself. This
  * filter does things like combining a call to startElement() that is directly
@@ -252,7 +254,10 @@ class SAXFilter implements ContentHandler {
 						}
 						else if ("xml:lang".equals(attQName)) {
 							elInfo.xmlLang = attributes.getValue(i);
-						}
+						} else if (BNS.NAMESPACE.equals(attributes.getURI(i))
+                                && BNS.GRAPH.equals(attributes.getLocalName(i))) {
+                            elInfo.context = attributes.getValue(i);
+                        }
 					}
 
 					elInfoStack.push(elInfo);
@@ -295,7 +300,8 @@ class SAXFilter implements ContentHandler {
 		rdfContextStackHeight++;
 
 		rdfParser.setBaseURI(deferredElement.baseURI);
-		rdfParser.setXMLLang(deferredElement.xmlLang);
+        rdfParser.setXMLLang(deferredElement.xmlLang);
+        rdfParser.setContext(deferredElement.context);
 
 		rdfParser.startElement(deferredElement.namespaceURI, deferredElement.localName, deferredElement.qName,
 				deferredElement.atts);
@@ -354,7 +360,8 @@ class SAXFilter implements ContentHandler {
 			if (deferredElement != null) {
 				// Start element still deferred, this is an empty element
 				rdfParser.setBaseURI(deferredElement.baseURI);
-				rdfParser.setXMLLang(deferredElement.xmlLang);
+                rdfParser.setXMLLang(deferredElement.xmlLang);
+                rdfParser.setContext(deferredElement.context);
 
 				rdfParser.emptyElement(deferredElement.namespaceURI, deferredElement.localName,
 						deferredElement.qName, deferredElement.atts);
@@ -463,6 +470,10 @@ class SAXFilter implements ContentHandler {
 				String namespace = attributes.getURI(i);
 				String localName = attributes.getLocalName(i);
 
+                if(BNS.NAMESPACE.equals(namespace)&&BNS.GRAPH.equals(localName)) {
+                    elInfo.context = value;
+                } else
+                
 				// A limited set of unqualified attributes must be supported by
 				// parsers, as is specified in section 6.1.4 of the spec
 				if ("".equals(namespace)) {
@@ -646,7 +657,9 @@ class SAXFilter implements ContentHandler {
 
 		public ParsedURI baseURI;
 
-		public String xmlLang;
+        public String xmlLang;
+
+        public String context;
 
 		public ElementInfo(String qName, String namespaceURI, String localName) {
 			this(null, qName, namespaceURI, localName);
@@ -667,6 +680,11 @@ class SAXFilter implements ContentHandler {
 				this.baseURI = documentURI;
 				this.xmlLang = "";
 			}
+            /*
+             * Note: not inherited since this is a statement identifier and is
+             * therefore only in scope for the current statement.
+             */
+            this.context = "";
 		}
 
 		public void setBaseURI(String uriString) {

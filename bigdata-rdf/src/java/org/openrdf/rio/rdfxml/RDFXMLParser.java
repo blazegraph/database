@@ -5,6 +5,10 @@
  */
 package org.openrdf.rio.rdfxml;
 
+import info.aduna.net.ParsedURI;
+import info.aduna.xml.XMLReaderFactory;
+import info.aduna.xml.XMLUtil;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -12,16 +16,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.Stack;
-
-import org.xml.sax.InputSource;
-import org.xml.sax.Locator;
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
-import org.xml.sax.XMLReader;
-
-import info.aduna.net.ParsedURI;
-import info.aduna.xml.XMLReaderFactory;
-import info.aduna.xml.XMLUtil;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -36,6 +30,13 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.helpers.RDFParserBase;
+import org.xml.sax.InputSource;
+import org.xml.sax.Locator;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
+import org.xml.sax.XMLReader;
+
+import com.bigdata.rdf.store.BNS;
 
 /**
  * A parser for XML-serialized RDF. This parser operates directly on the SAX
@@ -103,6 +104,12 @@ public class RDFXMLParser extends RDFParserBase {
 	 * elements are reported.
 	 */
 	private String xmlLang;
+    
+    /**
+     * The context for statements can be specified using the {@link BNS#GRAPH}
+     * attribute. FIXME set context per xmlLang in {@link SAXFilter}.
+     */
+    private Resource context;
 
 	/**
 	 * A stack of node- and property elements.
@@ -287,6 +294,7 @@ public class RDFXMLParser extends RDFParserBase {
 			// Clean up
 			saxFilter.clear();
 			xmlLang = null;
+            context = null;
 			elementStack.clear();
 			usedIDs.clear();
 			clear();
@@ -304,14 +312,29 @@ public class RDFXMLParser extends RDFParserBase {
 		super.setBaseURI(baseURI);
 	}
 
-	void setXMLLang(String xmlLang) {
-		if ("".equals(xmlLang)) {
-			this.xmlLang = null;
-		}
-		else {
-			this.xmlLang = xmlLang;
-		}
-	}
+    void setXMLLang(String xmlLang) {
+        if ("".equals(xmlLang)) {
+            this.xmlLang = null;
+        }
+        else {
+            this.xmlLang = xmlLang;
+        }
+    }
+
+    void setContext(String context) {
+        if ("".equals(context)) {
+            this.context = null;
+        }
+        else {
+            try {
+                // @todo or as sid?
+                this.context = createBNode(context);
+            } catch (RDFParseException e) {
+                // Note: exception is declared but not thrown by the base class.
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
 	void startElement(String namespaceURI, String localName, String qName, Atts atts)
 		throws RDFParseException, RDFHandlerException
@@ -393,7 +416,10 @@ public class RDFXMLParser extends RDFParserBase {
 		NodeElement subject = (NodeElement)peekStack(1);
 		PropertyElement predicate = (PropertyElement)peekStack(0);
 
-		reportStatement(subject.getResource(), predicate.getURI(), lit);
+        if(context!=null) 
+            reportStatement(subject.getResource(), predicate.getURI(), lit, context);
+        else
+            reportStatement(subject.getResource(), predicate.getURI(), lit);
 
 		handleReification(lit);
 	}
@@ -543,7 +569,11 @@ public class RDFXMLParser extends RDFParserBase {
 			URI predicate = createURI(att.getURI());
 			Literal lit = createLiteral(att.getValue(), xmlLang, null);
 
-			reportStatement(subject, predicate, lit);
+            if(context!=null) {
+                reportStatement(subject, predicate, lit, context);
+            } else {
+                reportStatement(subject, predicate, lit);
+            }
 		}
 	}
 
@@ -679,7 +709,10 @@ public class RDFXMLParser extends RDFParserBase {
 				NodeElement resourceElt = new NodeElement(resourceRes);
 				NodeElement subject = (NodeElement)peekStack(1);
 
-				reportStatement(subject.getResource(), propURI, resourceRes);
+                if(context!=null)
+                    reportStatement(subject.getResource(), propURI, resourceRes, context);
+                else 
+                    reportStatement(subject.getResource(), propURI, resourceRes);
 				handleReification(resourceRes);
 
 				Att type = atts.removeAtt(RDF.NAMESPACE, "type");
@@ -988,8 +1021,21 @@ public class RDFXMLParser extends RDFParserBase {
 		}
 	}
 
+    private void reportStatement(Resource subject, URI predicate, Value object, Resource context)
+        throws RDFParseException, RDFHandlerException
+    {
+        if(BNS.NAMESPACE.equals(predicate.getNamespace())&&BNS.GRAPH.equals(predicate.getLocalName())) {
+            /*
+             * Avoid asserting statements for the bigdata:graph attribute.
+             */
+            return;
+        }
+        Statement st = createStatement(subject, predicate, object, context);
+        rdfHandler.handleStatement(st);
+    }
+    
 	/**
-	 * Reports a stament to the configured RDFHandlerException.
+	 * Reports a statement to the configured RDFHandler.
 	 * 
 	 * @param subject
 	 *        The statement's subject.
@@ -998,12 +1044,12 @@ public class RDFXMLParser extends RDFParserBase {
 	 * @param object
 	 *        The statement's object.
 	 * @throws RDFHandlerException
-	 *         If the configured RDFHandlerException throws an
+	 *         If the configured RDFHandler throws an
 	 *         RDFHandlerException.
 	 */
 	private void reportStatement(Resource subject, URI predicate, Value object)
 		throws RDFParseException, RDFHandlerException
-	{
+	{ // FIXME locate all callers and verify that NO context is appropriate since none will be reported.
 		Statement st = createStatement(subject, predicate, object);
 		rdfHandler.handleStatement(st);
 	}

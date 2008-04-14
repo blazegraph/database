@@ -27,20 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
-import java.util.Properties;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
-import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Test suite for {@link BackchainOwlSameAsPropertiesIterator}.
@@ -96,15 +94,23 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
             final URI Z = new URIImpl("http://www.bigdata.com/Z");
 
             {
-                TMStatementBuffer buffer = new TMStatementBuffer
-                    ( inf, 100/* capacity */, BufferEnum.AssertionBuffer
+//                TMStatementBuffer buffer = new TMStatementBuffer
+//                ( inf, 100/* capacity */, BufferEnum.AssertionBuffer
+//                  );
+                StatementBuffer buffer = new StatementBuffer
+                    ( noClosure, 100/* capacity */
                       );
 
                 buffer.add(X, A, Z);
                 buffer.add(Y, B, W);
                 buffer.add(X, OWL.SAMEAS, Y);
                 buffer.add(Z, OWL.SAMEAS, W);
-                buffer.doClosure();
+                
+                // write statements on the database.
+                buffer.flush();
+                
+                // database at once closure.
+                noClosure.getInferenceEngine().computeClosure(null/*focusStore*/);
 
                 // write on the store.
 //                buffer.flush();

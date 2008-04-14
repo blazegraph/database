@@ -5,6 +5,8 @@
  */
 package org.openrdf.rio.rdfxml;
 
+import info.aduna.xml.XMLUtil;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -12,8 +14,6 @@ import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import info.aduna.xml.XMLUtil;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -26,36 +26,17 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
 
+import com.bigdata.rdf.store.BNS;
+
 /**
  * An implementation of the RDFWriter interface that writes RDF documents in
  * XML-serialized RDF format using a private extension of designed to support
  * the interchange of statement-level provenance.
- * <p>
- * This RDF/XML extension allows us to inline provenance with RDF/XML to clients
- * in a manner which should not interfere with the client (perhaps they will
- * have to turn off validation if they are very aggressive about how they
- * validate) and also allows us to accept provenance from clients aware of this
- * proposal.
- * <p>
- * Statement identifiers are serialized as blank nodes using the
- * <code>http://www.bigdata.com/rdf#graph</code> attribute. When RDF/XML is
- * deserialized, the attribute is interpreted as the context for the statement.
- * The <code>graph</code> attribute is allowed on statements and serves as a
- * per-statement identifier. The value of the <code>graph</code> attribute is
- * constrained to be a blank node.
- * <p>
- * By re-using the blank node specified in the <code>graph</code> attribute
- * within other statements in the same RDF/XML document, the client can express
- * statements about the statement identified by the blank node.
+ * 
+ * @see BNS#GRAPH
  */
 public class RDFXMLWriter implements RDFWriter {
 
-    /**
-     * The namespace used for the <code>graph</code> attribute which marks the
-     * source of a statement within the RDF/XML.
-     */
-    static protected final String BIGDATA_NAMESPACE = "http://www.bigdata.com/rdf#";
-    
 	/*-----------*
 	 * Variables *
 	 *-----------*/
@@ -122,7 +103,7 @@ public class RDFXMLWriter implements RDFWriter {
 			setNamespace("rdf", RDF.NAMESPACE, false);
 
             // Namespace the [graph] attribute.
-            setNamespace("bigdata", BIGDATA_NAMESPACE, false);
+            setNamespace("bigdata", BNS.NAMESPACE, false);
 
 			writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
@@ -271,20 +252,6 @@ public class RDFXMLWriter implements RDFWriter {
 					URI uri = (URI)subj;
 					writeAttribute(RDF.NAMESPACE, "about", uri.toString());
 				}
-                if(context != null) {
-                    /*
-                     * Add the graph attribute if the statement context is
-                     * non-null.
-                     */
-                    if (context instanceof BNode) {
-                        BNode bNode = (BNode)context;
-                        writeAttribute(BIGDATA_NAMESPACE, "graph", bNode.getID());
-                    }
-                    else {
-                        URI uri = (URI)context;
-                        writeAttribute(BIGDATA_NAMESPACE, "graph", uri.toString());
-                    }
-                }
 				writeEndOfStartTag();
 				writeNewLine();
 
@@ -295,6 +262,22 @@ public class RDFXMLWriter implements RDFWriter {
 			writeIndent();
 			writeStartOfStartTag(predNamespace, predLocalName);
 
+            // CONTEXT using bigdata:graph
+            if(context != null) {
+                /*
+                 * Add the graph attribute if the statement context is
+                 * non-null.
+                 */
+                if (context instanceof BNode) {
+                    BNode bNode = (BNode)context;
+                    writeAttribute(BNS.NAMESPACE, "graph", bNode.getID());
+                }
+                else {
+                    URI uri = (URI)context;
+                    writeAttribute(BNS.NAMESPACE, "graph", uri.toString());
+                }
+            }
+            
 			// OBJECT
 			if (obj instanceof Resource) {
 				Resource objRes = (Resource)obj;

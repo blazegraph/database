@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
@@ -55,6 +57,7 @@ import java.util.UUID;
 import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
@@ -662,8 +665,10 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
      * 
      * @throws SailException
      * @throws RDFHandlerException
+     * 
+     * @throws IOException 
      */
-    public void test_rdfXmlInterchange() throws SailException, RDFHandlerException {
+    public void test_rdfXmlInterchange() throws SailException, RDFHandlerException, IOException {
 
         AbstractTripleStore store = getStore();
 
@@ -780,8 +785,55 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             // write the rdf/xml on the console.
             System.err.println(rdfXml);
 
-            fail("modify DataLoader to read it back in.");
-//            store.getDataLoader().loadData(resource, baseURL, rdfFormat)
+            store.getDataLoader().loadData(new StringReader(rdfXml),
+                    ""/* baseURL */, RDFFormat.RDFXML);
+
+            /*
+             * FIXME verify read-back of the graph with statement-level
+             * provenance metadata.
+             * 
+             * FIXME There are a lot of ways in which reportStatement/3 gets
+             * called in RDFXMLParser. I need to survey them all and decide
+             * whether or not "context" (the variable set based on
+             * bigdata:graph) will be correct ("" or the sid) or in there are
+             * some uses, such as reification, where "context" should be
+             * ignored.
+             * 
+             * FIXME BNodes must be unified with statements identifiers when
+             * they appear in the context position and statement identifiers are
+             * enabled. This should happen in addStatements if the statement has
+             * context and statement identifiers are enabled. Also, if a BNode
+             * appears in the context position then it must be the same instance
+             * as all other instances of that bnode (this is handled by rio) and
+             * it SHOULD NOT be assigned a BNode termId since we are going to
+             * assign/resolve the statement identifier instead. This probably
+             * means sorting all statements with statement identifiers in
+             * dependency order (and using BNodes you could create cycles, which
+             * would have to be illegal).
+             * 
+             * FIXME detect cycles in statement identifiers -- they are not
+             * legal. you can not make a statement about itself and you can not
+             * make a statement whose transitive closure via the statement
+             * identifier describes itself. The statement identifier is not
+             * knowable until the triple is specified.
+             * 
+             * FIXME When parsing RDF/XML, we must defer the insert of
+             * statements with blank nodes in their subject or object position
+             * until the end of the input stream since we can not tell whether
+             * the blank node is in fact a statement identifier.  This issue can
+             * only arise during the conversion of an RDF interchange syntax into
+             * SPOs objects. Therefore it is addressed by the StatementBuffer and
+             * NOT the AbstractTripleStore.
+             * 
+             * FIXME When parsing, _BNode references need to be preserved in a
+             * cache until the end of the document in order to guarentee that
+             * all BNodes with a given ID within a document are mapped onto the
+             * same termId in the database. This means that we need something
+             * like a scoped optimized value factory object. (The same
+             * constraint probably obtains for any RDF Value to SPO conversion
+             * context, which is always handled by a StatementBuffer.)
+             */
+            fail("Verify correct read of the same graph");
             
         } finally {
 

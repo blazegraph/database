@@ -37,7 +37,7 @@ import com.bigdata.rdf.store.ITripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PresortRioLoader extends BasicRioLoader implements IRioLoader, RDFHandler
+public class PresortRioLoader extends BasicRioLoader implements RDFHandler
 {
 
     /**
@@ -128,6 +128,12 @@ public class PresortRioLoader extends BasicRioLoader implements IRioLoader, RDFH
 
     public void handleStatement( Statement stmt ) {
 
+        if(DEBUG) {
+            
+            log.debug(stmt);
+            
+        }
+        
         // buffer the write (handles overflow).
         buffer.add( stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext() );
 

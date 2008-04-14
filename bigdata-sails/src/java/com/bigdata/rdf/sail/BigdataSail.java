@@ -109,13 +109,11 @@ import org.openrdf.sail.SailException;
 import org.openrdf.sail.helpers.SailBase;
 
 import com.bigdata.rdf.inf.InferenceEngine;
-import com.bigdata.rdf.inf.TMStatementBuffer;
-import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
+import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
@@ -131,7 +129,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.StatementIterator;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Sesame <code>2.x</code> integration.
@@ -390,16 +388,29 @@ public class BigdataSail extends SailBase implements Sail {
         this.properties = database.getProperties();
         
         // truthMaintenance
+        {
+            
+            truthMaintenance = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.TRUTH_MAINTENANCE,
+                    BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
 
-        truthMaintenance = Boolean.parseBoolean(properties.getProperty(
-                BigdataSail.Options.TRUTH_MAINTENANCE, BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
-
-        log.info(BigdataSail.Options.TRUTH_MAINTENANCE + "=" + truthMaintenance);
+            log.info(BigdataSail.Options.TRUTH_MAINTENANCE + "="
+                    + truthMaintenance);
+            
+        }
         
-        bufferCapacity = Integer.parseInt(properties.getProperty(
-                BigdataSail.Options.BUFFER_CAPACITY, BigdataSail.Options.DEFAULT_BUFFER_CAPACITY));
+        // bufferCapacity
+        {
+            
+            bufferCapacity = Integer.parseInt(properties.getProperty(
+                    BigdataSail.Options.BUFFER_CAPACITY,
+                    BigdataSail.Options.DEFAULT_BUFFER_CAPACITY));
 
-        log.info(BigdataSail.Options.BUFFER_CAPACITY+ "=" + bufferCapacity);
+            log
+                    .info(BigdataSail.Options.BUFFER_CAPACITY + "="
+                            + bufferCapacity);
+
+        }
 
     }
 
@@ -515,8 +526,8 @@ public class BigdataSail extends SailBase implements Sail {
      * 
      * @see #asReadCommittedView() for a read-only connection.
      * 
-     * @todo the scale-out triple store could support multiple writable
-     *       connections.
+     * @todo many of the store can support concurrent writers, but there is a
+     *       requirement to serialize writers when truth maintenance is enabled.
      */
     protected SailConnection getConnectionInternal() throws SailException {
 
@@ -543,7 +554,7 @@ public class BigdataSail extends SailBase implements Sail {
      * complete.
      */
     protected void shutDownInternal() throws SailException {
-
+        
         database.close();
         
     }
@@ -572,22 +583,123 @@ public class BigdataSail extends SailBase implements Sail {
         private boolean open = true;
         
         /**
-         * Used to buffer statements that are being asserted so as to maximize the
-         * opportunity for batch writes.  Truth maintenance (if enabled) will be
-         * performed no later than the commit of the transaction.
-         * <p>
-         * Note: When non-empty, the buffer MUST be flushed (a) if it is not empty
-         * and a transaction completes (otherwise writes will not be stored on the
-         * database); or (b) if there is a read against the database during a
-         * transaction (otherwise reads will not see the unflushed statements).
+         * non-<code>null</code> iff truth maintenance is being performed.
          */
-        private IStatementBuffer assertBuffer;
+        private final TruthMaintenance tm;
         
         /**
-         * Used to collect statements being retracted IFF truth maintenance is
-         * enabled.
+         * Used to buffer statements that are being asserted.
+         * 
+         * @see #getAssertionBuffer()
          */
-        private TMStatementBuffer retractBuffer;
+        private StatementBuffer assertBuffer = null;
+        
+        /**
+         * Used to buffer statements being retracted.
+         * 
+         * @see #getRetractionBuffer()
+         */
+        private StatementBuffer retractBuffer = null;
+        
+        /**
+         * Return the assertion buffer.
+         * <p>
+         * The assertion buffer is used to buffer statements that are being
+         * asserted so as to maximize the opportunity for batch writes. Truth
+         * maintenance (if enabled) will be performed no later than the commit
+         * of the transaction.
+         * <p>
+         * Note: When non-<code>null</code> and non-empty, the buffer MUST be
+         * flushed (a) if a transaction completes (otherwise writes will not be
+         * stored on the database); or (b) if there is a read against the
+         * database during a transaction (otherwise reads will not see the
+         * unflushed statements).
+         * <p>
+         * Note: if {@link #truthMaintenance} is enabled then this buffer is
+         * backed by a temporary store which accumulates the {@link SPO}s to be
+         * asserted. Otherwise it will write directly on the database each time
+         * it is flushed, including when it overflows.
+         */
+        synchronized protected StatementBuffer getAssertionBuffer() {
+
+            if (assertBuffer == null) {
+
+                if (truthMaintenance) {
+
+                    assertBuffer = new StatementBuffer(tm.getTempStore(),
+                            database, bufferCapacity);
+
+                } else {
+
+                    assertBuffer = new StatementBuffer(database, bufferCapacity);
+
+                }
+
+            }
+            
+            return assertBuffer;
+            
+        }
+
+        /**
+         * Return the retraction buffer.
+         * <p>
+         * The retraction buffer is used by the {@link SailConnection} API IFF
+         * truth maintenance is enabled since the only methods available on the
+         * {@link Sail} to delete statements,
+         * {@link #removeStatements(Resource, URI, Value)} and
+         * {@link #removeStatements(Resource, URI, Value, Resource[])}, each
+         * accepts a triple pattern rather than a set of statements. The
+         * {@link AbstractTripleStore} directly supports removal of statements
+         * matching a triple pattern, so we do not buffer retractions for those
+         * method UNLESS truth maintenance is enabled.
+         * <p>
+         * Note: you CAN simply obtain the retraction buffer, write on it the
+         * statements to be retracted, and the {@link BigdataSailConnection}
+         * will do the right thing whether or not truth maintenance is enabled.
+         * <p>
+         * When non-<code>null</code> and non-empty the buffer MUST be
+         * flushed (a) if a transaction completes (otherwise writes will not be
+         * stored on the database); or (b) if there is a read against the
+         * database during a transaction (otherwise reads will not see the
+         * unflushed statements).
+         * <p>
+         * Note: if {@link #truthMaintenance} is enabled then this buffer is
+         * backed by a temporary store which accumulates the SPOs to be
+         * retracted. Otherwise it will write directly on the database each time
+         * it is flushed, including when it overflows.
+         * <p>
+         */
+        synchronized protected StatementBuffer getRetractionBuffer() {
+            
+            if (retractBuffer == null) {
+
+                if (truthMaintenance) {
+
+                    retractBuffer = new StatementBuffer(tm.getTempStore(),
+                            database, bufferCapacity);
+
+                } else {
+
+                    /*
+                     * Note: The SailConnection API will not use the
+                     * [retractBuffer] when truth maintenance is disabled, but
+                     * one is returned anyway so that callers may buffer
+                     * statements which they have on hand for retraction rather
+                     * as a complement to using triple patterns to describe the
+                     * statements to be retracted (which is how you do it with
+                     * the SailConnection API).
+                     */
+                    
+                    retractBuffer = new StatementBuffer(database, bufferCapacity);
+
+                }
+
+            }
+            
+            return retractBuffer;
+
+        }
         
         /**
          * Create a {@link SailConnection} for the database.
@@ -606,11 +718,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 log.info("Read-only view");
                 
-                // no assertion buffers are required for a read-only view.
-                
-                assertBuffer = null;
-
-                retractBuffer = null;
+                tm = null;
                 
             } else {
 
@@ -618,26 +726,23 @@ public class BigdataSail extends SailBase implements Sail {
 
                 if (truthMaintenance) {
 
-                    final InferenceEngine inf = getInferenceEngine();
+                    /*
+                     * Setup the object that will be used to maintain the
+                     * closure of the database.
+                     */
 
-                    assertBuffer = new TMStatementBuffer(inf, bufferCapacity,
-                            BufferEnum.AssertionBuffer);
-
-                    retractBuffer = new TMStatementBuffer(inf, bufferCapacity,
-                            BufferEnum.RetractionBuffer);
-
+                    tm = new TruthMaintenance(getInferenceEngine());
+                    
                 } else {
-
-                    assertBuffer = new StatementBuffer(database, bufferCapacity);
-
-                    retractBuffer = null; // Not used (deletes are immediate).
-
+                    
+                    tm = null;
+                    
                 }
-
+                    
             }
 
         }
-
+        
         /*
          * SailConnectionListener support.
          * 
@@ -904,12 +1009,7 @@ public class BigdataSail extends SailBase implements Sail {
             assertWritable();
 
             // flush any pending retractions first!
-            
-            if(retractBuffer!=null && !retractBuffer.isEmpty()) {
-                
-                retractBuffer.doClosure();
-                
-            }
+            flushStatementBuffers(false/* flushAssertBuffer */, true/* flushRetractBuffer */);
 
             s = (Resource) valueFactory.toNativeValue(s);
 
@@ -934,22 +1034,15 @@ public class BigdataSail extends SailBase implements Sail {
             
             assertWritable();
 
-            // discard any pending asserts.
-            assertBuffer.clear();
+            // discard any pending writes.
+            clearBuffers();
             
-            if(retractBuffer!=null) {
-            
-                // discard any pending retracts.
-                retractBuffer.clear();
-                
-            }
-
             /*
              * @todo if listeners are registered then we need to materialize
              * everything that is going to be removed....
              */
             
-            if (contexts == null || contexts.length == 0) {
+            if (contexts == null || contexts.length == 0 || contexts[0] == null) {
                 
                 // clear the database.
 
@@ -968,6 +1061,51 @@ public class BigdataSail extends SailBase implements Sail {
             }
                 
         }
+        
+        /**
+         * Clears all buffered statements in the {@link #assertBuffer} and in
+         * the optional {@link #retractBuffer}. If {@link #truthMaintenance} is
+         * enabled, then the backing tempStores are also closed and deleted. The
+         * buffer references are set to <code>null</code> and the buffers must
+         * be re-allocated on demand.
+         */
+        private void clearBuffers() {
+
+            if(assertBuffer != null) {
+                
+                // discard any pending asserts.
+                assertBuffer.clear();
+                
+                if(truthMaintenance) {
+                    
+                    // discard the temp store that buffers assertions.
+                    assertBuffer.getStatementStore().closeAndDelete();
+                    
+                    // must be re-allocated on demand.
+                    assertBuffer = null;
+                    
+                }
+                
+            }
+
+            if (retractBuffer != null) {
+
+                // discard any pending retracts.
+                retractBuffer.clear();
+
+                if (truthMaintenance) {
+
+                    // discard the temp store that buffers retractions.
+                    retractBuffer.getStatementStore().closeAndDelete();
+
+                    // must be re-allocated on demand.
+                    retractBuffer = null;
+
+                }
+
+            }
+
+        }
 
         /**
          * Note: This method is quite expensive since it must materialize all
@@ -979,33 +1117,11 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public long size(Resource... contexts) throws SailException {
 
-            flushStatementBuffers();
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
             
-            if (contexts == null || contexts.length == 0) {
+            if (contexts == null || contexts.length == 0 || contexts[0] == null) {
 
-                /*
-                 * Note: In order to get the #of explicit statements in the
-                 * repository we have to actually do a range scan and figure out
-                 * for each statement whether or not it is explicit.
-                 * 
-                 * @todo modify IAccessPath so that we can send the filter to
-                 * the data and just do a rangeCount().
-                 */
-
-                ISPOIterator itr = database.getAccessPath(KeyOrder.SPO)
-                        .iterator(ExplicitSPOFilter.INSTANCE);
-
-                long n = 0;
-
-                while (itr.hasNext()) {
-
-                    SPO[] chunk = itr.nextChunk();
-                    
-                    n += chunk.length;
-                    
-                }
-                
-                return n;
+                return database.getExplicitStatementCount();
                 
             } else {
                 
@@ -1018,7 +1134,7 @@ public class BigdataSail extends SailBase implements Sail {
         public void removeStatements(Resource s, URI p, Value o,
                 Resource... contexts) throws SailException {
 
-            if (contexts == null || contexts.length == 0) {
+            if (contexts == null || contexts.length == 0 || contexts[0] == null) {
 
                 removeStatements(s, p, o);
 
@@ -1034,16 +1150,8 @@ public class BigdataSail extends SailBase implements Sail {
                 throws SailException {
             
             assertWritable();
-                        
-            assertBuffer.flush(); // flush any pending assertions first!
 
-            if(getTruthMaintenance()) {
-            
-                // do truth maintenance, writing on the database.
-                
-                ((TMStatementBuffer)assertBuffer).doClosure();
-                
-            }
+            flushStatementBuffers(true/* flushAssertBuffer */, false/* flushRetractBuffer */);
 
             if (m_listeners != null) {
 
@@ -1065,27 +1173,27 @@ public class BigdataSail extends SailBase implements Sail {
             if (getTruthMaintenance()) {
 
                 /*
-                 * Since we are doing truth maintenance we need to copy the matching
-                 * "explicit" statements into a temporary store rather than deleting
-                 * them directly. This uses the internal API to copy the statements
-                 * to the temporary store without materializing them as Sesame
-                 * Statement objects.
+                 * Since we are doing truth maintenance we need to copy the
+                 * matching "explicit" statements into a temporary store rather
+                 * than deleting them directly. This uses the internal API to
+                 * copy the statements to the temporary store without
+                 * materializing them as Sesame Statement objects.
                  */
-                
+
                 /*
-                 * obtain a chunked iterator using the triple pattern that visits
-                 * only the explicit statements.
+                 * obtain a chunked iterator using the triple pattern that
+                 * visits only the explicit statements.
                  */
-                ISPOIterator itr = database.getAccessPath(s,p,o).iterator(ExplicitSPOFilter.INSTANCE);
-                
-                // copy explicit statements to retraction buffer.
-                {
+                final ISPOIterator itr = database.getAccessPath(s, p, o)
+                        .iterator(ExplicitSPOFilter.INSTANCE);
 
-                    final AbstractTripleStore tmp = retractBuffer.getStatementStore();
+                // the tempStore absorbing retractions.
+                final AbstractTripleStore tempStore = retractBuffer
+                        .getStatementStore();
 
-                    n = tmp.addStatements(tmp, true/* copyOnly */, itr, null/* filter */);
-                    
-                }
+                // copy explicit statements to tempStore.
+                n = tempStore.addStatements(tempStore, true/* copyOnly */,
+                        itr, null/* filter */);
                 
             } else {
 
@@ -1123,17 +1231,10 @@ public class BigdataSail extends SailBase implements Sail {
         public void rollback() throws SailException {
 
             assertWritable();
-            
-            // discard any pending asserts.
-            assertBuffer.clear();
-            
-            if(retractBuffer!=null) {
-            
-                // discard any pending retracts.
-                retractBuffer.clear();
-                
-            }
-            
+
+            // discard buffered assertions and/or retractions.
+            clearBuffers();
+
             // discard the write set.
             database.abort();
             
@@ -1157,7 +1258,7 @@ public class BigdataSail extends SailBase implements Sail {
              * the closure.
              */
             
-            flushStatementBuffers();
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
             
             database.commit();
             
@@ -1196,39 +1297,54 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
         /**
-         * Flush any pending assertions or retractions to the database using
+         * Flush pending assertions and/or retractions to the database using
          * efficient batch operations. If {@link #getTruthMaintenance()} returns
          * <code>true</code> this method will also handle truth maintenance.
          * <p>
-         * Note: This tests whether or not a transaction has been started. It MUST
-         * be invoked within any method that will read on the database to ensure
-         * that any pending writes have been flushed (otherwise the read operation
-         * will not be able to see the pending writes). However, methods that assert
-         * or retract statements MUST only flush the buffer on which they will NOT
-         * write.  E.g., if you are going to retract statements, then first flush
-         * the assertions buffer and visa versa.
+         * Note: This MUST be invoked within any method that will read on the
+         * database to ensure that any pending writes have been flushed
+         * (otherwise the read operation will not be able to see the pending
+         * writes). However, methods that assert or retract statements MUST only
+         * flush the buffer on which they will NOT write. E.g., if you are going
+         * to retract statements, then first flush the assertions buffer and
+         * visa versa.
          */
-        protected void flushStatementBuffers() {
+        protected void flushStatementBuffers(final boolean flushAssertBuffer,
+                final boolean flushRetractBuffer) {
 
             if (readOnly) return;
 
-            if (assertBuffer != null && !assertBuffer.isEmpty()) {
+            if (flushAssertBuffer && assertBuffer != null) {
 
+                // flush statements
                 assertBuffer.flush();
                 
                 if(getTruthMaintenance()) {
 
                     // do TM, writing on the database.
-                    ((TMStatementBuffer)assertBuffer).doClosure();
-                    
-                }
+                    tm.assertAll((TempTripleStore)assertBuffer.getStatementStore());
 
+                    // must be reallocated on demand.
+                    assertBuffer = null;
+
+                }
+                
             }
 
-            if (retractBuffer != null && !retractBuffer.isEmpty()) {
+            if (flushRetractBuffer && retractBuffer != null) {
 
-                // do TM, writing on the database.
-                retractBuffer.doClosure();
+                // flush statements.
+                retractBuffer.flush();
+                
+                if(getTruthMaintenance()) {
+                
+                    // do TM, writing on the database.
+                    tm.retractAll((TempTripleStore)retractBuffer.getStatementStore());
+
+                    // must be re-allocated on demand.
+                    retractBuffer = null;
+
+                }
                 
             }
             
@@ -1264,7 +1380,7 @@ public class BigdataSail extends SailBase implements Sail {
                     + includeInferred + ", contexts="
                     + Arrays.toString(contexts));
             
-            if (contexts == null || contexts.length == 0) {
+            if (contexts == null || contexts.length == 0 || contexts[0] == null) {
                 
                 // Operates on all contexts.
                 
@@ -1283,14 +1399,12 @@ public class BigdataSail extends SailBase implements Sail {
 
         /**
          * Returns an iterator that visits {@link IStatementWithType} objects.
-         * 
-         * @todo modify IAccessPath to accept a filter for inferences or no.
          */
         private StatementIterator getStatements(Resource s, URI p, Value o, boolean includeInferred) {
 
-            flushStatementBuffers();
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-            IAccessPath accessPath = database.getAccessPath(s, p, o);
+            final IAccessPath accessPath = database.getAccessPath(s, p, o);
 
             if(accessPath instanceof EmptyAccessPath) {
                 
@@ -1391,9 +1505,9 @@ public class BigdataSail extends SailBase implements Sail {
             
             assertWritable();
             
-            flushStatementBuffers();
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
             
-            getInferenceEngine().computeClosure(null/*focusStore*/);
+            getInferenceEngine().computeClosure(null/* focusStore */);
             
         }
         
@@ -1406,7 +1520,7 @@ public class BigdataSail extends SailBase implements Sail {
             
             assertWritable();
             
-            flushStatementBuffers();
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
 
             database.getAccessPath(NULL, NULL, NULL).removeAll(
                     InferredSPOFilter.INSTANCE);
@@ -1430,7 +1544,7 @@ public class BigdataSail extends SailBase implements Sail {
            
             log.info("Evaluating query: "+tupleExpr+", dataSet="+dataset+", includeInferred="+includeInferred);
             
-            flushStatementBuffers();
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
 
             // Clone the tuple expression to allow for more aggressive optimizations
             tupleExpr = tupleExpr.clone();

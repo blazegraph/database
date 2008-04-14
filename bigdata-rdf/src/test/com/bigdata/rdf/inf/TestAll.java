@@ -125,8 +125,8 @@ public class TestAll extends TestCase {
         // test suite for backward chaining of (?x rdf:type rdfs:Resource).
         suite.addTestSuite( TestBackchainTypeResourceIterator.class );
 
-        // test suite for owl:sameAs {2,3} (constained forward evaluation).
-        suite.addTestSuite( TestBackchainOwlSameAs.class );
+//        // test suite for owl:sameAs {2,3} (constained forward evaluation).
+//        suite.addTestSuite( TestBackchainOwlSameAs.class );
 
         // test suite for owl:sameAs {2,3} (backward chaining).
         suite.addTestSuite( TestBackchainOwlSameAsPropertiesIterator.class );
@@ -144,14 +144,7 @@ public class TestAll extends TestCase {
          */
         
         // test suite for basic TM mechansism encapsulated by this class.
-        suite.addTestSuite( TestTMStatementBuffer.class );
-        
-        /*
-         * @todo write a performance test of concurrent load and close rates
-         * using LUBM. This data set is good since it reuses the same ontology
-         * and will let us scale the #of concurrent clients and the #of files to
-         * be loaded to an arbitrary degree.
-         */
+        suite.addTestSuite( TestTruthMaintenance.class );
         
         return suite;
         
