@@ -42,6 +42,8 @@ import org.apache.log4j.Logger;
 /**
  * Test suite.
  * 
+ * FIXME integrate the Sesame 2 TCK (technology compatibility kit).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -92,6 +94,9 @@ public class TestAll extends TestCase {
         // high-level query tests.
         suite.addTestSuite(TestQuery.class);
 
+        // test of high-level query on a graph with statements about statements.
+        suite.addTestSuite(TestProvenanceQuery.class);
+        
 // FIXME Restore the following tests after adapting to Sesame 2.x
 //        
 //        // test suite for SAIL transaction semantics.

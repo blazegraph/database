@@ -48,7 +48,6 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.IStatementWithType;
-import com.bigdata.rdf.store.StatementWithType;
 
 /**
  * Bootstrap test case for bringing up the {@link BigdataSail}.
@@ -245,8 +244,8 @@ public class TestBigdataSail extends TestCase {
                     assertEquals("subject", s, stmt.getSubject());
                     assertEquals("predicate", p, stmt.getPredicate());
                     assertEquals("object", o, stmt.getObject());
-                    // @todo what value should the context have?
-                    assertEquals("context", null, stmt.getContext());
+//                    // @todo what value should the context have?
+//                    assertEquals("context", null, stmt.getContext());
 
                     n++;
 
@@ -293,8 +292,8 @@ public class TestBigdataSail extends TestCase {
                     assertEquals("subject", s, stmt.getSubject());
                     assertEquals("predicate", p, stmt.getPredicate());
                     assertEquals("object", o, stmt.getObject());
-                    // @todo what value should the context have?
-                    assertEquals("context", null, stmt.getContext());
+//                    // @todo what value should the context have?
+//                    assertEquals("context", null, stmt.getContext());
 
                     n++;
 

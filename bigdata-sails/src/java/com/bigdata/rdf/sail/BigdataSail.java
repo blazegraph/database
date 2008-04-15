@@ -1030,7 +1030,7 @@ public class BigdataSail extends SailBase implements Sail {
             o = (Value) valueFactory.toNativeValue(o);
             
             // buffer the assertion.
-            assertBuffer.add(s, p, o);
+            getAssertionBuffer().add(s, p, o);
             
             if (m_listeners != null) {
 
@@ -1200,7 +1200,7 @@ public class BigdataSail extends SailBase implements Sail {
                         .iterator(ExplicitSPOFilter.INSTANCE);
 
                 // the tempStore absorbing retractions.
-                final AbstractTripleStore tempStore = retractBuffer
+                final AbstractTripleStore tempStore = getRetractionBuffer()
                         .getStatementStore();
 
                 // copy explicit statements to tempStore.

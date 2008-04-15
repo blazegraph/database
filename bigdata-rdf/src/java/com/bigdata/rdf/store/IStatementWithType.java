@@ -64,4 +64,21 @@ public interface IStatementWithType extends Statement {
      */
     public StatementEnum getStatementType();
 
+    /**
+     * <code>true</code> if the statement is an axiom that is not present as
+     * an explicit assertion.
+     */
+    public boolean isAxiom();
+    
+    /**
+     * <code>true</code> if the statement is an inference that is not present
+     * as an explicit assertion or an axiom.
+     */
+    public boolean isInferred();
+    
+    /**
+     * <code>true</code> if the statement is an explicit assertion.
+     */
+    public boolean isExplicit();
+    
 }

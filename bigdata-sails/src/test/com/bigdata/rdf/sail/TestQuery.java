@@ -36,12 +36,8 @@ import info.aduna.iteration.CloseableIteration;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Set;
 
-import junit.framework.TestCase;
-
-import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
@@ -58,8 +54,6 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.journal.BufferMode;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.DataLoader;
 
 /**
@@ -70,10 +64,8 @@ import com.bigdata.rdf.store.DataLoader;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestQuery extends TestCase {
+public class TestQuery extends AbstractBigdataSailTestCase {
 
-    protected static final Logger log = Logger.getLogger(TestQuery.class);
-    
     /**
      * 
      */
@@ -87,91 +79,56 @@ public class TestQuery extends TestCase {
         super(arg0);
     }
 
-    /*
-     * test fixtures
-     */
-    
-    BigdataSail sail;
-    
-    protected void setUp() throws Exception {
-     
-        Properties properties = new Properties();
-
-        // transient means that there is nothing to delete after the test.
-        properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
-        
-        // the other way to handle cleanup is to use a temp file and mark it for delete on close.
-//        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//
-//        properties.setProperty(Options.DELETE_ON_CLOSE,"true");
-//
-//        properties.setProperty(Options.DELETE_ON_EXIT,"true");
-
-        // option to turn off closure.
-//        properties.setProperty(Options.CLOSURE,ClosureEnum.None.toString());
-        
-        sail = new BigdataSail(properties);
-
-        /* 
-         * Load the data set (LUBM with 1 university).
-         */
-
-        {
-
-            File dir = new File("src/resources/U1");
-            
-            String[] filenames = dir.list(new FilenameFilter() {
-
-                public boolean accept(File parent,String name) {
-
-                    return name.endsWith(".owl");
-                    
-                }}
-            
-            );
-            
-            final int n = filenames.length;
-            
-            String[] resource = new String[ n ];
-            
-            String[] baseURL = new String[ n ];
-            
-            RDFFormat[] rdfFormat = new RDFFormat[ n ]; 
-            
-            for(int i=0; i<n; i++) {
-
-                resource[i] = new File(dir,filenames[i]).toString();
-                
-                baseURL[i] = "";
-          
-                rdfFormat[i] = RDFFormat.RDFXML;
-                
-            }
-
-            log.info("Loading "+n+" files from "+dir);
-            
-            DataLoader dataLoader = sail.database.getDataLoader();
-            
-            dataLoader.loadData(resource, baseURL, rdfFormat);
-
-        }
-        
-    }
-    
-    protected void tearDown() throws Exception {
-        
-        if (sail != null) {
-
-            sail.shutDown();
-            
-        }
-                
-    }
-    
     /**
      * The namespace used when the LUBM data set was generated.
      */
     final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
+    
+    /**
+     * Load the data set (LUBM with 1 university).
+     */
+    protected void setUp() throws Exception {
+
+        super.setUp();
+
+        File dir = new File("src/resources/U1");
+
+        String[] filenames = dir.list(new FilenameFilter() {
+
+            public boolean accept(File parent, String name) {
+
+                return name.endsWith(".owl");
+
+            }
+        }
+
+        );
+
+        final int n = filenames.length;
+
+        String[] resource = new String[n];
+
+        String[] baseURL = new String[n];
+
+        RDFFormat[] rdfFormat = new RDFFormat[n];
+
+        for (int i = 0; i < n; i++) {
+
+            resource[i] = new File(dir, filenames[i]).toString();
+
+            baseURL[i] = "";
+
+            rdfFormat[i] = RDFFormat.RDFXML;
+
+        }
+
+        log.info("Loading " + n + " files from " + dir);
+
+        DataLoader dataLoader = sail.database.getDataLoader();
+
+        dataLoader.loadData(resource, baseURL, rdfFormat);
+
+    }
     
     /**
      * A hand-compiled high-level query based on query#1 from LUBM
