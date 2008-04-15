@@ -67,6 +67,9 @@ import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rio.StatementBuffer.StatementCyclesException;
+import com.bigdata.rdf.rio.StatementBuffer.UnificationException;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
@@ -658,6 +661,162 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 + " statements", itr.hasNext());
 
     }
+
+    /**
+     * Tests the correct rejection of a statement about itself.
+     */
+    public void test_correctRejection_cycles01() {
+        
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            if (!store.statementIdentifiers) {
+
+                log.warn("Statement identifiers are not enabled");
+
+                return;
+
+            }
+
+            _URI A = new _URI("http://www.foo.org/A");
+            _URI rdfType = new _URI(RDF.TYPE);
+            _BNode sid1 = new _BNode("_S1");
+
+            StatementBuffer buf = new StatementBuffer(store,100/*capacity*/);
+            
+            // statement about itself is a cycle.
+            buf.add(sid1, rdfType, A, sid1);
+            
+            /*
+             * Flush to the database, resolving statement identifiers as
+             * necessary.
+             */
+            try {
+
+                buf.flush();
+
+                fail("Expecting: "+StatementCyclesException.class);
+                
+            } catch(StatementCyclesException ex) {
+                
+                System.err.println("Ignoring expected exception: "+ex);
+                
+            }
+
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
+    
+    /**
+     * Tests the correct rejection of cycles within statements about statements.
+     */
+    public void test_correctRejection_cycles02() {
+        
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            if (!store.statementIdentifiers) {
+
+                log.warn("Statement identifiers are not enabled");
+
+                return;
+
+            }
+
+            _URI B = new _URI("http://www.foo.org/B");
+            _URI rdfType = new _URI(RDF.TYPE);
+            _BNode sid1 = new _BNode("_S1");
+            _BNode sid2 = new _BNode("_S2");
+
+            StatementBuffer buf = new StatementBuffer(store,100/*capacity*/);
+            
+            // a cycle with a period of one.
+            buf.add(sid2, rdfType, B, sid1);
+            buf.add(sid1, rdfType, B, sid2);
+            
+            /*
+             * Flush to the database, resolving statement identifiers as
+             * necessary.
+             */
+            try {
+
+                buf.flush();
+
+                fail("Expecting: "+StatementCyclesException.class);
+                
+            } catch(StatementCyclesException ex) {
+                
+                System.err.println("Ignoring expected exception: "+ex);
+                
+            }
+
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
+    
+    /**
+     * Tests the correct rejection when the same blank node is used in the
+     * context position of more than one statement.
+     */
+    public void test_correctRejection_unificationError() {
+        
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            if (!store.statementIdentifiers) {
+
+                log.warn("Statement identifiers are not enabled");
+
+                return;
+
+            }
+
+            _URI A = new _URI("http://www.foo.org/A");
+            _URI B = new _URI("http://www.foo.org/B");
+            _URI C = new _URI("http://www.foo.org/C");
+            _URI rdfType = new _URI(RDF.TYPE);
+            _BNode sid1 = new _BNode("_S1");
+
+            StatementBuffer buf = new StatementBuffer(store,100/*capacity*/);
+            
+            // same blank node in both two distinct statement is an error.
+            buf.add(A, rdfType, C, sid1);
+            buf.add(B, rdfType, C, sid1);
+            
+            /*
+             * Flush to the database, resolving statement identifiers as
+             * necessary.
+             */
+            try {
+
+                buf.flush();
+
+                fail("Expecting: "+UnificationException.class);
+                
+            } catch(UnificationException ex) {
+                
+                System.err.println("Ignoring expected exception: "+ex);
+                
+            }
+
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
     
     /**
      * Test case for the interchange of the statement identifiers using a
@@ -665,10 +824,10 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
      * 
      * @throws SailException
      * @throws RDFHandlerException
-     * 
      * @throws IOException 
      */
-    public void test_rdfXmlInterchange() throws SailException, RDFHandlerException, IOException {
+    public void test_rdfXmlInterchange() throws SailException,
+            RDFHandlerException, IOException {
 
         AbstractTripleStore store = getStore();
 
@@ -682,74 +841,84 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             }
 
-            _URI x = new _URI("http://www.foo.org/x");
-            _URI y = new _URI("http://www.foo.org/y");
-            _URI z = new _URI("http://www.foo.org/z");
+            {
+                _URI x = new _URI("http://www.foo.org/x");
+                _URI y = new _URI("http://www.foo.org/y");
+                _URI z = new _URI("http://www.foo.org/z");
 
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
+                _URI A = new _URI("http://www.foo.org/A");
+                _URI B = new _URI("http://www.foo.org/B");
+                _URI C = new _URI("http://www.foo.org/C");
 
-            _URI rdfType = new _URI(RDF.TYPE);
-            _URI rdfsLabel = new _URI(RDFS.LABEL);
-            _URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+                _URI rdfType = new _URI(RDF.TYPE);
 
-            _Literal lit1 = new _Literal("abc");
-            _Literal lit2 = new _Literal("abc", A);
-            _Literal lit3 = new _Literal("abc", "en");
+                _URI dcCreator = new _URI("http://purl.org/dc/terms/creator");
 
-            _BNode bn1 = new _BNode(UUID.randomUUID().toString());
-            _BNode bn2 = new _BNode("a12");
+                _Literal bryan = new _Literal("bryan");
+                _Literal mike = new _Literal("mike");
 
-            _Value[] terms = new _Value[] {
+                _BNode sid1 = new _BNode("_S1");
+                _BNode sid2 = new _BNode("_S2");
+                _BNode sid3 = new _BNode("_S3");
 
-            x, y, z,//
-                    A, B, C,//
-                    rdfType,//
-                    rdfsLabel,//
-                    rdfsSubClassOf,//
-                    lit1, lit2, lit3,//
-                    bn1, bn2 //
+                StatementBuffer buf = new StatementBuffer(store, 100/* capacity */);
 
-            };
+                // ground statements using BNodes for statement identifiers.
+                buf.add(x, rdfType, A, sid1);
+                buf.add(y, rdfType, B, sid2);
+                buf.add(z, rdfType, C, sid3);
 
-            store.addTerms(terms, terms.length);
+                // statements about statements using statement identifiers.
+                buf.add(sid1, dcCreator, bryan);
+                buf.add(sid2, dcCreator, bryan);
+                buf.add(sid2, dcCreator, mike);
+                buf.add(sid3, dcCreator, mike);
 
-            SPO[] stmts = new SPO[] {
+                /*
+                 * Flush to the database, resolving statement identifiers as
+                 * necessary.
+                 */
+                buf.flush();
 
-                    new SPO(x.termId, rdfType.termId, C.termId,
-                            StatementEnum.Explicit),
-                    new SPO(y.termId, rdfType.termId, B.termId,
-                            StatementEnum.Explicit),
-                    new SPO(z.termId, rdfType.termId, A.termId,
-                            StatementEnum.Explicit),
+                /*
+                 * Verify the structure of the graph, at least those aspects
+                 * that are dealing with the statements about statements since
+                 * we do not care about TM here.
+                 */
+                {
 
-                    new SPO(A.termId, rdfsLabel.termId, lit1.termId,
-                            StatementEnum.Explicit),
-                    new SPO(B.termId, rdfsLabel.termId, lit2.termId,
-                            StatementEnum.Explicit),
-                    new SPO(C.termId, rdfsLabel.termId, lit3.termId,
-                            StatementEnum.Explicit),
+                    final SPO spo1 = store.getStatement(x.termId,
+                            rdfType.termId, A.termId);
+                    final SPO spo2 = store.getStatement(y.termId,
+                            rdfType.termId, B.termId);
+                    final SPO spo3 = store.getStatement(z.termId,
+                            rdfType.termId, C.termId);
 
-                    new SPO(B.termId, rdfsSubClassOf.termId, A.termId,
-                            StatementEnum.Explicit),
-                    new SPO(C.termId, rdfsSubClassOf.termId, B.termId,
-                            StatementEnum.Explicit),
+                    assertNotNull(spo1);
+                    assertNotNull(spo2);
+                    assertNotNull(spo3);
 
-                    new SPO(bn1.termId, rdfsLabel.termId, lit1.termId,
-                            StatementEnum.Explicit),
-                    new SPO(bn2.termId, rdfsLabel.termId, lit2.termId,
-                            StatementEnum.Explicit),
+                    assertEquals(sid1.termId, spo1.getStatementIdentifier());
+                    assertEquals(sid2.termId, spo2.getStatementIdentifier());
+                    assertEquals(sid3.termId, spo3.getStatementIdentifier());
 
-            };
+                    assertNotNull(store.getStatement(sid1.termId,
+                            dcCreator.termId, bryan.termId));
+                    assertNotNull(store.getStatement(sid2.termId,
+                            dcCreator.termId, bryan.termId));
+                    assertNotNull(store.getStatement(sid2.termId,
+                            dcCreator.termId, mike.termId));
+                    assertNotNull(store.getStatement(sid3.termId,
+                            dcCreator.termId, mike.termId));
 
+                }
+            }
+            
             /*
-             * Add the statements to the KB.
-             * 
-             * Note: sorts into SPO order as a side-effect.
+             * Serialize as RDF/XML using a vendor specific extension to
+             * represent the statement identifiers and statements about
+             * statements.
              */
-            store.addStatements(stmts, stmts.length);
-
             final StatementIterator itr = store.getStatements(null, null, null);
             final String rdfXml;
             try {
@@ -785,55 +954,97 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             // write the rdf/xml on the console.
             System.err.println(rdfXml);
 
-            store.getDataLoader().loadData(new StringReader(rdfXml),
+            /*
+             * Deserialize the RDF/XML into a temporary store and verify
+             * read-back of the graph with statement-level provenance metadata.
+             */
+            final TempTripleStore tempStore = new TempTripleStore(store.getProperties());
+            try {
+                
+                log.info("Reading RDF/XML into temp store.");
+                
+                tempStore.getDataLoader().loadData(new StringReader(rdfXml),
                     ""/* baseURL */, RDFFormat.RDFXML);
 
+                /*
+                 * Re-define the vocabulary so that it does not use the term
+                 * identifiers from the other database.
+                 */
+                _URI x = new _URI("http://www.foo.org/x");
+                _URI y = new _URI("http://www.foo.org/y");
+                _URI z = new _URI("http://www.foo.org/z");
+
+                _URI A = new _URI("http://www.foo.org/A");
+                _URI B = new _URI("http://www.foo.org/B");
+                _URI C = new _URI("http://www.foo.org/C");
+
+                _URI rdfType = new _URI(RDF.TYPE);
+
+                _URI dcCreator = new _URI("http://purl.org/dc/terms/creator");
+
+                _Literal bryan = new _Literal("bryan");
+                _Literal mike = new _Literal("mike");
+
+                _Value[] terms = new _Value[] {
+                        x,y,z,//
+                        A,B,C,//
+                        rdfType,//
+                        dcCreator,//
+                        bryan, mike//
+                };
+                
+                // resolve term identifiers for the terms of interest.
+                tempStore.addTerms(terms, terms.length);
+                
+                /*
+                 * Verify the structure of the graph, at least those aspects that
+                 * are dealing with the statements about statements since we do not
+                 * care about TM here.
+                 */
+                
+
+                final SPO spo1 = tempStore.getStatement(x.termId,
+                        rdfType.termId, A.termId);
+                final SPO spo2 = tempStore.getStatement(y.termId,
+                        rdfType.termId, B.termId);
+                final SPO spo3 = tempStore.getStatement(z.termId,
+                        rdfType.termId, C.termId);
+
+                assertNotNull(spo1);
+                assertNotNull(spo2);
+                assertNotNull(spo3);
+
+                final long sid1 = spo1.getStatementIdentifier();
+                final long sid2 = spo2.getStatementIdentifier();
+                final long sid3 = spo3.getStatementIdentifier();
+                
+                assertEquals(sid1, spo1.getStatementIdentifier());
+                assertEquals(sid2, spo2.getStatementIdentifier());
+                assertEquals(sid3, spo3.getStatementIdentifier());
+
+                assertNotNull(tempStore.getStatement(sid1, dcCreator.termId,
+                        bryan.termId));
+                assertNotNull(tempStore.getStatement(sid2, dcCreator.termId,
+                        bryan.termId));
+                assertNotNull(tempStore.getStatement(sid2, dcCreator.termId,
+                        mike.termId));
+                assertNotNull(tempStore.getStatement(sid3, dcCreator.termId,
+                        mike.termId));
+                
+            } finally {
+                
+                tempStore.closeAndDelete();
+                
+            }
+
             /*
-             * FIXME verify read-back of the graph with statement-level
-             * provenance metadata.
-             * 
              * FIXME There are a lot of ways in which reportStatement/3 gets
              * called in RDFXMLParser. I need to survey them all and decide
              * whether or not "context" (the variable set based on
              * bigdata:graph) will be correct ("" or the sid) or in there are
              * some uses, such as reification, where "context" should be
              * ignored.
-             * 
-             * FIXME BNodes must be unified with statements identifiers when
-             * they appear in the context position and statement identifiers are
-             * enabled. This should happen in addStatements if the statement has
-             * context and statement identifiers are enabled. Also, if a BNode
-             * appears in the context position then it must be the same instance
-             * as all other instances of that bnode (this is handled by rio) and
-             * it SHOULD NOT be assigned a BNode termId since we are going to
-             * assign/resolve the statement identifier instead. This probably
-             * means sorting all statements with statement identifiers in
-             * dependency order (and using BNodes you could create cycles, which
-             * would have to be illegal).
-             * 
-             * FIXME detect cycles in statement identifiers -- they are not
-             * legal. you can not make a statement about itself and you can not
-             * make a statement whose transitive closure via the statement
-             * identifier describes itself. The statement identifier is not
-             * knowable until the triple is specified.
-             * 
-             * FIXME When parsing RDF/XML, we must defer the insert of
-             * statements with blank nodes in their subject or object position
-             * until the end of the input stream since we can not tell whether
-             * the blank node is in fact a statement identifier.  This issue can
-             * only arise during the conversion of an RDF interchange syntax into
-             * SPOs objects. Therefore it is addressed by the StatementBuffer and
-             * NOT the AbstractTripleStore.
-             * 
-             * FIXME When parsing, _BNode references need to be preserved in a
-             * cache until the end of the document in order to guarentee that
-             * all BNodes with a given ID within a document are mapped onto the
-             * same termId in the database. This means that we need something
-             * like a scoped optimized value factory object. (The same
-             * constraint probably obtains for any RDF Value to SPO conversion
-             * context, which is always handled by a StatementBuffer.)
              */
-            fail("Verify correct read of the same graph");
             
         } finally {
 

@@ -67,6 +67,7 @@ import info.aduna.iteration.CloseableIteration;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
@@ -111,6 +112,7 @@ import org.openrdf.sail.helpers.SailBase;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -602,6 +604,12 @@ public class BigdataSail extends SailBase implements Sail {
         private StatementBuffer retractBuffer = null;
         
         /**
+         * A canonicalizing mapping for blank nodes whose life cycle is the same
+         * as that of the {@link SailConnection}.
+         */
+        private Map<String,_BNode> bnodes = new HashMap<String,_BNode>(bufferCapacity);
+        
+        /**
          * Return the assertion buffer.
          * <p>
          * The assertion buffer is used to buffer statements that are being
@@ -628,13 +636,15 @@ public class BigdataSail extends SailBase implements Sail {
 
                     assertBuffer = new StatementBuffer(tm.getTempStore(),
                             database, bufferCapacity);
-
+                    
                 } else {
 
                     assertBuffer = new StatementBuffer(database, bufferCapacity);
 
                 }
 
+                assertBuffer.setBNodeMap(bnodes);
+                
             }
             
             return assertBuffer;
@@ -695,6 +705,8 @@ public class BigdataSail extends SailBase implements Sail {
 
                 }
 
+                retractBuffer.setBNodeMap(bnodes);
+                
             }
             
             return retractBuffer;
@@ -1073,7 +1085,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             if(assertBuffer != null) {
                 
-                // discard any pending asserts.
+                // discard all buffered data.
                 assertBuffer.clear();
                 
                 if(truthMaintenance) {
@@ -1090,7 +1102,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             if (retractBuffer != null) {
 
-                // discard any pending retracts.
+                // discard all buffered data.
                 retractBuffer.clear();
 
                 if (truthMaintenance) {

@@ -1052,50 +1052,15 @@ java.lang.AssertionError: lastModified=0
 	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:764)
 
 
-<?xml version="1.0" encoding="UTF-8"?>
-<rdf:RDF
-	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-	xmlns:bigdata="http://www.bigdata.com/rdf#">
+- FIXME Must support query with context(s) in the
+  BigdataSailConnection.  The interpretation of the context depends on
+  the database mode.
 
-<rdf:Description rdf:about="http://www.foo.org/A">
-	<label xmlns="http://www.w3.org/2000/01/rdf-schema#" bigdata:graph="_S67">abc</label>
-</rdf:Description>
+    When the database is in "provenance" mode, then each context
+    identifies a specific statement.  Statement identifiers can only
+    become bound by a triple pattern, so the query must always go
+    through the SPO, OSP, or POS index.
 
-<rdf:Description rdf:about="http://www.foo.org/B">
-	<label xmlns="http://www.w3.org/2000/01/rdf-schema#" bigdata:graph="_S71" rdf:datatype="http://www.foo.org/A">abc</label>
-	<subClassOf xmlns="http://www.w3.org/2000/01/rdf-schema#" bigdata:graph="_S75" rdf:resource="http://www.foo.org/A"/>
-</rdf:Description>
-
-<rdf:Description rdf:about="http://www.foo.org/C">
-	<label xmlns="http://www.w3.org/2000/01/rdf-schema#" bigdata:graph="_S79" xml:lang="en">abc</label>
-	<subClassOf xmlns="http://www.w3.org/2000/01/rdf-schema#" bigdata:graph="_S83" rdf:resource="http://www.foo.org/B"/>
-</rdf:Description>
-
-<rdf:Description rdf:about="http://www.foo.org/x">
-	<rdf:type bigdata:graph="_S87" rdf:resource="http://www.foo.org/C"/>
-</rdf:Description>
-
-<rdf:Description rdf:about="http://www.foo.org/y">
-	<rdf:type bigdata:graph="_S91" rdf:resource="http://www.foo.org/B"/>
-</rdf:Description>
-
-<rdf:Description rdf:about="http://www.foo.org/z">
-	<rdf:type bigdata:graph="_S95" rdf:resource="http://www.foo.org/A"/>
-</rdf:Description>
-
-<rdf:Description rdf:nodeID="_57">
-	<label xmlns="http://www.w3.org/2000/01/rdf-schema#" bigdata:graph="_S99" rdf:datatype="http://www.foo.org/A">abc</label>
-</rdf:Description>
-
-<rdf:Description rdf:nodeID="_61">
-	<label xmlns="http://www.w3.org/2000/01/rdf-schema#" bigdata:graph="_S103">abc</label>
-</rdf:Description>
-
-</rdf:RDF>
-
-Refactored TMStatementBuffer to encapsulate the TM logic in a
-TruthMaintenance class.  There is now a better division of effort
-between StatementBuffer (converting Sesame statements into SPOs),
-operations on the native triple store and SPOs, and truth maintaince.
-Ive also renamed the test suite from TestTMStatementBuffer to
-TestTruthMaintenance.
+    When the database is in "quadStore" mode, then the query can go
+    through any of 6 access patterns and we need to consider the
+    context(s) in order to choose the correct access pattern.

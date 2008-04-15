@@ -310,7 +310,8 @@ abstract class BaseAxioms implements Axioms {
         
         final int capacity = getAxioms().size();
         
-        MyStatementBuffer buffer = new MyStatementBuffer(db, capacity );
+        // Note: min capacity of one handles case with no axioms.
+        MyStatementBuffer buffer = new MyStatementBuffer(db, Math.max(1,capacity) );
 
         for (Iterator<Axioms.Triple> itr = getAxioms().iterator(); itr
                 .hasNext();) {
@@ -323,10 +324,6 @@ abstract class BaseAxioms implements Axioms {
             
             URI o = triple.getO();
             
-            /*
-             * FIXME axioms need to go into the appropriate context based on
-             * whatever CONOPS we have for contexts.
-             */
             buffer.add( s, p, o, null, StatementEnum.Axiom );
             
         }
@@ -362,10 +359,14 @@ abstract class BaseAxioms implements Axioms {
             // SPO[] exposed by our StatementBuffer subclass.
             SPO[] stmts = ((MyStatementBuffer)buffer).stmts;
             
-            for(SPO spo : stmts ) {
+            if (stmts != null) {
 
-                btree.insert(keyBuilder.statement2Key(KeyOrder.SPO, spo),
-                        spo.type.serialize());
+                for (SPO spo : stmts) {
+
+                    btree.insert(keyBuilder.statement2Key(KeyOrder.SPO, spo),
+                            spo.type.serialize());
+
+                }
 
             }
             

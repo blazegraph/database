@@ -44,7 +44,7 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser (the value is supplied by the ctor). 
      */
-    final protected IStatementBuffer buffer;
+    final protected StatementBuffer buffer;
 
     private boolean flush = true;
     
@@ -75,6 +75,11 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      * MAY have been written on the store.
      * 
      * @return The current value.
+     * 
+     * FIXME The use of this flag can introduce unexpected dependencies between
+     * source documents since they will use the same canonicalizing mapping for
+     * blank nodes and, when statement identifiers are used, statements using
+     * blank nodes will be deferred beyond the end of the source document.
      */
     public boolean getFlush() {
         
@@ -89,7 +94,7 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      *            The buffer used to collect, sort, and write statements onto
      *            the database.
      */
-    public PresortRioLoader(IStatementBuffer buffer) {
+    public PresortRioLoader(StatementBuffer buffer) {
 
         assert buffer != null;
                 
@@ -110,6 +115,19 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
 
     }
 
+    protected void error(Exception ex) {
+        
+        if(buffer != null) {
+            
+            // discard all buffered data.
+            buffer.clear();
+            
+        }
+
+        super.error( ex );
+        
+    }
+    
     // Let the caller clear the buffer!!!
 //    /**
 //     * Clear the buffer.

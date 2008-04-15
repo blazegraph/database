@@ -143,8 +143,9 @@ public interface ITripleStore {
      * Add a single {@link StatementEnum#Explicit} statement by lookup and/or
      * insert into the various indices (non-batch api).
      * <p>
-     * Note: The non-batch API is horridly inefficient. The batch load API for
-     * Sesame {@link Value} objects is:
+     * Note: The non-batch API is horridly inefficient and can not be used to
+     * co-reference blank nodes. The batch load API for Sesame {@link Value}
+     * objects is:
      * 
      * <pre>
      *  

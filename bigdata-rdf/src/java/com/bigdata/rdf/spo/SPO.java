@@ -173,6 +173,48 @@ public class SPO implements Comparable {
     }
 
     /**
+     * Constructor used when you know the {s,p,o} and have done a lookup in the
+     * index to determine whether or not the statement exists, its
+     * {@link StatementEnum} type, and its statement identifier (if assigned).
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param val
+     */
+    public SPO(long s, long p, long o, byte[] val) {
+
+        this.s = s;
+        this.p = p;
+        this.o = o;
+        
+        final byte code = val[0];
+        
+        type = StatementEnum.decode( code ); 
+        
+        if (val.length == 1 + 8) {
+
+            /*
+             * The value buffer appears to contain a statement identifier, so we
+             * read it.
+             */
+            
+            sid = new ByteArrayBuffer(1,val.length,val).getLong(1);
+        
+            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
+                    + toString(sid);
+
+            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
+                    + toString();
+
+            assert sid != NULL : "statement identifier is NULL for explicit statement: "
+                    + toString();
+
+        }
+        
+    }
+    
+    /**
      * Construct a triple from the sort key.
      * <p>
      * Note: If statement identifiers are enabled, then the statement identifier
@@ -255,8 +297,6 @@ public class SPO implements Comparable {
 
         }
         
-//        type = StatementEnum.deserialize(tuple.getValue());
-        
         final ByteArrayBuffer vbuf = tuple.getValueBuffer();
         
         final byte code = vbuf.getByte(0);
@@ -280,33 +320,6 @@ public class SPO implements Comparable {
 
             assert sid != NULL : "statement identifier is NULL for explicit statement: "
                     + toString();
-
-//                if (id == NULL) {
-//
-//                    /*
-//                     * Must be non-NULL for an explicit statement.
-//                     */
-//                    
-//                    throw new AssertionError(
-//                            "Statement identifier NULL but statement is explicit: "
-//                                    + toString());
-//                    
-//                }
-//                
-//            } else {
-//
-//                /*
-//                 * Must be NULL for an Axiom or Inferred statement.
-//                 * 
-//                 * Note: the statement identifier set to NULL when a statement
-//                 * is downgraded from Explicit during truth maintenance.
-//                 */
-//                
-//                throw new AssertionError(
-//                        "Statement identifier not NULL but statement is not explicit: "
-//                                + toString());
-//                
-//            }
 
         }
         

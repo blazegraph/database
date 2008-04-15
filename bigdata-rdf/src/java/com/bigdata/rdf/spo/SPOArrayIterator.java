@@ -339,6 +339,10 @@ public class SPOArrayIterator implements ISPOIterator {
              * The SPO[] does not have any unused elements and nothing has been
              * returned to the caller by next() so we can just return the
              * backing array in this case.
+             * 
+             * Note: If the caller then sorts the chunk it will have a
+             * side-effect on the original SPO[] since we are returning a
+             * reference to that array.
              */
             
             ret = stmts;

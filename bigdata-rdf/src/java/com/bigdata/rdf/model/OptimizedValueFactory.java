@@ -37,7 +37,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Comparator;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
@@ -56,7 +55,6 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -176,16 +174,23 @@ public class OptimizedValueFactory implements ValueFactory {
         
     }
     
+    /**
+     * Assigns the blank node ID based on a {@link UUID}. The reason for this
+     * approach is that the internal term identifier for the blank node is
+     * assigned when it is inserted into the term:id index. Since that index is
+     * stable, the same internal term identifier would be assigned if the same
+     * ID was observed, even across different documents.
+     */
     public BNode createBNode() {
 
-//        String id = "_"+UUID.randomUUID();
+        String id = "_"+UUID.randomUUID();
         
-        String id = "_"+_ID.incrementAndGet();
+//        String id = "_"+_ID.incrementAndGet();
         
         return new _BNode(id);
         
     }
-    private final AtomicLong _ID = new AtomicLong(0L); 
+//    private final AtomicLong _ID = new AtomicLong(0L); 
 
     public BNode createBNode(String id) {
 
@@ -1398,25 +1403,25 @@ public class OptimizedValueFactory implements ValueFactory {
             
         }
 
-        public Value getObject() {
+        public _Value getObject() {
 
             return o;
 
         }
 
-        public URI getPredicate() {
+        public _URI getPredicate() {
 
             return p;
 
         }
 
-        public Resource getSubject() {
+        public _Resource getSubject() {
 
             return s;
 
         }
 
-        public Resource getContext() {
+        public _Resource getContext() {
             
             return c;
             
