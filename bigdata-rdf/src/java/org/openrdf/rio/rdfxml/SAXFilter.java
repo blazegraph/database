@@ -255,7 +255,7 @@ class SAXFilter implements ContentHandler {
 						else if ("xml:lang".equals(attQName)) {
 							elInfo.xmlLang = attributes.getValue(i);
 						} else if (BNS.NAMESPACE.equals(attributes.getURI(i))
-                                && BNS.GRAPH.equals(attributes.getLocalName(i))) {
+                                && BNS.SID.equals(attributes.getLocalName(i))) {
                             elInfo.context = attributes.getValue(i);
                         }
 					}
@@ -470,7 +470,7 @@ class SAXFilter implements ContentHandler {
 				String namespace = attributes.getURI(i);
 				String localName = attributes.getLocalName(i);
 
-                if(BNS.NAMESPACE.equals(namespace)&&BNS.GRAPH.equals(localName)) {
+                if(BNS.NAMESPACE.equals(namespace)&&BNS.SID.equals(localName)) {
                     elInfo.context = value;
                 } else
                 

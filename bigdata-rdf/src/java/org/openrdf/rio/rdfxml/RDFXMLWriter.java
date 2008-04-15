@@ -33,7 +33,7 @@ import com.bigdata.rdf.store.BNS;
  * XML-serialized RDF format using a private extension of designed to support
  * the interchange of statement-level provenance.
  * 
- * @see BNS#GRAPH
+ * @see BNS#SID
  */
 public class RDFXMLWriter implements RDFWriter {
 
@@ -262,19 +262,20 @@ public class RDFXMLWriter implements RDFWriter {
 			writeIndent();
 			writeStartOfStartTag(predNamespace, predLocalName);
 
-            // CONTEXT using bigdata:graph
+            // CONTEXT
             if(context != null) {
                 /*
-                 * Add the graph attribute if the statement context is
-                 * non-null.
+                 * Vendor specific extension interprets the context as a
+                 * statement identifier and serializes it as a blank node using
+                 * a custom XML attribute.
                  */
                 if (context instanceof BNode) {
                     BNode bNode = (BNode)context;
-                    writeAttribute(BNS.NAMESPACE, "graph", bNode.getID());
+                    writeAttribute(BNS.NAMESPACE, BNS.SID, bNode.getID());
                 }
                 else {
                     URI uri = (URI)context;
-                    writeAttribute(BNS.NAMESPACE, "graph", uri.toString());
+                    writeAttribute(BNS.NAMESPACE, BNS.SID, uri.toString());
                 }
             }
             

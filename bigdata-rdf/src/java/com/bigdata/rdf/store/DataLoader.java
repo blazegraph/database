@@ -189,11 +189,13 @@ public class DataLoader {
      * {@link #loadData(String[], String[], RDFFormat[])} is not well-suited to
      * your purposes. This can be much more efficient, approximating the
      * throughput for large document loads. However, the caller MUST invoke
-     * {@link #flush()} once all documents are loaded successfully. If an error
+     * {@link #endSource()} once all documents are loaded successfully. If an error
      * occurs during the processing of one or more documents then the entire
      * data load should be discarded.
      * 
      * @return The current value.
+     * 
+     * @see Options#FLUSH
      */
     public boolean getFlush() {
         
@@ -211,7 +213,7 @@ public class DataLoader {
      * always safe to invoke this method - if the buffer is empty the method
      * will be a NOP.
      */
-    public void flush() {
+    public void endSource() {
 
         if (buffer != null) {
 
@@ -372,8 +374,8 @@ public class DataLoader {
         
         /**
          * 
-         * When <code>true</code> (the default) the {@link StatementBuffer}
-         * is flushed by each
+         * When <code>true</code> (the default) the {@link StatementBuffer} is
+         * flushed by each
          * {@link DataLoader#loadData(String, String, RDFFormat)} or
          * {@link DataLoader#loadData(String[], String[], RDFFormat[])}
          * operation and when {@link DataLoader#doClosure()} is requested. When
@@ -386,11 +388,17 @@ public class DataLoader {
          * {@link DataLoader#loadData(String[], String[], RDFFormat[])} is not
          * well-suited to your purposes. This can be much more efficient,
          * approximating the throughput for large document loads. However, the
-         * caller MUST invoke {@link DataLoader#flush()} (or
+         * caller MUST invoke {@link DataLoader#endSource()} (or
          * {@link DataLoader#doClosure()} if appropriate) once all documents are
          * loaded successfully. If an error occurs during the processing of one
          * or more documents then the entire data load should be discarded (this
          * is always true).
+         * <p>
+         * <strong>This feature is most useful when blank nodes are not in use,
+         * but it causes memory to grow when blank nodes are in use and forces
+         * statements using blank nodes to be deferred until the application
+         * flushes the {@link DataLoader} when statement identifers are enabled.
+         * </strong>
          */
         public static final String FLUSH = "dataLoader.flush";
         
@@ -549,11 +557,11 @@ public class DataLoader {
             
         }
 
-        if (flush) {
+        if (flush && buffer != null) {
 
             // Flush the buffer after the document(s) have been loaded.
             
-            flush();
+            buffer.flush();
             
         }
         
@@ -758,11 +766,26 @@ public class DataLoader {
         // Note: allocates a new buffer iff the [buffer] is null.
         getAssertionBuffer();
         
+        if(!buffer.isEmpty()) {
+            
+            /*
+             * Note: this is just paranoia. If the buffer is not empty when we
+             * are starting to process a new document then either the buffer was
+             * not properly cleared in the error handling for a previous source
+             * or the DataLoader instance is being used by concurrent threads.
+             */
+            
+            buffer.clear();
+            
+        }
+        
+        // Setup the loader.
         PresortRioLoader loader = new PresortRioLoader(buffer);
 
-        // disable auto-flush - caller will handle flush of the buffer.
-        loader.setFlush(false);
-        
+        // @todo review: disable auto-flush - caller will handle flush of the buffer.
+//        loader.setFlush(false);
+
+        // add listener to log progress.
         loader.addRioLoaderListener( new RioLoaderListener() {
             
             public void processingNotification( RioLoaderEvent e ) {
@@ -813,14 +836,14 @@ public class DataLoader {
                 stats.closureStats.add(doClosure());
                 
             }
-            
+
             // commit the data.
-            if(commitEnum==CommitEnum.Incremental) {
-                
+            if (commitEnum == CommitEnum.Incremental) {
+
                 log.info("Commit after each resource");
 
                 long beginCommit = System.currentTimeMillis();
-                
+
                 database.commit();
 
                 stats.commitTime = System.currentTimeMillis() - beginCommit;
@@ -860,7 +883,13 @@ public class DataLoader {
                 buffer = null;
                 
             }
-                        
+            
+            if (ex instanceof RuntimeException)
+                throw (RuntimeException) ex;
+
+            if (ex instanceof IOException)
+                throw (IOException) ex;
+            
             final IOException ex2 = new IOException("Problem loading data?");
             
             ex2.initCause(ex);
@@ -886,7 +915,7 @@ public class DataLoader {
             throw new IllegalStateException();
         
         // flush anything in the buffer.
-        flush();
+        buffer.flush();
         
         final ClosureStats stats;
         

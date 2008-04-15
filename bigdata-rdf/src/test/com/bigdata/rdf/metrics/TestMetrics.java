@@ -768,7 +768,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
         if(!dataLoader.getFlush()) {
             
-            dataLoader.flush();
+            dataLoader.endSource();
             
         }
         

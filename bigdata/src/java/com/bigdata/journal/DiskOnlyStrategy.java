@@ -1008,9 +1008,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * 
      * FIXME In order to be able to asynchronously drive data in the write cache
      * to the disk we need to track the offset of the 1st byte in {@link #buf}
-     * that has not been written onto the disk. {@link #flush()} will have to be
-     * modified so that it awaits the current task writing out data (if any) and
-     * then synchronously writes out the remaining data itself.
+     * that has not been written onto the disk.
+     * {@link DiskOnlyStrategy#force(boolean)} will have to be modified so that
+     * it awaits the current task writing out data (if any) and then
+     * synchronously writes out the remaining data itself.
      * <P>
      * We can submit a new task each time a record is written, but we do not
      * want to have more than one task on the queue. Alternatively, just make

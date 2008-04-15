@@ -106,7 +106,7 @@ public class RDFXMLParser extends RDFParserBase {
 	private String xmlLang;
     
     /**
-     * The context for statements can be specified using the {@link BNS#GRAPH}
+     * The context for statements can be specified using the {@link BNS#SID}
      * attribute. FIXME set context per xmlLang in {@link SAXFilter}.
      */
     private Resource context;
@@ -327,7 +327,12 @@ public class RDFXMLParser extends RDFParserBase {
         }
         else {
             try {
-                // @todo or as sid?
+                if (verifyData()) {
+                    // Check if 'nodeID' is a legal NCName
+                    if (!XMLUtil.isNCName(context)) {
+                        reportError("Not an XML Name: " + context);
+                    }
+                }
                 this.context = createBNode(context);
             } catch (RDFParseException e) {
                 // Note: exception is declared but not thrown by the base class.
@@ -1024,7 +1029,7 @@ public class RDFXMLParser extends RDFParserBase {
     private void reportStatement(Resource subject, URI predicate, Value object, Resource context)
         throws RDFParseException, RDFHandlerException
     {
-        if(BNS.NAMESPACE.equals(predicate.getNamespace())&&BNS.GRAPH.equals(predicate.getLocalName())) {
+        if(BNS.NAMESPACE.equals(predicate.getNamespace())&&BNS.SID.equals(predicate.getLocalName())) {
             /*
              * Avoid asserting statements for the bigdata:graph attribute.
              */

@@ -62,34 +62,28 @@ public interface BNS {
 
     /**
      * The name of an attribute whose value is recognized in RDF/XML as the
-     * <i>context</i> for statement spanned by the element on which it appears.
+     * statement identifier for statement described by the element on which it
+     * appears. The <code>bigdata:sid</code> attribute is allowed on elements
+     * describing RDF statements and serves as a per-statement identifier. The
+     * value of the <code>bigdata:sid</code> attribute must conform to the
+     * syntactic constraints of a blank node. By re-using the value of the
+     * <code>bigdata:sid</code> attribute within other statements in the same
+     * RDF/XML document, the client can express statements about the statements.
      * <p>
      * This RDF/XML extension allows us to inline provenance (statements about
-     * statements) with RDF/XML to clients and allows clients to submit
-     * provenance in a manner which has minor impact on unaware clients (they
-     * will perceive additional statements whose predicate is
-     * <code>bigdata:graph</code>).
-     * <p>
-     * Statement identifiers are serialized as blank nodes using the
-     * <code>http://www.bigdata.com/rdf#graph</code> attribute. When RDF/XML
-     * is deserialized, the attribute is interpreted as the context for the
-     * statement. The <code>graph</code> attribute is allowed on statements
-     * and serves as a per-statement identifier. The value of the
-     * <code>graph</code> attribute is constrained to be a blank node.
-     * <p>
-     * By re-using the blank node specified in the <code>graph</code>
-     * attribute within other statements in the same RDF/XML document, the
-     * client can express statements about the statement identified by the blank
-     * node.
+     * statements) with RDF/XML to clients in a manner which has minor impact on
+     * unaware clients (they will perceive additional statements whose predicate
+     * is <code>bigdata:sid</code>). In addition, clients aware of this
+     * extension can submit RDF/XML with inline provenance.
      * <p>
      * For example:
+     * 
      * <pre>
      * &lt;rdf:Description rdf:about=&quot;http://www.foo.org/A&quot;&gt;
-     *     &lt;label bigdata:graph=&quot;_S67&quot; xmlns=&quot;http://www.w3.org/2000/01/rdf-schema#&quot;&gt;abc&lt;/label&gt;
+     *     &lt;label bigdata:sid=&quot;_S67&quot; xmlns=&quot;http://www.w3.org/2000/01/rdf-schema#&quot;&gt;abc&lt;/label&gt;
      * &lt;/rdf:Description&gt;
      * </pre>
-     * 
      */
-    String GRAPH = "graph";
+    String SID = "sid";
     
 }

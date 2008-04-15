@@ -132,6 +132,20 @@ public class BasicRioLoader implements IRioLoader {
 
     }
 
+    final public void loadRdf(InputStream is, String baseURI,
+            RDFFormat rdfFormat, boolean verifyData) throws Exception {
+
+        loadRdf2(is, baseURI, rdfFormat, verifyData);
+        
+    }
+    
+    final public void loadRdf(Reader reader, String baseURI,
+            RDFFormat rdfFormat, boolean verifyData) throws Exception {
+        
+        loadRdf2(reader, baseURI, rdfFormat, verifyData);
+        
+    }
+
     /**
      * Core implementation.
      * 
@@ -201,6 +215,12 @@ public class BasicRioLoader implements IRioLoader {
             
             log.error("While parsing: " + ex, ex);
 
+            try {
+                error(ex);
+            } catch (Exception ex2) {
+                log.error("Ignoring: " + ex2);
+            }
+            
             throw ex;
             
         } finally {
@@ -211,36 +231,29 @@ public class BasicRioLoader implements IRioLoader {
         
     }
 
-    final public void loadRdf(InputStream is, String baseURI,
-            RDFFormat rdfFormat, boolean verifyData) throws Exception {
-
-        loadRdf2(is, baseURI, rdfFormat, verifyData);
-        
-    }
-    
-    final public void loadRdf(Reader reader, String baseURI,
-            RDFFormat rdfFormat, boolean verifyData) throws Exception {
-        
-        loadRdf2(reader, baseURI, rdfFormat, verifyData);
-        
-    }
-
     /**
-     * NOP.
+     * Invoked before parse (default is NOP).
      */
     protected void before() {
         
     }
     
     /**
-     * NOP.
+     * Invoked after successful parse (default is NOP).
      */
     protected void success() {
         
     }
     
     /**
-     * NOP.
+     * Invoked if the parse fails (default is NOP).
+     */
+    protected void error(Exception ex) {
+        
+    }
+    
+    /**
+     * Invoked from finally clause after parse regardless of success or failure.
      */
     protected void cleanUp() {
         
