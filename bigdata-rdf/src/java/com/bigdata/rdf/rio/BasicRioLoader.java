@@ -124,10 +124,6 @@ public class BasicRioLoader implements IRioLoader {
         
         final RDFParser parser = Rio.createParser(rdfFormat, valFactory);
         
-        // FIXME disable bnode preservation!
-        log.error("disable bnode preservation");
-        parser.setPreserveBNodeIDs(true);
-        
         return parser;
 
     }
@@ -172,6 +168,9 @@ public class BasicRioLoader implements IRioLoader {
         log.info("format="+rdfFormat+", verify="+verifyData);
         
         final RDFParser parser = getParser(rdfFormat);
+        
+        // FIXME it should be easier to configure these features on the underlying RIO parser.
+//        parser.setPreserveBNodeIDs(true);
         
         parser.setVerifyData( verifyData );
         

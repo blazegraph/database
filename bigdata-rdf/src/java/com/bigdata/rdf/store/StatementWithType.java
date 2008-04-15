@@ -95,4 +95,24 @@ public class StatementWithType extends StatementImpl implements IStatementWithTy
         
     }
  
+    public boolean isAxiom() {
+        
+        return StatementEnum.Axiom == type;
+        
+    }
+    
+    public boolean isInferred() {
+        
+        return StatementEnum.Inferred == type;
+        
+    }
+    
+    
+    public boolean isExplicit() {
+        
+        return StatementEnum.Explicit == type;
+        
+    }
+    
+
 }

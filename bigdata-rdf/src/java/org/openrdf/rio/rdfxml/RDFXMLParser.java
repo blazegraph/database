@@ -107,7 +107,8 @@ public class RDFXMLParser extends RDFParserBase {
     
     /**
      * The context for statements can be specified using the {@link BNS#SID}
-     * attribute. FIXME set context per xmlLang in {@link SAXFilter}.
+     * attribute. This is set within {@link SAXFilter} in a manner that closely
+     * parallels how {@link #xmlLang} is handled by that class.
      */
     private Resource context;
 

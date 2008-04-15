@@ -54,7 +54,9 @@ import java.io.Writer;
 import java.util.Arrays;
 import java.util.UUID;
 
+import org.openrdf.model.BNode;
 import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
@@ -819,12 +821,17 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
     }
     
     /**
-     * Test case for the interchange of the statement identifiers using a
-     * private extension for the interchange of RDF/XML.
+     * Test case builds up a graph from Sesame {@link Value} objects, using
+     * {@link BNode}s to create statements about statements. The state of the
+     * graph is verified. The explicit statements in the graph are then
+     * serialized using a vendor specific RDF/XML extension and de-serialized
+     * into a {@link TempTripleStore}. The state of the de-serialized graph is
+     * then verified to confirm that the statements about statements were
+     * correctly re-constructed.
      * 
      * @throws SailException
      * @throws RDFHandlerException
-     * @throws IOException 
+     * @throws IOException
      */
     public void test_rdfXmlInterchange() throws SailException,
             RDFHandlerException, IOException {
@@ -1037,15 +1044,6 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             }
 
-            /*
-             * FIXME There are a lot of ways in which reportStatement/3 gets
-             * called in RDFXMLParser. I need to survey them all and decide
-             * whether or not "context" (the variable set based on
-             * bigdata:graph) will be correct ("" or the sid) or in there are
-             * some uses, such as reification, where "context" should be
-             * ignored.
-             */
-            
         } finally {
 
             store.closeAndDelete();

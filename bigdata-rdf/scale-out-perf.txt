@@ -351,11 +351,6 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
         - Make sure that yum-updatesd does not run on the servers.  It
           absorbs an entire CPU for quite a while.
 
-        - Try running a thread that reads the file names and building
-          up a (blocking) queue of tasks to be started.  Reading all
-          the filenames and creating LoadTasks for each requires too
-          much startup time and too much heap!
-
 	- Make sure that each process writes on its own nohup_xxx.out
           file.  Hum - there is no way to do that.  Try creating a
           command group using (...) and running that group with nohup
@@ -363,23 +358,29 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
           subdirectory?  Could work, but need to fiddle with the jini
           config and CLASSPATH.
 
-      - Try with dynamically determined index partitions.  We can
-        start with either single or double host placement of the
-        initial index partitions.  Watch the load balancer and see how
-        host utilization and service response time change as the run
-        progresses, for different #of client threads, and as index
-        splits occur, and as index moves occur.  Delay start of some
-        data services, either on each host or on one of the hosts and
-        then see how the load changes once we start additional data
-        services.  Observe the metadata service response time and
-        verify that it does not become a bottleneck since the current
-        implementation is NOT caching.
+      - Try with dynamically determined index partitions.
+
+        Start with either single or double host placement of the
+        initial index partitions.
+
+	Watch the load balancer and see how host utilization and
+        service response time change as the run progresses, for
+        different #of client threads, and as index splits occur, and
+        as index moves occur.
+
+	Delay start of some data services, either on each host or on
+        one of the hosts and then see how the load changes once we
+        start additional data services.
+
+	Observe the metadata service response time and verify that it
+        does not become a bottleneck since the current implementation
+        is NOT caching.
 
       - Run single client with the metadata service (its lightly
         loaded) and one data service on one server and the other data
         service on another server.
 
-	- Move the client and  metadata server to server3, running the
+	- Move the client and metadata server to server3, running the
           data services on server1 and server2.
 
         - Have a client on each machine connect to the same federation
@@ -409,7 +410,7 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
         not then at least URIs can be broken down into common
         symbols).
 
-	Do not store bnodes in the id:term index.
+	Done. Do not store bnodes in the id:term index.
 
       - The terms (term:id) index is on the order of 5x larger than
         the ids (id:term) index.  Presumably this is because updates
@@ -454,82 +455,16 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 			at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1035)
 			... 9 more
 			
-     - Support copy in/out of keys and vals in lookup(),
-           insert(), remove(), and rangeIterator so that we can (a) be
-           more efficient in handling keys and vals by copying; (b)
-           handle keys and vals that are byte aligned or bit aligned
-           in the node or leaf; (c) reduce GC by converting to a
-           compacting record for the node/leaf; and (d) expose the
-           version counter and deletion marker for fused views of
-           indices with isolation.
-
-	 - done. change version counters to long (commit timestamps).
+     - Support copy in/out of keys and vals in lookup(), insert(),
+       remove(), and rangeIterator so that we can (a) be more
+       efficient in handling keys and vals by copying; (b) handle keys
+       and vals that are byte aligned or bit aligned in the node or
+       leaf; (c) reduce GC by converting to a compacting record for
+       the node/leaf; and (d) expose the version counter and deletion
+       marker for fused views of indices with isolation.
 
      - Turn off sendVals for rangeIterators if we recognize the value
        serialized as the NoDataSerializer?
-
-    - Tune serialization:
-
-	 - Test use of FastRDFValueCompression to write the values for
-	   the statement indices.
-
-	 - Look at how to do prefix coding using the mg4j and fast
-           classes.  That could be used as the default key
-           serialization and only overridden in special cases like RDF
-           where we can do even better with less effort.
-           
-	   (old summary, revisit now since significant code changes):
-	   the "fast" rdf serializers definately write (and read) less
-	   data resulting in a smaller store and less IO.  However,
-	   they are also without a doubt SLOWER.
-
-	   It is hard to tell to what extend the throughput drop is
-	   due to the work required to compute the compressed codes
-	   and to what extent it is due to the additional allocation
-	   and copying that we need to do to align the IDataSerializer
-	   API with the IKeySerializer API, with the IValueSerializer
-	   API, and with the use of the ImmutableKeyBuffer class in
-	   the BTree.
-
-	   Those API misalignments need to be reduced before we can
-	   figure out whether the "fast" rdf serialization is faster
-	   overall.  (There is SOME evidence that the API misalignment
-	   is causing problems since only using the "fast" value
-	   serializer is slower than using the byte[] value serializer
-	   and there is very little "computation" to be done -
-	   especially when compared to the "fast" key serializer which
-	   computes a code for each long term identifier used in the
-	   leaf.)
-
-	   Also, note that most of the time is on the SPO and JUST
-	   indices during closure (I would expect that) and on the
-	   statement indices (rather than the lexicon) during load
-	   (which is NOT what I would have expected for load).
-
-	   I should also try some other data sets, with more memory
-	   free on the machine, and on a server platform with more
-	   CPUs and memory.
-
-	   nciOncology:
-
-	   fast 1 : Loaded 1 resources: 464841 stmts added in 31.922 secs, rate= 14561, commitLatency=203ms; bytesWritten=?
-	   fast 1 : Computed closure in 289703ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=1300; bytesWritten=?
-
-	   fast 2 : Loaded 1 resources: 464841 stmts added in 26.094 secs, rate= 17814, commitLatency=172ms, bytesWritten=95,703,361, bytesRead=42,603,290
-	   fast 2 : Computed closure in 135313ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=2785, bytesWritten=581,338,696, bytesRead=742,823,674
-
-	   fast 3 : Loaded 1 resources: 464841 stmts added in 26.265 secs, rate= 17698, commitLatency=172ms
-	   fast 3 : Computed closure in 136875ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=2753
-
-	   kbs  1 : Loaded 1 resources: 464841 stmts added in 28.828 secs, rate= 16124, commitLatency=250ms, bytesWritten=109,833,180
-	   kbs  1 : Computed closure in 124860ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=3018; bytesWritten=??? (not reported)
-
-	   kbs  2 : Loaded 1 resources: 464841 stmts added in 23.594 secs, rate= 19701, commitLatency=250ms, bytesWritten=109,829,813, bytesRead=44,865,353
-	   kbs  2 : Computed closure in 123500ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=3051, bytesWritten=653,911,378, bytesRead=862,234,149
-
-
-Loaded 1 resources: 464841 stmts added in 25.218 secs, rate= 18432, commitLatency=391ms
-Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=3007
 
     - Distributed file repository
 
@@ -549,8 +484,6 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
       - Download, prepare, extract.
 
     - Tune network IO
-
-      - AddTerms and AddIds
 
       - Modify the procedure logic to abstract a 'next key/val'
         iterator using a shared buffer for de-compression in order to
@@ -588,6 +521,13 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
       transaction.  Either the application or an extension of the
       transaction manager MUST serialize the commits.  Within the
       commit processing, first do retractions then do assertions.
+
+      - Provide for transaction local indices.  The index is dropped
+        when the tx completes.
+
+      - Provide for registration of a global index within a
+        transaction, but the transaction will fail if the index
+        already exists when it commits.
 
 Short term tasks:
 
@@ -825,7 +765,7 @@ Short term tasks:
      commit time while transactions will use a free (-timestamp) value
      selected by the transaction manager.
 
-   - ** Quad store.
+   - Quad store.
 
     - ** Sesame 2 TCK (integration tests)
 
@@ -897,21 +837,52 @@ Short term tasks:
 	   (addStatements already resolves sids so as to always make
 	   them consistent).
 
-	   - add documentation on statement identifiers and TM.
-
 	   Done. write unit tests for TM cases when using statement
 	   identifiers to make metadata statements.
 
-	 - add [URI osa sid] if a URI is used rather than a BNode in a
-           named graph interchange?
+	 - Work through an import scenario from an application that is
+           using URIs generated from the {s,p,o} to represent the
+           statement identifier.
+
+	 - Survey all of the ways in which reportStatement/3 gets
+           called in RDFXMLParser and decide whether or not "context"
+           (the variable set based on bigdata:sid) is always correct
+           (either "" or the sid) or if there are some uses, such as
+           reification, where "context" should be ignored and update
+           the calls to reportStatement/3 or reportStatement/4 as
+           appropriate.
       
-      2. *** RDF/XML w/ source in.
+      2. Done. RDF/XML w/ statement identifiers in/out.
 
       3. High level query for reading variable bindings out.
 
-      4. *** RDF/XML w/ source out for use with CONSTRUCT.
+         This will be a little complex since the Statement objects
+         that are made visible to the Sesame JOINs and result sets
+         currently do NOT have access to the term identifiers and the
+         statement identifier.  This was done because there appeared
+         to be some expectation that the returned objects be
+         Statements, or more accurately, StatementImpls, but maybe I
+         had that wrong.
 
-      5. (****) JOIN optimization.
+	 Note: inferences will NOT have statement identifiers.  Only
+	 explicit statements have statement identifiers, so the graph
+	 variable will be unbound when matched triple pattern is not
+	 an explicit statement.
+
+	 The interpretation of the context depends on the database
+	 mode.
+
+	 Provenance mode: When the database is in "provenance" mode,
+	 then each context identifies a specific statement.  Statement
+	 identifiers can only become bound by a triple pattern, so the
+	 query must always go through the SPO, OSP, or POS index.
+
+	 quadStore mode: When the database is in "quadStore" mode,
+         then the query can go through any of 6 access patterns and we
+         need to consider the context(s) in order to choose the
+         correct access pattern.
+
+      4. (****) JOIN optimization.
 
 	 - (*) direct term scan.
 
@@ -1051,16 +1022,3 @@ java.lang.AssertionError: lastModified=0
 	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:834)
 	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:764)
 
-
-- FIXME Must support query with context(s) in the
-  BigdataSailConnection.  The interpretation of the context depends on
-  the database mode.
-
-    When the database is in "provenance" mode, then each context
-    identifies a specific statement.  Statement identifiers can only
-    become bound by a triple pattern, so the query must always go
-    through the SPO, OSP, or POS index.
-
-    When the database is in "quadStore" mode, then the query can go
-    through any of 6 access patterns and we need to consider the
-    context(s) in order to choose the correct access pattern.
