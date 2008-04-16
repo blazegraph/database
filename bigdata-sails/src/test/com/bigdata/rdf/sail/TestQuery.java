@@ -54,7 +54,9 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Unit tests for high-level query.
@@ -157,6 +159,10 @@ public class TestQuery extends AbstractBigdataSailTestCase {
      */
     public void test_query() throws SailException, QueryEvaluationException {
 
+//        assertEquals(new URIImpl(
+//                "http://www.Department0.University0.edu/GraduateStudent44"),
+//                new BigdataURIImpl("http://www.Department0.University0.edu/GraduateStudent44",IRawTripleStore.NULL));
+
         SailConnection conn = sail.getConnection();
 
         final URI graduateStudent = new URIImpl(ub+"GraduateStudent");
@@ -189,14 +195,10 @@ public class TestQuery extends AbstractBigdataSailTestCase {
             /*
              * Create a data set consisting of the contexts to be queried.
              * 
-             * @todo We a fake context to the data set so that Sesame will run
-             * the query. However this needs to be changed once the database is
-             * actually a quad store.
+             * Note: a [null] DataSet will cause context to be ignored when the
+             * query is processed.
              */
             DatasetImpl dataSet = null; //new DatasetImpl();
-            
-            // a fake context.
-//            dataSet.addDefaultGraph(new URIImpl("http://www.bigdata.com"));
             
             BindingSet bindingSet = new QueryBindingSet();
             
@@ -225,7 +227,7 @@ public class TestQuery extends AbstractBigdataSailTestCase {
                             "http://www.Department0.University0.edu/GraduateStudent44"));
             
             /*
-             * Verify that the query result in the correct solutions.
+             * Verify that the query result is the correct solutions.
              */
             
             try {
@@ -238,10 +240,11 @@ public class TestQuery extends AbstractBigdataSailTestCase {
                     
                     System.out.println("solution["+i+"] : "+solution);
                     
-                    Value actual = solution.getValue("X");
+                    final Value actual = solution.getValue("X");
                     
-                    assertTrue("Not expecting X=" + actual, expected
-                            .remove(actual));
+                    final boolean found = expected.remove(actual);
+                    
+                    assertTrue("Not expecting X=" + actual, found);
                     
                     i++;
                     

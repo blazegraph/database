@@ -75,6 +75,7 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.Semaphore;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -111,18 +112,19 @@ import org.openrdf.sail.helpers.SailBase;
 
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.EmptyAccessPath;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IAccessPath;
@@ -130,7 +132,6 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
@@ -158,17 +159,22 @@ import com.bigdata.rdf.store.TempTripleStore;
  * concurrency and SAIL transactions will be serialized (at most one will run at
  * a time) but they will not block readers.
  * 
- * @todo support context, including in all the vararg methods. The correct
- *       semantics for [... contexts] is that when NOT specified all graphs are
- *       effected and when specified only the specified graph(s) are effected. A
- *       contexts[i] == null should be illegal. A null contexts array is legal
- *       and is equivilent to an empty array.
- *       <p>
- *       Is closure context specific or global to the database? How does this
- *       effect the rule engine? How does this effect the efficiency of
- *       "database at once" closure (really, graph at once)?
+ * @todo update javadoc to describe new concurrency options.
  * 
- * @todo get basic query optimizations working and test w/ modified LUBM.
+ * @todo update javadoc to describe the "provenance" mode for the database,
+ *       where the context is always a statement identifier and can be bound in
+ *       query to recover statements about statements. Also document the
+ *       extension required for a client to make use of the resulting RDF/XML,
+ *       e.g., if a CONSTRUCT query is used to recover statements about
+ *       statements.
+ * 
+ * @todo support a "quadStore" mode with named graphs. I'm not clear if we need
+ *       3 or 6 statement indices for this.
+ * 
+ * @todo Get basic query optimizations working and test w/ modified LUBM.
+ *       <p>
+ *       (a) Use {@link BigdataValue} and avoid lookup of terms in the lexicon
+ *       staying within out native API for JOINs.
  * 
  * @todo Is there anything to be done with {@link #setDataDir(java.io.File)}?
  *       With {@link #getDataDir()}?
@@ -232,6 +238,18 @@ public class BigdataSail extends SailBase implements Sail {
      */
     public static final Logger log = Logger.getLogger(BigdataSail.class);
 
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+    
     /**
      * The equivilent of a null identifier for an internal RDF Value.
      */
@@ -1022,12 +1040,6 @@ public class BigdataSail extends SailBase implements Sail {
 
             // flush any pending retractions first!
             flushStatementBuffers(false/* flushAssertBuffer */, true/* flushRetractBuffer */);
-
-            s = (Resource) valueFactory.toNativeValue(s);
-
-            p = (URI) valueFactory.toNativeValue(p);
-
-            o = (Value) valueFactory.toNativeValue(o);
             
             // buffer the assertion.
             getAssertionBuffer().add(s, p, o);
@@ -1388,9 +1400,10 @@ public class BigdataSail extends SailBase implements Sail {
                 Resource s, URI p, Value o, boolean includeInferred,
                 Resource... contexts) throws SailException {
             
-            log.info("s=" + s + ", p=" + p + ", o=" + o + ", includeInferred="
-                    + includeInferred + ", contexts="
-                    + Arrays.toString(contexts));
+            if (INFO)
+                log.info("s=" + s + ", p=" + p + ", o=" + o
+                        + ", includeInferred=" + includeInferred
+                        + ", contexts=" + Arrays.toString(contexts));
             
             if (contexts == null || contexts.length == 0 || contexts[0] == null) {
                 
@@ -1554,7 +1567,8 @@ public class BigdataSail extends SailBase implements Sail {
                 TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred)
                 throws SailException {
            
-            log.info("Evaluating query: "+tupleExpr+", dataSet="+dataset+", includeInferred="+includeInferred);
+            if (INFO)
+                log.info("Evaluating query: "+tupleExpr+", dataSet="+dataset+", includeInferred="+includeInferred);
             
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
@@ -1586,7 +1600,8 @@ public class BigdataSail extends SailBase implements Sail {
 
                 optimizerList.optimize(tupleExpr, dataset, bindings);
 
-                log.info("Optimized query: "+tupleExpr);
+                if (INFO)
+                    log.info("Optimized query: "+tupleExpr);
 
                 final CloseableIteration<BindingSet, QueryEvaluationException> itr = strategy
                         .evaluate(tupleExpr, bindings);
@@ -1602,30 +1617,41 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * Replace all Value objects stored in variables with native Value
-         * objects.
+         * Replace all Value objects stored in variables with
+         * {@link BigdataValue} objects, which have access to the 64-bit
+         * internal term identifier associated with each value in the database.
+         * 
+         * FIXME Batch resolve the term identifiers. This will benefit from the
+         * term cache, but does an index hit per unknown term.
          */
         protected void replaceValues(TupleExpr tupleExpr) throws SailException {
             tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
 
                 @Override
                 public void meet(Var var) {
+                    
                     if (var.hasValue()) {
 
                         Value val = var.getValue();
 
-                        // convert to a native Value object.
-                        val = valueFactory.toNativeValue(val);
+                        // convert to a BigdataValue object.
+                        val = valueFactory.toSesameObject(val);
 
                         // resolve the termId.
+//                        final long termId = 
                         database.getTermId(val);
-
+                        
+                        if (DEBUG)
+                            log.debug("value: "+val+" : "+((BigdataValue)val).getTermId());
+                        
                         // replace the constant.
                         var.setValue(val);
 
                     }
                 }
+                
             });
+            
         }
 
         /**
@@ -1809,26 +1835,26 @@ public class BigdataSail extends SailBase implements Sail {
                  * database).
                  */
                 
-                final _Resource subj = (_Resource) getConstantValue(sp
+                final BigdataResource subj = (BigdataResource) getConstantValue(sp
                         .getSubjectVar());
                 
-                final _URI pred = (_URI) getConstantValue(sp.getPredicateVar());
+                final BigdataURI pred = (BigdataURI) getConstantValue(sp.getPredicateVar());
                 
-                final _Value obj = (_Value) getConstantValue(sp.getObjectVar());
+                final BigdataValue obj = (BigdataValue) getConstantValue(sp.getObjectVar());
                 
-                final _Resource context = (_Resource) getConstantValue(sp
+                final BigdataResource context = (BigdataResource) getConstantValue(sp
                         .getContextVar());
 
-                if (subj != null && subj.termId == NULL //
-                        || pred != null && pred.termId == NULL //
-                        || obj != null && obj.termId == NULL //
-                        || context != null && context.termId == NULL//
+                if (subj != null && subj.getTermId() == NULL //
+                        || pred != null && pred.getTermId() == NULL //
+                        || obj != null && obj.getTermId() == NULL //
+                        || context != null && context.getTermId() == NULL//
                 ) {
 
                     // non-existent subject, predicate, object or context
 
-                    log.debug("One or more constants not found in the lexicon: "
-                                    + sp);
+                    if (DEBUG)
+                        log.debug("One or more constants not found in the lexicon: "+ sp);
                     
                     cardinality = 0;
                     
@@ -1841,9 +1867,9 @@ public class BigdataSail extends SailBase implements Sail {
                  */
 
                 final IAccessPath accessPath = database.getAccessPath(
-                        (subj == null ? NULL : subj.termId),
-                        (pred == null ? NULL : pred.termId),
-                        (obj == null ? NULL : obj.termId));
+                        (subj == null ? NULL : subj.getTermId()),
+                        (pred == null ? NULL : pred.getTermId()),
+                        (obj == null ? NULL : obj.getTermId()));
 
                 /*
                  * The range count for that access path based on the data. The
@@ -1865,9 +1891,10 @@ public class BigdataSail extends SailBase implements Sail {
                     
                     cardinality = Math.pow(cardinality, 1.0 / sqrtFactor);
                     
-                    log.info("cardinality=" + cardinality + ", nbound="
-                            + boundVarCount + ", rangeCount=" + rangeCount
-                            + ", pattern=" + sp);
+                    if (INFO)
+                        log.info("cardinality=" + cardinality + ", nbound="
+                                + boundVarCount + ", rangeCount=" + rangeCount
+                                + ", pattern=" + sp);
                     
                 }
 
