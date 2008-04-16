@@ -184,14 +184,10 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
             /*
              * Create a data set consisting of the contexts to be queried.
              * 
-             * @todo We a fake context to the data set so that Sesame will run
-             * the query. However this needs to be changed once the database is
-             * actually a quad store.
+             * Note: a [null] DataSet will cause context to be ignored when the
+             * query is processed.
              */
-            DatasetImpl dataSet = null;//new DatasetImpl();
-
-            // a fake context.
-//            dataSet.addDefaultGraph(new URIImpl("http://www.bigdata.com"));
+            DatasetImpl dataSet = null; //new DatasetImpl();
 
             BindingSet bindingSet = new QueryBindingSet();
 
@@ -211,7 +207,7 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
             expected.add(mike);
 
             /*
-             * Verify that the query results in the correct solutions.
+             * Verify that the query results is the correct solutions.
              */
 
             final int nresults = expected.size();

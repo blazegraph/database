@@ -98,6 +98,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
@@ -1009,9 +1010,14 @@ abstract public class AbstractTripleStore implements ITripleStore,
              * BNode corresponds to a statement identifier.
              */
 
-            return (_BNode) OptimizedValueFactory.INSTANCE
+            _BNode stmt = (_BNode) OptimizedValueFactory.INSTANCE
                     .createBNode("S" + id);
 
+            // set the term identifier on the object.
+            stmt.termId = id;
+
+            return stmt;
+            
         }
 
         if (isBNode(id)) {
@@ -1021,8 +1027,13 @@ abstract public class AbstractTripleStore implements ITripleStore,
              * "_:B" prefix is a syntactic marker for a real blank node.
              */
 
-            return (_BNode) OptimizedValueFactory.INSTANCE
+            _BNode bnode = (_BNode) OptimizedValueFactory.INSTANCE
                     .createBNode("B" + id);
+
+            // set the term identifier on the object.
+            bnode.termId = id;
+
+            return bnode;
 
         }
 
@@ -1113,7 +1124,10 @@ abstract public class AbstractTripleStore implements ITripleStore,
     }
 
     /**
-     * Batch resolution of term identifiers.
+     * Batch resolution of term identifiers to {@link BigdataValue}s.
+     * <p>
+     * Note: the returned values will be {@link BigdataValueImpl}s that play well
+     * with Sesame 2.x
      * 
      * @param ids
      *            An collection of term identifiers.
@@ -1156,7 +1170,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
             if (value != null) {
             
                 // resolved.
-                ret.put(id, value);
+                ret.put(id, OptimizedValueFactory.INSTANCE.toSesameObject(value));
                 
                 continue;
 
@@ -1247,7 +1261,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                     value.known = true;
 
-                    ret.put(id, value);
+                    // convert to object that complies with the sesame APIs.
+                    ret.put(id, OptimizedValueFactory.INSTANCE.toSesameObject(value));
                     
                 }
 
@@ -1260,14 +1275,12 @@ abstract public class AbstractTripleStore implements ITripleStore,
     }
     
     /**
-     * Note: Handles both unisolatable and isolatable indices.
-     * <p>
-     * Note: If {@link _Value#key} is set, then that key is used. Otherwise the
-     * key is computed and set as a side effect.
-     * <p>
      * Note: If {@link _Value#termId} is set, then returns that value
      * immediately. Otherwise looks up the termId in the index and sets
      * {@link _Value#termId} as a side-effect.
+     * <p>
+     * Note: If {@link _Value#key} is set, then that key is used. Otherwise the
+     * key is computed and set as a side effect.
      */
     final public long getTermId(Value value) {
 
@@ -1277,26 +1290,37 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
-        final _Value val = (_Value) OptimizedValueFactory.INSTANCE
-                .toNativeValue(value);
+        if (value instanceof BigdataValue
+                && ((BigdataValue) value).getTermId() != IRawTripleStore.NULL) {
 
-        if (val.termId != IRawTripleStore.NULL) {
-
-            return val.termId;
+            return ((BigdataValue) value).getTermId();
 
         }
 
         final IIndex ndx = getTermIdIndex();
 
-        if (val.key == null) {
+        byte[] key ;
+        
+        if (value instanceof _Value && ((_Value)value).key != null) {
 
+            key = ((_Value)value).key;
+            
+        } else {
+        
             // generate key iff not on hand.
-            val.key = getKeyBuilder().value2Key(val);
-
+            key = getKeyBuilder().value2Key(value);
+        
+            if(value instanceof _Value) {
+            
+                // save computed key.
+                ((_Value)value).key = key;
+                
+            }
+            
         }
-
+        
         // lookup in the forward index.
-        final byte[] tmp = ndx.lookup(val.key);
+        final byte[] tmp = ndx.lookup(key);
 
         if (tmp == null) {
 
@@ -1304,9 +1328,11 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
+        // decode the term identifier.
+        final long termId;
         try {
 
-            val.termId = new DataInputBuffer(tmp).unpackLong();
+            termId = new DataInputBuffer(tmp).unpackLong();
 
         } catch (IOException ex) {
 
@@ -1314,11 +1340,38 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
-        // was found in the forward mapping (@todo if known means in both
-        // mappings then DO NOT set it here)
-        val.known = true;
+        /*
+         * @todo now that we have the termId and the term, we should stick them
+         * in the termCache, right?
+         * 
+         * FIXME The manner in which values are handled is somewhat crufty and
+         * should be reviewed to see if we can simplify, e.g., to just
+         * BigdataValue rather than _Value, without a performance loss.
+         */
 
-        return val.termId;
+//        if (termCache.get(id) == null) {
+//
+//            termCache.put(id, value, false/* dirty */);
+//
+//        }
+
+        if(value instanceof BigdataValue) {
+
+            // set as side-effect.
+            ((BigdataValue)value).setTermId(termId);
+            
+        }
+        
+        if((value instanceof _Value)) {
+
+            // was found in the forward mapping (@todo if known means in both
+            // mappings then DO NOT set it here)
+
+            ((_Value)value).known = true;
+            
+        }
+
+        return termId;
 
     }
 
@@ -1970,11 +2023,11 @@ abstract public class AbstractTripleStore implements ITripleStore,
          * convert other Value object types to our object types.
          */
 
-        s = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(s);
+        s = (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(s);
 
-        p = (URI) OptimizedValueFactory.INSTANCE.toNativeValue(p);
+        p = (URI) OptimizedValueFactory.INSTANCE.toSesameObject(p);
 
-        o = OptimizedValueFactory.INSTANCE.toNativeValue(o);
+        o = OptimizedValueFactory.INSTANCE.toSesameObject(o);
 
         /*
          * Convert our object types to internal identifiers.
@@ -2722,6 +2775,11 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
+    /**
+     * FIXME This fully buffers the result before returning to the caller.
+     * Modify to run a reader that populates a buffer and have the buffer
+     * wrapped up as an {@link ISPOIterator} that is returned to the caller.
+     */
     public ISPOIterator bulkFilterStatements(ISPOIterator itr, boolean present) {
 
         try {
@@ -2731,7 +2789,6 @@ abstract public class AbstractTripleStore implements ITripleStore,
             // Thread-local key builder.
             final RdfKeyBuilder keyBuilder = getKeyBuilder();
 
-            // FIXME This has simply got to be wrong.
             SPO[] stmts = new SPO[0];
             int numStmts = 0;
 
