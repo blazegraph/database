@@ -175,16 +175,19 @@ import cutthecrap.utils.striterators.Striterator;
  *       The assignment of the term identifier for a BNode ID can be from ANY
  *       key-range partition of the term:id index.
  * 
- * @todo Do the quad store. Make some of the indices optional such that we still
- *       have good access patterns but store less data when the quad is used as
- *       a statement identifier (by always using a distinct {@link BNode} as its
- *       value). There is no need for a pure triple store and the "bnode" trick
- *       can be used to model eagerly assigned statement identifiers. One
- *       question is whether the quad position can be left open (0L aka NULL).
- *       It seems that SPARQL might allow this, in which case we can save a lot
- *       of term identifiers that would otherwise be gobbled up eagerly. The
- *       quad position could of course be bound to some constant, in which case
- *       it would not be a statement identifier - more the context model.
+ * @todo Do the full quad store (vs the provenance mode, which uses the context
+ *       position for statements about statements).
+ *       <p>
+ *       Make some of the indices optional such that we still have good access
+ *       patterns but store less data when the quad is used as a statement
+ *       identifier (by always using a distinct {@link BNode} as its value).
+ *       There is no need for a pure triple store and the "bnode" trick can be
+ *       used to model eagerly assigned statement identifiers. One question is
+ *       whether the quad position can be left open (0L aka NULL). It seems that
+ *       SPARQL might allow this, in which case we can save a lot of term
+ *       identifiers that would otherwise be gobbled up eagerly. The quad
+ *       position could of course be bound to some constant, in which case it
+ *       would not be a statement identifier - more the context model.
  * 
  * @todo sesame 2.x TCK (technology compatibility kit).
  * 
@@ -195,12 +198,12 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo test on 10, 20, 40, ... nodes using dynamic partitioning and scale-out
  *       indices.
  * 
- * @todo possibly save frequently seen terms in each batch for the next batch in
- *       order to reduce unicode conversions and index access.
- * 
  * @todo examine role for semi joins (join indices) - these can be declared for
  *       various predicate combinations and then maintained, effectively by
  *       rules using the existing TM mechanisms.
+ * 
+ * @todo Support rules (IF TripleExpr THEN ...) This is basically encapsulating
+ *       the {@link Rule} engine.
  * 
  * @todo There are two basic ways in which we are considering extending the
  *       platform to make statement identifiers useful.
@@ -242,6 +245,14 @@ import cutthecrap.utils.striterators.Striterator;
  *       database, whether the statements are read from some RDF interchange
  *       syntax or added directly using
  *       {@link #addStatements(ISPOIterator, ISPOFilter)} and friends.
+ * 
+ * FIXME There is a lot of cruft in the {@link _Value} class and in how it is
+ * handled by the {@link AbstractTripleStore} which perhaps should be re-written
+ * entirely in terms of {@link BigdataValue} and external metadata were
+ * necessary for state during {@link AddTerms} or {@link AddIds}, etc.
+ * <p>
+ * Save frequently seen terms in each batch for the next batch in order to
+ * reduce unicode conversions and index access?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -1343,10 +1354,6 @@ abstract public class AbstractTripleStore implements ITripleStore,
         /*
          * @todo now that we have the termId and the term, we should stick them
          * in the termCache, right?
-         * 
-         * FIXME The manner in which values are handled is somewhat crufty and
-         * should be reviewed to see if we can simplify, e.g., to just
-         * BigdataValue rather than _Value, without a performance loss.
          */
 
 //        if (termCache.get(id) == null) {
