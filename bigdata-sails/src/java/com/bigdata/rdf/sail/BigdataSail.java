@@ -111,6 +111,7 @@ import org.openrdf.sail.helpers.SailBase;
 
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
@@ -126,11 +127,10 @@ import com.bigdata.rdf.store.EmptyAccessPath;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.IStatementWithType;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.rdf.store.StatementIterator;
+import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
@@ -1410,9 +1410,9 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * Returns an iterator that visits {@link IStatementWithType} objects.
+         * Returns an iterator that visits {@link BigdataStatement} objects.
          */
-        private StatementIterator getStatements(Resource s, URI p, Value o, boolean includeInferred) {
+        private BigdataStatementIterator getStatements(Resource s, URI p, Value o, boolean includeInferred) {
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 

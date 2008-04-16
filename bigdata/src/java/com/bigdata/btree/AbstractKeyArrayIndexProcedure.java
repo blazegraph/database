@@ -43,6 +43,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
+import com.bigdata.service.Split;
 
 /**
  * Abstract base class supports compact serialization and compression for remote
@@ -421,7 +422,7 @@ abstract public class AbstractKeyArrayIndexProcedure implements
          */
         private static final long serialVersionUID = -5705501700787163863L;
 
-        private IRandomAccessByteArray a;
+        private RandomAccessByteArray a;
 
         private IDataSerializer valSer;
         
@@ -587,7 +588,83 @@ abstract public class AbstractKeyArrayIndexProcedure implements
             obs.flush();
             
         }
-        
+
     }
-    
+
+    /**
+     * Knows how to aggregate {@link ResultBuffer} objects.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ResultBufferHandler implements
+            IResultHandler<ResultBuffer, ResultBuffer> {
+
+        private final byte[][] results;
+        private final IDataSerializer valueSerializer;
+
+        public ResultBufferHandler(int nkeys, IDataSerializer valueSerializer) {
+
+            this.results = new byte[nkeys][];
+
+            this.valueSerializer = valueSerializer;
+            
+        }
+
+        public void aggregate(ResultBuffer result, Split split) {
+
+            for (int i = 0, j = split.fromIndex; i < split.ntuples; i++, j++) {
+
+                results[j] = result.getResult(i);
+                
+            }
+            
+//            System.arraycopy(result.getResult(), 0, results, split.fromIndex,
+//                    split.ntuples);
+
+        }
+
+        /**
+         * The aggregated results.
+         */
+        public ResultBuffer getResult() {
+
+            return new ResultBuffer(results.length, results, valueSerializer);
+
+        }
+
+    }
+
+    /**
+     * Knows how to aggregate {@link ResultBitBuffer} objects.
+     */
+    public static class ResultBitBufferHandler implements
+            IResultHandler<ResultBitBuffer, ResultBitBuffer> {
+
+        private final boolean[] results;
+
+        public ResultBitBufferHandler(int nkeys) {
+
+            results = new boolean[nkeys];
+
+        }
+
+        public void aggregate(ResultBitBuffer result, Split split) {
+
+            System.arraycopy(result.getResult(), 0, results, split.fromIndex,
+                    split.ntuples);
+
+        }
+
+        /**
+         * The aggregated results.
+         */
+        public ResultBitBuffer getResult() {
+
+            return new ResultBitBuffer(results.length, results);
+
+        }
+
+    }
+
 }

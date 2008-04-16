@@ -114,9 +114,11 @@ public class TestQuery extends AbstractBigdataSailTestCase {
 
         for (int i = 0; i < n; i++) {
 
-            resource[i] = new File(dir, filenames[i]).toString();
+            final File file = new File(dir, filenames[i]);
+            
+            resource[i] = file.toString();
 
-            baseURL[i] = "";
+            baseURL[i] = file.toURI().toString();
 
             rdfFormat[i] = RDFFormat.RDFXML;
 
@@ -191,10 +193,10 @@ public class TestQuery extends AbstractBigdataSailTestCase {
              * the query. However this needs to be changed once the database is
              * actually a quad store.
              */
-            DatasetImpl dataSet = new DatasetImpl();
+            DatasetImpl dataSet = null; //new DatasetImpl();
             
             // a fake context.
-            dataSet.addDefaultGraph(new URIImpl("http://www.bigdata.com"));
+//            dataSet.addDefaultGraph(new URIImpl("http://www.bigdata.com"));
             
             BindingSet bindingSet = new QueryBindingSet();
             

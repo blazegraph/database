@@ -72,8 +72,11 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -89,6 +92,11 @@ import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataStatementImpl;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
@@ -970,6 +978,60 @@ abstract public class AbstractTripleStore implements ITripleStore,
             10000);
 
     /**
+     * Handles {@link IRawTripleStore#NULL}, blank node identifiers, statement
+     * identifiers, and the {@link #termCache}.
+     * 
+     * @param id
+     *            A term identifier.
+     * 
+     * @return The corresponding {@link _Value} if the term identifier is a
+     *         blank node identifier, a statement identifier, or found in the
+     *         {@link #termCache}.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>id</i> is {@link IRawTripleStore#NULL}.
+     */
+    private _Value _getTermId(long id) {
+        
+        if (id == NULL)
+            throw new IllegalArgumentException("NULL");
+
+        if (isStatement(id)) {
+
+            /*
+             * Statement identifiers are not stored in the reverse lexicon (or
+             * the cache).
+             * 
+             * A statement identifier is externalized as a BNode. The "S" prefix
+             * is a syntactic marker for those in the know to indicate that the
+             * BNode corresponds to a statement identifier.
+             */
+
+            return (_BNode) OptimizedValueFactory.INSTANCE
+                    .createBNode("S" + id);
+
+        }
+
+        if (isBNode(id)) {
+
+            /*
+             * BNodes are not stored in the reverse lexicon (or the cache). The
+             * "_:B" prefix is a syntactic marker for a real blank node.
+             */
+
+            return (_BNode) OptimizedValueFactory.INSTANCE
+                    .createBNode("B" + id);
+
+        }
+
+        // test the term cache.
+        final _Value value = termCache.get(id);
+
+        return value;
+
+    }
+    
+    /**
      * Note: {@link BNode}s are not stored in the reverse lexicon and are
      * recognized using {@link #isBNode(long)}.
      * <p>
@@ -993,54 +1055,18 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * @todo this always mints a new {@link BNode} instance when the term
      *       identifier is identifies a {@link BNode} or a statement. Should
      *       there be some cache effect to provide the same instance?
-     * 
-     * @todo add a batch variant accepting long[] termIds or an IChunkedIterator
-     *       whose generic type is Long.
      */
     final public _Value getTerm(long id) {
 
-        if (id == NULL)
-            throw new IllegalArgumentException("NULL");
-
-        if (isStatement(id)) {
-
-            /*
-             * Statement identifiers are not stored in the reverse lexicon (or
-             * the cache).
-             * 
-             * A statement identifier is externalized as a BNode. The "_S"
-             * prefix is a syntactic marker for those in the know to indicate
-             * that the BNode corresponds to a statement identifier.
-             */
-
-            return (_BNode) OptimizedValueFactory.INSTANCE.createBNode("_S"
-                    + id);
-
-        }
-
-        if (isBNode(id)) {
-
-            /*
-             * BNodes are not stored in the reverse lexicon (or the cache).
-             */
-
-            return (_BNode) OptimizedValueFactory.INSTANCE
-                    .createBNode("_" + id);
-
-        }
-
-        _Value value = termCache.get(id);
-
-        if (value != null) {
-
-            return value;
-
-        }
-
+        // handle NULL, bnodes, statement identifiers, and the termCache.
+        _Value value = _getTermId( id );
+        
+        if(value != null) return value;
+        
         final IIndex ndx = getIdTermIndex();
 
-        final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;// new
-                                                                    // KeyBuilder(Bytes.SIZEOF_LONG);
+        // new KeyBuilder(Bytes.SIZEOF_LONG);
+        final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;
 
         // Note: shortcut for keyBuilder.id2key(id)
         final byte[] key = keyBuilder.reset().append(id).getKey();
@@ -1084,6 +1110,131 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
+    /**
+     * Batch resolution of term identifiers.
+     * 
+     * @param termIds
+     * 
+     * @return
+     */
+    final public _Value[] getTerms(long[] ids, int n) {
+
+        if (ids == null)
+            throw new IllegalArgumentException();
+
+        if (n == 0)
+            return new _Value[] {};
+
+        final _Value[] values = new _Value[n];
+        
+        final byte[][] keys = new byte[n][];
+        
+        final int[] order = new int[n];
+        
+        final IIndex ndx = getIdTermIndex();
+
+        final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;
+
+        int j = 0;
+        
+        for(int i=0; i<n; i++) {
+            
+            final long id = ids[i];
+            
+            final _Value value = _getTermId(id);
+            
+            if (value != null) {
+            
+                // resolved.
+                values[i] = value;
+                
+            } else {
+                
+                /*
+                 * Not resolve - will test the index.
+                 */
+                
+                // Note: shortcut for keyBuilder.id2key(id)
+                keys[j] = keyBuilder.reset().append(id).getKey();
+                
+                // Note: Used to assign results from batch lookup into values[].
+                order[j] = i;
+                
+            }
+            
+        }
+
+        /*
+         * batch lookup.
+         */
+        {
+
+            final int nkeys = j;
+
+            final ResultBufferHandler resultHandler = new ResultBufferHandler(
+                    nkeys, ndx.getIndexMetadata().getValueSerializer());
+
+            ndx.submit(0/* fromIndex */, nkeys/* toIndex */, keys,
+                    null/* vals */, BatchLookupConstructor.INSTANCE,
+                    resultHandler);
+        
+            // the aggregated results.
+            final ResultBuffer results = resultHandler.getResult();
+            
+            synchronized (termCache) {
+
+                for (int i = 0; i < nkeys; i++) {
+
+                    // index into ids[] and values[].
+                    final int index = order[i];
+                    
+                    final long id = ids[index];
+
+                    final byte[] val = results.getResult(i);
+
+                    if (val == null) {
+
+                        log.warn("No such term: " + id );
+
+                        continue;
+
+                    }
+
+                    final _Value value = _Value.deserialize(val);
+
+                    /*
+                     * Note: This code block is synchronized to address a
+                     * possible race condition where concurrent threads resolve
+                     * the term against the database. It both threads attempt to
+                     * insert their resolved term definitions, which are
+                     * distinct objects, into the cache then one will get an
+                     * IllegalStateException since the other's object will
+                     * already be in the cache.
+                     */
+
+                    if (termCache.get(id) == null) {
+
+                        termCache.put(id, value, false/* dirty */);
+
+                    }
+
+                    // @todo modify unit test to verify that these fields are
+                    // being set.
+
+                    value.termId = id;
+
+                    value.known = true;
+
+                }
+
+            }
+            
+        }
+        
+        return values;
+        
+    }
+    
     /**
      * Note: Handles both unisolatable and isolatable indices.
      * <p>
@@ -1721,22 +1872,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
-    /**
-     * Return the statement from the database matching the fully bound query.
-     * <p>
-     * Note: If the parameters are from an {@link AbstractTripleStore} instance
-     * using a different lexicon then you MUST either clear the
-     * {@link _Value#termId} field or create a new Sesame {@link Value} object
-     * using {@link OptimizedValueFactory#toSesameObject(Value)} in order to
-     * avoid lookup using the term identifier rather than indirecting through
-     * the lexicon.
-     * 
-     * @param s
-     * @param p
-     * @param o
-     * @return
-     */
-    public IStatementWithType getStatement(Resource s, URI p, Value o)
+    public BigdataStatement getStatement(Resource s, URI p, Value o)
             throws SailException {
 
         if (s == null || p == null || o == null) {
@@ -1745,7 +1881,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
-        final StatementIterator itr = getStatements(s, p, o);
+        final BigdataStatementIterator itr = getStatements(s, p, o);
 
         try {
 
@@ -1755,7 +1891,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             }
 
-            return (IStatementWithType) itr.next();
+            return (BigdataStatement) itr.next();
 
         } finally {
 
@@ -1765,30 +1901,20 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
-    public StatementIterator getStatements(Resource s, URI p, Value o) {
+    public BigdataStatementIterator getStatements(Resource s, URI p, Value o) {
 
         return asStatementIterator(getAccessPath(s, p, o).iterator());
 
     }
 
-    /**
-     * Converts an internal {@link _Value} to a Sesame {@link Value} object.
-     * 
-     * @param value
-     *            Either an internal {@link _Value}, a Sesame {@link Value}
-     *            object, or <code>null</code>.
-     * 
-     * @return A corresponding Sesame {@link Value} object -or-
-     *         <code>null</code> iff <i>value</i> is <code>null</code>.
-     */
-    final public Value asValue(Value value) {
+    final public BigdataValue asValue(Value value) {
 
         return OptimizedValueFactory.INSTANCE.toSesameObject(value);
 
     }
 
-    // @todo modify to use a batch variant.
-    public Statement asStatement(SPO spo) {
+    // @todo modify to use batch term lookup.
+    public BigdataStatement asStatement(SPO spo) {
 
         final _Resource s = (_Resource) getTerm(spo.s);
         final _URI p = (_URI) getTerm(spo.p);
@@ -1798,19 +1924,19 @@ abstract public class AbstractTripleStore implements ITripleStore,
                 : null //
             );
 
-        return new StatementWithType( //
-                (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(s),//
-                (URI) OptimizedValueFactory.INSTANCE.toSesameObject(p), //
-                (Value) OptimizedValueFactory.INSTANCE.toSesameObject(o), //
-                (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(c),//
+        return new BigdataStatementImpl( //
+                (BigdataResource) OptimizedValueFactory.INSTANCE.toSesameObject(s),//
+                (BigdataURI) OptimizedValueFactory.INSTANCE.toSesameObject(p), //
+                (BigdataValue) OptimizedValueFactory.INSTANCE.toSesameObject(o), //
+                (BigdataResource) OptimizedValueFactory.INSTANCE.toSesameObject(c),//
                 spo.type//
         );
 
     }
 
-    public StatementIterator asStatementIterator(ISPOIterator src) {
+    public BigdataStatementIterator asStatementIterator(ISPOIterator src) {
 
-        return new SesameStatementIterator(this, src);
+        return new BigdataStatementIteratorImpl(this, src);
 
     }
 
@@ -2561,25 +2687,6 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
-    /**
-     * Filter the supplied set of SPO objects for whether they are "present" or
-     * "not present" in the database, depending on the value of the supplied
-     * boolean variable.
-     * <p>
-     * Note: This is different from using an ISPOFilter, as the point tests for
-     * existence in this method will be done in bulk using
-     * {@link IIndex#submit(int, int, byte[][], byte[][], com.bigdata.btree.AbstractIndexProcedureConstructor, IResultHandler)}.
-     * 
-     * @param stmts
-     *            the statements to test
-     * @param numStmts
-     *            the number of statements to test
-     * @param present
-     *            if true, filter for statements that exist in the db, otherwise
-     *            filter for statements that do not exist
-     * 
-     * @return an iteration over the filtered set of statements
-     */
     public ISPOIterator bulkFilterStatements(SPO[] stmts, int numStmts,
             boolean present) {
 
@@ -2591,30 +2698,16 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
-    /**
-     * Filter the supplied set of SPO objects for whether they are "present" or
-     * "not present" in the database, depending on the value of the supplied
-     * boolean variable.
-     * <p>
-     * Note: This is different from using an ISPOFilter, as the point tests for
-     * existence in this method will be done in bulk using
-     * {@link IIndex#submit(int, int, byte[][], byte[][], com.bigdata.btree.AbstractIndexProcedureConstructor, IResultHandler)}.
-     * 
-     * @param itr
-     *            an iterator over the set of statements to test
-     * @param present
-     *            if true, filter for statements that exist in the db, otherwise
-     *            filter for statements that do not exist
-     * 
-     * @return an iteration over the filtered set of statements
-     */
     public ISPOIterator bulkFilterStatements(ISPOIterator itr, boolean present) {
 
         try {
 
-            IIndex index = getSPOIndex();
-            RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder());
+            final IIndex index = getSPOIndex();
+            
+            // Thread-local key builder.
+            final RdfKeyBuilder keyBuilder = getKeyBuilder();
 
+            // FIXME This has simply got to be wrong.
             SPO[] stmts = new SPO[0];
             int numStmts = 0;
 
@@ -2635,21 +2728,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
                     keys[i] = keyBuilder.statement2Key(KeyOrder.SPO, chunk[i]);
                 }
 
-                // create an IResultHandler that can aggregate ResultBitBuffer
-                // objects
-                final IResultHandler<ResultBitBuffer, ResultBitBuffer> resultHandler = new IResultHandler<ResultBitBuffer, ResultBitBuffer>() {
-
-                    private boolean[] results = new boolean[keys.length];
-
-                    public void aggregate(ResultBitBuffer result, Split split) {
-                        System.arraycopy(result.getResult(), 0, results,
-                                split.fromIndex, split.ntuples);
-                    }
-
-                    public ResultBitBuffer getResult() {
-                        return new ResultBitBuffer(results.length, results);
-                    }
-                };
+                // knows how to aggregate ResultBitBuffers.
+                final ResultBitBufferHandler resultHandler = new ResultBitBufferHandler(keys.length);
 
                 // submit the batch contains procedure to the SPO index
                 index.submit(0/* fromIndex */, keys.length/* toIndex */, keys,

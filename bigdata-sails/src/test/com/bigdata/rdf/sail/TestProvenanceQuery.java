@@ -59,9 +59,9 @@ import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.StatementIterator;
-import com.bigdata.rdf.store.StatementWithType;
+import com.bigdata.rdf.store.BigdataStatementIterator;
 
 /**
  * Test suite for high-level query against a graph containing statements about
@@ -105,7 +105,7 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
          */
         {
          
-            final StatementIterator itr = sail.database.getStatements(null, null, null);
+            final BigdataStatementIterator itr = sail.database.getStatements(null, null, null);
             final String rdfXml;
             try {
 
@@ -117,7 +117,7 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
 
                 while (itr.hasNext()) {
 
-                    StatementWithType stmt = (StatementWithType)itr.next();
+                    BigdataStatementImpl stmt = (BigdataStatementImpl)itr.next();
 
                     // only write the explicit statements.
                     if(!stmt.isExplicit()) continue;
@@ -188,10 +188,10 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
              * the query. However this needs to be changed once the database is
              * actually a quad store.
              */
-            DatasetImpl dataSet = new DatasetImpl();
+            DatasetImpl dataSet = null;//new DatasetImpl();
 
             // a fake context.
-            dataSet.addDefaultGraph(new URIImpl("http://www.bigdata.com"));
+//            dataSet.addDefaultGraph(new URIImpl("http://www.bigdata.com"));
 
             BindingSet bindingSet = new QueryBindingSet();
 

@@ -45,6 +45,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -56,7 +57,6 @@ import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
-import com.bigdata.rdf.store.IStatementWithType;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
@@ -470,7 +470,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                 // verify that stmt c is marked as explicit in the kb.
 
-                IStatementWithType stmtC = (IStatementWithType) store
+                BigdataStatement stmtC = (BigdataStatement) store
                         .getStatement(foo, rdftype, graph);
                 
                 assertNotNull(stmtC);
@@ -508,7 +508,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                 // verify that stmt c is marked as explicit in the kb.
 
-                IStatementWithType stmtC = (IStatementWithType) store
+                BigdataStatement stmtC = (BigdataStatement) store
                         .getStatement(foo, rdftype, graph);
                 
                 assertNotNull(stmtC);

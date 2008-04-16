@@ -29,15 +29,16 @@ package com.bigdata.rdf.store;
 
 import info.aduna.iteration.CloseableIteration;
 
-import org.openrdf.model.Statement;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.model.BigdataStatement;
+
 /**
- * Placeholder for the old Sesame 1.x StatementIterator interface.
+ * Iterator visiting {@link BigdataStatement}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface StatementIterator extends CloseableIteration<Statement, SailException> {
+public interface BigdataStatementIterator extends CloseableIteration<BigdataStatement, SailException> {
 
 }
