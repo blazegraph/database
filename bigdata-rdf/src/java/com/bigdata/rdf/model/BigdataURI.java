@@ -42,43 +42,19 @@ Modifications:
 
 */
 /*
- * Created on Apr 11, 2008
+ * Created on Apr 16, 2008
  */
 
-package com.bigdata.rdf.store;
+package com.bigdata.rdf.model;
 
-import org.openrdf.model.Statement;
-
-import com.bigdata.rdf.model.StatementEnum;
+import org.openrdf.model.URI;
 
 /**
- * Also reports whether the statement is explicit, inferred or an axiom.
+ * A {@link URI} that exposes the internal term identifier.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStatementWithType extends Statement {
+public interface BigdataURI extends URI, BigdataValue {
 
-    /**
-     * Whether the statement is explicit, inferred or an axiom.
-     */
-    public StatementEnum getStatementType();
-
-    /**
-     * <code>true</code> if the statement is an axiom that is not present as
-     * an explicit assertion.
-     */
-    public boolean isAxiom();
-    
-    /**
-     * <code>true</code> if the statement is an inference that is not present
-     * as an explicit assertion or an axiom.
-     */
-    public boolean isInferred();
-    
-    /**
-     * <code>true</code> if the statement is an explicit assertion.
-     */
-    public boolean isExplicit();
-    
 }

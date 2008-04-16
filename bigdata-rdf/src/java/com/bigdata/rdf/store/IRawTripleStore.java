@@ -299,6 +299,39 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     public int removeStatements(ISPOIterator itr);
     
     /**
+     * Filter the supplied set of SPO objects for whether they are "present" or
+     * "not present" in the database, depending on the value of the supplied
+     * boolean variable (batch API).
+     * 
+     * @param stmts
+     *            the statements to test
+     * @param numStmts
+     *            the number of statements to test
+     * @param present
+     *            if true, filter for statements that exist in the db, otherwise
+     *            filter for statements that do not exist
+     * 
+     * @return an iteration over the filtered set of statements
+     */
+    public ISPOIterator bulkFilterStatements(SPO[] stmts, int numStmts,
+            boolean present);
+    
+    /**
+     * Efficiently filter the supplied set of {@link SPO} objects for whether
+     * they are "present" or "not present" in the database, depending on the
+     * value of the supplied boolean variable (batch api).
+     * 
+     * @param itr
+     *            an iterator over the set of statements to test
+     * @param present
+     *            if true, filter for statements that exist in the db, otherwise
+     *            filter for statements that do not exist
+     * 
+     * @return an iteration over the filtered set of statements
+     */
+    public ISPOIterator bulkFilterStatements(ISPOIterator itr, boolean present);
+    
+    /**
      * Externalizes a statement using an appreviated syntax.
      */
     public String toString(long s, long p, long o);

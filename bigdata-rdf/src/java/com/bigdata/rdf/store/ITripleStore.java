@@ -33,8 +33,12 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.inf.InferenceEngine;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataStatementImpl;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -176,24 +180,81 @@ public interface ITripleStore {
     public boolean hasStatement(Resource s, URI p, Value o);
 
     /**
+     * Return the statement from the database matching the fully bound query.
+     * <p>
+     * Note: If the parameters are from an {@link AbstractTripleStore} using a
+     * different lexicon then you MUST either {@link BigdataValue#clearTermId()}
+     * or create a new {@link Value} object which either is not aware of the
+     * term identifier or does not have its term identifier set in order to
+     * avoid lookup using the term identifier rather than indirecting through
+     * the lexicon.
+     * 
+     * @param s
+     *            The subject (required).
+     * @param p
+     *            The predicate (required).
+     * @param o
+     *            The object (required).
+     * 
+     * @return The statement for that triple -or- <code>null</code> iff the
+     *         triple is not defined in the database.
+     * 
+     * @see #asValue(Value)
+     */
+    public BigdataStatement getStatement(Resource s, URI p, Value o)
+            throws SailException;
+    
+    /**
+     * Return an iterator that will visit all {@link BigdataStatement}s in the
+     * database matching the triple pattern.
+     * 
+     * @param s
+     *            The subject (optional).
+     * @param p
+     *            The predicate (optional).
+     * @param o
+     *            The object (optional).
+     * 
+     * @return The iterator.
+     */
+    public BigdataStatementIterator getStatements(Resource s, URI p, Value o);
+    
+    /**
+     * Converts a {@link BigdataValue} to a Sesame {@link Value} object.
+     * 
+     * @param value
+     *            Either a {@link BigdataValue}, a Sesame {@link Value}
+     *            object, or <code>null</code>.
+     * 
+     * @return A corresponding Sesame {@link Value} object -or-
+     *         <code>null</code> iff <i>value</i> is <code>null</code>.
+     */
+    public BigdataValue asValue(Value value);
+    
+    /**
      * Unconditionally removes statement(s) matching the triple pattern (NO
      * truth maintenance).
      * 
      * @param s
+     *            The subject (optional).
      * @param p
+     *            The predicate (optional).
      * @param o
+     *            The object (optional).
      * 
      * @return The #of statements removed.
      */
     public int removeStatements(Resource s, URI p, Value o);
 
     /**
-     * Returns an {@link IAccessPath} given a triple pattern expressed using
-     * Sesame {@link Value} objects.
+     * Returns an {@link IAccessPath} matching the triple pattern.
      * 
      * @param s
+     *            The subject (optional).
      * @param p
+     *            The predicate (optional).
      * @param o
+     *            The object (optional).
      * 
      * @return The object that may be used to read efficiently on the indices
      *         for that triple pattern. In the special case where any of the
@@ -206,31 +267,31 @@ public interface ITripleStore {
     public IAccessPath getAccessPath(Resource s, URI p, Value o);
     
     /**
-     * Wraps an {@link ISPOIterator} as a {@link StatementIterator}.
+     * Wraps an {@link ISPOIterator} as a {@link BigdataStatementIterator}.
      * <p>
-     * Note: The object visited will be {@link StatementWithType}s.
+     * Note: The object visited will be {@link BigdataStatementImpl}s.
      * 
      * @param src
      *            An {@link ISPOIterator}
      * 
-     * @return The {@link StatementIterator}.
+     * @return The {@link BigdataStatementIterator}.
      * 
      * @see IAccessPath
      * @see #getAccessPath(Resource, URI, Value)
      */
-    public StatementIterator asStatementIterator(ISPOIterator src);
+    public BigdataStatementIterator asStatementIterator(ISPOIterator src);
 
     /**
      * Convert an internal {@link SPO} into a Sesame {@link Statement}.
      * <p>
-     * Note: The object returned will be a {@link IStatementWithType}
+     * Note: The object returned will be a {@link BigdataStatement}
      * 
      * @param spo
      *            The {@link SPO}.
      * 
      * @return The Sesame {@link Statement} -or- <code>null</code>.
      */
-    public Statement asStatement(SPO spo);
+    public BigdataStatement asStatement(SPO spo);
     
     /**
      * Return a {@link DataLoader} singleton configured using the properties

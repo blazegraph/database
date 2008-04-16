@@ -27,6 +27,7 @@ package com.bigdata.rdf.store;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.spo.ISPOIterator;
 
 /**
@@ -36,7 +37,7 @@ import com.bigdata.rdf.spo.ISPOIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SesameStatementIterator implements StatementIterator {
+public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
     private final AbstractTripleStore db;
     private final ISPOIterator src;
@@ -48,7 +49,7 @@ public class SesameStatementIterator implements StatementIterator {
      * @param src
      *            The source iterator.
      */
-    public SesameStatementIterator(AbstractTripleStore db,ISPOIterator src) {
+    public BigdataStatementIteratorImpl(AbstractTripleStore db, ISPOIterator src) {
 
         if (db == null)
             throw new IllegalArgumentException();
@@ -69,13 +70,13 @@ public class SesameStatementIterator implements StatementIterator {
     }
 
     /**
-     * Note: Returns instances of {@link IStatementWithType}.
+     * Note: Returns instances of {@link BigdataStatement}.
      * 
-     * FIXME Modify to do batch resolution of the termIds to the terms a chunk
+     * FIXME Modify to do chunked resolution of the termIds to the terms a chunk
      * at at time. This will probably be a huge performance win for
      * serialization as RDF/XML.
      */
-    public Statement next() {
+    public BigdataStatement next() {
 
         return db.asStatement( src.next() );
         

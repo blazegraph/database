@@ -270,7 +270,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             }
 
-            StatementIterator itr = store.getStatements(null, null, null);
+            BigdataStatementIterator itr = store.getStatements(null, null, null);
             
             try {
 
@@ -926,7 +926,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              * represent the statement identifiers and statements about
              * statements.
              */
-            final StatementIterator itr = store.getStatements(null, null, null);
+            final BigdataStatementIterator itr = store.getStatements(null, null, null);
             final String rdfXml;
             try {
 

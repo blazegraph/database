@@ -37,7 +37,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.StatementIterator;
+import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
@@ -159,7 +159,7 @@ public class TestCompareOwlSameAsEntailments extends
         boolean sameStatements1 = true;
         {
 
-            StatementIterator it = actual.getStatements(null, null, null);
+            BigdataStatementIterator it = actual.getStatements(null, null, null);
 
             try {
 
@@ -194,7 +194,7 @@ public class TestCompareOwlSameAsEntailments extends
         boolean sameStatements2 = true;
         {
 
-            StatementIterator it = expected.getStatements(null, null, null);
+            BigdataStatementIterator it = expected.getStatements(null, null, null);
 
             try {
 

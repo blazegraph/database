@@ -48,9 +48,8 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.BNodeImpl;
-import org.openrdf.model.impl.LiteralImpl;
-import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.datatypes.XMLDatatypeUtil;
+import org.openrdf.model.util.URIUtil;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.DataInputBuffer;
@@ -58,6 +57,7 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -121,56 +121,84 @@ public class OptimizedValueFactory implements ValueFactory {
     }
     
     /**
-     * Converts a {@link _Value} into a {@link Value} using the Sesame object
-     * model implementations.
+     * Converts a either a {@link _Value} or a {@link Value} into a
+     * {@link BigdataValue}. When a {@link _Value} is converted it this hides
+     * some non-conforming aspects of the {@link _Value} implementations and
+     * some public fields which they would otherwise expose. When a
+     * {@link Value} is converted, the term identifier will be initialized to
+     * {@link IRawTripleStore#NULL}.
      * 
      * @param v
      *            The value.
      * 
-     * @return A {@link Value} with the same data. If the value is
+     * @return A {@link BigdataValue} with the same data. If the value is
      *         <code>null</code> then <code>null</code> is returned.
      */
-    final public Value toSesameObject( Value v ) {
-        
-        if( v == null ) return null;
-        
-        if( v instanceof _URI ) {
-            
-            v = new URIImpl(((_URI) v).term);
-            
-        } else if( v instanceof _Literal ) {
-            
-            String label = ((_Literal)v).term;
-            
-            String language = ((_Literal)v).language;
-            
-            _URI datatype = ((_Literal)v).datatype;
-            
-            if( language != null ) {
+    final public BigdataValue toSesameObject(Value v) {
 
-                v = new LiteralImpl(label,language);
+        if (v == null)
+            return null;
+
+        if (v instanceof BigdataValueImpl)
+            return (BigdataValue) v;
+        
+        if (v instanceof _Value) {
+
+            if (v instanceof _URI) {
+
+                return new BigdataURIImpl((_URI) v);
+
+            } else if (v instanceof _Literal) {
+
+                return new BigdataLiteralImpl((_Literal) v);
+
+            } else if (v instanceof _BNode) {
+
+                return new BigdataBNodeImpl((_BNode) v);
+
+            } else {
+
+                throw new AssertionError();
+
+            }
+
+        } else {
+            
+            if( v instanceof URI) {
                 
-            } else if( datatype != null ) {
+                return new BigdataURIImpl(((URI) v).stringValue(),
+                        IRawTripleStore.NULL);
                 
-                v = new LiteralImpl(label, new URIImpl(datatype.term));
+            } else if( v instanceof BNode) {
                 
+                return new BigdataBNodeImpl(((BNode) v).stringValue(),
+                        IRawTripleStore.NULL);
+
+            } else if (v instanceof Literal) {
+
+                final Literal tmp = ((Literal) v);
+                
+                final String label =tmp.getLabel();
+                
+                final String language = tmp.getLanguage();
+                
+                final URI datatype = tmp.getDatatype();
+                
+                return new BigdataLiteralImpl(//
+                        label,//
+                        language,//
+                        (datatype == null ? null : new BigdataURIImpl(datatype
+                                .stringValue(), IRawTripleStore.NULL)),//
+                        IRawTripleStore.NULL//
+                );
+
             } else {
                 
-                v = new LiteralImpl(label);
+                throw new AssertionError();
                 
             }
             
-        } else if (v instanceof _BNode) {
-
-            v = new BNodeImpl( ((_BNode)v).term );
-            
-        } else {
-            
-            throw new AssertionError();
-            
         }
-        
-        return v;
         
     }
     
@@ -287,7 +315,7 @@ public class OptimizedValueFactory implements ValueFactory {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    abstract public static class _Value implements Value, Externalizable {
+    abstract public static class _Value implements Value, BigdataValue, Externalizable {
 
         /**
          * Version zero(0) of the term {@link Externalizable} format.
@@ -335,8 +363,38 @@ public class OptimizedValueFactory implements ValueFactory {
          * identifier under which the lexical item may be recovered from the
          * term identifiers index.
          */
-        public long termId = 0;
+        public long termId = NULL;
+        
+        final public long getTermId() {
+        
+            return termId;
+            
+        }
+        
+        final public void setTermId(long termId) {
+        
+            if (termId == NULL) {
+            
+                throw new IllegalArgumentException();
+                
+            }
+            
+            if (this.termId != NULL && termId != this.termId) {
+            
+                throw new IllegalStateException();
+                
+            }
+            
+            this.termId = termId;
+            
+        }
 
+        final public void clearTermId() {
+            
+            this.termId = NULL;
+            
+        }
+        
         /**
          * The #of times that this term has been used in a {@link Statement}.
          */
@@ -702,7 +760,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
     
-    abstract public static class _Resource extends _Value implements Resource {
+    abstract public static class _Resource extends _Value implements BigdataResource {
 
         /**
          * De-serialization constructor.
@@ -735,7 +793,7 @@ public class OptimizedValueFactory implements ValueFactory {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    final public static class _BNode extends _Resource implements BNode {
+    final public static class _BNode extends _Resource implements BigdataBNode {
 
         /**
          * 
@@ -846,7 +904,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
 
-    final public static class _Literal extends _Value implements Literal {
+    final public static class _Literal extends _Value implements BigdataLiteral {
 
         /*
          * Note: these fields are not final since that interfers with the
@@ -938,7 +996,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
             super(label);
 
-            if(language==null) {
+            if (language == null) {
                 
                 throw new IllegalArgumentException();
                 
@@ -982,13 +1040,20 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        // @todo return the fully formatted literal.
+        public String toString() {
+
+            return super.toString();
+            
+        }
+        
         public String getLabel() {
 
             return term;
 
         }
 
-        public URI getDatatype() {
+        public BigdataURI getDatatype() {
 
             return datatype;
 
@@ -1140,69 +1205,80 @@ public class OptimizedValueFactory implements ValueFactory {
         }
 
         /*
-         * FIXME datatype aware methods are not implemented.  frankly, I do not
-         * think that we will need them for the RIO integration.
+         * XSD stuff.
          */
         
         public boolean booleanValue() {
-            // TODO Auto-generated method stub
-            return false;
+
+            return XMLDatatypeUtil.parseBoolean(term);
+
         }
 
         public byte byteValue() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
 
-        public XMLGregorianCalendar calendarValue() {
-            // TODO Auto-generated method stub
-            return null;
-        }
+            return XMLDatatypeUtil.parseByte(term);
 
-        public BigDecimal decimalValue() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        public double doubleValue() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public float floatValue() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public int intValue() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public BigInteger integerValue() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        public long longValue() {
-            // TODO Auto-generated method stub
-            return 0;
         }
 
         public short shortValue() {
-            // TODO Auto-generated method stub
-            return 0;
+
+            return XMLDatatypeUtil.parseShort(term);
+
+        }
+
+        public int intValue() {
+
+            return XMLDatatypeUtil.parseInt(term);
+
+        }
+
+        public long longValue() {
+
+            return XMLDatatypeUtil.parseLong(term);
+
+        }
+
+        public float floatValue() {
+
+            return XMLDatatypeUtil.parseFloat(term);
+
+        }
+
+        public double doubleValue() {
+
+            return XMLDatatypeUtil.parseDouble(term);
+
+        }
+
+        public BigInteger integerValue() {
+
+            return XMLDatatypeUtil.parseInteger(term);
+
+        }
+
+        public BigDecimal decimalValue() {
+
+            return XMLDatatypeUtil.parseDecimal(term);
+
+        }
+
+        public XMLGregorianCalendar calendarValue() {
+
+            return XMLDatatypeUtil.parseCalendar(term);
+
         }
         
     }
 
-    final public static class _URI extends _Resource implements URI {
+    final public static class _URI extends _Resource implements BigdataURI {
         
         /**
          * 
          */
         private static final long serialVersionUID = 8085405245340777144L;
 
+        private int indexOf = -1;
+        
         /**
          * De-serialization constructor.
          */
@@ -1215,18 +1291,24 @@ public class OptimizedValueFactory implements ValueFactory {
         public _URI(String uri) {
 
             super(uri);
+            
+            if (term.indexOf(':') < 0) {
+                
+                throw new IllegalArgumentException("term=["+term+"]");
+                
+            }
 
         }
 
         public _URI(URI uri) {
 
-            super(uri.toString());
+            this(uri.toString());
 
         }
 
         public _URI(String namespace, String localName) {
 
-            super(namespace + localName);
+            this(namespace + localName);
 
         }
 
@@ -1236,32 +1318,27 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
-        public String getLocalName() {
-
-            int i = term.lastIndexOf('#');
-
-            if ((i + 1) < (term.length() - 1)) {
-
-                return term.substring(i + 1);
-
+        public String getNamespace() {
+            
+            if (indexOf == -1) {
+                
+                indexOf = URIUtil.getLocalNameIndex(term);
+                
             }
 
-            return "";
-
+            return term.substring(0, indexOf);
         }
 
-        public String getNamespace() {
-
-            int i = term.lastIndexOf('#');
-
-            if (i > 0) {
-
-                return term.substring(0, i + 1);
-
+        public String getLocalName() {
+            
+            if (indexOf == -1) {
+                
+                indexOf = URIUtil.getLocalNameIndex(term);
+                
             }
 
-            return "";
-
+            return term.substring(indexOf);
+            
         }
 
         /**
@@ -1272,7 +1349,7 @@ public class OptimizedValueFactory implements ValueFactory {
             return RdfKeyBuilder.TERM_CODE_URI;
             
         }
-
+        
         public boolean equals(Object o) {
 
             if (o == this) return true;
@@ -1327,7 +1404,7 @@ public class OptimizedValueFactory implements ValueFactory {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class _Statement implements Statement {
+    public static class _Statement implements BigdataStatement {
 
         /**
          * 
@@ -1515,9 +1592,42 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        /*
+         * Note: implementation per Statement interface.
+         */
+        public int hashCode() {
+            
+            return 961 * s.hashCode() + 31 * p.hashCode() + o.hashCode();
+        
+        }
+        
         public String toString() {
             
             return "<"+s+", "+p+", "+o+(c==null?"":", "+c)+">"+(type==null?"":" : "+type);
+            
+        }
+
+        public StatementEnum getStatementType() {
+
+            return type;
+            
+        }
+
+        public boolean isAxiom() {
+            
+            return StatementEnum.Axiom == type;
+            
+        }
+
+        public boolean isExplicit() {
+            
+            return StatementEnum.Explicit == type;
+            
+        }
+
+        public boolean isInferred() {
+            
+            return StatementEnum.Inferred == type;
             
         }
         

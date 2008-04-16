@@ -29,7 +29,7 @@ package com.bigdata.rdf.store;
 
 import java.util.NoSuchElementException;
 
-import org.openrdf.model.Statement;
+import com.bigdata.rdf.model.BigdataStatement;
 
 /**
  * Empty iterator.
@@ -37,9 +37,9 @@ import org.openrdf.model.Statement;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyStatementIterator implements StatementIterator {
+public class EmptyStatementIterator implements BigdataStatementIterator {
 
-    public static transient final StatementIterator INSTANCE = new EmptyStatementIterator();
+    public static transient final BigdataStatementIterator INSTANCE = new EmptyStatementIterator();
     
     private EmptyStatementIterator() {
         
@@ -55,7 +55,7 @@ public class EmptyStatementIterator implements StatementIterator {
         
     }
 
-    public Statement next() throws RuntimeException {
+    public BigdataStatement next() throws RuntimeException {
         
         throw new NoSuchElementException();
         

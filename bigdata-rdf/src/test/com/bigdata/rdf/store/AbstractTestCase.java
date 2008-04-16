@@ -632,7 +632,7 @@ abstract public class AbstractTestCase
 
     }
     
-    static public void assertSameStatements(Statement[] expected, StatementIterator actual) throws SailException {
+    static public void assertSameStatements(Statement[] expected, BigdataStatementIterator actual) throws SailException {
 
         assertSameStatements("", expected, actual);
 
@@ -643,7 +643,7 @@ abstract public class AbstractTestCase
      *       iterator we can not sort expected into the same order. therefore
      *       this should test for the same statements in any order
      */
-    static public void assertSameStatements(String msg, Statement[] expected, StatementIterator actual) throws SailException {
+    static public void assertSameStatements(String msg, Statement[] expected, BigdataStatementIterator actual) throws SailException {
 
         int i = 0;
 
