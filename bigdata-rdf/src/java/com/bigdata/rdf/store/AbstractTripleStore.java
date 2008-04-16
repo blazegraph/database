@@ -32,6 +32,7 @@ import java.io.StringReader;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -100,6 +101,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
+import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator2;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
@@ -1113,86 +1115,106 @@ abstract public class AbstractTripleStore implements ITripleStore,
     /**
      * Batch resolution of term identifiers.
      * 
-     * @param termIds
+     * @param ids
+     *            An collection of term identifiers.
      * 
-     * @return
+     * @return A map from term identifier to the {@link BigdataValue}. If a
+     *         term identifier was not resolved then the map will not contain an
+     *         entry for that term identifier.
+     * 
+     * FIXME write unit tests for this - it's mainly used by the
+     *       {@link BigdataStatementIteratorImpl}
      */
-    final public _Value[] getTerms(long[] ids, int n) {
+    final public Map<Long,BigdataValue> getTerms(Collection<Long> ids) {
 
         if (ids == null)
             throw new IllegalArgumentException();
 
-        if (n == 0)
-            return new _Value[] {};
+        // Maximum #of distinct term identifiers.
+        final int n = ids.size();
+        
+        if (n == 0) {
 
-        final _Value[] values = new _Value[n];
-        
-        final byte[][] keys = new byte[n][];
-        
-        final int[] order = new int[n];
-        
-        final IIndex ndx = getIdTermIndex();
-
-        final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;
-
-        int j = 0;
-        
-        for(int i=0; i<n; i++) {
+            return Collections.EMPTY_MAP;
             
-            final long id = ids[i];
+        }
+
+        final Map<Long/* id */, BigdataValue/* term */> ret = new HashMap<Long, BigdataValue>( n );
+
+        /*
+         * An array of any term identifiers that were not resolved in this first
+         * stage of processing. We will look these up in the index.
+         */
+        final Long[] notFound = new Long[n];
+
+        int numNotFound = 0;
+        
+        for(Long id : ids ) {
             
-            final _Value value = _getTermId(id);
+            final _Value value = _getTermId(id.longValue());
             
             if (value != null) {
             
                 // resolved.
-                values[i] = value;
+                ret.put(id, value);
                 
-            } else {
-                
-                /*
-                 * Not resolve - will test the index.
-                 */
-                
-                // Note: shortcut for keyBuilder.id2key(id)
-                keys[j] = keyBuilder.reset().append(id).getKey();
-                
-                // Note: Used to assign results from batch lookup into values[].
-                order[j] = i;
-                
+                continue;
+
             }
+
+            /*
+             * We will need to test the index for this term identifier.
+             */
+            notFound[numNotFound++] = id;
             
         }
 
         /*
          * batch lookup.
          */
-        {
+        if (numNotFound > 0) {
 
-            final int nkeys = j;
+            log.info("Will resolve "+numNotFound+" term identifers against the index.");
+            
+            // sort term identifiers into index order.
+            Arrays.sort(notFound, 0, numNotFound, TermIdComparator2.INSTANCE);
+            
+            final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;
 
+            final byte[][] keys = new byte[numNotFound][];
+
+            for(int i=0; i<numNotFound; i++) {
+
+                // Note: shortcut for keyBuilder.id2key(id)
+                keys[i] = keyBuilder.reset().append(notFound[i]).getKey();
+                
+            }
+
+            // the id:term index.
+            final IIndex ndx = getIdTermIndex();
+
+            // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
-                    nkeys, ndx.getIndexMetadata().getValueSerializer());
+                    numNotFound, ndx.getIndexMetadata().getValueSerializer());
 
-            ndx.submit(0/* fromIndex */, nkeys/* toIndex */, keys,
+            // batch lookup
+            ndx.submit(0/* fromIndex */, numNotFound/* toIndex */, keys,
                     null/* vals */, BatchLookupConstructor.INSTANCE,
                     resultHandler);
         
             // the aggregated results.
             final ResultBuffer results = resultHandler.getResult();
             
+            // synchronize on the term cache before updating it.
             synchronized (termCache) {
 
-                for (int i = 0; i < nkeys; i++) {
-
-                    // index into ids[] and values[].
-                    final int index = order[i];
+                for (int i = 0; i < numNotFound; i++) {
                     
-                    final long id = ids[index];
+                    final Long id = notFound[i];
 
-                    final byte[] val = results.getResult(i);
+                    final byte[] data = results.getResult(i);
 
-                    if (val == null) {
+                    if (data == null) {
 
                         log.warn("No such term: " + id );
 
@@ -1200,7 +1222,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                     }
 
-                    final _Value value = _Value.deserialize(val);
+                    final _Value value = _Value.deserialize(data);
 
                     /*
                      * Note: This code block is synchronized to address a
@@ -1225,13 +1247,15 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                     value.known = true;
 
+                    ret.put(id, value);
+                    
                 }
 
             }
             
         }
         
-        return values;
+        return ret;
         
     }
     
