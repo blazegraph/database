@@ -185,6 +185,11 @@ import com.bigdata.rdf.store.TempTripleStore;
  *       programmatically. You are free to add whatever initialization method to
  *       your Sail class.)
  * 
+ * FIXME add a magic predicate for free text search <code>bigdata:textsearch</code>.
+ * This will need to get hooked in as an alternative to a standard join, returning a
+ * set of term identifiers that are then used to select matching statements in the
+ * triple pattern within which it is embedded.
+ * 
  * FIXME run against the "Technology Compatibilty Kit"
  * https://src.aduna-software.org/svn/org.openrdf/projects/sesame2-tck/
  * 

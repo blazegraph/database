@@ -36,6 +36,8 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 import org.xml.sax.XMLReader;
 
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.BNS;
 
 /**
@@ -112,6 +114,14 @@ public class RDFXMLParser extends RDFParserBase {
      */
     private Resource context;
 
+    /**
+     * Whether the current statement is an axiom, an inference, or an explicit
+     * statement as reported by the {@link BNS#STATEMENT_TYPE} attribute. This is set
+     * within {@link SAXFilter} in a manner that closely parallels how
+     * {@link #xmlLang} is handled by that class.
+     */
+    private StatementEnum stmtType;
+    
 	/**
 	 * A stack of node- and property elements.
 	 */
@@ -296,6 +306,7 @@ public class RDFXMLParser extends RDFParserBase {
 			saxFilter.clear();
 			xmlLang = null;
             context = null;
+            stmtType = null;
 			elementStack.clear();
 			usedIDs.clear();
 			clear();
@@ -322,6 +333,12 @@ public class RDFXMLParser extends RDFParserBase {
         }
     }
 
+    /**
+     * Set the statement identifier as reported by {@link BNS#SID}.
+     * 
+     * @param context
+     *            The statement identifier (a blank node).
+     */
     void setContext(String context) {
         if ("".equals(context)) {
             this.context = null;
@@ -342,7 +359,34 @@ public class RDFXMLParser extends RDFParserBase {
         }
     }
 
-	void startElement(String namespaceURI, String localName, String qName, Atts atts)
+    /**
+     * Set the statement type as reported by {@link BNS#STATEMENT_TYPE}.
+     * 
+     * @param typeStr
+     *            The statement type (Axiom, Inferred, or Explicit) or "".
+     * 
+     * @see StatementEnum
+     */
+    void setStatementType(String typeStr) {
+        if ("".equals(typeStr)) {
+            this.stmtType = null;
+        }
+        else {
+            try {
+                this.stmtType = StatementEnum.valueOf(typeStr);
+            } catch (Exception ex) {
+                try {
+                    reportError("Bad attribute value: " + typeStr);
+                } catch (RDFParseException e) {
+                    // Note: exception is declared but not thrown by the base
+                    // class.
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+    
+    void startElement(String namespaceURI, String localName, String qName, Atts atts)
 		throws RDFParseException, RDFHandlerException
 	{
 		if (topIsProperty()) {
@@ -1030,13 +1074,19 @@ public class RDFXMLParser extends RDFParserBase {
     private void reportStatement(Resource subject, URI predicate, Value object, Resource context)
         throws RDFParseException, RDFHandlerException
     {
-        if(BNS.NAMESPACE.equals(predicate.getNamespace())&&BNS.SID.equals(predicate.getLocalName())) {
+        if(BNS.NAMESPACE.equals(predicate.getNamespace())
+                &&(BNS.SID.equals(predicate.getLocalName())||
+                        BNS.STATEMENT_TYPE.equals(predicate.getLocalName())
+                )) {
             /*
-             * Avoid asserting statements for the bigdata:graph attribute.
+             * Avoid asserting statements for various bigdata:foo attributes.
              */
             return;
         }
         Statement st = createStatement(subject, predicate, object, context);
+        if(stmtType != null && st instanceof BigdataStatement) {
+            ((BigdataStatement)st).setStatementType(stmtType);
+        }
         rdfHandler.handleStatement(st);
     }
     
@@ -1057,6 +1107,9 @@ public class RDFXMLParser extends RDFParserBase {
 		throws RDFParseException, RDFHandlerException
 	{ // FIXME locate all callers and verify that NO context is appropriate since none will be reported.
 		Statement st = createStatement(subject, predicate, object);
+        if(stmtType != null && st instanceof BigdataStatement) {
+            ((BigdataStatement)st).setStatementType(stmtType);
+        }
 		rdfHandler.handleStatement(st);
 	}
 

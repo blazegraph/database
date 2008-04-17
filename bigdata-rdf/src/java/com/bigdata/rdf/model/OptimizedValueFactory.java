@@ -1641,6 +1641,24 @@ public class OptimizedValueFactory implements ValueFactory {
             
         }
 
+        final public void setStatementType(StatementEnum type) {
+        
+            if (type == null) {
+            
+                throw new IllegalArgumentException();
+                
+            }
+            
+            if (this.type != null && type != this.type) {
+            
+                throw new IllegalStateException();
+                
+            }
+            
+            this.type = type;
+            
+        }
+
         public boolean isAxiom() {
             
             return StatementEnum.Axiom == type;

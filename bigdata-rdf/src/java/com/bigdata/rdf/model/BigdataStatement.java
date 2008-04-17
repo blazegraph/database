@@ -80,9 +80,26 @@ public interface BigdataStatement extends Statement {
     
     /**
      * Whether the statement is explicit, inferred or an axiom.
+     * 
+     * @return The {@link StatementEnum} type -or- <code>null</code> if the
+     *         statement type has not been specified.
      */
     public StatementEnum getStatementType();
-
+    
+    /**
+     * Set the statement type for this statement.
+     * 
+     * @param type
+     *            The statement type.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>type</i> is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the statement type is already set to a different non-<code>null</code>
+     *             value.
+     */
+    public void setStatementType(StatementEnum type);
+    
     /**
      * <code>true</code> if the statement is an axiom that is not present as
      * an explicit assertion.

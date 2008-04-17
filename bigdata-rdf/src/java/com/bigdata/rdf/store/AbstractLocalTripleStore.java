@@ -30,6 +30,7 @@ package com.bigdata.rdf.store;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.journal.IIndexManager;
@@ -51,10 +52,40 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  */
 abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
+    /**
+     * @todo configure capacity using
+     *       {@link IBigdataClient.Options#DEFAULT_CLIENT_THREAD_POOL_SIZE}
+     *       semantics.
+     */
     public AbstractLocalTripleStore(Properties properties) {
         
         super(properties);
 
+        // client thread pool setup.
+        final int threadPoolSize;
+        {
+         
+            threadPoolSize = Integer.parseInt(properties.getProperty(
+                    IBigdataClient.Options.CLIENT_THREAD_POOL_SIZE,
+                    IBigdataClient.Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
+
+            log.info(IBigdataClient.Options.CLIENT_THREAD_POOL_SIZE + "=" + threadPoolSize);
+
+        }
+
+        if (threadPoolSize == 0) {
+
+            threadPool = (ThreadPoolExecutor) Executors
+                    .newCachedThreadPool(DaemonThreadFactory
+                            .defaultThreadFactory());
+
+        } else {
+
+            threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                    threadPoolSize, DaemonThreadFactory.defaultThreadFactory());
+
+        }
+        
     }
 
     /**
@@ -62,15 +93,13 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      * do not have access to the {@link IBigdataFederation#getThreadPool()}.
      * Therefore a local {@link ExecutorService} is created on a per-{@link AbstractLocalTripleStore}
      * basis.
-     * 
-     * @todo configure capacity using {@link IBigdataClient.Options#DEFAULT_CLIENT_THREAD_POOL_SIZE}
-     * semantics.
      */
-//    private ExecutorService writeService = Executors.newFixedThreadPool(20,
-//            DaemonThreadFactory.defaultThreadFactory());
-    private ExecutorService threadPool = Executors
-            .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
-    
+    private final ExecutorService threadPool;
+
+    /**
+     * Note: The capacity of the thread pool may be configured using the
+     * {@link IBigdataClient.Options#CLIENT_THREAD_POOL_SIZE} property.
+     */
     public ExecutorService getThreadPool() {
         
         return threadPool;

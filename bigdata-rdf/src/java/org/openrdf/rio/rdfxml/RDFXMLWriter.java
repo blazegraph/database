@@ -26,6 +26,8 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
 
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.BNS;
 
 /**
@@ -277,6 +279,19 @@ public class RDFXMLWriter implements RDFWriter {
                     URI uri = (URI)context;
                     writeAttribute(BNS.NAMESPACE, BNS.SID, uri.toString());
                 }
+            }
+            
+            // AXIOM, INFERRED, or EXPLICIT
+            if( st instanceof BigdataStatement ) {
+                
+                StatementEnum type = ((BigdataStatement)st).getStatementType();
+                
+                if(type != null) {
+                    
+                    writeAttribute(BNS.NAMESPACE, BNS.STATEMENT_TYPE, type.toString());
+                    
+                }
+                
             }
             
 			// OBJECT

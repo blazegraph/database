@@ -534,7 +534,7 @@ Short term tasks:
    - (*) Builds and releases.
    
       - Change over to subversion so that the edit trail does not get
-        lost.
+        lost (complex process).
 
       - Maven 2.x build
       
@@ -543,9 +543,17 @@ Short term tasks:
 	 - Start periodic project documentation builds, perhaps on SF.
            Publish on the www.bigdata.com site.
 
-         - Change the dependency to dsiutils.
+         - Change the dependency to dsiutils.  I tried to do this with
+           dsiutils-1.0.4 and ran into problems with
+           (de-)serialization when compared to the lgpl-utils versions
+           of the same classes.  Try this again and pay close
+           attention to the lgpl-utils versions of the classes now
+           located in dsiutils and see if I can isolated the problem.
+           The problem was demonstrated by the bigdata-rdf test suites
+           for both the temp and local triple stores but not for the
+           bigdata test suites.
 
-	 - Update the Sesame 2.x dependency.
+	 - Done. Update the Sesame 2.x dependency.
 
    - Counters
 
@@ -752,6 +760,9 @@ Short term tasks:
        - Try out an mg4j integration for an alternative text indexer
          and search.
 
+   - Consider thread pool size defaults, especially for the temporary
+     stores such as the temp triple store.  What is a good policy?
+
    - *** Batch API for extractor, allowing runs directly against the
      KB.  Form a single prefix-scan query from a sort of all simple
      terms in the document and then piece together the phrases from
@@ -882,6 +893,10 @@ Short term tasks:
          need to consider the context(s) in order to choose the
          correct access pattern.
 
+	 - Verify a CONSTRUCT query.
+
+	 - Done. Verify a SELECT query using statement identifiers.
+
       4. (****) JOIN optimization.
 
 	 - (*) direct term scan.
@@ -913,6 +928,9 @@ Short term tasks:
            service since all indices are known to be local and the
            index lookups do not need to be batched since they will
            always be continuous unbuffered local reads.
+
+	 - ***** Replace Sesame 2 JOINs by re-writes into our rule
+                 engine.
       
       6. Publish on statement level provenance and truth maintenance
          for SPARQL end points.

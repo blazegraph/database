@@ -155,6 +155,7 @@ abstract public class AbstractTestCase
 //            m_properties = new Properties( m_properties );
 
             m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+//            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
 
             /*
              * If an explicit filename is not specified...

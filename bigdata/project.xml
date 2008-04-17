@@ -460,6 +460,12 @@
       <version>0.1-b2-dev</version>
       <url>http://www.sourceforge.net/projects/cweb</url>
     </dependency>
+   <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>lgpl-utils</artifactId>
+      <version>1.0-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
 
     <!-- Striterator support. -->
     <!-- Note: The jar name reflects the date when I downloaded it -->

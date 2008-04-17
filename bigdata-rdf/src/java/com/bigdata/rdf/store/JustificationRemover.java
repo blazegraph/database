@@ -22,10 +22,13 @@ import com.bigdata.rdf.util.KeyOrder;
  * <p>
  * Note: There is only one index for {@link Justification}s. The keys all use
  * the {s,p,o} of the entailed statement as their prefix, so given a statement
- * it is trivial to do a range scan for its justifications. Since this task
- * accepts a "chunk" of statements, it floods range delete requests for each of
- * the statements to the justifications index using the {@link ExecutorService}
- * exposed by {@link AbstractTripleStore#getThreadPool()}.
+ * it is trivial to do a range scan for its justifications.
+ * 
+ * FIXME Since this task accepts a "chunk" of statements, it should flood range
+ * delete requests for each of the statements to the justifications index using
+ * the {@link ExecutorService} exposed by
+ * {@link AbstractTripleStore#getThreadPool()}, but only if the triple store
+ * provides concurrency control for writers on the same index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

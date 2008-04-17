@@ -370,6 +370,10 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 }
             }
 
+        } catch(Exception ex) {
+            
+            log.error(ex.getMessage(),ex);
+            
         } finally {
 
             store.closeAndDelete();

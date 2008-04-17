@@ -202,8 +202,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
         } else {
 
             threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    client.getThreadPoolSize(), DaemonThreadFactory
-                            .defaultThreadFactory());
+                    threadPoolSize, DaemonThreadFactory.defaultThreadFactory());
 
         }
         

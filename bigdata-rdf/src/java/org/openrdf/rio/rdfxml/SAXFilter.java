@@ -254,9 +254,12 @@ class SAXFilter implements ContentHandler {
 						}
 						else if ("xml:lang".equals(attQName)) {
 							elInfo.xmlLang = attributes.getValue(i);
-						} else if (BNS.NAMESPACE.equals(attributes.getURI(i))
-                                && BNS.SID.equals(attributes.getLocalName(i))) {
-                            elInfo.context = attributes.getValue(i);
+						} else if (BNS.NAMESPACE.equals(attributes.getURI(i))) {
+                                if(BNS.SID.equals(attributes.getLocalName(i))) {
+                                    elInfo.context = attributes.getValue(i);
+                                } else if(BNS.STATEMENT_TYPE.equals(attributes.getLocalName(i))) {
+                                    elInfo.stmtType= attributes.getValue(i);
+                                }
                         }
 					}
 
@@ -302,6 +305,7 @@ class SAXFilter implements ContentHandler {
 		rdfParser.setBaseURI(deferredElement.baseURI);
         rdfParser.setXMLLang(deferredElement.xmlLang);
         rdfParser.setContext(deferredElement.context);
+        rdfParser.setStatementType(deferredElement.stmtType);
 
 		rdfParser.startElement(deferredElement.namespaceURI, deferredElement.localName, deferredElement.qName,
 				deferredElement.atts);
@@ -362,6 +366,7 @@ class SAXFilter implements ContentHandler {
 				rdfParser.setBaseURI(deferredElement.baseURI);
                 rdfParser.setXMLLang(deferredElement.xmlLang);
                 rdfParser.setContext(deferredElement.context);
+                rdfParser.setStatementType(deferredElement.stmtType);
 
 				rdfParser.emptyElement(deferredElement.namespaceURI, deferredElement.localName,
 						deferredElement.qName, deferredElement.atts);
@@ -470,8 +475,12 @@ class SAXFilter implements ContentHandler {
 				String namespace = attributes.getURI(i);
 				String localName = attributes.getLocalName(i);
 
-                if(BNS.NAMESPACE.equals(namespace)&&BNS.SID.equals(localName)) {
-                    elInfo.context = value;
+                if(BNS.NAMESPACE.equals(namespace)) {
+                    if(BNS.SID.equals(localName)) {
+                        elInfo.context = value;
+                    } else if(BNS.SID.equals(localName)) {
+                        elInfo.stmtType = value;
+                    }
                 } else
                 
 				// A limited set of unqualified attributes must be supported by
@@ -661,6 +670,8 @@ class SAXFilter implements ContentHandler {
 
         public String context;
 
+        public String stmtType;
+        
 		public ElementInfo(String qName, String namespaceURI, String localName) {
 			this(null, qName, namespaceURI, localName);
 		}
@@ -681,10 +692,13 @@ class SAXFilter implements ContentHandler {
 				this.xmlLang = "";
 			}
             /*
-             * Note: not inherited since this is a statement identifier and is
-             * therefore only in scope for the current statement.
+             * Note: not inherited since this is a per-statement attribute.
              */
             this.context = "";
+            /*
+             * Note: not inherited since this is a per-statement attribute. 
+             */
+            this.stmtType = "";
 		}
 
 		public void setBaseURI(String uriString) {
