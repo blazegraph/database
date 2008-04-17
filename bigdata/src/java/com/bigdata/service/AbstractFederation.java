@@ -43,6 +43,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.journal.ITx;
@@ -392,26 +393,39 @@ abstract public class AbstractFederation implements IBigdataFederation {
      */
     synchronized public IIndex getIndex(String name,long timestamp) {
 
+        log.info("name="+name+" @ "+timestamp);
+        
         assertOpen();
 
         final NT nt = new NT(name,timestamp);
         
         IClientIndex ndx = indexCache.get(nt);
-            
+
         if (ndx == null) {
 
             final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(name,
                     timestamp);
 
             // No such index.
-            if (mdmd == null)
+            if (mdmd == null) {
+
+                log.info("name="+name+" @ "+timestamp+" : is not registered");
+                
                 return null;
+                
+            }
 
             // Index exists.
             ndx = new ClientIndexView(this, name, timestamp, mdmd);
 
             indexCache.put(nt, ndx, false/* dirty */);
 
+            log.info("name="+name+" @ "+timestamp+" : index exists.");
+            
+        } else {
+            
+            log.info("name="+name+" @ "+timestamp+" : cache hit.");
+            
         }
 
         return ndx;
@@ -420,12 +434,16 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     public void dropIndex(String name) {
 
+        log.info("name="+name);
+        
         assertOpen();
 
         try {
             
             getMetadataService().dropScaleOutIndex(name);
 
+            log.info("dropped scale-out index.");
+            
             dropIndexFromCache(name);
 
         } catch (Exception e) {
@@ -452,11 +470,13 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
         synchronized(indexCache) {
             
-            Iterator<IClientIndex> itr = indexCache.iterator();
+            Iterator<ICacheEntry<NT,IClientIndex>> itr = indexCache.entryIterator();
             
             while(itr.hasNext()) {
                 
-                final IClientIndex ndx = itr.next();
+                final ICacheEntry<NT,IClientIndex> entry = itr.next();
+                
+                final IClientIndex ndx = entry.getObject(); 
                 
                 if(name.equals(ndx.getName())) {
                     
@@ -465,8 +485,10 @@ abstract public class AbstractFederation implements IBigdataFederation {
                     if (timestamp == ITx.UNISOLATED
                             || timestamp == ITx.READ_COMMITTED) {
                     
+                        log.info("dropped from cache: "+name+" @ "+timestamp);
+                        
                         // remove from the cache.
-                        itr.remove();
+                        indexCache.remove(entry.getKey());
 
                     }
                     
