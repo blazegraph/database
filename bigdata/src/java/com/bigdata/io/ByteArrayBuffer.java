@@ -29,7 +29,7 @@
 package com.bigdata.io;
 
 import it.unimi.dsi.fastutil.io.RepositionableStream;
-import it.unimi.dsi.mg4j.io.OutputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

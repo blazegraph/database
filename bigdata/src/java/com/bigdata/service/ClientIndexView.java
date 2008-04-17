@@ -142,7 +142,7 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ClientIndexView implements IIndex {
+public class ClientIndexView implements IClientIndex {
 
     protected static final transient Logger log = Logger
             .getLogger(ClientIndexView.class);
@@ -198,12 +198,6 @@ public class ClientIndexView implements IIndex {
      */
     private final long timestamp;
 
-    /**
-     * Either the startTime of an active transaction, {@link ITx#UNISOLATED} for
-     * the current unisolated index view, {@link ITx#READ_COMMITTED} for a
-     * read-committed view, or <code>-timestamp</code> for a historical view
-     * no later than the specified timestamp.
-     */
     public long getTimestamp() {
         
         return timestamp;
@@ -215,9 +209,6 @@ public class ClientIndexView implements IIndex {
      */
     private final String name;
     
-    /**
-     * The name of the scale-out index.
-     */
     public String getName() {
         
         return name;
@@ -437,13 +428,6 @@ public class ClientIndexView implements IIndex {
         
     }
 
-    /**
-     * Counters are local to a specific index partition and are only available
-     * to unisolated procedures.
-     * 
-     * @throws UnsupportedOperationException
-     *             always
-     */
     public ICounter getCounter() {
         
         throw new UnsupportedOperationException();

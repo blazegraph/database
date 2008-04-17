@@ -409,7 +409,7 @@ public class FileMetadata {
                     log.warn("Bad root block one: "+ex);
                 }
                 if( rootBlock0 == null && rootBlock1 == null ) {
-                    throw new RuntimeException("Both root blocks are bad - journal is not usable.");
+                    throw new RuntimeException("Both root blocks are bad - journal is not usable: "+file);
                 }
                 // Choose the root block based on the commit counter.
                 this.rootBlock =

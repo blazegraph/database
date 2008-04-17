@@ -249,6 +249,8 @@ public class LocalDataServiceFederation extends AbstractFederation {
             
             dataService.dropIndex(name);
             
+            dropIndexFromCache(name);
+            
         } catch (Exception e) {
 
             throw new RuntimeException(e);
@@ -264,7 +266,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
         final NT nt = new NT(name, timestamp);
 
         // check the cache.
-        IIndex ndx = indexCache.get(nt);
+        IClientIndex ndx = indexCache.get(nt);
 
         if (ndx == null) {
 
