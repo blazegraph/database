@@ -61,14 +61,15 @@ public interface BNS {
     String NAMESPACE = "http://www.bigdata.com/rdf#";
 
     /**
-     * The name of an attribute whose value is recognized in RDF/XML as the
-     * statement identifier for statement described by the element on which it
-     * appears. The <code>bigdata:sid</code> attribute is allowed on elements
-     * describing RDF statements and serves as a per-statement identifier. The
-     * value of the <code>bigdata:sid</code> attribute must conform to the
-     * syntactic constraints of a blank node. By re-using the value of the
-     * <code>bigdata:sid</code> attribute within other statements in the same
-     * RDF/XML document, the client can express statements about the statements.
+     * The name of a per-statement attribute whose value is recognized in
+     * RDF/XML as the statement identifier for statement described by the
+     * element on which it appears. The <code>bigdata:sid</code> attribute is
+     * allowed on elements describing RDF statements and serves as a
+     * per-statement identifier. The value of the <code>bigdata:sid</code>
+     * attribute must conform to the syntactic constraints of a blank node. By
+     * re-using the value of the <code>bigdata:sid</code> attribute within
+     * other statements in the same RDF/XML document, the client can express
+     * statements about the statements.
      * <p>
      * This RDF/XML extension allows us to inline provenance (statements about
      * statements) with RDF/XML to clients in a manner which has minor impact on
@@ -86,4 +87,26 @@ public interface BNS {
      */
     String SID = "sid";
     
+    /**
+     * The name of a per-statement attribute whose indicates whether the
+     * statement is an axiom, inference, or explicit in the knowledge base. This
+     * attribute is strictly informative for clients and is ignored when loading
+     * data into a knowledge base.
+     * <p>
+     * The value will be one of
+     * <dl>
+     * <dt>axiom</dt>
+     * <dd>The statement is an axiom that has not been explicitly asserted.</dd>
+     * <dt>inferred</dt>
+     * <dd>The statement is an inference that has not been explicitly asserted.</dd>
+     * <dt>explicit</dt>
+     * <dd>The statement has been explicitly asserted.</dd>
+     * </dl>
+     * Note: If the knowledge base supports truth maintenance and an explicit
+     * statement is deleted from the knowledge base but it remains provable as
+     * an inference or an axiom then then knowledge base will continue to report
+     * it as either an axiom or an inference as appropriate.
+     */
+    String TYPE = "type";
+        
 }

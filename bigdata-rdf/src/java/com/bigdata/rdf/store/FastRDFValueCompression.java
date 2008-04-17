@@ -1,7 +1,7 @@
 package com.bigdata.rdf.store;
 
-import it.unimi.dsi.mg4j.io.InputBitStream;
-import it.unimi.dsi.mg4j.io.OutputBitStream;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.DataInput;
 import java.io.DataOutput;

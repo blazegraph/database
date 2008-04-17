@@ -199,14 +199,6 @@
       <url>http://www.sourceforge.net/projects/cweb</url>
     </dependency>
 
-    <!-- LGPL utility classes. -->
-    <dependency> 
-      <groupId>org.CognitiveWeb</groupId>
-      <artifactId>lgpl-utils</artifactId>
-      <version>1.0-b1-dev</version>
-      <url>http://www.sourceforge.net/projects/cweb</url>
-    </dependency>
-
     <!-- Striterator support. -->
     <!-- Note: The jar name reflects the date when I downloaded it -->
     <!-- and makes it possible for me to rollback to historical CTC -->
@@ -219,11 +211,25 @@
       <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
     </dependency>
 
+	<!-- @todo Use autojar to select only the required classes for redistribution? -->
+    <dependency> 
+      <groupId>it.unimi</groupId>
+      <artifactId>dsiutils</artifactId>
+      <version>1.0.4</version>
+      <url>http://dsiutils.dsi.unimi.it/</url>
+    </dependency>
+    <dependency> 
+      <groupId>it.unimi</groupId>
+      <id>fastutil5</id> 
+      <version>5.1.3</version> 
+      <url>http://fastutil.dsi.unimi.it/</url>
+    </dependency>
+    
     <!-- The openrdf framework. -->
 	<dependency>
 	    <groupId>org.openrdf</groupId>
 	    <artifactId>sesame-onejar</artifactId>
-        <jar>openrdf-sesame-2.0-onejar.jar</jar>
+        <jar>openrdf-sesame-2.0.1-onejar.jar</jar>
         <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
 
