@@ -31,10 +31,9 @@ import java.io.IOException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.ICounter;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITupleFilter;
@@ -53,7 +52,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.util.InnerCause;
 
 /**
  * A view onto an unpartitioned index living inside an embedded
@@ -66,7 +64,7 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServiceIndex implements IIndex {
+public class DataServiceIndex implements IClientIndex {
 
     /**
      * 
@@ -91,15 +89,12 @@ public class DataServiceIndex implements IIndex {
      * 
      * @return The transaction identifier for the index view.
      */
-    public long getTx() {
+    public long getTimestamp() {
         
         return timestamp;
         
     }
     
-    /**
-     * The name of the scale-out index.
-     */
     public String getName() {
         
         return name;
@@ -182,13 +177,6 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    /**
-     * Counters are local to a specific index partition and are only available
-     * to unisolated procedures.
-     * 
-     * @throws UnsupportedOperationException
-     *             always
-     */
     public ICounter getCounter() {
         
         throw new UnsupportedOperationException();

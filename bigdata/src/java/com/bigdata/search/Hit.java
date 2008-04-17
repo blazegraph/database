@@ -15,18 +15,18 @@ import org.apache.log4j.Logger;
  */
 public class Hit implements IHit, Comparable<Hit>{
 
-    final public Logger log = Logger.getLogger(Hit.class);
+    final protected static Logger log = Logger.getLogger(Hit.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
    
     /** note: defaults to an illegal value. */

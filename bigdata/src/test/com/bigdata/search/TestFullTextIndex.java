@@ -84,12 +84,18 @@ public class TestFullTextIndex extends AbstractLocalDataServiceFederationTestCas
         IHit hit1 = itr.next();
 
         System.err.println("hit1:"+hit1);
-        
-        assertTrue(itr.hasNext());
-        
-        IHit hit2 = itr.next();
 
-        System.err.println("hit2:"+hit2);
+        /*
+         * Note: with cosine computation only the first hit is visited.
+         */
+        
+        assertFalse(itr.hasNext());
+        
+//        assertTrue(itr.hasNext());
+//        
+//        IHit hit2 = itr.next();
+//
+//        System.err.println("hit2:"+hit2);
         
     }
     

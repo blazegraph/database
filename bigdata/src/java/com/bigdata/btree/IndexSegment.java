@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import it.unimi.dsi.util.BloomFilter;
+
 import java.io.IOException;
 
 import com.bigdata.resources.ResourceManager;
@@ -64,7 +66,7 @@ public class IndexSegment extends AbstractBTree {
      * is restricted to {@link IndexSegment}s since they are read-only data
      * structures.
      */
-    protected it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
+    protected BloomFilter bloomFilter;
 
     final public int getHeight() {
 

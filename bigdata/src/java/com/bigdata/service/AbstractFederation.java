@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -210,8 +211,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
          */
         {
 
-            indexCache = new WeakValueCache<NT, IIndex>(
-                    new LRUCache<NT, IIndex>(client.getIndexCacheCapacity()));
+            indexCache = new WeakValueCache<NT, IClientIndex>(
+                    new LRUCache<NT, IClientIndex>(client.getIndexCacheCapacity()));
             
         }
         
@@ -321,22 +322,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     }
 
-    public void dropIndex(String name) {
-
-        assertOpen();
-
-        try {
-            
-            getMetadataService().dropScaleOutIndex(name);
-            
-        } catch (Exception e) {
-
-            throw new RuntimeException( e );
-            
-        }
-
-    }
-
     /**
      * An index name and a timestamp.
      * 
@@ -397,16 +382,22 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * Note: The "dirty" flag associated with the object in this cache is
      * ignored.
      */
-    final protected WeakValueCache<NT, IIndex> indexCache;
+    final protected WeakValueCache<NT, IClientIndex> indexCache;
     
+    /**
+     * @todo synchronization should be limited to the index resource and the
+     *       cache when we actually touch the cache. synchronizing the entire
+     *       method limits concurrency for access to other named resources or
+     *       the same named resource as of a different timestamp.
+     */
     synchronized public IIndex getIndex(String name,long timestamp) {
 
         assertOpen();
 
         final NT nt = new NT(name,timestamp);
         
-        IIndex ndx = indexCache.get(nt);
-
+        IClientIndex ndx = indexCache.get(nt);
+            
         if (ndx == null) {
 
             final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(name,
@@ -427,6 +418,66 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     }
 
+    public void dropIndex(String name) {
+
+        assertOpen();
+
+        try {
+            
+            getMetadataService().dropScaleOutIndex(name);
+
+            dropIndexFromCache(name);
+
+        } catch (Exception e) {
+
+            throw new RuntimeException( e );
+            
+        }
+
+    }
+
+    /**
+     * Drops the entry for the named index from the {@link #indexCache}.
+     * <p>
+     * Historical and transactional reads are still allowed, but we remove the
+     * the read-committed or unisolated views from the cache once the index has
+     * been dropped. If a client wants them, it needs to re-request. If they
+     * have been re-registered on the metadata service then they will become
+     * available again.
+     * <p>
+     * Note: Operations against unisolated or read-committed indices will throw
+     * exceptions if they execute after the index was dropped.
+     */
+    protected void dropIndexFromCache(String name) {
+        
+        synchronized(indexCache) {
+            
+            Iterator<IClientIndex> itr = indexCache.iterator();
+            
+            while(itr.hasNext()) {
+                
+                final IClientIndex ndx = itr.next();
+                
+                if(name.equals(ndx.getName())) {
+                    
+                    final long timestamp = ndx.getTimestamp();
+
+                    if (timestamp == ITx.UNISOLATED
+                            || timestamp == ITx.READ_COMMITTED) {
+                    
+                        // remove from the cache.
+                        itr.remove();
+
+                    }
+                    
+                }
+                
+            }
+            
+        }
+        
+    }
+    
     /**
      * Return the metadata for the metadata index itself.
      * 
