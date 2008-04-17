@@ -162,18 +162,23 @@ import cutthecrap.utils.striterators.Striterator;
  * read/write, for each SPO[] chunk from the 1st triple pattern, create an array
  * of binding[]s and process each binding in parallel.
  * 
- * @todo The only reason to enter {@link BNode} into the foward (term->id) index
- *       is during data load. We can do without bnodes in the forward index also
- *       as long as we (a) keep a hash or btree whose scope is the data load (a
- *       btree would be required for very large files); and (b) we hand the
- *       {@link BNode}s to {@link AddTerms}s but it only assigns a one up term
- *       identifier and does NOT enter the bnode into the index. The local (file
- *       load scope only) bnode resolution is the only context in which it is
- *       possible for two {@link BNode} {@link BNode#getID() ID}s to be
- *       interpreted as the same ID and therefore assigned the same term
- *       identifier. In all other cases we will assign a new term identifier.
- *       The assignment of the term identifier for a BNode ID can be from ANY
- *       key-range partition of the term:id index.
+ * FIXME The only reason to enter {@link BNode} into the foward (term->id) index
+ * is during data load. We can do without bnodes in the forward index also as
+ * long as we (a) keep a hash or btree whose scope is the data load (a btree
+ * would be required for very large files); and (b) we hand the {@link BNode}s
+ * to {@link AddTerms}s but it only assigns a one up term identifier and does
+ * NOT enter the bnode into the index. The local (file load scope only) bnode
+ * resolution is the only context in which it is possible for two {@link BNode}
+ * {@link BNode#getID() ID}s to be interpreted as the same ID and therefore
+ * assigned the same term identifier. In all other cases we will assign a new
+ * term identifier. The assignment of the term identifier for a BNode ID can be
+ * from ANY key-range partition of the term:id index.
+ * <P>
+ * This can be done by creating a {@link UUID} "seed" for bnodes in each
+ * document loaded by the {@link StatementBuffer} and then issuing one-up bnode
+ * IDs by appending a counter. At that point we do not need to store the Bnodes
+ * in the forward index either and all bnode ids for a given document will hit
+ * the same index partition, which will improve load performance.
  * 
  * @todo Do the full quad store (vs the provenance mode, which uses the context
  *       position for statements about statements).
@@ -653,6 +658,10 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     /**
      * A service used to run operations in parallel.
+     * <p>
+     * Note: Parallel tasks are supported on a given index iff
+     * {@link #isConcurrent()} returns <code>true</code>. However, parallel
+     * tasks are always supported on distinct indices.
      * 
      * @todo use for parallel execution of map of new vs old+new over the terms
      *       of a rule.
@@ -758,7 +767,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
         if (!statementIdentifiers) {
 
             /*
-             * @todo this value serializer does not know about statement
+             * FIXME this value serializer does not know about statement
              * identifiers. Therefore it is turned off if statement identifiers
              * are enabled. Examine some options for value compression for the
              * statement indices when statement identifiers are enabled.

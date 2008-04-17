@@ -26,8 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import it.unimi.dsi.io.InputBitStream;
-import it.unimi.dsi.io.OutputBitStream;
+import it.unimi.dsi.mg4j.io.InputBitStream;
+import it.unimi.dsi.mg4j.io.OutputBitStream;
 
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -43,6 +43,7 @@ import java.util.zip.Checksum;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.ByteBufferOutputStream;
 import com.bigdata.io.DataOutputBuffer;
@@ -594,7 +595,7 @@ public class NodeSerializer {
      * 
      * @return The de-serialized node.
      */
-    public IAbstractNodeData getNodeOrLeaf(IIndex btree, long addr,
+    public IAbstractNodeData getNodeOrLeaf(final IIndex btree, final long addr,
             ByteBuffer buf) {
 
         //        assert btree != null;
@@ -1231,7 +1232,7 @@ public class NodeSerializer {
      * 
      * @return The deserialized leaf.
      */
-    protected ILeafData getLeaf(IIndex btree,long addr,ByteBuffer buf,boolean decompressed) {
+    protected ILeafData getLeaf(final IIndex btree,final long addr,ByteBuffer buf, final boolean decompressed) {
         
 //        assert btree != null;
 //        assert addr != 0L;
@@ -1330,8 +1331,16 @@ public class NodeSerializer {
             
             // values.
             final byte[][] values = new byte[branchingFactor + 1][];
-            valueSerializer.read(is, new RandomAccessByteArray(0,0,values));   
-//          ByteArrayValueSerializer.INSTANCE.getValues(is, values, nkeys);
+            {
+                RandomAccessByteArray raba = new RandomAccessByteArray(0, 0,
+                        values);
+                valueSerializer.read(is, raba);
+                if (!(valueSerializer instanceof NoDataSerializer)) { // FIXME remove paranoia test.
+                    final int nread = raba.getKeyCount();
+                    assert nkeys == nread : "nkeys=" + nkeys
+                            + ", but read " + nread + " values.";
+                }
+            }
             
             // delete markers.
             final boolean[] deleteMarkers;
@@ -1352,7 +1361,11 @@ public class NodeSerializer {
             }
             
             // verify #of bytes actually read.
-            assert buf.position() - pos0 == nbytes;
+            {
+                final int bpos = buf.position();
+                assert bpos - pos0 == nbytes : " buf.position()=" + bpos
+                        + " + pos0="+pos0+" != "+nbytes;
+            }
 
             // reset the buffer position.
             buf.position(0);

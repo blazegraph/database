@@ -45,7 +45,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     private final BigdataURI p;
     private final BigdataValue o;
     private final BigdataResource c;
-    private final StatementEnum type;
+    private StatementEnum type;
     
     /**
      * Assumes that the context is <code>null</code>.
@@ -71,6 +71,7 @@ public class BigdataStatementImpl implements BigdataStatement {
      * @param context
      *            (optional)
      * @param type
+     *            (optional).
      */
     public BigdataStatementImpl(BigdataResource subject, BigdataURI predicate,
             BigdataValue object, BigdataResource context, StatementEnum type) {
@@ -81,8 +82,8 @@ public class BigdataStatementImpl implements BigdataStatement {
             throw new IllegalArgumentException();
         if (object==null) throw new IllegalArgumentException();
         
-        if (type == null)
-            throw new IllegalArgumentException();
+//        if (type == null)
+//            throw new IllegalArgumentException();
         
         this.s = subject;
 
@@ -126,6 +127,24 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
  
+    public void setStatementType(StatementEnum type) {
+        
+        if (type == null) {
+        
+            throw new IllegalArgumentException();
+            
+        }
+        
+        if (this.type != null && type != this.type) {
+        
+            throw new IllegalStateException();
+            
+        }
+        
+        this.type = type;
+        
+    }
+
     public boolean isAxiom() {
         
         return StatementEnum.Axiom == type;

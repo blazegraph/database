@@ -95,11 +95,11 @@ public interface BNS {
      * <p>
      * The value will be one of
      * <dl>
-     * <dt>axiom</dt>
+     * <dt>Axiom</dt>
      * <dd>The statement is an axiom that has not been explicitly asserted.</dd>
-     * <dt>inferred</dt>
+     * <dt>Inferred</dt>
      * <dd>The statement is an inference that has not been explicitly asserted.</dd>
-     * <dt>explicit</dt>
+     * <dt>Explicit</dt>
      * <dd>The statement has been explicitly asserted.</dd>
      * </dl>
      * Note: If the knowledge base supports truth maintenance and an explicit
@@ -107,6 +107,6 @@ public interface BNS {
      * an inference or an axiom then then knowledge base will continue to report
      * it as either an axiom or an inference as appropriate.
      */
-    String TYPE = "type";
+    String STATEMENT_TYPE = "statementType";
         
 }

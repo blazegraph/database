@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import it.unimi.dsi.util.BloomFilter;
+import it.unimi.dsi.mg4j.util.BloomFilter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
