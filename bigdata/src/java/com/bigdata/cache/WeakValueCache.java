@@ -593,6 +593,14 @@ final public class WeakValueCache<K,T>
      * layer handling installation of dirty objects onto pages, objects that are
      * not visitable are guarenteed to be clean.
      * </p>
+     * <p>
+     * Note: While the iterator supports removal, its behavior is delegated to
+     * the backing hard reference cache. Therefore, removal causes the entry to
+     * be removed from the backing hard reference cache but NOT the
+     * {@link WeakValueCache}. In order to remove the entry from the
+     * {@link WeakValueCache} as well you can use {@link #entryIterator()} and
+     * then also delete the entry under the last visited key.
+     * </p>
      * 
      * @return Iterator visiting objects from the delegate hard reference cache.
      */
@@ -615,6 +623,14 @@ final public class WeakValueCache<K,T>
      * entries in the weak reference cache, when integrated with a persistence
      * layer handling installation of dirty objects onto pages, entries that are
      * not visitable are guarenteed to be clean.
+     * </p>
+     * <p>
+     * Note: While the iterator supports removal, its behavior is delegated to
+     * the backing hard reference cache. Therefore, removal causes the entry to
+     * be removed from the backing hard reference cache but NOT the
+     * {@link WeakValueCache}. In order to remove the entry from the
+     * {@link WeakValueCache} you MUST also delete the entry under the last
+     * visited key.
      * </p>
      * 
      * @return Iterator visiting {@link ICacheEntry} objects from the delegate
