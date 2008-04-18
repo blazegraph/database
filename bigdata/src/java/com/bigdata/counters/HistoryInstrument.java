@@ -55,29 +55,22 @@ public class HistoryInstrument<T> implements IInstrument<T> {
          * Note: The base period is one minute in milliseconds
          */
         final long basePeriod = 60 * 1000;
-        
         this.minutes = new History<T>(minutes, basePeriod);
 
-        this.hours = new History<T>(24, this.minutes);
+        // 60 minutes to the hour.
+        this.hours = new History<T>(60, this.minutes);
 
-        this.days = new History<T>(30, this.hours);
+        // 24 hours to the day.
+        this.days = new History<T>(24, this.hours);
 
     }
-
-    public interface IEntry<T> {
-        
-        public long lastModified();
-        
-        public T getValue();
-        
-    };
 
     /**
      * Return the last value.
      */
     public T getValue() {
 
-        final IEntry<T> sample = minutes.getSample();
+        final IHistoryEntry<T> sample = minutes.getSample();
 
         if (sample == null)
             return null;
@@ -91,7 +84,7 @@ public class HistoryInstrument<T> implements IInstrument<T> {
      */
     public long lastModified() {
 
-        final IEntry<T> sample = minutes.getSample();
+        final IHistoryEntry<T> sample = minutes.getSample();
 
         if (sample == null)
             return -1L;
