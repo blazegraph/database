@@ -7,7 +7,6 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.counters.HistoryInstrument.IEntry;
 
 /**
  * Retains history for N periods, where the period is expressed in
@@ -38,6 +37,16 @@ public class History<T> {
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
+    /**
+     * The period in milliseconds between each sample in the buffer. The buffer
+     * will not accept the next sample until this period has elapsed.
+     */
+    public long getPeriod() {
+        
+        return period;
+        
+    }
+    
     /**
      * The #of samples that can be stored in the buffer.
      */
@@ -81,7 +90,7 @@ public class History<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class EntryIterator implements Iterator<IEntry<T>> {
+    private class EntryIterator implements Iterator<IHistoryEntry<T>> {
 
         private final int n;
 
@@ -93,7 +102,7 @@ public class History<T> {
 
         private final Entry entry = new Entry();
 
-        private class Entry implements IEntry<T> {
+        private class Entry implements IHistoryEntry<T> {
 
             public long lastModified() {
                 return _timestamps[current];
@@ -220,7 +229,7 @@ public class History<T> {
 
         }
 
-        public IEntry<T> next() {
+        public IHistoryEntry<T> next() {
 
             if (!hasNext())
                 throw new NoSuchElementException();
@@ -243,7 +252,7 @@ public class History<T> {
      * Return a snapshot of the most recent value in the buffer -or-
      * <code>null</code> if there are no samples in the buffer.
      */
-    synchronized public IEntry<T> getSample() {
+    synchronized public IHistoryEntry<T> getSample() {
 
         if (lastLogicalSlot == -1) {
 
@@ -257,7 +266,7 @@ public class History<T> {
 
         final T value = data[physicalSlot];
 
-        return new IEntry<T>() {
+        return new IHistoryEntry<T>() {
 
             public long lastModified() {
                 return lastModified;
@@ -282,7 +291,7 @@ public class History<T> {
      * This includes all non-missing samples over the last N periods, where
      * N is the capacity of the buffer.
      */
-    synchronized public Iterator<IEntry<T>> iterator() {
+    synchronized public Iterator<IHistoryEntry<T>> iterator() {
 
         return new EntryIterator();
 
@@ -299,13 +308,13 @@ public class History<T> {
 
         sb.append("{");
 
-        final Iterator<IEntry<T>> itr = iterator();
+        final Iterator<IHistoryEntry<T>> itr = iterator();
 
         int n = 0;
 
         while (itr.hasNext()) {
 
-            final IEntry<T> entry = itr.next();
+            final IHistoryEntry<T> entry = itr.next();
 
             final long lastModified = entry.lastModified();
 

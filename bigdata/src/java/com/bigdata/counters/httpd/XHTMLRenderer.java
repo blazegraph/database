@@ -5,6 +5,7 @@ import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLEncoder;
 import java.text.DecimalFormat;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
@@ -13,10 +14,13 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterNode;
 import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IHistoryEntry;
+import com.bigdata.counters.IInstrument;
 import com.bigdata.util.HTMLUtility;
 
 /**
@@ -297,31 +301,31 @@ public class XHTMLRenderer {
         
         w.write("<body\n>");
 
-        ICounterNode node = root.getPath(path);
+        final ICounterNode node = root.getPath(path);
         
         if(node == null) {
-            
+
             /*
-             * @todo should throw exception that will be caught and result in a
-             * BAD_REQUEST response.
+             * Used when the path does not evaluate to anything in the
+             * hierarchy. The generate markup at least lets you choose a parent
+             * from the path.
              */
-            throw new RuntimeException("No such counter: path="+path);
+            
+            w.write("<p>");
+            
+            w.write("No such counter or counter set: ");
+            
+            writePath(w, path);
+            
+            w.write("</p>");
+
+            return;
             
         }
         
         if(node instanceof ICounter) {
-            
-            /*
-             * @todo What should be displayed when focused on a single counter?
-             * Some possibilities are: (a) documentation on the counter; (b) its
-             * value and timestamp, or a table of the history data which could
-             * be plotted in a worksheet; (c)....
-             * 
-             * Note: There is no real display available yet for a single counter
-             * but at least this will let you navigate back up the hierarchy.
-             */
-            
-            writePath(w, path);
+
+            writeCounter(w, (ICounter) node);
 
         } else {
 
@@ -434,21 +438,16 @@ public class XHTMLRenderer {
         writePath(w,counterSet.getPath());
         w.write("</caption\n>");
         
-        /*
-         * @todo use css or attributes to fix min bounds for tables or nest
-         * tables so that the min bounds across them all are computed by the
-         * browser.
-         */
         w.write(" <tr\n>");
         w.write("  <th rowspan=\"2\" >Name</th\n>");
-        w.write("  <th colspan=\"3\">Average</th\n>");
+        w.write("  <th colspan=\"3\">Unit Average</th\n>");
         w.write("  <th rowspan=\"2\">Current</th\n>");
         w.write(" </tr\n>");
         
         w.write(" <tr\n>");
-        w.write("  <th>hour</th\n>");
-        w.write("  <th>day</th\n>");
-        w.write("  <th>month</th\n>");
+        w.write("  <th>Minutes</th\n>");
+        w.write("  <th>Hours</th\n>");
+        w.write("  <th>Days</th\n>");
         w.write(" </tr\n>");
 
         final Iterator<ICounter> itr = counterSet.getCounters(filter);
@@ -505,8 +504,7 @@ public class XHTMLRenderer {
                         + cdata(value(inst.days.size())) + ")" + "</td\n>");
 
                 // the most recent value.
-                w
-                        .write("  <td>" + cdata(value(counter.getValue()))
+                w.write("  <td>" + cdata(value(counter.getValue()))
                                 + "</td\n>");
 
             } else {
@@ -538,6 +536,138 @@ public class XHTMLRenderer {
         
     }
     
+    /**
+     * Writes details on a single counter.
+     * 
+     * @param counter
+     *            The counter.
+     * @throws IOException 
+     */
+    protected void writeCounter(Writer w, ICounter counter) throws IOException {
+        
+        w.write("<p>path: ");
+        
+        writePath(w, path);
+
+        w.write("</p>");
+
+        w.write("<p>value: ");
+        
+        // the most recent value.
+        w.write(cdata(value(counter.getValue())));
+        
+        w.write("</p>");
+
+        w.write("<p>time: ");
+
+        w.write(cdata(new Date(counter.lastModified()).toString()));
+        
+        w.write("</p>");
+
+        if(counter.getInstrument() instanceof HistoryInstrument) {
+         
+            writeHistoryCounter(w, counter);
+            
+        }
+        
+    }
+    
+    /**
+     * Writes details on a single counter whose {@link IInstrument} provides a
+     * history.
+     * 
+     * @param counter
+     *            The counter.
+     * 
+     * @see HistoryInstrument
+     * 
+     * @todo write three tables, perhaps aligned side-by-side. Each table has a
+     *       label (minutes, hours, days), the average, the last value, and the
+     *       timestamped samples for that level of aggregation. The point is to
+     *       be able to copy and past into a worksheet for plotting.
+     */
+    protected void writeHistoryCounter(Writer w, ICounter counter) throws IOException {
+
+        HistoryInstrument inst = (HistoryInstrument) counter.getInstrument();
+        
+        w.write("<p>");
+        w.write("</p>");
+        writeSamples(w, counter, inst.minutes);
+
+        w.write("<p>");
+        w.write("</p>");
+        writeSamples(w, counter, inst.hours);
+        
+        w.write("<p>");
+        w.write("</p>");
+        writeSamples(w, counter, inst.days);
+        
+    }
+
+    protected void writeSamples(Writer w, ICounter counter, History h) throws IOException {
+        
+        final long period = h.getPeriod();
+        
+        final String units;
+        if(period == 1000*60L) units="Minutes";
+        else if(period == 1000*60*60L) units="Hours";
+        else if(period == 1000*60*60*24L) units="Days";
+        else units="period="+period+"ms";
+        
+        final String summary = "Showing samples: period="+units+", path=" + counter.getPath();
+
+        w.write("<table border=\"1\" summary=\"" + attrib(summary) + "\"\n>");
+
+        // @todo use css to left justify the path.
+        w.write(" <caption>");
+        writePath(w, counter.getPath());
+        w.write("</caption\n>");
+
+        w.write(" <tr\n>");
+        w.write("  <th>"+cdata(units)+"</th\n>");
+        w.write("  <th>Value</th\n>");
+        w.write(" </tr\n>");
+
+        /*
+         * samples.
+         */
+        final Iterator<IHistoryEntry> itr = h.iterator();
+        
+        // zero initially.
+        long firstTimestamp = 0;
+        
+        while (itr.hasNext()) {
+
+            final IHistoryEntry sample = itr.next();
+                        
+            w.write(" <tr\n>");
+
+            final long lastModified = sample.lastModified();
+
+            if (firstTimestamp == 0) {
+                // zero base for first row.
+                firstTimestamp = lastModified;
+            }
+            
+            // all other rows a delta in units of measure.
+            final String timeStr = ""+(lastModified-firstTimestamp)/period;
+            
+//            final Date date = new Date(lastModified);
+            
+//            final String timeStr = date.toString();
+            
+            w.write("  <td>" + cdata(timeStr) + "</td\n>");
+
+            w.write("  <td>" + cdata(value(sample.getValue())) + "</td\n>");
+
+            w.write(" </tr\n>");
+
+        }
+
+        w.write("</table\n>");
+
+    }
+
     /**
      * Encode a string for including in a CDATA section.
      * 
