@@ -734,7 +734,11 @@ public class ConcurrentDataLoader {
 
             try {
 
-                loadData2(file.toString(), baseURL, rdfFormat);
+                // FIXME resolve what the baseURL SHOULD be.
+                loadData2(file.toString(), 
+//                        baseURL,
+                        file.toURI().toString(),
+                        rdfFormat);
 
             } catch (IOException e) {
 

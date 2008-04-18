@@ -1156,7 +1156,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
      *         term identifier was not resolved then the map will not contain an
      *         entry for that term identifier.
      * 
-     * FIXME write unit tests for this - it's mainly used by the
+     * FIXME write unit tests getTerms(ids) - it's mainly used by the
      *       {@link BigdataStatementIteratorImpl}
      */
     final public Map<Long,BigdataValue> getTerms(Collection<Long> ids) {
