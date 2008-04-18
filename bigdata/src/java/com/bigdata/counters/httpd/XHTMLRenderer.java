@@ -42,6 +42,9 @@ import com.bigdata.util.HTMLUtility;
  *       more support on the server to do that) or else just in the URL query
  *       parameters.
  * 
+ * @todo make documentation available on the counters via click through on their
+ *       name.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -286,7 +289,7 @@ public class XHTMLRenderer {
     
     protected void writeTitle(Writer w)  throws IOException {
         
-        w.write("<title>bigdata(tm) telemetry</title\n>");
+        w.write("<title>bigdata(tm) telemetry : "+cdata(path)+"</title\n>");
         
     }
     
@@ -308,26 +311,38 @@ public class XHTMLRenderer {
         
         if(node instanceof ICounter) {
             
-            w.write("counter selected: " + cdata(path));
+            /*
+             * @todo What should be displayed when focused on a single counter?
+             * Some possibilities are: (a) documentation on the counter; (b) its
+             * value and timestamp, or a table of the history data which could
+             * be plotted in a worksheet; (c)....
+             * 
+             * Note: There is no real display available yet for a single counter
+             * but at least this will let you navigate back up the hierarchy.
+             */
+            
+            writePath(w, path);
 
         } else {
 
-            Iterator<CounterSet> itr = ((CounterSet) node).preOrderIterator();
-
-            while (itr.hasNext()) {
-
-                final CounterSet cset = itr.next();
-
-                final String path = cset.getPath();
-
-                if (isExpanded(path)) {
-
-                    // write only the expanded children.
-                    writeCounterSet(w, cset);
-
-                }
-
-            }
+            writeCounterSet(w, (CounterSet)node);
+            
+//            Iterator<CounterSet> itr = ((CounterSet) node).preOrderIterator();
+//
+//            while (itr.hasNext()) {
+//
+//                final CounterSet cset = itr.next();
+//
+//                final String path = cset.getPath();
+//
+//                if (isExpanded(path)) {
+//
+//                    // write only the expanded children.
+//                    writeCounterSet(w, cset);
+//
+//                }
+//
+//            }
 
         }
         
@@ -402,7 +417,11 @@ public class XHTMLRenderer {
 //        }
 //        
 //    }
-    
+
+    /**
+     * Writes all counters in the hierarchy starting with the specified
+     * {@link CounterSet} in a single table.
+     */
     protected void writeCounterSet(Writer w, CounterSet counterSet) throws IOException {
 
         final String summary = "Showing counters for path="
@@ -431,9 +450,11 @@ public class XHTMLRenderer {
         w.write("  <th>day</th\n>");
         w.write("  <th>month</th\n>");
         w.write(" </tr\n>");
+
+        final Iterator<ICounter> itr = counterSet.getCounters(filter);
         
-        final Iterator<ICounter> itr = counterSet.directChildIterator(
-                true/* sorted */, ICounter.class/* type */);
+//        final Iterator<ICounter> itr = counterSet.directChildIterator(
+//                true/* sorted */, ICounter.class/* type */);
         
         while(itr.hasNext()) {
 
@@ -441,17 +462,17 @@ public class XHTMLRenderer {
 
             final String path = counter.getPath();
             
-            if (filter != null) {
-
-                if (!filter.matcher(path).matches()) {
-
-                    // skip counter not matching filter.
-                    
-                    continue;
-                    
-                }
-                
-            }
+//            if (filter != null) {
+//
+//                if (!filter.matcher(path).matches()) {
+//
+//                    // skip counter not matching filter.
+//                    
+//                    continue;
+//                    
+//                }
+//                
+//            }
 
             w.write(" <tr\n>");
 
@@ -459,7 +480,10 @@ public class XHTMLRenderer {
              * write out values for the counter.
              */
 
-            w.write("  <th>" + cdata(counter.getName()) + "</th\n>");
+            w.write("  <th align=\"left\">" );
+//            w.write( cdata(path) );
+            writePath(w, path);
+            w.write( "</th\n>");
 
             if (counter.getInstrument() instanceof HistoryInstrument) {
 
