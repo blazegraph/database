@@ -557,7 +557,7 @@ Short term tasks:
 
    - Counters
 
-     - (**) HTTP interface for examining aggregated statistics at the
+     - (*******) HTTP interface for examining aggregated statistics at the
        load balancer.
 
      - (**) Compute average response time and throughput as 1/average
@@ -626,13 +626,13 @@ Short term tasks:
 
    - ScaleOutTripleStore
 
-     - Optimized JOIN for the scale-out triple store.  It needs to
-       block up a set of right hand tuples that will be joined against
-       data on a given data service and then send those tuples to that
-       data service, recieving the results in return. It will also
-       have to handle stale locators if the join is running in an
-       read-committed mode, but not if it is transactional or a
-       historical read.
+     - (*****) Optimized JOIN for the scale-out triple store.  It
+       needs to block up a set of right hand tuples that will be
+       joined against data on a given data service and then send those
+       tuples to that data service, recieving the results in
+       return. It will also have to handle stale locators if the join
+       is running in an read-committed mode, but not if it is
+       transactional or a historical read.
 
        Inference is slow due to a large #of small join results.
        Parallel sub-query is probably the way to beat that.  After
@@ -963,7 +963,7 @@ Short term tasks:
 
    - write performance test drivers and run on cluster.
 
-      - (****) rdf concurrent data load.
+      - (*******) rdf concurrent data load.
 
       - rdf concurrent query (rdf lubm is not designed to test with
         concurrent loads).

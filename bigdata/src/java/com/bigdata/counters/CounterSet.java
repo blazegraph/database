@@ -49,6 +49,8 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+import com.bigdata.util.HTMLUtility;
+
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IStriterator;
@@ -559,8 +561,7 @@ public class CounterSet implements ICounterSet {
     public Iterator postOrderIterator() {
 
         /*
-         * Iterator append this node to the iterator in the post-order
-         * position.
+         * Appends this node to the iterator in the post-order position.
          */
 
         return new Striterator(postOrderIterator1())
@@ -568,6 +569,63 @@ public class CounterSet implements ICounterSet {
 
     }
 
+    /**
+     * Iterator visits this node and then children matching the option filter
+     * recursively expanding each child with a pre-order traversal of its
+     * children and finally visits this node itself.
+     */
+    public Iterator preOrderIterator() {
+        
+        /*
+         * Appends this node to the iterator in the pre-order position.
+         */
+
+        return new Striterator(new SingleValueIterator(this))
+                .append(preOrderIterator1());
+        
+    }
+    
+    /**
+     * Visits the children (recursively) using pre-order traversal, but
+     * does NOT visit this node.
+     */
+    @SuppressWarnings("unchecked")
+    private Iterator<ICounterSet> preOrderIterator1() {
+
+        /*
+         * Iterator visits the direct children, expanding them in turn with a
+         * recursive application of the pre-order iterator.
+         */
+
+        return new Striterator(counterSetIterator()).addTypeFilter(
+                ICounterSet.class).addFilter(new Expander() {
+
+            private static final long serialVersionUID = 1L;
+
+            /*
+             * Expand each child in turn.
+             */
+            protected Iterator expand(Object childObj) {
+
+                /*
+                 * A child of this node.
+                 */
+
+                final ICounterSet child = (ICounterSet) childObj;
+
+                // append this node in pre-order position.
+                final Striterator itr = new Striterator(
+                        new SingleValueIterator(child));
+
+                itr.append(((CounterSet) child).preOrderIterator1());
+
+                return itr;
+                
+            }
+        });
+
+    }
+    
     /**
      * Visits the children (recursively) using post-order traversal, but
      * does NOT visit this node.
@@ -1020,8 +1078,8 @@ public class CounterSet implements ICounterSet {
                 w.write(" time=\"" + time + "\"");
                 w.write(">");
                 
-                // FIXME encode for XML.
-                w.write("" + value);
+                // @todo better encoding for XML PCData
+                w.write("" + HTMLUtility.escapeForXHTML(value.toString()));
                 
                 w.write("</c\n>");
                 
