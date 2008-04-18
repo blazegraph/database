@@ -1,7 +1,11 @@
 package com.bigdata.service;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -32,8 +36,10 @@ import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * The {@link LoadBalancerService} collects a variety of performance counters
@@ -136,7 +142,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 abstract public class LoadBalancerService implements ILoadBalancerService,
         IServiceShutdown {
 
-    public Logger log = Logger.getLogger(LoadBalancerService.class);
+    final static protected Logger log = Logger.getLogger(LoadBalancerService.class);
 
     /**
      * Service join timeout in milliseconds - used when we need to wait for a
@@ -201,6 +207,25 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
      */
     protected CounterSet counters = new CounterSet();
 
+    /**
+     * The #of {@link UpdateTask}s which have run so far.
+     */
+    protected int nupdates = 0;
+    
+    /**
+     * A copy of the properties used to start the service.
+     */
+    private final Properties properties;
+    
+    /**
+     * An object wrapping the properties provided to the constructor.
+     */
+    public Properties getProperties() {
+        
+        return new Properties(properties);
+        
+    }
+    
     /**
      * Per-host metadata and a score for that host which gets updated
      * periodically by {@link UpdateTask}.
@@ -389,7 +414,12 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
      * Runs a periodic {@link UpdateTask}.
      */
     final protected ScheduledExecutorService updateService;
-    
+
+    /**
+     * The optional httpd service.
+     */
+    private final AbstractHTTPD httpd;
+
     /**
      * Options understood by the {@link LoadBalancerService}.
      * 
@@ -412,13 +442,39 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
          * 
          * @see AbstractStatisticsCollector.Options#INTERVAL
          */
-        public final static String UPDATE_DELAY = "updateDelay";
+        String UPDATE_DELAY = "updateDelay";
         
         /**
          * The default {@link #UPDATE_DELAY}.
          */
-        public final static String DEFAULT_UPDATE_DELAY = ""+(60*1000);
+        String DEFAULT_UPDATE_DELAY = ""+(60*1000);
     
+        /**
+         * The port on which the load balancer will run its <code>httpd</code>
+         * service (default {@value #DEFAULT_LOAD_BALANCER_HTTPD_PORT}) -or-
+         * ZERO (0) to NOT start the <code>httpd</code> service. This service
+         * may be used to view the telemetry reported by the various services in
+         * the federation that are, or have been, joined with the load balancer.
+         */
+        String LOAD_BALANCER_HTTPD_PORT = "loadBalancer.httpd.port";
+        
+        String DEFAULT_LOAD_BALANCER_HTTPD_PORT = "80";
+     
+        /**
+         * The path of the directory where the load balancer will log a copy of
+         * the counters every time it runs its {@link UpdateTask}. By default
+         * it will log the files in the directory for the load balancer service.
+         * You may specify an alternative directory using this property.
+         * 
+         * FIXME Perhaps it is best to have no default for this since the
+         * service UUID itself is not a good enough location. Normally the
+         * service runs under some directory and we have no access to that from
+         * here.
+         */
+        String LOAD_BALANCER_LOG_DIR = "loadBalancer.log.dir";
+        
+        String DEFAULT_LOAD_BALANCER_LOG_DIR = "";
+        
     }
 
     /**
@@ -426,6 +482,10 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
      * @param properties See {@link Options}
      */
     public LoadBalancerService(Properties properties) {
+        
+        if(properties==null) throw new IllegalArgumentException();
+        
+        this.properties = (Properties) properties.clone();
         
         // setup scheduled runnable for periodic updates of the service scores.
         {
@@ -453,6 +513,34 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
                     delay, unit);
 
         }
+
+        /*
+         * HTTPD service reporting out statistics. This will be shutdown with
+         * the load balancer.
+         */
+        {
+            
+            final int port = Integer.parseInt(properties.getProperty(
+                    Options.LOAD_BALANCER_HTTPD_PORT,
+                    Options.DEFAULT_LOAD_BALANCER_HTTPD_PORT));
+
+            log.info(Options.LOAD_BALANCER_HTTPD_PORT+"="+port);
+            
+            if (port < 0)
+                throw new RuntimeException(Options.LOAD_BALANCER_HTTPD_PORT
+                        + " may not be negative");
+            
+            AbstractHTTPD httpd = null;
+            if (port != 0) {
+                try {
+                    httpd = new CounterSetHTTPD(port,counters);
+                } catch (IOException e) {
+                    log.error("Could not start httpd on port=" + port, e);
+                }
+            }
+            this.httpd = httpd;
+            
+        }
         
     }
     
@@ -467,6 +555,9 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         log.info("begin");
         
         updateService.shutdown();
+        
+        if (httpd != null)
+            httpd.shutdown();
 
         log.info("done");
 
@@ -477,6 +568,9 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         log.info("begin");
         
         updateService.shutdownNow();
+        
+        if (httpd != null)
+            httpd.shutdownNow();
 
         log.info("done");
 
@@ -544,10 +638,16 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
                 
                 updateServiceScores();
                 
+                logCounters();
+                
             } catch (Throwable t) {
 
                 log.warn("Problem in update task?", t);
 
+            } finally {
+                
+                nupdates++;
+                
             }
 
         }
@@ -1106,6 +1206,67 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
             }
 
+        }
+
+        /**
+         * Writes the counters on a file.
+         * 
+         * @throws IOException
+         */
+        protected void logCounters() throws IOException {
+
+            final File logDir;
+            {
+
+                String val = properties.getProperty(
+                        Options.LOAD_BALANCER_LOG_DIR,
+                        Options.DEFAULT_LOAD_BALANCER_LOG_DIR);
+
+                if (val.trim().equals("")) {
+
+                    UUID serviceUUID;
+                    try {
+                        serviceUUID = getServiceUUID();
+                    } catch (IOException ex) {
+                        log.error("Service UUID not available - will not log counters");
+                        return;
+                    }
+
+                    // directory for the service.
+                    logDir = new File(serviceUUID.toString());
+
+                } else {
+
+                    logDir = new File(val);
+                    
+                }
+
+                // ensure exists.
+                logDir.mkdirs();
+                
+            }
+            
+            /*
+             * @todo configure how the files are named and how long they will
+             * persist.
+             */
+            
+            final File file = new File(logDir,""+(nupdates % 20)+"counters.xml");
+            
+            final OutputStream os = new BufferedOutputStream( new FileOutputStream(file) );
+            
+            try {
+
+                log.info("Writing counters on "+file);
+                
+                counters.asXML(os, "UTF-8", null/*filter*/);
+            
+            } finally {
+                
+                os.close();
+
+            }
+            
         }
         
     }

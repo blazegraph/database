@@ -468,7 +468,14 @@ abstract public class DataService implements IDataService, //IWritePipeline,
 
         }
 
-        // setup to collect statistics and report about this host.
+        /*
+         * Setup to collect statistics and report about this host.
+         * 
+         * Note: this is just starting the task that will start reporting once
+         * the load balancer has been discovered, so the initialDelay and the
+         * delay between retries are relatively short.  We are just waiting for
+         * the load balancer before we can start the ReportTask.
+         */
         {
 
             reportService = Executors

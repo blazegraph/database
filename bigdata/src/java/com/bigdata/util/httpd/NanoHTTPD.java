@@ -1,22 +1,4 @@
-/*
- * Note: This is included with the forward looking intention of exposing
- * performance counter data for the load balancer service and possibly
- * the individual data services via an embedded http option.  The license
- * for the original code is found at the bottom of this file.  Modifications
- * are under the same copyright as the rest of bigdata.
- * 
- * @todo disable 'serviceFile'.
- * 
- * @todo enable serve of CounterSet XML, Write XSL and stylesheet for interactive
- * browsing of the CounterSet XML, including the counter history.  The notional 
- * URI scheme would simply use the counter path, allowing tunneling down from the
- * root.  The service would have an option to configure a port and perhaps access
- * permissions (by source IP mask) for the counter data.  URI options would include
- * filters, depth of view in the counter hierarchy, etc.  Nice view touches would
- * include graphs of counter history, but I would like to keep that all client-side
- * using XSL, e.g., by generating SVG dynamically.
- */
-package com.bigdata.service;
+package com.bigdata.util.httpd;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -27,6 +9,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLEncoder;
@@ -37,47 +20,83 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
+import com.bigdata.service.IServiceShutdown;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A simple, tiny, nicely embeddable HTTP 1.0 server in Java
- *
- * <p> NanoHTTPD version 1.1,
- * Copyright &copy; 2001,2005-2007 Jarno Elonen (elonen@iki.fi, http://iki.fi/elonen/)
- *
- * <p><b>Features + limitations: </b><ul>
- *
- *    <li> Only one Java file </li>
- *    <li> Java 1.1 compatible </li>
- *    <li> Released as open source, Modified BSD licence </li>
- *    <li> No fixed config files, logging, authorization etc. (Implement yourself if you need them.) </li>
- *    <li> Supports parameter parsing of GET and POST methods </li>
- *    <li> Supports both dynamic content and file serving </li>
- *    <li> Never caches anything </li>
- *    <li> Doesn't limit bandwidth, request time or simultaneous connections </li>
- *    <li> Default code serves files and shows all HTTP parameters and headers</li>
- *    <li> File server supports directory listing, index.html and index.htm </li>
- *    <li> File server does the 301 redirection trick for directories without '/'</li>
- *    <li> File server supports simple skipping for files (continue download) </li>
- *    <li> File server uses current directory as a web root </li>
- *    <li> File server serves also very long files without memory overhead </li>
- *    <li> Contains a built-in list of most common mime types </li>
- *    <li> All header names are converted lowercase so they don't vary between browsers/clients </li>
- *
+ * 
+ * <p>
+ * NanoHTTPD version 1.1, Copyright &copy; 2001,2005-2007 Jarno Elonen
+ * (elonen@iki.fi, http://iki.fi/elonen/)
+ * <p>
+ * Various modifications since supporting integration within bigdata services
+ * &copy; 2008, SYSTAP, LLC.
+ * <p>
+ * <p>
+ * <b>Features + limitations: </b>
+ * <ul>
+ * 
+ * <li> Only one Java file </li>
+ * <li> Java 1.1 compatible </li>
+ * <li> Released as open source, Modified BSD licence </li>
+ * <li> No fixed config files, logging, authorization etc. (Implement yourself
+ * if you need them.) </li>
+ * <li> Supports parameter parsing of GET and POST methods </li>
+ * <li> Supports both dynamic content and file serving </li>
+ * <li> Never caches anything </li>
+ * <li> Doesn't limit bandwidth, request time or simultaneous connections </li>
+ * <li> Default code serves files and shows all HTTP parameters and headers</li>
+ * <li> File server supports directory listing, index.html and index.htm </li>
+ * <li> File server does the 301 redirection trick for directories without '/'</li>
+ * <li> File server supports simple skipping for files (continue download) </li>
+ * <li> File server uses current directory as a web root </li>
+ * <li> File server serves also very long files without memory overhead </li>
+ * <li> Contains a built-in list of most common mime types </li>
+ * <li> All header names are converted lowercase so they don't vary between
+ * browsers/clients </li>
+ * 
  * </ul>
- *
- * <p><b>Ways to use: </b><ul>
- *
- *    <li> Run as a standalone app, serves files from current directory and shows requests</li>
- *    <li> Subclass serve() and embed to your own program </li>
- *    <li> Call serveFile() from serve() with your own base directory </li>
- *
+ * 
+ * <p>
+ * <b>Ways to use: </b>
+ * <ul>
+ * 
+ * <li> Run as a standalone app, serves files from current directory and shows
+ * requests</li>
+ * <li> Subclass serve() and embed to your own program </li>
+ * <li> Call serveFile() from serve() with your own base directory </li>
+ * 
  * </ul>
- *
- * See the end of the source file for distribution license
- * (Modified BSD licence)
+ * 
+ * See the end of the source file for distribution license (Modified BSD
+ * licence)
  */
-public class NanoHTTPD
+public class NanoHTTPD implements IServiceShutdown
 {
+    
+    final static protected Logger log = Logger.getLogger(NanoHTTPD.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
 	// ==================================================
 	// API parts
 	// ==================================================
@@ -95,22 +114,25 @@ public class NanoHTTPD
 	 */
 	public Response serve( String uri, String method, Properties header, Properties parms )
 	{
-		System.out.println( method + " '" + uri + "' " );
+        if(INFO)
+		log.info( method + " '" + uri + "' " );
 
+        if(DEBUG) {
 		Enumeration e = header.propertyNames();
 		while ( e.hasMoreElements())
 		{
 			String value = (String)e.nextElement();
-			System.out.println( "  HDR: '" + value + "' = '" +
+            log.debug( "  HDR: '" + value + "' = '" +
 								header.getProperty( value ) + "'" );
 		}
 		e = parms.propertyNames();
 		while ( e.hasMoreElements())
 		{
 			String value = (String)e.nextElement();
-			System.out.println( "  PRM: '" + value + "' = '" +
+			log.debug( "  PRM: '" + value + "' = '" +
 								parms.getProperty( value ) + "'" );
 		}
+        }
 
 		return serveFile( uri, header, new File("."), true );
 	}
@@ -188,7 +210,8 @@ public class NanoHTTPD
 		HTTP_REDIRECT = "301 Moved Permanently",
 		HTTP_FORBIDDEN = "403 Forbidden",
 		HTTP_NOTFOUND = "404 Not Found",
-		HTTP_BADREQUEST = "400 Bad Request",
+        HTTP_BADREQUEST = "400 Bad Request",
+        HTTP_METHOD_NOT_ALLOWED = "405 Method Not Allowed",
 		HTTP_INTERNALERROR = "500 Internal Server Error",
 		HTTP_NOTIMPLEMENTED = "501 Not Implemented";
 
@@ -196,41 +219,150 @@ public class NanoHTTPD
 	 * Common mime types for dynamic content
 	 */
 	public static final String
-		MIME_PLAINTEXT = "text/plain",
-		MIME_HTML = "text/html",
-		MIME_DEFAULT_BINARY = "application/octet-stream";
+		MIME_TEXT_PLAIN = "text/plain",
+		MIME_TEXT_HTML = "text/html",
+		MIME_DEFAULT_BINARY = "application/octet-stream",
+        MIME_APPLICATION_XML = "application/xml";
 
 	// ==================================================
 	// Socket & server code
 	// ==================================================
 
 	/**
-	 * Starts a HTTP server to given port.<p>
-	 * Throws an IOException if the socket is already in use
-	 */
+     * Starts a HTTP server to given port.
+     * <p>
+     * Throws an IOException if the socket is already in use
+     */
 	public NanoHTTPD( int port ) throws IOException
 	{
 		myTcpPort = port;
 
-		final ServerSocket ss = new ServerSocket( myTcpPort );
-		Thread t = new Thread( new Runnable()
-			{
-				public void run()
-				{
-					try
-					{
-						while( true )
-							new HTTPSession( ss.accept());
-					}
-					catch ( IOException ioe )
-					{}
-				}
-			});
-		t.setDaemon( true );
-		t.start();
-	}
+        final ServerSocket ss = new ServerSocket(myTcpPort);
+        
+        log.info("Running on port=" + port);
 
-	/**
+        // @todo parameter and configuration of same.
+        final int requestServicePoolSize = 0;
+
+        if (requestServicePoolSize == 0) {
+
+            requestService = (ThreadPoolExecutor) Executors
+                    .newCachedThreadPool(DaemonThreadFactory
+                            .defaultThreadFactory());
+
+        } else {
+
+            requestService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                    requestServicePoolSize, DaemonThreadFactory
+                            .defaultThreadFactory());
+
+        }
+        
+        /*
+         * Begin accepting connections.
+         */
+        acceptService.submit(new Runnable() {
+            public void run() {
+                try {
+                    while (true) {
+                        /*
+                         * Hand off request to a pool of worker threads.
+                         */
+                        requestService.submit(new HTTPSession(ss.accept()));
+                    }
+                } catch (IOException ioe) {
+                    log.error(ioe);
+                }
+            }
+        });
+
+    }
+
+    /**
+     * Runs a single thread which accepts connections.
+     */
+    private final ExecutorService acceptService = Executors
+            .newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
+
+    /**
+     * Runs a pool of threads for handling requests.
+     */
+    private final ExecutorService requestService;
+
+    public boolean isOpen() {
+
+        return !acceptService.isShutdown() && !requestService.isShutdown();
+
+    }
+
+    public void shutdown() {
+    
+        // time when shutdown begins.
+        final long begin = System.currentTimeMillis();
+
+//        /*
+//         * Note: when the timeout is zero we approximate "forever" using
+//         * Long.MAX_VALUE.
+//         */
+
+        final long shutdownTimeout = 1000;
+        
+//        final long shutdownTimeout = this.shutdownTimeout == 0L ? Long.MAX_VALUE
+//                : this.shutdownTimeout;
+
+        final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+        acceptService.shutdown();
+        
+        requestService.shutdown();
+
+        try {
+
+            log.info("Awaiting accept service termination");
+            
+            long elapsed = System.currentTimeMillis() - begin;
+            
+            if (!acceptService.awaitTermination(shutdownTimeout - elapsed, unit)) {
+                
+                log.warn("Accept service termination: timeout");
+                
+            }
+
+        } catch(InterruptedException ex) {
+            
+            log.warn("Interrupted awaiting accept service termination.", ex);
+            
+        }
+
+        try {
+
+            log.info("Awaiting request service termination");
+            
+            long elapsed = System.currentTimeMillis() - begin;
+            
+            if (!requestService.awaitTermination(shutdownTimeout - elapsed, unit)) {
+                
+                log.warn("Request service termination: timeout");
+                
+            }
+
+        } catch(InterruptedException ex) {
+            
+            log.warn("Interrupted awaiting request service termination.", ex);
+            
+        }
+        
+    }
+
+    public void shutdownNow() {
+
+        acceptService.shutdownNow();
+
+        requestService.shutdownNow();
+        
+    }
+
+    /**
 	 * Starts as a standalone file server and waits for Enter.
 	 */
 	public static void main( String[] args )
@@ -281,16 +413,18 @@ public class NanoHTTPD
 	 */
 	private class HTTPSession implements Runnable
 	{
-		public HTTPSession( Socket s )
-		{
-			mySocket = s;
-			Thread t = new Thread( this );
-			t.setDaemon( true );
-			t.start();
-		}
+
+        final private Socket mySocket;
+        
+		public HTTPSession(Socket s) {
+
+            mySocket = s;
+
+        }
 
 		public void run()
 		{
+            log.info("Handling request: localPort="+mySocket.getLocalPort());
 			try
 			{
 				InputStream is = mySocket.getInputStream();
@@ -445,7 +579,7 @@ public class NanoHTTPD
 		 */
 		private void sendError( String status, String msg ) throws InterruptedException
 		{
-			sendResponse( status, MIME_PLAINTEXT, null, new ByteArrayInputStream( msg.getBytes()));
+			sendResponse( status, MIME_TEXT_PLAIN, null, new ByteArrayInputStream( msg.getBytes()));
 			throw new InterruptedException();
 		}
 
@@ -505,8 +639,6 @@ public class NanoHTTPD
 				try { mySocket.close(); } catch( Throwable t ) {}
 			}
 		}
-
-		private Socket mySocket;
 	};
 
 	/**
@@ -526,9 +658,13 @@ public class NanoHTTPD
 				newUri += "%20";
 			else
 			{
-				newUri += URLEncoder.encode( tok );
+//				newUri += URLEncoder.encode( tok );
 				// For Java 1.4 you'll want to use this instead:
-				// try { newUri += URLEncoder.encode( tok, "UTF-8" ); } catch ( UnsupportedEncodingException uee )
+				 try {
+                    newUri += URLEncoder.encode(tok, "UTF-8");
+                } catch (UnsupportedEncodingException uee) {
+                    throw new RuntimeException(uee);
+                }
 			}
 		}
 		return newUri;
@@ -550,7 +686,7 @@ public class NanoHTTPD
 	{
 		// Make sure we won't die of an exception later
 		if ( !homeDir.isDirectory())
-			return new Response( HTTP_INTERNALERROR, MIME_PLAINTEXT,
+			return new Response( HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
 								 "INTERNAL ERRROR: serveFile(): given homeDir is not a directory." );
 
 		// Remove URL arguments
@@ -560,12 +696,12 @@ public class NanoHTTPD
 
 		// Prohibit getting out of current directory
 		if ( uri.startsWith( ".." ) || uri.endsWith( ".." ) || uri.indexOf( "../" ) >= 0 )
-			return new Response( HTTP_FORBIDDEN, MIME_PLAINTEXT,
+			return new Response( HTTP_FORBIDDEN, MIME_TEXT_PLAIN,
 								 "FORBIDDEN: Won't serve ../ for security reasons." );
 
 		File f = new File( homeDir, uri );
 		if ( !f.exists())
-			return new Response( HTTP_NOTFOUND, MIME_PLAINTEXT,
+			return new Response( HTTP_NOTFOUND, MIME_TEXT_PLAIN,
 								 "Error 404, file not found." );
 
 		// List the directory, if necessary
@@ -576,7 +712,7 @@ public class NanoHTTPD
 			if ( !uri.endsWith( "/" ))
 			{
 				uri += "/";
-				Response r = new Response( HTTP_REDIRECT, MIME_HTML,
+				Response r = new Response( HTTP_REDIRECT, MIME_TEXT_HTML,
 										   "<html><body>Redirected: <a href=\"" + uri + "\">" +
 										   uri + "</a></body></html>");
 				r.addHeader( "Location", uri );
@@ -633,11 +769,11 @@ public class NanoHTTPD
 					msg += "<br/>";
 					if ( dir ) msg += "</b>";
 				}
-				return new Response( HTTP_OK, MIME_HTML, msg );
+				return new Response( HTTP_OK, MIME_TEXT_HTML, msg );
 			}
 			else
 			{
-				return new Response( HTTP_FORBIDDEN, MIME_PLAINTEXT,
+				return new Response( HTTP_FORBIDDEN, MIME_TEXT_PLAIN,
 								 "FORBIDDEN: No directory listing." );
 			}
 		}
@@ -680,14 +816,14 @@ public class NanoHTTPD
 		}
 		catch( IOException ioe )
 		{
-			return new Response( HTTP_FORBIDDEN, MIME_PLAINTEXT, "FORBIDDEN: Reading file failed." );
+			return new Response( HTTP_FORBIDDEN, MIME_TEXT_PLAIN, "FORBIDDEN: Reading file failed." );
 		}
 	}
 
 	/**
 	 * Hashtable mapping (String)FILENAME_EXTENSION -> (String)MIME_TYPE
 	 */
-	private static Hashtable theMimeTypes = new Hashtable();
+	private static Hashtable<String,String> theMimeTypes = new Hashtable<String, String>();
 	static
 	{
 		StringTokenizer st = new StringTokenizer(
@@ -749,4 +885,5 @@ public class NanoHTTPD
 		"THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n"+
 		"(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\n"+
 		"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.";
+
 }

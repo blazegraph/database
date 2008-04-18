@@ -35,7 +35,7 @@ public class HistoryInstrument<T> implements IInstrument<T> {
      * @param minutes
      *            An array of the desired data type. If the array does not have
      *            60 elements then a new array of the same type will be created.
-     *            Regardles, the array will be used to store one sample per
+     *            Regardless, the array will be used to store one sample per
      *            minute.
      */
     @SuppressWarnings("unchecked")
