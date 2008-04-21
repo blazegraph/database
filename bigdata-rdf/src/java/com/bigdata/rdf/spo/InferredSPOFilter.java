@@ -48,7 +48,7 @@ public class InferredSPOFilter implements ISPOFilter {
 
     public boolean isMatch(SPO spo) {
         
-        return spo.type==StatementEnum.Inferred;
+        return spo.getType()==StatementEnum.Inferred;
         
     }
 

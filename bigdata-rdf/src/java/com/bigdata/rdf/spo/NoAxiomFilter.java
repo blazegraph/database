@@ -49,7 +49,7 @@ public class NoAxiomFilter implements ISPOFilter {
     
     public boolean isMatch(SPO spo) {
         
-        return spo.type!=StatementEnum.Axiom;
+        return spo.getType()!=StatementEnum.Axiom;
         
     }
 

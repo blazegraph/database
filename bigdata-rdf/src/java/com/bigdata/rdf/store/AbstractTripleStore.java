@@ -178,7 +178,8 @@ import cutthecrap.utils.striterators.Striterator;
  * document loaded by the {@link StatementBuffer} and then issuing one-up bnode
  * IDs by appending a counter. At that point we do not need to store the Bnodes
  * in the forward index either and all bnode ids for a given document will hit
- * the same index partition, which will improve load performance.
+ * the same index partition, which will improve load performance.  (Also do this
+ * for the {@link BigdataValueFactory}.)
  * 
  * @todo Do the full quad store (vs the provenance mode, which uses the context
  *       position for statements about statements).
@@ -2022,7 +2023,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
                 (BigdataURI) OptimizedValueFactory.INSTANCE.toSesameObject(p), //
                 (BigdataValue) OptimizedValueFactory.INSTANCE.toSesameObject(o), //
                 (BigdataResource) OptimizedValueFactory.INSTANCE.toSesameObject(c),//
-                spo.type//
+                spo.getType()
         );
 
     }
@@ -2419,7 +2420,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                 final SPO spo = new SPO(KeyOrder.SPO, itr);
 
-                switch (spo.type) {
+                switch (spo.getType()) {
 
                 case Explicit:
                     nexplicit++;

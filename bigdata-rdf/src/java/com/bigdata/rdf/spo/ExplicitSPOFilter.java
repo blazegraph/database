@@ -48,7 +48,7 @@ final public class ExplicitSPOFilter implements ISPOFilter {
     
     public boolean isMatch(SPO spo) {
 
-        return spo.type == StatementEnum.Explicit;
+        return spo.getType() == StatementEnum.Explicit;
         
     }
 

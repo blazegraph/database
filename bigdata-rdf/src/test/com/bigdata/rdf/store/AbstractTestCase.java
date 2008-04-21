@@ -610,7 +610,7 @@ abstract public class AbstractTestCase
 
                 // log.info("expected: "+expectedSPO.toString(store));
 
-                assertEquals(expectedSPO.type, actualSPO.type);
+                assertEquals(expectedSPO.getType(), actualSPO.getType());
 
                 i++;
 

@@ -63,6 +63,8 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
 
 public class OptimizedValueFactory implements ValueFactory {
 
+    protected final long NULL = IRawTripleStore.NULL;
+    
     public static final OptimizedValueFactory INSTANCE = new OptimizedValueFactory();
     
     private OptimizedValueFactory() {
@@ -167,12 +169,12 @@ public class OptimizedValueFactory implements ValueFactory {
             if( v instanceof URI) {
                 
                 return new BigdataURIImpl(((URI) v).stringValue(),
-                        IRawTripleStore.NULL);
+                        NULL);
                 
             } else if( v instanceof BNode) {
                 
                 return new BigdataBNodeImpl(((BNode) v).stringValue(),
-                        IRawTripleStore.NULL);
+                        NULL);
 
             } else if (v instanceof Literal) {
 
@@ -188,8 +190,8 @@ public class OptimizedValueFactory implements ValueFactory {
                         label,//
                         language,//
                         (datatype == null ? null : new BigdataURIImpl(datatype
-                                .stringValue(), IRawTripleStore.NULL)),//
-                        IRawTripleStore.NULL//
+                                .stringValue(), NULL)),//
+                        NULL//
                 );
 
             } else {

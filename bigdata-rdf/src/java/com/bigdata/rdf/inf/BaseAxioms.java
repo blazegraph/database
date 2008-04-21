@@ -364,7 +364,7 @@ abstract class BaseAxioms implements Axioms {
                 for (SPO spo : stmts) {
 
                     btree.insert(keyBuilder.statement2Key(KeyOrder.SPO, spo),
-                            spo.type.serialize());
+                            spo.getType().serialize());
 
                 }
 

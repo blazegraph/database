@@ -80,7 +80,7 @@ public class DoNotAddFilter implements ISPOFilter {
             
         }
         
-        if (spo.type == StatementEnum.Explicit ) {
+        if (spo.getType() == StatementEnum.Explicit ) {
             
             // Accept all explicit statements.
             
