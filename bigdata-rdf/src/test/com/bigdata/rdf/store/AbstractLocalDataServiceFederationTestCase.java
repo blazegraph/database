@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jul 25, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.rdf.store;
 
 import java.io.File;
 import java.util.Properties;
@@ -35,6 +35,11 @@ import junit.framework.TestCase2;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.LocalDataServiceClient;
+import com.bigdata.service.LocalDataServiceFederation;
 
 /**
  * An abstract test harness that sets up (and tears down) a
