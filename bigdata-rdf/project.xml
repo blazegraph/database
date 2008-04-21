@@ -330,16 +330,16 @@
 	<!-- @todo Use autojar to select only the required classes for redistribution? -->
     <dependency> 
       <groupId>it.unimi</groupId>
-      <artifactId>dsiutils</artifactId>
-      <version>1.0.4</version>
-      <url>http://dsiutils.dsi.unimi.it/</url>
-    </dependency>
-    <dependency> 
-      <groupId>it.unimi</groupId>
-      <id>fastutil5</id> 
-      <version>5.1.3</version> 
+      <artifactId>fastutil</artifactId> 
+      <version>5.1.4</version> 
       <url>http://fastutil.dsi.unimi.it/</url>
     </dependency>
+	<dependency>
+       <groupId>colt</groupId>
+	   <artifactId>colt</artifactId>
+	   <version>1.2.0</version>
+	   <url>http://dsd.lbl.gov/~hoschek/colt/</url>
+	</dependency>
     
 	<!-- full text indexing support. -->
 	<dependency>
@@ -373,32 +373,6 @@
         <jar>openrdf-sesame-2.0.1-onejar.jar</jar>
         <url>http://sourceforge.net/projects/sesame/</url>
 	</dependency> 
-	<!--
-    <dependency>
-      <groupId>sesame</groupId>
-      <artifactId>openrdf-model</artifactId>
-      <version>1.2.7</version>
-      <url>http://sourceforge.net/projects/sesame/</url>
-    </dependency>
-    <dependency>
-      <groupId>sesame</groupId>
-      <artifactId>openrdf-util</artifactId>
-      <version>1.2.7</version>
-      <url>http://sourceforge.net/projects/sesame/</url>
-    </dependency>
-    <dependency>
-      <groupId>sesame</groupId>
-      <artifactId>rio</artifactId>
-      <version>1.2.7</version>
-      <url>http://sourceforge.net/projects/sesame/</url>
-    </dependency>
-    <dependency>
-      <groupId>sesame</groupId>
-      <artifactId>sesame</artifactId>
-      <version>1.2.7</version>
-      <url>http://sourceforge.net/projects/sesame/</url>
-    </dependency>
-    -->
 
     <!-- bigdata-jini and jini are only required by the scale-out triple store
          when run against a jini-based federation. -->
