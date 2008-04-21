@@ -44,7 +44,6 @@ import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.store.DataLoader.CommitEnum;
-import com.bigdata.repo.AbstractRepositoryTestCase;
 
 /**
  * FIXME refactor to use the ExperimentDriver.  This let me collect better
@@ -69,7 +68,7 @@ import com.bigdata.repo.AbstractRepositoryTestCase;
  * Note: This is not really designed as a JUnit test and does not expose any
  * suitable public constructors. {@link #main( String[] )} is responsible for
  * which tests are actually run. This class extends
- * {@link AbstractRepositoryTestCase} so that we can leverage the infrastructure
+ * {@link AbstractMetricsTestCase} so that we can leverage the infrastructure
  * of the latter. You MUST specify "-DrepositoryClass=" on the command line and
  * give the name of an {@link RdfSchemaRepository} implementation class.
  * </p>

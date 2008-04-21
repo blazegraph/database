@@ -39,7 +39,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
 import com.bigdata.service.LocalDataServiceFederation;
 
 /**
