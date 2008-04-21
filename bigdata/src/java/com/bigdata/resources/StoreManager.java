@@ -58,7 +58,6 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
-import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IPartitionMetadata;
@@ -415,9 +414,9 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
             try {
 
-                log.info("Waiting on startup...");
+                log.info("Waiting on startup : "+dataDir+" ...");
 
-                Thread.sleep(100/* ms */);
+                Thread.sleep(1000/* ms */);
 
             } catch (InterruptedException ex) {
 
@@ -1125,7 +1124,17 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
             properties.setProperty(Options.READ_ONLY, "true");
 
-            final AbstractJournal tmp = new ManagedJournal(properties);
+            final AbstractJournal tmp;
+            try {
+            
+                tmp = new ManagedJournal(properties);
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException("Problem opening journal: "
+                        + file.getAbsolutePath(), ex);
+                
+            }
 
             try {
             
@@ -1150,7 +1159,17 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
             // Note: disables buffering nodes during the scan.
             p.setProperty(IndexSegmentStore.Options.MAX_BYTES_TO_FULLY_BUFFER_NODES,"1");
             
-            final IndexSegmentStore segStore = new IndexSegmentStore( p );
+            final IndexSegmentStore segStore;
+            try {
+            
+                segStore = new IndexSegmentStore( p );
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException("Problem opening segment: "
+                        + file.getAbsolutePath(), ex);
+                
+            }
 
             try {
 
