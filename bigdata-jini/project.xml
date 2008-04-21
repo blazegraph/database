@@ -230,14 +230,16 @@
 
     <!-- log4j integration. -->
     <dependency> 
-      <id>log4j</id> 
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
       <version>1.2.8</version> 
       <url>http://logging.apache.org</url>
     </dependency>
 
     <!-- junit (tests only). -->
     <dependency> 
-      <id>junit</id> 
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
       <version>3.8.1</version> 
       <url>http://www.junit.org/</url>
     </dependency>
@@ -263,6 +265,13 @@
       <groupId>org.CognitiveWeb</groupId>
       <artifactId>cweb-extser</artifactId>
       <version>0.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+   <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>lgpl-utils</artifactId>
+      <version>1.0-b1-dev</version>
       <url>http://www.sourceforge.net/projects/cweb</url>
     </dependency>
 
