@@ -218,7 +218,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                     assertEquals("O @ i=" + i, expected.o, actual.o);
 
-                    assertEquals("TYPE @ i=" + i, expected.type, actual.type);
+                    assertEquals("TYPE @ i=" + i, expected.getType(), actual.getType());
 
                     assertEquals("SID @ i=" + i, expected
                             .getStatementIdentifier(), actual
@@ -246,7 +246,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                     
                     SPO spo = stmts[i];
                     
-                    a[i] = new SPO(spo.s, spo.p, spo.o, spo.type);
+                    a[i] = new SPO(spo.s, spo.p, spo.o, spo.getType());
                     
                 }
                 
@@ -345,7 +345,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                         SPO spo = stmts[i];
 
-                        a[i] = new SPO(spo.s, spo.p, spo.o, spo.type);
+                        a[i] = new SPO(spo.s, spo.p, spo.o, spo.getType());
 
                     }
 
@@ -654,8 +654,8 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             assertEquals("O @ i=" + i, expected.o, actual.o);
 
-            assertEquals("TYPE @ i=" + i, expected.type,
-                    actual.type);
+            assertEquals("TYPE @ i=" + i, expected.getType(),
+                    actual.getType());
 
             assertEquals("SID @ i=" + i, expected
                     .getStatementIdentifier(), actual

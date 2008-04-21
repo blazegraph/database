@@ -581,7 +581,7 @@ public class Justification implements Comparable<Justification> {
         
         if(testHead) {
 
-            if(head.type!=StatementEnum.Inferred) return true;
+            if(head.getType()!=StatementEnum.Inferred) return true;
             
             if(inf.isAxiom(head.s, head.p, head.o)) return true;
 
@@ -615,7 +615,7 @@ public class Justification implements Comparable<Justification> {
                 
                 SPO spo = itr.next();
                 
-                if (spo.type == StatementEnum.Explicit) {
+                if (spo.getType() == StatementEnum.Explicit) {
 
                     /*
                      * If we do not have to test the focusStore then we are

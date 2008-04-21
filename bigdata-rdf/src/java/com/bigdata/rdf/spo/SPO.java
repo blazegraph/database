@@ -59,7 +59,7 @@ public class SPO implements Comparable {
     /**
      * Statement type (inferred, explicit, or axiom).
      */
-    public final StatementEnum type;
+    private StatementEnum type;
     
     /**
      * Statement identifier (optional).
@@ -146,6 +146,18 @@ public class SPO implements Comparable {
      * deleting the statement (which would also delete its justifications).
      */
     public transient boolean override = false;
+
+    /**
+     * Construct a statement whose type is NOT known.
+     */
+    public SPO(long s, long p, long o) {
+        
+        this.s = s;
+        this.p = p;
+        this.o = o;
+        this.type = null;
+        
+    }
     
     /**
      * Construct a statement.
@@ -188,9 +200,23 @@ public class SPO implements Comparable {
         this.p = p;
         this.o = o;
         
+        decodeValue(val);
+        
+    }
+    
+    /**
+     * Sets the statement type and optionally the statement identifier by
+     * decoding the value associated with the key one of the statement indices.
+     * 
+     * @param val
+     *            The value associated with the key one of the statement
+     *            indices.
+     */
+    public void decodeValue(byte[] val) {
+        
         final byte code = val[0];
         
-        type = StatementEnum.decode( code ); 
+        setStatementType( StatementEnum.decode( code ) ); 
         
         if (val.length == 1 + 8) {
 
@@ -199,7 +225,7 @@ public class SPO implements Comparable {
              * read it.
              */
             
-            sid = new ByteArrayBuffer(1,val.length,val).getLong(1);
+            setStatementIdentifier( new ByteArrayBuffer(1,val.length,val).getLong(1) );
         
             assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
                     + toString(sid);
@@ -213,6 +239,7 @@ public class SPO implements Comparable {
         }
         
     }
+    
     
     /**
      * Construct a triple from the sort key.
@@ -297,31 +324,33 @@ public class SPO implements Comparable {
 
         }
         
-        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
+        decodeValue(tuple.getValue());
         
-        final byte code = vbuf.getByte(0);
-        
-        type = StatementEnum.decode( code ); 
-        
-        if (vbuf.limit() == 1 + 8) {
-
-            /*
-             * The value buffer appears to contain a statement identifier, so we
-             * read it.
-             */
-            
-            sid = vbuf.getLong(1);
-        
-            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
-                    + toString(sid);
-
-            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
-                    + toString();
-
-            assert sid != NULL : "statement identifier is NULL for explicit statement: "
-                    + toString();
-
-        }
+//        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
+//        
+//        final byte code = vbuf.getByte(0);
+//        
+//        type = StatementEnum.decode( code ); 
+//        
+//        if (vbuf.limit() == 1 + 8) {
+//
+//            /*
+//             * The value buffer appears to contain a statement identifier, so we
+//             * read it.
+//             */
+//            
+//            sid = vbuf.getLong(1);
+//        
+//            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
+//                    + toString(sid);
+//
+//            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
+//                    + toString();
+//
+//            assert sid != NULL : "statement identifier is NULL for explicit statement: "
+//                    + toString();
+//
+//        }
         
     }
 
@@ -609,5 +638,54 @@ public class SPO implements Comparable {
         return s != NULL && p != NULL && o != NULL;
 
     }
+
+    /**
+     * Return the statement type (axiom, explicit, or inferred).
+     * 
+     * @return the statement type.
+     * 
+     * @throws IllegalStateException
+     *             if the type is not known.
+     */
+    public StatementEnum getType() {
+
+        if (type == null)
+            throw new IllegalStateException();
+        
+        return type;
+
+    }
+
+    /**
+     * Set the statement type.
+     * 
+     * @param type
+     *            The statement type.
+     * 
+     * @throws IllegalStateException
+     *             if the statement type is already set to a different value.
+     */
+    public void setStatementType(StatementEnum type) {
+        
+        if(this.type != null && this.type != type) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        this.type = type;
+        
+    }
     
+    /**
+     * Return <code>true</code> iff the statement type is known.
+     * 
+     * <code>true</code> iff the statement type is known for this statement.
+     */
+    public boolean hasStatementType() {
+        
+        return type != null;
+        
+    }
+
 }

@@ -116,6 +116,7 @@ import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -264,7 +265,7 @@ public class BigdataSail extends SailBase implements Sail {
 
     final protected Properties properties;
 
-    final protected OptimizedValueFactory valueFactory = OptimizedValueFactory.INSTANCE;
+    final private ValueFactory valueFactory = new BigdataValueFactory();
     
     /**
      * The inference engine if the SAIL is using one.
@@ -528,6 +529,9 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
+    /**
+     * A {@link BigdataValueFactory}
+     */
     final public ValueFactory getValueFactory() {
         
         return valueFactory;
@@ -1640,7 +1644,7 @@ public class BigdataSail extends SailBase implements Sail {
                         Value val = var.getValue();
 
                         // convert to a BigdataValue object.
-                        val = valueFactory.toSesameObject(val);
+                        val = OptimizedValueFactory.INSTANCE.toSesameObject(val);
 
                         // resolve the termId.
 //                        final long termId = 
@@ -1706,6 +1710,9 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
 
+            /**
+             * The {@link BigdataValueFactory}.
+             */
             public ValueFactory getValueFactory() {
 
                 return valueFactory;

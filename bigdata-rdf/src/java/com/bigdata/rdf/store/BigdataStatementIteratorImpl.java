@@ -213,7 +213,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
                 : null);
         
         // the statement.
-        final BigdataStatement stmt = new BigdataStatementImpl(s, p, o, c, spo.type); 
+        final BigdataStatement stmt = new BigdataStatementImpl(s, p, o, c, spo.getType()); 
         
         if(DEBUG) {
             

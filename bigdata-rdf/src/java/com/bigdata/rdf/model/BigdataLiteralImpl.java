@@ -79,6 +79,12 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements BigdataLiter
         
     }
 
+    public BigdataLiteralImpl(String label, long termId) {
+        
+        this(label, null, null, termId);
+        
+    }
+
     public BigdataLiteralImpl(String label, String language, long termId) {
         
         this(label, language, null, termId);

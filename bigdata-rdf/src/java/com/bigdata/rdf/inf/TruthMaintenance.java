@@ -281,7 +281,7 @@ public class TruthMaintenance {
 
                         // The statement is known to the database.
 
-                        if (tmp.type == StatementEnum.Explicit) {
+                        if (tmp.getType() == StatementEnum.Explicit) {
                             
                             /*
                              * Since the statement is already explicit in the
@@ -663,7 +663,7 @@ public class TruthMaintenance {
                         
                     }
 
-                    if (spo.type == StatementEnum.Axiom) {
+                    if (spo.getType() == StatementEnum.Axiom) {
 
                         /*
                          * Ignore.
@@ -671,7 +671,7 @@ public class TruthMaintenance {
                         if (INFO)
                             log.info("Ignoring axiom in the tempStore: "+spo);
                         
-                    } else if( depth>0 && spo.type==StatementEnum.Explicit ) {
+                    } else if( depth>0 && spo.getType()==StatementEnum.Explicit ) {
                         
                         /*
                          * Closure produces inferences (rather than explicit
