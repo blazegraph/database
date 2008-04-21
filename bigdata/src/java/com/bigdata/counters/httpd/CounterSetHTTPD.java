@@ -5,9 +5,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Vector;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.httpd.XHTMLRenderer.Model;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
@@ -32,7 +35,8 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         
     }
     
-    public Response doGet( String uri, String method, Properties header, Properties parms ) throws Exception {
+    public Response doGet(String uri, String method, Properties header,
+            Map<String, Vector<String>> parms) throws Exception {
         
         ByteArrayOutputStream baos = new ByteArrayOutputStream(2 * Bytes.kilobyte32);
 
@@ -48,7 +52,13 @@ public class CounterSetHTTPD extends AbstractHTTPD {
             
             OutputStreamWriter w = new OutputStreamWriter(baos);
 
-            new XHTMLRenderer(root, uri, parms).write(w);
+            // build model of the controller state.
+            Model model = new Model(root, uri, parms);
+            
+            // @todo if controller state error then send HTTP_BAD_REQUEST
+            
+            // render the view.
+            new XHTMLRenderer(model).write(w);
 
             w.flush();
 

@@ -93,6 +93,24 @@ final class Counter<T> implements ICounter {
         
     }
     
+    public int getDepth() {
+        
+        int depth = 0;
+        
+        ICounterNode t = this;
+        
+        while(!t.isRoot()) {
+            
+            t = t.getParent();
+            
+            depth++;
+            
+        }
+        
+        return depth;
+        
+    }
+    
     public String toString() {
         
         return getPath();

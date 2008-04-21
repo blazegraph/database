@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import junit.framework.TestCase;
+import junit.framework.TestCase2;
 
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.DataServer;
@@ -47,7 +47,7 @@ import com.bigdata.service.jini.TimestampServer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractDistributedBigdataFederationTestCase extends TestCase {
+abstract public class AbstractDistributedBigdataFederationTestCase extends TestCase2 {
 
     public AbstractDistributedBigdataFederationTestCase() {
         super();
@@ -197,7 +197,13 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
       IBigdataFederation fed = client.connect();
       
       // verify that the client has/can get the metadata service.
-      assertNotNull("metadataService", fed.getMetadataService());
+      for (int i = 0; i < 3; i++) {
+            if (fed.getMetadataService() == null) {
+                log.warn("No metadata service yet...");
+                Thread.sleep(1000/*ms*/);
+          }
+      }
+      assertNotNull("No metadata service?", fed.getMetadataService());
 
     }
 

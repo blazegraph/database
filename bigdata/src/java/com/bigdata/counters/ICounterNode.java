@@ -53,6 +53,12 @@ public interface ICounterNode {
     public String getPath();
     
     /**
+     * Depth of this node in the hierarchy, where the depth of the root is ZERO
+     * (0).
+     */
+    public int getDepth();
+    
+    /**
      * The root of the hierarchy.
      */
     public ICounterSet getRoot();

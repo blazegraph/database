@@ -4,11 +4,14 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLEncoder;
+import java.text.DateFormat;
 import java.text.DecimalFormat;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Properties;
+import java.util.Vector;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
@@ -24,23 +27,9 @@ import com.bigdata.counters.IInstrument;
 import com.bigdata.util.HTMLUtility;
 
 /**
- * (X)HTML rendering of a {@link CounterSet}. *
+ * (X)HTML rendering of a {@link CounterSet}.
  * 
- * @todo URI options for filters, depth of view in the counter hierarchy, etc.
- * 
- * @todo Nice view touches would include graphs of counter history, but I would
- *       like to keep that all client-side using XSL, e.g., by generating SVG
- *       dynamically.
- * 
- * @todo parameterize the temporal aggregation (either summary or detail for
- *       minutes, hours, or days).
- * 
- * @todo show the timestamp for the values, at least in flyover.
- * 
- * @todo provide view that makes easy copy and paste into excel for graphing
- *       selected counter(s).
- * 
- * @todo parameterize for expanded or collapsed nodes.
+ * @todo UI widgets for regex filters and depth
  * 
  * @todo parameterize for expand/collapse of paths, perhaps in session (need
  *       more support on the server to do that) or else just in the URL query
@@ -56,15 +45,286 @@ public class XHTMLRenderer {
     
     final static protected Logger log = Logger.getLogger(XHTMLRenderer.class);
 
+    public static class Model {
+
+        /**
+         * Name of the URL query parameter specifying the starting path for the page
+         * view.
+         */
+        static final String PATH = "path";
+
+        /**
+         * Depth to be displayed from the given path -or- zero (0) to display
+         * all levels.
+         */
+        static final String DEPTH = "depth";
+        
+        /**
+         * Name of the URL query parameter specifying a regular expression for the
+         * filter to be applied to the counter paths.
+         */
+        static final String FILTER = "filter";
+        
+        final private String ps = ICounterSet.pathSeparator;
+
+        /**
+         * The {@link CounterSet} provided by the caller.
+         */
+        final public CounterSet root;
+        
+        /**
+         * The URI from the request.
+         */
+        final public String uri;
+        
+        /**
+         * The parameters from the request (eg, as parsed from URL query
+         * parameters).
+         */
+        final public Map<String,Vector<String>> params;
+        
+        /**
+         * The value of the {@link #PATH} query parameter. 
+         */
+        final public String path;
+        
+        /**
+         * The value of the {@link #DEPTH} query parameter.
+         */
+        final public int depth;
+        
+        /**
+         * The value(s) of the {@link #FILTER} query parameter.
+         */
+        final public Collection<String> filter;
+        
+        /**
+         * The {@link Pattern} compiled from the {@link #FILTER} query
+         * parameters and <code>null</code> iff there are no {@link #FILTER}
+         * query parameters.
+         */
+        final public Pattern pattern;
+        
+        /**
+         * Used to format values.
+         */
+        final DecimalFormat decimalFormat;
+        
+        /**
+         * Used to format the units of time when expressed as elapsed units since
+         * the first sample of a {@link History}.
+         */
+        final DecimalFormat unitsFormat;
+//        final DateFormat dateFormat;
+        
+        /**
+         * 
+         */
+        public Model(CounterSet root, String uri, Map<String,Vector<String>> params) {
+
+            this.root = root;
+
+            this.uri = uri;
+
+            this.params = params;
+
+            this.path = getProperty(params, PATH, ps);
+            log.info("path="+path);
+
+            // @todo must be non-negative.
+            this.depth = Integer.parseInt(getProperty(params, DEPTH, "2"));
+            log.info("depth="+depth);
+
+            this.filter = (Collection<String>)params.get(FILTER);
+
+            if(filter != null) {
+
+                /*
+                 * Joins multiple values for ?filter together in OR of quoted
+                 * patterns.
+                 * 
+                 * @todo make this more flexible in terms of allowing actual
+                 * regex from the user agent?
+                 */
+
+                final StringBuilder sb = new StringBuilder();
+                
+                for(String val : filter) {
+                
+                    log.info("filter="+val);
+                
+                    if(sb.length()>0) {
+                        
+                        sb.append("|");
+                        
+                    }
+                    
+                    sb.append("(.*"+Pattern.quote(val)+".*)");
+                    
+                }
+
+                final String regex = sb.toString();
+                
+                log.info("pattern=" + regex);
+                
+                this.pattern = Pattern.compile(regex);
+                
+            } else {
+                
+                this.pattern = null;
+                
+            }
+
+            /*
+             * @todo this should be parameter whose default is set on the server and
+             * which can be overriden by a URL query parameter (.
+             */
+//            this.decimalFormat = new DecimalFormat("0.###E0");
+            this.decimalFormat = new DecimalFormat("##0.#####E0");
+            
+//            decimalFormat.setGroupingUsed(true);
+    //
+//            decimalFormat.setMinimumFractionDigits(3);
+//            
+//            decimalFormat.setMaximumFractionDigits(6);
+//            
+//            decimalFormat.setDecimalSeparatorAlwaysShown(true);
+            
+            this.unitsFormat = new DecimalFormat("0.#");
+            
+        }
+
+        // @todo parameterize, perhaps by passing in as an interface.
+        protected boolean isExpanded(String path) {
+            
+            return true;
+            
+        }
+        
+        /**
+         * Return the first value for the named property.
+         * 
+         * @param params
+         *            The request parameters.
+         * @param property
+         *            The name of the property
+         * @param defaultValue
+         *            The default value (optional).
+         * 
+         * @return The first value for the named property and the defaultValue
+         *         if there named property was not present in the request.
+         * 
+         * @todo move to a request object?
+         */
+        public String getProperty(Map<String,Vector<String>> params, String property, String defaultValue) {
+            
+            if (params == null)
+                throw new IllegalArgumentException();
+
+            if (property == null)
+                throw new IllegalArgumentException();
+
+            final Vector<String> vals = params.get(property);
+
+            if (vals == null)
+                return defaultValue;
+
+            return vals.get(0);
+            
+        }
+
+        /**
+         * Re-create the request URL.
+         * 
+         * @todo move to request object?
+         */
+        public String getRequestURL() {
+            
+            return getRequestURL(null);
+            
+        }
+
+        /**
+         * Re-create the request URL.
+         * 
+         * @param override
+         *            Overriden query parameters (optional).
+         *            
+         * @todo move to request object?
+         */
+        public String getRequestURL(NV[] override) {
+        
+            final Map<String,Vector<String>> p;
+            
+            if(override == null) {
+                
+                p = params;
+                
+            } else {
+                
+                p = new HashMap<String,Vector<String>>(params);
+                
+                for(NV x : override) {
+                                            
+                    p.put(x.name, x.values);
+                    
+                }
+                
+            }
+            
+            StringBuilder sb = new StringBuilder();
+            
+            sb.append(uri);
+            
+            sb.append("?path=" + encodeURL(getProperty(p,PATH, ps)));
+            
+            Iterator itr = p.entrySet().iterator();
+            
+            while(itr.hasNext()) {
+                
+                final Map.Entry entry = (Map.Entry)itr.next();
+                
+                String name = (String)entry.getKey();
+
+                if(name.equals(PATH)) {
+                    
+                    // already handled.
+                    continue;
+                    
+                }
+                
+                Collection<String> vals = (Collection<String>)entry.getValue();
+                
+                for(String s : vals ) {
+
+                    sb.append("&"+encodeURL(name)+"="+encodeURL(s));
+                    
+                }
+                
+            }
+            
+            return sb.toString();
+            
+        }
+        
+        static public String encodeURL(String url) {
+            
+            final String charset = "UTF-8";
+            try {
+                return URLEncoder.encode(url, charset);
+            } catch (UnsupportedEncodingException e) {
+                log.error("Could not encode: charset="+charset+", url="+url);
+                return url;
+            }
+            
+        }
+        
+    } // class Model
+    
     final private String encoding = "UTF-8";
+    
     final private String ps = ICounterSet.pathSeparator;
     
-    final private CounterSet root;
-    final private String uri;
-    final private Properties params;
-    
-    final private String path;
-    final private Pattern filter;
     /*
      * Note: the page is valid for any of these doctypes.
      */
@@ -72,158 +332,80 @@ public class XHTMLRenderer {
 //    final private DoctypeEnum doctype = DoctypeEnum.html_4_01_transitional
     final private DoctypeEnum doctype = DoctypeEnum.xhtml_1_0_strict;
     
+    /**
+     * Allows override of the binding(s) for a named property.
+     *  
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     private class NV {
         
         public final String name;
-        public final String value;
+        public final Vector<String> values;
         
         public NV(String name, String value) {
+
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            this.name = name;
+
+            if (value == null) {
+
+                this.values = null;
+
+            } else {
+
+                Vector<String> values = new Vector<String>();
+
+                values.add(value);
+
+                this.values = values;
+
+            }
+            
+        }
+        
+        public NV(String name, String[] values) {
             
             if (name == null)
                 throw new IllegalArgumentException();
             
+            if (values == null)
+                throw new IllegalArgumentException();
+            
             this.name = name;
             
-            this.value = value;
+            Vector<String> tmp = new Vector<String>();
             
-        }
-        
-    }
-    
-    /**
-     * 
-     * @param root
-     * @param uri
-     * @param params
-     */
-    public XHTMLRenderer(CounterSet root, String uri, Properties params) {
+            for(String s : values) {
 
-        this.root = root;
-
-        this.uri = uri;
-
-        this.params = params;
-        
-        this.path = params.getProperty(PATH, ps);
-
-        {
-            String val = params.getProperty(FILTER);
-
-            if (val == null) {
-
-                this.filter = null;
-
-            } else {
-
-                /*
-                 * @todo join multiple values for ?filter together in OR of
-                 * quoted patterns.
-                 */
-
-                this.filter = Pattern.compile(Pattern.quote(val));
+                tmp.add(s);
                 
             }
             
+            this.values = tmp;
+            
         }
-
-        // @todo parameter?
-        this.decimalFormat = new DecimalFormat();
-        
-        decimalFormat.setGroupingUsed(true);
-
-        decimalFormat.setMinimumFractionDigits(3);
-        
-        decimalFormat.setMaximumFractionDigits(6);
-        
-        decimalFormat.setDecimalSeparatorAlwaysShown(true);
         
     }
-
+    
     /**
-     * Name of the URL query parameter specifying the starting path for the page
-     * view.
+     * Describes the state of the controller.
      */
-    final String PATH = "path";
-
+    protected final Model model;
+    
     /**
-     * Name of the URL query parameter specifying a regular expression for the
-     * filter to be applied to the counter paths.
-     */
-    final String FILTER = "filter";
-
-    /**
-     * Re-create the request URL.
-     */
-    public String getRequestURL() {
-        
-        return getRequestURL(null);
-        
-    }
-
-    /**
-     * Re-create the request URL.
      * 
-     * @param override
-     *            Overriden query parameters (optional).
      */
-    public String getRequestURL(NV[] override) {
-    
-        final Properties p;
-        
-        if(override == null) {
-            
-            p = params;
-            
-        } else {
-            
-            p = new Properties(params);
-            
-            for(NV x : override) {
-                                        
-                p.setProperty(x.name,x.value);
-                
-            }
-            
-        }
-        
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(uri);
-        
-        sb.append("?path="+p.getProperty(PATH,ps));
-        
-        Iterator itr = p.entrySet().iterator();
-        
-        while(itr.hasNext()) {
-            
-            final Map.Entry entry = (Map.Entry)itr.next();
-            
-            String name = (String)entry.getKey();
+    public XHTMLRenderer(Model model) {
 
-            if(name.equals(PATH)) continue;
-            
-            String value = (String)entry.getValue();
-            
-            sb.append("&"+encodeURL(name)+"="+encodeURL(value));
-            
-        }
+        if(model==null) throw new IllegalArgumentException();
         
-        return sb.toString();
+        this.model = model;
         
     }
-    
-    public String encodeURL(String url) {
-        
-        final String charset = "UTF-8";
-        try {
-            return URLEncoder.encode(url, charset);
-        } catch (UnsupportedEncodingException e) {
-            log.error("Could not encode: charset="+charset+", url="+url);
-            return url;
-        }
-        
-    }
-    
+
     public void write(Writer w) throws IOException {
 
         writeXmlDecl(w);
@@ -293,7 +475,7 @@ public class XHTMLRenderer {
     
     protected void writeTitle(Writer w)  throws IOException {
         
-        w.write("<title>bigdata(tm) telemetry : "+cdata(path)+"</title\n>");
+        w.write("<title>bigdata(tm) telemetry : "+cdata(model.path)+"</title\n>");
         
     }
     
@@ -301,7 +483,7 @@ public class XHTMLRenderer {
         
         w.write("<body\n>");
 
-        final ICounterNode node = root.getPath(path);
+        final ICounterNode node = model.root.getPath(model.path);
         
         if(node == null) {
 
@@ -315,7 +497,7 @@ public class XHTMLRenderer {
             
             w.write("No such counter or counter set: ");
             
-            writePath(w, path);
+            writeFullPath(w, model.path);
             
             w.write("</p>");
 
@@ -329,7 +511,7 @@ public class XHTMLRenderer {
 
         } else {
 
-            writeCounterSet(w, (CounterSet)node);
+            writeCounterSet(w, (CounterSet)node, model.depth);
             
 //            Iterator<CounterSet> itr = ((CounterSet) node).preOrderIterator();
 //
@@ -357,19 +539,37 @@ public class XHTMLRenderer {
     }
 
     /**
-     * A clickable trail of the current path.
+     * A clickable trail of the path from the root.
      */
-    protected void writePath(Writer w, String path) throws IOException {
+    protected void writeFullPath(Writer w, String path) throws IOException {
+        
+        writePath(w, path, 0/*root*/);
+        
+    }
+    
+    /**
+     * A clickable trail of the path.
+     * 
+     * @param rootDepth
+     *            The path components will be shown beginning at this depth -
+     *            ZERO (0) is the root.
+     */
+    protected void writePath(Writer w, String path, int rootDepth)
+            throws IOException {
 
         final String[] a = path.split(ps);
 
-        // click through to the root of the counter hierarchy
-        w.write("<a href=\""
-                + getRequestURL(new NV[] { new NV(PATH,
-                        ps) }) + "\">");
-        w.write(ps);
-        w.write("</a>");
-
+        if (rootDepth == 0) {
+            
+            // click through to the root of the counter hierarchy
+            w.write("<a href=\""
+                    + model.getRequestURL(new NV[] { new NV(Model.PATH, ps) })
+                    + "\">");
+            w.write(ps);
+            w.write("</a>");
+            
+        }
+        
         // builds up the path query parameter for each split.
         final StringBuilder sb = new StringBuilder(ps);
 
@@ -379,32 +579,56 @@ public class XHTMLRenderer {
             
             if (n > 1) {
 
-                w.write("&nbsp;");
+                if ((n+1) > rootDepth) {
 
-                w.write(ps);
+                    w.write("&nbsp;");
+
+                    w.write(ps);
+                    
+                }
 
                 sb.append(ps);
-                
+
             }
+
+            final String prefix = sb.toString();
             
             sb.append(name);
-            
-            w.write("&nbsp;");
 
-            w.write("<a href=\""
-                    + getRequestURL(new NV[] { new NV(PATH, sb.toString()) })
-                    + "\">");
+            if ((n+1) > rootDepth) {
 
-            // current path component.
-            w.write(cdata(name));
-            
-            w.write("</a>");
+                if(rootDepth!=0 && n==rootDepth) {
+                    
+                    w.write("<a href=\""
+                            + model.getRequestURL(new NV[] { new NV(Model.PATH, prefix) }) + "\">");
+
+                    w.write("...");
+
+                    w.write("</a>");
+                    
+                    w.write("&nbsp;"+ps);
+                    
+                }
+                
+                w.write("&nbsp;");
+
+                w.write("<a href=\""
+                        + model.getRequestURL(new NV[] { new NV(Model.PATH, sb
+                                .toString()) }) + "\">");
+
+                // current path component.
+                w.write(cdata(name));
+
+                w.write("</a>");
+
+            }
 
         }
         
     }
     
-//    protected void writeCounterNode(Writer w, ICounterNode node) throws IOException {
+// protected void writeCounterNode(Writer w, ICounterNode node) throws
+// IOException {
 //        
 //        if(node instanceof ICounterSet) {
 //            
@@ -426,8 +650,12 @@ public class XHTMLRenderer {
      * Writes all counters in the hierarchy starting with the specified
      * {@link CounterSet} in a single table.
      */
-    protected void writeCounterSet(Writer w, CounterSet counterSet) throws IOException {
+    protected void writeCounterSet(Writer w, final CounterSet counterSet,
+            final int depth) throws IOException {
 
+        // depth of the hierarchy at the point where we are starting.
+        final int rootDepth = counterSet.getDepth();
+        
         final String summary = "Showing counters for path="
                 + counterSet.getPath();
         
@@ -435,7 +663,7 @@ public class XHTMLRenderer {
 
         // @todo use css to left justify the path.
         w.write(" <caption>");
-        writePath(w,counterSet.getPath());
+        writeFullPath(w,counterSet.getPath());
         w.write("</caption\n>");
         
         w.write(" <tr\n>");
@@ -450,16 +678,33 @@ public class XHTMLRenderer {
         w.write("  <th>Days</th\n>");
         w.write(" </tr\n>");
 
-        final Iterator<ICounter> itr = counterSet.getCounters(filter);
+        final Iterator<ICounterNode> itr = counterSet.getNodes(model.pattern);
         
 //        final Iterator<ICounter> itr = counterSet.directChildIterator(
 //                true/* sorted */, ICounter.class/* type */);
         
         while(itr.hasNext()) {
 
-            final ICounter counter = itr.next();
+            final ICounterNode node = itr.next();
 
-            final String path = counter.getPath();
+            if(depth != 0) { 
+                
+                final int counterDepth = node.getDepth();
+                
+//                log.info("counterDepth("+counterDepth+") - rootDepth("+rootDepth+") = "+(counterDepth-rootDepth));
+                
+                if((counterDepth - rootDepth) > depth) {
+                
+                    // prune rendering
+                    log.debug("skipping: "+node.getPath());
+                    
+                    continue;
+                    
+                }
+                
+            }
+            
+            final String path = node.getPath();
             
 //            if (filter != null) {
 //
@@ -475,49 +720,63 @@ public class XHTMLRenderer {
 
             w.write(" <tr\n>");
 
-            /*
-             * write out values for the counter.
-             */
-
-            w.write("  <th align=\"left\">" );
-//            w.write( cdata(path) );
-            writePath(w, path);
-            w.write( "</th\n>");
-
-            if (counter.getInstrument() instanceof HistoryInstrument) {
-
-                /*
-                 * Report the average over the last hour, day, and month.
-                 */
-
-                HistoryInstrument inst = (HistoryInstrument) counter
-                        .getInstrument();
-
-                w.write("  <td>" + cdata(value(inst.minutes.getAverage()))
-                        + " (" + cdata(value(inst.minutes.size())) + ")"
-                        + "</td\n>");
-
-                w.write("  <td>" + cdata(value(inst.hours.getAverage())) + " ("
-                        + cdata(value(inst.hours.size())) + ")" + "</td\n>");
-
-                w.write("  <td>" + cdata(value(inst.days.getAverage())) + " ("
-                        + cdata(value(inst.days.size())) + ")" + "</td\n>");
-
-                // the most recent value.
-                w.write("  <td>" + cdata(value(counter.getValue()))
-                                + "</td\n>");
-
+            if(node instanceof ICounterSet) {
+            
+                w.write("  <th align=\"left\">");// colspan=\"5\">");
+                writePath(w, path, rootDepth);
+                w.write("  </th\n>");
+                w.write("  <td colspan=\"4\">&nbsp;...</td>");
+                
             } else {
+                
+                final ICounter counter = (ICounter) node;
 
                 /*
-                 * Report only the most recent value.
+                 * write out values for the counter.
                  */
 
-                // w.write(" <th>N/A</th\n>");
-                // w.write(" <th>N/A</th\n>");
-                // w.write(" <th>N/A</th\n>");
-                w.write("  <td colspan=\"4\">"
-                        + cdata(value(counter.getValue())) + "</td\n>");
+                w.write("  <th align=\"left\">");
+                writePath(w, path, rootDepth);
+                w.write("  </th\n>");
+
+                if (counter.getInstrument() instanceof HistoryInstrument) {
+
+                    /*
+                     * Report the average over the last hour, day, and month.
+                     */
+
+                    HistoryInstrument inst = (HistoryInstrument) counter
+                            .getInstrument();
+
+                    w.write("  <td>" + cdata(value(inst.minutes.getAverage()))
+                            + " (" + cdata(value(inst.minutes.size())) + ")"
+                            + "</td\n>");
+
+                    w.write("  <td>" + cdata(value(inst.hours.getAverage()))
+                            + " (" + cdata(value(inst.hours.size())) + ")"
+                            + "</td\n>");
+
+                    w.write("  <td>" + cdata(value(inst.days.getAverage()))
+                            + " (" + cdata(value(inst.days.size())) + ")"
+                            + "</td\n>");
+
+                    // the most recent value.
+                    w.write("  <td>" + cdata(value(counter.getValue()))
+                            + "</td\n>");
+
+                } else {
+
+                    /*
+                     * Report only the most recent value.
+                     */
+
+                    // w.write(" <th>N/A</th\n>");
+                    // w.write(" <th>N/A</th\n>");
+                    // w.write(" <th>N/A</th\n>");
+                    w.write("  <td colspan=\"4\">"
+                            + cdata(value(counter.getValue())) + "</td\n>");
+
+                }
 
             }
             
@@ -527,13 +786,6 @@ public class XHTMLRenderer {
 
         w.write("</table\n>");
 
-    }
-
-    // @todo parameterize, perhaps by passing in as an interface.
-    protected boolean isExpanded(String path) {
-        
-        return true;
-        
     }
     
     /**
@@ -545,24 +797,24 @@ public class XHTMLRenderer {
      */
     protected void writeCounter(Writer w, ICounter counter) throws IOException {
         
-        w.write("<p>path: ");
-        
-        writePath(w, path);
-
-        w.write("</p>");
-
-        w.write("<p>value: ");
-        
-        // the most recent value.
-        w.write(cdata(value(counter.getValue())));
-        
-        w.write("</p>");
-
-        w.write("<p>time: ");
-
-        w.write(cdata(new Date(counter.lastModified()).toString()));
-        
-        w.write("</p>");
+//        w.write("<p>path: ");
+//        
+//        writePath(w, path);
+//
+//        w.write("</p>");
+//
+//        w.write("<p>value: ");
+//        
+//        // the most recent value.
+//        w.write(cdata(value(counter.getValue())));
+//        
+//        w.write("</p>");
+//
+//        w.write("<p>time: ");
+//
+//        w.write(cdata(new Date(counter.lastModified()).toString()));
+//        
+//        w.write("</p>");
 
         if(counter.getInstrument() instanceof HistoryInstrument) {
          
@@ -574,97 +826,194 @@ public class XHTMLRenderer {
     
     /**
      * Writes details on a single counter whose {@link IInstrument} provides a
-     * history.
+     * history. The goal is to be able to easily copy and paste the data into a
+     * program for plotting, e.g., as an X-Y graph (values against time).
      * 
      * @param counter
      *            The counter.
      * 
      * @see HistoryInstrument
-     * 
-     * @todo write three tables, perhaps aligned side-by-side. Each table has a
-     *       label (minutes, hours, days), the average, the last value, and the
-     *       timestamped samples for that level of aggregation. The point is to
-     *       be able to copy and past into a worksheet for plotting.
      */
-    protected void writeHistoryCounter(Writer w, ICounter counter) throws IOException {
+    protected void writeHistoryCounter(Writer w, ICounter counter)
+            throws IOException {
 
         HistoryInstrument inst = (HistoryInstrument) counter.getInstrument();
-        
-        w.write("<p>");
-        w.write("</p>");
-        writeSamples(w, counter, inst.minutes);
 
-        w.write("<p>");
-        w.write("</p>");
-        writeSamples(w, counter, inst.hours);
-        
-        w.write("<p>");
-        w.write("</p>");
-        writeSamples(w, counter, inst.days);
+        if (inst.minutes.size() > 0) {
+            w.write("<p>");
+            w.write("</p>");
+            writeSamples(w, counter, inst.minutes);
+        }
+
+        if (inst.hours.size() > 0) {
+            w.write("<p>");
+            w.write("</p>");
+            writeSamples(w, counter, inst.hours);
+        }
+
+        if (inst.days.size() > 0) {
+            w.write("<p>");
+            w.write("</p>");
+            writeSamples(w, counter, inst.days);
+        }
         
     }
 
+    /**
+     * Writes a table containing the samples for a {@link History} for some
+     * {@link ICounter}.
+     * 
+     * @param w
+     * @param counter
+     * @param h
+     * 
+     * @throws IOException
+     */
     protected void writeSamples(Writer w, ICounter counter, History h) throws IOException {
         
-        final long period = h.getPeriod();
-        
-        final String units;
-        if(period == 1000*60L) units="Minutes";
-        else if(period == 1000*60*60L) units="Hours";
-        else if(period == 1000*60*60*24L) units="Days";
-        else units="period="+period+"ms";
-        
-        final String summary = "Showing samples: period="+units+", path=" + counter.getPath();
-
-        w.write("<table border=\"1\" summary=\"" + attrib(summary) + "\"\n>");
-
-        // @todo use css to left justify the path.
-        w.write(" <caption>");
-        writePath(w, counter.getPath());
-        w.write("</caption\n>");
-
-        w.write(" <tr\n>");
-        w.write("  <th>"+cdata(units)+"</th\n>");
-        w.write("  <th>Value</th\n>");
-        w.write(" </tr\n>");
-
         /*
-         * samples.
+         * Figure out the label for the units of the history.
          */
-        final Iterator<IHistoryEntry> itr = h.iterator();
-        
-        // zero initially.
-        long firstTimestamp = 0;
-        
-        while (itr.hasNext()) {
-
-            final IHistoryEntry sample = itr.next();
-                        
-            w.write(" <tr\n>");
-
-            final long lastModified = sample.lastModified();
-
-            if (firstTimestamp == 0) {
-                // zero base for first row.
-                firstTimestamp = lastModified;
-            }
-            
-            // all other rows a delta in units of measure.
-            final String timeStr = ""+(lastModified-firstTimestamp)/period;
-            
-//            final Date date = new Date(lastModified);
-            
-//            final String timeStr = date.toString();
-            
-            w.write("  <td>" + cdata(timeStr) + "</td\n>");
-
-            w.write("  <td>" + cdata(value(sample.getValue())) + "</td\n>");
-
-            w.write(" </tr\n>");
-
+        final String units;
+        final DateFormat dateFormat;
+        if (h.getPeriod() == 1000 * 60L) {
+            units = "Minutes";
+            dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
+        } else if (h.getPeriod() == 1000 * 60 * 24L) {
+            units = "Hours";
+            dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
+        } else if (h.getSource() != null
+                && h.getSource().getPeriod() == 1000 * 60 * 24L) {
+            units = "Days";
+            dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
+        } else {
+            units = "period=" + h.getPeriod() + "ms";
+            dateFormat = DateFormat.getDateTimeInstance();
         }
 
-        w.write("</table\n>");
+        /*
+         * Note: synchronization prevents concurrent updates to the history.
+         */
+        synchronized (h) {
+
+            /*
+             * Iterator will visit the timestamped samples in the history. We
+             * scan the history first, building up the table rows in a buffer,
+             * so that we can get the first/last timestamps from the history
+             * before we have to format the start of the table.
+             * 
+             * Note: the iterator is a snapshot of the history at the time that
+             * the iterator is requested. Since we are synchronized (above) on
+             * the history, the history will be unchanging when we populate the
+             * table and its caption, etc.
+             */
+            final Iterator<IHistoryEntry> itr = h.iterator();
+            
+            final StringBuilder sb = new StringBuilder();
+            
+            // zero initially.
+            long firstTimestamp = 0;
+            
+            // zero initially.
+            long lastTimestamp = 0;
+            
+            final long period = h.getPeriod();
+
+            while (itr.hasNext()) {
+
+                final IHistoryEntry sample = itr.next();
+
+                sb.append(" <tr\n>");
+
+                final long lastModified = sample.lastModified();
+
+                if (firstTimestamp == 0) {
+                    
+                    firstTimestamp = lastModified;
+                    
+                }
+                
+                if (lastTimestamp < lastModified) {
+                    
+                    lastTimestamp = lastModified;
+                }
+
+                /*
+                 * The time will be zero for the first row and a delta
+                 * (expressed in the units of the history) for the remaining
+                 * rows.
+                 * 
+                 * Note: The time units are computed using floating point math
+                 * and then converted to a display form using formatting in
+                 * order to be able to accurately convey where a sample falls
+                 * within the granularity of the unit (e.g., early or late in
+                 * the day).
+                 */
+                final String timeStr = model.unitsFormat
+                        .format(((double)lastModified - firstTimestamp) / period);
+
+                // final Date date = new Date(lastModified);
+                
+                // final String timeStr = date.toString();
+                
+                sb.append("  <td>" + cdata(timeStr) + "</td\n>");
+
+                sb.append("  <td>" + cdata(value(sample.getValue())) + "</td\n>");
+
+                sb.append("  <td>"+ cdata(dateFormat.format(new Date(lastModified)))+"</td\n>");
+                
+                sb.append(" </tr\n>");
+
+            }
+
+            /*
+             * Summary for the table.
+             * 
+             * @todo add some more substance to the summary?
+             */
+
+            final String summary = "Showing samples: period=" + units
+                    + ", path=" + counter.getPath();
+
+            /*
+             * Format the entire table now that we have all the data on hand.
+             */
+
+            w.write("<table border=\"1\" summary=\"" + attrib(summary)
+                    + "\"\n>");
+
+//            // caption : @todo use css to left justify the path.
+//            w.write(" <caption>");
+//            writePath(w, counter.getPath());
+//            w.write(" </caption\n>");
+
+            // header row.
+            w.write(" <tr\n>");
+            w.write("  <th colspan=\"3\">");
+            writeFullPath(w, counter.getPath());
+            w.write("  </th\n>");
+            w.write(" </tr\n>");
+
+            // header row.
+            w.write(" <tr\n>");
+            w.write("  <th>"+"From: "+dateFormat.format(new Date(firstTimestamp))+"</th\n>");
+            w.write("  <th>"+"To: "+dateFormat.format(new Date(lastTimestamp))+"</th\n>");
+//            w.write("  <th></th>");
+            w.write(" </tr\n>");
+
+            // header row.
+            w.write(" <tr\n>");
+            w.write("  <th>" + cdata(units) + "</th\n>");
+            w.write("  <th>Value</th\n>");
+            w.write("  <th>Timestamp</th>\n");
+            w.write(" </tr\n>");
+
+            // data rows.
+            w.write(sb.toString());
+
+            w.write("</table\n>");
+
+        }
 
     }
 
@@ -677,8 +1026,9 @@ public class XHTMLRenderer {
      * @return
      */
     protected String cdata(String s) {
-        
-        if(s == null) throw new IllegalArgumentException();
+
+        if (s == null)
+            throw new IllegalArgumentException();
         
         return HTMLUtility.escapeForXHTML(s);
         
@@ -711,14 +1061,12 @@ public class XHTMLRenderer {
         
         if(val instanceof Double || val instanceof Float) {
             
-            return decimalFormat.format(((Number)val).doubleValue());
+            return model.decimalFormat.format(((Number)val).doubleValue());
             
         }
 
         return val.toString();
         
     }
-    
-    final DecimalFormat decimalFormat;
     
 }

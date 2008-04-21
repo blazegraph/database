@@ -28,86 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.httpd;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Random;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import junit.framework.TestCase;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.util.httpd.AbstractHTTPD;
-import com.bigdata.util.httpd.NanoHTTPD;
 
 /**
- * Utility class for testing {@link CounterSetHTTPD}.
+ * Utility class for testing {@link CounterSetHTTPD} or
+ * {@link CounterSetHTTPDServer}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class CounterSetHTTPDServer implements Runnable {
+public class TestCounterSetHTTPDServer extends TestCase {
     
-    final static protected Logger log = Logger.getLogger(NanoHTTPD.class);
-    
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
-    /**
-     * Runs the httpd server.
-     * 
-     * @param args [port]
-     * 
-     * @throws IOException
-     */
-    public static void main(String[] args) throws Exception {
-
-        int port = 80;
-        if(args.length>0) {
-            port = Integer.parseInt(args[0]);
-        }
-
-        log.info("port: "+port);
-        
-        CounterSet counterSet = new CounterSet();
-
-        new CounterSetHTTPDServer(port,counterSet).run();
-        
-    }
-
-    private AbstractHTTPD httpd;
-
-    /**
-     * 
-     * @param port
-     * 
-     * @throws IOException
-     */
-    public CounterSetHTTPDServer(int port,CounterSet counterSet) throws Exception {
-
-        /*
-         * The runtime shutdown hook appears to be a robust way to handle ^C by
-         * providing a clean service termination.
-         */
-        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
-
-        setUp(counterSet);
-
-        httpd = new CounterSetHTTPD(port, counterSet);
-
-    }
-
     /**
      * Invoked during server startup to allow customization of the
      * {@link CounterSet} exposed by the httpd server.
@@ -170,88 +109,28 @@ public class CounterSetHTTPDServer implements Runnable {
         }
         
     }
-    
-    public void run() {
-
-        Object keepAlive = new Object();
-        
-        synchronized (keepAlive) {
-            
-            try {
-                
-                keepAlive.wait();
-                
-            } catch (InterruptedException ex) {
-                
-                log.info(""+ex);
-                
-            } finally {
-
-                // terminate.
-
-                shutdownNow();
-
-            }
-
-        }
-
-    }
-
-    synchronized public void shutdownNow() {
-
-        log.info("begin");
-
-        if (httpd != null) {
-
-            httpd.shutdownNow();
-
-            httpd = null;
-        
-        }
-
-        log.info("done");
-
-    }
 
     /**
-     * Runs {@link #shutdownNow()}.
+     * Starts a {@link CounterSetHTTPDServer} with some synthetic data.
+     * <p>
+     * Note: This test does not exit by itself. You use it to test the server
+     * from a web browser.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * @throws Exception
      */
-    static class ShutdownThread extends Thread {
-        
-        final CounterSetHTTPDServer server;
-        
-        public ShutdownThread(CounterSetHTTPDServer httpd) {
-            
-            if (httpd == null)
-                throw new IllegalArgumentException();
-            
-            this.server = httpd;
-            
-        }
-        
-        public void run() {
-            
-            try {
+    public void test_server() throws Exception {
 
-                log.info("Running shutdown.");
+        CounterSet counterSet = new CounterSet();
 
-                /*
-                 * Note: This is the "server" shutdown.
-                 */
-                
-                server.shutdownNow();
-                
-            } catch (Exception ex) {
+        setUp(counterSet);
 
-                log.error("While shutting down service: " + ex, ex);
+        final int port = 8080;
 
-            }
+        CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
+                counterSet);
 
-        }
-        
+        server.run();
+
     }
-    
+
 }

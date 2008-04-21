@@ -48,6 +48,18 @@ public class History<T> {
     }
     
     /**
+     * The source {@link History} which feeds this one.
+     * 
+     * @return The source {@link History} -or- <code>null</code> iff this is
+     *         the base {@link History}.
+     */
+    public History getSource() {
+
+        return source;
+        
+    }
+    
+    /**
      * The #of samples that can be stored in the buffer.
      */
     public int capacity() {
@@ -84,6 +96,15 @@ public class History<T> {
     }
 
     /**
+     * The datatype for the individual values.
+     */
+    public Class getValueType() {
+        
+        return data.getClass().getComponentType();
+        
+    }
+    
+    /**
      * Takes a snapshot of the samples in the {@link History} and then visits those
      * samples.
      * 
@@ -98,6 +119,8 @@ public class History<T> {
 
         private final long[] _timestamps;
 
+        private final int[] _counts;
+        
         private final T[] _data;
 
         private final Entry entry = new Entry();
@@ -105,16 +128,47 @@ public class History<T> {
         private class Entry implements IHistoryEntry<T> {
 
             public long lastModified() {
+
                 return _timestamps[current];
+                
             }
 
             public T getValue() {
-                return _data[current];
+                
+                final int count = _counts[current];
+                
+                assert count > 0;
+                
+                final T value = _data[current];
+                
+                if(isNumeric()) {
+                    
+                    // reports the average.
+                    return valueOf(((Number) value).doubleValue() / count);
+                
+                }
+                
+                return value;
+//                return _data[current];
+                
             }
 
+            public int getCount() {
+                
+                return _counts[current];
+                
+            }
+            
+            public T getTotal() {
+                
+                return _data[current];
+                
+            }
+            
             public String toString() {
 
-                return "(" + getValue() + "," + new Date(lastModified()) + ")";
+                return "(" + getValue() + ", " + getCount() + ","
+                        + new Date(lastModified()) + ")";
 
             }
 
@@ -129,6 +183,8 @@ public class History<T> {
 
                 _timestamps = null;
 
+                _counts = null;
+                
                 _data = null;
 
                 return;
@@ -195,6 +251,8 @@ public class History<T> {
              */
 
             _timestamps = new long[n];
+            
+            _counts = new int[n];
 
             _data = (T[]) java.lang.reflect.Array.newInstance(data.getClass()
                     .getComponentType(), n);
@@ -210,6 +268,8 @@ public class History<T> {
                     if (data[physicalSlot] != null) {
 
                         _timestamps[count] = timestamps[physicalSlot];
+                        
+                        _counts[count] = counts[physicalSlot];
 
                         _data[count] = data[physicalSlot];
 
@@ -266,19 +326,47 @@ public class History<T> {
 
         final T value = data[physicalSlot];
 
+        final int count = counts[physicalSlot];
+        
+        assert count >= 1;
+
         return new IHistoryEntry<T>() {
 
             public long lastModified() {
+        
                 return lastModified;
+                
             }
 
             public T getValue() {
+
+                if(isNumeric()) {
+                    
+                    // reports the average.
+                    return valueOf(((Number) value).doubleValue() / count);
+                
+                }
+                
                 return value;
+                
             }
 
+            public T getTotal() {
+                
+                return value;
+                
+            }
+            
+            public int getCount() {
+                
+                return count;
+                
+            }
+            
             public String toString() {
 
-                return "(" + value + "," + new Date(lastModified) + ")";
+                return "(" + value + ", count=" + count + ","
+                        + new Date(lastModified) + ")";
 
             }
 
@@ -316,13 +404,8 @@ public class History<T> {
 
             final IHistoryEntry<T> entry = itr.next();
 
-            final long lastModified = entry.lastModified();
-
-            final T value = entry.getValue();
-
-            assert value != null;
-
-            sb.append("(" + value + "," + new Date(lastModified) + ")");
+            sb.append("(" + entry.getValue() + "," + entry.getCount() + ", "
+                    + new Date(entry.lastModified()) + ")");
 
             if (itr.hasNext())
                 sb.append(",");
@@ -415,9 +498,17 @@ public class History<T> {
             if (data[physicalSlot] == null)
                 continue;
 
-            total += ((Number) data[physicalSlot]).doubleValue();
-
-            n++;
+            // #of samples in this slot.
+            final int count = counts[physicalSlot];
+            
+            assert count > 0;
+            
+            // total for this slot.
+            final double value = ((Number) data[physicalSlot]).doubleValue();
+            
+            total += value;
+            
+            n += count;
             
             assert n <= capacity;
 
@@ -481,15 +572,15 @@ public class History<T> {
     }
 
     /**
-     * Adds a sample to the history. The sample is placed into a slot in
-     * this history that reflects its <i>timestamp</i>.
+     * Adds a sample to the history. The sample is placed into a slot in this
+     * history that reflects its <i>timestamp</i>.
      * <p>
      * If the history wraps around into the next period and there is another
-     * history that aggregates this one, then the average for the last
-     * period will be added to the aggregating history.
+     * history that aggregates this one, then the average for the last period
+     * will be added to the aggregating history.
      * <p>
-     * Note: If we already have a sample for the same period then the new
-     * sample is ignored.
+     * Multiple samples in the same period are recorded as (a) the total of
+     * those samples in the period; and (b) the #of samples in the period.
      * 
      * @param timestamp
      *            The timestamp associated with the sample.
@@ -505,7 +596,7 @@ public class History<T> {
         if (timestamp <= 0) {
 
             /*
-             * Historical timestamps are not allowed. 
+             * Timestamps must be positive. 
              */
 
             throw new IllegalArgumentException("timestamp=" + timestamp
@@ -514,22 +605,35 @@ public class History<T> {
         }
 
         /*
-         * The [logicalSlot] is a strictly increasing index corresponding to
-         * the #of elapsed periods since the epoch (when timestamp was 0).
+         * The [logicalSlot] is the index corresponding to the #of elapsed
+         * periods since the epoch (when timestamp was 0).
          * 
-         * The [physicalSlot] is the index at which the new sample will be
-         * placed in the buffer. This is always interpreted as logically
-         * greater than the last sample (we have already asserted that the
-         * timestamp is greater than lastModified), even if the actual index
-         * is less than or equal to the current index.
+         * The [physicalSlot] is the index at which the sample will be placed in
+         * the buffer.
          * 
-         * All samples lying between the current sample (exclusive) and the
-         * new sample (inclusive and modulo the capacity of the buffer) are
-         * cleared. The new sample is then written at the computed position.
+         * Note: The buffer has a fixed capacity, but samples can arrive out of
+         * timestamp sequence. Of necessity, we can no longer record samples for
+         * an earlier period once that physical in the buffer has been recycled
+         * to represent a later period. In practice this is only a problem if a
+         * sample arrives so far out of sequence that its timestamp is [capacity *
+         * period] out of date. Such samples MUST be ignored.
          */
 
         final long logicalSlot = timestamp / period;
 
+        if (lastLogicalSlot != -1) {
+            
+            if ((lastLogicalSlot - logicalSlot) >= capacity) {
+
+                log.warn("Ignoring sample WAY out of timestamp order: timestamp="
+                                + timestamp + ", value=" + value);
+
+                return;
+                
+            }
+            
+        }
+        
         final int physicalSlot = (int) (logicalSlot % capacity);
 
         if (lastLogicalSlot == -1) {
@@ -543,6 +647,8 @@ public class History<T> {
 
             timestamps[physicalSlot] = timestamp;
 
+            counts[physicalSlot] = 1;
+            
             data[physicalSlot] = value;
 
             size = 1;
@@ -555,53 +661,58 @@ public class History<T> {
 
             assert lastModified > 0 : "lastModified=" + lastModified;
 
-            if (timestamp / period == lastModified / period) {
+//            if (timestamp / period == lastModified / period) {
+//
+//                /*
+//                 * This would cause us to overwrite the last value since the
+//                 * sample is for the same time period (same logicalSlot).
+//                 * 
+//                 * Note: This is checked _before_ we test for time going
+//                 * backwards since we want to allow updates of host-wide
+//                 * counters for multiple services running on the same host,
+//                 * in which case there will be more than one report for the
+//                 * same time period and those reports will rarely be in
+//                 * strict timestamp order.
+//                 * 
+//                 * @todo probably better off replacing the existing value in
+//                 * the same logicalSlot.
+//                 */
+//
+//                if (INFO)
+//                    log.info("overwrite ignored: t=" + timestamp + ", value="
+//                            + value);
+//
+//                return;
+//
+//            }
 
-                /*
-                 * This would cause us to overwrite the last value since the
-                 * sample is for the same time period (same logicalSlot).
-                 * 
-                 * Note: This is checked _before_ we test for time going
-                 * backwards since we want to allow updates of host-wide
-                 * counters for multiple services running on the same host,
-                 * in which case there will be more than one report for the
-                 * same time period and those reports will rarely be in
-                 * strict timestamp order.
-                 * 
-                 * @todo probably better off replacing the existing value in
-                 * the same logicalSlot.
-                 */
+//            if (timestamp < lastModified) {
+//
+//                /*
+//                 * FIXME This can happen if there is just a smidge of latency
+//                 * and the counter update falls right around the minute mark. By
+//                 * ignoring this we will wind up with dropped samples when
+//                 * aggregating data, which is not desirable. I need to verify
+//                 * that we can let in slightly old samples (from the last
+//                 * minute's data) without messing up the current data.
+//                 * 
+//                 * @todo It can also happen if some sample is wildly late for
+//                 * some reason. Those cases should be logged at WARN.
+//                 */
+//                
+//                if (INFO)
+//                    log.info("Time goes backwards: lastModified="
+//                            + lastModified + ", but timestamp=" + timestamp);
+//
+//                return;
+//                
+//            }
 
-                if (INFO)
-                    log.info("overwrite ignored: t=" + timestamp + ", value="
-                            + value);
-
-                return;
-
-            }
-
-            if (timestamp < lastModified) {
-
-                /*
-                 * FIXME This can happen if there is just a smidge of latency
-                 * and the counter update falls right around the minute mark. By
-                 * ignoring this we will wind up with dropped samples when
-                 * aggregating data, which is not desirable. I need to verify
-                 * that we can let in slightly old samples (from the last
-                 * minute's data) without messing up the current data.
-                 * 
-                 * @todo It can also happen if some sample is wildly late for
-                 * some reason. Those cases should be logged at WARN.
-                 */
-                
-                if (INFO)
-                    log.info("Time goes backwards: lastModified="
-                            + lastModified + ", but timestamp=" + timestamp);
-
-                return;
-                
-            }
-
+            /*
+             * Clear old samples in the buffer starting at one beyond the most
+             * recent sample previously record and continuing up to the current
+             * sample.
+             */
             for (long ls = lastLogicalSlot + 1; ls <= logicalSlot; ls++) {
 
                 final int ps = (int) (ls % capacity);
@@ -628,29 +739,50 @@ public class History<T> {
 
                 if (data[ps] != null) {
 
+                    // clear old slot.
+                    
                     size--;
 
                     assert size >= 0 : "size=" + size;
 
                     data[ps] = null;
 
+                    counts[ps] = 0;
+                    
                     timestamps[ps] = 0L;
 
                 }
 
             }
 
-            data[physicalSlot] = value;
+            /*
+             * Record the current sample.
+             */
+            
+            if (data[physicalSlot] == null) {
 
+                // another slot has its first sample.
+                size++;
+                
+            }
+
+            // aggregate iff numeric.
+            data[physicalSlot] = (data[physicalSlot] == null || !isNumeric() ? value
+                    : valueOf(((Number) data[physicalSlot]).doubleValue()
+                            + ((Number) value).doubleValue()));
+
+            // #of samples in that slot.
+            counts[physicalSlot] ++;
+
+            // most recent timestamp for that sample.
             timestamps[physicalSlot] = timestamp;
-
-            size++;
 
             assert size <= capacity : "size=" + size;
 
         }
 
-        lastLogicalSlot = logicalSlot;
+        // strictly increasing since samples may arrive out of timestamp order.
+        lastLogicalSlot = Math.max(lastLogicalSlot, logicalSlot);
 
     }
 
@@ -679,12 +811,16 @@ public class History<T> {
 
         this.capacity = data.length;
 
+        this.source = null;
+        
         this.period = period;
 
         //            this.source = null;
 
         this.timestamps = new long[capacity];
 
+        this.counts = new int[capacity];
+        
         this.data = data;
 
         final Class<T> ctype = (Class<T>) data.getClass().getComponentType();
@@ -717,12 +853,16 @@ public class History<T> {
 
         this.capacity = capacity;
 
+        this.source = source;
+        
         this.period = source.period * capacity;
 
         //            this.source = source;
 
         this.timestamps = new long[capacity];
 
+        this.counts = new int[capacity];
+        
         // Note: allocate based on the type of the source history.
         this.data = (T[]) java.lang.reflect.Array.newInstance(source.data
                 .getClass().getComponentType(), capacity);
@@ -740,6 +880,8 @@ public class History<T> {
 
     }
 
+    private final History source;
+    
     private final int capacity;
 
     private final long period;
@@ -752,9 +894,20 @@ public class History<T> {
 
     private History<T> sink;
 
+    /**
+     * The timestamp of the last sample reported in a given period.
+     */
     final private long[] timestamps;
 
+    /**
+     * The sum of the samples reported in a given period.
+     */
     final private T[] data;
+    
+    /**
+     * The #of samples reported in a given period.
+     */
+    final private int[] counts;
 
     /**
      * Number of valid samples in the buffer.

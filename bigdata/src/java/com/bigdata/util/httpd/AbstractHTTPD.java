@@ -29,7 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.util.httpd;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Vector;
 
 /**
  * Overrides some methods on {@link NanoHTTPD} to (a) prevent serving files from
@@ -45,22 +47,22 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     public AbstractHTTPD(int port) throws IOException {
         
         super(port);
-        
+
     }
 
     public Response serve(String uri, String method, Properties header,
-            Properties parms) {
+            Map<String, Vector<String>> parms) {
 
         try {
 
-            if("GET".equalsIgnoreCase(method)) {
-                
+            if ("GET".equalsIgnoreCase(method)) {
+
                 return doGet(uri, method, header, parms);
 
-            } else if("POST".equalsIgnoreCase(method)) {
-                    
-                    return doGet(uri, method, header, parms);
-                    
+            } else if ("POST".equalsIgnoreCase(method)) {
+
+                return doGet(uri, method, header, parms);
+
             } else if ("PUT".equalsIgnoreCase(method)) {
 
                 return doGet(uri, method, header, parms);
@@ -71,8 +73,8 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
 
             } else {
 
-                return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
-                        + method);
+                return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                        "" + method);
 
             }
 
@@ -88,7 +90,7 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     }
 
     public Response doGet(String uri, String method, Properties header,
-            Properties parms) throws Exception {
+            Map<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);
@@ -96,21 +98,23 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
     }
 
     public Response doPost(String uri, String method, Properties header,
-            Properties parms) throws Exception {
+            Map<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);
 
     }
 
-    public Response doPut( String uri, String method, Properties header, Properties parms ) throws Exception {
+    public Response doPut(String uri, String method, Properties header,
+            Map<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);
 
     }
 
-    public Response doDelete( String uri, String method, Properties header, Properties parms ) throws Exception {
+    public Response doDelete(String uri, String method, Properties header,
+            Map<String, Vector<String>> parms) throws Exception {
 
         return new Response(HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN, ""
                 + method);

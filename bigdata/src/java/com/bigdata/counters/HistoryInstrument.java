@@ -57,11 +57,11 @@ public class HistoryInstrument<T> implements IInstrument<T> {
         final long basePeriod = 60 * 1000;
         this.minutes = new History<T>(minutes, basePeriod);
 
-        // 60 minutes to the hour.
-        this.hours = new History<T>(60, this.minutes);
+        // 24 hours in a day
+        this.hours = new History<T>(24, this.minutes);
 
-        // 24 hours to the day.
-        this.days = new History<T>(24, this.hours);
+        // 30 days of history
+        this.days = new History<T>(30, this.hours);
 
     }
 
