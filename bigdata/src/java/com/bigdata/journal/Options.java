@@ -416,11 +416,11 @@ public interface Options {
     
     /**
      * The default maximum extent for a new journal before a commit triggers an
-     * overflow event (500M).
+     * overflow event (200M).
      * 
      * @see #MAXIMUM_EXTENT
      */
-    long DEFAULT_MAXIMUM_EXTENT = 500 * Bytes.megabyte;
+    long DEFAULT_MAXIMUM_EXTENT = 200 * Bytes.megabyte;
     
     /**
      * The default #of bits ({@value WormAddressManager#SCALE_OUT_OFFSET_BITS})

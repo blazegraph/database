@@ -1244,3 +1244,35 @@ Caused by: java.io.StreamCorruptedException: invalid stream header
 	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:120)
 	... 17 more
 
+main com.bigdata.journal.AbstractJournal.getCommitRecordIndex(AbstractJournal.java:1880): addr={nbytes=76,offset=419565794}
+java.lang.RuntimeException: java.io.StreamCorruptedException: invalid stream header
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:126)
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:179)
+	at com.bigdata.btree.Checkpoint.load(Checkpoint.java:282)
+	at com.bigdata.btree.BTree.load(BTree.java:1105)
+	at com.bigdata.journal.AbstractJournal.getCommitRecordIndex(AbstractJournal.java:1905)
+	at com.bigdata.journal.AbstractJournal.<init>(AbstractJournal.java:955)
+	at com.bigdata.journal.Journal.<init>(Journal.java:86)
+	at com.bigdata.journal.DumpJournal.dumpJournal(DumpJournal.java:196)
+	at com.bigdata.journal.DumpJournal.main(DumpJournal.java:135)
+Caused by: java.io.StreamCorruptedException: invalid stream header
+
+FIXME The stack traces about result from trying to deserialize a
+record containing only nul bytes.  In both cases it happens to be a
+checkpoint record.  In the 2nd case it is the checkpoint record for
+the commit record index, which means that we can't reopen the store.
+
+Note: the commit record is ALSO all nuls (79 bytes).
+
+rootBlock{ rootBlock=0, challisField=372, version=0,
+nextOffset=419565870, localTime=1208792661585,
+firstCommitTime=1208792332315,
+ lastCommitTime=1208792661569,
+commitCounter=372, commitRecordAddr={nbytes=79,offset=419564932},
+commitRecordIndexAddr={nbytes=76,offset=419565794},
+uuid=b4d8a601-89c4-49c2-9ead-ced80d91a22d, offsetBits=38,
+checksum=-1902635405, createTime=1208792329877, closeTime=0}
+
+While the root block was written, it seems that the commit record and
+the commit record index checkpoint record were NOT written on the
+disk.  Perhaps this is a failure of the OS write cache?

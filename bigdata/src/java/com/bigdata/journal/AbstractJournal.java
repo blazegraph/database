@@ -951,8 +951,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         /*
          * Create or re-load the index of commit records.
          */
-        this._commitRecordIndex = getCommitRecordIndex(this._rootBlock
-                .getCommitRecordIndexAddr());
+        this._commitRecordIndex = getCommitRecordIndex();
 
         /*
          * Give the store a chance to set any committers that it defines.
@@ -1486,8 +1485,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * again.
          */
         
-        _commitRecordIndex = getCommitRecordIndex(_rootBlock
-                .getCommitRecordIndexAddr());
+        _commitRecordIndex = getCommitRecordIndex();
 
         // discard any hard references that might be cached.
         discardCommitters();
@@ -1861,10 +1859,45 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     }
 
     /**
+     * Re-load the last committed state of the index that resolves timestamps to
+     * {@link ICommitRecord}s and create it if the index does not exist.
+     * 
+     * @return The {@link CommitRecordIndex}.
+     * 
+     * @see #_commitRecordIndex
+     */
+    protected CommitRecordIndex getCommitRecordIndex() {
+
+        final long addr = _rootBlock.getCommitRecordIndexAddr();
+
+        try {
+            
+            return getCommitRecordIndex(addr);
+    
+        } catch (RuntimeException ex) {
+            
+            /*
+             * Log the root block for post-mortem.
+             */
+            log.fatal("Could not read the commit record index:\n" + _rootBlock,
+                    ex);
+
+//            // Log the commit record also, if possible.
+//            try {
+//                log.fatal("commitRecord:" + getCommitRecord());
+//            } catch (Exception ex2) {
+//                /* Ignore. */
+//            }
+            
+            throw ex;
+            
+        }
+        
+    }
+    
+    /**
      * Create or re-load the index that resolves timestamps to
      * {@link ICommitRecord}s.
-     * <p>
-     * The current commit record index is {@link #_commitRecordIndex}.
      * 
      * @param addr
      *            The root address of the index -or- 0L if the index has not
@@ -1875,11 +1908,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * 
      * @see #_commitRecordIndex
      */
-    private CommitRecordIndex getCommitRecordIndex(long addr) {
+    protected CommitRecordIndex getCommitRecordIndex(long addr) {
 
-        log.info("");
+        log.info("addr=" + toString(addr));
         
-        CommitRecordIndex ndx;
+        final CommitRecordIndex ndx;
 
         if (addr == 0L) {
 
@@ -1888,7 +1921,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
              * then the store was never committed and the btree had since been
              * discarded. In any case we create a new btree now.
              * 
-             * Note: if the journal is read-only the we create the commit record
+             * Note: if the journal is read-only then we create the commit record
              * index on an in-memory store in order to avoid triggering a write
              * exception on the journal.
              */

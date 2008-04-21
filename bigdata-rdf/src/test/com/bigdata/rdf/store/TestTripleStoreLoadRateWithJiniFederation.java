@@ -68,35 +68,38 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         super(arg0);
     }
 
-    public Properties getProperties() {
-        
-        Properties properties = new Properties(super.getProperties());
-        
-        // Use the disk-backed store.
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-        
-        // Disable index partition moves (between data services).
-        properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
-        
-        // setup overflow conditions.
-        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
-        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
-//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*20);
-//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*20);
-        properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
-        
-        // name data directory for the unit test.
-        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
-        
-        // turn off incremental truth maintenance.
-        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
-
-        // turn off text indexing.
-        properties.setProperty(Options.TEXT_INDEX,"false");
-        
-        return properties;
-        
-    }
+    /*
+     * Note: You have to edit the service .property files to edit the configuration!
+     */
+//    public Properties getProperties() {
+//        
+//        Properties properties = new Properties(super.getProperties());
+//        
+//        // Use the disk-backed store.
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+//        
+//        // Disable index partition moves (between data services).
+//        properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
+//        
+//        // setup overflow conditions.
+//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
+//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
+////        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*20);
+////        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*20);
+//        properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
+//        
+//        // name data directory for the unit test.
+//        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
+//        
+//        // turn off incremental truth maintenance.
+//        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
+//
+//        // turn off text indexing.
+//        properties.setProperty(Options.TEXT_INDEX,"false");
+//        
+//        return properties;
+//        
+//    }
     
     public void test_loadNCIOncology() throws IOException {
 
