@@ -28,13 +28,12 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.DefaultInstrumentFactory;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IHostCounters;
-import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.IRequiredHostCounters;
-import com.bigdata.counters.Instrument;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.service.mapred.IMapService;
@@ -211,6 +210,11 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
      * The #of {@link UpdateTask}s which have run so far.
      */
     protected int nupdates = 0;
+    
+    /**
+     * The directory in which the service will log the {@link CounterSet}s.
+     */
+    protected final File logDir;
     
     /**
      * A copy of the properties used to start the service.
@@ -451,29 +455,25 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     
         /**
          * The port on which the load balancer will run its <code>httpd</code>
-         * service (default {@value #DEFAULT_LOAD_BALANCER_HTTPD_PORT}) -or-
+         * service (default {@value #DEFAULT_HTTPD_PORT}) -or-
          * ZERO (0) to NOT start the <code>httpd</code> service. This service
          * may be used to view the telemetry reported by the various services in
          * the federation that are, or have been, joined with the load balancer.
          */
-        String LOAD_BALANCER_HTTPD_PORT = "loadBalancer.httpd.port";
+        String HTTPD_PORT = "httpd.port";
         
-        String DEFAULT_LOAD_BALANCER_HTTPD_PORT = "80";
+        String DEFAULT_HTTPD_PORT = "80";
      
         /**
          * The path of the directory where the load balancer will log a copy of
          * the counters every time it runs its {@link UpdateTask}. By default
-         * it will log the files in the directory for the load balancer service.
-         * You may specify an alternative directory using this property.
-         * 
-         * FIXME Perhaps it is best to have no default for this since the
-         * service UUID itself is not a good enough location. Normally the
-         * service runs under some directory and we have no access to that from
-         * here.
+         * it will log the files in the directory from which the load balancer
+         * service was started. You may specify an alternative directory using
+         * this property.
          */
-        String LOAD_BALANCER_LOG_DIR = "loadBalancer.log.dir";
+        String LOG_DIR = "log.dir";
         
-        String DEFAULT_LOAD_BALANCER_LOG_DIR = "";
+        String DEFAULT_LOG_DIR = ".";
         
     }
 
@@ -486,7 +486,23 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         if(properties==null) throw new IllegalArgumentException();
         
         this.properties = (Properties) properties.clone();
-        
+
+        // setup the log directory.
+        {
+
+            final String val = properties.getProperty(
+                    Options.LOG_DIR,
+                    Options.DEFAULT_LOG_DIR);
+
+            logDir = new File(val);
+
+            log.info(Options.LOG_DIR + "=" + logDir);                
+
+            // ensure exists.
+            logDir.mkdirs();
+            
+        }
+
         // setup scheduled runnable for periodic updates of the service scores.
         {
 
@@ -521,13 +537,13 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         {
             
             final int port = Integer.parseInt(properties.getProperty(
-                    Options.LOAD_BALANCER_HTTPD_PORT,
-                    Options.DEFAULT_LOAD_BALANCER_HTTPD_PORT));
+                    Options.HTTPD_PORT,
+                    Options.DEFAULT_HTTPD_PORT));
 
-            log.info(Options.LOAD_BALANCER_HTTPD_PORT+"="+port);
+            log.info(Options.HTTPD_PORT+"="+port);
             
             if (port < 0)
-                throw new RuntimeException(Options.LOAD_BALANCER_HTTPD_PORT
+                throw new RuntimeException(Options.HTTPD_PORT
                         + " may not be negative");
             
             AbstractHTTPD httpd = null;
@@ -552,6 +568,8 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     
     synchronized public void shutdown() {
 
+        if(!isOpen()) return;
+        
         log.info("begin");
         
         updateService.shutdown();
@@ -559,11 +577,16 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         if (httpd != null)
             httpd.shutdown();
 
+        // log the final state of the counters.
+        logCounters("final");
+        
         log.info("done");
 
     }
 
     synchronized public void shutdownNow() {
+
+        if(!isOpen()) return;
 
         log.info("begin");
         
@@ -571,6 +594,9 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         
         if (httpd != null)
             httpd.shutdownNow();
+
+        // log the final state of the counters.
+        logCounters("final");
 
         log.info("done");
 
@@ -1210,67 +1236,69 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
         /**
          * Writes the counters on a file.
-         * 
-         * @throws IOException
          */
-        protected void logCounters() throws IOException {
+        protected void logCounters() {
 
-            final File logDir;
-            {
-
-                String val = properties.getProperty(
-                        Options.LOAD_BALANCER_LOG_DIR,
-                        Options.DEFAULT_LOAD_BALANCER_LOG_DIR);
-
-                if (val.trim().equals("")) {
-
-                    UUID serviceUUID;
-                    try {
-                        serviceUUID = getServiceUUID();
-                    } catch (IOException ex) {
-                        log.error("Service UUID not available - will not log counters");
-                        return;
-                    }
-
-                    // directory for the service.
-                    logDir = new File(serviceUUID.toString());
-
-                } else {
-
-                    logDir = new File(val);
-                    
-                }
-
-                // ensure exists.
-                logDir.mkdirs();
-                
-            }
-            
             /*
              * @todo configure how the files are named and how long they will
              * persist.
              */
-            
-            final File file = new File(logDir,""+(nupdates % 20)+"counters.xml");
-            
-            final OutputStream os = new BufferedOutputStream( new FileOutputStream(file) );
-            
-            try {
 
-                log.info("Writing counters on "+file);
-                
-                counters.asXML(os, "UTF-8", null/*filter*/);
-            
-            } finally {
-                
-                os.close();
+            final String basename = "" + (nupdates % 20);
 
-            }
+            LoadBalancerService.this.logCounters(basename);
             
         }
         
     }
 
+    /**
+     * Writes the counters on a file.
+     * 
+     * @param basename
+     *            The basename of the file. The file will be written in the
+     *            {@link #logDir}.
+     * 
+     * @throws IOException
+     */
+    protected void logCounters(String basename) {
+        
+        final File file = new File(logDir, "counters" + basename + ".xml");
+
+        log.info("Writing counters on "+file);
+        
+        OutputStream os = null;
+        
+        try {
+
+            os = new BufferedOutputStream( new FileOutputStream(file) );
+            
+            counters.asXML(os, "UTF-8", null/*filter*/);
+        
+        } catch(Exception ex) {
+            
+            log.error(ex.getMessage(), ex);
+
+        } finally {
+
+            if (os != null) {
+
+                try {
+                
+                    os.close();
+                    
+                } catch (Exception ex) {
+                    
+                    // Ignore.
+                    
+                }
+                
+            }
+
+        }
+        
+    }
+    
     /**
      * Notify the {@link LoadBalancerService} that a new service is available.
      * <p>
@@ -1376,35 +1404,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     /**
      * Used to read {@link CounterSet} XML.
      */
-    final private IInstrumentFactory instrumentFactory = new IInstrumentFactory() {
-
-        public IInstrument newInstance(Class type) {
-
-            if(type==null) throw new IllegalArgumentException();
-            
-            if (type == Double.class || type == Float.class) {
-
-                return new HistoryInstrument<Double>(new Double[] {});
-                
-            } else if (type == Long.class || type == Integer.class) {
-                
-                return new HistoryInstrument<Long>(new Long[] {});
-                
-            } else if( type == String.class ) {
-                
-                return new Instrument<String>() {
-                    public void sample() {}
-                };
-                
-            } else {
-                
-                throw new UnsupportedOperationException("type: "+type);
-                
-            }
-            
-        }
-      
-    };
+    final private IInstrumentFactory instrumentFactory = DefaultInstrumentFactory.INSTANCE;
     
     /**
      * Note: {@link #getClientHostname()} is the fully qualified hostname of the

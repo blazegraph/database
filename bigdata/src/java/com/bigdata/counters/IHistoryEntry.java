@@ -30,8 +30,24 @@ package com.bigdata.counters;
 
 public interface IHistoryEntry<T> {
     
+    /**
+     * The timestamp of the last sample to fall into this period.
+     */
     public long lastModified();
-    
+
+    /**
+     * The average of the samples in this period.
+     */
     public T getValue();
+
+    /**
+     * The #of samples in this period.
+     */
+    public int getCount();
+
+    /**
+     * The total of the samples in this period.
+     */
+    public T getTotal();
     
 }

@@ -273,6 +273,24 @@ public class CounterSet implements ICounterSet {
         
     }
     
+    public int getDepth() {
+        
+        int depth = 0;
+        
+        ICounterNode t = this;
+        
+        while(!t.isRoot()) {
+            
+            t = t.getParent();
+            
+            depth++;
+            
+        }
+        
+        return depth;
+        
+    }
+    
     /**
      * Attaches a {@link CounterSet} as a child of this node. If <i>child</i>
      * is a root, then all children of the <i>child</i> are attached instead.
@@ -456,6 +474,36 @@ public class CounterSet implements ICounterSet {
         return src;
         
     }
+
+    /**
+     * All spanned nodes.
+     * 
+     * @param filter An optional filter.
+     * 
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public Iterator<ICounterNode> getNodes(final Pattern filter) {
+     
+        IStriterator src = ((IStriterator) postOrderIterator())
+                .addFilter(new Expander() {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected Iterator expand(Object val) {
+                
+                CounterSet c = (CounterSet)val;
+                
+                return new Striterator(new SingleValueIterator(c)).append(c.counterIterator(filter));
+                
+            }
+            
+        });
+        
+        return src;
+        
+    }
     
     @SuppressWarnings("unchecked")
     public Iterator<ICounter> getCounters(final Pattern filter) {
@@ -553,9 +601,8 @@ public class CounterSet implements ICounterSet {
     }
 
     /**
-     * Iterator visits children matching the option filter recursively
-     * expanding each child with a post-order traversal of its children and
-     * finally visits this node itself.
+     * Iterator visits children recursively expanding each child with a
+     * post-order traversal of its children and finally visits this node itself.
      */
     @SuppressWarnings("unchecked")
     public Iterator postOrderIterator() {
@@ -570,9 +617,8 @@ public class CounterSet implements ICounterSet {
     }
 
     /**
-     * Iterator visits this node and then children matching the option filter
-     * recursively expanding each child with a pre-order traversal of its
-     * children and finally visits this node itself.
+     * Iterator visits this node recursively expanding each child with a
+     * pre-order traversal of its children and finally visits this node itself.
      */
     public Iterator preOrderIterator() {
         
@@ -1076,10 +1122,20 @@ public class CounterSet implements ICounterSet {
                 w.write(" name=\"" + name + "\"");
                 w.write(" type=\"" + type + "\"");
                 w.write(" time=\"" + time + "\"");
+                w.write(" value=\""+HTMLUtility.escapeForXHTML(value.toString())+"\"");
                 w.write(">");
                 
-                // @todo better encoding for XML PCData
-                w.write("" + HTMLUtility.escapeForXHTML(value.toString()));
+                if(counter.getInstrument() instanceof HistoryInstrument) {
+
+                    HistoryInstrument inst = (HistoryInstrument)counter.getInstrument();
+                    
+                    writeHistory(w, inst.minutes, "minutes");
+                    
+                    writeHistory(w, inst.hours, "hours");
+                    
+                    writeHistory(w, inst.days, "days");
+                       
+                }
                 
                 w.write("</c\n>");
                 
@@ -1093,6 +1149,53 @@ public class CounterSet implements ICounterSet {
         
         w.flush();
         
+    }
+    
+    /**
+     * Write the sample values for a {@link History} of some {@link ICounter}.
+     * 
+     * @param w
+     * @param h
+     * @param units
+     * 
+     * @throws IOException
+     */
+    protected void writeHistory(Writer w, History h, String units)
+            throws IOException {
+
+        /*
+         * Note: synchronized on the history to prevent concurrent modification.
+         */
+        synchronized(h) {
+        
+            w.write("<h");
+            w.write(" units=\"" + units + "\"");
+//            w.write(" type=\"" + type + "\"");
+            w.write("\n>");
+            
+            final Iterator<IHistoryEntry> itr = h.iterator();
+
+            while (itr.hasNext()) {
+
+                final IHistoryEntry entry = itr.next();
+                
+                w.write("<v");
+                
+                // last modified timestamp for the sample period.
+                w.write(" time=\"" + entry.lastModified() + "\"");
+                
+                // average for the sample period.
+                w.write(" value=\""
+                        + HTMLUtility.escapeForXHTML(entry.getValue().toString()) + "\"");
+
+                w.write("></v\n>");
+                
+            }
+            
+            w.write("</h\n>");
+        
+        }
+
     }
     
     public void readXML(InputStream is, IInstrumentFactory instrumentFactory,
@@ -1130,7 +1233,7 @@ public class CounterSet implements ICounterSet {
     static private class MyHandler extends DefaultHandler {
         
         /** Note: inner class so named with '$' vs '.' */
-        protected final Logger log = Logger.getLogger(MyHandler.class);
+        protected static final Logger log = Logger.getLogger(MyHandler.class);
         
         private final CounterSet root;
         
@@ -1170,29 +1273,44 @@ public class CounterSet implements ICounterSet {
 //         */
 //        private ICounterNode node;
 
-        /**
-         * The value of the <code>name</code> attribute from the last
-         * <code>c</code> element.
-         */
-        private String name;
+//        /**
+//         * The value of the <code>name</code> attribute from the last
+//         * <code>c</code> element.
+//         */
+//        private String name;
+//        
+//        /**
+//         * The value of the <code>time</code> attribute from the last
+//         * <code>c</code> element.
+//         */
+//        private long time;
+//        
+//        /**
+//         * The value of the <code>type</code> attribute from the last
+//         * <code>c</code> element.
+//         */
+//        private String type;
+        
+        /** The current counter. */
+        private ICounter counter;
         
         /**
-         * The value of the <code>time</code> attribute from the last
-         * <code>c</code> element.
+         * The current history and <code>null</code> if we are not reading
+         * some {@link History} for the current {@link #counter}.
          */
-        private long time;
+        private History history;
         
-        /**
-         * The value of the <code>type</code> attribute from the last
-         * <code>c</code> element.
-         */
-        private String type;
-        
-        /** qualified name for the <code>cs</code> element. */
+        /** qualified name for the <code>cs</code> element (counter set). */
         private final String cs = "cs"; 
 
-        /** qualified name for the <code>c</code> element. */
+        /** qualified name for the <code>c</code> element (counter). */
         private final String c = "c"; 
+        
+        /** qualified name for the <code>h</code> element (history). */
+        private final String h = "h"; 
+
+        /** qualified name for the <code>h</code> element (history value). */
+        private final String v = "v"; 
         
         /** buffers the cdata content inside of each element. */
         private StringBuilder cdata = new StringBuilder();
@@ -1203,7 +1321,11 @@ public class CounterSet implements ICounterSet {
             log.info("uri=" + uri + ",localName=" + localName + ", qName="
                     + qName);
 
-            if(qName.equals(cs)) {
+            if(qName.equals("counters")) {
+              
+                // ignore.
+                
+            } else if(qName.equals(cs)) {
                 
                 path = attributes.getValue("path");
                 
@@ -1211,14 +1333,119 @@ public class CounterSet implements ICounterSet {
                 
             } else if(qName.equals(c)) {
                 
-                name = attributes.getValue("name");
+                final String name = attributes.getValue("name");
 
-                type = attributes.getValue("type");
+                final String type = attributes.getValue("type");
                 
-                log.info("name="+name+", type="+type+", time="+attributes.getValue("time"));
+                final long time = Long.parseLong(attributes.getValue("time"));
                 
-                time = Long.parseLong(attributes.getValue("time"));
+                log.info("name="+name+", type="+type+", time="+time);
 
+                // determine value class from XSD attribute.
+                final Class typ = getType(type);
+
+                // find/create counter given its path, etc.
+                final ICounter counter = getCounter(path, name, typ);
+
+                if (counter != null) {
+
+                    final String value = attributes.getValue("value");
+
+                    // set the value on the counter.
+                    setValue(counter, typ, value, time);
+                    
+                }
+
+                /*
+                 * Set in case we need to read the counter's history also.
+                 * 
+                 * Note: this will be [null] if we could not find/create the
+                 * counter above.
+                 */
+                
+                this.counter = counter;
+
+                /*
+                 * clear history reference - set when we see the [h] element and
+                 * know the units for the history to be read.
+                 */
+                
+                this.history = null;
+
+            } else if (qName.equals(h)) {
+
+                // clear - will be set below based on units and otherwise not available.
+                history = null;
+
+                if (counter == null) {
+
+                    // The counter could not be read so ignore its history.
+                    return;
+
+                }
+
+                if(!(counter.getInstrument() instanceof HistoryInstrument)) {
+                    
+                    /*
+                     * Counter does not support history (either the factory is
+                     * wrong or the counter pre-existed but was created without
+                     * history support).
+                     */
+                    
+                    log.warn("Ignoring history: "+counter);
+                    
+                    return;
+                    
+                }
+                
+                final HistoryInstrument inst = (HistoryInstrument) counter
+                        .getInstrument();
+                
+                final String units = attributes.getValue("units");
+
+                if (units == null) {
+
+                    throw new SAXException("No units");
+                    
+                } else if (units.equals("minutes")) {
+
+                    history = inst.minutes;
+                    
+                } else if (units.equals("hours")) {
+
+                    history = inst.hours;
+                    
+                } else if (units.equals("days")) {
+
+                    history = inst.days;
+                    
+                } else {
+                    
+                    throw new SAXException("Bad units: " + units);
+                    
+                }
+                
+            } else if(qName.equals(v)) {
+            
+                if (counter == null || history == null) {
+
+                    // Ignore history.
+                    return;
+                    
+                }
+                
+                final long time = Long.parseLong(attributes.getValue("time"));
+
+                final String value = attributes.getValue("value");
+
+                log.info("counter=" + counter + ", time=" + time+", value="+value);
+
+                addValue(history, time, value);
+
+            } else {
+                
+                throw new SAXException("Unknown start tag: "+qName);
+                
             }
             
         }
@@ -1235,87 +1462,8 @@ public class CounterSet implements ICounterSet {
 
             try {
 
-                if(!qName.equals(c)) return;
-
-                final String localType = type.substring(type.lastIndexOf("#")+1);
-                
-                final Class typ;
-                
-                if(localType.equals(xsd_int)||localType.equals(xsd_long)) {
-                    
-                    typ = Long.class;
-                    
-                } else if(localType.equals(xsd_float)||localType.equals(xsd_double)) {
-                    
-                    typ = Double.class;
-                    
-                } else {
-                    
-                    typ = String.class;
-                    
-                }
-
-                final ICounter counter;
-
-                // iff there is an existing node for that path.
-                final ICounterNode node;
-                
-                // atomic makePath + counter create iff necessary.
-                synchronized (root) {
-
-                    /*
-                     * Note: use just the name when the path is '/' to avoid
-                     * forming a path that begins '//'.
-                     */
-                    node = root.getPath(path.equals(pathSeparator) ? name : path
-                            + ICounterSet.pathSeparator + name);
-
-                    if (node == null) {
-
-                        final IInstrument inst = instrumentFactory
-                                .newInstance(typ);
-
-                        counter = root.makePath(path).addCounter(name, inst);
-
-                    } else if (node.isCounter()) {
-
-                        counter = (ICounter) node;
-
-                    } else {
-
-                        log.error("Can not load counter: path=" + path
-                                + ", name=" + name
-                                + " : existing counter set with same name");
-
-                        return;
-
-                    }
-                    
-                }
-                
-                final String text = cdata.toString();
-
-                try {
-
-                    if (typ == Long.class) {
-
-                        counter.setValue(Long.parseLong(text), time);
-
-                    } else if (typ == Double.class) {
-
-                        counter.setValue(Double.parseDouble(text), time);
-
-                    } else {
-
-                        counter.setValue(text, time);
-
-                    }
-                } catch (Exception ex) {
-                    
-                    log.warn("Could not set counter value: path=" + path
-                            + ", name=" + name + " : " + ex, ex);
-                    
-                }
+//                if (!qName.equals(c))
+//                    return;
 
             } finally {
 
@@ -1324,6 +1472,154 @@ public class CounterSet implements ICounterSet {
                 
             }
             
+        }
+  
+        /**
+         * Find/create a counter given its path, name, and value class.
+         * 
+         * @param path
+         * @param name
+         * @param typ
+         * 
+         * @return The counter -or- <code>null</code> iff the path and name
+         *         identify a pre-existing {@link CounterSet}, which conflicts
+         *         with the described {@link ICounter}.
+         */
+        protected ICounter getCounter(final String path, final String name, Class typ) {
+            
+            final ICounter counter;
+
+            // iff there is an existing node for that path.
+            final ICounterNode node;
+            
+            // atomic makePath + counter create iff necessary.
+            synchronized (root) {
+
+                /*
+                 * Note: use just the name when the path is '/' to avoid
+                 * forming a path that begins '//'.
+                 */
+                node = root.getPath(path.equals(pathSeparator) ? name : path
+                        + ICounterSet.pathSeparator + name);
+
+                if (node == null) {
+
+                    final IInstrument inst = instrumentFactory
+                            .newInstance(typ);
+
+                    counter = root.makePath(path).addCounter(name, inst);
+
+                } else if (node.isCounter()) {
+
+                    counter = (ICounter) node;
+
+                } else {
+
+                    log.error("Can not load counter: path=" + path
+                            + ", name=" + name
+                            + " : existing counter set with same name");
+
+                    return null;
+
+                }
+                
+            }
+
+            return counter;
+            
+        }
+        
+        /**
+         * Interpret an XSD attribute value, returning the corresponding Java class.
+         * 
+         * @param type
+         *            The XSD attribute value.
+         * 
+         * @return
+         */
+        static protected Class getType(String type) {
+            
+            final String localType = type.substring(type.lastIndexOf("#")+1);
+            
+            final Class typ;
+            
+            if(localType.equals(xsd_int)||localType.equals(xsd_long)) {
+                
+                typ = Long.class;
+                
+            } else if(localType.equals(xsd_float)||localType.equals(xsd_double)) {
+                
+                typ = Double.class;
+                
+            } else {
+                
+                typ = String.class;
+                
+            }
+
+            return typ;
+
+        }
+        
+        /**
+         * Set the counter value given its value type and the text of its value.
+         * 
+         * @param counter
+         *            The counter whose value will be set.
+         * @param typ
+         *            The value type of the counter.
+         * @param text
+         *            The text of the value to be interpreted.
+         * @param time
+         *            The timestamp for the value.
+         */
+        static protected void setValue(final ICounter counter, final Class typ,
+                final String text, final long time) {
+            
+            try {
+
+                if (typ == Long.class) {
+
+                    counter.setValue(Long.parseLong(text), time);
+
+                } else if (typ == Double.class) {
+
+                    counter.setValue(Double.parseDouble(text), time);
+
+                } else {
+
+                    counter.setValue(text, time);
+
+                }
+                
+            } catch (Exception ex) {
+                
+                log.warn("Could not set counter value: path=" + counter.getPath()
+                        + " : " + ex, ex);
+                
+            }
+
+        }
+        
+        static protected void addValue(final History history, final long time,
+                final String text) {
+
+            final Class typ = history.getValueType();
+
+            if (typ == Long.class) {
+
+                history.add(time, Long.parseLong(text));
+
+            } else if (typ == Double.class) {
+
+                history.add(time, Double.parseDouble(text));
+
+            } else {
+
+                history.add(time, text);
+
+            }
+
         }
         
     }

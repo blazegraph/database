@@ -86,6 +86,7 @@ public class TestCounters extends TestCase {
         assertNull(root.getParent());
         assertEquals("/",root.getPath());
         assertEquals("",root.getName());
+        assertEquals(0,root.getDepth());
 
         // make a child.
         final CounterSet bigdata = root.makePath("www.bigdata.com");
@@ -95,6 +96,7 @@ public class TestCounters extends TestCase {
         
         // verify parent.
         assertTrue(root == bigdata.getParent());
+        assertEquals(1,bigdata.getDepth());
 
         assertEquals("www.bigdata.com",bigdata.getName());
         
@@ -104,6 +106,8 @@ public class TestCounters extends TestCase {
         final CounterSet memory = bigdata.makePath("memory");
         
         assertTrue(bigdata == memory.getParent());
+        
+        assertEquals(2,memory.getDepth());
 
         assertEquals("memory",memory.getName());
         
@@ -487,6 +491,9 @@ public class TestCounters extends TestCase {
              * Note: This is a mess - I have to tunnel in to do the comparisons.
              * 
              * @todo also vet the other counters.
+             * 
+             * @todo mock up a history counter and vet its de-serialization from
+             * XML.
              */
             
             assertNotNull(tmp.getPath(availableProcessors.getPath()));

@@ -63,7 +63,7 @@ abstract public class AbstractDistributedTripleStoreTestCase extends AbstractDis
      */
     ScaleOutTripleStore store;
     
-    protected Properties getProperties() {
+    public Properties getProperties() {
         
         return new Properties(System.getProperties());
     

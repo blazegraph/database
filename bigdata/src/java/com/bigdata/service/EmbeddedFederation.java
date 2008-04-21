@@ -690,7 +690,7 @@ public class EmbeddedFederation extends AbstractFederation {
         
         if (loadBalancerService != null) {
 
-            loadBalancerService.shutdownNow();
+            loadBalancerService.shutdown();
 
             loadBalancerService = null;
             

@@ -397,7 +397,7 @@ public class ConcurrentDataLoader {
          */
         while (true) {
 
-            log.info("Awaiting termination: completed="
+            log.info("Awaiting load task termination: completed="
                     + loadService.getCompletedTaskCount() + ", active="
                     + loadService.getActiveCount() + ", remaining="
                     + loadService.getQueue().size());
@@ -428,7 +428,9 @@ public class ConcurrentDataLoader {
 
             log.info("Flushing "+nflush+" buffers to the database");
             
-            final ThreadPoolExecutor tmpService = (ThreadPoolExecutor)Executors.newFixedThreadPool(nflush);
+            final ThreadPoolExecutor tmpService = (ThreadPoolExecutor) Executors
+                    .newFixedThreadPool(Math.min(nclients, nflush), DaemonThreadFactory
+                            .defaultThreadFactory());
 
             final List<Future> futures = new ArrayList<Future>(nflush);
             
@@ -440,7 +442,10 @@ public class ConcurrentDataLoader {
                     public void run() {
                         // flush the statement buffer when the task runs.
                         log.info("Flushing "+b.size()+" statements to the database.");
+                        final long begin = System.currentTimeMillis();
                         b.flush();
+                        final long elapsed = System.currentTimeMillis() - begin;
+                        log.info("Flushed "+b.size()+" statements to the database in "+elapsed+"ms");
                     }
                 }));
                 
@@ -452,12 +457,12 @@ public class ConcurrentDataLoader {
             // wait for the flush tasks to complete.
             while (true) {
 
-                log.info("Awaiting termination: completed="
+                log.info("Awaiting flush task termination: completed="
                         + tmpService.getCompletedTaskCount() + ", active="
                         + tmpService.getActiveCount()+ ", remaining="
                         + tmpService.getQueue().size());
 
-                if (tmpService.awaitTermination(60L/* 1 minute */,
+                if (tmpService.awaitTermination(20L/* secs */,
                         TimeUnit.SECONDS)) {
 
                     log.info("Flush tasks terminated normally.");

@@ -12,14 +12,19 @@ import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
+import java.util.Vector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -102,36 +107,44 @@ public class NanoHTTPD implements IServiceShutdown
 	// ==================================================
 
 	/**
-	 * Override this to customize the server.<p>
-	 *
-	 * (By default, this delegates to serveFile() and allows directory listing.)
-	 *
-	 * @parm uri	Percent-decoded URI without parameters, for example "/index.cgi"
-	 * @parm method	"GET", "POST" etc.
-	 * @parm parms	Parsed, percent decoded parameters from URI and, in case of POST, data.
-	 * @parm header	Header entries, percent decoded
-	 * @return HTTP response, see class Response for details
-	 */
-	public Response serve( String uri, String method, Properties header, Properties parms )
+     * Override this to customize the server.
+     * <p>
+     * 
+     * (By default, this delegates to serveFile() and allows directory listing.)
+     * 
+     * @parm uri Percent-decoded URI without parameters, for example
+     *       "/index.cgi"
+     * @parm method "GET", "POST" etc.
+     * @parm parms Parsed, percent decoded parameters from URI and, in case of
+     *       POST, data. The keys are the parameter names. Each value is a
+     *       {@link Colelction} of {@link String}s containing the bindings for
+     *       the named parameter.
+     * @parm header Header entries, percent decoded
+     * 
+     * @return HTTP response, see class Response for details
+     */
+	public Response serve( String uri, String method, Properties header, Map<String,Vector<String>> parms )
 	{
         if(INFO)
-		log.info( method + " '" + uri + "' " );
+		log.info(method + " '" + uri + "' ");
 
-        if(DEBUG) {
-		Enumeration e = header.propertyNames();
-		while ( e.hasMoreElements())
-		{
-			String value = (String)e.nextElement();
-            log.debug( "  HDR: '" + value + "' = '" +
-								header.getProperty( value ) + "'" );
-		}
-		e = parms.propertyNames();
-		while ( e.hasMoreElements())
-		{
-			String value = (String)e.nextElement();
-			log.debug( "  PRM: '" + value + "' = '" +
-								parms.getProperty( value ) + "'" );
-		}
+        if (DEBUG) {
+            {
+                Enumeration e = header.propertyNames();
+                while (e.hasMoreElements()) {
+                    String value = (String) e.nextElement();
+                    log.debug("  HDR: '" + value + "' = '"
+                            + header.getProperty(value) + "'");
+                }
+            }
+            {
+                Iterator e = parms.keySet().iterator();
+                while (e.hasNext()) {
+                    String value = (String) e.next();
+                    log.debug("  PRM: '" + value + "' = '"
+                            + parms.get(value) + "'");
+                }
+            }
         }
 
 		return serveFile( uri, header, new File("."), true );
@@ -427,42 +440,45 @@ public class NanoHTTPD implements IServiceShutdown
             log.info("Handling request: localPort="+mySocket.getLocalPort());
 			try
 			{
-				InputStream is = mySocket.getInputStream();
+				final InputStream is = mySocket.getInputStream();
 				if ( is == null) return;
-				BufferedReader in = new BufferedReader( new InputStreamReader( is ));
+				final BufferedReader in = new BufferedReader( new InputStreamReader( is ));
 
 				// Read the request line
-				StringTokenizer st = new StringTokenizer( in.readLine());
+				final StringTokenizer st = new StringTokenizer( in.readLine());
 				if ( !st.hasMoreTokens())
 					sendError( HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html" );
 
-				String method = st.nextToken();
+				final String method = st.nextToken();
 
 				if ( !st.hasMoreTokens())
 					sendError( HTTP_BADREQUEST, "BAD REQUEST: Missing URI. Usage: GET /example/file.html" );
 
-				String uri = decodePercent( st.nextToken());
+//                final String uri = decodePercent( st.nextToken());
+                String uri = st.nextToken();
 
 				// Decode parameters from the URI
-				Properties parms = new Properties();
-				int qmi = uri.indexOf( '?' );
-				if ( qmi >= 0 )
+                final HashMap<String,Vector<String>> parms = new HashMap<String,Vector<String>>();
+				final int qmi = uri.indexOf( '?' );
+				if ( qmi != -1 )
 				{
 					decodeParms( uri.substring( qmi+1 ), parms );
 					uri = decodePercent( uri.substring( 0, qmi ));
-				}
+				} else {
+                    uri = decodePercent( uri );
+                }
 
 				// If there's another token, it's protocol version,
 				// followed by HTTP headers. Ignore version but parse headers.
 				// NOTE: this now forces header names uppercase since they are
 				// case insensitive and vary by client.
-				Properties header = new Properties();
+				final Properties header = new Properties();
 				if ( st.hasMoreTokens())
 				{
 					String line = in.readLine();
 					while ( line.trim().length() > 0 )
 					{
-						int p = line.indexOf( ':' );
+						final int p = line.indexOf( ':' );
 						header.put( line.substring(0,p).trim().toLowerCase(), line.substring(p+1).trim());
 						line = in.readLine();
 					}
@@ -520,67 +536,79 @@ public class NanoHTTPD implements IServiceShutdown
 		 * Decodes the percent encoding scheme. <br/>
 		 * For example: "an+example%20string" -> "an example string"
 		 */
-		private String decodePercent( String str ) throws InterruptedException
+		private String decodePercent( final String str ) throws InterruptedException
 		{
 			try
 			{
-				StringBuffer sb = new StringBuffer();
-				for( int i=0; i<str.length(); i++ )
-				{
-				    char c = str.charAt( i );
-				    switch ( c )
-					{
-				        case '+':
-				            sb.append( ' ' );
-				            break;
-				        case '%':
-			                sb.append((char)Integer.parseInt( str.substring(i+1,i+3), 16 ));
-				            i += 2;
-				            break;
-				        default:
-				            sb.append( c );
-				            break;
-				    }
-				}
-				return new String( sb.toString().getBytes());
+                return URLDecoder.decode(str, "utf-8");
+//				final StringBuffer sb = new StringBuffer();
+//                for( int i=0; i<str.length(); i++ )
+//				{
+//				    char c = str.charAt( i );
+//				    switch ( c )
+//					{
+//				        case '+':
+//				            sb.append( ' ' );
+//				            break;
+//				        case '%':
+//			                sb.append((char)Integer.parseInt( str.substring(i+1,i+3), 16 ));
+//				            i += 2;
+//				            break;
+//				        default:
+//				            sb.append( c );
+//				            break;
+//				    }
+//				}
+//				return new String( sb.toString().getBytes());
 			}
 			catch( Exception e )
 			{
+                log.warn(e.getMessage()+" for input : ["+str+"]",e);
 				sendError( HTTP_BADREQUEST, "BAD REQUEST: Bad percent-encoding." );
 				return null;
 			}
 		}
 
 		/**
-		 * Decodes parameters in percent-encoded URI-format
-		 * ( e.g. "name=Jack%20Daniels&pass=Single%20Malt" ) and
-		 * adds them to given Properties.
-		 */
-		private void decodeParms( String parms, Properties p )
+         * Decodes parameters in percent-encoded URI-format ( e.g.
+         * "name=Jack%20Daniels&pass=Single%20Malt" ) and adds them to given
+         * Properties as a {@link Vector} of {@link String}s.
+         */
+		private void decodeParms( final String parms, Map<String,Vector<String>> p )
 			throws InterruptedException
 		{
 			if ( parms == null )
 				return;
 
-			StringTokenizer st = new StringTokenizer( parms, "&" );
+			final StringTokenizer st = new StringTokenizer( parms, "&" );
 			while ( st.hasMoreTokens())
 			{
-				String e = st.nextToken();
-				int sep = e.indexOf( '=' );
-				if ( sep >= 0 )
-					p.put( decodePercent( e.substring( 0, sep )).trim(),
-						   decodePercent( e.substring( sep+1 )));
+				final String e = st.nextToken();
+				final int sep = e.indexOf( '=' );
+				if (sep != -1) {
+                    final String name = decodePercent(e.substring(0, sep)).trim();
+                    final String val = decodePercent(e.substring(sep + 1));
+                    Vector<String> vals = p.get(name);
+                    if(vals==null) {
+                        vals = new Vector<String>();
+                        p.put(name,vals);
+                    }
+                    vals.add(val);
+                }
 			}
 		}
 
 		/**
-		 * Returns an error message as a HTTP response and
-		 * throws InterruptedException to stop furhter request processing.
-		 */
+         * Returns an error message as a HTTP response and throws
+         * {@link InterruptedException} to stop further request processing.
+         */
 		private void sendError( String status, String msg ) throws InterruptedException
 		{
-			sendResponse( status, MIME_TEXT_PLAIN, null, new ByteArrayInputStream( msg.getBytes()));
-			throw new InterruptedException();
+			
+            sendResponse( status, MIME_TEXT_PLAIN, null, new ByteArrayInputStream( msg.getBytes()));
+			
+            throw new InterruptedException();
+            
 		}
 
 		/**

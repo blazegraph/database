@@ -557,8 +557,93 @@ Short term tasks:
 
    - Counters
 
-     - (*******) HTTP interface for examining aggregated statistics at the
-       load balancer.
+     - Done. Work the counter path, name, and date(s) into the table
+       which shows the counters history values so that it can all get
+       copied easily into a worksheet.
+
+     - Done. #commit is not being encoded property and shows up as a
+       URL anchor and not as part of the PATH parameter.
+
+     - Done. Counter XML MUST persist the HISTORY in the XML so that
+       the log files can be useful for post-mortem.
+       
+     - Done. Write a final log file ('-final.xml') when the LBS
+       terminates.
+
+     - Done. This is now a configuration property.  The load balancer
+       is not writing its counters into the correct location (logDir).
+       The directory needs to be relative to the service directory, so
+       a method needs to expose that directory to the service.
+
+     - Done. (Not quite sure what the problem was here, but I made a
+       few changes and it appears to be fixed.)  The concurrent data
+       loader was failing to halt once it started the flush tasks.
+
+     - Done.  (Modified to accept samples out of timestamp order and
+       to record the #of and total of samples falling within a given
+       period.)  Loosing some samples through reporting w/in the same
+       period.  Round up to the next period if this period is filled.
+       An alternative is to sum the samples in the period and report
+       their average by also tracking the #of samples in the period!
+
+     - Done. When writing the path in the table rows, only write the
+       path from the selected root.
+
+     - Done. Problem with double-decoding of URL in NanoHTTP.
+
+     - Done. (Can be a bit odd when also using a regex filter.) Add
+       depth query parameter to limit the #of levels resolved from the
+       path.
+
+     - Done. (Currently using engineering notation, should be query
+       parameter).  Set to 6 digits precision, not {3,6} after the
+       decimal.  Or right justify decimal value with fixed N digits
+       after the decimal (could be query param).
+
+     - Done. (Also added the timestamp itself.) When converting to
+       minutes, hours, and days in httpd make sure to have a few
+       digits after the decimal -- otherwise false boundaries.
+
+     - Done. (uses wildcards before and after and ORs together.) The
+       filter needs to accept regex characters or prefix and post-fix
+       with ".*".  Since things are quoted, right now nothing is
+       actually matched.
+
+     - Done. Since the log files provide post-mortem, there should be
+       a way to view the files through the same httpd tool - a mode
+       where it reads a single named counter XML file and then lets
+       you browse it.  This will make it easy to find interesting
+       views.
+
+     - Add UI elements to set the filter(s), depth, decimalFormat,
+       etc.  These should be a FORM with a GET action.
+
+     - The services should be translated (or annotated) by the
+       hostname and service info.  This will make the information more
+       interesting than just staring at UUIDs.
+
+     - Maybe loosing some samples by running multiple typeperf's at
+       once.  Explore.  If true, then trying combining all w/in same
+       JVM using reference counter for process or identifying one
+       process in the JVM which will have responsibility for those
+       counters.
+
+     - I should be able to bookmark interesting counter sets, but the
+       service name needs to be there or the bookmarks will depend
+       only on filters, such as all unisolated counters.  An xpath
+       might be useful here so that the filter reads down to a service
+       name or type and then back up to reveal the service.
+
+     - Cache-Control (data are good up to 60 seconds after the
+       counters were last updated) and auto-update of page/view?
+
+   - LoadBalancerService
+
+     - Clear the log directory when the service is destroyed?  (This
+       has a negative side-effect for unit tests of a federation since
+       I loose all that nice post-mortem data.  This might well be a
+       bad idea for a deployment as well.  Perhaps clear the log of
+       old log files directory when the service starts instead?)
 
      - (**) Compute average response time and throughput as 1/average
        response time.  And measure on the client as well so that we
@@ -568,14 +653,9 @@ Short term tasks:
        and join operations (OverflowManager).  Also report #of errors
        during asynchronous overflow processing.
 
-     - (*) When aggregating data to the load balancer it will be
-       relatively common for some samples to arive "late", especially
-       when the reporting period falls right around the minute mark.
-       These samples SHOULD be let in if we do not already have a
-       sample for that period since otherwise we could see a lot of
-       dropped samples.
-
-     - Add a moving average computation to History
+     - Add a parameterized moving average computation to History with
+       a default weight.  This could be written into the UI tables for
+       easy of plotting.
 
      - Add counter to the write service that reports the #of tasks
        which have their locks and are actually doing their work
@@ -608,6 +688,11 @@ Short term tasks:
        groupCommitCount=109, abortCount=0, failedTaskCount=0,
        successTaskCount=2152, committedTaskCount=2140,
        overflowCount=0}
+
+     - Analysis U10 on workstation:
+
+         - Reads time FAR outpages write time, so consider a read
+           cache.
 
    - LocalTripleStoreWithEmbeddedDataService
 
@@ -1039,4 +1124,123 @@ java.lang.AssertionError: lastModified=0
 	at com.sun.org.apache.xerces.internal.impl.XMLDocumentFragmentScannerImpl.scanDocument(XMLDocumentFragmentScannerImpl.java:368)
 	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:834)
 	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:764)
+
+============================================================
+
+Counters error during concurrent data loader run (U50 on dpp
+workstation with lots of swapping going on).  Probable cause: failure
+to synchronize writers during write cache flush.
+
+aused by: java.nio.BufferOverflowException
+	at java.nio.HeapByteBuffer.put(HeapByteBuffer.java:182)
+	at com.bigdata.journal.DiskOnlyStrategy$WriteCache.write(DiskOnlyStrategy.java:348)
+	at com.bigdata.journal.DiskOnlyStrategy.write(DiskOnlyStrategy.java:1504)
+	at com.bigdata.journal.AbstractJournal.write(AbstractJournal.java:1714)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:1990)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:98)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
+	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:273)
+	at com.bigdata.cache.HardReferenceQueue.append(HardReferenceQueue.java:235)
+	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:1752)
+	at com.bigdata.btree.Node.lookup(Node.java:647)
+	at com.bigdata.btree.Node.lookup(Node.java:653)
+	at com.bigdata.btree.AbstractBTree.lookup(AbstractBTree.java:1148)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:380)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:353)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:321)
+	at com.bigdata.rdf.store.AddTerms.apply(AddTerms.java:194)
+	at com.bigdata.journal.IndexProcedureTask.doTask(IndexProcedureTask.java:56)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1029)
+
+Also during U50 run:
+
+java.lang.RuntimeException: java.lang.RuntimeException: Execution failed: ntasks=1, nfailed=1
+	at com.bigdata.rdf.store.ConcurrentDataLoader.<init>(ConcurrentDataLoader.java:363)
+	at com.bigdata.rdf.store.ConcurrentDataLoader.<init>(ConcurrentDataLoader.java:222)
+	at com.bigdata.rdf.store.TestTripleStoreLoadRateWithJiniFederation.test_U50(TestTripleStoreLoadRateWithJiniFederation.java:141)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)
+	at java.lang.reflect.Method.invoke(Method.java:585)
+	at junit.framework.TestCase.runTest(TestCase.java:154)
+	at junit.framework.TestCase.runBare(TestCase.java:127)
+	at junit.framework.TestResult$1.protect(TestResult.java:106)
+	at junit.framework.TestResult.runProtected(TestResult.java:124)
+	at junit.framework.TestResult.run(TestResult.java:109)
+	at junit.framework.TestCase.run(TestCase.java:118)
+	at org.eclipse.jdt.internal.junit.runner.junit3.JUnit3TestReference.run(JUnit3TestReference.java:128)
+	at org.eclipse.jdt.internal.junit.runner.TestExecution.run(TestExecution.java:38)
+	at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.runTests(RemoteTestRunner.java:460)
+	at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.runTests(RemoteTestRunner.java:673)
+	at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.run(RemoteTestRunner.java:386)
+	at org.eclipse.jdt.internal.junit.runner.RemoteTestRunner.main(RemoteTestRunner.java:196)
+Caused by: java.lang.RuntimeException: Execution failed: ntasks=1, nfailed=1
+	at com.bigdata.service.ClientIndexView.runParallel(ClientIndexView.java:1027)
+	at com.bigdata.service.ClientIndexView.runTasks(ClientIndexView.java:948)
+	at com.bigdata.service.ClientIndexView.submit(ClientIndexView.java:812)
+	at com.bigdata.service.ClientIndexView.rangeCount(ClientIndexView.java:562)
+	at com.bigdata.rdf.store.AbstractTripleStore.getStatementCount(AbstractTripleStore.java:814)
+	at com.bigdata.rdf.store.ConcurrentDataLoader.process(ConcurrentDataLoader.java:569)
+	at com.bigdata.rdf.store.ConcurrentDataLoader.<init>(ConcurrentDataLoader.java:335)
+	... 18 more
+Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.io.StreamCorruptedException: invalid stream header
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
+	at com.bigdata.service.DataService.submit(DataService.java:1370)
+	at sun.reflect.GeneratedMethodAccessor21.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)
+	at java.lang.reflect.Method.invoke(Method.java:585)
+	at net.jini.jeri.BasicInvocationDispatcher.invoke(BasicInvocationDispatcher.java:1126)
+	at net.jini.jeri.BasicInvocationDispatcher.dispatch(BasicInvocationDispatcher.java:608)
+	at com.sun.jini.jeri.internal.runtime.ObjectTable$6.run(ObjectTable.java:597)
+	at net.jini.export.ServerContext.doWithServerContext(ServerContext.java:103)
+	at com.sun.jini.jeri.internal.runtime.ObjectTable$Target.dispatch0(ObjectTable.java:595)
+	at com.sun.jini.jeri.internal.runtime.ObjectTable$Target.access$700(ObjectTable.java:212)
+	at com.sun.jini.jeri.internal.runtime.ObjectTable$5.run(ObjectTable.java:568)
+	at java.security.AccessController.doPrivileged(Native Method)
+	at com.sun.jini.jeri.internal.runtime.ObjectTable$Target.dispatch(ObjectTable.java:565)
+	at com.sun.jini.jeri.internal.runtime.ObjectTable$Target.dispatch(ObjectTable.java:540)
+	at com.sun.jini.jeri.internal.runtime.ObjectTable$RD.dispatch(ObjectTable.java:778)
+	at net.jini.jeri.connection.ServerConnectionManager$Dispatcher.dispatch(ServerConnectionManager.java:148)
+	at com.sun.jini.jeri.internal.mux.MuxServer$2.run(MuxServer.java:244)
+	at java.security.AccessController.doPrivileged(Native Method)
+	at com.sun.jini.jeri.internal.mux.MuxServer$1.run(MuxServer.java:241)
+	at com.sun.jini.thread.ThreadPool$Worker.run(ThreadPool.java:136)
+	at java.lang.Thread.run(Thread.java:595)
+	at com.sun.jini.jeri.internal.runtime.Util.__________EXCEPTION_RECEIVED_FROM_SERVER__________(Util.java:108)
+	at com.sun.jini.jeri.internal.runtime.Util.exceptionReceivedFromServer(Util.java:101)
+	at net.jini.jeri.BasicInvocationHandler.unmarshalThrow(BasicInvocationHandler.java:1303)
+	at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethodOnce(BasicInvocationHandler.java:832)
+	at net.jini.jeri.BasicInvocationHandler.invokeRemoteMethod(BasicInvocationHandler.java:659)
+	at net.jini.jeri.BasicInvocationHandler.invoke(BasicInvocationHandler.java:528)
+	at $Proxy2.submit(Unknown Source)
+	at com.bigdata.service.ClientIndexView$AbstractDataServiceProcedureTask.submit(ClientIndexView.java:1267)
+	at com.bigdata.service.ClientIndexView$AbstractDataServiceProcedureTask.submit(ClientIndexView.java:1226)
+	at com.bigdata.service.ClientIndexView$AbstractDataServiceProcedureTask.call(ClientIndexView.java:1188)
+	at com.bigdata.service.ClientIndexView$AbstractDataServiceProcedureTask.call(ClientIndexView.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run(Thread.java:595)
+Caused by: java.lang.RuntimeException: java.io.StreamCorruptedException: invalid stream header
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:126)
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:179)
+	at com.bigdata.btree.Checkpoint.load(Checkpoint.java:282)
+	at com.bigdata.btree.BTree.load(BTree.java:1105)
+	at com.bigdata.journal.AbstractJournal.getIndex(AbstractJournal.java:2037)
+	at com.bigdata.journal.AbstractJournal.getIndex(AbstractJournal.java:1985)
+	at com.bigdata.resources.IndexManager.getIndexOnStore(IndexManager.java:352)
+	at com.bigdata.resources.IndexManager.getIndexSources(IndexManager.java:520)
+	at com.bigdata.resources.IndexManager.getIndex(IndexManager.java:759)
+	at com.bigdata.journal.AbstractTask.getIndex(AbstractTask.java:1266)
+	at com.bigdata.journal.IndexProcedureTask.doTask(IndexProcedureTask.java:56)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:685)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:604)
+	... 5 more
+Caused by: java.io.StreamCorruptedException: invalid stream header
+	at java.io.ObjectInputStream.readStreamHeader(ObjectInputStream.java:763)
+	at java.io.ObjectInputStream.<init>(ObjectInputStream.java:278)
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:120)
+	... 17 more
 

@@ -68,7 +68,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         super(arg0);
     }
 
-    protected Properties getProperties() {
+    public Properties getProperties() {
         
         Properties properties = new Properties(super.getProperties());
         
@@ -125,6 +125,20 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
     public void test_U10() {
         
         new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/,  new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+
+            public boolean accept(File dir, String name) {
+                if(name.endsWith(".owl")) return true;
+                return false;
+            }
+            
+        });
+        
+    }
+
+    
+    public void test_U50() {
+        
+        new ConcurrentDataLoader(store, 10/*nthreads*/, 20000 /*bufferCapacity*/,  new File("../rdf-data/lehigh/U50"), new FilenameFilter(){
 
             public boolean accept(File dir, String name) {
                 if(name.endsWith(".owl")) return true;
