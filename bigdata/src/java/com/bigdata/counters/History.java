@@ -320,12 +320,29 @@ public class History<T> {
 
         }
 
+        /*
+         * Collect data while synchronized so that we can return a coherent view
+         * of the entry as of the time that this method executed.
+         */
+        
         final int physicalSlot = (int) (lastLogicalSlot % capacity);
 
         final long lastModified = timestamps[physicalSlot];
 
         final T value = data[physicalSlot];
 
+        if (value == null) {
+            
+            /*
+             * @todo I have seen a null [value] when [lastLogicalSlot != -1].
+             * How does this condition arise?  Is there a problem elsewhere 
+             * that only shows up here as a null [value]?
+             */
+            
+            return null;
+            
+        }
+        
         final int count = counts[physicalSlot];
         
         assert count >= 1;
@@ -471,7 +488,7 @@ public class History<T> {
             
         }
         
-        if(this.lastLogicalSlot == -1) {
+        if(lastLogicalSlot == -1) {
             
             // No data.
             
@@ -485,8 +502,12 @@ public class History<T> {
         // #of non-null values.
         int n = 0;
 
-        final long currentLogicalSlot = timestamps[(int)(lastLogicalSlot % capacity)]
-                / period;
+        // @todo this is winding up with an array index of -1 for some reason.
+        final int tmpi = (int) (lastLogicalSlot % capacity);
+        assert tmpi >= 0 && tmpi < capacity : "index=" + tmpi
+                + ", lastLogicalSlot=" + lastLogicalSlot + ", capacity="
+                + capacity;
+        final long currentLogicalSlot = timestamps[tmpi] / period;
 
         final long firstLogicalSlot = lastLogicalSlot - nperiods + 1;
 
