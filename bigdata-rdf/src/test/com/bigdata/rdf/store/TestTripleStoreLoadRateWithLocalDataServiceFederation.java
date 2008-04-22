@@ -145,4 +145,72 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         
     }
 
+    /**
+     * 
+     * <dl>
+     * <dt>-Dnthreads</dt>
+     * <dd>#of threads to use.</dd>
+     * <dt>-DbufferCapacity</dt>
+     * <dd>Capacity of the statement buffers.</dd>
+     * <dt>-Ddocuments.directory</dr>
+     * <dd>The file or directory to be loaded (recursive processing).</dd>
+     * </dl>
+     * 
+     * You must also specify
+     * 
+     * <pre>
+     *   -Djava.security.policy=policy.all
+     * </pre>
+     * 
+     * and probably want to specify
+     * 
+     * <pre>
+     *  -Dcom.sun.jini.jeri.tcp.useNIO=true
+     * </pre>
+     * 
+     * as well.
+     * 
+     * @todo support load of the ontology as well?
+     * 
+     * @todo make this part of the {@link ConcurrentDataLoader} and modify so
+     *       that you can run against any pre-existing database, including a
+     *       jini-based bigdata federation, or create a new one from the defined
+     *       properties.
+     * 
+     * @param args
+     * @throws Exception
+     */
+    public static void main(String[] args) throws Exception {
+
+        final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
+        
+        final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
+        
+        final String file = System.getProperty("documents.directory");
+  
+        if(file==null) throw new RuntimeException("Required property 'documents.directory' was not specified");
+        
+        TestTripleStoreLoadRateWithLocalDataServiceFederation test = new TestTripleStoreLoadRateWithLocalDataServiceFederation("test");
+        
+        test.setUp();
+        
+        new ConcurrentDataLoader(test.store, nthreads, bufferCapacity,
+                new File(file), new FilenameFilter() {
+
+            public boolean accept(File dir, String name) {
+//                if(name.endsWith(".owl")) return true;
+                return true;
+//                return false;
+            }
+            
+        });
+        
+        test.tearDown();
+        
+        System.out.println("Exiting normally.");
+        
+        System.exit(0);
+        
+    }
+
 }
