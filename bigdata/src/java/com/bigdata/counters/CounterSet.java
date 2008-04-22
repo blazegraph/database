@@ -295,7 +295,11 @@ public class CounterSet implements ICounterSet {
      * Attaches a {@link CounterSet} as a child of this node. If <i>child</i>
      * is a root, then all children of the <i>child</i> are attached instead.
      * If a {@link CounterSet} already exists then its children are attached. If
-     * a {@link Counter}s already exists then it is overwritten.
+     * a {@link Counter}s already exists then it is overwritten. During
+     * recursive attach if we encounter a node that already exists then just
+     * copy its children. If there is a conflict (trying to copy a counter over
+     * a counter set or visa-versa), then a warning is logged and we ignore the
+     * conflicting node.
      * 
      * @param src
      *            The child counter set.
@@ -315,14 +319,12 @@ public class CounterSet implements ICounterSet {
             /*
              * If the child is a root then we attach its children.
              */
-            Iterator<ICounterNode> itr = ((CounterSet) src).children.values()
+            final Iterator<ICounterNode> itr = ((CounterSet) src).children.values()
                     .iterator();
 
             while (itr.hasNext()) {
 
-                ICounterNode child2 = itr.next();
-
-                attach2(child2);
+                attach2(itr.next());
 
             }
 
@@ -334,33 +336,52 @@ public class CounterSet implements ICounterSet {
         
     }
 
-    /**
-     * @todo during recursive attach if we encounter a node that already exists
-     *       then just copy its children.
-     */
     @SuppressWarnings("unchecked")
-    private void attach2(ICounterNode child) {
+    private void attach2(ICounterNode src) {
 
-        if (child == null)
+        if (src == null)
             throw new IllegalArgumentException();
 
-        if (children.containsKey(child.getName())) {
+        if (children.containsKey(src.getName())) {
 
             /*
-             * Note: This can also occur when the child is a counter vs a
-             * counter set.
+             * There is an existing node with the same path as [src]. 
              */
-            
-            throw new IllegalStateException("child by that name exists: path="
-                    + getPath() + ", child=" + child.getName());
+
+            // the existing node with the same path as [src].
+            final ICounterNode existingChild = children.get(src.getName());
+
+            if(existingChild.isCounter()) {
+                
+                log.warn("Will not replace existing counter: "+existingChild.getPath());
+                
+            } else if (src.isCounterSet()) {
+                
+                /*
+                 * If the [src] is a counter set, then attach its children
+                 * instead.
+                 */
+
+                final Iterator<ICounterNode> itr = ((CounterSet) src).children
+                        .values().iterator();
+
+                while (itr.hasNext()) {
+
+                    ((CounterSet) existingChild).attach2(itr.next());
+
+                }
+
+            }
+
+            return;
             
         }
         
-        synchronized(child) {
+        synchronized(src) {
 
-            final String name = child.getName();
+            final String name = src.getName();
             
-            final CounterSet oldParent = (CounterSet)child.getParent();
+            final CounterSet oldParent = (CounterSet)src.getParent();
             
             assert oldParent != null;
             
@@ -370,17 +391,17 @@ public class CounterSet implements ICounterSet {
                 
             }
             
-            if(child.isCounterSet()) {
+            if(src.isCounterSet()) {
                 
-                ((CounterSet)child).parent = this;
+                ((CounterSet)src).parent = this;
                 
             } else {
                 
-                ((Counter)child).parent = this;
+                ((Counter)src).parent = this;
                 
             }
             
-            children.put(name, child);
+            children.put(name, src);
             
 //            /*
 //             * update the path on the child (and recursively on its children) to

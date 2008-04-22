@@ -483,8 +483,8 @@ abstract public class DataService implements IDataService, //IWritePipeline,
                             .defaultThreadFactory());
             
             reportService.scheduleWithFixedDelay(new StartPerformanceCounterCollectionTask(properties),
-                    50, // initialDelay (ms)
-                    50, // delay
+                    150, // initialDelay (ms)
+                    150, // delay
                     TimeUnit.MILLISECONDS // unit
                     );
 
@@ -681,13 +681,23 @@ abstract public class DataService implements IDataService, //IWritePipeline,
                 throw new RuntimeException(ex);
             }
             
-            countersRoot = new CounterSet();
+            if (serviceUUID == null) {
+                
+                throw new IllegalStateException("The ServiceUUID is not available yet");
+                
+            }
             
-            countersRoot.attach( statisticsCollector.getCounters() );
+            countersRoot = new CounterSet();
+
+//            if( statisticsCollector != null) {
+//
+//                countersRoot.attach(statisticsCollector.getCounters());
+//
+//            }
             
             final String ps = ICounterSet.pathSeparator;
             
-            final String hostname = statisticsCollector.fullyQualifiedHostName;
+            final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
                        
             final String pathPrefix = ps + hostname + ps + "service" + ps
                     + serviceUUID + ps;
@@ -947,6 +957,23 @@ abstract public class DataService implements IDataService, //IWritePipeline,
         
         protected String getStatus() {
 
+            if(!resourceManager.isRunning()) {
+                
+                return "Resource manager not running.";
+                
+            }
+            
+            try {
+                if (getServiceUUID() != null) {
+                  
+                    return "Service UUID not available yet.";
+                    
+                }
+            } catch (IOException e) {
+                // Note: should not be thrown for a local function call.
+                throw new RuntimeException(e);
+            }
+            
             final String s = getCounters().toString(filter);
 
             return s;
@@ -957,11 +984,12 @@ abstract public class DataService implements IDataService, //IWritePipeline,
 
     /**
      * This task runs periodically. Once {@link IDataService#getServiceUUID()}
-     * reports a non-<code>null</code> value, it starts the performance
-     * counter collector and the {@link ReportTask} which will relay the
-     * performance counters to the {@link ILoadBalancerService}. At that point
-     * this task will throw an exception in order to prevent it from being
-     * re-executed by the {@link DataService#reportService}.
+     * reports a non-<code>null</code> value AND
+     * {@link ResourceManager#isRunning()} reports <code>true</code>, it will
+     * start the performance counter collector and the {@link ReportTask} which
+     * will relay the performance counters to the {@link ILoadBalancerService}.
+     * At that point this task will throw an exception in order to prevent it
+     * from being re-executed by the {@link DataService#reportService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1044,6 +1072,14 @@ abstract public class DataService implements IDataService, //IWritePipeline,
                 return false;
 
             }
+            
+            if(!resourceManager.isRunning()) {
+                
+                log.info("Resource manager is not running yet.");
+                
+                return false;
+                
+            }
 
             log.info("Service UUID was assigned - will start performance counter collection: uuid="
                             + uuid);
@@ -1055,6 +1091,12 @@ abstract public class DataService implements IDataService, //IWritePipeline,
             statisticsCollector = AbstractStatisticsCollector.newInstance(properties);
             
             statisticsCollector.start();
+            
+            /*
+             * Attach the counters that will be reported by the statistics
+             * collector service.
+             */
+            ((CounterSet)getCounters()).attach(statisticsCollector.getCounters());
 
             final long delay = Long.parseLong(properties.getProperty(
                     Options.REPORT_DELAY,
