@@ -1060,6 +1060,58 @@ Short term tasks:
       - the memory demand jumps up during overflow handling.  maybe I
         need to throttle the thread pool more on the data service?
 
+      - (****) Write script to allocate services to nodes.
+
+        - The per-process counters for linux are not being reported
+          under "service" but instead directly under the service UUID.
+
+	- The per-host counters for linux are not being reported at
+          all.
+
+        - N data services; 1 MDS; 1 LBS; 1 TS, etc.
+
+	- The script needs to start the services on a LOCAL disk on
+          each machine (I am currently setup on NAS so that means the
+          DISK is REMOTE).  This means replicating the environment
+          onto the local host (at least the configuration) and then
+          starting the service.  The classpath could be resolved on
+          NAS or replicated onto the local host and resolve there. (I
+          just need to copy [policy.all,
+          bigdata-rdf/src/resources/logging/log4j.properties, and
+          bigdata-rdf/src/resources/config/standalone ->
+          .../src/resources/config/standalone {create the directory
+          path first}].  I could also copy the classpath resources,
+          but presumably they will be fetched quickly enough and
+          become stable - or maybe not?
+
+	- Need to touch up launch-all after the jini install as well
+          as installing from a pre-touched version fixing the
+          LD_ASSUME_KERNEL_VERSION bug.
+
+	- Done. (Problem was bad path in the classpath element for
+          lgpl-utils.)  Problem with dependency on dsiutils that keeps
+          cropping up.  Changing the binary changed the symptom but
+          not the problem.  Try w/o jini.  Perhaps it is a
+          downloadable code issue?  Can I abstract the federation
+          startup enough to run the same code against the local
+          federation or embedded federation w/o jini? (Yes, I see the
+          same problem for the local data service federation.)
+
+	- Still an annoying problem with the service names as
+          displayed by the jini browser....
+
+	- ConcurrentDataLoader:
+
+	- U10, host3: 11517 tps : LocalDataServiceFederation and
+          writing on local disk but reading the classpath and data
+          from NAS.
+
+	- U10, host3: xxx tps : JiniFederation - has problems finding
+          the timestamp service leading to the store manager not
+          starting.  May be related to problems starting the sysstat
+          processes to monitor the host or JVM (I saw an NPE there) or
+          just a timeout during startup (307 ms).
+
 ============================================================
 
 - ERROR: 39296     pool-1-thread-142 com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1436): java.lang.AssertionError: ndone=8, but #used=9
