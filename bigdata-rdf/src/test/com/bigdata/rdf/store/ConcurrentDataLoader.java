@@ -697,7 +697,7 @@ public class ConcurrentDataLoader {
                         + ", completed="+ loadService.getCompletedTaskCount()//
                         );
                 
-                Thread.sleep(100/*ms*/);
+                Thread.sleep(250/*ms*/);
                 
             }
 
