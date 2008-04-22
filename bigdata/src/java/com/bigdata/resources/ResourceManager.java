@@ -117,9 +117,15 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     }
                 });
 
+                tmp.addCounter("Overflow Enabled", new Instrument<Boolean>() {
+                    public void sample() {
+                        setValue(isOverflowEnabled());
+                    }
+                });
+                
                 tmp.addCounter("Overflow Allowed", new Instrument<Boolean>() {
                     public void sample() {
-                        setValue(overflowAllowed.get());
+                        setValue(isOverflowAllowed());
                     }
                 });
                 

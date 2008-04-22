@@ -203,6 +203,19 @@ abstract public class OverflowManager extends IndexManager {
     }
     
     /**
+     * <code>true</code> if overflow processing is enabled and
+     * <code>false</code> if overflow processing was disabled as a
+     * configuration option, in which case the live journal will NOT overflow.
+     * 
+     * @see Options#OVERFLOW_ENABLED
+     */
+    public boolean isOverflowEnabled() {
+        
+        return overflowEnabled;
+        
+    }
+
+    /**
      * <code>true</code> unless an overflow event is currently being
      * processed.
      */
