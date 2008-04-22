@@ -542,14 +542,12 @@ public class StatementBuffer implements IStatementBuffer {
     }
     
     /**
-     * Clears all buffered data (used when there is an error loading data and
-     * everything in the buffer needs to be cleared, including the
-     * canonicalizing mapping for blank nodes and deferred provenance
-     * statements).
+     * Clears all buffered data, including the canonicalizing mapping for blank
+     * nodes and deferred provenance statements.
      */
     public void clear() {
         
-        log.warn("");
+        log.info("");
         
         _clear();
         
