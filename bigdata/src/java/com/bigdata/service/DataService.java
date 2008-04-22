@@ -1049,8 +1049,8 @@ abstract public class DataService implements IDataService, //IWritePipeline,
                             + uuid);
             
             properties.setProperty(
-                    AbstractStatisticsCollector.Options.PROCESS_NAME, uuid
-                            .toString());
+                    AbstractStatisticsCollector.Options.PROCESS_NAME, "service"
+                            + ICounterSet.pathSeparator + uuid.toString());
             
             statisticsCollector = AbstractStatisticsCollector.newInstance(properties);
             
