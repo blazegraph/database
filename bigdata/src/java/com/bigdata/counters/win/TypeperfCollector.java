@@ -295,6 +295,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
         public void run() {
 
+            log.info("");
+            
             try {
 
                 // run
@@ -318,12 +320,14 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
         private void read() throws Exception {
 
+            log.info("");
+
             long nsamples = 0;
 
-            LineNumberReader reader = new LineNumberReader(
+            final LineNumberReader reader = new LineNumberReader(
                     new InputStreamReader(is));
 
-            CSVReader csvReader = new CSVReader(reader);
+            final CSVReader csvReader = new CSVReader(reader);
 
             /*
              * @todo This is a bit delicate.
@@ -366,10 +370,12 @@ public class TypeperfCollector extends AbstractProcessCollector {
              * names.
              */
             {
+                
+                log.info("setting up headers.");
 
                 int i = 1;
 
-                for (InstrumentForWPC decl : decls) {
+                for (final InstrumentForWPC decl : decls) {
 
                     String path = decl.getPath();
                     // String path = hostPathPrefix + decl.getPath();
@@ -382,6 +388,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
                 }
 
             }
+
+            log.info("starting row reads");
 
             while (!Thread.currentThread().isInterrupted()
                     && csvReader.hasNext()) {
@@ -412,6 +420,8 @@ public class TypeperfCollector extends AbstractProcessCollector {
                 nsamples++;
 
             }
+            
+            log.info("done.");
 
         }
 
