@@ -225,7 +225,7 @@ public class BigdataValueFactory implements ValueFactory {
                 (BigdataResourceImpl)OptimizedValueFactory.INSTANCE.toSesameObject(s),//
                 (BigdataURIImpl)OptimizedValueFactory.INSTANCE.toSesameObject(p),//
                 (BigdataValueImpl)OptimizedValueFactory.INSTANCE.toSesameObject(o),//
-                StatementEnum.Explicit//
+                null // no statement type by default
                 );
         
     }
@@ -240,7 +240,7 @@ public class BigdataValueFactory implements ValueFactory {
                 (BigdataURIImpl)OptimizedValueFactory.INSTANCE.toSesameObject(p),//
                 (BigdataValueImpl)OptimizedValueFactory.INSTANCE.toSesameObject(o),//
                 (BigdataResourceImpl)OptimizedValueFactory.INSTANCE.toSesameObject(c),//
-                StatementEnum.Explicit//
+                null // no statement type by default
                 );
         
     }
