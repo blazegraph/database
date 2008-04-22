@@ -17,6 +17,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.Stack;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -83,6 +84,8 @@ import com.bigdata.rdf.store.BNS;
  */
 public class RDFXMLParser extends RDFParserBase {
 
+    private static final Logger log = Logger.getLogger(RDFXMLParser.class);
+    
 	/*-----------*
 	 * Variables *
 	 *-----------*/
@@ -160,6 +163,8 @@ public class RDFXMLParser extends RDFParserBase {
 
 		// SAXFilter does some filtering and verifying of SAX events
 		saxFilter = new SAXFilter(this);
+        
+        log.info("this is the bigdata parser");
 	}
 
 	/*---------*

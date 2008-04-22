@@ -35,23 +35,20 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
-
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.sail.SailException;
-
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -610,7 +607,13 @@ abstract public class AbstractTestCase
 
                 // log.info("expected: "+expectedSPO.toString(store));
 
-                assertEquals(expectedSPO.getType(), actualSPO.getType());
+                StatementEnum expectedType =
+                        expectedSPO.hasStatementType() ? expectedSPO.getType()
+                                : null;
+                StatementEnum actualType =
+                        actualSPO.hasStatementType() ? actualSPO.getType()
+                                : null;
+                assertEquals(expectedType, actualType);
 
                 i++;
 
