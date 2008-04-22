@@ -539,8 +539,12 @@ abstract public class AbstractLocalTransactionManager implements
 
         final long begin = System.currentTimeMillis();
         
-        final int maxtries = 3;
-
+        // delay between attemps to obtain a timestamp (ms).
+        final long delay = 100L;
+        
+        // #of attempts - a total of 1000ms of trying before we give up.
+        final int maxtries = 10; 
+        
         IOException cause = null;
 
         int ntries;
@@ -577,7 +581,7 @@ abstract public class AbstractLocalTransactionManager implements
 
                 try {
 
-                    Thread.sleep(100/* ms */);
+                    Thread.sleep(delay/* ms */);
 
                 } catch (InterruptedException e2) {
 
