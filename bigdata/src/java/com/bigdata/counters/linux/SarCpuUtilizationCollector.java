@@ -349,7 +349,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
                 final String s = data.substring(0, 11);
                 try {
                     lastModified = StatisticsCollectorForLinux.f.parse(s).getTime();
-                } catch (ParseException e) {
+                } catch (Exception e) {
                     log.warn("Could not parse time: [" + s + "] : " + e);
                     lastModified = System.currentTimeMillis(); // should be pretty close.
                 }
