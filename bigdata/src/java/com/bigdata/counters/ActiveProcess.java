@@ -182,7 +182,7 @@ public class ActiveProcess {
      */
     public boolean isAlive() {
         
-        if(readerFuture.isDone() || process == null || is == null) {
+        if(readerFuture==null || readerFuture.isDone() || process == null || is == null) {
             
             return false;
             
