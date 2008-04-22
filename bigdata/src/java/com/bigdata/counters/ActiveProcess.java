@@ -62,7 +62,7 @@ public class ActiveProcess {
 
     protected InputStream is = null;
 
-    protected Future readerFuture;
+    protected volatile Future readerFuture;
 
     /**
      * 
@@ -142,8 +142,16 @@ public class ActiveProcess {
         
         /*
          * @todo restart processes if it dies before we shut it down, but no
-         * more than some #of tries. if the process dies then we will not
-         * have any data for this host.
+         * more than some #of tries. if the process dies then we will not have
+         * any data for this host.
+         * 
+         * @todo this code for monitoring processes is a mess and should
+         * probably be re-written from scratch. the processReader task
+         * references the readerFuture via isAlive() but the readerFuture is not
+         * even assigned until after we submit the processReader task, which
+         * means that it can be running before the readerFuture is set! The
+         * concrete implementations of ProcessReaderHelper all poll isAlive()
+         * until the readerFuture becomes available.
          */
 
         log.info("starting process reader: "+processReader);
