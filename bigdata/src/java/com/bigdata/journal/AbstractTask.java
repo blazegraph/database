@@ -1199,7 +1199,13 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                     
                     log.info("Rolling back index: "+name+" : "+this);
                     
-                    btree.close();
+                    if(btree.isOpen()) {
+                        try {
+                            btree.close();
+                        } catch(Exception ex) {
+                            log.warn("While rolling back index: "+name+" : "+this+" : "+ex);
+                        }
+                    }
                     
                 }
 

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
@@ -37,9 +38,11 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Base class for collecting data on a host. The data are described by a
@@ -435,6 +438,22 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         
         client.start();
 
+        /*
+         * HTTPD service reporting out statistics.
+         */
+        AbstractHTTPD httpd = null;
+        {
+            final int port = 8080;
+            if (port != 0) {
+                try {
+                    httpd = new CounterSetHTTPD(port,client.countersRoot);
+                } catch (IOException e) {
+                    log.warn("Could not start httpd: port=" + port+" : "+e);
+                }
+            }
+            
+        }
+        
         int n = 0;
         
         final long begin = System.currentTimeMillis();
@@ -457,6 +476,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         
         client.stop();
 
+        if (httpd != null)
+            httpd.shutdown();
+        
         System.err.println("Done");
         
     }

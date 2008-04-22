@@ -691,7 +691,7 @@ public class ConcurrentDataLoader {
 
                 log.info("loadService queue full"//
                         + ": queueSize="+ loadService.getQueue().size()//
-                        + ", poolSize" + loadService.getPoolSize()//
+                        + ", poolSize=" + loadService.getPoolSize()//
                         + ", active="+ loadService.getActiveCount()//
                         + ", tasked="+ ntasked //
                         + ", completed="+ loadService.getCompletedTaskCount()//

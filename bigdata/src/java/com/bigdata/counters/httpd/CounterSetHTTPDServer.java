@@ -33,17 +33,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetAddress;
-import java.util.Random;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.DefaultInstrumentFactory;
-import com.bigdata.counters.HistoryInstrument;
-import com.bigdata.counters.Instrument;
-import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
 
