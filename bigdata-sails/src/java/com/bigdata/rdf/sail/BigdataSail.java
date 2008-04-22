@@ -948,7 +948,7 @@ public class BigdataSail extends SailBase implements Sail {
          * direction is actually backed by a Map object - the other uses a scan.
          */
         
-        public void setNamespace(String namespace, String prefix)
+        public void setNamespace(String prefix, String namespace)
                 throws SailException {
 
             assertWritable();
@@ -1039,19 +1039,23 @@ public class BigdataSail extends SailBase implements Sail {
         
         public void addStatement(Resource s, URI p, Value o, Resource... contexts) throws SailException {
 
-            if (contexts == null || contexts.length == 0 || contexts[0]==null ) {
-                
-                addStatement(s, p, o);
+            if (contexts == null || contexts.length == 0 || contexts[0] == null) {
+
+                addStatement(s, p, o, (Resource) null);
                 
             } else {
-                
-                throw new UnsupportedOperationException();
+
+                for (Resource c : contexts) {
+
+                    addStatement(s, p, o, c);
+
+                }
                 
             }
             
         }
 
-        private void addStatement(Resource s, URI p, Value o)
+        private void addStatement(Resource s, URI p, Value o, Resource c)
                 throws SailException {
 
             assertWritable();
@@ -1060,7 +1064,7 @@ public class BigdataSail extends SailBase implements Sail {
             flushStatementBuffers(false/* flushAssertBuffer */, true/* flushRetractBuffer */);
             
             // buffer the assertion.
-            getAssertionBuffer().add(s, p, o);
+            getAssertionBuffer().add(s, p, o, c);
             
             if (m_listeners != null) {
 

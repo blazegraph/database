@@ -478,7 +478,7 @@ class SAXFilter implements ContentHandler {
                 if(BNS.NAMESPACE.equals(namespace)) {
                     if(BNS.SID.equals(localName)) {
                         elInfo.context = value;
-                    } else if(BNS.SID.equals(localName)) {
+                    } else if(BNS.STATEMENT_TYPE.equals(localName)) {
                         elInfo.stmtType = value;
                     }
                 } else
