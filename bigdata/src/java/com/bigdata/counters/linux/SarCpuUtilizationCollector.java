@@ -307,6 +307,16 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
             
             log.info("begin");
 
+            for(int i=0; i<10 && !getActiveProcess().isAlive(); i++) {
+
+                log.info("waiting for the readerFuture to be set.");
+
+                Thread.sleep(100/*ms*/);
+                
+            }
+
+            log.info("running");
+            
             // The most recently read header.
             String header;
             
