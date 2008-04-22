@@ -24,7 +24,7 @@
 /*
  * Created on Jan 29, 2007
  */
-package com.bigdata.rdf.rio;
+package com.bigdata.rdf.sail;
 
 import java.io.File;
 import java.io.StringReader;

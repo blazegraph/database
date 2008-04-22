@@ -1065,6 +1065,16 @@ public class RDFXMLParser extends RDFParserBase {
 			while (iter.hasNext()) {
 				Att att = iter.next();
 
+                if(BNS.NAMESPACE.equals(att.getNamespace())) {
+                    /*
+                     * Ignore bigdata namespace attributes - they can not be
+                     * expected to validate as RDF/XML.
+                     */
+                    reportWarning("non-standard attribute '" + att.getQName() + "'");
+                    iter.remove();
+                    continue;
+                }
+                
 				reportError("unexpected attribute '" + att.getQName() + "'");
 				iter.remove();
 			}
