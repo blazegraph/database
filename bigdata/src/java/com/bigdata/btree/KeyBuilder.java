@@ -1473,11 +1473,11 @@ public class KeyBuilder implements IKeyBuilder {
         if (!explicitCollatorChoice) {
 
             /*
-             * Issue warning since the choice was made by default rather than
-             * explicitly specified by a property.
+             * Choice was made by default rather than explicitly specified by a
+             * property.
              */
             
-            log.warn("Defaulting: "+Options.COLLATOR+"=" + collatorChoice);
+            log.info("Defaulting: "+Options.COLLATOR+"=" + collatorChoice);
             
         }
         
