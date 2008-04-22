@@ -542,7 +542,12 @@ abstract public class AbstractLocalTransactionManager implements
         // delay between attemps to obtain a timestamp (ms).
         final long delay = 100L;
         
-        // #of attempts - a total of 1000ms of trying before we give up.
+        /* #of attempts - a total of 1000ms of trying before we give up.
+         * 
+         * if this is not enough, then consider adding an optional parameter
+         * giving the time the caller will wait and letting the StoreManager
+         * wait longer during startup to discover the timestamp service.
+         */
         final int maxtries = 10; 
         
         IOException cause = null;
