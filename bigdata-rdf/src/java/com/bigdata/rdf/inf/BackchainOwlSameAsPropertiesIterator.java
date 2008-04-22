@@ -26,6 +26,9 @@
  */
 package com.bigdata.rdf.inf;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import org.apache.log4j.Logger;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -41,15 +44,29 @@ import com.bigdata.rdf.util.KeyOrder;
  * @see BackchainOwlSameAsPropertiesSPIterator
  * @see BackchainOwlSameAsPropertiesPOIterator
  * @see BackchainOwlSameAsPropertiesPIterator
- * 
  * @see InferenceEngine
  * @see InferenceEngine.Options
- * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id: BackchainOwlSameAsPropertiesIterator.java,v 1.2 2008/03/20
  *          04:05:51 mrpersonick Exp $
  */
 public class BackchainOwlSameAsPropertiesIterator implements ISPOIterator {
+    private static final Logger log =
+            Logger.getLogger(BackchainOwlSameAsPropertiesIterator.class);
+
+    private boolean closed = false;
+    
+    private String stack;
+
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        if (!closed) {
+            log
+                    .error("DANGER! Someone needs to close this iterator correctly.\n"+stack);
+        }
+    }
+
     private ISPOIterator delegate;
 
     /**
@@ -77,18 +94,26 @@ public class BackchainOwlSameAsPropertiesIterator implements ISPOIterator {
     public BackchainOwlSameAsPropertiesIterator(ISPOIterator src, long s,
             long p, long o, AbstractTripleStore db, final long sameAs) {
         if (s != NULL && o != NULL) {
-            this.delegate = new BackchainOwlSameAsPropertiesSPOIterator(src, s,
-                    p, o, db, sameAs);
+            this.delegate =
+                    new BackchainOwlSameAsPropertiesSPOIterator(
+                            src, s, p, o, db, sameAs);
         } else if (s != NULL && o == NULL) {
-            this.delegate = new BackchainOwlSameAsPropertiesSPIterator(src, s,
-                    p, db, sameAs);
+            this.delegate =
+                    new BackchainOwlSameAsPropertiesSPIterator(
+                            src, s, p, db, sameAs);
         } else if (s == NULL && o != NULL) {
-            this.delegate = new BackchainOwlSameAsPropertiesPOIterator(src, p,
-                    o, db, sameAs);
+            this.delegate =
+                    new BackchainOwlSameAsPropertiesPOIterator(
+                            src, p, o, db, sameAs);
         } else if (s == NULL && o == NULL) {
-            this.delegate = new BackchainOwlSameAsPropertiesPIterator(src, p,
-                    db, sameAs);
+            this.delegate =
+                    new BackchainOwlSameAsPropertiesPIterator(
+                            src, p, db, sameAs);
         }
+        
+        StringWriter sw = new StringWriter();
+        new Exception("Stack trace").printStackTrace(new PrintWriter(sw));
+        stack = sw.toString();
     }
 
     public KeyOrder getKeyOrder() {
@@ -113,6 +138,7 @@ public class BackchainOwlSameAsPropertiesIterator implements ISPOIterator {
 
     public void close() {
         delegate.close();
+        closed = true;
     }
 
     public void remove() {

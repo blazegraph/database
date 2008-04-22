@@ -604,12 +604,16 @@ public class SPO implements Comparable {
 
             String t = null;
             
-            switch(type) {
-            case Explicit    : t = "Explicit    "; break;
-            case Inferred    : t = "Inferred    "; break;
-            case Axiom       : t = "Axiom       "; break;
-            case Backchained : t = "Backchained "; break;
-            default: throw new AssertionError();
+            if (type != null) {
+                switch(type) {
+                case Explicit    : t = "Explicit    "; break;
+                case Inferred    : t = "Inferred    "; break;
+                case Axiom       : t = "Axiom       "; break;
+                case Backchained : t = "Backchained "; break;
+                default: throw new AssertionError();
+                }
+            } else {
+                t = "Unknown     ";
             }
             
             // Note: the statement [id] is not stored in the reverse lexicon.
@@ -648,10 +652,10 @@ public class SPO implements Comparable {
      *             if the type is not known.
      */
     public StatementEnum getType() {
-
+/*
         if (type == null)
             throw new IllegalStateException();
-        
+*/        
         return type;
 
     }
