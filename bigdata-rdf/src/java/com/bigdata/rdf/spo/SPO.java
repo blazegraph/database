@@ -652,10 +652,10 @@ public class SPO implements Comparable {
      *             if the type is not known.
      */
     public StatementEnum getType() {
-/*
+
         if (type == null)
             throw new IllegalStateException();
-*/        
+        
         return type;
 
     }
