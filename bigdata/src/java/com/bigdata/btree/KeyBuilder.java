@@ -1453,7 +1453,7 @@ public class KeyBuilder implements IKeyBuilder {
      
         final boolean icu_avail = isICUAvailable();
 
-        log.warn("ICU library is" + (icu_avail ? "" : " not") + " available.");
+        log.info("ICU library is" + (icu_avail ? "" : " not") + " available.");
         
         /*
          * Figure out which collator to use.
@@ -1565,7 +1565,7 @@ public class KeyBuilder implements IKeyBuilder {
 
                 locale = Locale.getDefault();
 
-                log.warn("Using default locale: " + locale.getDisplayName());
+                log.info("Using default locale: " + locale.getDisplayName());
 
             }
 
