@@ -1116,6 +1116,15 @@ public class RDFXMLParser extends RDFParserBase {
 	private void reportStatement(Resource subject, URI predicate, Value object)
 		throws RDFParseException, RDFHandlerException
 	{ // FIXME locate all callers and verify that NO context is appropriate since none will be reported.
+        if(BNS.NAMESPACE.equals(predicate.getNamespace())
+                &&(BNS.SID.equals(predicate.getLocalName())||
+                        BNS.STATEMENT_TYPE.equals(predicate.getLocalName())
+                )) {
+            /*
+             * Avoid asserting statements for various bigdata:foo attributes.
+             */
+            return;
+        }
 		Statement st = createStatement(subject, predicate, object);
         if(stmtType != null && st instanceof BigdataStatement) {
             ((BigdataStatement)st).setStatementType(stmtType);

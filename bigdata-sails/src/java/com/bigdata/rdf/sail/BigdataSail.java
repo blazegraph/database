@@ -1014,7 +1014,7 @@ public class BigdataSail extends SailBase implements Sail {
              
                 final Map.Entry<String/*namespace*/,String/*prefix*/> current = src.next();
                 
-                return new NamespaceImpl(current.getKey(), current.getValue());
+                return new NamespaceImpl(current.getValue(), current.getKey());
                 
             }
 
