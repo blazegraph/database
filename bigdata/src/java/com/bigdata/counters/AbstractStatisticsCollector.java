@@ -80,14 +80,37 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             .toInt();
 
     /** {@link InetAddress#getHostName()} for this host. */
-    final public String hostname;
+    static final public String hostname;
 
     /** {@link InetAddress#getCanonicalHostName()} for this host. */
-    final public String fullyQualifiedHostName;
+    static final public String fullyQualifiedHostName;
 
     /** The path prefix under which all counters for this host are found. */
-    final public String hostPathPrefix;
+    static final public String hostPathPrefix;
 
+    static {
+    
+        try {
+
+            hostname = InetAddress.getLocalHost().getHostName();
+            
+            fullyQualifiedHostName = InetAddress.getLocalHost().getCanonicalHostName();
+            
+        } catch (UnknownHostException e) {
+            
+            throw new AssertionError(e);
+            
+        }
+
+        hostPathPrefix = ICounterSet.pathSeparator + fullyQualifiedHostName
+                + ICounterSet.pathSeparator;
+
+        log.info("hostname  : "+hostname);
+        log.info("FQDN      : "+fullyQualifiedHostName);
+        log.info("hostPrefix: "+hostPathPrefix);
+        
+    }
+    
     /** Reporting interval in seconds. */
     final protected int interval;
     
@@ -110,25 +133,6 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         
         this.interval = interval;
         
-        try {
-
-            hostname = InetAddress.getLocalHost().getHostName();
-            
-            fullyQualifiedHostName = InetAddress.getLocalHost().getCanonicalHostName();
-            
-        } catch (UnknownHostException e) {
-            
-            throw new AssertionError(e);
-            
-        }
-
-        hostPathPrefix = ICounterSet.pathSeparator + fullyQualifiedHostName
-                + ICounterSet.pathSeparator;
-
-        log.info("hostname  : "+hostname);
-        log.info("FQDN      : "+fullyQualifiedHostName);
-        log.info("hostPrefix: "+hostPathPrefix);
-
     }
     
 //    /**

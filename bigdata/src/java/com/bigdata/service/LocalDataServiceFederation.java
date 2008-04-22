@@ -34,8 +34,6 @@ import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
@@ -118,33 +116,38 @@ public class LocalDataServiceFederation extends AbstractFederation {
         };
 
         /*
-         * HTTPD service reporting out statistics. This will be shutdown with
-         * the federation.
-         */
-        {
-            
-            final int port = Integer.parseInt(properties.getProperty(
-                    LocalDataServiceClient.Options.HTTPD_PORT,
-                    LocalDataServiceClient.Options.DEFAULT_HTTPD_PORT));
-
-            log.info(LocalDataServiceClient.Options.HTTPD_PORT + "=" + port);
-
-            if (port < 0)
-                throw new RuntimeException(
-                        LocalDataServiceClient.Options.HTTPD_PORT
-                                + " may not be negative");
-            
-            AbstractHTTPD httpd = null;
-            if (port != 0) {
-                try {
-                    httpd = new CounterSetHTTPD(port,(CounterSet)dataService.getCounters());
-                } catch (IOException e) {
-                    log.error("Could not start httpd on port=" + port, e);
-                }
-            }
-            this.httpd = httpd;
-            
-        }
+         * @todo enable once there are events to report the setting of the
+         * service UUID and the end of the StoreManager startup (isRunning
+         * becomes true).
+         */  
+//        /*
+//         * HTTPD service reporting out statistics. This will be shutdown with
+//         * the federation.
+//         */
+//        {
+//            
+//            final int port = Integer.parseInt(properties.getProperty(
+//                    LocalDataServiceClient.Options.HTTPD_PORT,
+//                    LocalDataServiceClient.Options.DEFAULT_HTTPD_PORT));
+//
+//            log.info(LocalDataServiceClient.Options.HTTPD_PORT + "=" + port);
+//
+//            if (port < 0)
+//                throw new RuntimeException(
+//                        LocalDataServiceClient.Options.HTTPD_PORT
+//                                + " may not be negative");
+//            
+//            AbstractHTTPD httpd = null;
+//            if (port != 0) {
+//                try {
+//                    httpd = new CounterSetHTTPD(port,(CounterSet)dataService.getCounters());
+//                } catch (IOException e) {
+//                    log.error("Could not start httpd on port=" + port, e);
+//                }
+//            }
+//            this.httpd = httpd;
+//            
+//        }
         
     }
 
