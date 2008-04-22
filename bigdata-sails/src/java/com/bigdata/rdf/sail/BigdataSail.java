@@ -126,6 +126,7 @@ import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.EmptyAccessPath;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IAccessPath;
@@ -633,6 +634,10 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * A canonicalizing mapping for blank nodes whose life cycle is the same
          * as that of the {@link SailConnection}.
+         * 
+         * @todo share with {@link BigdataStatementIteratorImpl}s returned by
+         *       the {@link SailConnection}? Make concurrency safe if I do
+         *       that?
          */
         private Map<String,_BNode> bnodes = new HashMap<String,_BNode>(bufferCapacity);
         
@@ -1182,17 +1187,31 @@ public class BigdataSail extends SailBase implements Sail {
 
             if (contexts == null || contexts.length == 0 || contexts[0] == null) {
 
-                removeStatements(s, p, o);
+                removeStatements(s, p, o, (Resource) null);
 
             } else {
 
-                throw new UnsupportedOperationException();
+                for (Resource c : contexts) {
+
+                    removeStatements(s, p, o, c);
+
+                }
                     
             }
             
         }
 
-        private int removeStatements(Resource s, URI p, Value o)
+        /**
+         * Note: The CONTEXT is ignored when in statementIdentifier mode!
+         * 
+         * @param s
+         * @param p
+         * @param o
+         * @param c
+         * @return
+         * @throws SailException
+         */
+        private int removeStatements(Resource s, URI p, Value o, Resource c)
                 throws SailException {
             
             assertWritable();
@@ -1507,6 +1526,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
+//            return new BigdataStatementIteratorImpl(this, src);
             return database.asStatementIterator(src);
 
         }

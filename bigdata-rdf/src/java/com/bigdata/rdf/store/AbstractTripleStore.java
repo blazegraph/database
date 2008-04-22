@@ -1043,7 +1043,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             /*
              * BNodes are not stored in the reverse lexicon (or the cache). The
-             * "_:B" prefix is a syntactic marker for a real blank node.
+             * "B" prefix is a syntactic marker for a real blank node.
              */
 
             _BNode bnode = (_BNode) OptimizedValueFactory.INSTANCE

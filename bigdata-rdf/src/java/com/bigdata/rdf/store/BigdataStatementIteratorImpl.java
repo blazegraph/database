@@ -31,8 +31,10 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
@@ -102,7 +104,13 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
      * @param src
      *            The source iterator.
      */
-    public BigdataStatementIteratorImpl(AbstractTripleStore db, ISPOIterator src) {
+//    * @param bnodes
+//    *            An bnode cache which is used to ensure that a term identifier
+//    *            is always resolved to the same {@link BNode} object during
+//    *            traversal.
+    public BigdataStatementIteratorImpl(AbstractTripleStore db,
+//            Map<Long,BigdataBNode> bnodes, 
+            ISPOIterator src) {
 
         if (db == null)
             throw new IllegalArgumentException();
