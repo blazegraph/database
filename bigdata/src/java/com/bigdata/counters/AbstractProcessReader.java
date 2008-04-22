@@ -43,6 +43,8 @@ public abstract class AbstractProcessReader implements Runnable {
      */
     public void start(InputStream is) {
 
+        log.info("");
+
         if (is == null)
             throw new IllegalArgumentException();
 

@@ -31,6 +31,8 @@ package com.bigdata.counters;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 
 /**
  * Base class for collection of performance counters as reported by a native process.
@@ -40,6 +42,8 @@ import java.util.Map;
  */
 abstract public class AbstractProcessCollector implements IStatisticsCollector {
 
+    protected static final Logger log = Logger.getLogger(AbstractProcessCollector.class);
+    
     final private int interval;
 
     public int getInterval() {
@@ -79,6 +83,8 @@ abstract public class AbstractProcessCollector implements IStatisticsCollector {
      */
     public void start() {
 
+        log.info("");
+        
         activeProcess = new ActiveProcess(getCommand(), this);
         
         activeProcess.start(getProcessReader());
@@ -86,6 +92,8 @@ abstract public class AbstractProcessCollector implements IStatisticsCollector {
     }
 
     public void stop() {
+
+        log.info("");
 
         if (activeProcess != null) {
 

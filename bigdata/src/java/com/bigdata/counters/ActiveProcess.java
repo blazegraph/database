@@ -128,6 +128,8 @@ public class ActiveProcess {
      */
     public void start(AbstractProcessReader processReader) {
         
+        log.info("");
+
         if (processReader == null)
             throw new IllegalArgumentException();
 
@@ -136,15 +138,23 @@ public class ActiveProcess {
 
         is = process.getInputStream();
 
+        assert is != null;
+        
         /*
          * @todo restart processes if it dies before we shut it down, but no
          * more than some #of tries. if the process dies then we will not
          * have any data for this host.
          */
 
+        log.info("starting process reader: "+processReader);
+
         processReader.start(is);
 
+        log.info("submitting process reader task: "+processReader);
+
         readerFuture = readService.submit(processReader);
+        
+        log.info("readerFuture: done="+readerFuture.isDone());
 
     }
 
@@ -183,6 +193,11 @@ public class ActiveProcess {
     public boolean isAlive() {
         
         if(readerFuture==null || readerFuture.isDone() || process == null || is == null) {
+            
+            log.info("Not alive: readerFuture="
+                    + readerFuture
+                    + (readerFuture != null ? "done=" + readerFuture.isDone()
+                            : "") + ", process=" + process + ", is=" + is);
             
             return false;
             

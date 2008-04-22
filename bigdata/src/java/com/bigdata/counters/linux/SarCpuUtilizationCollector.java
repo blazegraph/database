@@ -305,6 +305,8 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
         @Override
         protected void readProcess() throws Exception {
             
+            log.info("begin");
+
             // The most recently read header.
             String header;
             
