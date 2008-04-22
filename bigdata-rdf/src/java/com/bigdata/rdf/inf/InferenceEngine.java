@@ -1328,7 +1328,7 @@ public class InferenceEngine extends RDFSHelper {
         
         final ISPOIterator src = database.getAccessPath(s, p, o).iterator(filter);
         
-        final Striterator ret;
+        final ISPOIterator ret;
 
         if (rdfsOnly) {
             
@@ -1337,12 +1337,12 @@ public class InferenceEngine extends RDFSHelper {
         
         } else if(forwardChainOwlSameAsClosure && !forwardChainOwlSameAsProperties) {
             
-            ret = new Striterator(new BackchainOwlSameAsPropertiesIterator(//
+            ret = new BackchainOwlSameAsPropertiesIterator(//
                     src,//
                     s,p,o,//
                     database, //
                     owlSameAs.id
-                    ));
+                    );
 
         } else {
             

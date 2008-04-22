@@ -311,14 +311,14 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
-//    /**
-//     * The implementation object.
-//     */
-//    public AbstractTripleStore getDatabase() {
-//        
-//        return database;
-//        
-//    }
+    /**
+     * The implementation object.
+     */
+    public AbstractTripleStore getDatabase() {
+        
+        return database;
+        
+    }
 
     /**
      * Defaults various properties.
@@ -782,6 +782,15 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
         
+        /**
+         * The implementation object.
+         */
+        public AbstractTripleStore getDatabase() {
+            
+            return database;
+            
+        }
+
         /*
          * SailConnectionListener support.
          * 

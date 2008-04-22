@@ -49,7 +49,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -61,7 +60,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
@@ -98,6 +96,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
@@ -135,7 +134,6 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
-
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -2855,6 +2853,94 @@ abstract public class AbstractTripleStore implements ITripleStore,
                 System.arraycopy(chunk, 0, temp, numStmts, chunkSize);
                 stmts = temp;
                 numStmts += chunkSize;
+
+            }
+
+            return new SPOArrayIterator(stmts, numStmts);
+
+        } finally {
+
+            itr.close();
+
+        }
+
+    }
+
+    public ISPOIterator bulkCompleteStatements(SPO[] stmts, int numStmts) {
+
+        if (numStmts == 0)
+            return new EmptySPOIterator(KeyOrder.SPO);
+
+        return bulkCompleteStatements(new SPOArrayIterator(stmts, numStmts));
+
+    }
+
+    /**
+     * This method fills out the statement metadata (type and sid) for SPOs
+     * that are present in the database.  SPOs not present in the database
+     * are left as-is.
+     *  
+     * FIXME This fully buffers the result before returning to the caller.
+     * Modify to run a reader that populates a buffer and have the buffer
+     * wrapped up as an {@link ISPOIterator} that is returned to the caller.
+     */
+    public ISPOIterator bulkCompleteStatements(ISPOIterator itr) {
+
+        try {
+
+            final IIndex index = getSPOIndex();
+            
+            // Thread-local key builder.
+            final RdfKeyBuilder keyBuilder = getKeyBuilder();
+
+            SPO[] stmts = new SPO[0];
+            int numStmts = 0;
+
+            /*
+             * Note: We process the iterator a "chunk" at a time. If the
+             * iterator is backed by an SPO[] then it will all be processed in
+             * one "chunk".
+             */
+
+            while (itr.hasNext()) {
+
+                // get the next chunk
+                final SPO[] chunk = itr.nextChunk(KeyOrder.SPO);
+
+                // create an array of keys for the chunk
+                final byte[][] keys = new byte[chunk.length][];
+                for (int i = 0; i < chunk.length; i++) {
+                    keys[i] = keyBuilder.statement2Key(KeyOrder.SPO, chunk[i]);
+                }
+
+                // knows how to aggregate ResultBitBuffers.
+                final ResultBufferHandler resultHandler = 
+                    new ResultBufferHandler(
+                        keys.length, 
+                        index.getIndexMetadata().getValueSerializer()
+                        );
+
+                // submit the batch contains procedure to the SPO index
+                index.submit(0/* fromIndex */, keys.length/* toIndex */, keys,
+                        null/* vals */, BatchLookupConstructor.INSTANCE,
+                        resultHandler);
+
+                // get the values from lookup
+                ResultBuffer vals = resultHandler.getResult();
+
+                for (int i = 0; i < chunk.length; i++) {
+                    byte[] val = vals.getResult(i);
+                    if (val != null) {
+                        chunk[i].decodeValue(val);
+                    }
+                }
+
+                // aggegate this chunk's results to the return value
+                SPO[] temp = new SPO[numStmts + chunk.length];
+                System.arraycopy(stmts, 0, temp, 0, numStmts);
+                System.arraycopy(chunk, 0, temp, numStmts, chunk.length);
+                stmts = temp;
+                numStmts += chunk.length;
 
             }
 

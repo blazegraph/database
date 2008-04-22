@@ -30,7 +30,6 @@ package com.bigdata.rdf.store;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -155,6 +154,94 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
                                 StatementEnum.Explicit),
                         new SPO(x,a,z,
                                 StatementEnum.Explicit)
+                    },
+                    
+                    itr,
+                    true // ignore axioms
+                    
+                );
+/*            
+                while(itr.hasNext()) {
+                    SPO spo = itr.next();
+                    System.err.println(spo.toString(store));
+                }
+*/
+            }
+        
+        } finally {
+            
+            store.closeAndDelete();
+
+        }
+
+    }
+    
+    /**
+     * Simple test of bulk SPO completion (value lookup).
+     */
+    public void testCompletion() {
+
+        AbstractTripleStore store = getStore();
+        
+        try {
+
+            final URI A = new URIImpl("http://www.bigdata.com/A");
+            final URI B = new URIImpl("http://www.bigdata.com/B");
+            final URI C = new URIImpl("http://www.bigdata.com/C");
+            final URI D = new URIImpl("http://www.bigdata.com/D");
+            final URI E = new URIImpl("http://www.bigdata.com/E");
+
+            final URI V = new URIImpl("http://www.bigdata.com/V");
+            final URI W = new URIImpl("http://www.bigdata.com/W");
+            final URI X = new URIImpl("http://www.bigdata.com/X");
+            final URI Y = new URIImpl("http://www.bigdata.com/Y");
+            final URI Z = new URIImpl("http://www.bigdata.com/Z");
+            
+            final long a = store.addTerm(A);
+            final long b = store.addTerm(B);
+            final long c = store.addTerm(C);
+            final long d = store.addTerm(D);
+            final long e = store.addTerm(E);
+            
+            final long v = store.addTerm(V);
+            final long w = store.addTerm(W);
+            final long x = store.addTerm(X);
+            final long y = store.addTerm(Y);
+            final long z = store.addTerm(Z);
+            
+            SPO[] stmts = new SPO[] {
+                new SPO(x,a,y,StatementEnum.Explicit),
+                new SPO(x,a,z,StatementEnum.Inferred)
+            };
+            int numStmts = stmts.length;
+                
+            store.addStatements(stmts, numStmts);
+            
+            store.commit();
+    
+            System.err.println(store.dumpStore(true, true, false));
+
+            stmts = new SPO[] {
+                new SPO(x,a,y),
+                new SPO(x,a,z),
+                new SPO(x,a,v),
+                new SPO(x,a,w)
+            };
+            numStmts = stmts.length;
+
+            { // filter out and complete
+                
+                ISPOIterator itr = store.bulkCompleteStatements(stmts, numStmts);
+                
+                assertSameSPOsAnyOrder(store,
+                    
+                    new SPO[]{
+                        new SPO(x,a,y,
+                                StatementEnum.Explicit),
+                        new SPO(x,a,z,
+                                StatementEnum.Inferred),
+                        new SPO(x,a,v),
+                        new SPO(x,a,w)
                     },
                     
                     itr,
