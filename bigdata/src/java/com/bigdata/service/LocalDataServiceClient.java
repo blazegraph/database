@@ -31,7 +31,9 @@ package com.bigdata.service;
 import java.util.Properties;
 
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.service.LoadBalancerService.UpdateTask;
 
 /**
  * Client for a local (embedded) {@link DataService} exposed as an
@@ -64,6 +66,17 @@ public class LocalDataServiceClient extends AbstractClient {
      * @version $Id$
      */
     public interface Options extends DataService.Options, IBigdataClient.Options {
+        
+        /**
+         * The port on which the federation will run an optional
+         * <code>httpd</code> service (default {@value #DEFAULT_HTTPD_PORT})
+         * -or- ZERO (0) to NOT start the <code>httpd</code> service. This
+         * service may be used to view the {@link CounterSet} hierarchy for the
+         * embedded data service.
+         */
+        String HTTPD_PORT = "httpd.port";
+        
+        String DEFAULT_HTTPD_PORT = "80";
         
     }
     
