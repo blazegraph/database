@@ -113,7 +113,7 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
              * Note: Validation SHOULD be disabled except for testing.
              * 
              * FIXME turn off validation for release or performance testing (its
-             * not really that much overhead).
+             * not really that much overhead so maybe leave it on).
              */
             final boolean validate = true;
             
@@ -121,9 +121,14 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
 
                 // The term identifier.
                 final long id = KeyBuilder.decodeLong(key, 0);
+
+                assert id != IRawTripleStore.NULL;
                 
                 // Note: BNodes are not allowed in the reverse index.
                 assert ! AbstractTripleStore.isBNode(id);
+                
+                // Note: SIDS are not allowed in the reverse index.
+                assert ! AbstractTripleStore.isStatement(id);
                 
                 /*
                  * When the term identifier is found in the reverse mapping
@@ -145,20 +150,30 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
                 } else {
 
                     /*
-                     * Note: This would fail if the serialization of the
-                     * term was changed. In order to validate when different
+                     * Note: This would fail if the serialization of the term
+                     * was changed. In order to validate when different
                      * serialization formats might be in use you have to
                      * actually deserialize the terms. However, I have the
-                     * validation logic here just as a santity check while
-                     * getting the basic system running - it is not meant to
-                     * be deployed.
+                     * validation logic here just as a sanity check while
+                     * getting the basic system running - it is not meant to be
+                     * deployed.
                      */
 
                     if (! BytesUtil.bytesEqual(val, oldval)) {
 
-                        throw new RuntimeException(
-                                "Consistency problem: id="
-                                + id);
+                        char suffix = '?';
+                        if (AbstractTripleStore.isLiteral(id))
+                            suffix = 'L';
+                        else if (AbstractTripleStore.isURI(id))
+                            suffix = 'U';
+                        else if (AbstractTripleStore.isBNode(id))
+                            suffix = 'B';
+                        else if (AbstractTripleStore.isStatement(id))
+                            suffix = 'S';
+
+                        throw new RuntimeException("Consistency problem: id="
+                                + id + suffix+", val=" + BytesUtil.toString(val)
+                                + ", oldval=" + BytesUtil.toString(oldval));
                         
                     }
                     

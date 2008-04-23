@@ -102,7 +102,6 @@ public class AbstractResourceManagerTestCase extends
     protected ResourceManager resourceManager;
     protected ConcurrencyManager concurrencyManager;
     protected AbstractLocalTransactionManager localTransactionManager;
-    protected static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
 
     /**
      * Setup test fixtures.
@@ -195,7 +194,7 @@ public class AbstractResourceManagerTestCase extends
 
             public long nextTimestamp() {
 
-                return timestampFactory.nextMillis();
+                return MillisecondTimestampFactory.nextMillis();
                 
             }
             

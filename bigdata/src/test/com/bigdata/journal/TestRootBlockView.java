@@ -37,14 +37,9 @@ import com.bigdata.rawstore.TestWormAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.MillisecondTimestampFactory;
-import com.bigdata.util.NanosecondTimestampFactory;
 
 /**
  * Test suite for {@link RootBlockView}.
- * <p>
- * Note: The tests use the {@link NanosecondTimestampFactory}, which has potentially nano
- * second resolution, rather than {@link MillisecondTimestampFactory} so that
- * they may complete faster.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -64,7 +59,11 @@ public class TestRootBlockView extends TestCase2 {
         super(arg0);
     }
 
-    private final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
+    private long nextTimestamp() {
+        
+        return MillisecondTimestampFactory.nextMillis();
+        
+    }
     
     /**
      * Constructor correct acceptance stress test.
@@ -82,9 +81,9 @@ public class TestRootBlockView extends TestCase2 {
             final boolean rootBlock0 = r.nextBoolean();
 //            final int segmentId = r.nextInt();
             final boolean anyTransactions = r.nextInt(100)>90;
-            final long firstCommitTime = anyTransactions?timestampFactory.nextMillis():0L;
+            final long firstCommitTime = anyTransactions?nextTimestamp():0L;
             // note: always greater than or equal to the first transaction timestamp.
-            final long lastCommitTime = anyTransactions?timestampFactory.nextMillis():0L;
+            final long lastCommitTime = anyTransactions?nextTimestamp():0L;
             // any legal value for offsetBits.
             final int offsetBits = r.nextInt(WormAddressManager.MAX_OFFSET_BITS
                     - WormAddressManager.MIN_OFFSET_BITS)
@@ -95,7 +94,7 @@ public class TestRootBlockView extends TestCase2 {
             final long commitRecordAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
             final long commitRecordIndexAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
             final UUID uuid = UUID.randomUUID();
-            final long createTime = timestampFactory.nextMillis();
+            final long createTime = nextTimestamp();
             final long closeTime = (r.nextInt(100)<10?(createTime+r.nextInt(10000)):0L);
             
             RootBlockView rootBlock = new RootBlockView(rootBlock0, offsetBits,
@@ -289,25 +288,25 @@ public class TestRootBlockView extends TestCase2 {
         final long lastCommitTimeOk = 0L;
 //        final long commitTimeOk = 0L;
         //
-        final long firstCommitTimeOk2 = timestampFactory.nextMillis();
-        final long lastCommitTimeOk2 = timestampFactory.nextMillis();
+        final long firstCommitTimeOk2 = nextTimestamp();
+        final long lastCommitTimeOk2 = nextTimestamp();
 //        final long commitTimeOk2 = TimestampFactory.nextNanoTime();
         //
-        final long firstCommitTimeBad1 = timestampFactory.nextMillis();
+        final long firstCommitTimeBad1 = nextTimestamp();
         final long lastCommitTimeBad1 = 0L;
 //        final long commitTimeBad1 = TimestampFactory.nextNanoTime();
         //
         final long firstCommitTimeBad2 = 0L;
-        final long lastCommitTimeBad2 = timestampFactory.nextMillis();
+        final long lastCommitTimeBad2 = nextTimestamp();
 //        final long commitTimeBad2 = TimestampFactory.nextNanoTime();
         //
-        final long lastCommitTimeBad3 = timestampFactory.nextMillis(); // note: out of order.
-        final long firstCommitTimeBad3 = timestampFactory.nextMillis(); // note: out of order.
+        final long lastCommitTimeBad3 = nextTimestamp(); // note: out of order.
+        final long firstCommitTimeBad3 = nextTimestamp(); // note: out of order.
 //        final long commitTimeBad3 = TimestampFactory.nextNanoTime();
         //
 //        final long commitTimeBad4 = TimestampFactory.nextNanoTime(); // note: out of order.
-        final long lastCommitTimeBad4 = timestampFactory.nextMillis(); // note: out of order.
-        final long firstCommitTimeBad4 = timestampFactory.nextMillis();
+        final long lastCommitTimeBad4 = nextTimestamp(); // note: out of order.
+        final long firstCommitTimeBad4 = nextTimestamp();
         //
         // @todo present bad combinations of {commitCounter, rootsAddr, and commitRecordIndex}.
         //
@@ -326,7 +325,7 @@ public class TestRootBlockView extends TestCase2 {
         final UUID uuidOk = UUID.randomUUID();
         final UUID uuidBad = null;
         //
-        final long createTimeOk = timestampFactory.nextMillis();
+        final long createTimeOk = nextTimestamp();
         final long createTimeBad = 0L;
         //
         final long closeTimeOk = 0L;

@@ -99,15 +99,6 @@ import com.bigdata.util.MillisecondTimestampFactory;
 public class OldTransactionServer {
 
     /**
-     * The service used to generate commit timestamps.
-     * 
-     * @todo paramterize using {@link Options} so that we can resolve a
-     *       low-latency service for use with a distributed database commit
-     *       protocol.
-     */
-    protected final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-
-    /**
      * Class modeling transaction metadata. An instance of this class is used to
      * model a transaction in the {@link OldTransactionServer}. {@link ITx}
      * objects are used to model the transaction local to a {@link Journal}.
@@ -257,7 +248,7 @@ public class OldTransactionServer {
         /*
          * Wait for the next distinct millisecond.
          */
-        long ts = timestampFactory.nextMillis();
+        long ts = MillisecondTimestampFactory.nextMillis();
         
         transactions.put(ts, new TxMetadata(ts,isolationLevel));
         

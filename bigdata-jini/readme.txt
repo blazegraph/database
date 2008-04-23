@@ -14,12 +14,25 @@ JINI
   http://www.linuxquestions.org/questions/showthread.php?t=370056 for
   a resolution.
 
-- You need to have an HTTP server that will serve class files for
-  downloadable code to jini, including the interfaces for all remote
-  services.  You can use any HTTP server for this purpose, and the
-  server can be located on any machine accessible from the host(s) on
-  which you are running jini.  As a convenience, jini bundles a simple
-  HTTP server that you can start using a command like the following:
+- Downloadable code is NOT required for deployments, but MAY be useful
+  for the following purposes:
+
+   (a) exposing services to the Jini service browser;
+
+   (b) running procedures against services which were deployed before
+       the procedures were written;
+
+  If you have a complete classpath when running the various services
+  then jini will not seek to transfer code from the client as the code
+  will be resolved locally by the service.
+
+  In order to support downloadable code you need to have an HTTP
+  server that will serve class files to jini, including the interfaces
+  for all remote services.  You can use any HTTP server for this
+  purpose, and the server can be located on any machine accessible
+  from the host(s) on which you are running jini.  As a convenience,
+  jini bundles a simple HTTP server that you can start using a command
+  like the following:
 
     java -jar ${JINI_HOME}/lib/classserver.jar -port 8080 -dir classes -trees -verbose&
 

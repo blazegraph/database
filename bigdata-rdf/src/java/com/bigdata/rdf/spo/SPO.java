@@ -559,7 +559,7 @@ public class SPO implements Comparable {
     }
 
     /**
-     * Reprents the term identifier together with its type (literal, bnode, uri,
+     * Represents the term identifier together with its type (literal, bnode, uri,
      * or statement identifier).
      * 
      * @param id

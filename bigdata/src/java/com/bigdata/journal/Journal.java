@@ -59,12 +59,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     private final AbstractLocalTransactionManager localTransactionManager; 
     
     /**
-     * A static instance is used so that different journals on the same JVM will
-     * all use the same underlying time source.
-     */
-    private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-
-    /**
      * Options understood by the {@link Journal}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -89,7 +83,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          
             public long nextTimestamp() {
 
-                return timestampFactory.nextMillis();
+                return MillisecondTimestampFactory.nextMillis();
 
             }
             

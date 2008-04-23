@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util;
 
+import java.util.Date;
+
 import junit.framework.TestCase;
 
 /**
@@ -47,6 +49,37 @@ public class TestMillisecondTimestampFactory extends TestCase {
         
     }
 
+    /**
+     * This test simply displays some timestamps where I observed time going
+     * backward on a Fedora core 6 host using Sun JDK <code>1.6.0_03</code>.
+     * The first timestamp was the previous value assigned by the factory as
+     * reported by {@link System#currentTimeMillis()}. The second timestamp was
+     * the next distinct value reported by {@link System#currentTimeMillis()}.
+     * As you can see, the 2nd timestamp was actually earlier than the first
+     * timestamp. This event lead to a refactor of the
+     * {@link MillisecondTimestampFactory} to introduce a failback
+     * "auto-increment" mode for handling precisely such bizarre events.
+     * 
+     * <pre>
+     * lastTimestamp = Tue Apr 22 21:12:16 EDT 2008
+     * millisTime    = Tue Apr 22 21:12:14 EDT 2008
+     * </pre>
+     * 
+     * The actual long integer values reported were:
+     * 
+     * <pre>
+     * lastTimestamp = 1208913136715
+     * millisTime    = 1208913134964
+     * </pre>
+     */
+    public void test_showTime() {
+        
+        System.err.println("lastTimestamp = " + new Date(1208913136715L));
+
+        System.err.println("millisTime    = " + new Date(1208913134964L));
+        
+    }
+    
     /**
      * Test determines whether or not millisecond timestamps are always distinct
      * from the last generated timestamp (as assigned by
@@ -100,8 +133,6 @@ public class TestMillisecondTimestampFactory extends TestCase {
      */
     public void test_nextTimestamp2() {
 
-        final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-        
         final int limit = 1000;
         
         long lastTimestamp = System.currentTimeMillis() - 1;
@@ -111,7 +142,7 @@ public class TestMillisecondTimestampFactory extends TestCase {
         
         for( int i=0; i<limit; i++ ) {
 
-            timestamp = timestampFactory.nextMillis();
+            timestamp = MillisecondTimestampFactory.nextMillis();
             
             if( timestamp == lastTimestamp ) fail("Same timestamp?");
 

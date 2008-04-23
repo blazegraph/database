@@ -653,7 +653,9 @@ abstract public class OverflowManager extends IndexManager {
      * This is invoked once all pre-conditions have been satisified.
      * <p>
      * Index partitions that have fewer than some threshold #of index entries
-     * will be copied onto the new journal.
+     * will be copied onto the new journal.  Otherwise the view of the index
+     * will be re-defined to place writes on the new journal and read historical
+     * data from the old journal.
      * <p>
      * This uses {@link #purgeOldResources()} to delete old resources from the
      * local file system that are no longer required as determined by
@@ -986,12 +988,6 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-        log.warn("\ndoOverflow(): firstCommitTime=" + firstCommitTime
-                + "\nfile=" + newJournal.getFile()
-                + "\npost-condition views: overflowCounter="
-                + getOverflowCount() + "\n"
-                + listIndexPartitions(-firstCommitTime));
-
         /*
          * Close out the old journal.
          * 
@@ -1026,6 +1022,17 @@ abstract public class OverflowManager extends IndexManager {
             log.info("Changed over to a new live journal");
 
         }
+
+        /*
+         * Show the new views once we have cut over to the new journal. if we do
+         * this before we cut over then the data will still be read from the old
+         * journal.
+         */
+        log.warn("\ndoOverflow(): firstCommitTime=" + firstCommitTime
+                + "\nfile=" + newJournal.getFile()
+                + "\npost-condition views: overflowCounter="
+                + getOverflowCount() + "\n"
+                + listIndexPartitions(-firstCommitTime));
         
         /*
          * Change over the counter set to the new live journal.
@@ -1046,7 +1053,7 @@ abstract public class OverflowManager extends IndexManager {
             log.warn("Problem updating counters: "+t, t);
             
         }
-        
+
         /*
          * Cause old resources to be deleted on the file system.
          */
