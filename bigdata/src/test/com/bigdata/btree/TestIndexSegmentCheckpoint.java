@@ -43,19 +43,19 @@ import com.bigdata.rawstore.WormAddressManager;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestIndexSegmentMetadata extends TestCase {
+public class TestIndexSegmentCheckpoint extends TestCase {
 
     /**
      * 
      */
-    public TestIndexSegmentMetadata() {
+    public TestIndexSegmentCheckpoint() {
         super();
     }
 
     /**
      * @param arg0
      */
-    public TestIndexSegmentMetadata(String arg0) {
+    public TestIndexSegmentCheckpoint(String arg0) {
         super(arg0);
     }
 
@@ -202,9 +202,6 @@ public class TestIndexSegmentMetadata extends TestCase {
 //            raf.close();
 //            
 //            raf = new RandomAccessFile(tmp,"r");
-            
-            // rewind.
-            raf.seek(0L);
             
             // read back from the file.
             IndexSegmentCheckpoint actual = new IndexSegmentCheckpoint(raf);

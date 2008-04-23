@@ -150,7 +150,7 @@ public class TestAll extends TestCase {
         // test encoding and decoding of child node/leaf addresses.
         suite.addTestSuite( TestIndexSegmentAddressManager.class );
         // test write and read back of the index segment metadata record.
-        suite.addTestSuite( TestIndexSegmentMetadata.class );
+        suite.addTestSuite( TestIndexSegmentCheckpoint.class );
         // test with small known examples in detail.
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
         // stress test with larger random input trees and a variety of branching factors.

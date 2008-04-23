@@ -31,6 +31,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RootBlockException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 
@@ -47,7 +48,7 @@ import com.bigdata.rawstore.IAddressManager;
  * contains only data that pertains specifically to the {@link IndexSegment}
  * checkpoint or data otherwise required to bootstrap the load of the
  * {@link IndexSegment} from the file. General purpose metadata is stored in the
- * extension metadata record.
+ * {@link IndexMetadata} record.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -87,7 +88,8 @@ public class IndexSegmentCheckpoint {
     static final int SIZEOF_UNUSED = 256;
 
     /**
-     * The #of bytes required by the current metadata record format.
+     * The #of bytes required by the current {@link IndexSegmentCheckpoint}
+     * record format.
      */
     static final int SIZE = //
             SIZEOF_MAGIC + //
@@ -104,7 +106,8 @@ public class IndexSegmentCheckpoint {
     ;
     
     /**
-     * Magic value written at the start of the metadata record.
+     * Magic value written at the start of the {@link IndexSegmentCheckpoint}
+     * record.
      */
     static transient final public int MAGIC = 0x87ab34f5;
     
@@ -223,31 +226,49 @@ public class IndexSegmentCheckpoint {
     final public long commitTime;
 
     /**
-     * Reads the metadata record for the {@link IndexSegment} from the current
-     * position in the file.
+     * Reads the {@link IndexSegmentCheckpoint} record for the
+     * {@link IndexSegment}. The operation seeks to the start of the file and
+     * uses relative reads with the file pointer.
      * 
      * @param raf
      *            The file.
      * 
      * @throws IOException
+     *             If there is a IO problem.
+     * 
+     * @throws RootBlockException
+     *             if the {@link IndexSegmentCheckpoint} record is invalid (it
+     *             doubles as a root block), including if the total file length
+     *             is not large enough to contain an valid
+     *             {@link IndexSegmentCheckpoint} record.
      */
     public IndexSegmentCheckpoint(RandomAccessFile raf) throws IOException {
 
-//        raf.seek(0);
+        if (raf.length() < SIZE) {
+
+            throw new RootBlockException(
+                    "File is too small to contain a valid root block");
+            
+        }
+        
+        // rewind.
+        raf.seek(0L);
         
         final int magic = raf.readInt();
 
         if (magic != MAGIC) {
-            throw new IOException("Bad magic: actual=" + magic
-                    + ", expected=" + MAGIC);
+
+            throw new RootBlockException("MAGIC: expected=" + MAGIC
+                    + ", actual=" + magic);
+
         }
 
         final int version = raf.readInt();
-        
-        if( version != VERSION0 ) {
-            
-            throw new IOException("unknown version="+version);
-            
+
+        if (version != VERSION0) {
+
+            throw new RootBlockException("unknown version=" + version);
+
         }
 
         final long timestamp0 = raf.readLong();
@@ -282,8 +303,8 @@ public class IndexSegmentCheckpoint {
         
         if (length != raf.length()) {
 
-            throw new IOException("Length differs: actual=" + raf.length()
-                    + ", expected=" + length);
+            throw new RootBlockException("Length differs: actual="
+                    + raf.length() + ", expected=" + length);
 
         }
         
@@ -291,9 +312,9 @@ public class IndexSegmentCheckpoint {
         
         final long timestamp1 = raf.readLong();
         
-        if(timestamp0 != timestamp1) {
-            
-            throw new RuntimeException("Timestamps do not agree - file is not useable.");
+        if (timestamp0 != timestamp1) {
+
+            throw new RootBlockException("Timestamps differ: "+timestamp0 +" vs "+ timestamp1);
             
         }
         
@@ -308,7 +329,7 @@ public class IndexSegmentCheckpoint {
     }
 
     /**
-     * Create a new metadata record in preparation for writing it on a file
+     * Create a new checkpoint record in preparation for writing it on a file
      * containing a newly constructed {@link IndexSegment}.
      * 
      * @todo javadoc.
@@ -366,7 +387,7 @@ public class IndexSegmentCheckpoint {
     }
 
     /**
-     * Test validity of the checkpoint record.
+     * Test validity of the {@link IndexSegmentCheckpoint} record.
      * 
      * @todo this uses asserts which may be disabled.
      */
@@ -374,35 +395,107 @@ public class IndexSegmentCheckpoint {
         
 //        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
-        assert height >= 0;
+        // height is non-negative.
+//        assert height >= 0;
+        if (height < 0)
+            throw new RootBlockException("height=" + height);
         
-        assert nleaves > 0; // always at least one leaf.
+        // always at least one leaf.
+//        assert nleaves > 0;
+        if (nleaves <= 0)
+            throw new RootBlockException("nleaves=" + nleaves);
         
-        assert nnodes >= 0; // may be just a root leaf.
+        // zero nodes is Ok - the B+Tree may be just a root leaf.
+//        assert nnodes >= 0;
+        if (nnodes < 0)
+            throw new RootBlockException("nnodes=" + nnodes);
         
         // index may not be empty.
-        assert nentries > 0;
+//        assert nentries > 0;
+        if (nentries <= 0)
+            throw new RootBlockException("nentries=" + nentries);
 //        // #entries must fit within the tree height.
 //        assert nentries <= Math.pow(branchingFactor,height+1);
         
-        assert maxNodeOrLeafLength > 0;
+//        assert maxNodeOrLeafLength > 0;
+        if (maxNodeOrLeafLength <= 0)
+            throw new RootBlockException("maxNodeOrLeafLength="
+                    + maxNodeOrLeafLength);
         
-        assert addrLeaves != 0L;
-        assert am.getOffset(addrLeaves)==SIZE;
-        assert am.getByteCount(addrLeaves) > 0;
+        // validate addrLeaves
+        {
+            // assert addrLeaves != 0L;
+            if (addrLeaves == 0L) {
+
+                throw new RootBlockException("addrLeaves=" + addrLeaves);
+
+            }
+
+            // leaves start immediately after the checkpoint record.
+            if (am.getOffset(addrLeaves) != SIZE) {
+
+                throw new RootBlockException("addrLeaves.offset="
+                        + am.getOffset(addrLeaves) + ", but expecting " + SIZE);
+
+            }
+            
+            if (am.getOffset(addrLeaves) + am.getByteCount(addrLeaves) > length) {
+                throw new RootBlockException(
+                        "The leaf record(s) extend beyond the end of the file: addrLeaves="
+                                + am.toString(addrLeaves) + ", but length="
+                                + length);
+            }
+
+        }
 
         if(nnodes == 0) {
-            // the root is a leaf.
-            assert addrNodes == 0L;
-            assert am.getOffset(addrLeaves) < length;
-            assert am.getOffset(addrRoot) >= am.getOffset(addrLeaves);
-            assert am.getOffset(addrRoot) < length;
+            /*
+             * The root is a leaf. In this case there is only a single root leaf
+             * and there are no nodes.
+             */
+            if (addrNodes != 0L) {
+                /*
+                 * Since there is are no nodes, addrNodes MUST be ZERO.
+                 */
+                throw new RootBlockException("addrNodes=" + addrNodes
+                        + ", but expecting zero.");
+            }
+            if (addrRoot != addrLeaves) {
+                /*
+                 * Since there is only a single root leaf, addrRoot MUST equal
+                 * addrLeaves.
+                 */
+                throw new RootBlockException("addrRoot("
+                        + am.toString(addrRoot)
+                        + ") is not equal to addrLeaves(" + addrLeaves + ")");
+            }
+//            assert am.getOffset(addrRoot) >= am.getOffset(addrLeaves);
+//            assert am.getOffset(addrRoot) < length;
         } else {
-            // the root is a node.
-            assert am.getOffset(addrNodes) > am.getOffset(addrLeaves);
-            assert am.getOffset(addrNodes) < length;
-            assert am.getOffset(addrRoot) >= am.getOffset(addrNodes);
-            assert am.getOffset(addrRoot) < length;
+            /*
+             * The root is a node.
+             */
+            if(addrNodes==0L) {
+                // the nodes region MUST exist.
+                throw new RootBlockException("addrNodes=" + addrNodes);                
+            }
+            if (am.getOffset(addrNodes) + am.getByteCount(addrNodes) > length) {
+                throw new RootBlockException(
+                        "The node record(s) extend beyond the end of the file: addrNodes="
+                                + am.toString(addrNodes) + ", but length="
+                                + length);
+            }
+            if (am.getOffset(addrRoot) + am.getByteCount(addrRoot) > length) {
+                throw new RootBlockException(
+                        "The root node record extends beyond the end of the file: addrRoot="
+                                + am.toString(addrRoot) + ", but length="
+                                + length);
+            }
+
+//            assert am.getOffset(addrNodes) > am.getOffset(addrLeaves);
+//            assert am.getOffset(addrNodes) < length;
+//            assert am.getOffset(addrRoot) >= am.getOffset(addrNodes);
+//            assert am.getOffset(addrRoot) < length;
         }
 
         /*
@@ -414,14 +507,24 @@ public class IndexSegmentCheckpoint {
 //        
 //        if( errorRate != 0.) assert addrBloom != 0L;
         
-        assert commitTime != 0L;
+//        assert commitTime != 0L;
+        if (commitTime <= 0L) {
+
+            throw new RootBlockException("commitTime=" + commitTime);
+            
+        }
         
-        assert segmentUUID != null;
+//        assert segmentUUID != null;
+        if (segmentUUID == null) {
+            
+            throw new RootBlockException("No segment UUID");
+            
+        }
 
     }
     
     /**
-     * Write the metadata record on the current position of the file.
+     * Write the checkpoint record on the current position of the file.
      * 
      * @param raf
      *            The file.
@@ -487,7 +590,8 @@ public class IndexSegmentCheckpoint {
     }
     
     /**
-     * A human readable representation of the metadata record.
+     * A human readable representation of the {@link IndexSegmentCheckpoint}
+     * record.
      */
     public String toString() {
  
