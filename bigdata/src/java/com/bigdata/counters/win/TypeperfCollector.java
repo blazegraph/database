@@ -394,7 +394,18 @@ public class TypeperfCollector extends AbstractProcessCollector {
             while (!Thread.currentThread().isInterrupted()
                     && csvReader.hasNext()) {
 
-                final Map<String, Object> row = csvReader.next();
+                final Map<String, Object> row;
+                try {
+
+                    row = csvReader.next();
+                    
+                } catch(Throwable t) {
+                    
+                    log.warn(t.getMessage(),t);
+                    
+                    continue;
+                    
+                }
 
                 final long timestamp = ((Date)row.get("Timestamp")).getTime();
 

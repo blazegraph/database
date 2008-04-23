@@ -1155,74 +1155,44 @@ Short term tasks:
 
 	- U100, host3, Jini, 10 threads: ______ tps.
 
-	  Note: Observed consistency problem in AddIds(#159).  May
-	  have been a bad start.  MAY have been a result of overflow
-	  processing with its effect on the partition identifier....
-	  MAY be a bad classpath from a compile.  I keep seeing
-	  "modification dates in the future" when compiling on host3
-	  even through the clock looks good to me.
+	  FIXME: 
 
-	  This problem appeared to persist on host3 until I changed
-	  the configuration for the data servers to [overflowEnabled =
-	  false]
-
-	  I've been able to re-create this on the workstation by
-	  lowering the initial and maximum extent to 50M and enabling
-	  overflow.
+	  I have observed consistency problem in AddIds(line 159).
+	  This problem is definately linked to synchronous overflow
+	  processing.  I've been able to re-create this on the
+	  workstation by lowering the initial and maximum extent to
+	  50M, or even 10M or 1M and enabling overflow.
 
 	  Caused by: java.lang.RuntimeException: Consistency problem: id=2090932
 	      at com.bigdata.rdf.store.AddIds.apply(AddIds.java:159)
 
-	  This appears shortly after an overflow completed generating
-	  new views.  
+	  A message such as this appears shortly after synchronous
+	  overflow for the data service on which the lexicon is hosted
+	  completed generating new views (probably the term:id index
+	  since that is the one responsible for assigning term
+	  identifiers).
+	
+	  The forward map makes a persistent term identifier
+	  assignment and SHOULD be consistent.  My current guess is
+	  that overflow processing is not handled correctly, for
+	  example synchronous overflow MUST NOT run concurrent with
+	  any other tasks.  I've made several changes to the
+	  WriteExecutorService to try and nail this down and have
+	  identified at least one way in which the code was wrong (the
+	  group commit did not ensure [nrunning == 0]).  I've changed
+	  this, but I can still observe the problem.
 
-	  FIXME The forward map makes a persistent term identifier
-	  assignment and SHOULD be consistent....  Perhaps the problem
-	  is with a BNode or StatementIdentifier....?  _OR_ perhaps
-	  the problem is with a bad commit, e.g., the data was not
-	  made restart safe and therefore another AddTerms task was
-	  able to assign a different term identifier !!!!
-
+	  I have modified the U10 test for the LDS (can not overflow)
+	  and the embedded federation (overflow can be enabled or
+	  disabled and restricted to one data service).  Both the LDS
+	  and the embedded federation appear to be fine when overflow
+	  is disabled.  When overflow is enabled, it triggers the
+	  consistency problem noted above and can also trigger a
+	  variety of other problems that I am documenting below.
+	  
  
-	  ------
-
-	  And here is the answer to the question about atomic commit
-	  points for index segments.  Clearly there is NOT an atomic
-	  commit point, or if there is then the logic to read the
-	  index segment checkpoint record is not sufficiently robust
-	  (the latter I think)
-
-	  I've placed a copy of testPOS_part00000_14341.seg into the
-	  bigdata project root for testing.
-
-java.lang.RuntimeException: Problem opening segment: C:\Documents and Settings\bthompson\workspace\bigdata-rdf\standalone\DataServer0\segments\643ee44d-fe4c-4c1e-a0c9-ae4e0ca37e7d\testPOS_part00000_14341.seg
-	at com.bigdata.resources.StoreManager.scanFile(StoreManager.java:1169)
-	at com.bigdata.resources.StoreManager.scanDataDirectory(StoreManager.java:1101)
-	at com.bigdata.resources.StoreManager.scanDataDirectory(StoreManager.java:1097)
-	at com.bigdata.resources.StoreManager.scanDataDirectory(StoreManager.java:1097)
-	at com.bigdata.resources.StoreManager.access$2(StoreManager.java:1081)
-	at com.bigdata.resources.StoreManager$Startup.start(StoreManager.java:819)
-	at com.bigdata.resources.StoreManager$Startup.run(StoreManager.java:757)
-	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:441)
-	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
-	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
-	at java.lang.Thread.run(Thread.java:619)
-Caused by: java.lang.RuntimeException: java.io.EOFException
-	at com.bigdata.btree.IndexSegmentStore.reopen(IndexSegmentStore.java:389)
-	at com.bigdata.btree.IndexSegmentStore.<init>(IndexSegmentStore.java:278)
-	at com.bigdata.resources.StoreManager.scanFile(StoreManager.java:1165)
-	... 12 more
-Caused by: java.io.EOFException
-	at java.io.RandomAccessFile.readInt(RandomAccessFile.java:725)
-	at com.bigdata.btree.IndexSegmentCheckpoint.<init>(IndexSegmentCheckpoint.java:238)
-	at com.bigdata.btree.IndexSegmentStore.reopen(IndexSegmentStore.java:349)
-	... 14 more
-
-
-
-	- U1000, host3, Jini, 10 threads: ______ tps.
+	- U1000, host3, Jini, 10 threads: ______ tps.  ***** RERUN w/
+          overflow disabled.
 
 ============================================================
 
@@ -1458,3 +1428,28 @@ Also Caused by: java.lang.AssertionError
 
 which might be similar and showed up when I changed the
 OverflowManager log level to INFO.
+
+
+Caused by: java.lang.AssertionError
+	at com.bigdata.btree.BTree.writeCheckpoint(BTree.java:722)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.checkpointIndices(AbstractTask.java:1133)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1041)
+
+
+Error during groupCommit while concurrent overflow processing is running.
+
+java.lang.AssertionError
+	at com.bigdata.btree.Node.getIndexOf(Node.java:1746)
+	at com.bigdata.btree.Node.setChildKey(Node.java:542)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:2043)
+	at com.bigdata.btree.AbstractBTree.writeNodeRecursive(AbstractBTree.java:1896)
+	at com.bigdata.btree.BTree.writeCheckpoint(BTree.java:726)
+	at com.bigdata.btree.BTree.handleCommit(BTree.java:938)
+	at com.bigdata.journal.Name2Addr.handleCommit(Name2Addr.java:283)
+	at com.bigdata.journal.AbstractJournal.notifyCommitters(AbstractJournal.java:1419)
+	at com.bigdata.journal.AbstractJournal.commitNow(AbstractJournal.java:1557)
+	at com.bigdata.journal.AbstractJournal.commit(AbstractJournal.java:1517)
+	at com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1463)
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:926)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:547)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:800)

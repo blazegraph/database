@@ -69,6 +69,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
         timestampService = new EmbeddedTimestampService(UUID.randomUUID(),
                 properties);
         
+        /*
+         * Note: This will expose the counters for the local data service.
+         */
         loadBalancerService = new EmbeddedLoadBalancerService(
                 UUID.randomUUID(), properties);
         
@@ -115,40 +118,6 @@ public class LocalDataServiceFederation extends AbstractFederation {
             
         };
 
-        /*
-         * @todo enable once there are events to report the setting of the
-         * service UUID and the end of the StoreManager startup (isRunning
-         * becomes true).
-         */  
-//        /*
-//         * HTTPD service reporting out statistics. This will be shutdown with
-//         * the federation.
-//         */
-//        {
-//            
-//            final int port = Integer.parseInt(properties.getProperty(
-//                    LocalDataServiceClient.Options.HTTPD_PORT,
-//                    LocalDataServiceClient.Options.DEFAULT_HTTPD_PORT));
-//
-//            log.info(LocalDataServiceClient.Options.HTTPD_PORT + "=" + port);
-//
-//            if (port < 0)
-//                throw new RuntimeException(
-//                        LocalDataServiceClient.Options.HTTPD_PORT
-//                                + " may not be negative");
-//            
-//            AbstractHTTPD httpd = null;
-//            if (port != 0) {
-//                try {
-//                    httpd = new CounterSetHTTPD(port,(CounterSet)dataService.getCounters());
-//                } catch (IOException e) {
-//                    log.error("Could not start httpd on port=" + port, e);
-//                }
-//            }
-//            this.httpd = httpd;
-//            
-//        }
-        
     }
 
     /**

@@ -219,6 +219,10 @@ public interface IResourceManager extends IServiceShutdown {
      * Note: The caller MUST ensure that they have an exclusive lock on the
      * {@link WriteExecutorService} such that no task is running with write
      * access to the {@link #getLiveJournal() live journal}.
+     * <p>
+     * Note: The implementation MUST NOT write on the old journal - those writes
+     * will not be made restart safe by the {@link WriteExecutorService} - but
+     * it MAY write on the new journal.
      * 
      * @return The {@link Future} for the task handling post-processing of the
      *         old journal.

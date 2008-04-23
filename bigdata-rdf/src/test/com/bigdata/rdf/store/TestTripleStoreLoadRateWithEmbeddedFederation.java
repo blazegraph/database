@@ -73,24 +73,33 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         // Use the disk-backed store.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
         
+        // name data directory for the unit test.
+        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
+
         // Disable index partition moves (between data services).
         properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
         
-        // setup overflow conditions.
-      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
-        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
-//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*20);
-//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*20);
-//        properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
+        /*
+         * setup overflow conditions - can be easily modified to trigger
+         * overflow early or late or to disable overflow all together.
+         */
+      properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
+//      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
+//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
+        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
+        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
         
-        // name data directory for the unit test.
-        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
-        
+        // control the #of data services.
+        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
+
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
 
         // turn off text indexing.
 //        properties.setProperty(Options.TEXT_INDEX,"false");
+
+        // change the default port for httpd exposed by the load balancer. 
+        properties.setProperty(com.bigdata.service.LoadBalancerService.Options.HTTPD_PORT,"8080");
 
         return properties;
         

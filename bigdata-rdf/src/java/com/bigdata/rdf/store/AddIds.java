@@ -161,7 +161,7 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
 
                     if (! BytesUtil.bytesEqual(val, oldval)) {
 
-                        char suffix = '?';
+                        final char suffix;
                         if (AbstractTripleStore.isLiteral(id))
                             suffix = 'L';
                         else if (AbstractTripleStore.isURI(id))
@@ -170,10 +170,17 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
                             suffix = 'B';
                         else if (AbstractTripleStore.isStatement(id))
                             suffix = 'S';
+                        else
+                            suffix = '?';
 
-                        throw new RuntimeException("Consistency problem: id="
-                                + id + suffix+", val=" + BytesUtil.toString(val)
-                                + ", oldval=" + BytesUtil.toString(oldval));
+                        log.error("id=" + id + suffix);
+                        log.error("val=" + BytesUtil.toString(val));
+                        log.error("oldval=" + BytesUtil.toString(oldval));
+                        log.error("val=" + _Value.deserialize(val));
+                        log.error("oldval=" + _Value.deserialize(oldval));
+                        
+                        throw new RuntimeException("Consistency problem: id="+ id);
+                        
                         
                     }
                     

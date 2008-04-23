@@ -1014,7 +1014,11 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * Note: this object is used to ensure that checkpoints and
              * rollbacks are coordinated with the write service. In particular,
              * this ensures that checkpoint and rollback operations do NOT
-             * overlap a group commit.
+             * overlap a group commit. Since indices do not participate in group
+             * commits until we write their checkpoint records and since we do
+             * not write their checkpoint records until we have this lock, we
+             * are able to guarentee that the write set of a task is made
+             * restart safe atomically by the next group commit.
              */
             final Lock lock = writeService.lock;
 
@@ -1095,7 +1099,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          */
         private void checkpointIndices() {
 
-            log.info("Task accessed "+delegate.indexCache.size()+" indices: "+this);
+            if(INFO) log.info("Task accessed "+delegate.indexCache.size()+" indices: "+this);
             
             final Iterator<Map.Entry<String,IIndex>> itr = delegate.indexCache.entrySet().iterator();
 
@@ -1121,18 +1125,18 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
                 final boolean needsCheckpoint = btree.needsCheckpoint();
                 
-                log.info("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
+                if(INFO) log.info("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
                 
                 if(needsCheckpoint) {
                     
                     /*
                      * There are writes on the btree, so write a checkpoint
-                     * for it now that the task has completed successfully.
+                     * record now that the task has completed successfully.
                      */
                     
                     final long checkpointAddr = btree.writeCheckpoint();
                     
-                    log.info("name=" + name + ", newcheckpointAddr="
+                    if(INFO) log.info("name=" + name + ", newcheckpointAddr="
                             + btree.getStore().toString(checkpointAddr) + " : "
                             + this);
                     
@@ -1151,7 +1155,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          */
         private void rollbackIndices() {
 
-            log.info("Rolling back "+delegate.indexCache.size()+" indices: "+this);
+            if(INFO) log.info("Rolling back "+delegate.indexCache.size()+" indices: "+this);
             
             final Iterator<Map.Entry<String,IIndex>> itr = delegate.indexCache.entrySet().iterator();
 
@@ -1177,7 +1181,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 
                 final boolean needsCheckpoint = btree.needsCheckpoint();
                 
-                log.debug("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
+                if(DEBUG) log.debug("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
                 
                 if(needsCheckpoint) {
                     
@@ -1197,7 +1201,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                      * checkpoint rollback addresses.
                      */
                     
-                    log.info("Rolling back index: "+name+" : "+this);
+                    if(INFO) log.info("Rolling back index: "+name+" : "+this);
                     
                     if(btree.isOpen()) {
                         try {
