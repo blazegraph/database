@@ -33,6 +33,7 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -1727,7 +1728,38 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      *       readers, and nodes are never dirty and hence will never be made
      *       persistent on eviction so it probably does not matter if the
      *       reference counts are over or under for this case.
+     *       <p>
+     *       Note: I have since seen an exception where the evicted node
+     *       reference was [null]. The problem is that the
+     *       {@link HardReferenceQueue} is NOT thread-safe. Concurrent readers
+     *       driving {@link HardReferenceQueue#append(Object)} can cause the
+     *       data structure to become inconsistent. This is not much of a
+     *       problem for readers since the queue is being used to retain hard
+     *       references - effectively a cache and the null reference could be
+     *       ignored. For writers, we are always single threaded.
+     *       <p>
+     *       Still, it seems best to either make this method synchronized or to
+     *       replace the {@link HardReferenceQueue} with an
+     *       {@link ArrayBlockingQueue} since there could well be side-effects
+     *       of concurrent appends on the queue with concurrent writers. The
+     *       latency for synchronization will be short for readers since
+     *       eviction is a NOP while the latency of append can be high for a
+     *       single threaded writer since IO may result.
+     *       <p>
+     *       The use of an {@link ArrayBlockingQueue} opens up some interesting
+     *       possibilities since a concurrent thread could now handle
+     *       serialization and eviction of nodes while the caller was blocked
+     *       and the caller would not need to wait for serialization and IO
+     *       unless the queue was full. This really sounds like the same old
+     *       concept of a write retention queue (we do not want to evict nodes
+     *       too quickly or we will make them persistent while they are still
+     *       likely to be touched) and a read retention queue (keeping nodes
+     *       around for a while after they have been made persistent) with the
+     *       new twist being that serialization and IO could be asynchronous in
+     *       the zone of action available between those queues in order to keep
+     *       the write reference queue at a minimium capacity).
      */
+    synchronized
     final protected void touch(AbstractNode node) {
 
         assert node != null;
