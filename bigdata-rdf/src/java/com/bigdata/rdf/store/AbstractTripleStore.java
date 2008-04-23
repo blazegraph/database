@@ -110,6 +110,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.SPOConvertingIterator;
 import com.bigdata.rdf.spo.DelegateSPOIterator;
 import com.bigdata.rdf.spo.EmptySPOIterator;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -2779,179 +2780,114 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
-    public ISPOIterator bulkFilterStatements(SPO[] stmts, int numStmts,
-            boolean present) {
-
+    public ISPOIterator bulkFilterStatements(final SPO[] stmts,
+            final int numStmts, boolean present) {
         if (numStmts == 0)
             return new EmptySPOIterator(KeyOrder.SPO);
-
-        return bulkFilterStatements(new SPOArrayIterator(stmts, numStmts),
-                present);
-
+        return bulkFilterStatements(
+                new SPOArrayIterator(stmts, numStmts), present);
     }
 
-    /**
-     * FIXME This fully buffers the result before returning to the caller.
-     * Modify to run a reader that populates a buffer and have the buffer
-     * wrapped up as an {@link ISPOIterator} that is returned to the caller.
-     */
-    public ISPOIterator bulkFilterStatements(ISPOIterator itr, boolean present) {
-
-        try {
-
-            final IIndex index = getSPOIndex();
-            
-            // Thread-local key builder.
-            final RdfKeyBuilder keyBuilder = getKeyBuilder();
-
-            SPO[] stmts = new SPO[0];
-            int numStmts = 0;
-
-            /*
-             * Note: We process the iterator a "chunk" at a time. If the
-             * iterator is backed by an SPO[] then it will all be processed in
-             * one "chunk".
-             */
-
-            while (itr.hasNext()) {
-
-                // get the next chunk
-                final SPO[] chunk = itr.nextChunk(KeyOrder.SPO);
-
-                // create an array of keys for the chunk
-                final byte[][] keys = new byte[chunk.length][];
-                for (int i = 0; i < chunk.length; i++) {
-                    keys[i] = keyBuilder.statement2Key(KeyOrder.SPO, chunk[i]);
-                }
-
-                // knows how to aggregate ResultBitBuffers.
-                final ResultBitBufferHandler resultHandler = new ResultBitBufferHandler(keys.length);
-
-                // submit the batch contains procedure to the SPO index
-                index.submit(0/* fromIndex */, keys.length/* toIndex */, keys,
-                        null/* vals */, BatchContainsConstructor.INSTANCE,
-                        resultHandler);
-
-                // get the array of existence test results
-                boolean[] contains = resultHandler.getResult().getResult();
-
-                // filter in or out, depending on the present variable
-                int chunkSize = chunk.length;
-                int j = 0;
-                for (int i = 0; i < chunk.length; i++) {
-                    if (contains[i] == present) {
-                        chunk[j] = chunk[i];
-                        j++;
-                    } else {
-                        chunkSize--;
+    public ISPOIterator bulkFilterStatements(final ISPOIterator itr,
+            final boolean present) {
+        return new SPOConvertingIterator(
+                itr, new SPOConvertingIterator.SPOConverter() {
+                    public SPO[] convert(SPO[] chunk) {
+                        Arrays.sort(chunk, SPOComparator.INSTANCE);
+                        final IIndex index = getSPOIndex();
+                        // Thread-local key builder.
+                        final RdfKeyBuilder keyBuilder = getKeyBuilder();
+                        // create an array of keys for the chunk
+                        final byte[][] keys = new byte[chunk.length][];
+                        for (int i = 0; i < chunk.length; i++) {
+                            keys[i] =
+                                    keyBuilder.statement2Key(
+                                            KeyOrder.SPO, chunk[i]);
+                        }
+                        // knows how to aggregate ResultBitBuffers.
+                        final ResultBitBufferHandler resultHandler =
+                                new ResultBitBufferHandler(keys.length);
+                        // submit the batch contains procedure to the SPO index
+                        index.submit(
+                                0/* fromIndex */, keys.length/* toIndex */,
+                                keys, null/* vals */,
+                                BatchContainsConstructor.INSTANCE,
+                                resultHandler);
+                        // get the array of existence test results
+                        boolean[] contains =
+                                resultHandler.getResult().getResult();
+                        // filter in or out, depending on the present variable
+                        int chunkSize = chunk.length;
+                        int j = 0;
+                        for (int i = 0; i < chunk.length; i++) {
+                            if (contains[i] == present) {
+                                chunk[j] = chunk[i];
+                                j++;
+                            } else {
+                                chunkSize--;
+                            }
+                        }
+                        // size the return array correctly
+                        SPO[] filtered = new SPO[chunkSize];
+                        System.arraycopy(chunk, 0, filtered, 0, chunkSize);
+                        return filtered;
                     }
-                }
-
-                // aggegate this chunk's results to the return value
-                SPO[] temp = new SPO[numStmts + chunkSize];
-                System.arraycopy(stmts, 0, temp, 0, numStmts);
-                System.arraycopy(chunk, 0, temp, numStmts, chunkSize);
-                stmts = temp;
-                numStmts += chunkSize;
-
-            }
-
-            return new SPOArrayIterator(stmts, numStmts);
-
-        } finally {
-
-            itr.close();
-
-        }
-
+                });
     }
 
-    public ISPOIterator bulkCompleteStatements(SPO[] stmts, int numStmts) {
-
+    public ISPOIterator bulkCompleteStatements(final SPO[] stmts,
+            final int numStmts) {
         if (numStmts == 0)
             return new EmptySPOIterator(KeyOrder.SPO);
-
         return bulkCompleteStatements(new SPOArrayIterator(stmts, numStmts));
-
     }
 
     /**
      * This method fills out the statement metadata (type and sid) for SPOs
      * that are present in the database.  SPOs not present in the database
      * are left as-is.
-     *  
-     * FIXME This fully buffers the result before returning to the caller.
-     * Modify to run a reader that populates a buffer and have the buffer
-     * wrapped up as an {@link ISPOIterator} that is returned to the caller.
      */
-    public ISPOIterator bulkCompleteStatements(ISPOIterator itr) {
-
-        try {
-
-            final IIndex index = getSPOIndex();
-            
-            // Thread-local key builder.
-            final RdfKeyBuilder keyBuilder = getKeyBuilder();
-
-            SPO[] stmts = new SPO[0];
-            int numStmts = 0;
-
-            /*
-             * Note: We process the iterator a "chunk" at a time. If the
-             * iterator is backed by an SPO[] then it will all be processed in
-             * one "chunk".
-             */
-
-            while (itr.hasNext()) {
-
-                // get the next chunk
-                final SPO[] chunk = itr.nextChunk(KeyOrder.SPO);
-
-                // create an array of keys for the chunk
-                final byte[][] keys = new byte[chunk.length][];
-                for (int i = 0; i < chunk.length; i++) {
-                    keys[i] = keyBuilder.statement2Key(KeyOrder.SPO, chunk[i]);
-                }
-
-                // knows how to aggregate ResultBitBuffers.
-                final ResultBufferHandler resultHandler = 
-                    new ResultBufferHandler(
-                        keys.length, 
-                        index.getIndexMetadata().getValueSerializer()
-                        );
-
-                // submit the batch contains procedure to the SPO index
-                index.submit(0/* fromIndex */, keys.length/* toIndex */, keys,
-                        null/* vals */, BatchLookupConstructor.INSTANCE,
-                        resultHandler);
-
-                // get the values from lookup
-                ResultBuffer vals = resultHandler.getResult();
-
-                for (int i = 0; i < chunk.length; i++) {
-                    byte[] val = vals.getResult(i);
-                    if (val != null) {
-                        chunk[i].decodeValue(val);
+    public ISPOIterator bulkCompleteStatements(final ISPOIterator itr) {
+        return new SPOConvertingIterator(
+                itr, new SPOConvertingIterator.SPOConverter() {
+                    public SPO[] convert(SPO[] chunk) {
+                        Arrays.sort(chunk, SPOComparator.INSTANCE);
+                        final IIndex index = getSPOIndex();
+                        // Thread-local key builder.
+                        final RdfKeyBuilder keyBuilder = getKeyBuilder();
+                        // create an array of keys for the chunk
+                        final byte[][] keys = new byte[chunk.length][];
+                        for (int i = 0; i < chunk.length; i++) {
+                            keys[i] =
+                                    keyBuilder.statement2Key(
+                                            KeyOrder.SPO, chunk[i]);
+                        }
+                        // knows how to aggregate ResultBitBuffers.
+                        final ResultBufferHandler resultHandler =
+                                new ResultBufferHandler(keys.length, index
+                                        .getIndexMetadata()
+                                        .getValueSerializer());
+                        // submit the batch contains procedure to the SPO index
+                        index.submit(
+                                0/* fromIndex */, keys.length/* toIndex */,
+                                keys, null/* vals */,
+                                BatchLookupConstructor.INSTANCE, resultHandler);
+                        // get the values from lookup
+                        ResultBuffer vals = resultHandler.getResult();
+                        for (int i = 0; i < chunk.length; i++) {
+                            byte[] val = vals.getResult(i);
+                            if (val != null) {
+                                chunk[i].decodeValue(val);
+                            } else {
+                                // the SPO does not actually exist in the db
+                                // let's make it inferred
+                                chunk[i]
+                                        .setStatementType(StatementEnum.Inferred);
+                            }
+                        }
+                        return chunk;
                     }
-                }
-
-                // aggegate this chunk's results to the return value
-                SPO[] temp = new SPO[numStmts + chunk.length];
-                System.arraycopy(stmts, 0, temp, 0, numStmts);
-                System.arraycopy(chunk, 0, temp, numStmts, chunk.length);
-                stmts = temp;
-                numStmts += chunk.length;
-
-            }
-
-            return new SPOArrayIterator(stmts, numStmts);
-
-        } finally {
-
-            itr.close();
-
-        }
-
+                });
     }
 
     public int addStatements(SPO[] stmts, int numStmts) {
