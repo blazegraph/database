@@ -220,6 +220,12 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
                 .get(spo.getStatementIdentifier())
                 : null);
         
+        if(spo.hasStatementType() == false) {
+            
+            log.error("statement with no type: " + new BigdataStatementImpl(s, p, o, c, null));
+            
+        }
+        
         // the statement.
         final BigdataStatement stmt = new BigdataStatementImpl(s, p, o, c, spo.getType()); 
         
