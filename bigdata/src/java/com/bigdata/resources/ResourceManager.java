@@ -187,6 +187,9 @@ abstract public class ResourceManager extends OverflowManager implements IResour
             /*
              * Note: these counters are detached and reattached to the new
              * live journal during overflow processing.
+             * 
+             * FIXME also attach when startup completes successfully rather
+             * than assuming that it already has done so.
              */
             root.makePath("Live Journal").attach(getLiveJournal().getCounters());
                         

@@ -30,6 +30,8 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -39,6 +41,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -59,7 +62,6 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.RootBlockException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
@@ -225,6 +227,20 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
          */
         String DEFAULT_STORE_CACHE_CAPACITY = "20";
 
+        /**
+         * A boolean property whose value determines whether or not startup will
+         * complete successfully if bad files are identified during the startup
+         * scan (default {@value #DEFAULT_IGNORE_BAD_FILES}). When
+         * <code>false</code> the {@link StoreManager} will refuse to start if
+         * if find bad files. When <code>true</code> the {@link StoreManager}
+         * will startup anyway but some index views may not be available.
+         * Regardless, bad files will be logged as they are identified and all
+         * files will be scanned before the {@link StoreManager} aborts.
+         */
+        String IGNORE_BAD_FILES = "ignoreBadFiles";
+        
+        String DEFAULT_IGNORE_BAD_FILES = "false";
+        
 
     }
     
@@ -335,7 +351,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * 
      * @see #isOpen()
      */
-    private boolean open = true;
+    private final AtomicBoolean open = new AtomicBoolean(true);
     
     /**
      * <code>true</code> initially and until {@link #start()} completes
@@ -344,8 +360,13 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * 
      * @see #isStarting()
      */
-    private volatile boolean starting = true;
+    private final AtomicBoolean starting = new AtomicBoolean(true);
 
+    /**
+     * @see Options#IGNORE_BAD_FILES
+     */
+    private final boolean ignoreBadFiles;
+    
     /**
      * Used to run the {@link Startup}.
      */
@@ -361,10 +382,10 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     protected void assertRunning() {
         
-        if (!open)
+        if (!isOpen())
             throw new IllegalStateException("Not open");
 
-        if (starting)
+        if (isStarting())
             throw new IllegalStateException("Starting up");
         
     }
@@ -375,7 +396,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     public boolean isRunning() {
         
-        return open && !starting;
+        return isOpen() && !isStarting();
         
     }
     
@@ -385,7 +406,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     protected void assertOpen() {
         
-        if (!open)
+        if (!isOpen())
             throw new IllegalStateException();
         
     }
@@ -396,7 +417,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     protected void assertNotOpen() {
         
-        if (open)
+        if (isOpen())
             throw new IllegalStateException();
 
     }
@@ -521,6 +542,18 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
         this.properties = properties;
 
+        // ignoreBadFiles
+        {
+            
+            ignoreBadFiles = Boolean
+                    .parseBoolean(properties.getProperty(
+                            Options.IGNORE_BAD_FILES,
+                            Options.DEFAULT_IGNORE_BAD_FILES));
+
+            log.info(Options.IGNORE_BAD_FILES + "=" + ignoreBadFiles);
+
+        }
+        
         /*
          * storeCacheCapacity
          */
@@ -755,20 +788,38 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
             try {
 
-                start();
+                try {
 
-            } catch (InterruptedException ex) {
+                    start();
 
-                log.warn("Startup was interrupted.");
+                } catch (Throwable ex) {
 
-                shutdownNow();
-                
-            } catch(Exception ex) {
-                
-                log.error("Problem during startup? : "+ex, ex);
-                
-                shutdownNow();
-                
+                    // avoid possibility that isRunning() could become true.
+                    open.set(false);
+
+                    log.error("Problem during startup? : " + ex, ex);
+
+                    shutdownNow();
+
+                    // terminate Startup task.
+                    throw new RuntimeException(ex);
+                    
+                }
+
+            } finally {
+
+                /*
+                 * Whether or not startup was successful, we now turn this flag
+                 * off.
+                 */
+
+                starting.set( false );
+
+                log.info("Startup "
+                        + (isOpen() ? "successful" : "failed")+" : "
+                        + (isTransient ? "transient" : Options.DATA_DIR + "="
+                                + dataDir));
+
             }
 
         }
@@ -789,24 +840,32 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
          * 
          * @throws InterruptedException
          *             if the startup scan is interrupted.
+         * 
+         * @throws RuntimeException
+         *             if bad files are encountered, etc.
          */
         final private void start() throws InterruptedException {
 
-            if (!starting)
+            if (!isStarting()) {
+
                 throw new IllegalStateException();
+                
+            }
 
             /*
              * Verify that the concurrency manager has been set and wait a while
              * it if is not available yet.
              */
-            for(int i=0; i<3; i++) {
+            log.info("Waiting for concurrency manager");
+            for (int i = 0; i < 3; i++) {
                 try {
                     getConcurrencyManager();
-                } catch(IllegalStateException ex) {
-                    Thread.sleep(100/*ms*/);
+                } catch (IllegalStateException ex) {
+                    Thread.sleep(100/* ms */);
                 }
             }
             getConcurrencyManager();
+            if(Thread.interrupted()) throw new InterruptedException();
 
             /*
              * Look for pre-existing data files.
@@ -815,20 +874,46 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
                 log.info("Starting scan of data directory: " + dataDir);
 
-                Stats stats = new Stats();
+                final Stats stats = new Stats();
 
                 scanDataDirectory(dataDir, stats);
 
-                log.info("Data directory contains " + stats.njournals
-                        + " journals and " + stats.nsegments
-                        + " index segments for a total of " + stats.nfiles
-                        + " resources and " + stats.nbytes + " bytes");
+                final int nbad = stats.badFiles.size();
+
+                log.info("Scan results: " + stats);
+                
+                if (!stats.badFiles.isEmpty()) {
+
+                    if (ignoreBadFiles) {
+
+                        log.warn("The following "
+                                        + nbad
+                                        + " file(s) had problems and are being ignored: "
+                                        + stats.badFiles);
+
+                    } else {
+
+                        final String msg = "There are " + nbad
+                                + " bad files - will not start: badFiles="
+                                + stats.badFiles;
+
+                        log.fatal(msg);
+
+                        throw new RuntimeException(msg);
+
+                    }
+
+                }
 
                 assert journalIndex.getEntryCount() == stats.njournals;
 
                 assert indexSegmentIndex.getEntryCount() == stats.nsegments;
 
-                assert resourceFiles.size() == stats.nfiles;
+                assert resourceFiles.size() + nbad == stats.nfiles : "#resourceFiles="
+                        + resourceFiles.size()
+                        + ", #nbad="
+                        + nbad
+                        + ", nfiles=" + stats.nfiles;
 
             }
 
@@ -836,6 +921,10 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
              * Open the "live" journal.
              */
             {
+                
+                log.info("Creating/opening the live journal: dataDir="+dataDir);
+
+                if(Thread.interrupted()) throw new InterruptedException();
 
                 final Properties p = getProperties();
                 final File file;
@@ -861,7 +950,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                      * logic with the same problem.
                      */
 
-                    log.info("Creating initial journal");
+                    log.info("Creating initial journal: dataDir="+dataDir);
 
                     // unique file name for new journal.
                     if (isTransient) {
@@ -891,7 +980,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                     /*
                      * Set the createTime on the new journal resource.
                      */
-                    p.setProperty(Options.CREATE_TIME, "" + nextTimestampRobust());
+                    p.setProperty(Options.CREATE_TIME, ""
+                            + nextTimestampRobust());
 
                     newJournal = true;
 
@@ -904,11 +994,12 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                      * writes until it overflows.
                      */
 
-                    // resource metadata for journal with the largest timestamp.
+                    // resource metadata for journal with the largest
+                    // timestamp.
                     final IResourceMetadata resource = journalIndex
                             .find(Long.MAX_VALUE);
 
-                    log.info("Will open " + resource);
+                    log.info("Will open as live journal: " + resource);
 
                     assert resource != null : "No resource? : timestamp="
                             + Long.MAX_VALUE;
@@ -933,7 +1024,11 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
                 }
 
+                log.info("Open/create of live journal: newJournal="
+                        + newJournal + ", file=" + file);
+                
                 // Create/open journal.
+                if(Thread.interrupted()) throw new InterruptedException();
                 liveJournal = new ManagedJournal(p);
 
                 if (newJournal) {
@@ -946,26 +1041,23 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
                 // add to set of open stores.
                 storeCache.put(liveJournal.getRootBlockView().getUUID(),
-                        liveJournal, false/*dirty*/);
+                        liveJournal, false/* dirty */);
+
+                if(Thread.interrupted()) throw new InterruptedException();
 
             }
-
-            starting = false;
-            
-            log.info("Successful startup: "
-                    + (isTransient ? "transient" : Options.DATA_DIR + "="
-                            + dataDir));
 
         }
 
     }
     
     /**
-     * <code>true</code> initally and until {@link #start()} completes successfully.
+     * <code>true</code> initally and until {@link #start()} completes
+     * successfully.
      */
     public boolean isStarting() {
 
-        return starting;
+        return starting.get();
         
     }
 
@@ -977,18 +1069,29 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     public boolean isOpen() {
         
-        return open;
+        return open.get();
         
     }
     
     synchronized public void shutdown() {
         
-        if(!open) return;
+        log.info("");
 
-        open = false;
-        
+        final boolean wasOpen = this.open.get();
+
+        /*
+         * Note: clear before we clear [starting] or the
+         * StoreManager#isRunning() could report true.
+         */
+        this.open.set(false);
+
         // Note: if startup is running, then cancel immediately.
         startupService.shutdownNow();
+
+        // failsafe clear : note that [open] is already false.
+        starting.set( false );
+
+        if(!wasOpen) return;
 
         try {
             closeStores();
@@ -1006,11 +1109,22 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
     
     synchronized public void shutdownNow() {
 
-        if(!open) return;
+        log.info("");
 
-        open = false;
+        final boolean wasOpen = this.open.get();
+
+        /*
+         * Note: clear before we clear [starting] or the
+         * StoreManager#isRunning() could report true.
+         */
+        this.open.set(false);
 
         startupService.shutdownNow();
+
+        // failsafe clear : note that [open] is already false.
+        starting.set( false );
+
+        if(!wasOpen) return;
 
         try {
             closeStores();
@@ -1050,6 +1164,11 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
         public int nsegments;
 
         /**
+         * A list of all bad files found during the scan.
+         */
+        public Collection<String> badFiles = Collections.synchronizedCollection(new TreeSet<String>());
+        
+        /**
          * total #of bytes of user data found in those files.
          */
         public long nbytes;
@@ -1057,7 +1176,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
         public String toString() {
             
             return "Stats{nfiles=" + nfiles + ", njournals=" + njournals
-                    + ", nsegments=" + nsegments + ", nbytes=" + nbytes + "}";
+                    + ", nsegments=" + nsegments + ", nbad=" + badFiles.size()
+                    + ", nbytes=" + nbytes + ", badFiles=" + badFiles + "}";
             
         }
         
@@ -1113,6 +1233,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
         
         log.info("Scanning file: "+file+", stats="+stats);
         
+        stats.nfiles++;
+
         final IResourceMetadata resource;
 
         final String name = file.getName();
@@ -1132,8 +1254,12 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
             } catch (Exception ex) {
 
-                throw new RuntimeException("Problem opening journal: "
+                log.error("Problem opening journal: file="
                         + file.getAbsolutePath(), ex);
+
+                stats.badFiles.add(file.getAbsolutePath());
+                
+                return;
                 
             }
 
@@ -1142,7 +1268,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                 resource = tmp.getResourceMetadata();
     
                 stats.njournals++;
-                stats.nfiles++;
+
                 stats.nbytes += file.length(); //tmp.size(); //getBufferStrategy().getExtent();
                 
             } finally {
@@ -1162,30 +1288,19 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
             
             /*
              * Attempt to open the index segment.
-             * 
-             * FIXME If there is a dependency on the index segment then certain
-             * views can not be restored. How does that play out? I presume that
-             * an exception will be reported when attempting to open that view.
-             * This will probably be a resource not found exception since bad
-             * index segment is not being entered into the indexSegmentIndex.
              */
             final IndexSegmentStore segStore;
             try {
             
                 segStore = new IndexSegmentStore( p );
 
-            } catch( RootBlockException ex) {
-
-                log.error("Bad root block - file will be ignored: file="
-                        + file.getAbsolutePath(), ex);
-                
-                return;
-                
             } catch (Exception ex) {
 
-                log.error("Problem opening segment: " + file.getAbsolutePath(),
-                        ex);
+                log.error("Problem opening segment: file="
+                        + file.getAbsolutePath(), ex);
                 
+                stats.badFiles.add(file.getAbsolutePath());
+
                 return;
                 
             }
@@ -1195,7 +1310,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                 resource = segStore.getResourceMetadata();
 
                 stats.nsegments++;
-                stats.nfiles++;
+
                 stats.nbytes += file.length(); //segStore.size();
 
             } finally {
@@ -1255,15 +1370,18 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     private void closeStores() {
         
-        open = false;
-
-        Iterator<IRawStore> itr = storeCache.iterator();
+        final Iterator<IRawStore> itr = storeCache.iterator();
 
         while (itr.hasNext()) {
 
-            IRawStore store = itr.next();
-
-            store.close();
+            final IRawStore store = itr.next();
+            
+            try {
+                store.close();
+            }
+            catch(Exception ex) {
+                log.warn(ex.getMessage(),ex);
+            }
 
             itr.remove();
 
@@ -1483,7 +1601,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
              * from the disk in this method.
              */
 
-            assert liveJournal != null;
+            assert liveJournal != null : "open="+isOpen()+", starting="+isStarting()+", dataDir="+dataDir;
             assert liveJournal.isOpen();
             assert !liveJournal.isReadOnly();
 
