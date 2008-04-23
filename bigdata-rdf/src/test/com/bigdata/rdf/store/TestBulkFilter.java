@@ -240,8 +240,10 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
                                 StatementEnum.Explicit),
                         new SPO(x,a,z,
                                 StatementEnum.Inferred),
-                        new SPO(x,a,v),
-                        new SPO(x,a,w)
+                        new SPO(x,a,v,
+                                StatementEnum.Inferred),
+                        new SPO(x,a,w,
+                                StatementEnum.Inferred)
                     },
                     
                     itr,
