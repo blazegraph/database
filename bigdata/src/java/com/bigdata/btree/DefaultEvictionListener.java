@@ -55,10 +55,10 @@ public class DefaultEvictionListener implements
      * True iff the {@link #log} level is DEBUG or less.
      */
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
-    
-    public void evicted(HardReferenceQueue<PO> cache, PO ref) {
 
-        AbstractNode node = (AbstractNode) ref;
+    public void evicted(final HardReferenceQueue<PO> cache, final PO ref) {
+
+        final AbstractNode node = (AbstractNode) ref;
 
         /*
          * Decrement the reference counter.  When it reaches zero (0) we will
