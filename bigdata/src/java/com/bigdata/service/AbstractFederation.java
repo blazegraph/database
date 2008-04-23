@@ -594,6 +594,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
     private final String GLOBAL_ROW_STORE_INDEX = "__global_namespace_index";
 
     synchronized public SparseRowStore getGlobalRowStore() {
+        
+        log.info("");
 
         if (globalRowStore == null) {
 
@@ -601,6 +603,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             if (ndx == null) {
 
+                log.info("Global row store does not exist - will try to register now");
+                
                 try {
 
                     registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,

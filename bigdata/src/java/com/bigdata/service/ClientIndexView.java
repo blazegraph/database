@@ -1210,6 +1210,9 @@ public class ClientIndexView implements IClientIndex {
             // resolve service UUID to data service.
             final IDataService dataService = getDataService(locator);
 
+            if (dataService == null)
+                throw new RuntimeException("DataService not found: " + locator);
+            
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(//
                     ClientIndexView.this.name, // the name of the scale-out index.
