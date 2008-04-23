@@ -174,12 +174,12 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
         
-        if (counter.get() == IRawTripleStore.NULL) {
-            /*
-             * Note: we never assign this value as a term identifier.
-             */
-            counter.incrementAndGet();
-        }
+//        if (counter.get() == IRawTripleStore.NULL) {
+//            /*
+//             * Note: we never assign this value as a term identifier.
+//             */
+//            counter.incrementAndGet();
+//        }
         
         // used to serialize term identifers.
         final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
@@ -191,7 +191,7 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
             final long termId;
 
             // Lookup in the forward index.
-            byte[] tmp = ndx.lookup(key);
+            final byte[] tmp = ndx.lookup(key);
 
             if (tmp == null) {
                 
@@ -207,7 +207,13 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
                  * pack the termId in a manner that does not allow negative
                  * integers. a different pack routine would allow us all bits.
                  */
-                long id = counter.incrementAndGet()<<2;
+                long id = counter.incrementAndGet();
+                
+                // 0L is never used as a counter value.
+                assert id != IRawTripleStore.NULL;
+
+                // left shift two bits to make room for term type coding.
+                id = id << 2;
                 
                 // this byte encodes the kind of term (URI, Literal, BNode, etc.)
                 final byte code = KeyBuilder.decodeByte(key[0]);

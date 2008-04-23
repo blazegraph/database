@@ -554,7 +554,7 @@ abstract public class AbstractLocalTransactionManager implements
 
         int ntries;
 
-        for (ntries = 0; ntries < maxtries; ntries++) {
+        for (ntries = 1; ntries <= maxtries; ntries++) {
 
             try {
 
@@ -598,7 +598,8 @@ abstract public class AbstractLocalTransactionManager implements
                 
             } catch (IOException e) {
 
-                log.warn("RMI problem with timestamp service? : " + e, e);
+                log.warn("Problem with timestamp service? : ntries=" + ntries
+                        + ", " + e, e);
 
                 cause = e;
 

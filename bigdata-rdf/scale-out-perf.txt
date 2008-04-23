@@ -622,7 +622,7 @@ Short term tasks:
        hostname and service info.  This will make the information more
        interesting than just staring at UUIDs.
 
-     - Maybe loosing some samples by running multiple typeperf's at
+     - May be loosing some samples by running multiple typeperf's at
        once.  Explore.  If true, then trying combining all w/in same
        JVM using reference counter for process or identifying one
        process in the JVM which will have responsibility for those
@@ -688,11 +688,6 @@ Short term tasks:
        groupCommitCount=109, abortCount=0, failedTaskCount=0,
        successTaskCount=2152, committedTaskCount=2140,
        overflowCount=0}
-
-     - Analysis U10 on workstation:
-
-         - Reads time FAR outpages write time, so consider a read
-           cache.
 
    - LocalTripleStoreWithEmbeddedDataService
 
@@ -861,6 +856,23 @@ Short term tasks:
      commit time while transactions will use a free (-timestamp) value
      selected by the transaction manager.
 
+   - Modify to have an observable event or callback that assigns the
+     service UUID and that indicates when the resource manager is
+     running and refactor the LDS and DS startup logic to use that to
+     configure the reporting of counters and an optional httpd service
+     (at least for the LDS). The relevant Jini method is
+     ServiceIDNotify().  For the moment I have disabled the httpd for
+     the LDS.
+
+   - Consider dropping the BasicRioLoader, PresortRioLoader, etc.  All
+     of the benefit is in the use of the StatementBuffer.  These
+     loaders just obscure the RIO mechanism and make them harder to
+     configure.
+
+     The DataLoader might be a utility class.
+
+     The ConcurrentDataLoader is certainly a useful utility class.
+
    - Quad store.
 
     - ** Sesame 2 TCK (integration tests)
@@ -950,33 +962,11 @@ Short term tasks:
       
       2. Done. RDF/XML w/ statement identifiers in/out.
 
+         - @todo reduce to only an "explicit" flag rather than
+           {explicit, axiom, inferred} since we can not differentiate
+           between constructed statements and inferences.
+
       3. High level query for reading variable bindings out.
-
-         This will be a little complex since the Statement objects
-         that are made visible to the Sesame JOINs and result sets
-         currently do NOT have access to the term identifiers and the
-         statement identifier.  This was done because there appeared
-         to be some expectation that the returned objects be
-         Statements, or more accurately, StatementImpls, but maybe I
-         had that wrong.
-
-	 Note: inferences will NOT have statement identifiers.  Only
-	 explicit statements have statement identifiers, so the graph
-	 variable will be unbound when matched triple pattern is not
-	 an explicit statement.
-
-	 The interpretation of the context depends on the database
-	 mode.
-
-	 Provenance mode: When the database is in "provenance" mode,
-	 then each context identifies a specific statement.  Statement
-	 identifiers can only become bound by a triple pattern, so the
-	 query must always go through the SPO, OSP, or POS index.
-
-	 quadStore mode: When the database is in "quadStore" mode,
-         then the query can go through any of 6 access patterns and we
-         need to consider the context(s) in order to choose the
-         correct access pattern.
 
 	 - Verify a CONSTRUCT query.
 
@@ -1022,7 +1012,7 @@ Short term tasks:
 
       7. Defer "named-graph" style quad store for now.
 
-      8. (*) implement prefix compression and apply to the lexicon.
+      8. (***) implement prefix compression and apply to the lexicon.
          test it out also on the statement indices and see how it
          stacks up against the "fast rdf key" compression and compare
          with huffman encoding of the decoded long identifiers as
@@ -1048,8 +1038,6 @@ Short term tasks:
 
    - write performance test drivers and run on cluster.
 
-      - (*******) rdf concurrent data load.
-
       - rdf concurrent query (rdf lubm is not designed to test with
         concurrent loads).
 
@@ -1061,12 +1049,6 @@ Short term tasks:
         need to throttle the thread pool more on the data service?
 
       - (****) Write script to allocate services to nodes.
-
-        - The per-process counters for linux are not being reported
-          under "service" but instead directly under the service UUID.
-
-	- The per-host counters for linux are not being reported at
-          all.
 
         - N data services; 1 MDS; 1 LBS; 1 TS, etc.
 
@@ -1088,29 +1070,159 @@ Short term tasks:
           as installing from a pre-touched version fixing the
           LD_ASSUME_KERNEL_VERSION bug.
 
-	- Done. (Problem was bad path in the classpath element for
-          lgpl-utils.)  Problem with dependency on dsiutils that keeps
-          cropping up.  Changing the binary changed the symptom but
-          not the problem.  Try w/o jini.  Perhaps it is a
-          downloadable code issue?  Can I abstract the federation
-          startup enough to run the same code against the local
-          federation or embedded federation w/o jini? (Yes, I see the
-          same problem for the local data service federation.)
+	- Get clusterondemand account.
+
+	- Support downloadable code in the configuration, including a
+          an optional security model.
+
+      - (*******) rdf concurrent data load.
+
+        - (**) Test PIDStat and SAR collection directly and verify
+          reporting out via the httpd server.
+
+          - Done. The per-process counters for linux are not being
+            reported under "service" but instead directly under the
+            service UUID.
+
+  	  - The per-host physical disk counters for linux are not
+            being reported at all. In fact, I need to write the Sar or
+            vmstat utility to collect these data.
+
+	  - Parsing errors for sysstat utilities from time to time.
+            They are mostly for the SarCpuUtilization utility.
+
+  	  - I am seeing a "ignoring sample WAY out of timestamp
+            order" warning.
+
+	  - syslogd integration so that I see ERROR and FATAL messages
+            for the hosts in the federation.
 
 	- Still an annoying problem with the service names as
-          displayed by the jini browser....
+          displayed by the jini browser....  This may well be an issue
+          with failing to expose the interfaces and service classes
+          via an http service as downloadable code.
 
-	- ConcurrentDataLoader:
+	- Verify that there is an atomic commit point for the
+          IndexSegment so that partial index segment writes can be
+          recognized.
 
-	- U10, host3: 11517 tps : LocalDataServiceFederation and
-          writing on local disk but reading the classpath and data
-          from NAS.
+	  Once recognized they should be deleted.
 
-	- U10, host3: xxx tps : JiniFederation - has problems finding
-          the timestamp service leading to the store manager not
-          starting.  May be related to problems starting the sysstat
-          processes to monitor the host or JVM (I saw an NPE there) or
-          just a timeout during startup (307 ms).
+	- Results:
+
+	  Note: writing on local disk but reading the classpath and
+          data from NAS.
+
+	  Note: test on host1/host2 and get a sense of the platform
+	  differences.
+
+	  **** Try with overflow processing enabled.
+
+	  **** Try with services running in distinct JVMs and on more
+               than one host.
+
+
+	  http://192.168.20.28:8080/
+
+	- U10, host3, LDS, 20 threads: 11517 tps <== verify again
+
+	- U10, host3, LDS, 10 threads: 16837/16389/16942 tps.
+
+	- U100, host3, LDS, 10 threads: ____ tps. OOM after 1098 tasks
+          completed with 2G RAM trying to flush the write cache to the
+          disk.  This occurred during a commit, resulting in an abort
+          which interrupted concurrent tasks.
+
+	  Evidentally the JVK requests a temporary direct byte buffer
+          for this purpose, at least this JDK on Linux.  Perhaps the
+          write cache SHOULD be a direct byte buffer to avoid this
+          allocation, but remember that release of direct buffers can
+          be a problem?
+
+	- U10, host3, Jini, 20 threads: fails to progress.  (*) Why is
+          the system so sensitive to the #of client threads?
+
+	- U10, host3, Jini, 10 threads: 9692/9611/9406 tps
+
+	- U100, host3, Jini, 10 threads: 11693 tps - saved copy of the
+          log output.
+
+	- U1000, host3, Jini, 10 threads: ______ tps.
+
+	  ----------------- overflow enabled --------------
+
+	- U10, host3, Jini, 10 threads: ______ tps.
+
+	- U100, host3, Jini, 10 threads: ______ tps.
+
+	  Note: Observed consistency problem in AddIds(#159).  May
+	  have been a bad start.  MAY have been a result of overflow
+	  processing with its effect on the partition identifier....
+	  MAY be a bad classpath from a compile.  I keep seeing
+	  "modification dates in the future" when compiling on host3
+	  even through the clock looks good to me.
+
+	  This problem appeared to persist on host3 until I changed
+	  the configuration for the data servers to [overflowEnabled =
+	  false]
+
+	  I've been able to re-create this on the workstation by
+	  lowering the initial and maximum extent to 50M and enabling
+	  overflow.
+
+	  Caused by: java.lang.RuntimeException: Consistency problem: id=2090932
+	      at com.bigdata.rdf.store.AddIds.apply(AddIds.java:159)
+
+	  This appears shortly after an overflow completed generating
+	  new views.  
+
+	  FIXME The forward map makes a persistent term identifier
+	  assignment and SHOULD be consistent....  Perhaps the problem
+	  is with a BNode or StatementIdentifier....?  _OR_ perhaps
+	  the problem is with a bad commit, e.g., the data was not
+	  made restart safe and therefore another AddTerms task was
+	  able to assign a different term identifier !!!!
+
+ 
+	  ------
+
+	  And here is the answer to the question about atomic commit
+	  points for index segments.  Clearly there is NOT an atomic
+	  commit point, or if there is then the logic to read the
+	  index segment checkpoint record is not sufficiently robust
+	  (the latter I think)
+
+	  I've placed a copy of testPOS_part00000_14341.seg into the
+	  bigdata project root for testing.
+
+java.lang.RuntimeException: Problem opening segment: C:\Documents and Settings\bthompson\workspace\bigdata-rdf\standalone\DataServer0\segments\643ee44d-fe4c-4c1e-a0c9-ae4e0ca37e7d\testPOS_part00000_14341.seg
+	at com.bigdata.resources.StoreManager.scanFile(StoreManager.java:1169)
+	at com.bigdata.resources.StoreManager.scanDataDirectory(StoreManager.java:1101)
+	at com.bigdata.resources.StoreManager.scanDataDirectory(StoreManager.java:1097)
+	at com.bigdata.resources.StoreManager.scanDataDirectory(StoreManager.java:1097)
+	at com.bigdata.resources.StoreManager.access$2(StoreManager.java:1081)
+	at com.bigdata.resources.StoreManager$Startup.start(StoreManager.java:819)
+	at com.bigdata.resources.StoreManager$Startup.run(StoreManager.java:757)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:441)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
+	at java.lang.Thread.run(Thread.java:619)
+Caused by: java.lang.RuntimeException: java.io.EOFException
+	at com.bigdata.btree.IndexSegmentStore.reopen(IndexSegmentStore.java:389)
+	at com.bigdata.btree.IndexSegmentStore.<init>(IndexSegmentStore.java:278)
+	at com.bigdata.resources.StoreManager.scanFile(StoreManager.java:1165)
+	... 12 more
+Caused by: java.io.EOFException
+	at java.io.RandomAccessFile.readInt(RandomAccessFile.java:725)
+	at com.bigdata.btree.IndexSegmentCheckpoint.<init>(IndexSegmentCheckpoint.java:238)
+	at com.bigdata.btree.IndexSegmentStore.reopen(IndexSegmentStore.java:349)
+	... 14 more
+
+
+
+	- U1000, host3, Jini, 10 threads: ______ tps.
 
 ============================================================
 
@@ -1328,3 +1440,21 @@ checksum=-1902635405, createTime=1208792329877, closeTime=0}
 While the root block was written, it seems that the commit record and
 the commit record index checkpoint record were NOT written on the
 disk.  Perhaps this is a failure of the OS write cache?
+
+Also Caused by: java.lang.AssertionError
+	at com.bigdata.btree.NodeSerializer.getNode(NodeSerializer.java:910)
+	at com.bigdata.btree.NodeSerializer.getNodeOrLeaf(NodeSerializer.java:630)
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2074)
+	at com.bigdata.btree.Node.getChild(Node.java:2110)
+	at com.bigdata.btree.Node.lookup(Node.java:651)
+	at com.bigdata.btree.AbstractBTree.lookup(AbstractBTree.java:1148)
+	at com.bigdata.btree.IndexSegment.lookup(IndexSegment.java:357)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:380)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:353)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:321)
+	at com.bigdata.rdf.store.AddTerms.apply(AddTerms.java:194)
+	at com.bigdata.journal.IndexProcedureTask.doTask(IndexProcedureTask.java:56)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1029)
+
+which might be similar and showed up when I changed the
+OverflowManager log level to INFO.

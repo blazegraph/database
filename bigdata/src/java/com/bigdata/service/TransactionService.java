@@ -146,11 +146,6 @@ abstract public class TransactionService extends TimestampService implements
     public static final Logger log = Logger.getLogger(TransactionService.class);
 
     /**
-     * Used to generate start time and commit time timestamps.
-     */
-    protected final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-
-    /**
      * A hash map containing all active transactions. A transaction that is
      * preparing will remain in this collection until it has completed (aborted
      * or committed).
@@ -208,7 +203,7 @@ abstract public class TransactionService extends TimestampService implements
         /*
          * Wait for the next distinct millisecond.
          */
-        return timestampFactory.nextMillis();
+        return MillisecondTimestampFactory.nextMillis();
         
     }
     

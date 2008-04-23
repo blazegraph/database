@@ -123,9 +123,13 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         }
 
     }
-    
-    final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
 
+    private long getNextTimestamp() {
+        
+        return MillisecondTimestampFactory.nextMillis();
+        
+    }
+    
     /**
      * Test creation of a new {@link ResourceManager}. This verifies the
      * correct creation of the data directory, the various subdirectories, and
@@ -148,7 +152,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             public long nextTimestamp() {
 
-                return timestampFactory.nextMillis();
+                return getNextTimestamp();
 
             }
 
@@ -282,7 +286,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             public long nextTimestamp() {
 
-                return timestampFactory.nextMillis();
+                return getNextTimestamp();
 
             }
 
@@ -426,7 +430,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             public long nextTimestamp() {
 
-                return timestampFactory.nextMillis();
+                return getNextTimestamp();
 
             }
 
@@ -660,7 +664,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             public long nextTimestamp() {
 
-                return timestampFactory.nextMillis();
+                return getNextTimestamp();
 
             }
 

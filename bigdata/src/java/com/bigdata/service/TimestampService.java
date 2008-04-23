@@ -73,12 +73,6 @@ abstract public class TimestampService implements ITimestampService, IServiceShu
     }
     
     /**
-     * A static instance is used so that different journals on the same JVM will
-     * all use the same underlying time source.
-     */
-    private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-    
-    /**
      * @param properties
      *            See {@link Options}.
      */
@@ -96,7 +90,7 @@ abstract public class TimestampService implements ITimestampService, IServiceShu
 
     public long nextTimestamp() throws IOException {
         
-        return timestampFactory.nextMillis();
+        return MillisecondTimestampFactory.nextMillis();
         
     }
     
