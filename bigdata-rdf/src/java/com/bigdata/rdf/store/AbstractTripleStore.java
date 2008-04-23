@@ -65,6 +65,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
@@ -125,6 +126,7 @@ import com.bigdata.rdf.store.AddTerms.AddTermsConstructor;
 import com.bigdata.rdf.store.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 import com.bigdata.search.TokenBuffer;
@@ -725,10 +727,32 @@ abstract public class AbstractTripleStore implements ITripleStore,
      */
     protected IndexMetadata getIndexMetadata(String name) {
 
-        IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
 
         metadata.setBranchingFactor(branchingFactor);
 
+        /*
+         * The defaults.
+         * 
+         * @todo play around with override of the split handler.
+         */
+//        final ISplitHandler splitHandler = new DefaultSplitHandler(
+//                1 * Bytes.megabyte32, // minimumEntryCount
+//                5 * Bytes.megabyte32, // entryCountPerSplit
+//                1.5, // overCapacityMultiplier
+//                .75, // underCapacityMultiplier
+//                20   // sampleRate
+//                );
+        final ISplitHandler splitHandler = new DefaultSplitHandler(
+                10 * Bytes.kilobyte32, // minimumEntryCount
+                50 * Bytes.kilobyte32, // entryCountPerSplit
+                1.5, // overCapacityMultiplier
+                .75, // underCapacityMultiplier
+                20   // sampleRate
+                );
+        
+        metadata.setSplitHandler(splitHandler);
+        
         return metadata;
 
     }

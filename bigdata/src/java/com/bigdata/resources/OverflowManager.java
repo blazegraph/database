@@ -497,13 +497,22 @@ abstract public class OverflowManager extends IndexManager {
              * then re-open a transient journal.
              */
 
-            log.info("Overflow processing not allowed for transient journals");
+            if (DEBUG)
+                log.debug("Overflow processing not allowed for transient journals");
 
             return false;
 
         }
 
-        if(!overflowEnabled || !overflowAllowed.get()) {
+        if (!overflowEnabled) {
+            
+            if (DEBUG)
+                log.debug("Overflow processing is disabled");
+            
+            return false;
+        }
+
+        if(!overflowAllowed.get()) {
             
             /*
              * Note: overflow is disabled until we are done processing the old
@@ -512,7 +521,8 @@ abstract public class OverflowManager extends IndexManager {
              * @todo show elapsed time since disabled in log message.
              */
             
-            log.info("Overflow processing disabled");
+            if (INFO)
+                log.info("Asynchronous overflow still active");
             
             return false;
             
@@ -549,9 +559,17 @@ abstract public class OverflowManager extends IndexManager {
                 
             }
 
-            log.info("testing overflow" + ": nextOffset=" + nextOffset
-                    + ", maximumExtent=" + journal.getMaximumExtent()
-                    + ", shouldOverflow=" + shouldOverflow);
+            if (!shouldOverflow && DEBUG) {
+
+                log.debug("should not overflow" + ": nextOffset=" + nextOffset
+                        + ", maximumExtent=" + journal.getMaximumExtent());
+
+            } else if (shouldOverflow && INFO) {
+
+                log.debug("shouldOverflow" + ": nextOffset=" + nextOffset
+                        + ", maximumExtent=" + journal.getMaximumExtent());
+
+            }
                
         }
 
@@ -600,22 +618,32 @@ abstract public class OverflowManager extends IndexManager {
          */
         final long lastCommitTime;
         final Set<String> copied = new HashSet<String>();
-        try {
+//        try {
 
             // Do overflow processing.
             lastCommitTime = doOverflow(copied);
             
-        } finally {
-            
-            // Allow the write service to resume executing tasks on the new journal.
-            concurrencyManager.getWriteService().resume();
-
-            log.info("Resumed write service.");
-
-        }
+//        } finally {
+//            
+//            /*
+//             * Allow the write service to resume executing tasks on the new
+//             * journal.
+//             * 
+//             * Note: We need to do this in order to start asynchronous
+//             * processing.
+//             */
+//
+//            log.info("Resuming write service.");
+//
+//            concurrencyManager.getWriteService().resume();
+//
+//            log.info("Resumed write service.");
+//
+//        }
         
-        // report event.
-        notifyJournalOverflowEvent(getLiveJournal());
+          // Note: commented out to protect access to the new journal until the write service is resumed.
+//        // report event.
+//        notifyJournalOverflowEvent(getLiveJournal());
 
         /*
          * Start the asynchronous processing of the named indices on the old
@@ -641,6 +669,8 @@ abstract public class OverflowManager extends IndexManager {
         final Map<String/* name */, Counters> indexCounters = concurrencyManager
                 .resetCounters();
 
+        log.info("Starting asynchronous overflow processing.");
+        
         return overflowService.submit(new PostProcessOldJournalTask(
                 (ResourceManager) this, lastCommitTime, copied, totalCounters,
                 indexCounters));
@@ -911,8 +941,14 @@ abstract public class OverflowManager extends IndexManager {
                     // Propagate the counter to the new B+Tree.
                     final long oldCounter = oldBTree.getCounter().get();
 
-                    log.info("Propagating counter=" + oldCounter + " for "
-                            + entry.name);
+                    if(INFO)
+                    log.info("Re-defining view on new journal"//
+                            + ": name=" + entry.name //
+                            + ", copyIndexThreashold=" + copyIndexThreshold //
+                            + ", entryCount=" + entryCount//
+                            + ", copyIndex=" + copyIndex//
+                            + ", counter=" + oldCounter//
+                    );
 
                     // Create checkpoint for the new B+Tree.
                     final Checkpoint overflowCheckpoint = indexMetadata
@@ -947,7 +983,8 @@ abstract public class OverflowManager extends IndexManager {
                          * (see above).
                          */
                         
-                        log.info("Copying data to new journal: name=" + entry.name
+                        if(DEBUG)
+                        log.debug("Copying data to new journal: name=" + entry.name
                                 + ", entryCount=" + entryCount + ", threshold="
                                 + copyIndexThreshold);
                         
@@ -972,13 +1009,14 @@ abstract public class OverflowManager extends IndexManager {
 
                 }
 
-                log.info("Did overflow: " + noverflow + " of " + nindices
-                        + " : " + entry.name);
-
                 noverflow++;
+
+//                log.info("Did overflow: " + noverflow + " of " + nindices
+//                        + " : " + entry.name);
 
             }
 
+            if(INFO)
             log.info("Did overflow of " + noverflow + " indices");
 
             assert nindices == noverflow;

@@ -77,6 +77,9 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
 //
 //        // writes on the statement indices.
 //        suite.addTestSuite(TestStatementIndex.class);
+        
+        // test for consistent lexicon after overflow when using scale-out indices
+        suite.addTestSuite(TestLexiconConsistentAfterOverflow.class);
                
         /*
          * Proxied test suite for use only with the LocalTripleStore.

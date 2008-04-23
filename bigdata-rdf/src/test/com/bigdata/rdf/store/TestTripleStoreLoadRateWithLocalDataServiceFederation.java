@@ -98,7 +98,10 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
 
         // turn off text indexing.
-        properties.setProperty(Options.TEXT_INDEX,"false");
+//        properties.setProperty(Options.TEXT_INDEX,"false");
+
+        // change the default port for httpd exposed by the load balancer. 
+        properties.setProperty(com.bigdata.service.LoadBalancerService.Options.HTTPD_PORT,"8080");
         
         return properties;
         
@@ -134,7 +137,7 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
      */
     public void test_U10() {
         
-        new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
 
             public boolean accept(File dir, String name) {
                 if(name.endsWith(".owl")) return true;

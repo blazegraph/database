@@ -396,23 +396,23 @@ public class ResourceEvents {
 
     }
 
-    /**
-     * Report an overflow event.
-     * 
-     * @param journal
-     */
-    public void notifyJournalOverflowEvent(AbstractJournal journal) {
-
-        if (INFO) {
-
-            log.info("filename=" + journal.getFile() + ", nextOffset="
-                    + journal.getBufferStrategy().getNextOffset() + ", extent="
-                    + journal.getBufferStrategy().getExtent() + ", maxExtent="
-                    + journal.getMaximumExtent());
-
-        }
-        
-    }
+//    /**
+//     * Report an overflow event.
+//     * 
+//     * @param journal
+//     */
+//    public void notifyJournalOverflowEvent(AbstractJournal journal) {
+//
+//        if (INFO) {
+//
+//            log.info("filename=" + journal.getFile() + ", nextOffset="
+//                    + journal.getBufferStrategy().getNextOffset() + ", extent="
+//                    + journal.getBufferStrategy().getExtent() + ", maxExtent="
+//                    + journal.getMaximumExtent());
+//
+//        }
+//        
+//    }
 
     /**
      * Report close of an {@link IJournal} resource.

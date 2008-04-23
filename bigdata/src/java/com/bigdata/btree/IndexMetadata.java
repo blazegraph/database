@@ -613,7 +613,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         this.overflowHandler = null;
         
         this.splitHandler = new DefaultSplitHandler(
-                1 * Bytes.megabyte32, // minmumEntryCount
+                1 * Bytes.megabyte32, // minimumEntryCount
                 5 * Bytes.megabyte32, // entryCountPerSplit
                 1.5, // overCapacityMultiplier
                 .75, // underCapacityMultiplier

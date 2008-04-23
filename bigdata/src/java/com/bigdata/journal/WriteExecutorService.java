@@ -46,6 +46,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
@@ -361,8 +362,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * Sets the flag indicating that new worker tasks must pause in
      * {@link #beforeExecute(Thread, Runnable)}.
+     * <p>
+     * Note: This is not a very safe thing to do and therefore the operation is
+     * restricted to its use by this class. However, {@link #resume()} is
+     * exposed so that the {@link OverflowManager} can direct the
+     * {@link WriteExecutorService} to resume processing as soon as synchronous
+     * overflow is complete (concurrent to the startup of asynchronous
+     * processing).
      */
-    public void pause() {
+    protected void pause() {
 
         log.debug("Pausing write service");
         
@@ -857,8 +865,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         }
 
-        log.info("This thread will run group commit: "+Thread.currentThread()+" : "+r);
-        
         try {
 
             /*
@@ -873,105 +879,93 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // save a reference to the thread that is running the group commit.
             groupCommitThread = Thread.currentThread();
             
-            // timestamp from which we measure the latency until the commit begins.
-
-            final long beginWait = System.currentTimeMillis();            
+            log.info("This thread will run group commit: "+Thread.currentThread()+" : "+r);
 
             /*
-             * Wait a moment to let other tasks start, but if the queue is empty
-             * then we make that a very small moment to keep down latency for a
-             * single task that is run all by itself without anything else in
-             * the queue.
-             * 
-             * @todo do NOT wait if the current task might exceeds its max
-             * latency from submit (likewise, do not start task if it has
-             * already execeeded its maximum latency from submit).
+             * Note: Synchronous overflow processing has a stronger
+             * pre-condition than a normal group commit. In addition to holding
+             * the lock, there MUST NOT be any running tasks (their write sets
+             * would be lost when we cut over to the new journal). This flag is
+             * therefore set [true] if we need to pause the write service. Also,
+             * synchronous overflow is NOT performed unless we were actually
+             * able to await all running tasks (nrunning == 0).
              */
-            
-            int nwaits = 0;
-            while(true) {
+            final boolean shouldOverflow = (forceOverflow.get() || resourceManager.shouldOverflow());
 
-                final int queueSize = getQueue().size();
-                final int nrunning = this.nrunning.get();
-                final int nwrites = this.nwrites.get();
-                final int corePoolSize = getCorePoolSize();
-                final int maxPoolSize = getMaximumPoolSize();
-                final int poolSize = getPoolSize();
-                final long elapsedWait = System.currentTimeMillis() - beginWait;
-                                
-                if ((elapsedWait > 100 && queueSize == 0) || elapsedWait > 250) {
-                    
-                    // Don't wait any longer.
-                    
-                    if(INFO) log.info("Not waiting any longer: nwaits="
-                            + nwaits + ", elapsed=" + elapsedWait
-                            + "ms, queueSize=" + queueSize + ", nrunning="
-                            + nrunning + ", nwrites=" + nwrites
-                            + ", corePoolSize=" + corePoolSize + ", poolSize="
-                            + poolSize+", maxPoolSize="+maxPoolSize);
-                    
-                    break;
-                    
-                }
+            if (shouldOverflow)
+                log.warn("Should overflow - will try to pause the write service.");
+
+            /*
+             * Wait for some or all running tasks to join the commit group.
+             */
+            waitForRunningTasks(shouldOverflow /* pauseWriteService */);
+
+            // Note: this clears the interrupt flag!
+            if(Thread.currentThread().isInterrupted()) {
                 
-                /*
-                 * Note: if interrupted during sleep then the group commit will
-                 * abort.
-                 */
+                log.warn("Interrupted awaiting other tasks to join the group commit.");
                 
-                waiting.await(10,TimeUnit.MICROSECONDS);
-                
-                nwaits++;
+                // will not do group commit.
+                return false;
                 
             }
-
-            log.info("Will do group commit: nrunning="+nrunning);
-
-            // at this point nwrites is the size of the commit group.
+            
+            /*
+             * At this point [nwrites] is the size of the commit group and
+             * [nrunning] is the #of concurrent tasks which are still executing.
+             * Both of these values will be constant while we hold the [lock].
+             * While tasks may continue to execute, [nrunning] can not be
+             * decremented until a task can acquire the [lock].
+             */
             final int nwrites = this.nwrites.get();
-            log.info("Committing store: commit group size="+nwrites);
+
+            log.info("Committing store: commit group size=" + nwrites
+                    + ", #running=" + nrunning);
 
             // timestamp used to measure commit latency.
             final long beginCommit = System.currentTimeMillis();
-            
-            final long latencyUntilCommit = beginCommit - beginWait;
-            
-            if (latencyUntilCommit > maxLatencyUntilCommit) {
-
-                maxLatencyUntilCommit = latencyUntilCommit;
-                
-            }
 
             // commit the store (note: does NOT throw exceptions).
             if (!commit()) {
 
+                // commit failed.
                 return false;
-                
+
             }
 
             // track #of safely committed tasks.
             committedTaskCount += nwrites;
-            
+
             // the commit latency.
             final long commitLatency = System.currentTimeMillis() - beginCommit;
-            
+
             if (commitLatency > maxCommitLatency) {
-                
+
                 maxCommitLatency = commitLatency;
+
+            }
+
+            if (INFO)
+                log.info("Commit Ok : commitLatency=" + commitLatency
+                        + ", maxCommitLatency=" + maxCommitLatency
+                        + ", shouldOverflow=" + shouldOverflow);
+
+            if (shouldOverflow && nrunning.get() == 0) {
+
+                log.info("Will do overflow now: nrunning="+nrunning);
+                
+                overflow();
+
+                log.info("Did overflow.");
                 
             }
             
-            log.info("Commit Ok");
-            
-            // overflow iff necessary.
-            overflow();
-            
             return true;
-            
-        } catch(Throwable t) {
-            
-            log.error("Problem with commit? : "+t,t);
-            
+
+        } catch (Throwable t) {
+
+            log.error("Problem with commit? : " + t, t);
+
             /*
              * A thrown exception here indicates a failure, but not during the
              * commit() itself. One example is when the group commit is
@@ -999,14 +993,237 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // group commit is not being run.
             groupCommitThread = null;
             
-//            // allow new tasks to run.
-//            resume();
+            /*
+             * Allow new tasks to run.
+             */
+            if(isPaused()) {
+
+                resume();
+                
+            }
 
 //            lock.unlock();
 
         }
 
     }
+
+    /**
+     * Wait a moment to let other tasks start, but if the queue is empty then we
+     * make that a very small moment to keep down latency for a single task that
+     * is run all by itself without anything else in the queue.
+     * <p>
+     * Note: This updates {@link #maxLatencyUntilCommit} as a side-effect.
+     * 
+     * @param pauseWriteService
+     *            When <code>true</code>, an attempt will be made to pause
+     *            the write service such that there are no running tasks.
+     *            However, this is NOT a guarentee and the caller MUST test
+     *            {@link #nrunning} in order to determine whether or not any
+     *            tasks are still running.
+     * 
+     * @todo do NOT wait if the current task might exceeds its max latency from
+     *       submit (likewise, do not start task if it has already execeeded its
+     *       maximum latency from submit).
+     */
+    private void waitForRunningTasks(boolean pauseWriteService)
+            throws InterruptedException {
+
+        assert lock.isHeldByCurrentThread();
+        
+        assert !isPaused();
+
+        // timestamp from which we measure the latency until the commit begins.
+        final long beginWait = System.currentTimeMillis();
+
+        if (pauseWriteService) {
+
+            if (INFO)
+                log.info("Should overflow - will pause the write service.");
+
+            /*
+             * Pause the write service (no more tasks will start) and wait
+             * until there are no more tasks running.
+             * 
+             * Note: If this succeeds then the caller MUST resume() the
+             * write service. If it fails, then the write service is
+             * automatically resumed by error handling within awaitPaused().
+             */
+
+            final long timeout = 2000; // ms
+
+            if (awaitPaused(timeout)) {
+
+                log.info("write service is paused: #running=" + nrunning);
+
+            }
+
+        } else {
+
+            int nwaits = 0;
+            while (true) {
+
+                final int queueSize = getQueue().size();
+                final int nrunning = this.nrunning.get();
+                final int nwrites = this.nwrites.get();
+                final int corePoolSize = getCorePoolSize();
+                final int maxPoolSize = getMaximumPoolSize();
+                final int poolSize = getPoolSize();
+                final long elapsedWait = System.currentTimeMillis() - beginWait;
+
+                if ((elapsedWait > 100 && queueSize == 0) || elapsedWait > 250) {
+
+                    // Don't wait any longer.
+
+                    if (INFO)
+                        log.info("Not waiting any longer: nwaits=" + nwaits
+                                + ", elapsed=" + elapsedWait + "ms, queueSize="
+                                + queueSize + ", nrunning=" + nrunning
+                                + ", nwrites=" + nwrites + ", corePoolSize="
+                                + corePoolSize + ", poolSize=" + poolSize
+                                + ", maxPoolSize=" + maxPoolSize);
+
+                    break;
+
+                }
+
+                /*
+                 * Note: if interrupted during sleep then the group commit will
+                 * abort.
+                 */
+
+                waiting.await(10, TimeUnit.MICROSECONDS);
+
+                nwaits++;
+
+            }
+
+        }
+
+        final long endWait = System.currentTimeMillis();
+
+        final long latencyUntilCommit = endWait - beginWait;
+
+        if (latencyUntilCommit > maxLatencyUntilCommit) {
+
+            maxLatencyUntilCommit = latencyUntilCommit;
+
+        }
+
+    }
+        
+// /*
+// * At this point the group commit is safe. Before we return to the
+// * caller (who will release their lock on the write service), we check
+// * to see if we need to do synchronous overflow processing.
+// */
+//        
+// if (forceOverflow.get() || resourceManager.shouldOverflow()) {
+//
+// /*
+// * Overflow iff necessary.
+// */
+//
+// log.info("Overflow processing pre-conditions are satisfied");
+//
+//            assert lock.isHeldByCurrentThread();
+//
+//            if (nrunning.get() == 0) {
+//
+//                /*
+//                 * Overflow processing requires that no tasks are running. Since
+//                 * we are holding the lock, no new tasks can start (at least
+//                 * until this thread blocks or otherwise releases the lock).
+//                 * Therefore if there are no running tasks then we can
+//                 * immediately begin overflow processing.
+//                 */ 
+//
+//                log.info("No running tasks - will do overflow now.");
+//                
+//                overflow();
+//
+//                log.info("No running tasks - did overflow.");
+//                
+//            } else {
+//    
+//                /*
+//                 * Otherwise we need to pause the write service (at which point
+//                 * there will be no more running tasks) and then re-invoke
+//                 * groupCommit() via tail recursion (at which point there will
+//                 * be no uncommitted tasks). This will satisfy the
+//                 * pre-conditions for synchronous overflow processing (all
+//                 * writers are committed and no writers are running) and we will
+//                 * take the other code path above and do overflow processing.
+//                 */
+//                
+//                log.info("Pausing write queue so that we can do overflow processing: nrunning="
+//                                + nrunning);
+//                
+//                assert !isPaused();
+//                
+//                try {
+//
+//                    /*
+//                     * Pause the write service (no more tasks will start) and
+//                     * wait until there are no more tasks running.
+//                     * 
+//                     * Note: If this succeeds then we need to resume() the write
+//                     * service, which we do below. If it fails, then the write
+//                     * service is automatically resumed by error handling within
+//                     * awaitPaused().
+//                     */
+//
+//                    awaitPaused();
+//
+//                    log.info("write service is paused: #running="+nrunning);
+//                    
+//                } catch (InterruptedException ex) {
+//
+//                    log.warn("Interrupted awaiting paused write service");
+//
+//                    // set the interrupt flag again.
+//                    Thread.currentThread().interrupt();
+//
+//                    /*
+//                     * The group commit was successful, so return true even
+//                     * through we were interrupted waiting on the write service
+//                     * to be paused.
+//                     */
+//                    
+//                    return true;
+//
+//                }
+//
+//                /*
+//                 * Recursive invocation of group commit now that the write
+//                 * service is paused (nothing is running). When we re-enter
+//                 * overflow() the write service will still be paused, any
+//                 * writers will have been committed, and we can safely do
+//                 * synchronous overflow processing.
+//                 */
+//
+//                assert isPaused();
+//                assert nrunning.get() == 0;
+//
+//                try {
+//                    
+//                    if (!groupCommit()) {
+//                        
+//                        return false;
+//                        
+//                    }
+//                    
+//                } finally {
+//
+//                    // resume the write service (process new tasks).
+//                    resume();
+//
+//                }
+//
+//            }
+//
+//        }
+        
     /**
      * Flag may be set to force overflow processing during the next group
      * commit. The flag is cleared once an overflow has occurred.
@@ -1014,55 +1231,36 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     public final AtomicBoolean forceOverflow = new AtomicBoolean(false);
 
     /**
-     * Once an overflow condition is recognized the {@link ResourceManager} will
-     * {@link WriteExecutorService#pause()} the {@link WriteExecutorService}
-     * until it already has what amounts to an exclusive lock on the write
-     * service. Eventually the {@link WriteExecutorService} will quiese, at
-     * which point {@link IResourceManager#overflow()} will be invoked to handle
-     * synchronous overflow processing, including putting a new {@link IJournal}
-     * into place and re-defining the views for all named indices to include the
-     * pre-overflow view with reads being absorbed by a new btree on the new
-     * journal.
+     * Once an overflow condition has been recognized and NO tasks are
+     * {@link #nrunning running} then {@link IResourceManager#overflow()} MAY be
+     * invoked to handle synchronous overflow processing, including putting a
+     * new {@link IJournal} into place and re-defining the views for all named
+     * indices to include the pre-overflow view with reads being absorbed by a
+     * new btree on the new journal.
      * <p>
      * Note: This method traps all of its exceptions.
+     * <p>
+     * Pre-conditions: You own the {@link #lock} and {@link #nrunning} is
+     * zero(0).
      */
     private void overflow() {
 
-        if (!forceOverflow.get() && !resourceManager.shouldOverflow()) {
+        assert lock.isHeldByCurrentThread();
 
-            // Don't overflow at this time.
-            
-            return;
-            
-        }
-
+        assert nrunning.get() == 0;
+        
+        /*
+         * This case gets run when we re-enter overflow() recursively since
+         * group commit normally occurs when the write service is NOT
+         * paused, which is handled below.
+         */
+        
         try {
 
-            log.info("Will do overflow");
-
-            assert lock.isHeldByCurrentThread();
-
-            assert !isPaused();
-        
-            try {
-
-                awaitPaused();
-
-            } catch (InterruptedException ex) {
-
-                log.warn("Interrupted awaiting paused write service");
-                
-                // set the interrupt flag again.
-                Thread.currentThread().interrupt();
-
-                return;
-                
-            }
-            
             log.info("Doing overflow");
-            
+        
             resourceManager.overflow();
-            
+        
             noverflow++;
 
             log.info("Did overflow");
@@ -1075,9 +1273,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             // clear force flag.
             forceOverflow.set(false);
-
-            // resume the write service (process new tasks).
-            resume();
             
         }
 
@@ -1087,12 +1282,25 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Pause the {@link WriteExecutorService} and wait until there are no more
      * tasks running (eg, an exclusive lock on the write service as a whole).
      * <p>
-     * On a successful return the write service will be paused and no tasks will
-     * be running. After a successful return the caller MUST ensure that the
-     * processing is {@link #resume() resumed} before relinquishing control.
+     * On a successful return (returns <code>true</code>) the write service
+     * will be paused and no tasks will be running. After a successful return
+     * the caller MUST ensure that the processing is {@link #resume() resumed}
+     * before relinquishing control.
+     * <p>
+     * On an unsuccessful return (returns <code>false</code>) the write
+     * service will NOT be paused and there will be at least one task still
+     * running.
+     * 
+     * @param timeout
+     *            The maximum amount of time to wait. Use {@link Long#MAX_VALUE}
+     *            to wait forever.
+     * 
+     * @return true iff nothing is running.
      */
-    private void awaitPaused() throws InterruptedException {
+    private boolean awaitPaused(final long timeout) throws InterruptedException {
 
+        assert timeout >= 0L;
+        
         assert lock.isHeldByCurrentThread();
 
         assert ! isPaused(); 
@@ -1100,19 +1308,43 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         // notify the write service that new tasks MAY NOT run.
         pause();
 
+        final long begin = System.currentTimeMillis();
+        
         // wait for active tasks to complete.
         int n;
         while ((n = nrunning.get()) > 0) {
 
-            log.info("There are "+n+" tasks running");
+            final long elapsed = begin - System.currentTimeMillis();
+            
+            final long remaining = timeout - elapsed;
+            
+            if (remaining <= 0L) {
+
+                log.warn("timeout: elapsed=" + elapsed + ", nrunning=" + n);
+                
+                resume();
+                
+                return false;
+                
+            }
+            
+            if (INFO)
+                log.info("There are " + n + " tasks running after " + elapsed
+                        + "ms.");
             
             try {
 
                 /*
                  * Each task that completes signals [waiting].
+                 * 
+                 * Note: While we specify a timeout equal to the time remaining
+                 * to limit the time that we will await other threads, this
+                 * thread will not resume until it has re-acquired the lock
+                 * which it releases temporarily while awaiting other threads to
+                 * signal it via [waiting].
                  */
 
-                waiting.await();
+                waiting.await(remaining, TimeUnit.MILLISECONDS);
 
             } catch (InterruptedException ex) {
 
@@ -1127,7 +1359,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         }
         
-        log.info("Write service is paused (nothing running).");
+        log.info("Write service is paused: #running="+nrunning);
+        
+        return true;
 
     }
     
@@ -1456,31 +1690,5 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
 
     }
-
-//    /**
-//     * An instance of this exception is thrown if a task successfully completed
-//     * but did not commit owing to a problem with some other task executing
-//     * concurrently in the {@link WriteExecutorService}. The task MAY be
-//     * retried.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class RetryException extends RuntimeException {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = 2129883896957364071L;
-//
-//        public RetryException() {
-//            super();
-//        }
-//
-//        public RetryException(String msg) {
-//            super(msg);
-//        }
-//        
-//    }
 
 }

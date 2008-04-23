@@ -62,6 +62,12 @@ public class TestTripleStoreBasics extends TestCase2 {
 
         // test of the statement identifier semantics.
         suite.addTestSuite(TestStatementIdentifiers.class);
+
+        // test suite for bulk filter of statements absent/present in the kb.
+        suite.addTestSuite(TestBulkFilter.class);
+
+        // test suite for the full-text indexer integration.
+        suite.addTestSuite(TestFullTextIndex.class);
         
         // test suite for the access path api.
         suite.addTestSuite(TestAccessPath.class);

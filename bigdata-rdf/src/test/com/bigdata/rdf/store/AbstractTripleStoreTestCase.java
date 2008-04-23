@@ -29,8 +29,7 @@ package com.bigdata.rdf.store;
 
 
 /**
- * Base class for test suites for inference engine and the magic sets
- * implementation.
+ * Base class for test suites for inference engine
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

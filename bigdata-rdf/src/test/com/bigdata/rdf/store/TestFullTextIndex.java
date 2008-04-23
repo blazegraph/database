@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.util.Properties;
 import java.util.UUID;
 
 import org.openrdf.model.vocabulary.RDF;
@@ -38,7 +37,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataClient;
 
@@ -147,16 +145,21 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
              * re-open the store before search to verify that the data were made
              * restart safe.
              */
-            store = reopenStore(store);
-            
-            store.textSearch("", "abc"); // finds plain literals (@todo or anytype?)
-            store.textSearch("en", "abc");
-            store.textSearch("en", "GOOD DAY");
-            store.textSearch("de", "gutten tag");
-            store.textSearch("de", "tag");
-            store.textSearch("en", "tag");
-            store.textSearch("de", "team");
-            store.textSearch("en", "the"); // 'the' is a stopword.
+            if (store.isStable()) {
+                
+                store = reopenStore(store);
+
+                store.textSearch("", "abc"); // finds plain literals (@todo
+                                                // or anytype?)
+                store.textSearch("en", "abc");
+                store.textSearch("en", "GOOD DAY");
+                store.textSearch("de", "gutten tag");
+                store.textSearch("de", "tag");
+                store.textSearch("en", "tag");
+                store.textSearch("de", "team");
+                store.textSearch("en", "the"); // 'the' is a stopword.
+                
+            }
             
         } finally {
 
