@@ -59,6 +59,7 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.RootBlockException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
@@ -1159,15 +1160,33 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
             // Note: disables buffering nodes during the scan.
             p.setProperty(IndexSegmentStore.Options.MAX_BYTES_TO_FULLY_BUFFER_NODES,"1");
             
+            /*
+             * Attempt to open the index segment.
+             * 
+             * FIXME If there is a dependency on the index segment then certain
+             * views can not be restored. How does that play out? I presume that
+             * an exception will be reported when attempting to open that view.
+             * This will probably be a resource not found exception since bad
+             * index segment is not being entered into the indexSegmentIndex.
+             */
             final IndexSegmentStore segStore;
             try {
             
                 segStore = new IndexSegmentStore( p );
 
+            } catch( RootBlockException ex) {
+
+                log.error("Bad root block - file will be ignored: file="
+                        + file.getAbsolutePath(), ex);
+                
+                return;
+                
             } catch (Exception ex) {
 
-                throw new RuntimeException("Problem opening segment: "
-                        + file.getAbsolutePath(), ex);
+                log.error("Problem opening segment: " + file.getAbsolutePath(),
+                        ex);
+                
+                return;
                 
             }
 

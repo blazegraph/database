@@ -38,6 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.RootBlockException;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
@@ -223,12 +224,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     
     /**
      * Open a read-only store containing an {@link IndexSegment}.
+     * <p>
+     * Note: If an exception is thrown then the backing file will be closed.
      * 
      * @param properties
      *            The properties. See {@link Options}.
      * 
      * @see Options
      * @see #loadIndexSegment()
+     * 
+     * @throws RuntimeException
+     *             if there is a problem.
+     * @throws RootBlockException
+     *             if the root block is invalid.
      */
     public IndexSegmentStore(Properties properties) {
 
@@ -322,9 +330,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     /**
      * Re-open a closed store. This operation should succeed if the backing file
      * is still accessible.
+     * <p>
+     * Note: If an exception is thrown then the backing file will be closed.
      * 
-     * @exception IllegalStateException
-     *                if the store is not closed.
+     * @throws IllegalStateException
+     *             if the store is already open.
+     * @throws RootBlockException
+     *             if the root block is invalid.
+     * @throws RuntimeException
+     *             if there is a problem.
      * 
      * @see #close()
      */
@@ -339,6 +353,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                     + file.getAbsoluteFile());
 
         }
+        
+        /*
+         * This should already be null (see close()), but make sure reference is
+         * cleared first.
+         */
+        raf = null;
 
         try {
 
@@ -385,6 +405,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             this.open = true;
 
         } catch (IOException ex) {
+
+            // clean up.
+            _close();
 
             throw new RuntimeException(ex);
 
@@ -481,27 +504,45 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     synchronized public void close() {
 
-        assertOpen();
+        log.info("");
         
-        try {
+        assertOpen();
+     
+        _close();
+        
+    }
+        
+    /**
+     * Method is safe to invoke whether or not the store is "open" and will
+     * always close {@link #raf} (if open), release various buffers, and set
+     * {@link #open} to <code>false</code>. All exceptions are trapped, a log
+     * message is written, and the exception is NOT re-thrown.
+     */
+    synchronized private void _close() {
+        
+        if (raf != null) {
 
-            raf.close();
-            
+            try {
+
+                raf.close();
+                
+            } catch (IOException ex) {
+                
+                log.warn("Problem closing file: " + file, ex);
+                
+            }
+
             raf = null;
-            
-            buf_nodes = null;
-
-            checkpoint = null;
-            
-            metadata = null;
-            
-            open = false;
-
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
 
         }
+
+        buf_nodes = null;
+
+        checkpoint = null;
+
+        metadata = null;
+
+        open = false;
 
     }
     
@@ -552,10 +593,15 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      *       {@link IndexSegment} itself.
      */
     synchronized public CounterSet getCounters() {
+
         if(root==null) {
+        
             root = new CounterSet();
+            
         }
+        
         return root;
+        
     }
     private CounterSet root;
 
