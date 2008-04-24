@@ -151,20 +151,19 @@ abstract public class MetadataService extends DataService implements
 
         try {
 
-            final AbstractTask task = new AbstractTask(
-                    concurrencyManager, timestamp, getMetadataIndexName(name)
-                    ) {
+            if (timestamp == ITx.UNISOLATED) {
 
-                        @Override
-                        protected Object doTask() throws Exception {
-                            
-                            MetadataIndex ndx = (MetadataIndex)getIndex(getOnlyResource());
-                            
-                            return ndx.get(key);
-                            
-                        }
+                /*
+                 * This is a read-only operation so run as read committed rather
+                 * than unisolated.
+                 */
                 
-            };
+                timestamp = ITx.READ_COMMITTED;
+
+            }
+
+            final AbstractTask task = new GetTask(concurrencyManager,
+                    timestamp, getMetadataIndexName(name), key);
             
             return (PartitionLocator) concurrencyManager.submit(task).get();
             
@@ -176,6 +175,36 @@ abstract public class MetadataService extends DataService implements
 
     }
 
+    /**
+     * Task for {@link MetadataService#get(String, long, byte[])}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static private final class GetTask extends AbstractTask {
+
+        private final byte[] key;
+        
+        public GetTask(IConcurrencyManager concurrencyManager, long timestamp,
+                String resource, byte[] key) {
+
+            super(concurrencyManager, timestamp, resource);
+
+            this.key = key;
+            
+        }
+
+        @Override
+        protected Object doTask() throws Exception {
+
+            MetadataIndex ndx = (MetadataIndex) getIndex(getOnlyResource());
+
+            return ndx.get(key);
+
+        }
+        
+    }
+
     public PartitionLocator find(String name, long timestamp, final byte[] key)
             throws InterruptedException, ExecutionException, IOException {
 
@@ -183,20 +212,20 @@ abstract public class MetadataService extends DataService implements
 
         try {
 
-            final AbstractTask task = new AbstractTask(concurrencyManager,
-                    timestamp, getMetadataIndexName(name)) {
+            if (timestamp == ITx.UNISOLATED) {
 
-                @Override
-                protected Object doTask() throws Exception {
+                /*
+                 * This is a read-only operation so run as read committed rather
+                 * than unisolated.
+                 */
+                
+                timestamp = ITx.READ_COMMITTED;
 
-                    MetadataIndex ndx = (MetadataIndex) getIndex(getOnlyResource());
-
-                    return ndx.find(key);
-
-                }
-
-            };
-
+            }
+            
+            final AbstractTask task = new FindTask(concurrencyManager,
+                    timestamp, getMetadataIndexName(name), key);
+            
             return (PartitionLocator) concurrencyManager.submit(task).get();
 
         } finally {
@@ -207,6 +236,36 @@ abstract public class MetadataService extends DataService implements
 
     }
 
+    /**
+     * Task for {@link MetadataService#find(String, long, byte[])}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static private final class FindTask extends AbstractTask {
+
+        private final byte[] key;
+        
+        public FindTask(IConcurrencyManager concurrencyManager, long timestamp,
+                String resource, byte[] key) {
+
+            super(concurrencyManager, timestamp, resource);
+
+            this.key = key;
+            
+        }
+
+        @Override
+        protected Object doTask() throws Exception {
+
+            MetadataIndex ndx = (MetadataIndex) getIndex(getOnlyResource());
+
+            return ndx.find(key);
+
+        }
+        
+    }
+    
     public void splitIndexPartition(String name, PartitionLocator oldLocator,
             PartitionLocator newLocators[]) throws IOException,
             InterruptedException, ExecutionException {
