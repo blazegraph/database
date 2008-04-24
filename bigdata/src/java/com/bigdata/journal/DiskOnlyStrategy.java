@@ -1437,7 +1437,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
     
-    public long write(ByteBuffer data) {
+    public long write(final ByteBuffer data) {
 
         if (data == null)
             throw new IllegalArgumentException(ERR_BUFFER_NULL);
@@ -1570,7 +1570,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * @param offset
      *            The offset in the file at which the data will be written.
      */
-    void writeOnDisk(ByteBuffer data, long offset) {
+    void writeOnDisk(final ByteBuffer data, final long offset) {
 
         final long begin = System.nanoTime();
         
@@ -1599,15 +1599,59 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             /*
              * Write the data onto the channel.
+             * 
+             * Note: writes bytes from position to limit on the channel at pos.
+             * 
+             * Note: I have seen count != remaining() for a single invocation of
+             * FileChannel#write(). This occured 5 hours into a run with the
+             * write cache disabled (so lots of small record writes). All of a
+             * sudden, several writes wound up reporting too few bytes written -
+             * this persisted until the end of the run (Fedora core 6 with Sun
+             * JDK 1.6.0_03). I have since modified this code to use a loop to
+             * ensure that all bytes get written.
+             * 
+             * FIXME Propagate this change to all places where we use
+             * FileChannel#write().
              */
 
-            // writes bytes from position to limit on the channel at pos.
-            final int count = getChannel().write(data, pos);
+            int count = 0;
+            int nwrites = 0;
+
+            while (data.remaining() > 0) {
+
+                count += getChannel().write(data, pos);
+                
+                nwrites++;
+
+                counters.ndiskWrite++;
+
+                if (nwrites == 100) {
+
+                    log.warn("writing on channel: remaining="
+                            + data.remaining() + ", nwrites=" + nwrites
+                            + ", written=" + count);
+
+                } else if (nwrites == 1000) {
+
+                    log.error("writing on channel: remaining="
+                            + data.remaining() + ", nwrites=" + nwrites
+                            + ", written=" + count);
+
+                }
+                if (nwrites > 10000) {
+
+                    throw new RuntimeException("writing on channel: remaining="
+                            + data.remaining() + ", nwrites=" + nwrites
+                            + ", written=" + count);
+
+                }
+
+            }
 
             if (count != nbytes) {
 
-                throw new IOException("Expecting to write " + nbytes
-                        + " bytes, but wrote " + count + " bytes.");
+                throw new RuntimeException("Expecting to write " + nbytes
+                        + " bytes, but wrote " + count + " bytes in " + nwrites);
 
             }
 
@@ -1620,7 +1664,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         // update the next offset at which data will be written on the disk.
         writeCacheOffset += nbytes;
                 
-        counters.ndiskWrite++;
         counters.bytesWrittenOnDisk+=nbytes;
         counters.elapsedDiskWriteNanos+=(System.nanoTime()-begin);
 
