@@ -132,6 +132,10 @@ public class QueueLengthTask extends Instrument<Double> implements Runnable {
                 /*
                  * Note: This is reporting the task execution concurrency
                  * _with_locks_held_ for the write service
+                 * 
+                 * FIXME Since there are all these values which we are
+                 * computing, have this class expose several "instruments" and
+                 * not just one.
                  */
 
                 activeCount = ((WriteExecutorService) service)

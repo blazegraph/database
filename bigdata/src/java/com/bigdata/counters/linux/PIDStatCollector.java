@@ -205,7 +205,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         command.add(""+pid);
     
         command.add("-u"); // CPU stats
-        command.add("-I"); // normalize to 100% iff SMP?
+        
+        command.add("-I"); // normalize CPU stats to 100% iff SMP.
         
         if(perProcessIOData) {
          
@@ -419,15 +420,15 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                                 + ", %cpu=" + cpu + "\n" + header + "\n"
                                 + data);
                 
-                vals.put(IProcessCounters.CPU_PercentProcessorTime,
-                            Double.parseDouble(cpu));
-
                 vals.put(IProcessCounters.CPU_PercentUserTime,
                         Double.parseDouble(user));
 
                 vals.put(IProcessCounters.CPU_PercentSystemTime,
                         Double.parseDouble(system));
                 
+                vals.put(IProcessCounters.CPU_PercentProcessorTime,
+                        Double.parseDouble(cpu));
+
             } else if(header.contains("RSS")) {
                 
                 /*

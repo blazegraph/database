@@ -533,6 +533,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     /**
      * Adds the following fields to the {@link MDC} logging context:
      * <dl>
+     * <dt>taskname</dt>
+     * <dd>The name of the task as reported by {@link #getTaskName()}.</dd>
      * <dt>timestamp</dt>
      * <dd>The {@link #timestamp} specified to the ctor.</dd>
      * <dt>resources</dt>
@@ -543,6 +545,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         // Add to the logging context for the current thread.
             
+        MDC.put("taskname", getTaskName());
+
         MDC.put("timestamp", ""+timestamp);
         
         MDC.put("resources", Arrays.toString(resource));
@@ -554,7 +558,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * logging context.
      */
     protected void clearLoggingContext() {
-        
+
+        MDC.remove("taskname");
+
         MDC.remove("timestamp");
 
         MDC.remove("resources");

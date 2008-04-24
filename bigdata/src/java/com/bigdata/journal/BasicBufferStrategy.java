@@ -351,7 +351,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         buffer.limit((int)nextOffset);
         buffer.position(0);
         
-        // write the data.
+        // write the data : @todo use an explicit position for this write?
         final long nwritten = outChannel.write(buffer);
         
         if( nwritten != count ) {
