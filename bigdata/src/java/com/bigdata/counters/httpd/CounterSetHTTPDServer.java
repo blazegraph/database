@@ -74,7 +74,7 @@ public class CounterSetHTTPDServer implements Runnable {
      * analysis.
      * 
      * @param args
-     *            [-p port] <i>file(s)</i>
+     *            [-p port] [-d {debug,info,warn,error,fatal}] <i>file(s)</i>
      * 
      * @throws IOException
      */
@@ -97,7 +97,26 @@ public class CounterSetHTTPDServer implements Runnable {
 
                     System.out.println("port: "+port);
                     
+                } else if( arg.equals("-d")) {
+                    
+                    final Level level = Level.toLevel(args[++i]);
+                    
+                    System.out.println("Setting server and service log levels: "+level);
+                    
+                    // set logging level on the server.
+                    CounterSetHTTPDServer.log.setLevel(level);
+
+                    // set logging level on the service.
+                    NanoHTTPD.log.setLevel(level);
+                    
+                } else {
+                    
+                    System.err.println("Unknown option: "+arg);
+                    
+                    System.exit( 1 );
+                    
                 }
+                
             } else {
 
                 final File file = new File(arg);
@@ -129,8 +148,12 @@ public class CounterSetHTTPDServer implements Runnable {
         
         System.out.println("starting httpd server on port="+port);
 
+        // new server.
+        CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
+                counterSet);
+
         // run server.
-        new CounterSetHTTPDServer(port,counterSet).run();
+        server.run();
 
     }
 

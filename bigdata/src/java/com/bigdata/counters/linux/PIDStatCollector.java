@@ -251,8 +251,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             
             inst.add(new I(IProcessCounters.Memory_minorFaultsPerSec,1d));
             inst.add(new I(IProcessCounters.Memory_majorFaultsPerSec,1d));
-            inst.add(new I(IProcessCounters.Memory_virtualSize,1d));
-            inst.add(new I(IProcessCounters.Memory_residentSetSize,1d));
+            inst.add(new I(IProcessCounters.Memory_virtualSize,Bytes.kilobyte));
+            inst.add(new I(IProcessCounters.Memory_residentSetSize,Bytes.kilobyte));
             inst.add(new I(IProcessCounters.Memory_percentMemorySize,.01d));
 
             /*
