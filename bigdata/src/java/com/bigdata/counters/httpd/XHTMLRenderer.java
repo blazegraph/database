@@ -6,6 +6,8 @@ import java.io.Writer;
 import java.net.URLEncoder;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
+import java.text.Format;
+import java.text.NumberFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -106,9 +108,19 @@ public class XHTMLRenderer {
         final public Pattern pattern;
         
         /**
-         * Used to format values.
+         * Used to format double and float counter values.
          */
         final DecimalFormat decimalFormat;
+        
+        /**
+         * Used to format counter values that can be inferred to be a percentage.
+         */
+        final NumberFormat percentFormat;
+        
+        /**
+         * Used to format integer and long counter values.
+         */
+        final NumberFormat integerFormat;
         
         /**
          * Used to format the units of time when expressed as elapsed units since
@@ -189,6 +201,12 @@ public class XHTMLRenderer {
 //            decimalFormat.setMaximumFractionDigits(6);
 //            
 //            decimalFormat.setDecimalSeparatorAlwaysShown(true);
+            
+            this.percentFormat = NumberFormat.getPercentInstance();
+            
+            this.integerFormat = NumberFormat.getIntegerInstance();
+            
+            integerFormat.setGroupingUsed(true);
             
             this.unitsFormat = new DecimalFormat("0.#");
             
@@ -748,20 +766,20 @@ public class XHTMLRenderer {
                     HistoryInstrument inst = (HistoryInstrument) counter
                             .getInstrument();
 
-                    w.write("  <td>" + cdata(value(inst.minutes.getAverage()))
-                            + " (" + cdata(value(inst.minutes.size())) + ")"
+                    w.write("  <td>" + cdata(value(counter,inst.minutes.getAverage()))
+                            + " (" + cdata(value(counter,inst.minutes.size())) + ")"
                             + "</td\n>");
 
-                    w.write("  <td>" + cdata(value(inst.hours.getAverage()))
-                            + " (" + cdata(value(inst.hours.size())) + ")"
+                    w.write("  <td>" + cdata(value(counter,inst.hours.getAverage()))
+                            + " (" + cdata(value(counter,inst.hours.size())) + ")"
                             + "</td\n>");
 
-                    w.write("  <td>" + cdata(value(inst.days.getAverage()))
-                            + " (" + cdata(value(inst.days.size())) + ")"
+                    w.write("  <td>" + cdata(value(counter,inst.days.getAverage()))
+                            + " (" + cdata(value(counter,inst.days.size())) + ")"
                             + "</td\n>");
 
                     // the most recent value.
-                    w.write("  <td>" + cdata(value(counter.getValue()))
+                    w.write("  <td>" + cdata(value(counter,counter.getValue()))
                             + "</td\n>");
 
                 } else {
@@ -774,7 +792,7 @@ public class XHTMLRenderer {
                     // w.write(" <th>N/A</th\n>");
                     // w.write(" <th>N/A</th\n>");
                     w.write("  <td colspan=\"4\">"
-                            + cdata(value(counter.getValue())) + "</td\n>");
+                            + cdata(value(counter,counter.getValue())) + "</td\n>");
 
                 }
 
@@ -873,22 +891,39 @@ public class XHTMLRenderer {
         
         /*
          * Figure out the label for the units of the history.
+         * 
+         * FIXME The history really needs to be separately informed of the
+         * period (in ms) of its buckets (that is, how many seconds, minutes,
+         * hours, etc), and the #of buckets that it will collect. The two are
+         * not of necessity aligned: the source MUST include at least enough
+         * samples to make up one sample at the higher level, but the source MAY
+         * collect more samples and the higher level MAY collect an arbitrary
+         * number of samples. Change this in History, allow configuration of the
+         * HistoryInstrument, make sure that interchange reflects this, and then
+         * replace the explicitly specified period here with the appropriate
+         * method call on the History object. And add a label to the history
+         * object or a typesafe enum for minutes, hours, days, etc.
          */
         final String units;
         final DateFormat dateFormat;
+        final long period;
         if (h.getPeriod() == 1000 * 60L) {
             units = "Minutes";
+            period = 1000*60;// 60 seconds (in ms).
             dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
         } else if (h.getPeriod() == 1000 * 60 * 24L) {
             units = "Hours";
+            period = 1000*60*60;// 60 minutes (in ms).
             dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
         } else if (h.getSource() != null
                 && h.getSource().getPeriod() == 1000 * 60 * 24L) {
             units = "Days";
+            period = 1000*60*60*24;// 24 hours (in ms).
             dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
         } else {
-            units = "period=" + h.getPeriod() + "ms";
-            dateFormat = DateFormat.getDateTimeInstance();
+            throw new AssertionError("period="+h.getPeriod());
+//            units = "period=" + h.getPeriod() + "ms";
+//            dateFormat = DateFormat.getDateTimeInstance();
         }
 
         /*
@@ -917,7 +952,7 @@ public class XHTMLRenderer {
             // zero initially.
             long lastTimestamp = 0;
             
-            final long period = h.getPeriod();
+//            final long period = h.getPeriod();
 
             while (itr.hasNext()) {
 
@@ -958,7 +993,7 @@ public class XHTMLRenderer {
                 
                 sb.append("  <td>" + cdata(timeStr) + "</td\n>");
 
-                sb.append("  <td>" + cdata(value(sample.getValue())) + "</td\n>");
+                sb.append("  <td>" + cdata(value(counter,sample.getValue())) + "</td\n>");
 
                 sb.append("  <td>"+ cdata(dateFormat.format(new Date(lastModified)))+"</td\n>");
                 
@@ -1004,7 +1039,7 @@ public class XHTMLRenderer {
             // header row.
             w.write(" <tr\n>");
             w.write("  <th>" + cdata(units) + "</th\n>");
-            w.write("  <th>Value</th\n>");
+            w.write("  <th>"+cdata(counter.getName())+"</th\n>");
             w.write("  <th>Timestamp</th>\n");
             w.write(" </tr\n>");
 
@@ -1051,17 +1086,36 @@ public class XHTMLRenderer {
     /**
      * Formats a counter value as a String.
      * 
+     * @param counter
+     *            The counter.
      * @param value
      *            The counter value (MAY be <code>null</code>).
      * @return
      */
-    protected String value(Object val) {
+    protected String value(ICounter counter,Object val) {
+        
+        if (counter == null)
+            throw new IllegalArgumentException();
         
         if(val == null) return "N/A";
         
         if(val instanceof Double || val instanceof Float) {
             
-            return model.decimalFormat.format(((Number)val).doubleValue());
+            Format fmt = model.decimalFormat;
+            
+            if(counter.getName().contains("%")||counter.getName().matches("[Pp]ercent")) {
+                
+                fmt = model.percentFormat;
+                
+            }
+            
+            return fmt.format(((Number)val).doubleValue());
+            
+        } else if(val instanceof Long || val instanceof Integer) {
+            
+            Format fmt = model.integerFormat;
+            
+            return fmt.format(((Number)val).longValue());
             
         }
 
