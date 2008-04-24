@@ -607,7 +607,11 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              */
             counters.workerNanoLatency += (System.nanoTime() - nanoTime_submitTask);
             
-            Object ret = call2();
+            setupLoggingContext();
+            
+            final Object ret = call2();
+            
+            clearLoggingContext();
 
             counters.successCount++;
 
