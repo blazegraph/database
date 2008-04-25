@@ -1103,7 +1103,8 @@ public class XHTMLRenderer {
             
             Format fmt = model.decimalFormat;
             
-            if(counter.getName().contains("%")||counter.getName().matches("[Pp]ercent")) {
+            if (counter.getName().contains("%")
+                    || percent_pattern.matcher(counter.getName()).matches()) {
                 
                 fmt = model.percentFormat;
                 
@@ -1122,5 +1123,12 @@ public class XHTMLRenderer {
         return val.toString();
         
     }
+    
+    /**
+     * A pattern matching the occurrence of the word "percent" in a counter
+     * name. Leading and trailing wildcards are used and the match is
+     * case-insensitive.
+     */
+    static private final Pattern percent_pattern = Pattern.compile(".*percent.*",Pattern.CASE_INSENSITIVE);
     
 }

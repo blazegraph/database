@@ -353,16 +353,22 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
                     continue;
                     
                 }
+
+                try {
                 
 //                *   04:14:45 PM     CPU     %user     %nice   %system   %iowait    %steal     %idle
 //                *   04:14:46 PM     all      0.00      0.00      0.00      0.00      0.00    100.00
 
-                final String s = data.substring(0, 11);
-                try {
-                    lastModified = StatisticsCollectorForLinux.f.parse(s).getTime();
-                } catch (Exception e) {
-                    log.warn("Could not parse time: [" + s + "] : " + e);
-                    lastModified = System.currentTimeMillis(); // should be pretty close.
+                {
+                    final String s = data.substring(0, 11);
+                    try {
+                        lastModified = StatisticsCollectorForLinux.f.parse(s)
+                                .getTime();
+                    } catch (Exception e) {
+                        log.warn("Could not parse time: [" + s + "] : " + e);
+                        // should be pretty close.
+                        lastModified = System.currentTimeMillis();
+                    }
                 }
                                 
                 final String user = data.substring(20-1, 30-1);
@@ -386,6 +392,20 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
                 vals.put(IRequiredHostCounters.CPU_PercentProcessorTime, 
                         (100d - Double.parseDouble(idle)));
                 
+            } catch(Exception ex) {
+
+                /*
+                 * Issue warning for parsing problems.
+                 */
+                
+                log.warn(ex.getMessage() //
+                            + "\nheader: " + header //
+                            + "\n  data: " + data   //
+                            //, ex//
+                            );
+                
+            }
+
             }
             
         }
