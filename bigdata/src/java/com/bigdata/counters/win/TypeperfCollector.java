@@ -394,41 +394,41 @@ public class TypeperfCollector extends AbstractProcessCollector {
             while (!Thread.currentThread().isInterrupted()
                     && csvReader.hasNext()) {
 
-                final Map<String, Object> row;
                 try {
+                    
+                    final Map<String, Object> row = csvReader.next();
 
-                    row = csvReader.next();
-                    
-                } catch(Throwable t) {
-                    
-                    log.warn(t.getMessage(),t);
-                    
+                    final long timestamp = ((Date) row.get("Timestamp"))
+                            .getTime();
+
+                    // update the sample time.
+                    TypeperfCollector.this.lastModified = timestamp;
+
+                    for (Map.Entry<String, Object> entry : row.entrySet()) {
+
+                        final String path = entry.getKey();
+
+                        if (path.equals("Timestamp"))
+                            continue;
+
+                        final String value = "" + entry.getValue();
+
+                        log.debug(path + "=" + value);
+
+                        // update the value from which the counter reads.
+                        vals.put(path, Double.parseDouble(value));
+
+                    }
+
+                    nsamples++;
+
+                } catch (Throwable t) {
+
+                    log.warn(t.getMessage(), t);
+
                     continue;
-                    
-                }
-
-                final long timestamp = ((Date)row.get("Timestamp")).getTime();
-
-                // update the sample time.
-                TypeperfCollector.this.lastModified = timestamp;
-                
-                for (Map.Entry<String, Object> entry : row.entrySet()) {
-
-                    final String path = entry.getKey();
-
-                    if(path.equals("Timestamp")) continue;
-                    
-                    final String value = "" + entry.getValue();
-
-                    log.debug(path + "=" + value);
-
-                    // update the value from which the counter reads.
-                    vals.put(path,
-                            Double.parseDouble(value));
 
                 }
-
-                nsamples++;
 
             }
             
