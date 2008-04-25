@@ -16,6 +16,7 @@ import net.jini.io.context.ClientSubject;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.counters.httpd.CounterSetHTTPDServer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.LoadBalancerService;
 import com.bigdata.service.MetadataService;
@@ -219,6 +220,11 @@ public class LoadBalancerServer extends AbstractServer {
         /**
          * Destroy the service and deletes any files containing resources (<em>application data</em>)
          * that was in use by that service.
+         * <p>
+         * Note: The {@link LoadBalancerService} writes counters into a
+         * configured directly but does not otherwise have configured state.
+         * Those counters are NOT destroyed so that they may be used for
+         * post-mortem analysis. See {@link CounterSetHTTPDServer}.
          * 
          * @throws RemoteException
          */
