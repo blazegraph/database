@@ -907,7 +907,7 @@ public class NodeSerializer {
 
         // #of bytes in record.
         final int nbytes = buf.getInt();
-        assert nbytes > SIZEOF_NODE_HEADER;
+        assert nbytes > SIZEOF_NODE_HEADER : "nbytes="+nbytes+", but headerSize="+SIZEOF_NODE_HEADER;
 
         /*
          * verify checksum now that we know how many bytes of data we expect to
