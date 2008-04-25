@@ -87,7 +87,50 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * supported based on the {@link KernelVersion}.
      */
     protected final boolean perProcessIOData;
+    
+    /**
+     * Abstract inner class integrating the current values with the {@link ICounterSet}
+     * hierarchy.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    abstract class AbstractInst<T> implements IInstrument<T> {
+        
+        protected final String path;
+        
+        final public String getPath() {
+            
+            return path;
+            
+        }
+        
+        protected AbstractInst(String path) {
+            
+            assert path != null;
+            
+            this.path = path;
+            
+        }
+        
+        final public long lastModified() {
 
+            return lastModified;
+            
+        }
+
+        /**
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        final public void setValue(T value, long timestamp) {
+           
+            throw new UnsupportedOperationException();
+            
+        }
+
+    }
+        
     /**
      * Inner class integrating the current values with the {@link ICounterSet}
      * hierarchy.
@@ -95,22 +138,48 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class I implements IInstrument<Double> {
+    class IL extends AbstractInst<Long> {
         
-        protected final String path;
-        protected final double scale;
+        protected final long scale;
         
-        public String getPath() {
+        public IL(String path, long scale) {
             
-            return path;
+            super( path );
+            
+            this.scale = scale;
             
         }
         
-        public I(String path, double scale) {
+        public Long getValue() {
+         
+            final Long value = (Long) vals.get(path);
+
+            // no value is defined.
+            if (value == null)
+                return 0L;
+
+            final long v = value.longValue() * scale;
+
+            return v;
             
-            assert path != null;
-            
-            this.path = path;
+        }
+
+    }
+    
+    /**
+     * Inner class integrating the current values with the {@link ICounterSet}
+     * hierarchy.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    class ID extends AbstractInst<Double> {
+        
+        protected final double scale;
+        
+        public ID(String path, double scale) {
+
+            super(path);
             
             this.scale = scale;
             
@@ -127,22 +196,6 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             final double d = value.doubleValue() * scale;
 
             return d;
-            
-        }
-
-        public long lastModified() {
-
-            return lastModified;
-            
-        }
-
-        /**
-         * @throws UnsupportedOperationException
-         *             always.
-         */
-        public void setValue(Double value, long timestamp) {
-           
-            throw new UnsupportedOperationException();
             
         }
 
@@ -236,7 +289,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         
             root = new CounterSet();
             
-            inst = new LinkedList<I>();
+            inst = new LinkedList<AbstractInst>();
             
             /*
              * Note: Counters are all declared as Double to facilitate
@@ -246,28 +299,28 @@ public class PIDStatCollector extends AbstractProcessCollector implements
              * to [0:1] using a scaling factor.
              */
 
-            inst.add(new I(IProcessCounters.CPU_PercentUserTime,.01d));
-            inst.add(new I(IProcessCounters.CPU_PercentSystemTime,.01d));
-            inst.add(new I(IProcessCounters.CPU_PercentProcessorTime,.01d));
+            inst.add(new ID(IProcessCounters.CPU_PercentUserTime,.01d));
+            inst.add(new ID(IProcessCounters.CPU_PercentSystemTime,.01d));
+            inst.add(new ID(IProcessCounters.CPU_PercentProcessorTime,.01d));
             
-            inst.add(new I(IProcessCounters.Memory_minorFaultsPerSec,1d));
-            inst.add(new I(IProcessCounters.Memory_majorFaultsPerSec,1d));
-            inst.add(new I(IProcessCounters.Memory_virtualSize,Bytes.kilobyte));
-            inst.add(new I(IProcessCounters.Memory_residentSetSize,Bytes.kilobyte));
-            inst.add(new I(IProcessCounters.Memory_percentMemorySize,.01d));
+            inst.add(new ID(IProcessCounters.Memory_minorFaultsPerSec,1d));
+            inst.add(new ID(IProcessCounters.Memory_majorFaultsPerSec,1d));
+            inst.add(new IL(IProcessCounters.Memory_virtualSize,Bytes.kilobyte));
+            inst.add(new IL(IProcessCounters.Memory_residentSetSize,Bytes.kilobyte));
+            inst.add(new ID(IProcessCounters.Memory_percentMemorySize,.01d));
 
             /*
              * Note: pidstat reports in kb/sec so we normalize to bytes/second
              * using a scaling factor.
              */
-            inst.add(new I(IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
-            inst.add(new I(IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
+            inst.add(new ID(IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
+            inst.add(new ID(IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
 
         }
         
-        for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
+        for(Iterator<AbstractInst> itr = inst.iterator(); itr.hasNext(); ) {
             
-            I i = itr.next();
+            AbstractInst i = itr.next();
             
             root.addCounter(i.getPath(), i);
             
@@ -276,7 +329,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         return root;
         
     }
-    private List<I> inst = null;
+    private List<AbstractInst> inst = null;
     private CounterSet root = null;
     
     /**
@@ -393,13 +446,28 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 
             // data.
             final String data = readLine();
-            
-            final String s = data.substring(0, 11);
+
             try {
-                lastModified = StatisticsCollectorForLinux.f.parse(s).getTime();
-            } catch (Exception e) {
-                log.warn("Could not parse time: [" + s + "] : " + e);
-                lastModified = System.currentTimeMillis(); // should be pretty close.
+                
+            // timestamp
+            {
+
+                final String s = data.substring(0, 11);
+
+                try {
+
+                    lastModified = StatisticsCollectorForLinux.f.parse(s)
+                            .getTime();
+
+                } catch (Exception e) {
+
+                    log.warn("Could not parse time: [" + s + "] : " + e);
+
+                    // should be pretty close.
+                    lastModified = System.currentTimeMillis();
+
+                }
+
             }
                             
             if(header.contains("%CPU")) {
@@ -460,10 +528,10 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                         Double.parseDouble(majorFaultsPerSec));
                 
                 vals.put(IProcessCounters.Memory_virtualSize, 
-                        Double.parseDouble(virtualSize));
+                        Long.parseLong(virtualSize));
                 
                 vals.put(IProcessCounters.Memory_residentSetSize,
-                        Double.parseDouble(residentSetSize));
+                        Long.parseLong(residentSetSize));
                 
                 vals.put(IProcessCounters.Memory_percentMemorySize, 
                         Double.parseDouble(percentMemory));
@@ -497,6 +565,21 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 continue;
                 
             }
+            
+            } catch(Exception ex) {
+
+                /*
+                 * Issue warning for parsing problems.
+                 */
+                
+                log.warn(ex.getMessage() //
+                            + "\nheader: " + header //
+                            + "\n  data: " + data   //
+                            //, ex//
+                            );
+                
+            }
+
             n++;
         
         }
