@@ -86,6 +86,9 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         
         // Use the disk-backed store.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+
+        // turn off the write cache.
+        properties.setProperty(Options.WRITE_CACHE_CAPACITY, "0");
         
         // name data directory for the unit test.
         properties.setProperty(com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR, getName());
