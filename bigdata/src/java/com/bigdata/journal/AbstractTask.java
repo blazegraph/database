@@ -48,7 +48,6 @@ import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
-import com.bigdata.journal.ConcurrencyManager.TaskCounters;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
 
@@ -400,8 +399,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             readOnly = true;
 
-            counters = (timestamp == ITx.READ_COMMITTED) ? this.concurrencyManager.countersRC
-                    : this.concurrencyManager.countersHR;
+            counters = this.concurrencyManager.countersHR;
             
         } else {
 
@@ -604,7 +602,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * Increment by the amount of time that the task waited on the queue
              * before it began to execute.
              */
-            counters.workerNanoLatency += (System.nanoTime() - nanoTime_submitTask);
+            
+            final long waitingTime = (System.nanoTime() - nanoTime_submitTask);
+            
+            counters.queueWaitingTime += waitingTime;
             
             setupLoggingContext();
             
@@ -629,10 +630,13 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         } finally {
 
-            counters.taskCount++;
+            counters.completedCount++;
             
             // increment by the amount of time that the task was executing.
-            counters.workerNanoTime += (nanoTime_finishedWork - nanoTime_beginWork);
+            counters.serviceNanoTime += (nanoTime_finishedWork - nanoTime_beginWork);
+
+            // increment by the total time from submit to completion.
+            counters.queuingNanoTime += (nanoTime_finishedWork - nanoTime_submitTask);
             
         }
 
@@ -782,7 +786,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                  * acquire its lock(s).
                  */
 
-                counters.workerLockLatency += delegate.getLockLatency();
+                counters.lockWaitingTime += delegate.getLockLatency();
                 
             }
 
