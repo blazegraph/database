@@ -743,15 +743,28 @@ abstract public class AbstractTripleStore implements ITripleStore,
 //                .75, // underCapacityMultiplier
 //                20   // sampleRate
 //                );
-        final ISplitHandler splitHandler = new DefaultSplitHandler(
-                10 * Bytes.kilobyte32, // minimumEntryCount
-                50 * Bytes.kilobyte32, // entryCountPerSplit
-                1.5, // overCapacityMultiplier
-                .75, // underCapacityMultiplier
-                20   // sampleRate
-                );
         
-        metadata.setSplitHandler(splitHandler);
+//        if (name.contains(name_idTerm)) {
+//            
+//            // An override that makes a split very likely.
+//            final ISplitHandler splitHandler = new DefaultSplitHandler(
+//                    10 * Bytes.kilobyte32, // minimumEntryCount
+//                    50 * Bytes.kilobyte32, // entryCountPerSplit
+//                    1.5, // overCapacityMultiplier
+//                    .75, // underCapacityMultiplier
+//                    20 // sampleRate
+//            );
+//            
+//            metadata.setSplitHandler(splitHandler);
+//            
+//        }
+        
+//        /*
+//         * paranoia option
+//         * 
+//         * FIXME disable here and make a record level option on the store.
+//         */
+//        metadata.setUseChecksum(true);
         
         return metadata;
 
@@ -2348,35 +2361,39 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     }
 
-    final public void predicateUsage() {
+    final public String predicateUsage() {
 
-        predicateUsage(this);
+        return predicateUsage(this);
 
     }
 
     /**
-     * Dumps the #of statements using each predicate in the kb on
-     * {@link System#err} (tab delimited, unordered).
+     * Dumps the #of statements using each predicate in the kb (tab delimited,
+     * unordered).
      * 
      * @param resolveTerms
      *            Used to resolve term identifiers to terms (you can use this to
      *            dump a {@link TempTripleStore} that is using the term
      *            dictionary of the main database).
      */
-    final public void predicateUsage(AbstractTripleStore resolveTerms) {
+    final public String predicateUsage(AbstractTripleStore resolveTerms) {
 
+        StringBuilder sb = new StringBuilder();
+        
         // visit distinct term identifiers for the predicate position.
-        Iterator<Long> itr = getAccessPath(KeyOrder.POS).distinctTermScan();
-
+        final Iterator<Long> itr = getAccessPath(KeyOrder.POS).distinctTermScan();
+        
         while (itr.hasNext()) {
 
             long p = itr.next();
 
             long n = getAccessPath(NULL, p, NULL).rangeCount();
 
-            System.err.println(n + "\t" + resolveTerms.toString(p));
+            sb.append(n + "\t" + resolveTerms.toString(p)+"\n");
 
         }
+        
+        return sb.toString();
 
     }
 

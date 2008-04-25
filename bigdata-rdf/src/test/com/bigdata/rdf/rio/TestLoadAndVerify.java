@@ -126,7 +126,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
             
         }
 
-        store.predicateUsage();
+        System.err.println(store.predicateUsage());
         
         /*
          * re-parse and verify all statements exist in the db using each

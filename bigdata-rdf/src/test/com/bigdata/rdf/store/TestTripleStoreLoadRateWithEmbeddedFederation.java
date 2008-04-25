@@ -78,12 +78,12 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
 
         // Disable index partition moves (between data services).
         properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
-        
+                
         /*
          * setup overflow conditions - can be easily modified to trigger
          * overflow early or late or to disable overflow all together.
          */
-      properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
+//      properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
 //      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
 //        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
         properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
