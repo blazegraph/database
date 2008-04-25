@@ -30,9 +30,11 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.rmi.NoSuchObjectException;
+import java.util.Enumeration;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -431,6 +433,8 @@ abstract public class DataService implements IDataService, //IWritePipeline,
         // show the copyright banner during statup.
         Banner.banner();
 
+        this.properties = (Properties) properties.clone();
+        
         resourceManager = (ResourceManager) newResourceManager(properties);
 
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
@@ -518,7 +522,21 @@ abstract public class DataService implements IDataService, //IWritePipeline,
         }
 
     }
+    
+    /**
+     * A clone of properties specified to the ctor.
+     */
+    private final Properties properties;
 
+    /**
+     * An object wrapping the properties specified to the ctor.
+     */
+    public Properties getProperties() {
+
+        return new Properties(properties);
+        
+    }
+    
     /**
      * Note: "open" is judged by the {@link ConcurrencyManager#isOpen()} but the
      * {@link DataService} is not usable until {@link StoreManager#isStarting()}
@@ -711,6 +729,42 @@ abstract public class DataService implements IDataService, //IWritePipeline,
 
                 tmp.addCounter("Service Type", new OneShotInstrument<String>(
                     DataService.this.getClass().getName()));
+
+                CounterSet ptmp = tmp.makePath("Properties"); 
+                {
+
+                    /*
+                     * List out all of the properties and then report them from
+                     * a one-shot instrument.
+                     */
+                    final Enumeration e = properties.propertyNames();
+                    
+                    while (e.hasMoreElements()) {
+
+                        final String name;
+                        final String value;
+                        try {
+
+                            name = (String) e.nextElement();
+
+                            value = (String) properties.getProperty(name);
+
+                        } catch (ClassCastException ex) {
+                            
+                            log.warn(ex.getMessage());
+                            
+                            continue;
+                        
+                        }
+
+                        if(value==null) continue;
+                        
+                        ptmp.addCounter(name, new OneShotInstrument<String>(
+                                value));
+                        
+                    }
+                    
+                }
                 
             }
 

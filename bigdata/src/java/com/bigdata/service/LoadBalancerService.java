@@ -106,7 +106,7 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  *       they quickly become available for assignment unless we are also doing
  *       service discovery.
  * 
- * @todo logging on this {@link ILoadBalancerService#log} can provide a single
+ * @todo logging on this {@link LoadBalancerService#log} can provide a single
  *       point for administrators to configure email or other alerts.
  * 
  * @todo refactor so that we can use the same basic infrastructure for load

@@ -172,6 +172,19 @@ abstract public class IndexManager extends StoreManager {
      * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
      */
     final private WeakValueCache<UUID, IndexSegment> indexSegmentCache;
+
+    /**
+     * The #of entries in the hard reference cache for {@link IndexSegment}s.
+     * There MAY be more {@link IndexSegment}s open than are reported by this
+     * method if there are hard references held by the application to those
+     * {@link IndexSegment}s. {@link IndexSegment}s that are not fixed by a
+     * hard reference will be quickly finalized by the JVM.
+     */
+    public int getIndexSegmentCacheSize() {
+        
+        return indexSegmentCache.size();
+        
+    }
     
     /**
      * This cache is used to provide remote clients with an unambiguous
@@ -846,6 +859,14 @@ abstract public class IndexManager extends StoreManager {
      * 
      * @throws IllegalArgumentException
      *             if <i>timestamp</i> is positive (a transaction identifier).
+     * 
+     * @return The dump.
+     * 
+     * @throws IllegalStateException
+     *             if the live journal is closed when this method is invoked.
+     * @throws RuntimeException
+     *             if the live journal is closed asynchronously while this
+     *             method is running.
      */
     public String listIndexPartitions(long timestamp) {
 
@@ -855,7 +876,7 @@ abstract public class IndexManager extends StoreManager {
         StringBuilder sb = new StringBuilder();
 
         final AbstractJournal journal = getJournal(timestamp);
-
+        
         sb.append("timestamp="+timestamp+"\njournal="+journal.getResourceMetadata());
 
         final ITupleIterator itr = journal.getName2Addr().rangeIterator(

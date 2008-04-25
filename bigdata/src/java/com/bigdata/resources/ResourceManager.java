@@ -111,12 +111,6 @@ abstract public class ResourceManager extends OverflowManager implements IResour
 
                 final CounterSet tmp = root.makePath("Overflow Manager");
 
-                tmp.addCounter("Overflow Count", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(getOverflowCount());
-                    }
-                });
-
                 tmp.addCounter("Overflow Enabled", new Instrument<Boolean>() {
                     public void sample() {
                         setValue(isOverflowEnabled());
@@ -135,6 +129,42 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     }
                 });
                 
+                tmp.addCounter("Overflow Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(getOverflowCount());
+                    }
+                });
+                
+                tmp.addCounter("Overflow Failed Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(overflowFailedCounter.get());
+                    }
+                });
+
+                tmp.addCounter("Index Partition Build Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(buildCounter.get());
+                    }
+                });
+                
+                tmp.addCounter("Index Partition Split Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(splitCounter.get());
+                    }
+                });
+
+                tmp.addCounter("Index Partition Join Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(joinCounter.get());
+                    }
+                });
+
+                tmp.addCounter("Index Partition Move Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(moveCounter.get());
+                    }
+                });
+
             }
             
             // IndexManager
@@ -149,6 +179,13 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                             }
                         });
                 
+                tmp.addCounter("Index Segment Cache Size",
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue((long) getIndexSegmentCacheSize());
+                            }
+                        });
+                
             }
 
             // StoreManager
@@ -160,6 +197,10 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     public void sample() {
                         setValue(dataDir==null?"N/A":dataDir.getAbsolutePath());
                     }
+                });
+
+                tmp.addCounter("Store Cache Size", new Instrument<Long>(){
+                    public void sample() {setValue((long)getStoreCacheSize());}
                 });
 
                 tmp.addCounter("Journal Count", new Instrument<Long>(){
