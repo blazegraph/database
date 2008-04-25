@@ -336,6 +336,20 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
     final protected WeakValueCache<UUID, IRawStore> storeCache;
 
     /**
+     * The #of entries in the hard reference cache for {@link IRawStore}s,
+     * including both {@link ManagedJournal}s and IndexSegment}s. There MAY be
+     * more {@link IRawStore}s open than are reported by this method if there
+     * are hard references held by the application to those {@link IRawStore}s.
+     * {@link IRawStore}s that are not fixed by a hard reference will be
+     * quickly finalized by the JVM.
+     */
+    public int getStoreCacheSize() {
+    
+        return storeCache.size();
+        
+    }
+    
+    /**
      * <code>true</code> iff {@link BufferMode#Transient} was indicated.
      */
     private final boolean isTransient;

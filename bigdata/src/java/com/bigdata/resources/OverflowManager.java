@@ -37,7 +37,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -190,6 +190,33 @@ abstract public class OverflowManager extends IndexManager {
      * post-processing of the old journal.
      */
     protected final AtomicLong overflowCounter = new AtomicLong(0L);
+
+    /**
+     * The #of asynchronous overflow operations which fail.
+     * 
+     * @see PostProcessOldJournalTask
+     */
+    protected final AtomicLong overflowFailedCounter = new AtomicLong(0L);
+
+    /**
+     * #of successful index partition build operations.
+     */
+    protected final AtomicLong buildCounter = new AtomicLong(0L);
+
+    /**
+     * #of successful index partition split operations.
+     */
+    protected final AtomicLong splitCounter = new AtomicLong(0L);
+    
+    /**
+     * #of successful index partition join operations.
+     */
+    protected final AtomicLong joinCounter = new AtomicLong(0L);
+    
+    /**
+     * #of successful index partition move operations.
+     */
+    protected final AtomicLong moveCounter = new AtomicLong(0L);
     
     /**
      * #of overflows that have taken place. This counter is incremented each
@@ -411,7 +438,26 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-        overflowService = Executors.newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
+        if(overflowEnabled) {
+
+            overflowService = Executors.newFixedThreadPool(1,
+                    DaemonThreadFactory.defaultThreadFactory());
+         
+            /*
+             * Note: The core thread is pre-started so that the MDC logging
+             * information does not get inherited from whatever thread was
+             * running the AbstractTask that wound up doing the groupCommit
+             * during which overflow processing was initiated - this just cleans
+             * up the log which is otherwise (even more) confusing.
+             */
+            
+            ((ThreadPoolExecutor)overflowService).prestartCoreThread();
+            
+        } else {
+            
+            overflowService = null;
+            
+        }
 
     }
 
@@ -423,40 +469,48 @@ abstract public class OverflowManager extends IndexManager {
 
         log.info("Begin");
         
-        // overflowService shutdown
-        {
-
-            /*
-             * Note: when the timeout is zero we approximate "forever" using
-             * Long.MAX_VALUE.
-             */
-
-            final long shutdownTimeout = this.shutdownTimeout == 0L ? Long.MAX_VALUE
-                    : this.shutdownTimeout;
-
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-            overflowService.shutdown();
-
-            try {
-
-                log.info("Awaiting service termination");
-
-                long elapsed = System.currentTimeMillis() - begin;
-
-                if (!overflowService.awaitTermination(shutdownTimeout - elapsed, unit)) {
-
-                    log.warn("Service termination: timeout");
-
-                }
-
-            } catch (InterruptedException ex) {
-
-                log.warn("Interrupted awaiting service termination.", ex);
-
-            }
-            
-        }
+        /*
+         * overflowService shutdown
+         * 
+         * Note: This uses immediate termination even during shutdown since
+         * asynchronous overflow processing does not need to complete and will
+         * remain coherent regardless of when it is interrupted.
+         */
+        if (overflowService != null)
+            overflowService.shutdownNow();
+//            {
+//
+//            /*
+//             * Note: when the timeout is zero we approximate "forever" using
+//             * Long.MAX_VALUE.
+//             */
+//
+//            final long shutdownTimeout = this.shutdownTimeout == 0L ? Long.MAX_VALUE
+//                    : this.shutdownTimeout;
+//
+//            final TimeUnit unit = TimeUnit.MILLISECONDS;
+//
+//            overflowService.shutdown();
+//
+//            try {
+//
+//                log.info("Awaiting service termination");
+//
+//                long elapsed = System.currentTimeMillis() - begin;
+//
+//                if (!overflowService.awaitTermination(shutdownTimeout - elapsed, unit)) {
+//
+//                    log.warn("Service termination: timeout");
+//
+//                }
+//
+//            } catch (InterruptedException ex) {
+//
+//                log.warn("Interrupted awaiting service termination.", ex);
+//
+//            }
+//            
+//        }
 
         super.shutdown();
         
@@ -474,7 +528,8 @@ abstract public class OverflowManager extends IndexManager {
         
         log.info("Begin");
 
-        overflowService.shutdownNow();
+        if(overflowService!=null)
+            overflowService.shutdownNow();
 
         super.shutdownNow();
         
@@ -774,9 +829,9 @@ abstract public class OverflowManager extends IndexManager {
                     + getOverflowCount() + "\n"
                     + listIndexPartitions(-lastCommitTime));
 
-            int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
+            final int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
 
-            ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(null,null);
+            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(null,null);
 
             while (itr.hasNext()) {
 

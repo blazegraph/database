@@ -12,7 +12,7 @@ import com.bigdata.counters.Instrument;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class QueueLengthTask extends Instrument<Double> implements Runnable {
+public class QueueLengthTask implements Runnable {
 
     protected static Logger log = Logger.getLogger(QueueLengthTask.class);
     
@@ -190,12 +190,16 @@ public class QueueLengthTask extends Instrument<Double> implements Runnable {
         }
         
     }
-
-    @Override
-    protected void sample() {
-
-        setValue( getAverage() );
+    
+    public final Instrument<Double> averageQueueLength = new Instrument<Double>() {
         
-    }
+        @Override
+        protected void sample() {
+
+            setValue( getAverage() );
+            
+        }
+        
+    };
     
 }

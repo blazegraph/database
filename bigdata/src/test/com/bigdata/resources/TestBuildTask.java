@@ -54,7 +54,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.resources.BuildIndexSegmentTask.AtomicUpdate;
+import com.bigdata.resources.BuildIndexSegmentTask.AtomicUpdateBuildIndexSegmentTask;
 import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 
 /**
@@ -270,7 +270,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         // run task that re-defines the index partition view.
         {
 
-            AbstractTask task = new AtomicUpdate(resourceManager,
+            AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
                     concurrencyManager, name, result);
 
             // run task, await completion.

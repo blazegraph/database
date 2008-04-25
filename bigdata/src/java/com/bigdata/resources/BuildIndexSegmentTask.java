@@ -124,7 +124,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
                 outFile, lastCommitTime, fromKey, toKey);
 
         // task will update the index partition view definition.
-        final AbstractTask task = new AtomicUpdate(resourceManager,
+        final AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
                 concurrencyManager, name, result);
 
         // submit task and wait for it to complete @todo config timeout?
@@ -173,6 +173,12 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
 
             this.segmentMetadata = segmentMetadata;
 
+        }
+
+        public String toString() {
+            
+            return "BuildResult{name="+name+"}";
+            
         }
 
     }
@@ -244,7 +250,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class AtomicUpdate extends AbstractResourceManagerTask {
+    static public class AtomicUpdateBuildIndexSegmentTask extends AbstractResourceManagerTask {
 
         final protected BuildResult buildResult;
         
@@ -254,7 +260,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
          * @param resource
          * @param buildResult
          */
-        public AtomicUpdate(ResourceManager resourceManager,
+        public AtomicUpdateBuildIndexSegmentTask(ResourceManager resourceManager,
                 IConcurrencyManager concurrencyManager, String resource,
                 BuildResult buildResult) {
 
@@ -382,17 +388,27 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
                     oldpmd.getRightSeparatorKey(),//
                     newResources, //
                     oldpmd.getHistory()+
-                    "replaceHistory(lastCommitTime="+segmentMetadata.getCreateTime()+",segment="+segmentMetadata.getUUID()+") "
+                    "replaceHistory(lastCommitTime="
+                            + segmentMetadata.getCreateTime() + ",segment="
+                            + segmentMetadata.getUUID() + ") "
                     ));
 
-            // update the metadata associated with the btree.
+            // update the metadata associated with the btree
             btree.setIndexMetadata(indexMetadata);
 
             log.info("Updated view: name=" + getOnlyResource() + ", pmd="
                     + indexMetadata.getPartitionMetadata());
             
-            // verify that the btree recognizes that it needs to be checkpointed.
+            /*
+             * Verify that the btree recognizes that it needs to be
+             * checkpointed.
+             * 
+             * Note: The atomic commit point is when this task commits.
+             */
             assert btree.needsCheckpoint();
+
+            // notify successful index partition build.
+            resourceManager.buildCounter.incrementAndGet();
             
             return null;
 

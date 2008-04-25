@@ -1,6 +1,9 @@
 package com.bigdata.resources;
 
 import java.io.File;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,6 +51,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.util.InnerCause;
 
 /**
  * Examine the named indices defined on the journal identified by the
@@ -561,7 +565,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final LocalPartitionMetadata pmd = indexMetadata
                         .getPartitionMetadata();
 
-                log.info("Considering join: name="+name+", pmd="+pmd);
+                if (INFO)
+                    log.info("Considering join: name=" + name + ", entryCount="
+                            + view.rangeCount(null, null) + ", pmd=" + pmd);
                 
                 if (splitHandler != null
                         && pmd.getRightSeparatorKey() != null
@@ -1270,6 +1276,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     markUsed(name);
 
+                    log.info("index was copied: " + name);
+
                     nskip++;
 
                 } else {
@@ -1328,6 +1336,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     }
 
     /**
+     * Note: This task is interrupted by {@link OverflowManager#shutdownNow()}.
+     * Therefore is tests {@link Thread#isInterrupted()} and returns immediately
+     * if it has been interrupted.
+     * 
      * @return The return value is always null.
      * 
      * @throws Exception
@@ -1349,12 +1361,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         try {
 
             log.info("begin");
+
+            if(Thread.currentThread().isInterrupted()) return null;
             
             tmpStore = new TemporaryRawStore();
             
             if(INFO) {
                 
                 // The pre-condition views.
+            
+                if(Thread.currentThread().isInterrupted()) return null;
                 
                 log.info("\npre-condition views: overflowCounter="
                         + resourceManager.overflowCounter.get() + "\n"
@@ -1362,7 +1378,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
+            if(Thread.currentThread().isInterrupted()) return null;
+            
             List<AbstractTask> tasks = chooseTasks();
+            
+            if(Thread.currentThread().isInterrupted()) return null;
             
             // runTasks()
             {
@@ -1380,6 +1400,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final List<Future<Object>> futures = resourceManager
                         .getConcurrencyManager().invokeAll(tasks, 60*1, TimeUnit.SECONDS);
 
+                if(Thread.currentThread().isInterrupted()) return null;
+                
                 // verify that all tasks completed successfully.
                 for (Future<Object> f : futures) {
 
@@ -1403,11 +1425,36 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                          * succeed fully or fail, and failure will mean that the view
                          * was not changed.
                          */
+                        
+                        if(Thread.currentThread().isInterrupted()) return null;
+                        
                         f.get(100,TimeUnit.MILLISECONDS);
                         
                     } catch(Throwable t) {
-                    
-                        log.error("Update task failed", t);
+                
+                        if(Thread.currentThread().isInterrupted()) return null;
+                        
+                        if (InnerCause.isInnerCause(t,
+                                InterruptedException.class)
+                                || InnerCause.isInnerCause(t,
+                                        ClosedByInterruptException.class)
+                                || InnerCause.isInnerCause(t,
+                                        ClosedChannelException.class)
+                                || InnerCause.isInnerCause(t,
+                                        AsynchronousCloseException.class)) {
+                            
+                            /*
+                             * These are all good indicators that the resource
+                             * manager was closed, e.g., by shutdown.
+                             */
+                            
+                            log.warn("Update task was interrupted.");
+                            
+                        } else {
+                        
+                            log.error("Update task failed", t);
+                            
+                        }
                         
                         continue;
                         
@@ -1419,9 +1466,21 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             }
             
+            if(Thread.currentThread().isInterrupted()) return null;
+            
+            if(!resourceManager.isRunning()) {
+                
+                log.warn("Resource manager no longer running.");
+                
+                return null;
+                
+            }
+            
             if(INFO) {
                 
                 // The post-condition views.
+            
+                if(Thread.currentThread().isInterrupted()) return null;
                 
                 log.info("\npost-condition views: overflowCounter="
                         + resourceManager.overflowCounter.get() + "\n"
@@ -1452,7 +1511,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * ResourceManager so no one checks the Future for the task.
              * Therefore it is very important to log any errors here since
              * otherwise they will not be noticed.
+             * 
+             * At the same time, the resource manager can be shutdown at any
+             * time. Asynchrous shutdown will provoke an exception here, but
+             * those exceptions do not indicate a problem.
              */
+            
+            resourceManager.overflowFailedCounter.incrementAndGet();
             
             log.error(t/*msg*/, t/*stack trace*/);
 
@@ -1460,16 +1525,20 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
         } finally {
 
+            if (tmpStore != null) {
+
+                try {
+                    tmpStore.closeAndDelete();
+                } catch (Throwable t) {
+                    log.warn(t.getMessage(), t);
+                }
+
+            }
+
             // enable overflow again as a post-condition.
             if (!resourceManager.overflowAllowed.compareAndSet(false/*expect*/, true/*set*/)) {
 
                 throw new AssertionError();
-
-            }
-
-            if (tmpStore != null) {
-
-                tmpStore.closeAndDelete();
 
             }
 

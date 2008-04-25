@@ -649,7 +649,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         } finally {
         
             // Remove since thread is no longer running the task.
-            ITask tmp = active.remove(Thread.currentThread());
+            final ITask tmp = active.remove(Thread.currentThread());
 
             lock.unlock();
             
@@ -916,11 +916,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Both of these values will be constant while we hold the [lock].
              * While tasks may continue to execute, [nrunning] can not be
              * decremented until a task can acquire the [lock].
+             * 
+             * [active] is the set of tasks concurrently executing -or-
+             * participating in the group commit. [active] is exactly the commit
+             * group IFF [nrunning == 0]. When [nrunning > 0] then there are
+             * concurrent tasks still executing during the group commit.
              */
             final int nwrites = this.nwrites.get();
 
-            log.info("Committing store: commit group size=" + nwrites
-                    + ", #running=" + nrunning);
+            if (INFO)
+                log.info("Committing store: commit group size=" + nwrites
+                        + ", #running=" + nrunning + ", active="
+                        + active.entrySet());
 
             // timestamp used to measure commit latency.
             final long beginCommit = System.currentTimeMillis();
@@ -953,7 +960,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             if (shouldOverflow && nrunning.get() == 0) {
 
                 log.info("Will do overflow now: nrunning="+nrunning);
-                
+
                 overflow();
 
                 log.info("Did overflow.");
@@ -1259,6 +1266,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             log.info("Doing overflow");
         
+            /*
+             * @todo should the active set be empty? that is, have all tasks
+             * waiting on commit reached a state where they will neither effect
+             * or be effected by an overflow onto another journal?
+             */
+            log.warn("active="+active.entrySet());
+            
             resourceManager.overflow();
         
             noverflow++;
@@ -1534,13 +1548,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             log.info("Interrupting tasks awaiting commit.");
             
-            Iterator<Map.Entry<Thread,AbstractTask>> itr = active.entrySet().iterator();
+            final Iterator<Map.Entry<Thread, AbstractTask>> itr = active
+                    .entrySet().iterator();
 
             int ninterrupted = 0;
             
             while (itr.hasNext()) {
 
-                Map.Entry<Thread,AbstractTask> entry = itr.next();
+                final Map.Entry<Thread,AbstractTask> entry = itr.next();
                 
                 // set flag to deny access to resources.
                 

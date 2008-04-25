@@ -809,13 +809,24 @@ public class ConcurrencyManager implements IConcurrencyManager {
             }
             
             // readService
-            addCounters(countersRoot.makePath("Read Service"), readService)
-                    .addCounter("averageQueueLength", readServiceQueueLength);
+            {
+                CounterSet tmp = addCounters(countersRoot
+                        .makePath("Read Service"), readService);
+
+                tmp.addCounter("averageQueueLength",
+                        readServiceQueueLength.averageQueueLength);
+            }
 
             // txWriteService
-            addCounters(countersRoot.makePath("Transaction Write Service"),
-                    txWriteService).addCounter("averageQueueLength",
-                    txWriteServiceQueueLength);
+            {
+            
+                CounterSet tmp = addCounters(countersRoot
+                        .makePath("Transaction Write Service"), txWriteService);
+
+                tmp.addCounter("averageQueueLength",
+                        txWriteServiceQueueLength.averageQueueLength);
+                
+            }
             
             // writeService
             {
@@ -823,7 +834,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 final CounterSet tmp = addCounters(countersRoot
                         .makePath("Unisolated Write Service"), writeService);
                 
-                tmp.addCounter("averageQueueLength", writeServiceQueueLength);
+                tmp.addCounter("averageQueueLength",
+                        writeServiceQueueLength.averageQueueLength);
             
                 /*
                  * data only available for the write service.

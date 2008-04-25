@@ -19,7 +19,7 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.repo.BigdataRepository;
-import com.bigdata.resources.SplitIndexPartitionTask.UpdateSplitIndexPartition;
+import com.bigdata.resources.SplitIndexPartitionTask.AtomicUpdateSplitIndexPartitionTask;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
 
@@ -549,7 +549,7 @@ public class DefaultSplitHandler implements ISplitHandler {
      * Note: The caller MUST disregard the {@link IResourceMetadata}[]
      * attached to {@link Split#pmd} since we do not have that information
      * on hand here. The correct {@link IResourceMetadata}[] is available
-     * locally to {@link UpdateSplitIndexPartition}.
+     * locally to {@link AtomicUpdateSplitIndexPartitionTask}.
      * 
      * @param ndx
      *            The source index partition.

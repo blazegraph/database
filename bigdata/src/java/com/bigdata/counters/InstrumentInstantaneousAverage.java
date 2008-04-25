@@ -4,15 +4,15 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * An {@link IInstrument} that reports the instantaneous average during a
- * reporting period where the average is based on a counter of events and
- * the cumulative elapsed time for those events. For this implementation we
- * need to "sample" both the counter and the cumulative elapsed time. Then
- * we report the (deltaCounter / deltaCumulativeElapsedTime) and multiply
- * through by the specified scaling factor.
+ * reporting period where the average is based on a counter of events and the
+ * cumulative elapsed time for those events. For this implementation we need to
+ * "sample" both the counter and the cumulative elapsed time. Then we report the
+ * (deltaCounter / deltaCumulativeElapsedTime) and multiply through by the
+ * specified scaling factor.
  * <p>
- * Note: This {@link IInstrument} does NOT monitor {@link #sample()}.
- * Instead it decides each time {@link #getValue()} is invoked whether
- * sufficient time has elapsed to take another {@link #sample()}.
+ * Note: This {@link IInstrument} does NOT monitor the value. Instead it decides
+ * each time {@link #getValue()} is invoked whether sufficient time has elapsed
+ * to take another {@link #sample()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

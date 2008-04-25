@@ -57,18 +57,18 @@ import com.bigdata.service.DataService.AbstractDataServiceIndexProcedure;
  * Historical read task is used to copy a view of an index partition as of the
  * lastCommitTime of old journal to another {@link IDataService}. After this
  * task has been run you must run an {@link ITx#UNISOLATED}
- * {@link UpdateMoveIndexPartitionTask} in order to atomically migrate any
+ * {@link AtomicUpdateMoveIndexPartitionTask} in order to atomically migrate any
  * writes on the live journal to the target {@link IDataService} and update the
  * {@link MetadataIndex}.
  * <p>
  * Note: This task is run on the target {@link IDataService} and it copies the
  * data from the source {@link IDataService}. This allows us to use standard
  * {@link IRangeQuery} operations to copy the historical view. However, the
- * {@link UpdateMoveIndexPartitionTask} is run on the source
+ * {@link AtomicUpdateMoveIndexPartitionTask} is run on the source
  * {@link IDataService} since it needs to obtain an exclusive lock on the index
  * partition that is being moved in order to prevent concurrent writes during
  * the atomic cutover. For the same reason, the
- * {@link UpdateMoveIndexPartitionTask} can not use standard {@link IRangeQuery}
+ * {@link AtomicUpdateMoveIndexPartitionTask} can not use standard {@link IRangeQuery}
  * operations. Instead, it initiates a series of data transfers while holding
  * onto the exclusive lock until the target {@link IDataService} has the current
  * state of the index partition. At that point is notifies the
@@ -206,7 +206,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         final MoveResult result = new MoveResult(sourceIndexName, src
                 .getIndexMetadata(), targetDataServiceUUID, newPartitionId);
         
-        final AbstractTask task = new UpdateMoveIndexPartitionTask(
+        final AbstractTask task = new AtomicUpdateMoveIndexPartitionTask(
                 resourceManager, result.name, result);
 
         // submit atomic update and await completion @todo config timeout.
@@ -243,6 +243,15 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             this.newPartitionId = newPartitionId;
             
         }
+        
+        public String toString() {
+            
+            return "MoveResult{name=" + name + ", newPartitionId="
+                    + newPartitionId + ", targetDataService="
+                    + targetDataServiceUUID + "}";
+            
+        }
+
 
     }
 
@@ -426,7 +435,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class UpdateMoveIndexPartitionTask extends AbstractResourceManagerTask {
+    static public class AtomicUpdateMoveIndexPartitionTask extends AbstractResourceManagerTask {
 
         final private MoveResult moveResult;
 
@@ -437,7 +446,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
          * @param moveResult
          *            The target index partition.
          */
-        public UpdateMoveIndexPartitionTask(ResourceManager resourceManager,
+        public AtomicUpdateMoveIndexPartitionTask(ResourceManager resourceManager,
                 String resource, MoveResult moveResult) {
 
             super(resourceManager, ITx.UNISOLATED, resource);
@@ -532,137 +541,141 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             log.info("Updating metadata index: name=" + scaleOutIndexName
                     + ", oldLocator=" + oldLocator + ", newLocator=" + newLocator);
 
+            // atomic update on the metadata server.
             resourceManager.getMetadataService().moveIndexPartition(
                     scaleOutIndexName, oldLocator, newLocator);
             
+            // notify successful index partition move.
+            resourceManager.moveCounter.incrementAndGet();
+
             return ncopied;
             
         }
+        
+    }
+
+    /**
+     * Task copies data described in a {@link ResultSet} onto the target index
+     * partition. This task is invoked by the
+     * {@link AtomicUpdateMoveIndexPartitionTask} while the latter holds an
+     * exclusive lock on the source index partition.
+     * <p>
+     * Note: This task does not handle re-directs. The target index partition
+     * MUST be on the target data service.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class CopyBufferedWritesProcedure implements IIndexProcedure {
 
         /**
-         * Task copies data described in a {@link ResultSet} onto the target index
-         * partition. This task is invoked by the
-         * {@link UpdateMoveIndexPartitionTask} while the latter holds an exclusive
-         * lock on the source index partition.
-         * <p>
-         * Note: This task does not handle re-directs. The target index partition
-         * MUST be on the target data service.
          * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
          */
-        public static class CopyBufferedWritesProcedure implements IIndexProcedure {
+        private static final long serialVersionUID = -7715086561289117891L;
 
-            /**
+        private ResultSet rset;
+        
+        /**
+         * De-serialization ctor.
+         */
+        public CopyBufferedWritesProcedure() {
+            
+        }
+
+        public CopyBufferedWritesProcedure(ResultSet rset) {
+        
+            if (rset == null)
+                throw new IllegalArgumentException();
+            
+            this.rset = rset;
+            
+        }
+        
+        public Object apply(IIndex ndx) {
+            
+            assert rset != null;
+         
+            /*
+             * Get hold of the BTree that is currently absorbing writes for the
+             * target index partition.
              * 
+             * Note: Since the target index partition was recently create the
+             * _odds_ are that it is just a BTree on the live journal for the
+             * target data service. However, if the target data service has
+             * undergone a concurrent overflow then the target index partition
+             * COULD be a FusedView.
+             * 
+             * In either case, we want the mutable BTree that is absorbing
+             * writes and we copy the data from the source index partition view
+             * to the target index partition view.
              */
-            private static final long serialVersionUID = -7715086561289117891L;
+            final BTree dst = (BTree) ((ndx instanceof AbstractBTree) ? ndx
+                    : ((FusedView) ndx).getSources()[0]);
+            
+            final int n = rset.getNumTuples();
+            
+            final boolean deleteMarkers = ndx.getIndexMetadata().getDeleteMarkers();
+            
+            final boolean versionTimestamps = ndx.getIndexMetadata().getVersionTimestamps();
+      
+            if(ndx.getIndexMetadata().getOverflowHandler()!=null) {
 
-            private ResultSet rset;
-            
-            /**
-             * De-serialization ctor.
-             */
-            public CopyBufferedWritesProcedure() {
-                
-            }
-
-            public CopyBufferedWritesProcedure(ResultSet rset) {
-            
-                if (rset == null)
-                    throw new IllegalArgumentException();
-                
-                this.rset = rset;
-                
-            }
-            
-            public Object apply(IIndex ndx) {
-                
-                assert rset != null;
-             
                 /*
-                 * Get hold of the BTree that is currently absorbing writes for the
-                 * target index partition.
+                 * FIXME Must apply overflowHandler - see AbstractBTree#rangeCopy.
                  * 
-                 * Note: Since the target index partition was recently create the
-                 * _odds_ are that it is just a BTree on the live journal for the
-                 * target data service. However, if the target data service has
-                 * undergone a concurrent overflow then the target index partition
-                 * COULD be a FusedView.
-                 * 
-                 * In either case, we want the mutable BTree that is absorbing
-                 * writes and we copy the data from the source index partition view
-                 * to the target index partition view.
+                 * Probably the easiest way to handle this is to do an
+                 * UNISOLATED build on the view, or to combine an build on the
+                 * old view (from the lastCommitTime) which runs before the
+                 * update task with an UNISOLATED build on the BTree buffering
+                 * writes. The send the resulting index segment(s) to the target
+                 * data service while holding an exclusive write lock. Once the
+                 * target puts those files into place as a view we do the atomic
+                 * update thing here. The "send two index segments" version will
+                 * have the lowest latency since we can build and send one while
+                 * we continue to absorb writes and then send another with just
+                 * the buffered writes.
                  */
-                final BTree dst = (BTree) ((ndx instanceof AbstractBTree) ? ndx
-                        : ((FusedView) ndx).getSources()[0]);
+                throw new UnsupportedOperationException("Must apply overflowHandler");
+
+            }
+            
+            for(int i=0; i<n; i++) {
                 
-                final int n = rset.getNumTuples();
+                final byte[] key = rset.getKey(i);
                 
-                final boolean deleteMarkers = ndx.getIndexMetadata().getDeleteMarkers();
-                
-                final boolean versionTimestamps = ndx.getIndexMetadata().getVersionTimestamps();
-          
-                if(ndx.getIndexMetadata().getOverflowHandler()!=null) {
+                if (versionTimestamps) {
 
-                    /*
-                     * FIXME Must apply overflowHandler - see AbstractBTree#rangeCopy.
-                     * 
-                     * Probably the easiest way to handle this is to do an
-                     * UNISOLATED build on the view, or to combine an build on the
-                     * old view (from the lastCommitTime) which runs before the
-                     * update task with an UNISOLATED build on the BTree buffering
-                     * writes. The send the resulting index segment(s) to the target
-                     * data service while holding an exclusive write lock. Once the
-                     * target puts those files into place as a view we do the atomic
-                     * update thing here. The "send two index segments" version will
-                     * have the lowest latency since we can build and send one while
-                     * we continue to absorb writes and then send another with just
-                     * the buffered writes.
-                     */
-                    throw new UnsupportedOperationException("Must apply overflowHandler");
+                    final long timestamp = rset.getVersionTimestamps()[i];
 
-                }
-                
-                for(int i=0; i<n; i++) {
-                    
-                    final byte[] key = rset.getKey(i);
-                    
-                    if (versionTimestamps) {
+                    if (deleteMarkers && rset.getDeleteMarkers()[i]==0?false:true) {
 
-                        final long timestamp = rset.getVersionTimestamps()[i];
-
-                        if (deleteMarkers && rset.getDeleteMarkers()[i]==0?false:true) {
-
-                            dst.insert(key, null/* value */, true/* delete */,
-                                    timestamp, null/* tuple */);
-
-                        } else {
-
-                            dst.insert(key, rset.getValue(i),
-                                            false/* delete */, timestamp, null/* tuple */);
-
-                        }
+                        dst.insert(key, null/* value */, true/* delete */,
+                                timestamp, null/* tuple */);
 
                     } else {
 
-                        if (deleteMarkers && rset.getDeleteMarkers()[i]==0?false:true) {
-
-                            dst.remove(key);
-
-                        } else {
-
-                            dst.insert(key, rset.getValue(i));
-
-                        }
+                        dst.insert(key, rset.getValue(i),
+                                        false/* delete */, timestamp, null/* tuple */);
 
                     }
-                    
+
+                } else {
+
+                    if (deleteMarkers && rset.getDeleteMarkers()[i]==0?false:true) {
+
+                        dst.remove(key);
+
+                    } else {
+
+                        dst.insert(key, rset.getValue(i));
+
+                    }
+
                 }
                 
-                return null;
-                
             }
+
+            return null;
             
         }
         

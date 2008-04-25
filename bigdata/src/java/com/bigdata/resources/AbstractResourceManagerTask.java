@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.IDataService;
@@ -43,11 +46,35 @@ import com.bigdata.service.IMetadataService;
  * long as overflow is disabled while these tasks are running (this is a
  * pre-condition for all of these tasks).
  * 
+ * FIXME There is a potential failure point once we notify the metadata service
+ * of the change in the index partitions since this is done before the task has
+ * actually committed its changes on the live journal. If the commit on the
+ * journal fails then the metadata index will now reference index partitions
+ * which do not exist (or do not have all their data) on the live journal. A
+ * full transaction might be one way to close this gap.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 abstract public class AbstractResourceManagerTask extends AbstractTask {
     
+    /**
+     * Note: Logger shadows {@link AbstractTask#log}.
+     */
+    static protected final Logger log = Logger.getLogger(AbstractResourceManagerTask.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    static final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    static final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     protected final ResourceManager resourceManager;
     
     /**

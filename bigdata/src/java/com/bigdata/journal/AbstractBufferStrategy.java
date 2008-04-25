@@ -427,7 +427,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
          * writes for at least some implementations.
          */
 
-//        System.err.println("fromPosition="+tmpChannel.position()+", toPosition="+toPosition+", count="+count);
+        log.warn("fromPosition="+tmpChannel.position()+", toPosition="+toPosition+", count="+count);
 
         int nwrites = 0; // #of write operations.
 
@@ -439,6 +439,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
             
             while (n > 0) {
 
+                log.warn("to="+toPosition+", remaining="+n+", nwrites="+nwrites);
                 long nxfer = outChannel.transferFrom(tmpChannel, to, n);
                 
                 to += nxfer;
@@ -467,7 +468,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("\nTransferred " + count
+        log.warn("Transferred " + count
                 + " bytes from disk channel to disk channel (offset="
                 + toPosition + ") in " + nwrites + " writes and " + elapsed
                 + "ms");

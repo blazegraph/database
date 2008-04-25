@@ -250,7 +250,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
 
             // The task to make the atomic updates on the live journal and
             // the metadata index.
-            final AbstractTask task = new UpdateJoinIndexPartition(
+            final AbstractTask task = new AtomicUpdateJoinIndexPartition(
                     resourceManager, names2, result);
 
             // submit task and wait for it to complete @todo config timeout?
@@ -292,6 +292,13 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
             this.oldnames = oldnames;
             
         }
+        
+        public String toString() {
+            
+            return "JoinResult{name="+name+", sources="+Arrays.toString(oldnames)+"}";
+            
+        }
+
 
     }
 
@@ -310,7 +317,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class UpdateJoinIndexPartition extends AbstractResourceManagerTask {
+    static public class AtomicUpdateJoinIndexPartition extends AbstractResourceManagerTask {
 
         private final JoinResult result;
         
@@ -324,7 +331,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
          *            partition and then dropped).
          * @param result
          */
-        public UpdateJoinIndexPartition(ResourceManager resourceManager,
+        public AtomicUpdateJoinIndexPartition(ResourceManager resourceManager,
                 String[] resource, JoinResult result) {
             
             super(resourceManager, ITx.UNISOLATED, resource);
@@ -413,7 +420,10 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                     );
             
             resourceManager.getMetadataService().joinIndexPartition(scaleOutIndexName, oldLocators, newLocator);
-            
+
+            // notify successful index partition join.
+            resourceManager.joinCounter.incrementAndGet();
+
             return null;
             
         }

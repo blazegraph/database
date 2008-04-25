@@ -48,5 +48,11 @@ public abstract class AbstractResult {
         this.indexMetadata = indexMetadata;
 
     }
+    
+    public String toString() {
+        
+        return super.toString()+"{name="+name+"}";
+        
+    }
 
 }
