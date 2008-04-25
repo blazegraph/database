@@ -1511,8 +1511,8 @@ public class Node extends AbstractNode implements INodeData {
         
 //        assert key > IIndex.NEGINF && key < IIndex.POSINF;
         assert child != null;
-        assert child.isDirty(); // always dirty since it was just created.
-        assert isDirty(); // must be dirty to permit mutation.
+        assert child.isDirty() : "child not dirty"; // always dirty since it was just created.
+        assert isDirty() : "not dirty"; // must be dirty to permit mutation.
 
         /*
          * Find the location where this key belongs. When a new node is

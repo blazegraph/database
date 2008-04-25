@@ -28,6 +28,9 @@ package com.bigdata.btree;
 
 import java.util.Locale;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.KeyBuilder.DecompositionEnum;
 import com.bigdata.btree.KeyBuilder.StrengthEnum;
 import com.bigdata.btree.KeyBuilder.UnicodeSortKeyGenerator;
@@ -87,6 +90,20 @@ import com.ibm.icu.text.RuleBasedCollator;
  */
 class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
+    protected static final Logger log = Logger.getLogger(ICUSortKeyGenerator.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     /**
      * Used to encode unicode strings into compact byte[]s that have the same
      * sort order (aka sort keys).
@@ -114,18 +131,28 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
         this.locale = locale;
         
+        if(INFO) log.info("locale="+locale);
+        
         this.collator = (RuleBasedCollator) Collator.getInstance(locale);
 
         if (strength != null) {
             
             if (strength instanceof Integer) {
 
-                collator.setStrength(((Integer) strength).intValue());
+                final int str = ((Integer) strength).intValue();
+                
+                if (INFO)
+                    log.info("strength=" + str);
+
+                collator.setStrength(str);
 
             } else {
 
                 StrengthEnum str = (StrengthEnum) strength;
 
+                if (INFO)
+                    log.info("strength=" + str);
+                
                 switch (str) {
 
                 case Primary:
@@ -159,6 +186,8 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         }
         
         if (mode != null) {
+
+            if(INFO) log.info("mode="+mode);
 
             switch (mode) {
 
