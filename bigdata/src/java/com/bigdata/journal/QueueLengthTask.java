@@ -4,6 +4,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.Instrument;
 
 /**
@@ -52,7 +53,10 @@ public class QueueLengthTask implements Runnable {
      * definition of the "queue length".
      * <p>
      * Note: for the {@link WriteExecutorService} this is reporting the task
-     * execution concurrency <strong>with locks held</strong>.
+     * execution concurrency <strong>with locks held</strong>. This is the real
+     * concurrency of the tasks on the {@link WriteExecutorService} since tasks
+     * need to wait (in a queue on the {@link LockManager}) until they have
+     * their resource lock(s) before they can begin to do useful work.
      * 
      * @see #averageQueueLength(double, double, double)
      */
@@ -201,6 +205,10 @@ public class QueueLengthTask implements Runnable {
                         .getConcurrentTaskCount();
                 
             } else {
+                
+                /*
+                 * This reports all tasks since there are no locks.
+                 */
                 
                 activeCount = service.getActiveCount();
                 
