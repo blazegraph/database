@@ -29,36 +29,6 @@ import com.bigdata.counters.CounterSet;
 public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
     /**
-     * Used to parse the timestamp associated with each row of the [pidstat]
-     * output.
-     */
-    static protected final SimpleDateFormat f;
-    static {
-
-        f = new SimpleDateFormat("hh:mm:ss aa");
-
-        /*
-         * Code may be enabled for a runtime test of the date format.
-         */
-        if (true) {
-
-            System.err.println("Format: " + f.format(new Date()));
-
-            try {
-
-                System.err.println("Parsed: " + f.parse("06:35:15 AM"));
-
-            } catch (ParseException e) {
-
-                log.error("Could not parse?");
-
-            }
-
-        }
-        
-    }
-    
-    /**
      * The process identifier for this process (the JVM).
      */
     static protected int pid;

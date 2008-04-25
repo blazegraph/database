@@ -530,8 +530,9 @@ public class History<T> {
             total += value;
             
             n += count;
-            
-            assert n <= capacity;
+  
+            // Note: assertion is NOT valid since a slot may have more than one sample.
+//            assert n <= capacity : "n=" + n + ", capacity=" + capacity;
 
         }
 

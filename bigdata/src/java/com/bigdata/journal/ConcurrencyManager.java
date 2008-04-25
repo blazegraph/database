@@ -1418,6 +1418,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * collected by the {@link ConcurrencyManager} in four groups corresponding
      * to {@link ITx#UNISOLATED}, {@link ITx#READ_COMMITTED}, read historical,
      * and transaction tasks.
+     * <p>
+     * Note: this does not directly replicate data available even the simple
+     * counts of tasks executed or failed reflect the break down into these four
+     * distinct timestamp regiems. The main difference is that you can see the
+     * {@link ITx#READ_COMMITTED} broken down from the historical reads, which 
+     * is a distinction that is not made by the different services.
      */
     static public class TaskCounters {
 
@@ -1528,12 +1534,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
             /*
              * The sample period.
              * 
-             * @todo this is one second. A longer sample period is going to
-             * produce more stable results, e.g., 60 seconds, but you have to be
-             * running the service for at least that long to get your first
-             * sample.
+             * A longer sample period is going to produce more stable results,
+             * but you have to be running the service for at least that long to
+             * get your first sample.
              */
-            final long samplePeriod = 1;
+            final long samplePeriod = 60;
             final TimeUnit samplePeriodUnits = TimeUnit.SECONDS;
             
             // Scaling factor converts nanoseconds to milliseconds.

@@ -92,7 +92,7 @@ abstract public class InstrumentInstantaneousAverage implements
      * @return The change in the sample value.
      */
     public Double getValue() {
-
+        
         if (nsamples == 0) {
 
             /*
