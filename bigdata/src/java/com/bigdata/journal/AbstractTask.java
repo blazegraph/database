@@ -46,7 +46,6 @@ import org.apache.log4j.MDC;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.journal.ConcurrencyManager.TaskCounters;

@@ -1037,10 +1037,6 @@ abstract public class IndexManager extends StoreManager {
 
          /*
           * notify the resource manager so that it can find this file.
-          * 
-          * @todo once the index segment has been built the resource manager
-          * should notice it in a restart manner and put it into play if it
-          * has not already been used to update the view.
           */
 
          addResource(segmentMetadata, outFile);

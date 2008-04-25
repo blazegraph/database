@@ -438,9 +438,10 @@ public class NanoHTTPD implements IServiceShutdown
 		public void run()
 		{
             log.info("Handling request: localPort="+mySocket.getLocalPort());
+            InputStream is = null;
 			try
 			{
-				final InputStream is = mySocket.getInputStream();
+                is = mySocket.getInputStream();
 				if ( is == null) return;
 				final BufferedReader in = new BufferedReader( new InputStreamReader( is ));
 
@@ -510,27 +511,42 @@ public class NanoHTTPD implements IServiceShutdown
 				}
 
 				// Ok, now do the serve()
-				Response r = serve( uri, method, header, parms );
-				if ( r == null )
-					sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: Serve() returned a null response." );
-				else
-					sendResponse( r.status, r.mimeType, r.header, r.data );
-
-				in.close();
+                try {
+                    final Response r = serve( uri, method, header, parms );
+                    if ( r == null )
+                        sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: Serve() returned a null response." );
+                    else
+                        sendResponse( r.status, r.mimeType, r.header, r.data );
+                } catch(Exception ex) {
+                    log.warn(ex.getMessage(),ex);
+                    sendError( HTTP_INTERNALERROR, ex.getMessage() );
+                    return;
+                }
 			}
-			catch ( IOException ioe )
-			{
-				try
-				{
-					sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: IOException: " + ioe.getMessage());
-				}
-				catch ( Throwable t ) {}
-			}
-			catch ( InterruptedException ie )
-			{
-				// Thrown by sendError, ignore and exit the thread.
-			}
-		}
+            catch ( InterruptedException ie )
+            {
+                // Thrown by sendError, ignore and exit the thread.
+            }
+            catch(Throwable t) {
+                try
+                {
+                    log.error(t.getMessage(),t);
+                    sendError( HTTP_INTERNALERROR, "SERVER INTERNAL ERROR: " + t.getMessage());
+                }
+                catch ( Throwable t2 ) {
+                    // ignore.
+                }
+            }
+            finally {
+                if (is != null) {
+                    try {
+                        is.close();
+                    } catch (IOException ex) {/*ignore*/
+                    }                    
+                }
+            }
+            
+        }
 
 		/**
 		 * Decodes the percent encoding scheme. <br/>

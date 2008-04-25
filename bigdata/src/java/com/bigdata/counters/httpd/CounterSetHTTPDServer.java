@@ -105,6 +105,9 @@ public class CounterSetHTTPDServer implements Runnable {
                     
                     // set logging level on the server.
                     CounterSetHTTPDServer.log.setLevel(level);
+                    
+                    // set logging level for the view.
+                    XHTMLRenderer.log.setLevel(level);
 
                     // set logging level on the service.
                     NanoHTTPD.log.setLevel(level);

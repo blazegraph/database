@@ -670,10 +670,12 @@ public class XHTMLRenderer {
      */
     protected void writeCounterSet(Writer w, final CounterSet counterSet,
             final int depth) throws IOException {
-
-        // depth of the hierarchy at the point where we are starting.
-        final int rootDepth = counterSet.getDepth();
         
+        // depth of the hierarchy at the point where we are starting.
+        final int ourDepth = counterSet.getDepth();
+
+        log.info("path="+counterSet.getPath()+", depth="+depth+", ourDepth="+ourDepth);
+
         final String summary = "Showing counters for path="
                 + counterSet.getPath();
         
@@ -705,13 +707,15 @@ public class XHTMLRenderer {
 
             final ICounterNode node = itr.next();
 
+            log.debug("considering: "+node.getPath());
+            
             if(depth != 0) { 
                 
                 final int counterDepth = node.getDepth();
                 
 //                log.info("counterDepth("+counterDepth+") - rootDepth("+rootDepth+") = "+(counterDepth-rootDepth));
                 
-                if((counterDepth - rootDepth) > depth) {
+                if((counterDepth - ourDepth) > depth) {
                 
                     // prune rendering
                     log.debug("skipping: "+node.getPath());
@@ -741,7 +745,7 @@ public class XHTMLRenderer {
             if(node instanceof ICounterSet) {
             
                 w.write("  <th align=\"left\">");// colspan=\"5\">");
-                writePath(w, path, rootDepth);
+                writePath(w, path, ourDepth);
                 w.write("  </th\n>");
                 w.write("  <td colspan=\"4\">&nbsp;...</td>");
                 
@@ -754,7 +758,7 @@ public class XHTMLRenderer {
                  */
 
                 w.write("  <th align=\"left\">");
-                writePath(w, path, rootDepth);
+                writePath(w, path, ourDepth);
                 w.write("  </th\n>");
 
                 if (counter.getInstrument() instanceof HistoryInstrument) {

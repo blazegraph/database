@@ -29,6 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters.linux;
 
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -456,8 +459,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 
                 try {
 
-                    lastModified = StatisticsCollectorForLinux.f.parse(s)
-                            .getTime();
+                    lastModified = f.parse(s).getTime();
 
                 } catch (Exception e) {
 
@@ -586,6 +588,38 @@ public class PIDStatCollector extends AbstractProcessCollector implements
         
         }
 
+    }
+    
+    /**
+     * Used to parse the timestamp associated with each row of the [pidstat]
+     * output.
+     */
+    protected final SimpleDateFormat f;
+    {
+
+        f = new SimpleDateFormat("hh:mm:ss aa");
+
+        /*
+         * Code may be enabled for a runtime test of the date format.
+         */
+        if (true) {
+
+            System.err.println("Format: " + f.format(new Date()));
+
+            try {
+
+                System.err.println("Parsed: " + f.parse("06:35:15 AM"));
+                
+                System.err.println("Parsed: " + f.parse("02:08:24 PM"));
+                
+            } catch (ParseException e) {
+
+                log.error("Could not parse?");
+
+            }
+
+        }
+        
     }
     
 }
