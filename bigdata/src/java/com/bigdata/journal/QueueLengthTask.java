@@ -19,35 +19,98 @@ public class QueueLengthTask implements Runnable {
     /**
      * The service that is being monitored.
      */
-    protected final ThreadPoolExecutor service;
+    private final ThreadPoolExecutor service;
     
     /**
      * The label for the service (used in log messages).
      */
-    public final String name;
+    private final String name;
     
     /**
      * The weight used to compute the moving average.
      */
-    public final double w;
-    
+    private final double w;
+
     /**
-     * The current value of the moving average.
+     * #of samples taken so far.
      */
-    private double avg = 0.0d;
+    private long nsamples = 0;
+    
+    /*
+     * There are several different moving averages which are computed.
+     */
+    
+    private double averageQueueLength = 0.0d;
     private double averageActiveCount = 0.0d;
     private double averageQueueSize = 0.0d;
     
     /**
-     * The current value of the moving average.
+     * The queue length (moving average).
+     * <p>
+     * Note: this is the primary average of interest - it includes both the
+     * tasks waiting to be run and those that are currently running in the
+     * definition of the "queue length".
+     * <p>
+     * Note: for the {@link WriteExecutorService} this is reporting the task
+     * execution concurrency <strong>with locks held</strong>.
+     * 
+     * @see #averageQueueLength(double, double, double)
      */
-    public double getAverage() {
+    public final Instrument<Double> averageQueueLengthInst = new Instrument<Double>() {
+        
+        @Override
+        protected void sample() {
+
+            setValue( averageQueueLength );
+            
+        }
+        
+    };
     
-        return avg;
+    /**
+     * The #of tasks that are currently running (moving average).
+     * <p>
+     * Note: for the {@link WriteExecutorService} this is reporting the task
+     * execution concurrency <strong>with locks held</strong>.
+     * 
+     * @see #averageQueueLength(double, double, double)
+     */
+    public final Instrument<Double> averageActiveCountInst = new Instrument<Double>() {
+        
+        @Override
+        protected void sample() {
+
+            setValue( averageActiveCount );
+            
+        }
+        
+    };
+    
+    /**
+     * The #of tasks not yet assigned to any thread which are waiting to run
+     * (moving average).
+     * 
+     * @see #averageQueueLength(double, double, double)
+     */
+    public final Instrument<Double> averageQueueSizeInst = new Instrument<Double>() {
+        
+        @Override
+        protected void sample() {
+
+            setValue( averageQueueSize );
+            
+        }
+        
+    };
+
+    /**
+     * The weight used to compute the moving average.
+     */
+    public double getWeight() {
+        
+        return w;
         
     }
-
-    private long nsamples = 0;
     
     /**
      * #of samples taken so far.
@@ -132,10 +195,6 @@ public class QueueLengthTask implements Runnable {
                 /*
                  * Note: This is reporting the task execution concurrency
                  * _with_locks_held_ for the write service
-                 * 
-                 * FIXME Since there are all these values which we are
-                 * computing, have this class expose several "instruments" and
-                 * not just one.
                  */
 
                 activeCount = ((WriteExecutorService) service)
@@ -154,12 +213,12 @@ public class QueueLengthTask implements Runnable {
              * the tasks waiting to be run and those that are currently running
              * in the definition of the "queue length".
              */ 
-            avg = averageQueueLength(avg, (activeCount + queueSize), w);
+            averageQueueLength = averageQueueLength(averageQueueLength, (activeCount + queueSize), w);
 
             // This is just the tasks that are currently running.
             averageActiveCount = averageQueueLength(averageActiveCount, activeCount, w);
             
-            // This is just the tasks that are currently waiting to run.
+            // This is just the tasks that are currently waiting to run (not assigned to any thread).
             averageQueueSize = averageQueueLength(averageQueueSize, queueSize, w);
 
             nsamples++;
@@ -170,7 +229,7 @@ public class QueueLengthTask implements Runnable {
 //                    name.equals("writeService") && 
                     nsamples % period == 0) {
 
-                log.info(name + ":\naverageQueueLength=" + avg
+                log.info(name + ":\naverageQueueLength=" + averageQueueLength
                         + " (activeCountAverage=" + averageActiveCount
                         + ",queueSizeAverage=" + averageQueueSize
                         + "), nsamples=" + nsamples+"\n"+service+"\n"
@@ -190,16 +249,5 @@ public class QueueLengthTask implements Runnable {
         }
         
     }
-    
-    public final Instrument<Double> averageQueueLength = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
 
-            setValue( getAverage() );
-            
-        }
-        
-    };
-    
 }

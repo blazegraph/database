@@ -814,7 +814,14 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         .makePath("Read Service"), readService);
 
                 tmp.addCounter("averageQueueLength",
-                        readServiceQueueLength.averageQueueLength);
+                        readServiceQueueLength.averageQueueLengthInst);
+
+                tmp.addCounter("averageActiveCount",
+                        readServiceQueueLength.averageActiveCountInst);
+                
+                tmp.addCounter("averageQueueSize",
+                        readServiceQueueLength.averageQueueSizeInst);
+
             }
 
             // txWriteService
@@ -824,7 +831,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         .makePath("Transaction Write Service"), txWriteService);
 
                 tmp.addCounter("averageQueueLength",
-                        txWriteServiceQueueLength.averageQueueLength);
+                        txWriteServiceQueueLength.averageQueueLengthInst);
+                
+                tmp.addCounter("averageActiveCount",
+                        txWriteServiceQueueLength.averageActiveCountInst);
+                
+                tmp.addCounter("averageQueueSize",
+                        txWriteServiceQueueLength.averageQueueSizeInst);
                 
             }
             
@@ -835,7 +848,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         .makePath("Unisolated Write Service"), writeService);
                 
                 tmp.addCounter("averageQueueLength",
-                        writeServiceQueueLength.averageQueueLength);
+                        writeServiceQueueLength.averageQueueLengthInst);
+                
+                tmp.addCounter("averageActiveCount",
+                        writeServiceQueueLength.averageActiveCountInst);
+
+                tmp.addCounter("averageQueueSize",
+                        writeServiceQueueLength.averageQueueSizeInst);
             
                 /*
                  * data only available for the write service.
