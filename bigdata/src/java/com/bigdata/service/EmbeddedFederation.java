@@ -604,33 +604,7 @@ public class EmbeddedFederation extends AbstractFederation {
                     
                 }
 
-                dataService[i] = new EmbeddedDataService(serviceUUID, p) {
-                  
-                    public IMetadataService getMetadataService() {
-                        
-                        return metadataService;
-                        
-                    }
-                    
-                    public ITimestampService getTimestampService() {
-                        
-                        return timestampService;
-                        
-                    }
-                    
-                    public ILoadBalancerService getLoadBalancerService() {
-                        
-                        return loadBalancerService;
-                        
-                    }
-
-                    public IDataService getDataService(UUID serviceUUID) {
-                        
-                        return dataServiceByUUID.get(serviceUUID);
-                        
-                    }
-                    
-                };
+                dataService[i] = new EmbeddedDataServiceImpl(serviceUUID, p);
 
                 dataServiceByUUID.put(serviceUUID, dataService[i]);
 
@@ -640,6 +614,50 @@ public class EmbeddedFederation extends AbstractFederation {
         
         return ndataServices;
 
+    }
+    
+    /**
+     * Concrete implementation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class EmbeddedDataServiceImpl extends EmbeddedDataService {
+
+        /**
+         * @param serviceUUID
+         * @param properties
+         */
+        public EmbeddedDataServiceImpl(UUID serviceUUID, Properties properties) {
+       
+            super(serviceUUID, properties);
+            
+        }
+
+        public IMetadataService getMetadataService() {
+
+            return metadataService;
+
+        }
+
+        public ITimestampService getTimestampService() {
+
+            return timestampService;
+
+        }
+
+        public ILoadBalancerService getLoadBalancerService() {
+
+            return loadBalancerService;
+
+        }
+
+        public IDataService getDataService(UUID serviceUUID) {
+
+            return dataServiceByUUID.get(serviceUUID);
+
+        }
+        
     }
     
     public IMetadataIndex getMetadataIndex(String name,long timestamp) {

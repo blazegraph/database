@@ -48,7 +48,7 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.journal.QueueLengthTask;
+import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
@@ -230,7 +230,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-            QueueLengthTask queueLengthTask = new QueueLengthTask(
+            QueueStatisticsTask queueLengthTask = new QueueStatisticsTask(
                     "clientThreadPool", threadPool);
 
             sampleService.scheduleWithFixedDelay(queueLengthTask, initialDelay,
