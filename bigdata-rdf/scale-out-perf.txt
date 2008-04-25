@@ -466,6 +466,16 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
      - Turn off sendVals for rangeIterators if we recognize the value
        serialized as the NoDataSerializer?
 
+     - Change checksums to be at the store/record level.  Interpret
+       the record length as having 2 additional bytes for read/write
+       of the checksum.  Put it at the end of the record.
+       Enable/disable at the store level.
+
+       Add an option for read-back validation of writes?
+       
+       Add an option for a fully synchronized raw store interface on
+       the Journal?
+
     - Distributed file repository
 
          - handle overflow of blocks to the index segments during MOVE
@@ -555,6 +565,8 @@ Short term tasks:
 
 	 - Done. Update the Sesame 2.x dependency.
 
+	 - Put all properties into the com.bigdata namespace.
+
    - Counters
 
      - Done. Work the counter path, name, and date(s) into the table
@@ -615,6 +627,18 @@ Short term tasks:
        you browse it.  This will make it easy to find interesting
        views.
 
+     - Done. The IndexManager should report the #of index views open
+       concurrently.  Either sample once per second and take a moving
+       average track the total number and compute the instanteous
+       average per minute.
+ 
+     - Done (reports the #of stores in the weak value
+       cache). Likewise, the StoreManager should report the #of open
+       journals and index segments.
+
+     - Done. Anything with "%" or "percent" in the name should be
+       formatted as a percentage in [0.00:1.00].
+
      - Add UI elements to set the filter(s), depth, decimalFormat,
        etc.  These should be a FORM with a GET action.
 
@@ -622,36 +646,49 @@ Short term tasks:
        hostname and service info.  This will make the information more
        interesting than just staring at UUIDs.
 
-     - May be loosing some samples by running multiple typeperf's at
-       once.  Explore.  If true, then trying combining all w/in same
-       JVM using reference counter for process or identifying one
-       process in the JVM which will have responsibility for those
-       counters.
-
      - I should be able to bookmark interesting counter sets, but the
        service name needs to be there or the bookmarks will depend
        only on filters, such as all unisolated counters.  An xpath
        might be useful here so that the filter reads down to a service
        name or type and then back up to reveal the service.
 
+     - May be loosing some samples by running multiple typeperf's at
+       once.  Explore.  If true, then trying combining all w/in same
+       JVM using reference counter for process or identifying one
+       process in the JVM which will have responsibility for those
+       counters.
+
      - Cache-Control (data are good up to 60 seconds after the
        counters were last updated) and auto-update of page/view?
 
-   - LoadBalancerService
+     - Done.  The data service should report its configuration
+       properties under "Info".
 
-     - Clear the log directory when the service is destroyed?  (This
-       has a negative side-effect for unit tests of a federation since
-       I loose all that nice post-mortem data.  This might well be a
-       bad idea for a deployment as well.  Perhaps clear the log of
-       old log files directory when the service starts instead?)
+       This should be done for the other services as well.  Refactor
+       the code in DataService, moving it into the counters package.
+
+       Servers should add their Jini configuration information as
+       well.  This probably has to be done explicitly for the
+       configuration items of interest.
+
+     - Add histograms of response time by task.  E.g., AddIds,
+       AddTerms, IndexWriteProx, etc.
 
      - (**) Compute average response time and throughput as 1/average
        response time.  And measure on the client as well so that we
-       can compute the RMI overhead.
+       can compute the RMI overhead.  Do this as a refactor of the
+       task that takes samples from a queue.
 
-     - (**) Add counters for #of index partition split, move (on/off),
-       and join operations (OverflowManager).  Also report #of errors
-       during asynchronous overflow processing.
+     - Done. Add counters for #of index partition split, move, and
+       join operations (OverflowManager).
+
+       Done. Also report #of errors during asynchronous overflow
+       processing.
+
+       There should also be a counter of the #of index partitions
+       moved onto a data service.  However there is no place in the
+       code to easily note this on the target data service since the
+       move is made atomic by an action on the metadata service.
 
      - Add a parameterized moving average computation to History with
        a default weight.  This could be written into the UI tables for
@@ -688,6 +725,54 @@ Short term tasks:
        groupCommitCount=109, abortCount=0, failedTaskCount=0,
        successTaskCount=2152, committedTaskCount=2140,
        overflowCount=0}
+
+     - (****) I think that nearly all of these issues a problems with
+       the Sar, and to some extend the Pidstat, collectors.
+
+       The saved history is filling up the hours and days with zero
+       for some odd reason when you bring it up again under the
+       post-mortem mode.  E.g., CPU/% IO Wait.  This only happens for
+       the host-wide statistics reported by Sar.  The PidStat
+       statistics and the service specific statistics are fine.
+	    
+       Sar is the worst - lost samples and bad timestamps.
+
+       Parsing errors for sysstat utilities from time to time.  They
+       are mostly for the SarCpuUtilization utility.  "grep -i
+       exception nohup.out" will find them.
+
+       I am seeing a "ignoring sample WAY out of timestamp order"
+       warning.
+	    
+       PidStat appears to report Ok, but it does not aggregate to
+       hours or days correctly.  Or maybe I lost the history when
+       rolling over at midnight?  No.  It was a run from ~noon to
+       ~6pm. Other counters have all of those hours.
+
+     - Done. The per-process counters for linux are not being reported
+       under "service" but instead directly under the service UUID.
+
+     - The per-host physical disk counters for linux are not being
+       reported at all. In fact, I need to write the Sar or vmstat
+       utility to collect these data.
+
+     - For some reason a query for the hostname on host3 does not
+       return the counters in the browser.  Response is fast both
+       beneath that level at at the root.  Maybe the problem is in the
+       /host/CPU and /host/Info counter sets - those appear to hang
+       while /host/service is fine.... that does not seem to pay out
+       either.
+
+       (**) turn up the log level for the server and service and see
+       what's up with this.  I can direct the log to another file to
+       make this easy to see.
+
+     - Make it possible to have more than 60 minutes in the buffer but
+       still overflow after 60 minutes onto the hours.  This will
+       allow a longer reachback at a given level of aggregation.
+
+     - syslogd integration so that I see ERROR and FATAL messages for
+       the hosts in the federation.
 
    - LocalTripleStoreWithEmbeddedDataService
 
@@ -742,6 +827,11 @@ Short term tasks:
        This is a good time to do efficient prior/next leaf operations
        for the IndexSegment and to make that more efficient for the
        BTree as well.
+
+     - Done. (get() and find() were running as unisolated tasks.)  I
+       am seeing a lot of tasks in the concurrency manager for the
+       metadata service, but few commits on the live journal.  What
+       the heck is the being reported for the metadata service?
 
    - (*****) The consistentRead option used by the
      PartitionedIndexRangeIterator needs to use the most recent commit
@@ -1077,36 +1167,16 @@ Short term tasks:
 
       - (*******) rdf concurrent data load.
 
-        - (**) Test PIDStat and SAR collection directly and verify
-          reporting out via the httpd server.
-
-          - Done. The per-process counters for linux are not being
-            reported under "service" but instead directly under the
-            service UUID.
-
-  	  - The per-host physical disk counters for linux are not
-            being reported at all. In fact, I need to write the Sar or
-            vmstat utility to collect these data.
-
-	  - Parsing errors for sysstat utilities from time to time.
-            They are mostly for the SarCpuUtilization utility.
-
-  	  - I am seeing a "ignoring sample WAY out of timestamp
-            order" warning.
-
-	  - syslogd integration so that I see ERROR and FATAL messages
-            for the hosts in the federation.
-
 	- Still an annoying problem with the service names as
           displayed by the jini browser....  This may well be an issue
           with failing to expose the interfaces and service classes
           via an http service as downloadable code.
 
-	- Verify that there is an atomic commit point for the
+	- Done. Verify that there is an atomic commit point for the
           IndexSegment so that partial index segment writes can be
           recognized.
 
-	  Once recognized they should be deleted.
+	  ============================================================
 
 	- Results:
 
@@ -1121,6 +1191,14 @@ Short term tasks:
 	  **** Try with services running in distinct JVMs and on more
                than one host.
 
+	  **** Try w/o disabling flush so that each document is parsed
+               and written in a single pass.
+
+	  **** Try w/ the DiskMode write cache enabled (it's been
+               disabled for a lot of, but not all of, these runs).
+	       
+	  **** Try w/o checksum (i've enabled it in the
+               AbstractTripleStore as of 8:30am 4/25)
 
 	  http://192.168.20.28:8080/
 
@@ -1157,6 +1235,8 @@ Short term tasks:
 
 	  FIXME: 
 
+	  Note: Our write cache was disabled for this test!
+
 	  I have observed consistency problem in AddIds(line 159).
 	  This problem is definately linked to synchronous overflow
 	  processing.  I've been able to re-create this on the
@@ -1189,10 +1269,39 @@ Short term tasks:
 	  is disabled.  When overflow is enabled, it triggers the
 	  consistency problem noted above and can also trigger a
 	  variety of other problems that I am documenting below.
-	  
+
+	  FIXME Continue testing with the embedded data service and
+	  overflow enabled with one data service and eager triggering
+	  with a low initial and maximum extent.
+
+	  FIXME Add post-load validation to make sure that the
+	  concurrent data load is really correct and run that
+	  validation after a db restart.  This will probably require
+	  that I write the bulk term scan and get the validation unit
+	  tests running for scale-out modes.
  
-	- U1000, host3, Jini, 10 threads: ______ tps.  ***** RERUN w/
-          overflow disabled.
+	- U1000, host3, Jini, 10 threads, no write cache, no overflow:
+          ______ tps.
+
+	     Note: I am re-running on host3 with some changes, but
+             overflow is still disabled.  The run appears to have
+             progressed fine until it ran out of disk after 6 hours
+             (U1000-host3-disk-full).  At that point it had loaded
+             17349 out of ~20000 files and consumed ~59G.
+
+============================================================
+
+	Looks like virtuoso is running a clustered triple store!
+
+	http://virtuoso.openlinksw.com/wiki/main/Main/VOSArticleLUBMBenchmark
+
+	http://www.openlinksw.com/weblog/oerling/?id=1336
+
+	http://www.openlinksw.com/weblog/oerling/?id=1335
+
+	http://docs.openlinksw.com/virtuoso/clusterprogrammingsqlexmod.html
+
+
 
 ============================================================
 
@@ -1453,3 +1562,166 @@ java.lang.AssertionError
 	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:926)
 	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:547)
 	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:800)
+
+
+============================================================
+
+INFO : 32406 com.bigdata.rdf.store.SPOIndexWriteProc [testSPO#0] 0
+pool-1-thread-76
+com.bigdata.resources.PostProcessOldJournalTask.chooseTasks(PostProcessOldJournalTask.java:1260):
+index split: testids#0
+
+the id:term index will be split on this overflow.
+
+WARN : 42797
+com.bigdata.resources.SplitIndexPartitionTask$UpdateSplitIndexPartition
+[testids#0] 0 pool-1-thread-94
+com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:643):
+Task failed:
+task=Task{com.bigdata.resources.SplitIndexPartitionTask$UpdateSplitIndexPartition,timestamp=0,resource=[testids#0]}
+
+The atomic update failed.
+
+Caused by: java.lang.IllegalStateException: Object already persistent
+	at com.bigdata.btree.PO.setIdentity(PO.java:93)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:2036)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:98)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
+	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:273)
+	at com.bigdata.cache.HardReferenceQueue.append(HardReferenceQueue.java:235)
+	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:1784)
+	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:320)
+	at com.bigdata.btree.Leaf.<init>(Leaf.java:174)
+	at com.bigdata.btree.Leaf.split(Leaf.java:594)
+	at com.bigdata.btree.Leaf.insert(Leaf.java:472)
+	at com.bigdata.btree.Node.insert(Node.java:637)
+	at com.bigdata.btree.Node.insert(Node.java:637)
+	at com.bigdata.btree.Node.insert(Node.java:637)
+	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:1017)
+	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:962)
+	at com.bigdata.btree.AbstractBTree.rangeCopy(AbstractBTree.java:1499)
+	at com.bigdata.resources.SplitIndexPartitionTask$UpdateSplitIndexPartition.doTask(SplitIndexPartitionTask.java:534)
+
+On another run, it is again a SPLIT of the id:term index that
+immediately causes problems once that split is made effective on the
+MDI (atomic update).
+
+1. Try setting the split threashold higher and see if build (vs split)
+   causes problems.
+
+   Ah.  Build seems ok.  However, the memory requirements ramp up
+   quickly (perhaps it is fully buffering the nodes?) and I then saw
+   an OOM exception.  Try specifying [maxBytesToFullyBufferNodes=1]
+   and see if this fixes the OOM problem.  (Note that I increased the
+   heap to 1G so change that too.)  This also shows that I need to be
+   reporting out the #of open store files and index segments, perhaps
+   on each open/close.
+
+   If I push things then I eventually see this stack trace, but there
+   seems to be disk left so I am not sure what this is.  Perhaps the
+   command was constructed incorrectly?  I've changed the log level to
+   WARN for transferFromDiskTo so that I will have more information if
+   this occurs again.
+
+Caused by: java.io.IOException: Not enough storage is available to process this command
+	at sun.nio.ch.FileChannelImpl.map0(Native Method)
+	at sun.nio.ch.FileChannelImpl.map(FileChannelImpl.java:742)
+	at sun.nio.ch.FileChannelImpl.transferFromFileChannel(FileChannelImpl.java:540)
+	at sun.nio.ch.FileChannelImpl.transferFrom(FileChannelImpl.java:603)
+	at com.bigdata.journal.AbstractBufferStrategy.transferFromDiskTo(AbstractBufferStrategy.java:442)
+	at com.bigdata.journal.DiskOnlyStrategy.transferTo(DiskOnlyStrategy.java:1768)
+	at com.bigdata.btree.IndexSegmentBuilder.writeIndexSegment(IndexSegmentBuilder.java:1338)
+	at com.bigdata.btree.IndexSegmentBuilder.<init>(IndexSegmentBuilder.java:787)
+
+Note: Another run w/o changes produced this trace instead, but I am no
+longer seeing this after enabling checksums on the triple store indices.
+
+Caused by: java.lang.AssertionError
+	at com.bigdata.btree.NodeSerializer.getNode(NodeSerializer.java:910)
+	at com.bigdata.btree.NodeSerializer.getNodeOrLeaf(NodeSerializer.java:630)
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2106)
+	at com.bigdata.btree.Node.getChild(Node.java:2110)
+	at com.bigdata.btree.Node.lookup(Node.java:651)
+	at com.bigdata.btree.AbstractBTree.lookup(AbstractBTree.java:1149)
+	at com.bigdata.btree.IndexSegment.lookup(IndexSegment.java:357)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:380)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:353)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:321)
+	at com.bigdata.rdf.store.AddTerms.apply(AddTerms.java:194)
+	at com.bigdata.journal.IndexProcedureTask.doTask(IndexProcedureTask.java:56)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1043)
+
+2. Trace the logic of the atomic update for the split.  This appears
+   to be a culprit.
+
+   Yes, it was running the BuildIndexSegmentTask which was then
+   chaining its own atomic update.  I have modified it to now run a
+   BuildIndexSegmentSplitTask, collect all of the intermediate results
+   for the split, and then chain the atomic update for the split task.
+
+
+   Another run then produces this exception for the SPO index.
+
+   *** Note that the SPO index was _EMPTY_ and was "copied" over.
+
+   This suggests either a fence post in how "copy" is handled or a
+   broken assumption regarding the active tasks when preparing the
+   writeService for overflow.
+
+Caused by: java.lang.IllegalStateException
+	at com.bigdata.btree.PO.getIdentity(PO.java:64)
+	at com.bigdata.btree.Checkpoint.<init>(Checkpoint.java:215)
+	... 21 more
+
+ - add option to verify writes by read back.
+
+ - add post-run validation of the told triples.
+
+
+WARN : 60529 91700c7b-7fde-4d88-8bb6-63bf21814f70
+com.bigdata.resources.BuildIndexSegmentTask$AtomicUpdateBuildIndexSegmentTask
+0 [testIndex0#13] pool-1-thread-505
+com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:643):
+Task failed:
+task=Task{com.bigdata.resources.BuildIndexSegmentTask$AtomicUpdateBuildIndexSegmentTask,timestamp=0,resource=[testIndex0#13]}
+
+
+ERROR: 60529      pool-1-thread-14 com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1455): Update task failed
+java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.AssertionError: Expecting either 2 or 3 resources: [JournalMetadata{ size=1048576, filename=C:\Documents and Settings\bthompson\workspace\bigdata\test_stressTest1\91700c7b-7fde-4d88-8bb6-63bf21814f70\journals\journal60560.jnl, uuid=74817d57-30e3-4221-9230-1432fb0200fd, createTime=1209133010972}]
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:215)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:85)
+	at com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1431)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)
+Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.lang.AssertionError: Expecting either 2 or 3 resources: [JournalMetadata{ size=1048576, filename=C:\Documents and Settings\bthompson\workspace\bigdata\test_stressTest1\91700c7b-7fde-4d88-8bb6-63bf21814f70\journals\journal60560.jnl, uuid=74817d57-30e3-4221-9230-1432fb0200fd, createTime=1209133010972}]
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
+	at com.bigdata.resources.SplitIndexPartitionTask.doTask(SplitIndexPartitionTask.java:264)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:695)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:612)
+	... 5 more
+Caused by: java.lang.RuntimeException: java.lang.AssertionError: Expecting either 2 or 3 resources: [JournalMetadata{ size=1048576, filename=C:\Documents and Settings\bthompson\workspace\bigdata\test_stressTest1\91700c7b-7fde-4d88-8bb6-63bf21814f70\journals\journal60560.jnl, uuid=74817d57-30e3-4221-9230-1432fb0200fd, createTime=1209133010972}]
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1080)
+	at com.bigdata.concurrent.LockManagerTask.call(LockManagerTask.java:325)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:777)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:718)
+	... 6 more
+Caused by: java.lang.AssertionError: Expecting either 2 or 3 resources: [JournalMetadata{ size=1048576, filename=C:\Documents and Settings\bthompson\workspace\bigdata\test_stressTest1\91700c7b-7fde-4d88-8bb6-63bf21814f70\journals\journal60560.jnl, uuid=74817d57-30e3-4221-9230-1432fb0200fd, createTime=1209133010972}]
+	at com.bigdata.resources.BuildIndexSegmentTask$AtomicUpdateBuildIndexSegmentTask.doTask(BuildIndexSegmentTask.java:329)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1043)
+	... 9 more
+
+and also:
+
+ERROR: 65685      pool-1-thread-9 com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1520): java.lang.AssertionError: ndone=3, but #used=4 : [testIndex0#1, testIndex0#8, testIndex0#5, testIndex0#3]
+java.lang.AssertionError: ndone=3, but #used=4 : [testIndex0#1, testIndex0#8, testIndex0#5, testIndex0#3]
+	at com.bigdata.resources.PostProcessOldJournalTask.chooseTasks(PostProcessOldJournalTask.java:1328)
+	at com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1383)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)

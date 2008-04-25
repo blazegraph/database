@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 
+import junit.framework.TestCase2;
+
 import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.rio.RDFFormat;
 
@@ -46,7 +48,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.resources.ResourceManager;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -822,7 +823,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
     /**
      * Writes information about the store and the indices on stderr and the
-     * {@link ResourceManager#log}.
+     * {@link TestCase2#log}.
      */
     private void usage() {
         
