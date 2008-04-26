@@ -205,16 +205,32 @@ public class Checkpoint implements Externalizable {
     }
 
     /**
-     * Creates a check point record from a {@link BTree}.
+     * Creates a {@link Checkpoint} record from a {@link BTree}.
+     * <p>
+     * Pre-conditions:
+     * <ul>
+     * <li>The root is clean.</li>
+     * <li>The metadata record is clean (</li>
+     * </ul>
+     * Note: if the root is <code>null</code> then the root is assumed to be
+     * clean and the root address from the last {@link Checkpoint} record is
+     * used. Otherwise the address of the root is used (in which case it MUST be
+     * defined).
      * 
      * @param btree
      *            The btree.
      */
     public Checkpoint(final BTree btree) {
         
-        this(btree.metadata.getMetadataAddr(), btree.getRoot().getIdentity(),
-                btree.height, btree.nnodes, btree.nleaves, btree.nentries,
-                btree.counter.get());
+        this(btree.metadata.getMetadataAddr(),//
+                (btree.root == null ? btree.getCheckpoint().getRootAddr()
+                        : btree.root.getIdentity()),//
+                btree.height,//
+                btree.nnodes,//
+                btree.nleaves,//
+                btree.nentries,//
+                btree.counter.get()//
+                );
            
     }
 

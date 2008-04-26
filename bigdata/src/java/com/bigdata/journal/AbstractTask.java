@@ -1032,6 +1032,11 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * not write their checkpoint records until we have this lock, we
              * are able to guarentee that the write set of a task is made
              * restart safe atomically by the next group commit.
+             * 
+             * FIXME when the task succeeds, it should be possible to flush the
+             * index to the store before we obtain the lock in order to reduce
+             * the latency when we write the checkpoint record.  (if the task
+             * fails, the rollback is a light weight operation.)
              */
             final Lock lock = writeService.lock;
 
@@ -1149,7 +1154,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                     
                     final long checkpointAddr = btree.writeCheckpoint();
                     
-                    if(INFO) log.info("name=" + name + ", newcheckpointAddr="
+                    if(INFO) log.info("name=" + name + ", newCheckpointAddr="
                             + btree.getStore().toString(checkpointAddr) + " : "
                             + this);
                     

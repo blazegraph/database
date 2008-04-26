@@ -479,7 +479,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      *                btree and there are mutations that have not been written
      *                through to the store)
      */
-    public void close() {
+    synchronized public void close() {
 
         if (root == null) {
 
