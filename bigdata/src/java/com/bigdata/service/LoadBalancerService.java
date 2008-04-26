@@ -425,6 +425,24 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     private final AbstractHTTPD httpd;
 
     /**
+     * The delay between writes of the {@link CounterSet} on a log file.
+     */
+    private final long logDelayMillis; 
+    /**
+     * The #of distinct log files to retain.
+     */
+    private final long logMaxFiles;
+    /**
+     * Time that the {@link CounterSet} was last written onto a log file.
+     */
+    private long logLastMillis = System.currentTimeMillis();
+    /**
+     * A one-up counter of the #of times the {@link CounterSet} was written onto
+     * a log file.
+     */
+    private int logFileCount = 0;
+    
+    /**
      * Options understood by the {@link LoadBalancerService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -474,6 +492,23 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         String LOG_DIR = "log.dir";
         
         String DEFAULT_LOG_DIR = ".";
+
+        /**
+         * The delay in milliseconds between writes of the {@link CounterSet} on
+         * a log file (default is {@value #DEFAULT_LOG_DELAY}, which is
+         * equivilent to one hour).
+         */
+        String LOG_DELAY = "log.delay";
+        
+        String DEFAULT_LOG_DELAY = ""+1000*60*60;
+
+        /**
+         * The maximum #of distinct log files to retain (default is one week
+         * based on a {@link #LOG_DELAY} equivilant to one hour).
+         */
+        String LOG_MAX_FILES = "log.maxFiles";
+        
+        String DEFAULT_LOG_MAX_FILES = ""+24*7;
         
     }
 
@@ -503,6 +538,26 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
             
         }
 
+        // logDelayMillis
+        {
+            
+            logDelayMillis = Long.parseLong(properties.getProperty(
+                    Options.LOG_DELAY, Options.DEFAULT_LOG_DELAY));
+
+            log.info(Options.LOG_DELAY + "=" + logDelayMillis);
+            
+        }
+
+        // logMaxFiles
+        {
+
+            logMaxFiles = Integer.parseInt(properties.getProperty(
+                    Options.LOG_MAX_FILES, Options.DEFAULT_LOG_MAX_FILES));
+
+            log.info(Options.LOG_MAX_FILES + "=" + logMaxFiles);
+
+        }
+        
         // setup scheduled runnable for periodic updates of the service scores.
         {
 
@@ -1236,17 +1291,28 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
         /**
          * Writes the counters on a file.
+         * 
+         * @see Options
          */
         protected void logCounters() {
 
-            /*
-             * @todo configure how the files are named and how long they will
-             * persist.
-             */
+            final long now = System.currentTimeMillis();
 
-            final String basename = "" + (nupdates % 20);
+            final long elapsed = now - logLastMillis;
 
-            LoadBalancerService.this.logCounters(basename);
+            if (elapsed > logDelayMillis) {
+                
+                final String basename = "" + (logFileCount % logMaxFiles);
+
+                log.info("Writing counters on: "+basename);
+
+                LoadBalancerService.this.logCounters(basename);
+
+                logFileCount++;
+
+                logLastMillis = now;
+
+            }
             
         }
         
