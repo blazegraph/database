@@ -719,9 +719,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
         assertNotReadOnly();
         
-        assert root != null; // i.e., isOpen().
+//        assert root != null : "root is null"; // i.e., isOpen().
 
-        if (root.dirty) {
+        if (root != null && root.dirty) {
 
             writeNodeRecursive( root );
             

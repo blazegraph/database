@@ -514,6 +514,8 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
                 final boolean wasDirty = btree.root.dirty;
                 
+                assert newNode != null;
+                
                 btree.root = newNode;
                 
                 if (!wasDirty) {

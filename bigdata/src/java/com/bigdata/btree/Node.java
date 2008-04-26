@@ -1944,7 +1944,7 @@ public class Node extends AbstractNode implements INodeData {
              */
             if (nkeys == 0 && !isLeaf()) {
 
-                AbstractNode lastChild = getChild(0);
+                final AbstractNode lastChild = getChild(0);
 
                 if(btree.debug) lastChild.assertInvariants();
 
@@ -1957,6 +1957,8 @@ public class Node extends AbstractNode implements INodeData {
                 }
                 
                 final boolean wasDirty = btree.root.dirty;
+                
+                assert lastChild != null;
                 
                 // replace the root node with a root leaf.
                 btree.root = lastChild;
