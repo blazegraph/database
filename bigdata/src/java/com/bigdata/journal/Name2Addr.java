@@ -280,7 +280,18 @@ public class Name2Addr extends BTree {
             log.info("Will commit: "+name);
             
             // request commit.
-            final long checkpointAddr = btree.handleCommit(commitTime);
+            final long checkpointAddr;
+            try {
+
+                checkpointAddr = btree.handleCommit(commitTime);
+                
+            } catch(Throwable t) {
+
+                // adds the name to the stack trace.
+                throw new RuntimeException("Could not commit index: name="
+                        + name, t);
+                
+            }
             
             // set commitTime on the btree: @todo could be done by BTree#handleCommit() as easily.
             btree.setLastCommitTime(commitTime);

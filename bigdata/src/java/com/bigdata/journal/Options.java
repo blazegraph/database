@@ -166,10 +166,15 @@ public interface Options {
     /**
      * <code>writeCacheCapacity</code> - An integer property whose value
      * controls the size of the write cache (in bytes) used by the selected
-     * {@link BufferMode} (default <code>10485760</code> bytes). A value of
-     * ZERO (0) will disable the write cache.
+     * {@link BufferMode} (default {@value #DEFAULT_WRITE_CACHE_CAPACITY}
+     * bytes). A value of ZERO (0) will disable the write cache.
      * <p>
      * Note: This value is ignored by some {@link BufferMode}s.
+     * <p>
+     * Note: The write cache is flushed incrementally each time it becomes full
+     * and on each commit. Therefore there is no point having a write cache that
+     * is significantly larger then the #of bytes which are written on average
+     * during a commit.
      * 
      * @see #DEFAULT_WRITE_CACHE_CAPACITY
      */
