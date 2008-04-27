@@ -768,6 +768,30 @@ abstract public class OverflowManager extends IndexManager {
         final long closeTime = createTime;
         
         /*
+         * Close out the old journal.
+         * 
+         * Note: closeForWrites() does NOT "close" the old journal in order to
+         * avoid disturbing concurrent readers (we only have an exclusive lock
+         * on the writeService, NOT the readService or the txWriteService).
+         * 
+         * Note: The old journal MUST be closed out before we open the new
+         * journal since the journal will use the SAME direct ByteBuffer
+         * instance for their write cache.
+         */
+        final AbstractJournal oldJournal = getLiveJournal();
+        {
+            
+            // writes no longer accepted.
+            oldJournal.closeForWrites(closeTime);
+
+//            // remove from list of open journals.
+//            storeCache.remove(oldJournal.getRootBlockView().getUUID());
+
+            log.info("Closed out the old journal.");
+            
+        }
+        
+        /*
          * Create the new journal.
          * 
          * @todo this is not using the temp filename mechanism in a manner that
@@ -780,7 +804,7 @@ abstract public class OverflowManager extends IndexManager {
          * See StoreFileManager#start() which has very similar logic with the
          * same problem.
          */
-        final AbstractJournal newJournal;
+        final ManagedJournal newJournal;
         {
 
             final File file;
@@ -803,6 +827,14 @@ abstract public class OverflowManager extends IndexManager {
              * Set the create time on the new journal.
              */
             p.setProperty(Options.CREATE_TIME, ""+createTime);
+
+            /*
+             * Note: the new journal will be handed the write cache from the old
+             * journal so the old journal MUST have been closed for writes
+             * before this point in order to ensure that it can no longer write
+             * on that write cache.
+             */
+            assert oldJournal.getRootBlockView().getCloseTime() != 0L : "Old journal has not been closed for writes";
             
             newJournal = new ManagedJournal(p);
             
@@ -818,7 +850,6 @@ abstract public class OverflowManager extends IndexManager {
         int numNonZeroCopy = 0;
         // Maximum #of non-zero indices that we will copy over.
         final int maxNonZeroCopy = 100;
-        final AbstractJournal oldJournal = getLiveJournal();
         final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
         final long firstCommitTime;
         {
@@ -1081,25 +1112,6 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-        /*
-         * Close out the old journal.
-         * 
-         * Note: closeForWrites() does NOT "close" the old journal in order to
-         * avoid disturbing concurrent readers (we only have an exclusive lock
-         * on the writeService, NOT the readService or the txWriteService).
-         */
-        {
-            
-            // writes no longer accepted.
-            oldJournal.closeForWrites(closeTime);
-
-//            // remove from list of open journals.
-//            storeCache.remove(oldJournal.getRootBlockView().getUUID());
-
-            log.info("Closed out the old journal.");
-            
-        }
-        
         /*
          * Cut over to the new journal.
          */

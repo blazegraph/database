@@ -425,17 +425,36 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         // We still need an object to compute the checksum to be stored in the root blocks.
         final ChecksumUtility checker = new ChecksumUtility();
         
-        /* Create a unique store file and setup the root blocks.  The file
-         * will be pre-extended to the requested initialExtent.
+        /*
+         * Create a unique store file and setup the root blocks. The file will
+         * be pre-extended to the requested initialExtent.
+         * 
+         * @todo There is a bug in the release of large temporary direct
+         * ByteBuffers. For regular journals that overflow, the write cache is
+         * allocated once and handed off from journal to journal. However, there
+         * is no such opportunity for temporary stores. Therefore the write
+         * cache is NOT enabled for the temporary store since it can lead to a
+         * leak of native memory.
+         * 
+         * @todo An alternative is to use a smaller direct byte buffer and hope
+         * that GC works correctly for smaller buffers, but a smaller buffer
+         * will not be much more effective than NO buffer.
+         * 
+         * @todo Another alternative is to maintain a static pool (JVM wide) of
+         * direct byte buffers that are used for temporary stores.
+         * 
+         * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
+         * 
          */
         FileMetadata fileMetadata = new FileMetadata(file, BufferMode.Disk,
                 useDirectBuffers, initialExtent, maximumDiskExtent, create,
                 isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                getOffsetBits(), validateChecksum, createTime, checker);
-        
+                getOffsetBits(), null/* writeCache */, validateChecksum,
+                createTime, checker);
+
         // Open the disk-based store file.
         DiskOnlyStrategy diskBuf = new DiskOnlyStrategy(Bytes.gigabyte * 2,
-                fileMetadata, Bytes.megabyte32 /*writeCacheCapacity*/);
+                fileMetadata);
 
         try {
 

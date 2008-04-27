@@ -1856,8 +1856,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
          * nodes and leaves anyway. If we were to evict everything from the hard
          * reference queue before a commit then the counters would be zero but
          * the queue would no longer be holding our nodes and leaves and they
-         * would be GC'd soon as since they would no longer be strongly
-         * reachable.
+         * would be GC'd soon since they would no longer be strongly reachable.
          */
         assert node.referenceCount >= 0;
 
@@ -1873,11 +1872,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
          * 
          * Note: This iterator only visits dirty nodes.
          */
-        Iterator itr = node.postOrderNodeIterator(true);
+        final Iterator itr = node.postOrderNodeIterator(true);
 
         while (itr.hasNext()) {
 
-            AbstractNode t = (AbstractNode) itr.next();
+            final AbstractNode t = (AbstractNode) itr.next();
 
             assert t.dirty;
 
@@ -1967,7 +1966,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
          * persistent identity since it needs to write the identity of each
          * child in its serialization record.
          */
-        Node parent = node.getParent();
+        final Node parent = node.getParent();
 
         if (parent == null) {
 

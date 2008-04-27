@@ -726,6 +726,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             writeNodeRecursive( root );
             
         }
+        
+        // pre-condition: all nodes in the tree are clean.
+        assert root == null || !root.dirty;
 
         if (metadata.getMetadataAddr() == 0L) {
             

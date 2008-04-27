@@ -30,6 +30,7 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -58,6 +59,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
@@ -355,9 +357,26 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
     private final boolean isTransient;
 
     /**
+     * A direct {@link ByteBuffer} that will be used as the write cache for the
+     * live journal and which will be handed off from live journal to live
+     * journal during overflow processing which is allocated iff
+     * {@link BufferMode#Disk} is choosen.
+     * <p>
+     * Note: This design is motivated by by JVM bug <a
+     * href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
+     * 6210541</a> which describes a failure by
+     * <code>releaseTemporaryDirectBuffer()</code> to release temporary direct
+     * {@link ByteBuffer}s that are allocated for channel IO.
+     * 
+     * @see com.bigdata.journal.Options#WRITE_CACHE_CAPACITY
+     * @see DiskOnlyStrategy
+     */
+    protected final ByteBuffer writeCache;
+    
+    /**
      * A hard reference to the live journal.
      */
-    protected AbstractJournal liveJournal;
+    protected ManagedJournal liveJournal;
 
     /**
      * <code>true</code> initially and remains <code>true</code> until the
@@ -607,6 +626,16 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                         + " must be non-negative");
 
             }
+
+        }
+        
+        /*
+         * Allocate an optional write cache that will be passed from live
+         * journal to live journal during overflow.
+         */
+        {
+
+            writeCache = AbstractJournal.getWriteCache(properties);
 
         }
         
@@ -1259,6 +1288,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
             properties.setProperty(Options.FILE, file.getAbsolutePath());
 
+            // Note: no writes allowed during startup.
+            // Note: disables the write cache among other things.
             properties.setProperty(Options.READ_ONLY, "true");
 
             final AbstractJournal tmp;
@@ -1546,9 +1577,16 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     public class ManagedJournal extends AbstractJournal {
 
-        public ManagedJournal(Properties properties) {
+        /**
+         * Note: Each instance of the {@link ManagedJournal} reuses the SAME
+         * {@link StoreManager#writeCache}. Therefore you MUST close out writes
+         * on the old journal BEFORE you may allocate a new journal.
+         * 
+         * @param properties
+         */
+        protected ManagedJournal(Properties properties) {
             
-            super(properties);
+            super(properties, writeCache);
             
         }
 
@@ -1785,6 +1823,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                 properties.setProperty(Options.FILE, file.toString());
 
                 // All historical journals are read-only!
+                // Note: disables the write cache among other things.
                 properties.setProperty(Options.READ_ONLY, "true");
 
                 final AbstractJournal journal = new ManagedJournal(properties);

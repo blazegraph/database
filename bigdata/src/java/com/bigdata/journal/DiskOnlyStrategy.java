@@ -48,6 +48,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -269,23 +270,55 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * @see Task
          */
         private int start = 0;
-        
-        public WriteCache(int capacity) {
+
+        /**
+         * Create a {@link WriteCache} from a caller supplied buffer.
+         * <p>
+         * Note: {@link FileChannel} IO is fact perform using a direct
+         * {@link ByteBuffer}. When the caller supplies a {@link ByteBuffer}
+         * that is allocated on the Java heap as opposed to in native memory a
+         * temporary direct {@link ByteBuffer} will be allocated for the IO
+         * operation. The JVM can fail to release this temporary direct
+         * {@link ByteBuffer}, resulting in a memory leak. For this reason, the
+         * write cache should be a direct {@link ByteBuffer} and the same direct
+         * {@link ByteBuffer} instance should be shared when overflow causes the
+         * live journal overflow, being replaced by a new live journal. This bug
+         * forces us to pass in the write cache {@link ByteBuffer} directly via
+         * the {@link ManagedJournal} constructor.
+         * 
+         * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
+         * 
+         * @param writeCache
+         *            A {@link ByteBuffer} to be used as the write cache
+         *            (optional).
+         * 
+         * @param capacity
+         */
+        public WriteCache(ByteBuffer writeCache) {
             
-            if(capacity<=0) throw new IllegalArgumentException();
+            if (writeCache == null)
+                throw new IllegalArgumentException();
+
+            // save reference to the write cache.
+            this.buf = writeCache;
+            
+            // the capacity of the buffer in bytes.
+            final int capacity = writeCache.capacity();
+            
+            /*
+             * Discard anything in the buffer, resetting the position to zero,
+             * the mark to zero, and the limit to the capacity.
+             */
+            writeCache.clear();
             
             /*
              * An estimate of the #of records that might fit within the write
              * cache. This is based on an assumption that the "average" record
-             * is 4k. This is used solely to assign the initial capacity to the
+             * is 1k. This is used solely to assign the initial capacity to the
              * writeCacheIndex.
              */
-            final int indexDefaultCapacity = capacity / (4 * Bytes.kilobyte32);
-
-            // allocate the write cache : @todo make using a direct buffer an
-            // option.
-            this.buf = ByteBuffer.allocate(capacity);
-
+            final int indexDefaultCapacity = capacity / (1 * Bytes.kilobyte32);
+            
             // allocate and initialize the write cache index.
             writeCacheIndex = new ConcurrentHashMap<Long, Integer>(indexDefaultCapacity);
 
@@ -946,14 +979,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * 
      * @param maximumExtent
      * @param fileMetadata
-     * @param writeCacheCapacity
-     *            The #of bytes that can be buffered by the write cache and also
-     *            the maximum length of a sequential write operation when
-     *            flushing the write cache to disk. Large sequential writes far
-     *            outperform a set of smaller writes since the alliviate the
-     *            need to repeatedly seek on the disk.
      */
-    DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata, int writeCacheCapacity) {
+    DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, BufferMode.Disk, fileMetadata.readOnly);
@@ -970,13 +997,22 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         this.userExtent = extent - headerSize;
 
-        if (writeCacheCapacity > 0) {
+        /*
+         * Enable the write cache?
+         * 
+         * Note: Do NOT enable the write cache if the file is being opened in a
+         * read-only mode.
+         * 
+         * Note: If the file has been closed for writes (closeTime != 0L), then
+         * the file is read-only regardless of the mode in which it was opened.
+         */
+        if (fileMetadata.writeCache != null && !fileMetadata.readOnly
+                && fileMetadata.closeTime == 0L) {
 
-            // Enable the write cache.
+            log.info("Enabling writeCache: capacity="
+                    + fileMetadata.writeCache.capacity());
 
-            log.info("Enabling writeCache: capacity="+writeCacheCapacity);
-
-            writeCache = new WriteCache( writeCacheCapacity );
+            writeCache = new WriteCache( fileMetadata.writeCache );
             
             /*
              * Start a thread that will be used to asynchronously drive data in

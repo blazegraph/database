@@ -114,6 +114,11 @@ public class FileMetadata {
      * encode the byte count (aka record length) as an unsigned integer.
      */
     final int offsetBits;
+
+    /**
+     * The optional {@link ByteBuffer} to be used as the write cache.
+     */
+    final ByteBuffer writeCache;
     
     /**
      * The next offset at which a record would be written on the store.  The
@@ -239,8 +244,9 @@ public class FileMetadata {
     FileMetadata(File file, BufferMode bufferMode, boolean useDirectBuffers,
             long initialExtent, long maximumExtent, boolean create,
             boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
-            ForceEnum forceWrites, int offsetBits, boolean validateChecksum,
-            final long createTime, ChecksumUtility checker) throws RuntimeException {
+            ForceEnum forceWrites, int offsetBits, ByteBuffer writeCache,
+            boolean validateChecksum, final long createTime,
+            ChecksumUtility checker) throws RuntimeException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -276,6 +282,8 @@ public class FileMetadata {
         this.bufferMode = bufferMode;
 
         this.offsetBits = offsetBits;
+
+        this.writeCache = writeCache;
         
         this.fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
