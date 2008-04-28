@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 public class EmbeddedLoadBalancerService extends LoadBalancerService {
 
-    final private UUID serviceUUID;
+//    final private UUID serviceUUID;
     final private String hostname;
     
     public EmbeddedLoadBalancerService(UUID serviceUUID,
@@ -21,10 +21,12 @@ public class EmbeddedLoadBalancerService extends LoadBalancerService {
         
         super( properties );
         
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
+//        if (serviceUUID == null)
+//            throw new IllegalArgumentException();
+
+//        this.serviceUUID = serviceUUID;
         
-        this.serviceUUID = serviceUUID;
+        setServiceUUID(serviceUUID);
         
         String hostname;
         try {
@@ -40,11 +42,11 @@ public class EmbeddedLoadBalancerService extends LoadBalancerService {
 
     }
 
-    public UUID getServiceUUID() {
-        
-        return serviceUUID;
-        
-    }
+//    public UUID getServiceUUID() {
+//        
+//        return serviceUUID;
+//        
+//    }
 
     protected String getClientHostname() {
 

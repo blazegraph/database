@@ -2221,9 +2221,22 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public BTree registerIndex(String name, IndexMetadata metadata) {
 
-        /*
-         * Verify some aspects of the partition metadata.
-         */
+        validateIndexMetadata(name, metadata);
+        
+        final BTree btree = BTree.create(this, metadata);
+
+        return registerIndex(name, btree);
+        
+    }
+    
+    /**
+     * Validates some aspects of the {@link IndexMetadata} for an index
+     * partition and sets the {@link IResourceMetadata} to this journal if it is
+     * <code>null</code> since a remote caller can not have the correct
+     * metadata on hand when they formulate the request.
+     */
+    protected void validateIndexMetadata(String name, IndexMetadata metadata) {
+
         final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
         if (pmd != null) {
 
@@ -2292,15 +2305,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             
         }
 
-        final BTree btree = BTree.create(this, metadata);
-
-        return registerIndex(name, btree);
-        
     }
     
     /**
-     * Registers a named index. Once registered the index will participate in
-     * atomic commits.
+     * Registers a named index (core impl). Once registered the index will
+     * participate in atomic commits.
      * <p>
      * Note: A named index must be registered outside of any transaction before
      * it may be used inside of a transaction.

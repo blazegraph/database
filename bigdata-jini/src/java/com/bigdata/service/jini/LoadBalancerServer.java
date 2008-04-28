@@ -7,7 +7,6 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
-import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.export.ServerContext;
@@ -138,7 +137,7 @@ public class LoadBalancerServer extends AbstractServer {
             RemoteAdministrable, RemoteDestroyAdmin {
         
         protected LoadBalancerServer server;
-        private UUID serviceUUID;
+//        private UUID serviceUUID;
         
         public AdministrableLoadBalancer(LoadBalancerServer server,Properties properties) {
             
@@ -266,17 +265,17 @@ public class LoadBalancerServer extends AbstractServer {
             
         }
 
-        public UUID getServiceUUID() {
-
-            if (serviceUUID == null) {
-
-                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-
-            }
-
-            return serviceUUID;
-            
-        }
+//        public UUID getServiceUUID() {
+//
+//            if (serviceUUID == null) {
+//
+//                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
+//
+//            }
+//
+//            return serviceUUID;
+//            
+//        }
         
         /**
         * Note: {@link InetAddress#getHostName()} is used. This method makes a

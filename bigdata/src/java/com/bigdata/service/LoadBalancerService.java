@@ -138,8 +138,8 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  *       original counters (as averaged) and the massaged metrics on which we
  *       plan to make decisions.
  */
-abstract public class LoadBalancerService implements ILoadBalancerService,
-        IServiceShutdown {
+abstract public class LoadBalancerService extends AbstractService
+    implements ILoadBalancerService, IServiceShutdown {
 
     final static protected Logger log = Logger.getLogger(LoadBalancerService.class);
 
@@ -658,6 +658,31 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     }
 
     /**
+     * Extended to setup the generic per-service {@link CounterSet}.
+     */
+    public void setServiceUUID(UUID serviceUUID) {
+        
+        super.setServiceUUID(serviceUUID);
+        
+        final String ps = ICounterSet.pathSeparator;
+        
+        final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
+                   
+        final String pathPrefix = ps + hostname + ps + "service" + ps
+                + serviceUUID + ps;
+
+        final CounterSet serviceRoot = counters.makePath(pathPrefix);
+
+        /*
+         * Service generic counters. 
+         */
+        
+        AbstractStatisticsCollector.addBasicServiceOrClientCounters(
+                serviceRoot, this, properties);
+
+    }
+    
+    /**
      * Computes and updates the {@link ServiceScore}s based on an examination
      * of aggregated performance counters.
      * 
@@ -718,6 +743,8 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
                 updateHostScores();
                 
                 updateServiceScores();
+                
+                setupCounters();
                 
                 logCounters();
                 
@@ -842,7 +869,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
                 activeHosts.put(score.hostname, score);
 
                 log.info(score.toString()); //@todo debug?
-
+                
             }
             
             log.info("The most active host was: " + a[a.length - 1]);
@@ -853,7 +880,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
             LoadBalancerService.this.hostScores.set( a );
 
             log.info("Updated scores for "+a.length+" hosts");
-
+            
         }
 
         /**
@@ -1290,6 +1317,138 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         }
 
         /**
+         * Sets up reporting for the computed per-host and per-service scores.
+         * These counters are reported under the service {@link UUID} for the
+         * {@link LoadBalancerService} itself. This makes it easy to consult the
+         * scores for the various hosts and services.
+         * <p>
+         * Note: The host and service scores will not appear until the
+         * {@link UpdateTask} has executed and those scores have been computed.
+         * By default, the first execution of the {@link UpdateTask} is delayed
+         * until we expect to have the host and service counters from two
+         * reporting periods. This means that you can expect to wait at least
+         * two minutes before these data will appear.
+         * 
+         * @todo counters for service scores should be eventually removed after
+         *       the service leaves. Likewise for host scores. However, these
+         *       counters SHOULD remain available for a while for post-mortem of
+         *       the service/host, e.g., at least 2-3 days.
+         */
+        protected void setupCounters() {
+            
+            final String ps = ICounterSet.pathSeparator;
+            
+            final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
+
+            final UUID serviceUUID = getServiceUUID();
+
+            if (serviceUUID == null) {
+
+                log.warn("No serviceUUID for this service?");
+                
+                return;
+                
+            }
+            
+            final String pathPrefix = ps + hostname + ps + "service" + ps
+                    + serviceUUID + ps;
+
+            final CounterSet serviceRoot = counters.makePath(pathPrefix);
+
+            final long now = System.currentTimeMillis();
+            
+            // per-host scores.
+            {
+
+                log.info("Will setup counters for "+activeHosts.size()+" hosts");
+                
+                final CounterSet tmp = serviceRoot.makePath("hosts");
+
+                synchronized (tmp) {
+                    
+                    for (HostScore hs : activeHosts.values()) {
+
+                        final String hn = hs.hostname;
+
+                        if (tmp.getChild(hn) == null) {
+
+                            log.info("Adding counter for host: "+hn);
+                            
+                            tmp.addCounter(hn, new HistoryInstrument<String>(new String[]{}));
+                            
+                        }
+                        
+                        {
+
+                            final ICounter counter = (ICounter) tmp.getChild(hn);
+
+                            final HistoryInstrument<String> inst = (HistoryInstrument<String>) counter
+                                    .getInstrument();
+
+                            final HostScore score = activeHosts.get(hn);
+                            
+                            if (score != null) {
+
+                                inst.add(now, score.toString());
+                                
+                            }
+
+                        }
+
+                    }
+
+                }
+                
+            }
+            
+            // per-service scores.
+            {
+                
+                log.info("Will setup counters for "+activeServices.size()+" services");
+
+                final CounterSet tmp = serviceRoot.makePath("services");
+
+                synchronized (tmp) {
+
+                    for (ServiceScore ss : activeServices.values()) {
+
+                        final String uuidStr = ss.serviceUUID.toString();
+
+                        if (tmp.getChild(uuidStr) == null) {
+
+                            log.info("Adding counter for service: "+uuidStr);
+
+                            tmp.addCounter(uuidStr, new HistoryInstrument<String>(new String[]{}));
+                            
+                        }
+                        
+                        {
+
+                            final ICounter counter = (ICounter) tmp.getChild(uuidStr);
+
+                            final HistoryInstrument<String> inst = (HistoryInstrument<String>) counter
+                                    .getInstrument();
+
+                            final ServiceScore score = activeServices
+                                    .get(ss.serviceUUID);
+
+                            if (score != null) {
+
+                                inst.add(now, score.toString());
+
+                            }
+
+                        }
+
+                    }
+
+                }
+                
+            }
+            
+        }
+        
+        /**
          * Writes the counters on a file.
          * 
          * @see Options
@@ -1368,18 +1527,14 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     /**
      * Notify the {@link LoadBalancerService} that a new service is available.
      * <p>
-     * Note: You CAN NOT use this method to handle a Jini service join since you
+     * Note: You CAN NOT use this method to handle a Jini service join (where a
+     * client notices the join of some service with a jini registrar) since you
      * will not have access to the hostname. The hostname is only available when
-     * the service itself uses {@link #notify(String, byte[])} for the first
-     * time.
+     * the service itself uses {@link #notify(String, byte[])}.
      * 
      * @param serviceUUID
-     * 
-     * @todo Jini is not restricted to host-based protocols, but may be there is
-     *       a way to get the hostname from the service item? If you assume that
-     *       it is a TCP connection?
      */
-    protected void join(UUID serviceUUID,String hostname) {
+    protected void join(UUID serviceUUID, String hostname) {
         
         log.info("serviceUUID="+serviceUUID+", hostname="+hostname);
         
@@ -1398,7 +1553,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
              */
             if(activeServices.putIfAbsent(serviceUUID, new ServiceScore(hostname, serviceUUID))!=null) {
              
-                log.warn("Already joined: serviceUUID="+serviceUUID+", hostname="+hostname);
+                log.info("Already joined: serviceUUID="+serviceUUID+", hostname="+hostname);
                 
                 return;
                 
@@ -1473,10 +1628,12 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     final private IInstrumentFactory instrumentFactory = DefaultInstrumentFactory.INSTANCE;
     
     /**
-     * Note: {@link #getClientHostname()} is the fully qualified hostname of the
-     * client.
+     * Note: Only idata services are entered into the internal tables for the
+     * load balancer. Other kinds of services are noted and the reported
+     * counters are aggregated.
      */
-    public void notify(String msg, UUID serviceUUID, byte[] data) {
+    public void notify(final String msg, final UUID serviceUUID,
+            final String serviceIFace, final byte[] data) {
 
         setupLoggingContext();
         
@@ -1484,6 +1641,16 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         
             log.info(msg+" : serviceUUID="+serviceUUID);
 
+            if (IDataService.class.getName().equals(serviceIFace)) {
+
+                /*
+                 * Note: only IDataService gets into the internal tables.
+                 */
+                
+                join(serviceUUID, getClientHostname());
+
+            }
+            
             try {
                 
                 // read into our local history.

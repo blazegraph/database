@@ -58,6 +58,13 @@ public interface ICounterHierarchy {
      * The namespace for counters dealing with memory (RAM).
      */
     String Memory = "Memory";
+    
+    /**
+     * The namespace for counters dealing with garbage collection (GC is per-JVM
+     * and is therefore reported for each service, so this namespace is relative
+     * to the counter set for the service).
+     */
+    String Memory_GarbageCollectors = Memory + ps + "Garbage Collectors";
 
     /**
      * The namespace for counters dealing with logical aggregations of disk.

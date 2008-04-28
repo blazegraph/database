@@ -28,16 +28,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
@@ -46,10 +53,15 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounter;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.SparseRowStore;
@@ -94,6 +106,17 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
         log.info("begin");
 
+        // terminate sampling and reporting tasks.
+        sampleService.shutdown();
+
+        if (statisticsCollector != null) {
+
+            statisticsCollector.stop();
+
+            statisticsCollector = null;
+
+        }
+
         // allow client requests to finish normally.
         threadPool.shutdown();
 
@@ -110,9 +133,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
             log.warn("Interrupted awaiting thread pool termination.", e);
 
         }
+        
+        // @todo run a final ReportTask?
+        // @todo send leave() notice to the LBS?
 
         log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
-        
+
         client = null;
         
     }
@@ -143,6 +169,17 @@ abstract public class AbstractFederation implements IBigdataFederation {
         // stop client requests.
         threadPool.shutdownNow();
         
+        if (statisticsCollector != null) {
+
+            statisticsCollector.stop();
+
+            statisticsCollector = null;
+
+        }
+
+        // terminate sampling and reporting tasks immediately.
+        sampleService.shutdownNow();
+
         log.info("done: elapsed="+(System.currentTimeMillis()-begin));
         
         client = null;
@@ -172,9 +209,105 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * Used to sample and report on the queue associated with the
      * {@link #threadPool}.
      */
-    protected final ScheduledExecutorService sampleService = Executors
+    private final ScheduledExecutorService sampleService = Executors
             .newSingleThreadScheduledExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
+    
+    /**
+     * Collects interesting statistics about the {@link #getThreadPool()}
+     * for reporting to the {@link ILoadBalancerService}.
+     */
+    private final QueueStatisticsTask queueStatisticsTask;
+
+    /**
+     * Collects interesting statistics on the client's host and process
+     * for reporting to the {@link ILoadBalancerService}.
+     */
+    private AbstractStatisticsCollector statisticsCollector;
+    
+    /**
+     * Adds a task which will run until cancelled, until it throws an exception,
+     * or until the federation is {@link #shutdown()}.
+     * <p>
+     * Note: Tasks run on this service generally update sampled values on
+     * {@link ICounter}s reported to the {@link ILoadBalancerService}. Basic
+     * information on the {@link #getThreadPool()} is reported automatically.
+     * Clients may add additional tasks to report on client-side aspects of
+     * their application.
+     * <p>
+     * Note: Non-sampled counters are automatically conveyed to the
+     * {@link ILoadBalancerService} once added to the basic {@link CounterSet}
+     * returned by {@link #getCounterSet()}.
+     * 
+     * @param task
+     *            The task.
+     * @param initialDelay
+     *            The initial delay.
+     * @param delay
+     *            The delay between invocations.
+     * @param unit
+     *            The units for the delay parameters.
+     * 
+     * @return The {@link ScheduledFuture} for that task.
+     */
+    public ScheduledFuture addScheduledStatisticsTask(Runnable task,
+            long initialDelay, long delay, TimeUnit unit) {
+
+        if (task == null)
+            throw new IllegalArgumentException();
+
+        log.info("Adding task: " + task.getClass());
+
+        return sampleService.scheduleWithFixedDelay(task, initialDelay, delay,
+                unit);
+
+    }
+
+    synchronized public CounterSet getCounterSet() {
+
+        if (countersRoot == null) {
+
+            countersRoot = new CounterSet();
+
+            if (statisticsCollector != null) {
+
+                countersRoot.attach(statisticsCollector.getCounters());
+
+            }
+
+            final CounterSet clientRoot = countersRoot
+                    .makePath(getClientCounterPathPrefix());
+
+            /*
+             * Basic counters.
+             */
+
+            AbstractStatisticsCollector.addBasicServiceOrClientCounters(
+                    clientRoot, getClient(), client.getProperties());
+
+            queueStatisticsTask.addCounters(clientRoot.makePath("Thread Pool"));
+
+        }
+
+        return countersRoot;
+        
+    }
+    private CounterSet countersRoot;
+    
+    public String getClientCounterPathPrefix() {
+
+        final UUID clientUUID = getClient().getClientUUID();
+
+        final String ps = ICounterSet.pathSeparator;
+
+        final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
+
+        final String pathPrefix = ps + hostname + ps + "client" + ps
+                + clientUUID + ps;
+
+        return pathPrefix;
+
+    }
     
     public ExecutorService getThreadPool() {
         
@@ -217,24 +350,47 @@ abstract public class AbstractFederation implements IBigdataFederation {
         }
         
         /*
+         * Start collecting performance counters from the OS.
+         */
+        {
+            
+            final UUID clientUUID = client.getClientUUID();
+            
+            log.info("Starting performance counter collection: uuid="
+                            + clientUUID);
+
+            Properties p = client.getProperties();
+
+            p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
+                    "client" + ICounterSet.pathSeparator
+                            + clientUUID.toString());
+
+            statisticsCollector = AbstractStatisticsCollector.newInstance(p);
+
+            statisticsCollector.start();
+        
+        }
+
+        /*
          * Setup sampling and reporting on the client's thread pool.
-         * 
-         * @todo report to the load balancer.
-         * 
-         * @todo config. See ConcurrencyManager, which also setups up some queue
-         * monitors.
          */
         {
 
+            {
             final long initialDelay = 0; // initial delay in ms.
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-            QueueStatisticsTask queueLengthTask = new QueueStatisticsTask(
-                    "clientThreadPool", threadPool);
-
-            sampleService.scheduleWithFixedDelay(queueLengthTask, initialDelay,
+            queueStatisticsTask = new QueueStatisticsTask("clientThreadPool",
+                    threadPool);
+            
+            addScheduledStatisticsTask(queueStatisticsTask, initialDelay,
                     delay, unit);
+            }
+
+            addScheduledStatisticsTask(new ReportTask(), 60/* initialDelay */,
+                    60/* delay */, TimeUnit.SECONDS);
+            
         }
 
     }
@@ -690,4 +846,98 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     }
 
+    /**
+     * Periodically send performance counter data to the
+     * {@link ILoadBalancerService}.
+     * 
+     * @see DataService.ReportTask
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class ReportTask implements Runnable {
+
+        /**
+         * Note: The logger is named for this class, but since it is an inner
+         * class the name uses a "$" delimiter (vs a ".") between the outer and
+         * the inner class names.
+         */
+        final protected Logger log = Logger.getLogger(ReportTask.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+
+        public ReportTask() {
+        }
+
+        /**
+         * Note: Don't throw anything here since we don't want to have the task
+         * suppressed!
+         */
+        public void run() {
+
+            try {
+
+                reportPerformanceCounters();
+                
+            } catch (Throwable t) {
+
+                log.warn("Problem in report task?", t);
+
+            }
+
+        }
+        
+        /**
+         * Send performance counters to the load balancer.
+         * 
+         * @throws IOException 
+         */
+        protected void reportPerformanceCounters() throws IOException {
+
+            final UUID clientUUID = getClient().getClientUUID();
+
+            final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+
+            if (loadBalancerService == null) {
+
+                log.warn("Could not discover load balancer service.");
+
+                return;
+
+            }
+
+            /*
+             * @todo this is probably worth compressing as there will be a lot
+             * of redundency.
+             * 
+             * @todo allow filter on what gets sent to the load balancer?
+             */
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(
+                    Bytes.kilobyte32 * 2);
+
+            getCounterSet().asXML(baos, "UTF-8", null/* filter */);
+
+            loadBalancerService.notify("Hello", clientUUID,
+                    IBigdataClient.class.getName(), baos.toByteArray());
+
+            log.info("Notified the load balancer.");
+            
+        }
+
+    }
+
+    /**
+     * Forces the immediate reporting of the {@link CounterSet} to the
+     * {@link ILoadBalancerService}.
+     */
+    public void reportCounters() {
+
+        new ReportTask().run();
+        
+    }
+    
 }

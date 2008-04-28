@@ -19,16 +19,16 @@ import java.util.concurrent.atomic.AtomicLong;
 public class TaskCounters {
 
     /** #of tasks that have been submitted. */
-    public long submittedCount;
+    public long taskSubmitCount;
     
     /** #of tasks that have been completed. */
-    public long completedCount;
+    public long taskCompleteCount;
 
     /** #of tasks that failed. */
-    public long failCount;
+    public long tailFailCount;
 
     /** #of tasks that succeeded. */
-    public long successCount;
+    public long taskSuccessCount;
 
     /**
      * Cumulative elapsed time waiting on the queue pending service.
@@ -70,13 +70,13 @@ public class TaskCounters {
      */
     public void add(TaskCounters c) {
 
-        submittedCount += c.submittedCount;
+        taskSubmitCount += c.taskSubmitCount;
 
-        completedCount += c.completedCount;
+        taskCompleteCount += c.taskCompleteCount;
 
-        failCount += c.failCount;
+        tailFailCount += c.tailFailCount;
 
-        successCount += c.successCount;
+        taskSuccessCount += c.taskSuccessCount;
 
         queueWaitingTime += c.queueWaitingTime;
 

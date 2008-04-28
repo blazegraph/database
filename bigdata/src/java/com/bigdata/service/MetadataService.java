@@ -39,7 +39,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
@@ -1028,16 +1027,8 @@ abstract public class MetadataService extends DataService implements
              * Create the metadata index.
              */
             
-            AbstractJournal journal = getJournal();
-            
-            MetadataIndex mdi = MetadataIndex.create(journal,
+            final MetadataIndex mdi = MetadataIndex.create(getJournal(),
                     metadataIndexUUID, metadata);
-
-            /*
-             * Register the metadata index with the metadata service. This
-             * registration will not be restart safe until the task commits.
-             */
-            journal.registerIndex(metadataName, mdi);
 
             /*
              * Map the partitions onto the data services.
@@ -1110,6 +1101,14 @@ abstract public class MetadataService extends DataService implements
                 mdi.insert(separatorKeys[i], SerializerUtil.serialize(partitions[i]));
             
             }
+
+            /*
+             * Register the metadata index with the metadata service. This
+             * registration will not be restart safe until the task commits.
+             * 
+             * FIXME violates atomic change in visibility
+             */
+            getJournal().registerIndex(metadataName, mdi);
 
             // Done.
             

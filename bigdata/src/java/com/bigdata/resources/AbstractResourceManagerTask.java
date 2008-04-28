@@ -51,7 +51,9 @@ import com.bigdata.service.IMetadataService;
  * actually committed its changes on the live journal. If the commit on the
  * journal fails then the metadata index will now reference index partitions
  * which do not exist (or do not have all their data) on the live journal. A
- * full transaction might be one way to close this gap.
+ * full transaction might be one way to close this gap. The opportunity for
+ * failure could be significantly reduced by checkpointing all indices before we
+ * RMI the MDS.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

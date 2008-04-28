@@ -28,6 +28,7 @@
 package com.bigdata.service;
 
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
@@ -168,6 +169,11 @@ public interface IBigdataClient {
      * An object wrapping the properties used to configure the client.
      */
     public Properties getProperties();
+    
+    /**
+     * The {@link UUID} for this client (assigned when the client is started).
+     */
+    public UUID getClientUUID();
 
     /**
      * Configuration options for {@link IBigdataClient}s.

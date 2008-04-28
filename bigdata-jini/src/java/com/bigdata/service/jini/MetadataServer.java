@@ -135,7 +135,7 @@ public class MetadataServer extends DataServer {
             implements Remote, RemoteAdministrable, RemoteDestroyAdmin {
         
         protected MetadataServer server;
-        private UUID serviceUUID;
+//        private UUID serviceUUID;
 
         /**
          * @param properties
@@ -211,17 +211,17 @@ public class MetadataServer extends DataServer {
             
         }
         
-        public UUID getServiceUUID() {
-
-            if (serviceUUID == null) {
-
-                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-
-            }
-            
-            return serviceUUID;
-            
-        }
+//        public UUID getServiceUUID() {
+//
+//            if (serviceUUID == null) {
+//
+//                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
+//
+//            }
+//            
+//            return serviceUUID;
+//            
+//        }
 
         public ILoadBalancerService getLoadBalancerService() {
             

@@ -209,15 +209,15 @@ public class EmbeddedFederation extends AbstractFederation {
         
         for(int i=0; i<n; i++) {
             
-            try {
+//            try {
             
                 uuids[i] = getDataService( i ).getServiceUUID();
             
-            } catch (IOException e) {
-                
-                throw new RuntimeException( e );
-                
-            }
+//            } catch (IOException e) {
+//                
+//                throw new RuntimeException( e );
+//                
+//            }
             
         }
         

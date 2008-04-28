@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,30 +20,39 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
-package com.bigdata.journal;
 
-import com.bigdata.btree.IIndex;
+*/
+/*
+ * Created on Apr 28, 2008
+ */
+
+package com.bigdata.service;
+
+import java.io.IOException;
+import java.rmi.Remote;
+import java.util.UUID;
 
 /**
- * Interface accessing named indices.
+ * Common service interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndexStore {
+public interface IService extends Remote {
 
     /**
-     * Return a view of the named index as of the specified timestamp.
+     * The unique identifier for this data service.
+     * <p>
+     * Note: Some service discovery frameworks (Jini) will assign the service a
+     * {@link UUID} asynchronously after a new service starts, in which case
+     * this method will return <code>null</code> until the service
+     * {@link UUID} has been assigned.
      * 
-     * @param name
-     *            The index name.
-     * @param timestamp
-     *            The timestamp - see {@link ITx}.
+     * @return The unique data service identifier.
      * 
-     * @return The index or <code>null</code> iff there is no index registered
-     *         with that name.
+     * @throws IOException
+     *             since you can use this method with RMI.
      */
-    public IIndex getIndex(String name, long timestamp);
-
+    UUID getServiceUUID() throws IOException;
+    
 }

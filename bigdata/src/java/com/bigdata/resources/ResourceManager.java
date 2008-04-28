@@ -226,11 +226,22 @@ abstract public class ResourceManager extends OverflowManager implements IResour
             }
             
             /*
-             * Note: these counters are detached and reattached to the new
-             * live journal during overflow processing.
+             * Note: these counters are detached and reattached to the new live
+             * journal during overflow processing.
              * 
-             * FIXME also attach when startup completes successfully rather
-             * than assuming that it already has done so.
+             * @todo This assumes that the StoreManager is running. Normally,
+             * this will be true since the DataService does not setup its
+             * counter set until the store manager is running and the service
+             * UUID has been assigned. However, eagerly requesting the counters
+             * set would violate that assumption and cause an exception to be
+             * thrown here since the live journal is not defined until the
+             * StoreManager is running.
+             * 
+             * It would be best to modify this to attach the live journal
+             * counters when the StoreManager startup completes successfully
+             * rather than assuming that it already has done so. However, the
+             * counter set for the ResourceManager is not currently defined
+             * until the StoreManager is running...
              */
             root.makePath("Live Journal").attach(getLiveJournal().getCounters());
                         

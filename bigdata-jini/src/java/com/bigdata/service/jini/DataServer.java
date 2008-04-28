@@ -279,7 +279,7 @@ public class DataServer extends AbstractServer {
             RemoteAdministrable, RemoteDestroyAdmin {
         
         protected DataServer server;
-        private UUID serviceUUID;
+//        private UUID serviceUUID;
         
         public AdministrableDataService(DataServer server,Properties properties) {
             
@@ -382,17 +382,17 @@ public class DataServer extends AbstractServer {
 
         }
 
-        public UUID getServiceUUID() {
-
-            if (serviceUUID == null) {
-
-                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-
-            }
-
-            return serviceUUID;
-            
-        }
+//        public UUID getServiceUUID() {
+//
+//            if (serviceUUID == null) {
+//
+//                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
+//
+//            }
+//
+//            return serviceUUID;
+//            
+//        }
 
         synchronized public void shutdown() {
             

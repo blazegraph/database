@@ -12,10 +12,6 @@ import com.bigdata.counters.Instrument;
 /**
  * Helper class maintains the moving average of the length of a queue.
  * 
- * @todo the instruments counters declared on this class could be collected and
- *       reported as a {@link CounterSet}.  this would make it somewhat easier
- *       to use.  this could also make toString() a bit easier to write.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -357,7 +353,7 @@ public class QueueStatisticsTask implements Runnable {
                  */
 
                 // #of tasks that have been submitted so far.
-                final long taskCount = taskCounters.completedCount;
+                final long taskCount = taskCounters.taskCompleteCount;
                 
                 if (taskCount > 0) {
 
@@ -376,7 +372,7 @@ public class QueueStatisticsTask implements Runnable {
 
                         averageTaskQueueWaitingTime = averageQueueLength(
                                 averageTaskQueueWaitingTime,
-                                (delta * scalingFactor / taskCounters.completedCount),
+                                (delta * scalingFactor / taskCounters.taskCompleteCount),
                                 w);
 
                     }
@@ -396,7 +392,7 @@ public class QueueStatisticsTask implements Runnable {
 
                         averageTaskLockWaitingTime = averageQueueLength(
                                 averageTaskLockWaitingTime,
-                                (delta * scalingFactor / taskCounters.completedCount),
+                                (delta * scalingFactor / taskCounters.taskCompleteCount),
                                 w);
 
                     }
@@ -417,7 +413,7 @@ public class QueueStatisticsTask implements Runnable {
 
                         averageTaskServiceTime = averageQueueLength(
                                 averageTaskServiceTime,
-                                (delta * scalingFactor / taskCounters.completedCount),
+                                (delta * scalingFactor / taskCounters.taskCompleteCount),
                                 w);
 
                     }
@@ -437,7 +433,7 @@ public class QueueStatisticsTask implements Runnable {
 
                         averageTaskQueuingTime = averageQueueLength(
                                 averageTaskQueuingTime,
-                                (delta * scalingFactor / taskCounters.completedCount),
+                                (delta * scalingFactor / taskCounters.taskCompleteCount),
                                 w);
 
                     }
@@ -474,6 +470,186 @@ public class QueueStatisticsTask implements Runnable {
 
         }
         
+    }
+
+    /**
+     * Adds counters for all innate variables defined for a
+     * {@link ThreadPoolExecutor} and for each of the variables computed by this
+     * class. Note that some variables are only available when the <i>service</i>
+     * specified to the ctor is a {@link WriteExecutorService}.
+     * 
+     * @param counterSet
+     *            The counters will be added to this {@link CounterSet}.
+     * @param service
+     *            The service for which the counters will be reported.
+     * 
+     * @return The caller's <i>counterSet</i>
+     */
+    public CounterSet addCounters(CounterSet counterSet) {
+        
+        /*
+         * Defined for ThreadPoolExecutor.
+         */
+        counterSet.addCounter("#active",
+                new Instrument<Integer>() {
+                    public void sample() {
+                        setValue(service.getActiveCount());
+                    }
+                });
+        
+        counterSet.addCounter("#queued",
+                new Instrument<Integer>() {
+                    public void sample() {
+                        setValue(service.getQueue().size());
+                    }
+                });
+
+        counterSet.addCounter("#completed",
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(service.getCompletedTaskCount());
+                    }
+                });
+        
+        counterSet.addCounter("poolSize",
+                new Instrument<Integer>() {
+                    public void sample() {
+                        setValue(service.getPoolSize());
+                    }
+                });
+
+        counterSet.addCounter("largestPoolSize",
+                new Instrument<Integer>() {
+                    public void sample() {
+                        setValue(service.getLargestPoolSize());
+                    }
+                });
+
+        /*
+         * Computed variables based on the service itself.
+         */
+        counterSet.addCounter("averageQueueLength", averageQueueLengthInst);
+
+        counterSet.addCounter("averageQueueActiveCount",
+                averageQueueActiveCountInst);
+
+        counterSet.addCounter("averageQueueSize", averageQueueSizeInst);
+
+        /*
+         * Computed variables based on the per-task counters.
+         */
+        if (taskCounters != null) {
+
+            /*
+             * Simple counters.
+             */
+
+            // count of all tasks submitted to the service. 
+            counterSet.addCounter("taskSubmittedCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(taskCounters.taskSubmitCount);
+                }
+            });
+
+            // count of all tasks completed by the service (failed + success).
+            counterSet.addCounter("taskCompleteCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(taskCounters.taskCompleteCount);
+                }
+            });
+
+            // count of all tasks which failed during execution.
+            counterSet.addCounter("taskFailedCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(taskCounters.tailFailCount);
+                }
+            });
+
+            // count of all tasks which were successfully executed.
+            counterSet.addCounter("taskSuccessCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(taskCounters.taskSuccessCount);
+                }
+            });
+
+            /*
+             * Moving averages.
+             */
+            
+            counterSet.addCounter("averageTaskQueueWaitingTime",
+                    averageTaskQueueWaitingTimeInst);
+
+            if(service instanceof WriteExecutorService) {
+            
+                counterSet.addCounter("averageTaskLockWaitingTime",
+                    averageTaskLockWaitingTimeInst);
+                
+            }
+
+            counterSet.addCounter("averageTaskServiceTime",
+                    averageTaskServiceTimeInst);
+
+            counterSet.addCounter("averageTaskQueuingTime",
+                    averageTaskQueuingTimeInst);
+            
+        }
+    
+        /*
+         * These data are available only for the write service.
+         */
+        if(service instanceof WriteExecutorService) {
+            
+            final WriteExecutorService writeService = (WriteExecutorService)service;
+           
+            /*
+             * Simple counters.
+             */
+            
+            counterSet.addCounter("#commits", new Instrument<Long>() {
+                public void sample() {
+                    setValue(writeService.getGroupCommitCount());
+                }
+            });
+
+            counterSet.addCounter("#aborts", new Instrument<Long>() {
+                public void sample() {
+                    setValue(writeService.getAbortCount());
+                }
+            });
+
+            counterSet.addCounter("overflowCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(writeService.getOverflowCount());
+                }
+            });
+
+            /*
+             * Maximum observed values.
+             */
+
+            counterSet.addCounter("maxLatencyUntilCommit",
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService.getMaxLatencyUntilCommit());
+                        }
+                    });
+
+            counterSet.addCounter("maxCommitLatency", new Instrument<Long>() {
+                public void sample() {
+                    setValue(writeService.getMaxCommitLatency());
+                }
+            });
+
+            counterSet.addCounter("maxRunning", new Instrument<Long>() {
+                public void sample() {
+                    setValue(writeService.getMaxRunning());
+                }
+            });
+
+        }
+
+        return counterSet;
+
     }
 
 }

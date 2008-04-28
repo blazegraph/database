@@ -65,6 +65,7 @@ import net.jini.lookup.ServiceIDListener;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.service.AbstractService;
 import com.bigdata.service.IServiceShutdown;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.admin.StorageLocationAdmin;
@@ -331,6 +332,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         LookupLocator[] unicastLocators = null;
         String[] groups = null;
         Properties properties = null;
+        boolean readServiceIDFromFile = false;
         
         try {
             
@@ -374,6 +376,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 try {
 
                     serviceID = readServiceId(serviceIdFile);
+                    
+                    readServiceIDFromFile = true;
                     
                 } catch(IOException ex) {
 
@@ -534,6 +538,17 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             
         }
         
+        if (readServiceIDFromFile && impl != null && impl instanceof AbstractService) {
+
+            /*
+             * Notify the service that it's service UUID has been set.
+             */
+
+            ((AbstractService) impl).setServiceUUID(JiniUtil
+                    .serviceID2UUID(serviceID));
+
+        }
+        
     }
 
     /**
@@ -669,6 +684,17 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 log.error("Could not save ServiceID", ex);
                 
             }
+            
+        }
+        
+        if(impl != null && impl instanceof AbstractService) {
+
+            /*
+             * Notify the service that it's service UUID has been set.
+             */
+            
+            ((AbstractService) impl).setServiceUUID(JiniUtil
+                    .serviceID2UUID(serviceID));
             
         }
 

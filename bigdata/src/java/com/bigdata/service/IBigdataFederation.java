@@ -33,6 +33,8 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITimestampService;
@@ -87,6 +89,26 @@ public interface IBigdataFederation extends IIndexManager {
      */
     public ExecutorService getThreadPool();
 
+    /**
+     * The {@link CounterSet} which the client will use report its statistics to
+     * the {@link ILoadBalancerService}.
+     * <p>
+     * Note: Applications MAY add their own counters (within a suitable
+     * namespace) to the returned {@link CounterSet} in order to report their
+     * own performance data to the {@link ILoadBalancerService}.
+     * 
+     * @see #getClientCounterPathPrefix()
+     */
+    public CounterSet getCounterSet();
+    
+    /**
+     * The path prefix under which all of the client's counters are located.
+     * This includes the fully qualified hostname, the word "client', and the
+     * {@link UUID} for the client. The returned path prefix is terminated by
+     * an {@link ICounterSet#pathSeparator}.
+     */
+    public String getClientCounterPathPrefix();
+    
     /**
      * Return an array UUIDs for {@link IDataService}s.
      * 

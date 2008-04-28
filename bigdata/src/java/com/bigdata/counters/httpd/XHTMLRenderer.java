@@ -688,7 +688,7 @@ public class XHTMLRenderer {
         
         w.write(" <tr\n>");
         w.write("  <th rowspan=\"2\" >Name</th\n>");
-        w.write("  <th colspan=\"3\">Unit Average</th\n>");
+        w.write("  <th colspan=\"3\">Averages</th\n>");
         w.write("  <th rowspan=\"2\">Current</th\n>");
         w.write(" </tr\n>");
         

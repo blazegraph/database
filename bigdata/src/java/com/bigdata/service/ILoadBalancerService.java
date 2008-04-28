@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
-import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -40,15 +39,8 @@ import java.util.concurrent.TimeoutException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILoadBalancerService extends Remote {
+public interface ILoadBalancerService extends IService {
     
-    /**
-     * The {@link UUID} of the {@link ILoadBalancerService} itself.
-     * 
-     * @throws IOException
-     */
-    public UUID getServiceUUID() throws IOException;
-
     /**
      * Notify the load balancer service that the identified service is shutting
      * down.
@@ -67,13 +59,21 @@ public interface ILoadBalancerService extends Remote {
      * @param msg
      *            A message.
      * @param serviceUUID
-     *            The service {@link UUID} on which the client is reporting.
+     *            The service {@link UUID} that is self-reporting.
+     * @param serviceIface
+     *            The name of the primary interface which characterizes the
+     *            service as reported by {@link Class#getName()}. For example,
+     *            a {@link DataService} would report {@link IDataService} while
+     *            a {@link MetadataService} would report
+     *            {@link IMetadataService} and a client would report
+     *            {@link IBigdataClient}.
      * @param data
      *            The serialized performance counter data.
      * 
      * @throws IOException
      */
-    public void notify(String msg, UUID serviceUUID, byte[] data) throws IOException;
+    public void notify(String msg, UUID serviceUUID, String serviceIface,
+            byte[] data) throws IOException;
 
     /**
      * A warning issued by a client when it is in danger of depleting its
@@ -82,21 +82,21 @@ public interface ILoadBalancerService extends Remote {
      * @param msg
      *            A message.
      * @param serviceUUID
-     *            The service {@link UUID} on which the client is reporting.
+     *            The service {@link UUID} that is self-reporting.
      * 
      * @throws IOException
      */
     public void warn(String msg,UUID serviceUUID) throws IOException;
 
     /**
-     * An urgent warning issue by a client when it is in immediate danger of
-     * depleting its resources with a consequence of immediate service and/or
-     * host failure(s).
+     * An urgent warning issued the caller is in immediate danger of depleting
+     * its resources with a consequence of immediate service and/or host
+     * failure(s).
      * 
      * @param msg
      *            A message.
      * @param serviceUUID
-     *            The service {@link UUID} on which the client is reporting.
+     *            The service {@link UUID} that is self-reporting.
      * 
      * @throws IOException
      */

@@ -29,8 +29,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters;
 
 import java.io.IOException;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -42,6 +47,7 @@ import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -226,6 +232,192 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         
         return countersRoot;
         
+    }
+
+    /**
+     * Adds the Info and Memory counter sets under the <i>serviceRoot</i>.
+     * 
+     * @param serviceRoot
+     *            The {@link CounterSet} corresponding to the service (or
+     *            client).
+     * @param serviceOrClient
+     *            The service (or client).
+     * @param properties
+     *            The properties used to configure that service or client.
+     */
+    static public void addBasicServiceOrClientCounters(CounterSet serviceRoot,
+            Object serviceOrClient, Properties properties) {
+        
+        // Service info.
+        {
+
+            final CounterSet serviceInfoSet = serviceRoot.makePath("Info");
+
+            serviceInfoSet.addCounter("Service Type",
+                    new OneShotInstrument<String>(
+                            serviceOrClient.getClass().getName()));
+
+            AbstractStatisticsCollector.addServiceProperties(serviceInfoSet,
+                    properties);
+            
+        }
+
+        // Service per-process memory data
+        {
+
+            serviceRoot.addCounter(
+                    IProcessCounters.Memory_runtimeMaxMemory,
+                    new OneShotInstrument<Long>(Runtime.getRuntime().maxMemory()));
+
+            serviceRoot.addCounter(IProcessCounters.Memory_runtimeFreeMemory,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(Runtime.getRuntime().freeMemory());
+                        }
+                    });
+
+            serviceRoot.addCounter(IProcessCounters.Memory_runtimeTotalMemory,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(Runtime.getRuntime().totalMemory());
+                        }
+                    });
+
+            // add counters for garbage collection.
+            AbstractStatisticsCollector
+                    .addGarbageCollectorMXBeanCounters(serviceRoot
+                            .makePath(ICounterHierarchy.Memory_GarbageCollectors));
+            
+        }
+                
+    }
+    
+    /**
+     * Lists out all of the properties and then report each property using a
+     * {@link OneShotInstrument}.
+     * 
+     * @param serviceInfoSet
+     *            The {@link ICounterHierarchy#Info} {@link CounterSet} for the
+     *            service.
+     * @param properties
+     *            The properties to be reported out.
+     */
+    static public void addServiceProperties(CounterSet serviceInfoSet,
+            Properties properties) {
+
+        final CounterSet ptmp = serviceInfoSet.makePath("Properties");
+
+        final Enumeration e = properties.propertyNames();
+
+        while (e.hasMoreElements()) {
+
+            final String name;
+            final String value;
+            try {
+
+                name = (String) e.nextElement();
+
+                value = (String) properties.getProperty(name);
+
+            } catch (ClassCastException ex) {
+
+                log.warn(ex.getMessage());
+
+                continue;
+
+            }
+
+            if (value == null)
+                continue;
+
+            ptmp.addCounter(name, new OneShotInstrument<String>(value));
+
+        }
+
+    }
+    
+    /**
+     * Adds/updates counters relating to JVM Garbage Collection. These counters
+     * should be located within a per-service path.
+     * 
+     * @param counterSet
+     *            The counters set that is the direct parent.
+     */
+    static public void addGarbageCollectorMXBeanCounters(CounterSet counterSet) {
+
+        final String name_pools = "Memory Pool Names";
+
+        final String name_count = "Collection Count";
+
+        final String name_time = "Collection Time";
+
+        synchronized (counterSet) {
+
+            final List<GarbageCollectorMXBean> list = ManagementFactory
+                    .getGarbageCollectorMXBeans();
+
+            for (final GarbageCollectorMXBean bean : list) {
+
+                final String name = bean.getName();
+
+                // counter set for this GC bean (may be pre-existing).
+                final CounterSet tmp = counterSet.makePath(name);
+
+                synchronized (tmp) {
+
+                    // memory pool names.
+                    {
+                        if (tmp.getChild(name_pools) == null) {
+                            tmp.addCounter(name_pools,
+                                    new Instrument<String>() {
+
+                                        @Override
+                                        protected void sample() {
+
+                                            setValue(Arrays.toString(bean
+                                                    .getMemoryPoolNames()));
+
+                                        }
+                                    });
+                        }
+                    }
+
+                    // collection count.
+                    {
+                        if (tmp.getChild(name_count) == null) {
+                            tmp.addCounter(name_count, new Instrument<Long>() {
+
+                                @Override
+                                protected void sample() {
+
+                                    setValue(bean.getCollectionCount());
+
+                                }
+                            });
+                        }
+                    }
+
+                    // collection time.
+                    {
+                        if (tmp.getChild(name_time) == null) {
+                            tmp.addCounter(name_time, new Instrument<Long>() {
+
+                                @Override
+                                protected void sample() {
+
+                                    setValue(bean.getCollectionTime());
+
+                                }
+                            });
+                        }
+                    }
+
+                }
+
+            }
+
+        }
+
     }
     
     /**

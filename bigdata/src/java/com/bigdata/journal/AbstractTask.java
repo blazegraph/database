@@ -27,10 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -46,8 +52,11 @@ import org.apache.log4j.MDC;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
 
@@ -130,45 +139,34 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         
     }
     
-    /**
-     * The journal against which the operation will be carried out.
-     * <p>
-     * If the task is running against an unisolated index, then this will be the
-     * {@link IResourceManager#getLiveJournal()}. Otherwise it will be whatever
-     * journal is appropriate to the historical commit point against which the
-     * task is being run.
-     * <p>
-     * Note: This exposes unconstrained access to the journal that could be used
-     * to violate the concurrency control mechanisms, therefore you SHOULD NOT
-     * use this unless you have a clear idea what you are about. You should be
-     * able to write all application level tasks in terms of
-     * {@link #getIndex(String)} and operations on the returned index.
-     * <p>
-     * Note: For example, if you use the returned object to access a named index
-     * and modify the state of that named index, your changes WILL NOT be
-     * noticed by the checkpoint protocol in {@link InnerWriteServiceCallable}.
-     * 
-     * @return The corresponding journal for that timestamp -or-
-     *         <code>null</code> if no journal has data for that timestamp,
-     *         including when a historical journal with data for that timestamp
-     *         has been deleted.
-     * 
-     * @see IResourceManager#getJournal(long)
-     */
-    public final AbstractJournal getJournal() {
-
-        final AbstractJournal journal = resourceManager.getJournal(Math
-                .abs(timestamp));
+    synchronized public final IJournal getJournal() {
 
         if (journal == null) {
 
-            log.warn("No such journal: timestamp=" + timestamp);
+            journal = resourceManager.getJournal(Math.abs(timestamp));
+
+            if (journal == null) {
+
+                log.warn("No such journal: timestamp=" + timestamp);
+
+                return null;
+                
+            }
             
+            if (readOnly) {
+
+                // disallow writes.
+                journal = new ReadOnlyJournal(journal);
+                
+            }
+
         }
-        
+
         return journal;
-        
+
     }
+
+    private IJournal journal;
     
     /**
      * The transaction identifier -or- {@link ITx#UNISOLATED} IFF the operation
@@ -613,7 +611,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             clearLoggingContext();
 
-            counters.successCount++;
+            counters.taskSuccessCount++;
 
             return ret;
 
@@ -624,13 +622,13 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * hierarchy (which you are not supposed to catch).
              */
             
-            counters.failCount++;
+            counters.tailFailCount++;
             
             throw e;
             
         } finally {
 
-            counters.completedCount++;
+            counters.taskCompleteCount++;
             
             // increment by the amount of time that the task was executing.
             counters.serviceNanoTime += (nanoTime_finishedWork - nanoTime_beginWork);
@@ -870,7 +868,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         
         }
 
-        public AbstractJournal getJournal() {
+        public IJournal getJournal() {
 
             return delegate.getJournal();
             
@@ -1033,10 +1031,18 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * are able to guarentee that the write set of a task is made
              * restart safe atomically by the next group commit.
              * 
-             * FIXME when the task succeeds, it should be possible to flush the
+             * FIXME NOW : when the task succeeds, it should be possible to flush the
              * index to the store before we obtain the lock in order to reduce
-             * the latency when we write the checkpoint record.  (if the task
+             * the latency when we write the checkpoint record. (if the task
              * fails, the rollback is a light weight operation.)
+             * 
+             * FIXME NOW : In fact, the checkpoint and rollback actions then become
+             * simply recording the new checkpoint record. for checkpoint, it
+             * has the new root address and (if changed) the new metadata
+             * address. for rollback, we simply close the index and write a copy
+             * of the saved checkpoint record, thereby discarding any possible
+             * side effects from checkpoints performed from within the task
+             * itself.
              */
             final Lock lock = writeService.lock;
 
@@ -1204,7 +1210,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 if(needsCheckpoint) {
                     
                     /*
-                     * FIXME rollback semantics when task checkpoints indices.
+                     * FIXME NOW : rollback semantics when task checkpoints indices.
                      * 
                      * This is not the precisely correct rollback condition. The
                      * issue is if the task itself checkpoints the index then
@@ -1396,4 +1402,767 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
     }
     
+    /**
+     * A read-write view of an {@link IJournal} that is used to impose isolated
+     * and atomic changes for {@link ITx#UNISOLATED} tasks that register or drop
+     * indices. The intentions of the task are buffered locally (by this class)
+     * for that task such that the index appears to have been registered or
+     * dropped immediately. Those intentions are propagated to {@link Name2Addr}
+     * on a task-by-task basis only when (a) this task is part of the current
+     * commit group; and (b) the {@link WriteExecutorService} performs a group
+     * commit. If there is a conflict between the state of {@link Name2Addr} at
+     * the time of the commit and the intentions of the tasks in the commit
+     * group (for example, if two tasks try to drop the same index), then the
+     * 2nd task will be interrupted. The enumeration of the intentions of tasks
+     * always begins with the task executed by the thread performing the commit
+     * so that no other task's intention could cause the commit itself to be
+     * interrupted.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class AtomicRegisterDropJournal implements IJournal {
+        
+        private final AbstractJournal delegate;
+        
+        abstract class Action {
+
+            final String name;
+            private Action priorAction = null;
+
+            private Action() {
+                throw new UnsupportedOperationException();
+            }
+            
+            Action(String name) {
+            
+                if (name == null)
+                    throw new IllegalArgumentException();
+                
+                this.name = name;
+                
+            }
+            
+            abstract boolean isRegister();
+            
+            abstract boolean isDrop();
+            
+            final protected Action getPriorAction() {
+                
+                return priorAction;
+                
+            }
+            
+            abstract void doAction();
+            
+            /**
+             * Chains together actions on the same named index so that we can
+             * apply the actions in the same sequence in {@link #doAction()}
+             * during the commit.
+             * 
+             * @param priorAction
+             *            The previous action on the named index.
+             */
+            void setPreviousAction(Action priorAction) {
+
+                if (priorAction == null)
+                    throw new IllegalArgumentException();
+                
+                if (this.priorAction != null) {
+
+                    throw new IllegalStateException();
+                    
+                }
+                
+                this.priorAction = priorAction;
+                
+            }
+            
+        }
+        
+        /**
+         * Action to drop an index.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        class DropAction extends Action {
+
+            DropAction(String name) {
+                super(name);
+            }
+            
+            final boolean isRegister() {return false;}
+            
+            final boolean isDrop() {return true;}
+
+            /**
+             * Drops the index on the <strong>delegate</strong>.
+             */
+            final void doAction() {
+
+                final Action priorAction = getPriorAction();
+                
+                if (priorAction != null) {
+
+                    // recursively handle previous actions first.
+                    priorAction.doAction();
+                    
+                }
+                
+                delegate.dropIndex(name);
+                
+            }
+            
+        }
+        
+        /**
+         * Action to register an index.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        class RegisterAction extends Action {
+            
+            final BTree btree;
+
+            RegisterAction(String name,BTree btree) {
+                
+                super(name);
+                
+                if (btree == null)
+                    throw new IllegalArgumentException();
+                
+                this.btree = btree;
+                
+            }
+            
+            final boolean isRegister() {return true;}
+            
+            final boolean isDrop() {return false;}
+            
+            /**
+             * Registers the index on the <strong>delegate</strong>.
+             */
+            final void doAction() {
+
+                final Action priorAction = getPriorAction();
+                
+                if (priorAction != null) {
+
+                    // recursively handle previous actions first.
+                    priorAction.doAction();
+                    
+                }
+                
+                delegate.registerIndex(name, btree);
+                
+            }
+
+        }
+        
+        /**
+         * Local cache of actions is interposed between the {@link AbstractTask}
+         * and the {@link Name2Addr} instance used by the {@link #delegate}
+         * journal.
+         */
+        private final Map<String,Action> actions = new HashMap<String, Action>();
+
+        /**
+         * FIXME NOW : Use this instead of directly exposing the
+         * {@link AbstractJournal} to the task. Once this change is applied and
+         * until I get this right I may be unable to add/drop indices!
+         * 
+         * @param source
+         */
+        public AtomicRegisterDropJournal(AbstractJournal source) {
+
+            if (source == null)
+                throw new IllegalArgumentException();
+
+            this.delegate = source;
+
+        }
+
+        /*
+         * Overriden methods for registering or dropping indices.
+         */
+        
+        synchronized public void dropIndex(String name) {
+            
+            final Action lastAction = actions.get(name);
+            
+            if (lastAction != null) {
+                
+                if (lastAction.isDrop()) {
+                    
+                    /*
+                     * The index would not exist since it was dropped by a prior
+                     * action.
+                     */
+                    
+                    throw new NoSuchIndexException(name);
+                    
+                } else {
+                    
+                    /*
+                     * Drop an index that was already registered by this task?
+                     * 
+                     * Note: We replace the action in the local cache, but we
+                     * also chain together the actions so that they are both
+                     * applied during the commit protocol.
+                     */
+                    
+                    final DropAction newAction = new DropAction(name);
+                    
+                    newAction.setPreviousAction(lastAction);
+
+                    actions.put(name, newAction);
+
+                }
+
+            } else {
+
+                /*
+                 * Drop an index (1st action for that index).
+                 */
+
+                if (delegate.getIndex(name) == null) {
+
+                    // Index was not defined when this task started.
+
+                    throw new NoSuchIndexException(name);
+
+                }
+
+                // index will be dropped iff this task completes.
+                actions.put(name, new DropAction(name));
+
+            }
+            
+        }
+
+        /**
+         * Note: This is the core implementation for registering an index - it
+         * handles the local cache.
+         */
+        synchronized public BTree registerIndex(String name, BTree btree) {
+
+            final Action lastAction = actions.get(name);
+            
+            if (lastAction != null) {
+                
+                if (lastAction.isRegister()) {
+                    
+                    // can not double-register an index.
+                    
+                    throw new IndexExistsException(name);
+                    
+                } else {
+                    
+                    /*
+                     * Register an index which was already dropped by this
+                     * task.
+                     * 
+                     * Note: We replace the action in the local cache, but we
+                     * also chain together the actions so that they are both
+                     * applied during the commit protocol. This is necessary in
+                     * order for a sequence which drops a pre-existing index and
+                     * then registers a new index under the same name to work!
+                     */
+                    
+                    actions.remove(name);
+                    
+                    final RegisterAction newAction = new RegisterAction(name,btree);
+                    
+                    newAction.setPreviousAction(lastAction);
+                    
+                    actions.put(name,newAction);
+                    
+                }
+                
+            } else {
+
+                /*
+                 * Register an index (first action for that index). 
+                 */
+                
+                if(delegate.getIndex(name) != null) {
+                
+                    /*
+                     * The index already exists.
+                     */
+                    
+                    throw new IndexExistsException(name);
+                    
+                } else {
+
+                    /*
+                     * The task will register the index iff it commits.
+                     */
+                    
+                    actions.put(name, new RegisterAction(name, btree));
+                    
+                }
+                
+            }
+            
+            return btree;
+            
+        }
+
+        public void registerIndex(IndexMetadata indexMetadata) {
+         
+            // delegate to core impl.
+            registerIndex(indexMetadata.getName(), indexMetadata);
+            
+        }
+
+        public BTree registerIndex(String name, IndexMetadata indexMetadata) {
+            
+            // Note: handles constraints and defaults for index partitions.
+            delegate.validateIndexMetadata(name, indexMetadata);
+            
+            // Note: create on the _delegate_.
+            final BTree btree = BTree.create(delegate, indexMetadata);
+
+            // delegate to core impl.
+            return registerIndex(name, btree);
+            
+        }
+
+        /**
+         * Propagates add/drop actions to {@link Name2Addr} on the backing
+         * journal.
+         * <p>
+         * Note: it is sufficient to simply execute the actions in sequence
+         * against the backing group once we have reached the commit point for
+         * all tasks in the commit group. The backing journal will delegate
+         * those actions to its {@link Name2Addr} object, which will accept or
+         * reject the actions based on its then current state.
+         * 
+         * FIXME NOW : actions which are rejected MUST cause the task to be
+         * interrupted (or otherwise through out an exception, ideally one
+         * wrapping the {@link NoSuchIndexException} or
+         * {@link IndexExistsException})
+         * 
+         * FIXME NOW : Tasks which fail MUST have their checkpoints discarded
+         * (this may require that we execute the tasks in the strict order in
+         * which they wrote their checkpoints), and only the failed tasks (or
+         * any tasks which were dependent on their success) should fail.
+         * 
+         * FIXME NOW : Make sure that this gets invoked and watch the order in
+         * which we invoke this method for each task in a commit group. We can
+         * FLUSH the root of the index at any time. If we checkpoint the index
+         * in the task, then rollback needs to re-write the original (pre-task)
+         * checkpoint record.
+         * 
+         * FIXME NOW : should tasks within the same commit group be allowed to
+         * read or write on the same index, thereby creating a dependency on the
+         * success of other tasks in that commit group? if we allow this then we
+         * need to cause those task(s) to fail if the tasks which have become
+         * essentially their pre-conditions fail during the commit. If we will
+         * disallow this, then a mechanism must be put into place to prevent
+         * this situation.
+         */
+        protected void commitHelper() throws NoSuchIndexException,
+                IndexExistsException {
+
+            for(Action action : actions.values()) {
+
+                action.doAction();
+                
+            }
+
+        }
+
+        /**
+         * Tests the local {@link Action} cache and delegates to the backing journal
+         * iff there was no cached {@link Action}.
+         */
+        public IIndex getIndex(String name) {
+
+            final Action lastAction = actions.get(name);
+            
+            if (lastAction != null) {
+
+                if (lastAction.isDrop()) {
+
+                    // index was dropped.
+                    return null;
+
+                } else {
+
+                    // index was registered.
+                    return ((RegisterAction) lastAction).btree;
+                
+                }
+
+            } else {
+
+                // no local action, send request to the delegate.
+                return delegate.getIndex(name);
+
+            }
+            
+        }
+
+        public IIndex getIndex(String name, long timestamp) {
+            
+            if (timestamp == ITx.UNISOLATED) {
+
+                // unisolated index requests must test the local cache first.
+                return getIndex(name);
+                
+            }
+            
+            return delegate.getIndex(name, timestamp);
+            
+        }
+
+        /*
+         * Disallowed methods.
+         */
+        
+        public void abort() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void close() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void closeAndDelete() {
+            throw new UnsupportedOperationException();
+        }
+
+        public long commit() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void deleteResources() {
+            delegate.deleteResources();
+        }
+
+        public Object deserialize(byte[] b, int off, int len) {
+            return delegate.deserialize(b, off, len);
+        }
+
+        public Object deserialize(byte[] b) {
+            return delegate.deserialize(b);
+        }
+
+        public Object deserialize(ByteBuffer buf) {
+            return delegate.deserialize(buf);
+        }
+
+        public void discardCommitters() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void force(boolean metadata) {
+            delegate.force(metadata);
+        }
+
+        public int getByteCount(long addr) {
+            return delegate.getByteCount(addr);
+        }
+
+        public ICommitRecord getCommitRecord(long timestamp) {
+            return delegate.getCommitRecord(timestamp);
+        }
+
+        public CounterSet getCounters() {
+            return delegate.getCounters();
+        }
+
+        public File getFile() {
+            return delegate.getFile();
+        }
+
+        public long getOffset(long addr) {
+            return delegate.getOffset(addr);
+        }
+
+        public Properties getProperties() {
+            return delegate.getProperties();
+        }
+
+        public IResourceMetadata getResourceMetadata() {
+            return delegate.getResourceMetadata();
+        }
+
+        public long getRootAddr(int index) {
+            return delegate.getRootAddr(index);
+        }
+
+        public IRootBlockView getRootBlockView() {
+            return delegate.getRootBlockView();
+        }
+
+        public boolean isFullyBuffered() {
+            return delegate.isFullyBuffered();
+        }
+
+        public boolean isOpen() {
+            return delegate.isOpen();
+        }
+
+        public boolean isReadOnly() {
+            return delegate.isReadOnly();
+        }
+
+        public boolean isStable() {
+            return delegate.isStable();
+        }
+
+        public void packAddr(DataOutput out, long addr) throws IOException {
+            delegate.packAddr(out, addr);
+        }
+
+        public ByteBuffer read(long addr) {
+            return delegate.read(addr);
+        }
+
+        public byte[] serialize(Object obj) {
+            return delegate.serialize(obj);
+        }
+
+        public void setCommitter(int index, ICommitter committer) {
+            delegate.setCommitter(index, committer);
+        }
+
+        public void setupCommitters() {
+            delegate.setupCommitters();
+        }
+
+        public void shutdown() {
+            delegate.shutdown();
+        }
+
+        public void shutdownNow() {
+            delegate.shutdownNow();
+        }
+
+        public long size() {
+            return delegate.size();
+        }
+
+        public long toAddr(int nbytes, long offset) {
+            return delegate.toAddr(nbytes, offset);
+        }
+
+        public String toString(long addr) {
+            return delegate.toString(addr);
+        }
+
+        public long unpackAddr(DataInput in) throws IOException {
+            return delegate.unpackAddr(in);
+        }
+
+        public long write(ByteBuffer data) {
+            return delegate.write(data);
+        }
+
+    }
+    
+    /**
+     * A read-only view of an {@link IJournal} that is used to enforce read-only
+     * semantics on tasks using {@link AbstractTask#getJournal()} to access the
+     * backing store.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class ReadOnlyJournal implements IJournal {
+
+        private final IJournal delegate;
+        
+        public ReadOnlyJournal(IJournal source) {
+
+            if (source == null)
+                throw new IllegalArgumentException();
+
+            this.delegate = source;
+
+        }
+
+        public void abort() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void close() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void closeAndDelete() {
+            throw new UnsupportedOperationException();
+        }
+
+        public long commit() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void deleteResources() {
+            throw new UnsupportedOperationException();
+        }
+
+        public Object deserialize(byte[] b, int off, int len) {
+            return delegate.deserialize(b, off, len);
+        }
+
+        public Object deserialize(byte[] b) {
+            return delegate.deserialize(b);
+        }
+
+        public Object deserialize(ByteBuffer buf) {
+            return delegate.deserialize(buf);
+        }
+
+        public void discardCommitters() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void dropIndex(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        public void force(boolean metadata) {
+            throw new UnsupportedOperationException();
+        }
+
+        public int getByteCount(long addr) {
+            return delegate.getByteCount(addr);
+        }
+
+        public ICommitRecord getCommitRecord(long timestamp) {
+            return delegate.getCommitRecord(timestamp);
+        }
+
+        public CounterSet getCounters() {
+            return delegate.getCounters();
+        }
+
+        public File getFile() {
+            return delegate.getFile();
+        }
+
+        /**
+         * Note: Does not allow access to {@link ITx#UNISOLATED} indices.
+         */
+        public IIndex getIndex(String name, long timestamp) {
+
+            if (timestamp == ITx.UNISOLATED)
+                throw new UnsupportedOperationException();
+
+            return delegate.getIndex(name, timestamp);
+
+        }
+
+        /**
+         * Note: Not supported since this method returns the {@link ITx#UNISOLATED}
+         * index.
+         */
+        public IIndex getIndex(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        public long getOffset(long addr) {
+            return delegate.getOffset(addr);
+        }
+
+        public Properties getProperties() {
+            return delegate.getProperties();
+        }
+
+        public IResourceMetadata getResourceMetadata() {
+            return delegate.getResourceMetadata();
+        }
+
+        public long getRootAddr(int index) {
+            return delegate.getRootAddr(index);
+        }
+
+        public IRootBlockView getRootBlockView() {
+            return delegate.getRootBlockView();
+        }
+
+        public boolean isFullyBuffered() {
+            return delegate.isFullyBuffered();
+        }
+
+        public boolean isOpen() {
+            return delegate.isOpen();
+        }
+
+        public boolean isReadOnly() {
+            return delegate.isReadOnly();
+        }
+
+        public boolean isStable() {
+            return delegate.isStable();
+        }
+
+        public void packAddr(DataOutput out, long addr) throws IOException {
+            delegate.packAddr(out, addr);
+        }
+
+        public ByteBuffer read(long addr) {
+            return delegate.read(addr);
+        }
+
+        public void registerIndex(IndexMetadata indexMetadata) {
+            throw new UnsupportedOperationException();
+        }
+
+        public IIndex registerIndex(String name, BTree btree) {
+            throw new UnsupportedOperationException();
+        }
+
+        public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
+            throw new UnsupportedOperationException();
+        }
+
+        public byte[] serialize(Object obj) {
+            return delegate.serialize(obj);
+        }
+
+        public void setCommitter(int index, ICommitter committer) {
+            delegate.setCommitter(index, committer);
+        }
+
+        public void setupCommitters() {
+            delegate.setupCommitters();
+        }
+
+        public void shutdown() {
+            delegate.shutdown();
+        }
+
+        public void shutdownNow() {
+            delegate.shutdownNow();
+        }
+
+        public long size() {
+            return delegate.size();
+        }
+
+        public long toAddr(int nbytes, long offset) {
+            return delegate.toAddr(nbytes, offset);
+        }
+
+        public String toString(long addr) {
+            return delegate.toString(addr);
+        }
+
+        public long unpackAddr(DataInput in) throws IOException {
+            return delegate.unpackAddr(in);
+        }
+
+        public long write(ByteBuffer data) {
+            throw new UnsupportedOperationException();
+        }
+
+    }
+
 }

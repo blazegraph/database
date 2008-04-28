@@ -60,7 +60,7 @@ import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.QueueLengthTask;
+import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.ValidationError;
@@ -410,7 +410,7 @@ public class StressTestConcurrent extends
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-            QueueLengthTask queueLengthTask = new QueueLengthTask(
+            QueueStatisticsTask queueLengthTask = new QueueStatisticsTask(
                     "testExecutorService", executorService);
 
             sampleService.scheduleWithFixedDelay(queueLengthTask, initialDelay,

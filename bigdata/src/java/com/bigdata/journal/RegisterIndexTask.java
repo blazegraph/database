@@ -26,7 +26,6 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.mdi.IResourceMetadata;
@@ -84,7 +83,7 @@ public class RegisterIndexTask extends AbstractTask {
      */
     protected Object doTask() throws Exception {
 
-        String name = getOnlyResource();
+        final String name = getOnlyResource();
 
         IIndex ndx = getJournal().getIndex(name);
             
@@ -99,12 +98,12 @@ public class RegisterIndexTask extends AbstractTask {
         }
 
         // register the index.
-        final BTree btree = getJournal().registerIndex(name, metadata);
+        ndx = getJournal().registerIndex(name, metadata);
 
-        final UUID indexUUID = btree.getIndexMetadata().getIndexUUID();
+        final UUID indexUUID = ndx .getIndexMetadata().getIndexUUID();
 
         log.info("Registered index: name=" + name + ", class="
-                + btree.getClass() + ", indexUUID=" + indexUUID);
+                + ndx.getClass() + ", indexUUID=" + indexUUID);
 
         return indexUUID;
         

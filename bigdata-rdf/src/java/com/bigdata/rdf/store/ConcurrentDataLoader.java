@@ -345,117 +345,136 @@ public class ConcurrentDataLoader {
          * Setup reporting to the load balancer on the client progress if using
          * a federation.
          */
+        AbstractFederation fed = null;
         ScheduledFuture loadServiceStatisticsFuture = null;
-        if(db instanceof ScaleOutTripleStore) {
-            
-            final AbstractFederation fed = (AbstractFederation)((ScaleOutTripleStore)db).getFederation();
-        
-            final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
-                    "Load Service", loadService);
-            
-            loadServiceStatisticsFuture = fed.addScheduledStatisticsTask(
-                    loadServiceStatisticsTask, 60, 60, TimeUnit.SECONDS);
-            
-            final CounterSet tmp = fed.getCounterSet()
-                    .makePath(
-                            fed.getClientCounterPathPrefix()
-                                    + "Concurrent Data Loader");
-            
-            tmp.addCounter("#scanned", new Instrument<Long>(){
-
-                @Override
-                protected void sample() {
-
-                    setValue((long)nscanned.get());
-                    
-                }});
-
-            loadServiceStatisticsTask.addCounters(tmp.makePath("Load Service"));
-            
-            tmp.addCounter("toldTriples", new Instrument<Long>(){
-
-                @Override
-                protected void sample() {
-
-                    setValue(toldTriples.get());
-                    
-                }});
-            
-            tmp.addCounter("elapsed", new Instrument<Long>(){
-
-                @Override
-                protected void sample() {
-
-                    final long elapsed = System.currentTimeMillis() - begin;
-                    
-                    setValue(elapsed);
-                    
-                }});
-            
-            /*
-             * Note: This is the told triples per second rate for _this_ client
-             * only. When you are loading using multiple instances of the
-             * concurrent data loader, then the total told triples per second
-             * rate is the aggregation across all of those instances.
-             */
-            tmp.addCounter("toldTriplesPerSec", new Instrument<Long>(){
-
-                @Override
-                protected void sample() {
-
-                    final long elapsed = System.currentTimeMillis() - begin;
-                    
-                    final double tps = (long) (((double) toldTriples.get()) / ((double) elapsed) * 1000d);
-
-                    setValue((long) tps);
-                    
-                }});
-            
-        }
-        
         try {
 
-            /*
-             * Scans the files, creating LoadTasks and then awaits completion of
-             * the load tasks. The thread pool is shutdown once all tasks have
-             * been run and some statistics are reported.
-             */
-            
-            process(file, filter);
+            if (db instanceof ScaleOutTripleStore) {
 
-        } catch (Throwable t) {
+                // if using the federation api.
+                fed = (AbstractFederation) ((ScaleOutTripleStore) db)
+                        .getFederation();
 
-            /*
-             * Some uncorrectable problem during data load.
-             */
-            log.fatal(t);
+                final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
+                        "Load Service", loadService);
+
+                loadServiceStatisticsFuture = fed.addScheduledStatisticsTask(
+                        loadServiceStatisticsTask, 60, 60, TimeUnit.SECONDS);
+
+                final CounterSet tmp = fed.getCounterSet().makePath(
+                        fed.getClientCounterPathPrefix()
+                                + "Concurrent Data Loader");
+
+                tmp.addCounter("#scanned", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue((long) nscanned.get());
+
+                    }
+                });
+
+                loadServiceStatisticsTask.addCounters(tmp
+                        .makePath("Load Service"));
+
+                tmp.addCounter("toldTriples", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue(toldTriples.get());
+
+                    }
+                });
+
+                tmp.addCounter("elapsed", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        final long elapsed = System.currentTimeMillis() - begin;
+
+                        setValue(elapsed);
+
+                    }
+                });
+
+                /*
+                 * Note: This is the told triples per second rate for _this_
+                 * client only. When you are loading using multiple instances of
+                 * the concurrent data loader, then the total told triples per
+                 * second rate is the aggregation across all of those instances.
+                 */
+                tmp.addCounter("toldTriplesPerSec", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        final long elapsed = System.currentTimeMillis() - begin;
+
+                        final double tps = (long) (((double) toldTriples.get())
+                                / ((double) elapsed) * 1000d);
+
+                        setValue((long) tps);
+
+                    }
+                });
+
+            }
 
             try {
 
-                if (loadServiceStatisticsFuture != null) {
+                /*
+                 * Scans the files, creating LoadTasks and then awaits
+                 * completion of the load tasks. The thread pool is shutdown
+                 * once all tasks have been run and some statistics are
+                 * reported.
+                 */
 
-                    loadServiceStatisticsFuture.cancel(true/*mayInterrupt*/);
-                    
+                process(file, filter);
+
+            } catch (Throwable t) {
+
+                /*
+                 * Some uncorrectable problem during data load.
+                 */
+                log.fatal(t);
+
+                try {
+
+                    // immediate shutdown.
+                    loadService.shutdownNow();
+
+                } catch (Throwable t2) {
+
+                    log.warn("Problems during shutdown: " + t2);
+
                 }
 
-                // immediate shutdown.
-                loadService.shutdownNow();
-                
-                // wait for shutdown.
-                while(!loadService.awaitTermination(2L, TimeUnit.SECONDS)) {
-                    
-                    log.warn("Shutdown taking too long.");
-                    
-                }
-                
-            } catch (Throwable t2) {
-                
-                log.warn("Problems during shutdown: " + t2);
-                
+                // rethrow the exception.
+                throw new RuntimeException(t);
+
             }
 
-            // rethrow the exception.
-            throw new RuntimeException(t);
+        } finally {
+
+            // make sure that the thread pool is shutdown.
+            loadService.shutdown();
+
+            // cancel the statistics task if it's still running.
+            if (loadServiceStatisticsFuture != null) {
+
+                loadServiceStatisticsFuture.cancel(true/* mayInterrupt */);
+
+            }
+
+            if (fed != null) {
+
+                // report out the final counter set state.
+                fed.reportCounters();
+
+            }
 
         }
 

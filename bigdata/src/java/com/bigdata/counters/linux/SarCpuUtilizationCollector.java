@@ -55,21 +55,6 @@ import com.bigdata.counters.ProcessReaderHelper;
  * Collects statistics on the CPU utilization for the entire host using
  * <code>sar -u</code>.
  * 
- * <pre>
- *             Linux 2.6.18-1.2798.fc6 (hostname)   03/03/2008
- *             
- *             avg-cpu:  %user   %nice %system %iowait  %steal   %idle
- *                        5.01    0.00    1.88    0.61    0.00   92.50
- *             
- *             Device:            tps   Blk_read/s   Blk_wrtn/s   Blk_read   Blk_wrtn
- *             sda              18.89       209.75       135.41  995990159  642992550
- *             sdb               0.00         0.00         0.00       1272          0
- *             dm-0             32.68       209.71       135.37  995771418  642807736
- *             dm-1              0.01         0.05         0.04     215048     184776
- * </pre>
- * 
- * @todo <code>sar -b</code> to get the iowait data.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
