@@ -46,19 +46,25 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
+import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOBuffer;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -151,10 +157,21 @@ public class ConcurrentDataLoader {
     final int nclients;
     
     final int clientNum;
-    
+
+    /**
+     * The time when the ctor is executed - this is used to compute told triples
+     * per second.
+     */
+    final long begin = System.currentTimeMillis();
+
     AtomicInteger nscanned = new AtomicInteger(0);
 
     AtomicInteger ntasked = new AtomicInteger(0);
+    
+    /**
+     * #of told triples loaded into the database.
+     */
+    AtomicLong toldTriples = new AtomicLong(0);
 
     /**
      * Validation of RDF by the RIO parser is disabled.
@@ -287,7 +304,7 @@ public class ConcurrentDataLoader {
         this.nclients = nclients;
         
         this.clientNum = clientNum;
-        
+       
         if (autoFlush) {
 
             buffers = null;
@@ -324,6 +341,78 @@ public class ConcurrentDataLoader {
                 Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
                 DaemonThreadFactory.defaultThreadFactory()); 
 
+        /*
+         * Setup reporting to the load balancer on the client progress if using
+         * a federation.
+         */
+        ScheduledFuture loadServiceStatisticsFuture = null;
+        if(db instanceof ScaleOutTripleStore) {
+            
+            final AbstractFederation fed = (AbstractFederation)((ScaleOutTripleStore)db).getFederation();
+        
+            final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
+                    "Load Service", loadService);
+            
+            loadServiceStatisticsFuture = fed.addScheduledStatisticsTask(
+                    loadServiceStatisticsTask, 60, 60, TimeUnit.SECONDS);
+            
+            final CounterSet tmp = fed.getCounterSet()
+                    .makePath(
+                            fed.getClientCounterPathPrefix()
+                                    + "Concurrent Data Loader");
+            
+            tmp.addCounter("#scanned", new Instrument<Long>(){
+
+                @Override
+                protected void sample() {
+
+                    setValue((long)nscanned.get());
+                    
+                }});
+
+            loadServiceStatisticsTask.addCounters(tmp.makePath("Load Service"));
+            
+            tmp.addCounter("toldTriples", new Instrument<Long>(){
+
+                @Override
+                protected void sample() {
+
+                    setValue(toldTriples.get());
+                    
+                }});
+            
+            tmp.addCounter("elapsed", new Instrument<Long>(){
+
+                @Override
+                protected void sample() {
+
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    
+                    setValue(elapsed);
+                    
+                }});
+            
+            /*
+             * Note: This is the told triples per second rate for _this_ client
+             * only. When you are loading using multiple instances of the
+             * concurrent data loader, then the total told triples per second
+             * rate is the aggregation across all of those instances.
+             */
+            tmp.addCounter("toldTriplesPerSec", new Instrument<Long>(){
+
+                @Override
+                protected void sample() {
+
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    
+                    final double tps = (long) (((double) toldTriples.get()) / ((double) elapsed) * 1000d);
+
+                    setValue((long) tps);
+                    
+                }});
+            
+        }
+        
         try {
 
             /*
@@ -343,9 +432,15 @@ public class ConcurrentDataLoader {
 
             try {
 
+                if (loadServiceStatisticsFuture != null) {
+
+                    loadServiceStatisticsFuture.cancel(true/*mayInterrupt*/);
+                    
+                }
+
                 // immediate shutdown.
                 loadService.shutdownNow();
-
+                
                 // wait for shutdown.
                 while(!loadService.awaitTermination(2L, TimeUnit.SECONDS)) {
                     
@@ -382,8 +477,6 @@ public class ConcurrentDataLoader {
      */
     private void process(File file, FilenameFilter filter) throws IOException,
             InterruptedException {
-
-        final long begin = System.currentTimeMillis();
 
         process2(file, filter);
 
@@ -737,10 +830,11 @@ public class ConcurrentDataLoader {
 
             }
 
+            final LoadStats loadStats;
             try {
 
                 // FIXME resolve what the baseURL SHOULD be.
-                loadData2(file.toString(), 
+                loadStats = loadData2(file.toString(), 
 //                        baseURL,
                         file.toURI().toString(),
                         rdfFormat);
@@ -752,6 +846,8 @@ public class ConcurrentDataLoader {
                 throw new RuntimeException(e);
 
             }
+            
+            toldTriples.addAndGet(loadStats.toldTriples);
 
         }
 
