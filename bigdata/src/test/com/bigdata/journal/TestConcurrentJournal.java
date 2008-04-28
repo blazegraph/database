@@ -1050,13 +1050,13 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final long abortCount0 = writeService.getAbortCount();
             
             // the #of failed tasks before we submit the tasks.
-            final long failedTaskCount0 = writeService.getFailedTaskCount();
+            final long failedTaskCount0 = writeService.getTaskFailedCount();
             
             // the #of successfully tasks before we submit the tasks.
-            final long successTaskCount0 = writeService.getSuccessTaskCount();
+            final long successTaskCount0 = writeService.getTaskSuccessCount();
             
             // the #of successfully committed tasks before we submit the tasks.
-            final long committedTaskCount0 = writeService.getCommittedTaskCount();
+            final long committedTaskCount0 = writeService.getTaskCommittedCount();
             
             // submit the tasks.
             final List<Future<Object>> futures = journal.invokeAll( tasks );
@@ -1088,15 +1088,15 @@ public class TestConcurrentJournal extends ProxyTestCase {
             
             // ONE(1) tasks SHOULD have failed.
             assertEquals("failedTaskCount", failedTaskCount0 + 1, writeService.
-                    getFailedTaskCount());
+                    getTaskFailedCount());
 
             // TWO(2) tasks SHOULD have succeeded.
             assertEquals("successTaskCount", successTaskCount0 + 2, writeService
-                    .getSuccessTaskCount());
+                    .getTaskSuccessCount());
 
             // TWO(2) successfull tasks SHOULD have been committed.
             assertEquals("committedTaskCount", committedTaskCount0 + 2, writeService
-                    .getCommittedTaskCount());
+                    .getTaskCommittedCount());
 
             assertEquals( 3, futures.size());
             
@@ -1272,9 +1272,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final long groupCommitCount0 = writeService.getGroupCommitCount();
 
             // Note: #of failed tasks before we submit the tasks.
-            final long failedTaskCount0 = writeService.getFailedTaskCount();
-            final long successTaskCount0 = writeService.getSuccessTaskCount();
-            final long committedTaskCount0 = writeService.getCommittedTaskCount();
+            final long failedTaskCount0 = writeService.getTaskFailedCount();
+            final long successTaskCount0 = writeService.getTaskSuccessCount();
+            final long committedTaskCount0 = writeService.getTaskCommittedCount();
     
             // Note: set by one of the tasks below.
             final AtomicLong checkpointAddr2 = new AtomicLong(0L);
@@ -1416,11 +1416,11 @@ public class TestConcurrentJournal extends ProxyTestCase {
              * will be serialized (executed in a strict sequence).
              */
             assertEquals("failedTaskCount", failedTaskCount0 + 1,
-                    writeService.getFailedTaskCount());
+                    writeService.getTaskFailedCount());
             assertEquals("successTaskCount", successTaskCount0 + 3,
-                    writeService.getSuccessTaskCount());
+                    writeService.getTaskSuccessCount());
             assertEquals("committedTaskCount", committedTaskCount0 + 3,
-                    writeService.getCommittedTaskCount());
+                    writeService.getTaskCommittedCount());
             assertEquals("groupCommitCount", groupCommitCount0 + 1,
                     writeService.getGroupCommitCount());
             assertEquals("commitCounter", commitCounter + 1, journal

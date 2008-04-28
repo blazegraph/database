@@ -292,7 +292,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Rather, the failed task never joins a commit group and returns control
      * immediately to the caller.
      */
-    public long getFailedTaskCount() {
+    public long getTaskFailedCount() {
     
         return failedTaskCount;
         
@@ -302,9 +302,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * The #of tasks that have executed successfully (MIGHT NOT have been
      * committed safely).
      * 
-     * @see #getCommittedTaskCount()
+     * @see #getTaskCommittedCount()
      */
-    public long getSuccessTaskCount() {
+    public long getTaskSuccessCount() {
         
         return successTaskCount;
         
@@ -313,7 +313,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * The #of tasks that (a) executed successfully and (b) have been committed.
      */
-    public long getCommittedTaskCount() {
+    public long getTaskCommittedCount() {
         
         return committedTaskCount;
         

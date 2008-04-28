@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
@@ -87,36 +88,49 @@ public class LocalDataServiceFederation extends AbstractFederation {
         // Disable overflow.
         properties.setProperty(Options.OVERFLOW_ENABLED,"false");
         
-        dataService = new EmbeddedDataService(UUID.randomUUID(), properties) {
+        // create the embedded data service.
+        dataService = new EmbeddedDataServiceImpl(properties);
 
-            @Override
-            public IDataService getDataService(UUID serviceUUID) {
-                
-                return LocalDataServiceFederation.this.getDataService(serviceUUID);
-                
-            }
-
-            @Override
-            public IMetadataService getMetadataService() {
-
-                throw new UnsupportedOperationException();
-                
-            }
-
-            @Override
-            public ILoadBalancerService getLoadBalancerService() {
-
-                return loadBalancerService;
-                
-            }
+        // notify join.
+        loadBalancerService.join(dataService.getServiceUUID(),
+                AbstractStatisticsCollector.fullyQualifiedHostName);
+        
+    }
+    
+    protected class EmbeddedDataServiceImpl extends EmbeddedDataService {
+        
+        EmbeddedDataServiceImpl(Properties properties) {
             
-            public ITimestampService getTimestampService() {
-                
-                return timestampService;
-                
-            }
+            super(UUID.randomUUID(), properties);
             
-        };
+        }
+        
+        @Override
+        public IDataService getDataService(UUID serviceUUID) {
+            
+            return LocalDataServiceFederation.this.getDataService(serviceUUID);
+            
+        }
+
+        @Override
+        public IMetadataService getMetadataService() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        @Override
+        public ILoadBalancerService getLoadBalancerService() {
+
+            return loadBalancerService;
+            
+        }
+        
+        public ITimestampService getTimestampService() {
+            
+            return timestampService;
+            
+        }
 
     }
 
@@ -136,16 +150,16 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
         assertOpen();
         
-        try {
+//        try {
         
             return new UUID[]{dataService.getServiceUUID()};
             
-        } catch (IOException ex) {
-            
-            // Note: Should never be thrown since this is a local method call.
-            throw new RuntimeException(ex);
-            
-        }
+//        } catch (IOException ex) {
+//            
+//            // Note: Should never be thrown since this is a local method call.
+//            throw new RuntimeException(ex);
+//            
+//        }
         
     }
     
@@ -178,16 +192,16 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         assertOpen();
         
-        try {
+//        try {
             
             return dataService.getServiceUUID();
             
-        } catch (IOException ex) {
-            
-            // Note: Should never be thrown since this is a local method call.
-            throw new RuntimeException(ex);
-            
-        }
+//        } catch (IOException ex) {
+//            
+//            // Note: Should never be thrown since this is a local method call.
+//            throw new RuntimeException(ex);
+//            
+//        }
 
     }
     

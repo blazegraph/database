@@ -347,15 +347,18 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
         protected Object doTask() throws Exception {
        
             /*
-             * Load the btree from the live journal that already contains all data
-             * from the source index partitions to the merge as of the
+             * Load the btree from the live journal that already contains all
+             * data from the source index partitions to the merge as of the
              * lastCommitTime of the old journal.
              * 
-             * In order to make this btree complete we will now copy in any writes
-             * absorbed by those index partitions now that we have an exclusive lock
-             * on everyone on the new journal.
-             */ 
-            final BTree btree = getJournal().getIndex(result.checkpointAddr); 
+             * Note: At this point the btree exists on the journal but has not
+             * been registered and is therefore NOT visible to concurrent tasks.
+             * 
+             * In order to make this btree complete we will now copy in any
+             * writes absorbed by those index partitions now that we have an
+             * exclusive lock on everyone on the new journal.
+             */
+            final BTree btree = resourceManager.getLiveJournal().getIndex(result.checkpointAddr); 
             
             assert btree != null;
             
@@ -397,7 +400,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                  */
                 btree.rangeCopy(src, null, null, false/*overflow*/);
                 
-                // drop the old index partition.
+                // drop the old index partition : FIXME violates atomic change in visibility.
                 getJournal().dropIndex(name);
                 
                 // will notify tasks that index partition was joined.
@@ -405,7 +408,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                 
             }
             
-            // register the new index partition.
+            // register the new index partition : FIXME violates atomic change in visibility.
             getJournal().registerIndex(result.name, btree);
 
             final LocalPartitionMetadata pmd = btree.getIndexMetadata().getPartitionMetadata();

@@ -14,27 +14,14 @@ import com.bigdata.journal.IResourceManager;
  */
 abstract public class EmbeddedDataService extends DataService {
     
-    final private UUID serviceUUID;
-    
     public EmbeddedDataService(UUID serviceUUID, Properties properties) {
         
         super(properties);
-        
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
-        
-        this.serviceUUID = serviceUUID;
-        
-        log.info("uuid="+serviceUUID);
+
+        setServiceUUID(serviceUUID);
         
     }
 
-    public UUID getServiceUUID() throws IOException {
-
-        return serviceUUID;
-        
-    }
- 
     public void destroy() throws IOException {
 
         log.info("");

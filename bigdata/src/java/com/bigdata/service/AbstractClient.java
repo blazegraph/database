@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.Banner;
 
@@ -48,6 +49,14 @@ abstract public class AbstractClient implements IBigdataClient {
     public Properties getProperties() {
         
         return new Properties( properties );
+        
+    }
+    
+    private final UUID clientUUID;
+    
+    final public UUID getClientUUID() {
+        
+        return clientUUID;
         
     }
     
@@ -112,6 +121,8 @@ abstract public class AbstractClient implements IBigdataClient {
             throw new IllegalArgumentException();
 
         this.properties = properties;
+
+        this.clientUUID = UUID.randomUUID();
         
         // client thread pool setup.
         {

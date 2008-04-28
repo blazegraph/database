@@ -31,6 +31,7 @@ package com.bigdata.journal;
 import java.util.concurrent.Callable;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.journal.AbstractTask.InnerWriteServiceCallable;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
@@ -50,16 +51,21 @@ public interface ITask extends Callable<Object> {
     /**
      * The journal against which the operation will be carried out.
      * <p>
-     * If the task is running against an unisolated index, then this will be the
-     * {@link IResourceManager#getLiveJournal()}. Otherwise it will be whatever
-     * journal is appropriate to the historical commit point against which the
-     * task is being run.
+     * If the task is running against an {@link ITx#UNISOLATED} index, then this
+     * will be the {@link IResourceManager#getLiveJournal()}. If the operation
+     * is a historical read, then it will be whatever journal is appropriate to
+     * the historical commit point against which the task is being run.
      * <p>
-     * Note: This exposes unconstrained access to the journal that could be used
-     * to violate the concurrency control mechanisms, therefore you SHOULD NOT
-     * use this unless you have a clear idea what you are about. You should be
-     * able to write all application level tasks in terms of
-     * {@link #getIndex(String)} and operations on the returned index.
+     * Note: For {@link ITx#UNISOLATED} operations this exposes unconstrained
+     * access to the journal that could be used to violate the concurrency
+     * control mechanisms, therefore you SHOULD NOT use this unless you have a
+     * clear idea what you are about. You should be able to write all
+     * application level tasks in terms of {@link #getIndex(String)} and
+     * operations on the returned index.
+     * <p>
+     * Note: For example, if you use the returned object to access a named index
+     * and modify the state of that named index, your changes WILL NOT be
+     * noticed by the checkpoint protocol in {@link InnerWriteServiceCallable}.
      * 
      * @return The corresponding journal for that timestamp -or-
      *         <code>null</code> if no journal has data for that timestamp,
@@ -68,7 +74,7 @@ public interface ITask extends Callable<Object> {
      * 
      * @see IResourceManager#getJournal(long)
      */
-    public AbstractJournal getJournal();
+    public IJournal getJournal();
 
     /**
      * Returns a copy of the array of resources declared to the constructor.

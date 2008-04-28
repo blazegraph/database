@@ -15,7 +15,7 @@ import com.bigdata.journal.ITimestampService;
  */
 public class EmbeddedMetadataService extends MetadataService {
 
-    final private UUID serviceUUID;
+//    final private UUID serviceUUID;
     private EmbeddedFederation federation;
     
     public EmbeddedMetadataService(EmbeddedFederation federation,
@@ -31,15 +31,10 @@ public class EmbeddedMetadataService extends MetadataService {
         
         this.federation = federation;
 
-        this.serviceUUID = serviceUUID;
+        setServiceUUID(serviceUUID);
         
     }
 
-    public UUID getServiceUUID() throws IOException {
-
-        return serviceUUID;
-        
-    }
 
     @Override
     public IDataService getDataService(UUID dataService) {

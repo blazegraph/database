@@ -30,7 +30,6 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.rmi.NoSuchObjectException;
@@ -60,6 +59,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
+import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IProcessCounters;
 import com.bigdata.counters.Instrument;
@@ -154,8 +154,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       a private network, but replicate across gateways is also a common use
  *       case. Do we have to handle it specially?
  */
-abstract public class DataService implements IDataService, //IWritePipeline,
-        IServiceShutdown {
+abstract public class DataService extends AbstractService
+    implements IDataService, IServiceShutdown //IWritePipeline
+    {
 
     public static final Logger log = Logger.getLogger(DataService.class);
 
@@ -395,15 +396,15 @@ abstract public class DataService implements IDataService, //IWritePipeline,
             
             public UUID getDataServiceUUID() {
 
-                try {
+//                try {
                     
                     return DataService.this.getServiceUUID();
                 
-                } catch (IOException e) {
-                    
-                    throw new RuntimeException(e);
-                    
-                }
+//                } catch (IOException e) {
+//                    
+//                    throw new RuntimeException(e);
+//                    
+//                }
                 
             }
             
@@ -486,7 +487,7 @@ abstract public class DataService implements IDataService, //IWritePipeline,
                     .newSingleThreadScheduledExecutor(DaemonThreadFactory
                             .defaultThreadFactory());
             
-            reportService.scheduleWithFixedDelay(new StartPerformanceCounterCollectionTask(properties),
+            reportService.scheduleWithFixedDelay(new StartPerformanceCounterCollectionTask(),
                     150, // initialDelay (ms)
                     150, // delay
                     TimeUnit.MILLISECONDS // unit
@@ -573,9 +574,15 @@ abstract public class DataService implements IDataService, //IWritePipeline,
 
         reportService.shutdown();
 
-        statisticsCollector.stop();
+        if (statisticsCollector != null) {
+
+            statisticsCollector.stop();
+
+            statisticsCollector = null;
+
+        }
         
-//        if (INFO)
+// if (INFO)
 //            log.info(getCounters().toString());
 
     }
@@ -621,15 +628,15 @@ abstract public class DataService implements IDataService, //IWritePipeline,
             
             // Note: this is a local method call.
             final UUID serviceUUID;
-            try {
+//            try {
                 
                 serviceUUID = getServiceUUID();
                 
-            } catch(IOException ex) {
-                
-                throw new AssertionError();
-                
-            }
+//            } catch(IOException ex) {
+//                
+//                throw new AssertionError();
+//                
+//            }
             
             String msg = "Goodbye: class=" + getClass().getName()
                     + ", immediateShutdown=" + immediateShutdown;
@@ -676,28 +683,20 @@ abstract public class DataService implements IDataService, //IWritePipeline,
      * </dl>
      * Subclasses MAY extend this method to report additional {@link ICounter}s.
      * 
-     * @todo add some counters for the #of journals stored by the
-     *       {@link ResourceManager}? #of index segments stored by the
-     *       {@link ResourceManager}? ???
-     * 
      * @todo Add some counters providing a histogram of the index partitions
      *       that have touched or that are "hot"?
-     * 
-     * FIXME attached and detach counters for the live journal during overflow
-     * so that we can report the disk usage? (We get this from performance
-     * counters anyway so maybe this does not matter.)
      */
     synchronized public ICounterSet getCounters() {
      
         if (countersRoot == null) {
 
             final UUID serviceUUID;
-            try {
+//            try {
                 // Note: this is a local method call.
                 serviceUUID = getServiceUUID();
-            } catch(IOException ex) {
-                throw new RuntimeException(ex);
-            }
+//            } catch(IOException ex) {
+//                throw new RuntimeException(ex);
+//            }
             
             if (serviceUUID == null) {
                 
@@ -722,76 +721,16 @@ abstract public class DataService implements IDataService, //IWritePipeline,
 
             final CounterSet serviceRoot = countersRoot.makePath(pathPrefix);
 
-            // Service info.
-            {
+            /*
+             * Service generic counters. 
+             */
+            
+            AbstractStatisticsCollector.addBasicServiceOrClientCounters(
+                    serviceRoot, this, properties);
 
-                CounterSet tmp = serviceRoot.makePath("Info");
-
-                tmp.addCounter("Service Type", new OneShotInstrument<String>(
-                    DataService.this.getClass().getName()));
-
-                CounterSet ptmp = tmp.makePath("Properties"); 
-                {
-
-                    /*
-                     * List out all of the properties and then report them from
-                     * a one-shot instrument.
-                     */
-                    final Enumeration e = properties.propertyNames();
-                    
-                    while (e.hasMoreElements()) {
-
-                        final String name;
-                        final String value;
-                        try {
-
-                            name = (String) e.nextElement();
-
-                            value = (String) properties.getProperty(name);
-
-                        } catch (ClassCastException ex) {
-                            
-                            log.warn(ex.getMessage());
-                            
-                            continue;
-                        
-                        }
-
-                        if(value==null) continue;
-                        
-                        ptmp.addCounter(name, new OneShotInstrument<String>(
-                                value));
-                        
-                    }
-                    
-                }
-                
-            }
-
-            // Service per-process memory data
-            {
-
-                countersRoot.addCounter(pathPrefix
-                        + IProcessCounters.Memory_runtimeMaxMemory,
-                        new OneShotInstrument<Long>(Runtime.getRuntime().maxMemory()));
-
-                countersRoot.addCounter(pathPrefix
-                        + IProcessCounters.Memory_runtimeFreeMemory,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(Runtime.getRuntime().freeMemory());
-                            }
-                        });
-
-                countersRoot.addCounter(pathPrefix
-                        + IProcessCounters.Memory_runtimeTotalMemory,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(Runtime.getRuntime().totalMemory());
-                            }
-                        });
-
-            }
+            /*
+             * Service specific counters.
+             */
             
             serviceRoot.makePath("Resource Manager").attach(
                     resourceManager.getCounters());
@@ -1017,16 +956,16 @@ abstract public class DataService implements IDataService, //IWritePipeline,
                 
             }
             
-            try {
+//            try {
                 if (getServiceUUID() != null) {
                   
                     return "Service UUID not available yet.";
                     
                 }
-            } catch (IOException e) {
-                // Note: should not be thrown for a local function call.
-                throw new RuntimeException(e);
-            }
+//            } catch (IOException e) {
+//                // Note: should not be thrown for a local function call.
+//                throw new RuntimeException(e);
+//            }
             
             final String s = getCounters().toString(filter);
 
@@ -1040,10 +979,11 @@ abstract public class DataService implements IDataService, //IWritePipeline,
      * This task runs periodically. Once {@link IDataService#getServiceUUID()}
      * reports a non-<code>null</code> value AND
      * {@link ResourceManager#isRunning()} reports <code>true</code>, it will
-     * start the performance counter collector and the {@link ReportTask} which
-     * will relay the performance counters to the {@link ILoadBalancerService}.
-     * At that point this task will throw an exception in order to prevent it
-     * from being re-executed by the {@link DataService#reportService}.
+     * start an appropriate {@link AbstractStatisticsCollector} and a
+     * {@link ReportTask}. The {@link ReportTask} will relay the performance
+     * counters to the {@link ILoadBalancerService}. At that point this task
+     * will throw an exception in order to prevent it from being re-executed by
+     * the {@link DataService#reportService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1057,15 +997,15 @@ abstract public class DataService implements IDataService, //IWritePipeline,
          */
         final protected Logger log = Logger.getLogger(StartPerformanceCounterCollectionTask.class);
 
-        protected Properties properties;
+//        private final Properties properties;
         
-        public StartPerformanceCounterCollectionTask(Properties properties) {
+        public StartPerformanceCounterCollectionTask() {
         
-            if (properties == null)
-                throw new IllegalArgumentException();
-            
-            // prevent modification of the caller's properties.
-            this.properties = new Properties( properties );
+//            if (properties == null)
+//                throw new IllegalArgumentException();
+//            
+//            // prevent modification of the caller's properties.
+//            this.properties = new Properties( properties );
         
         }
 
@@ -1121,7 +1061,7 @@ abstract public class DataService implements IDataService, //IWritePipeline,
 
             if (uuid == null) {
 
-                log.info("Service UUID is not assigned yet.");
+                log.warn("Service UUID is not assigned yet.");
 
                 return false;
 
@@ -1129,22 +1069,34 @@ abstract public class DataService implements IDataService, //IWritePipeline,
             
             if(!resourceManager.isRunning()) {
                 
-                log.info("Resource manager is not running yet.");
+                log.warn("Resource manager is not running yet.");
                 
                 return false;
                 
             }
 
-            log.info("Service UUID was assigned - will start performance counter collection: uuid="
-                            + uuid);
+            /*
+             * Start collecting performance counters from the OS.
+             */
+            {
+
+                log.info("Service UUID was assigned - will start performance counter collection: uuid="
+                                + uuid);
+
+                final Properties p = getProperties();
+
+                p.setProperty(
+                                AbstractStatisticsCollector.Options.PROCESS_NAME,
+                                "service" + ICounterSet.pathSeparator
+                                        + uuid.toString());
+
+                statisticsCollector = AbstractStatisticsCollector
+                        .newInstance(p);
+
+                statisticsCollector.start();
+                
+            }
             
-            properties.setProperty(
-                    AbstractStatisticsCollector.Options.PROCESS_NAME, "service"
-                            + ICounterSet.pathSeparator + uuid.toString());
-            
-            statisticsCollector = AbstractStatisticsCollector.newInstance(properties);
-            
-            statisticsCollector.start();
             
             /*
              * Attach the counters that will be reported by the statistics
@@ -1166,6 +1118,8 @@ abstract public class DataService implements IDataService, //IWritePipeline,
             reportService.scheduleWithFixedDelay(new ReportTask(),
                     initialDelay, delay, unit);
             
+            log.warn("Started ReportTask.");
+            
             return true;
             
         }
@@ -1175,6 +1129,8 @@ abstract public class DataService implements IDataService, //IWritePipeline,
     /**
      * Periodically send performance counter data to the
      * {@link ILoadBalancerService}.
+     * 
+     * @see AbstractFederation.ReportTask
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1257,9 +1213,23 @@ abstract public class DataService implements IDataService, //IWritePipeline,
 
             getCounters().asXML(baos, "UTF-8", null/* filter */);
 
-            loadBalancerService
-                    .notify("Hello", serviceUUID, baos.toByteArray());
+            final String serviceIface;
+            
+            if(DataService.this instanceof IMetadataService) {
+            
+                serviceIface = IMetadataService.class.getName();
+                
+            } else {
+                
+                serviceIface = IDataService.class.getName();
+                
+            }
+            
+            loadBalancerService.notify("Hello", serviceUUID, serviceIface, baos
+                    .toByteArray());
 
+            log.info("Notified the load balancer.");
+            
         }
 
     }

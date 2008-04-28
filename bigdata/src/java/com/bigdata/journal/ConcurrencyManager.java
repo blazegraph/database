@@ -735,22 +735,22 @@ public class ConcurrencyManager implements IConcurrencyManager {
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
             
-            writeServiceQueueLength = new QueueStatisticsTask("writeService",
+            writeServiceQueueStatisticsTask = new QueueStatisticsTask("writeService",
                     writeService, countersUN, w);
 
-            txWriteServiceQueueLength = new QueueStatisticsTask("txWriteService",
+            txWriteServiceQueueStatisticsTask = new QueueStatisticsTask("txWriteService",
                     txWriteService, countersTX, w);
 
-            readServiceQueueLength = new QueueStatisticsTask("readService",
+            readServiceQueueStatisticsTask = new QueueStatisticsTask("readService",
                     readService, countersHR, w);
 
-            sampleService.scheduleWithFixedDelay(writeServiceQueueLength,
+            sampleService.scheduleWithFixedDelay(writeServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
             
-            sampleService.scheduleWithFixedDelay(txWriteServiceQueueLength,
+            sampleService.scheduleWithFixedDelay(txWriteServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
 
-            sampleService.scheduleWithFixedDelay(readServiceQueueLength,
+            sampleService.scheduleWithFixedDelay(readServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
 
         }
@@ -770,9 +770,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Sampling instruments for the various queues giving us the moving average
      * of the queue length.
      */
-    private final QueueStatisticsTask writeServiceQueueLength;
-    private final QueueStatisticsTask txWriteServiceQueueLength;
-    private final QueueStatisticsTask readServiceQueueLength;
+    private final QueueStatisticsTask writeServiceQueueStatisticsTask;
+    private final QueueStatisticsTask txWriteServiceQueueStatisticsTask;
+    private final QueueStatisticsTask readServiceQueueStatisticsTask;
     
     private CounterSet countersRoot;
     
@@ -794,167 +794,31 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
             // readService
             {
-                CounterSet tmp = addCounters(countersRoot
-                        .makePath("Read Service"), readService);
-
-                tmp.addCounter("averageQueueLength",
-                        readServiceQueueLength.averageQueueLengthInst);
-
-                tmp.addCounter("averageQueueActiveCount",
-                        readServiceQueueLength.averageQueueActiveCountInst);
-                
-                tmp.addCounter("averageQueueSize",
-                        readServiceQueueLength.averageQueueSizeInst);
-
-                // per-task counters.
-                tmp.addCounter("averageTaskQueueWaitingTime",
-                        readServiceQueueLength.averageTaskQueueWaitingTimeInst);
-
-                tmp.addCounter("averageTaskServiceTime",
-                        readServiceQueueLength.averageTaskServiceTimeInst);
-
-                tmp.addCounter("averageTaskQueuingTime",
-                        readServiceQueueLength.averageTaskQueuingTimeInst);
+                CounterSet tmp = readServiceQueueStatisticsTask
+                        .addCounters(countersRoot.makePath("Read Service"));
 
             }
 
             // txWriteService
             {
-            
-                CounterSet tmp = addCounters(countersRoot
-                        .makePath("Transaction Write Service"), txWriteService);
 
-                tmp.addCounter("averageQueueLength",
-                        txWriteServiceQueueLength.averageQueueLengthInst);
-                
-                tmp.addCounter("averageQueueActiveCount",
-                        txWriteServiceQueueLength.averageQueueActiveCountInst);
-                
-                tmp.addCounter("averageQueueSize",
-                        txWriteServiceQueueLength.averageQueueSizeInst);
-
-                // per-task counters.
-                tmp.addCounter("averageTaskQueueWaitingTime",
-                        txWriteServiceQueueLength.averageTaskQueueWaitingTimeInst);
-
-                // is there lock waiting for the tx write queue? there may be....
-                tmp.addCounter("averageTaskLockWaitingTime",
-                        txWriteServiceQueueLength.averageTaskLockWaitingTimeInst);
-
-                tmp.addCounter("averageTaskServiceTime",
-                        txWriteServiceQueueLength.averageTaskServiceTimeInst);
-
-                tmp.addCounter("averageTaskQueuingTime",
-                        txWriteServiceQueueLength.averageTaskQueuingTimeInst);
+                CounterSet tmp = txWriteServiceQueueStatisticsTask
+                        .addCounters(countersRoot
+                                .makePath("Transaction Write Service"));
 
             }
-            
+
             // writeService
             {
-                
-                final CounterSet tmp = addCounters(countersRoot
-                        .makePath("Unisolated Write Service"), writeService);
-                
-                tmp.addCounter("averageQueueLength",
-                        writeServiceQueueLength.averageQueueLengthInst);
-                
-                tmp.addCounter("averageQueueActiveCount",
-                        writeServiceQueueLength.averageQueueActiveCountInst);
 
-                tmp.addCounter("averageQueueSize",
-                        writeServiceQueueLength.averageQueueSizeInst);
-
-                // per-task counters.
-                tmp.addCounter("averageTaskQueueWaitingTime",
-                        writeServiceQueueLength.averageTaskQueueWaitingTimeInst);
-
-                tmp.addCounter("averageTaskLockWaitingTime",
-                        writeServiceQueueLength.averageTaskLockWaitingTimeInst);
-
-                tmp.addCounter("averageTaskServiceTime",
-                        writeServiceQueueLength.averageTaskServiceTimeInst);
-
-                tmp.addCounter("averageTaskQueuingTime",
-                        writeServiceQueueLength.averageTaskQueuingTimeInst);
-            
-                /*
-                 * data only available for the write service.
-                 */
-
-                // Note: this is an instantaneous measure and needs to be sampled and smoothed.
-                tmp.addCounter("#concurrentTasks",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue((long)writeService.getConcurrentTaskCount());
-                            }
-                        });
-                
-                tmp.addCounter("#commits",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getGroupCommitCount());
-                            }
-                        });
-
-                tmp.addCounter("#aborts",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getAbortCount());
-                            }
-                        });
-
-                tmp.addCounter("overflowCount",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getOverflowCount());
-                            }
-                        });
-
-                tmp.addCounter("failedTaskCount",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getFailedTaskCount());
-                            }
-                        });
-
-                tmp.addCounter("successTaskCount",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getSuccessTaskCount());
-                            }
-                        });
-
-                tmp.addCounter("committedTaskCount",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getCommittedTaskCount());
-                            }
-                        });
-
-                tmp.addCounter("maxLatencyUntilCommit",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getMaxLatencyUntilCommit());
-                            }
-                        });
-
-                tmp.addCounter("maxCommitLatency",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getMaxCommitLatency());
-                            }
-                        });
-
-                tmp.addCounter("maxRunning",
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getMaxRunning());
-                            }
-                        });
+                final CounterSet tmp = writeServiceQueueStatisticsTask
+                        .addCounters(countersRoot
+                                .makePath("Unisolated Write Service"));
                 
                 /*
                  * The lock manager for the write service.
                  */
+
                 tmp.makePath("LockManager").attach(lockManager.getCounters());
 
             }
@@ -965,57 +829,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
         
     }
 
-    /**
-     * Adds counters defined for a {@link ThreadPoolExecutor}.
-     * 
-     * @param counterSet
-     *            The counters will be added to this {@link CounterSet}.
-     * @param service
-     *            The service for which the counters will be reported.
-     * 
-     * @return The caller's <i>counterSet</i>
-     */
-    protected CounterSet addCounters(CounterSet counterSet, final ThreadPoolExecutor service) {
-        
-        counterSet.addCounter("#active",
-                new Instrument<Integer>() {
-                    public void sample() {
-                        setValue(service.getActiveCount());
-                    }
-                });
-        
-        counterSet.addCounter("#queued",
-                new Instrument<Integer>() {
-                    public void sample() {
-                        setValue(service.getQueue().size());
-                    }
-                });
-
-        counterSet.addCounter("#completed",
-                new Instrument<Long>() {
-                    public void sample() {
-                        setValue(service.getCompletedTaskCount());
-                    }
-                });
-        
-        counterSet.addCounter("poolSize",
-                new Instrument<Integer>() {
-                    public void sample() {
-                        setValue(service.getPoolSize());
-                    }
-                });
-
-        counterSet.addCounter("largestPoolSize",
-                new Instrument<Integer>() {
-                    public void sample() {
-                        setValue(service.getLargestPoolSize());
-                    }
-                });
-
-        return counterSet;
-        
-    }
-    
     /**
      * Submit a task (asynchronous). Tasks will execute asynchronously in the
      * appropriate thread pool with as much concurrency as possible.
@@ -1155,7 +968,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
     private Future<Object> submitWithDynamicLatency(AbstractTask task,
             ExecutorService service, TaskCounters taskCounters) {
 
-        taskCounters.submittedCount++;
+        taskCounters.taskSubmitCount++;
         
         /*
          * Note: The StoreManager (part of the ResourceManager) has some

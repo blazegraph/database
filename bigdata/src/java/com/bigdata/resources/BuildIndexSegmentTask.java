@@ -1,7 +1,6 @@
 package com.bigdata.resources;
 
 import java.io.File;
-import java.util.Arrays;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
@@ -325,8 +324,8 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
 
                 final IResourceMetadata[] oldResources = oldpmd.getResources();
 
-                assert oldResources.length == 2 || oldResources.length == 3 : "Expecting either 2 or 3 resources: "
-                        + Arrays.toString(oldResources);
+//                assert oldResources.length == 2 || oldResources.length == 3 : "Expecting either 2 or 3 resources: "
+//                        + Arrays.toString(oldResources);
 
                 assert oldResources[0].getUUID().equals(
                         getJournal().getRootBlockView().getUUID()) : "Expecting live journal to the first resource: "

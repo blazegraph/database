@@ -25,8 +25,6 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.rmi.Remote;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.IIndex;
@@ -260,23 +258,8 @@ import com.bigdata.sparse.SparseRowStore;
  *       can have more flexibility since they are under less of a latency
  *       constraint.
  */
-public interface IDataService extends IRemoteTxCommitProtocol, Remote {
+public interface IDataService extends IRemoteTxCommitProtocol, IService {
 
-    /**
-     * The unique identifier for this data service.
-     * <p>
-     * Note: Some service discovery frameworks (Jini) will assign the service a
-     * {@link UUID} asynchronously after a new service starts, in which case
-     * this method will return <code>null</code> until the service
-     * {@link UUID} has been assigned.
-     * 
-     * @return The unique data service identifier.
-     * 
-     * @throws IOException
-     *             since you can use this method with RMI.
-     */
-    public abstract UUID getServiceUUID() throws IOException;
-    
     /**
      * An XML representation of performance counters for the {@link IDataService}.
      */
@@ -532,26 +515,9 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     /**
      * Shutdown the service immediately and destroy any persistent data
      * associated with the service.
+     * 
+     * @todo move to {@link IService}?
      */
     public void destroy() throws IOException;
-    
-//    /**
-//     * Returns <code>true</code> unless the data service is currently
-//     * performing either overflow or overflow post-processing actions.
-//     * 
-//     * @return <code>true</code> iff the data service is able to initiate
-//     *         overflow processing.
-//     * 
-//     * @throws IOException
-//     */
-//    public boolean isOverflowAllowed() throws IOException;
-//    
-//    /**
-//     * The createTime of the live journal backing the data service. This field
-//     * will be updated each time the data service overflows.
-//     * 
-//     * @throws IOException
-//     */
-//    public long getJournalCreateTime() throws IOException;
     
 }
