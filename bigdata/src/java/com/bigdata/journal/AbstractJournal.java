@@ -679,6 +679,19 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         log.info(Options.OFFSET_BITS + "=" + offsetBits);
 
         /*
+         * readCacheCapacity
+         */
+        final int readCacheCapacity = Integer.parseInt(properties.getProperty(
+                Options.READ_CACHE_CAPACITY,
+                Options.DEFAULT_READ_CACHE_CAPACITY));
+
+        log.info(Options.READ_CACHE_CAPACITY + "=" + readCacheCapacity);
+
+        if (readCacheCapacity < 0)
+            throw new RuntimeException(Options.READ_CACHE_CAPACITY
+                    + " must be non-negative");
+        
+        /*
          * "createTempFile"
          */
 
@@ -941,7 +954,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     BufferMode.Direct,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, null/* writeCache */, validateChecksum,
+                    offsetBits, 0/* readCacheCapacity */, null/* writeCache */, validateChecksum,
                     createTime, checker);
 
             _bufferStrategy = new DirectBufferStrategy(
@@ -963,7 +976,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, null/* writeCache */, validateChecksum,
+                    offsetBits, 0/*readCacheCapacity*/, null/* writeCache */, validateChecksum,
                     createTime, checker);
 
             /*
@@ -989,7 +1002,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             fileMetadata = new FileMetadata(file, BufferMode.Disk,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, readOnly ? null : writeCache, validateChecksum,
+                    offsetBits, readCacheCapacity,
+                    readOnly ? null : writeCache, validateChecksum,
                     createTime, checker);
 
             _bufferStrategy = new DiskOnlyStrategy(

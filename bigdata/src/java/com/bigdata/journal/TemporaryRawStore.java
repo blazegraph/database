@@ -445,12 +445,13 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
          * 
          * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
          * 
+         * @todo use a read cache when converting to a DiskOnlyStrategy?
          */
         FileMetadata fileMetadata = new FileMetadata(file, BufferMode.Disk,
                 useDirectBuffers, initialExtent, maximumDiskExtent, create,
                 isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                getOffsetBits(), null/* writeCache */, validateChecksum,
-                createTime, checker);
+                getOffsetBits(), 0/* readCacheCapacity */,
+                null/* writeCache */, validateChecksum, createTime, checker);
 
         // Open the disk-based store file.
         DiskOnlyStrategy diskBuf = new DiskOnlyStrategy(Bytes.gigabyte * 2,
