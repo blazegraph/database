@@ -26,6 +26,8 @@ package com.bigdata.journal;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
@@ -207,6 +209,84 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * <code>null</code> if group commit is not being executed.
      */
     private Thread groupCommitThread = null;
+    
+    /**
+     * A list of the {@link ITx#UNISOLATED} AbstractTask}s executed by this
+     * {@link WriteExecutorService} in the order in which their commits are
+     * serialized.
+     * <p>
+     * {@link AbstractTask}s are already executed in a partial ordered
+     * determined by their exclusive resource locks. This partial order is
+     * sufficient to guarentee that concurrent tasks do not read or write on the
+     * same unisolated index. In addition, the {@link AbstractTask} itself
+     * coordinates a post-task checkpoint using the {@link #lock}, which
+     * imposes a total serialization order over the {@link AbstractTask}s.
+     * <p>
+     * Tasks are added to this list after they have successfully checkpointed
+     * themselves and are removed during the group commit protocol. If a task
+     * fails during its normal execution, then it is never entered into this
+     * list. If a task succeeds and writes its checkpoint record(s), then other
+     * tasks MAY begin to execute that depend on the same resources and hence on
+     * the checkpoint(s) written by that task. If a task fails or fails to write
+     * its checkpoint record(s) then its write set is rolled back and it is NOT
+     * entered onto this list since its write set will not be visible and can
+     * not become a precondition for other tasks.
+     * <p>
+     * During the group commit, there is a per-task commit protocol that
+     * atomically updates the {@link Name2Addr} object on the live journal to
+     * reflect (a) named indices registered by the task; (b) named indices
+     * dropped by the task; and (c) checkpoint records for named indices written
+     * by the task.
+     * <p>
+     * If this per-task commit protocol fails for a given task, then the
+     * transitive closure of downstream tasks in the {@link #serializationOrder}
+     * having a dependency (a lock on a resource that was accessed by the
+     * pre-condition task) MUST fail since its preconditions have not been made
+     * restart safe. Note that this transitive closure expands the set of
+     * resources as well as the set of downstream tasks since each resource lock
+     * can cause new preconditions to exists. Task whose preconditions have not
+     * been made restart safe are made to fail by interrupting the thread in
+     * which they are executing.
+     * <p>
+     * During the group commit, tasks are removed from the
+     * {@link #serializationOrder} as their post-commit processing is performed.
+     * After a group commit, the serialization order will always be empty. This
+     * is because tasks require the {@link #lock} in order to add themselves to
+     * the {@link #serializationOrder} but the group commit will hold the lock
+     * once the commit group is stabilized thereby preventing any tasks not in
+     * the commit group from entering the {@link #serializationOrder}.
+     * <p>
+     * Note: This list is not thread-safe. In order to read or write on this
+     * list you MUST own the {@link #lock}.
+     * 
+     * @todo does anything strictly prevent a task that is executed after
+     *       another task and with overlapping resource locks from becoming the
+     *       task to run the group commit? Probably not, in which case modify
+     *       the logic that chooses the group commit thread to require that the
+     *       thread is the one whose task is first in the serialization order!
+     */
+    private final List<AbstractTask> serializationOrder = new LinkedList<AbstractTask>();
+
+    /**
+     * Appends the task to the {@link #serializationOrder}.
+     * 
+     * @param task
+     */
+    void addTaskToSerializationOrder(AbstractTask task) {
+        
+        if (task == null)
+            throw new IllegalArgumentException();
+
+        log.info("#tasks=" + serializationOrder.size() + ", task="
+                + task.toString());
+       
+        // the lock MUST be held by the thread before you can touch this list.
+        assert lock.isHeldByCurrentThread();
+        
+        // add to the end of the list.
+        serializationOrder.add(task);
+        
+    }
     
     /*
      * Counters

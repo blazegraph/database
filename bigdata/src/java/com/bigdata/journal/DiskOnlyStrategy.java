@@ -38,14 +38,12 @@ import java.util.concurrent.Exchanger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 
-import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.IndexMetadata;
+import com.bigdata.cache.LRUCache;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager.ManagedJournal;
@@ -140,10 +138,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo test verifying that the buffer position and limit are updated correctly
  *       by {@link #write(ByteBuffer)} regardless of the code path.
  * 
- * @todo config parameter for buffer size, direct vs heap allocation of the
- *       {@link #writeCache}, and whether or not the {@link #writeCache} is
- *       enabled.
- * 
  * @todo Retro fit the concept of a write cache into the
  *       {@link DirectBufferStrategy} so that we defer writes onto the disk
  *       until (a) a threshold of data has been buffered; or (b)
@@ -152,14 +146,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       we do not need to allocate a separate writeCache. However, we will
  *       still need to track the {@link #writeCacheOffset} and maintain a
  *       {@link #writeCacheIndex}.
- * 
- * FIXME add a read cache for records. This will be useful for things like the
- * {@link CommitRecord}s, {@link Checkpoint} records and the
- * {@link IndexMetadata} records for frequently read indices since they will
- * eventually get flushed from the write cache. This can be a general layer, but
- * is only useful when the store is not fully buffered. E.g., DiskOnlyStrategy
- * and perhaps the mapped mode, but that's not supported anyway.
- * 
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -201,6 +188,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     private long userExtent;
 
+    /**
+     * Optional read cache.
+     * <p>
+     * Note: When enabled, records are entered iff there is a miss on a read.
+     * Written records are NOT entered into the read cache since (when the
+     * {@link #writeCache} is enabled), recently written records are already in
+     * the {@link #writeCache}.
+     */
+    private LRUCache<Long, byte[]> readCache = null;
+    
     /**
      * Optional {@link WriteCache}.
      */
@@ -261,15 +258,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          */
         final private Map<Long,Integer> writeCacheIndex;
         
-        /**
-         * The starting position in the buffer for data that has not been
-         * written to the disk.
-         * 
-         * FIXME not used yet.
-         * 
-         * @see Task
-         */
-        private int start = 0;
+//        /**
+//         * The starting position in the buffer for data that has not been
+//         * written to the disk.
+//         * 
+//         * @see Task
+//         */
+//        private int start = 0;
 
         /**
          * Create a {@link WriteCache} from a caller supplied buffer.
@@ -951,16 +946,89 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * other.
              */
             {
-                CounterSet writeCache = root.makePath("writeCache");
+                final CounterSet writeCache = root.makePath("writeCache");
 
-                final WriteCache tmp = DiskOnlyStrategy.this.writeCache;
+                {
+                 
+                    final WriteCache tmp = DiskOnlyStrategy.this.writeCache;
+
+                    // add counter for the write cache capacity.
+                    writeCache.addCounter("capacity",
+                            new OneShotInstrument<Long>(tmp == null ? 0L : tmp
+                                    .capacity()));
+                    
+                }
                 
-                // add counter for the write cache capacity.
-                writeCache.addCounter("capacity", new Instrument<Long>() {
-                    public void sample() {
-                        setValue(tmp == null ? 0L : tmp.capacity());
-                    }
-                });
+            }
+            
+            /*
+             * read cache.
+             */
+            {
+
+                final CounterSet readCache = root.makePath("readCache");
+
+                {
+                    
+                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+
+                    readCache.addCounter("capacity",
+                            new OneShotInstrument<Long>((long) (tmp == null ? 0
+                                    : tmp.capacity())));
+                    
+                }
+                
+                readCache.addCounter("testCount",new Instrument<Long>(){
+
+                    @Override
+                    protected void sample() {
+
+                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+                        
+                        if(tmp==null) return;
+                        
+                        setValue(tmp.getTestCount());
+
+                    }});
+                
+                readCache.addCounter("successCount",new Instrument<Long>(){
+
+                    @Override
+                    protected void sample() {
+
+                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+                        
+                        if(tmp==null) return;
+                        
+                        setValue(tmp.getSuccessCount());
+
+                    }});
+                
+                readCache.addCounter("insertCount",new Instrument<Long>(){
+
+                    @Override
+                    protected void sample() {
+
+                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+                        
+                        if(tmp==null) return;
+                        
+                        setValue(tmp.getInsertCount());
+
+                    }});
+                
+                readCache.addCounter("hitRatio",new Instrument<Double>(){
+
+                    @Override
+                    protected void sample() {
+
+                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+                        
+                        if(tmp==null) return;
+                        
+                        setValue(tmp.getHitRatio());
+
+                    }});
                 
             }
             
@@ -1035,47 +1103,57 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         // the offset at which the next record would be written on the file.
         writeCacheOffset = fileMetadata.nextOffset;
-        
-    }
-    private ExecutorService writeService = null;
 
-    /**
-     * Writes all data in the {@link WriteCache} onto the disk file.
-     * 
-     * FIXME In order to be able to asynchronously drive data in the write cache
-     * to the disk we need to track the offset of the 1st byte in {@link #buf}
-     * that has not been written onto the disk.
-     * {@link DiskOnlyStrategy#force(boolean)} will have to be modified so that
-     * it awaits the current task writing out data (if any) and then
-     * synchronously writes out the remaining data itself.
-     * <P>
-     * We can submit a new task each time a record is written, but we do not
-     * want to have more than one task on the queue. Alternatively, just make
-     * the thread runnable and coordinate with a {@link Lock} and
-     * {@link Condition}s.
-     * 
-     * in order to handle the end of the buffer gracefully we might have to just
-     * and the application a new one when the current one is full. we can then
-     * trigger a write once the buffer is at least X% (or #M) and if the next
-     * record would cause an overflow in anycase. the write can be a partial
-     * write of the buffer or not.
-     * 
-     * using multiple buffers means that we have to search the chain of buffers
-     * still holding data as our write cache. if we make the buffer change over
-     * point synchronous then this will only be a single buffer. else a chain.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class Task implements Runnable {
+        if (fileMetadata.readCacheCapacity > 0) {
 
-        public void run() {
+            log.info("Enabling read cache: capacity="
+                    + fileMetadata.readCacheCapacity);
 
-            throw new UnsupportedOperationException();
+            this.readCache = new LRUCache<Long, byte[]>(
+                    fileMetadata.readCacheCapacity);
             
         }
         
     }
+    private ExecutorService writeService = null;
+
+//    /**
+//     * Writes all data in the {@link WriteCache} onto the disk file.
+//     * 
+//     * FIXME In order to be able to asynchronously drive data in the write cache
+//     * to the disk we need to track the offset of the 1st byte in {@link #buf}
+//     * that has not been written onto the disk.
+//     * {@link DiskOnlyStrategy#force(boolean)} will have to be modified so that
+//     * it awaits the current task writing out data (if any) and then
+//     * synchronously writes out the remaining data itself.
+//     * <P>
+//     * We can submit a new task each time a record is written, but we do not
+//     * want to have more than one task on the queue. Alternatively, just make
+//     * the thread runnable and coordinate with a {@link Lock} and
+//     * {@link Condition}s.
+//     * 
+//     * in order to handle the end of the buffer gracefully we might have to just
+//     * and the application a new one when the current one is full. we can then
+//     * trigger a write once the buffer is at least X% (or #M) and if the next
+//     * record would cause an overflow in anycase. the write can be a partial
+//     * write of the buffer or not.
+//     * 
+//     * using multiple buffers means that we have to search the chain of buffers
+//     * still holding data as our write cache. if we make the buffer change over
+//     * point synchronous then this will only be a single buffer. else a chain.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private class Task implements Runnable {
+//
+//        public void run() {
+//
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//        
+//    }
     
     final public boolean isStable() {
         
@@ -1156,6 +1234,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         // Release the write cache.
         writeCache = null;
         
+        if(readCache != null) {
+
+            // @todo change to info level
+            log.warn("readCache: "+readCache.getStatistics());
+            
+            // Discard the LRU cache.
+            readCache = null;
+            
+        }
+        
         try {
 
             raf.close();
@@ -1225,6 +1313,23 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
+        if (readCache != null) {
+            
+            /*
+             * Test the read cache first and return the record from the read
+             * cache if it is found there.
+             */
+            
+            final byte[] data = readCache.get(addr);
+
+            if (data != null) {
+
+                return ByteBuffer.wrap(data).asReadOnlyBuffer();
+                
+            }
+            
+        }
+        
         /*
          * Allocate a new buffer of the exact capacity.
          * 
@@ -1405,6 +1510,26 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             counters.ndiskRead++;
             counters.elapsedReadNanos+=(System.nanoTime()-begin);
             counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
+
+            if (readCache != null) {
+                
+                /*
+                 * Put a copy of the record in the read cache.
+                 */
+
+                // new byte[] for the read cache.
+                final byte[] data = new byte[nbytes];
+                
+                // copy contents into the new byte[].
+                dst.get(data);
+                
+                // flip the buffer again so that it is read for re-reading.
+                dst.flip();
+                
+                // put the record into the read cache.
+                readCache.put(addr, data, false/*dirty*/);
+                
+            }
             
             // return the buffer.
             return dst;

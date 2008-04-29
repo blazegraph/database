@@ -86,6 +86,30 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
 
     private long highTide = 0, ninserts = 0, ntests = 0, nsuccess = 0;
 
+    public double getHitRatio() {
+        
+        return ((double) nsuccess / ntests);
+        
+    }
+
+    public long getInsertCount() {
+        
+        return ninserts;
+        
+    }
+    
+    public long getTestCount() {
+        
+        return ntests;
+        
+    }
+    
+    public long getSuccessCount() {
+        
+        return nsuccess;
+        
+    }
+    
     /**
      * The cache eviction listener.
      */
@@ -200,15 +224,21 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
     protected void finalize() throws Throwable
     {
     
-        log.info
-           ( "LRUCache: capacity="+capacity+
-                     ", loadFactor="+loadFactor+
-                     ", highTide="+highTide+
-                     ", ninserts="+ninserts+
-                     ", ntests="+ntests+
-                     ", nsuccess="+nsuccess+
-                     ", hitRatio="+((double)nsuccess/ntests)
-             );
+        log.info(getStatistics());
+        
+    }
+
+    public String getStatistics() {
+
+        return "LRUCache" + //
+                ": capacity=" + capacity + //
+                ", loadFactor=" + loadFactor + //
+                ", highTide=" + highTide + //
+                ", ninserts=" + ninserts + //
+                ", ntests=" + ntests + //
+                ", nsuccess=" + nsuccess + //
+                ", hitRatio=" + ((double) nsuccess / ntests)//
+        ;
         
     }
 

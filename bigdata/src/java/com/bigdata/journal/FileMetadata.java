@@ -116,6 +116,12 @@ public class FileMetadata {
     final int offsetBits;
 
     /**
+     * The #of records to be buffered in an optional read cache -or- ZERO(0) to
+     * disable the read cache.
+     */
+    final int readCacheCapacity;
+    
+    /**
      * The optional {@link ByteBuffer} to be used as the write cache.
      */
     final ByteBuffer writeCache;
@@ -228,6 +234,23 @@ public class FileMetadata {
      *            encode the byte offset as an unsigned integer. The remaining
      *            bits are used to encode the byte count (aka record length) as
      *            an unsigned integer.
+     * @param readCacheCapacity
+     *            The capacity of an optional read cache. When ZERO(0) the read
+     *            cache will be disabled. The capacity specifies the #of records
+     *            that will be retained by an LRU style cache. Note that this
+     *            option is only supported by the {@link DiskOnlyStrategy}.
+     *            Further note that most of the other {@link IBufferStrategy}s
+     *            are already fully buffered and hence can not benefit from a
+     *            read cache.
+     * @param writeCache
+     *            A direct {@link ByteBuffer} to be used as the write cache
+     *            (optional). Note that this write cache is only used by the
+     *            {@link DiskOnlyStrategy}. Further note that this MUST be a
+     *            direct {@link ByteBuffer} in order to avoid potential memory
+     *            leaks since NIO will otherwise force the allocation of a
+     *            "temporary" direct {@link ByteBuffer} and there is a known bug
+     *            from 1.4 through at least 1.6 with the release of such
+     *            temporary buffers.
      * @param createTime
      *            The create time to be assigned to the root block iff a new
      *            file is created.
@@ -244,7 +267,8 @@ public class FileMetadata {
     FileMetadata(File file, BufferMode bufferMode, boolean useDirectBuffers,
             long initialExtent, long maximumExtent, boolean create,
             boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
-            ForceEnum forceWrites, int offsetBits, ByteBuffer writeCache,
+            ForceEnum forceWrites, int offsetBits, int readCacheCapacity,
+            ByteBuffer writeCache,
             boolean validateChecksum, final long createTime,
             ChecksumUtility checker) throws RuntimeException {
 
@@ -283,6 +307,8 @@ public class FileMetadata {
 
         this.offsetBits = offsetBits;
 
+        this.readCacheCapacity = readCacheCapacity;
+        
         this.writeCache = writeCache;
         
         this.fileMode = (readOnly ?"r" :forceWrites.asFileMode());

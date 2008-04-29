@@ -162,6 +162,19 @@ public interface Options {
      * memory-mapped or disk-only buffer modes.
      */
     String USE_DIRECT_BUFFERS = "useDirectBuffers";
+
+    /**
+     * <code>readCacheCapacity</code> - An integer property whose value
+     * controls the size of the write cache (in records) (default
+     * {@value #DEFAULT_READ_CACHE_CAPACITY} bytes). A value of ZERO (0) will
+     * disable the read cache.
+     * <p>
+     * Note that only the {@link BufferMode#Disk} mode supports a read cache -
+     * most of the other modes are already fully buffered.
+     * 
+     * @see #DEFAULT_READ_CACHE_CAPACITY
+     */
+    String READ_CACHE_CAPACITY = "readCacheCapacity";
     
     /**
      * <code>writeCacheCapacity</code> - An integer property whose value
@@ -411,6 +424,11 @@ public interface Options {
      * The default for {@link #WRITE_CACHE_CAPACITY} (10M).
      */
     int DEFAULT_WRITE_CACHE_CAPACITY = 10 * Bytes.megabyte32;
+    
+    /**
+     * The default for {@link #READ_CACHE_CAPACITY} (10000).
+     */
+    String DEFAULT_READ_CACHE_CAPACITY = ""+10000;
     
     /**
      * The default initial extent for a new journal.

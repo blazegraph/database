@@ -1031,18 +1031,29 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * are able to guarentee that the write set of a task is made
              * restart safe atomically by the next group commit.
              * 
-             * FIXME NOW : when the task succeeds, it should be possible to flush the
-             * index to the store before we obtain the lock in order to reduce
-             * the latency when we write the checkpoint record. (if the task
-             * fails, the rollback is a light weight operation.)
+             * FIXME NOW : Rather than fooling around with [autoCommit],
+             * getIndex() could simply NOT register the index with Name2Addr as
+             * a listener. The index cache would be preserved until the group
+             * commit and would then be directly updated on Name2Addr using
+             * logic exactly parallel to the handleCommit() logic, but without
+             * entering the named indices onto the dirtyList.
              * 
-             * FIXME NOW : In fact, the checkpoint and rollback actions then become
-             * simply recording the new checkpoint record. for checkpoint, it
-             * has the new root address and (if changed) the new metadata
-             * address. for rollback, we simply close the index and write a copy
-             * of the saved checkpoint record, thereby discarding any possible
-             * side effects from checkpoints performed from within the task
-             * itself.
+             * Another way to do this is to simply register a Name2Addr subclass
+             * by overriding AbstractJournal#setupCommitters(). The subclass
+             * would not use a dirtyList.
+             * 
+             * FIXME NOW : when the task succeeds, it should be possible to
+             * flush the index to the store before we obtain the lock in order
+             * to reduce the latency when we write the checkpoint record. (if
+             * the task fails, the rollback is a light weight operation.)
+             * 
+             * FIXME NOW : In fact, the checkpoint and rollback actions then
+             * become simply recording the new checkpoint record. for
+             * checkpoint, it has the new root address and (if changed) the new
+             * metadata address. for rollback, we simply close the index and
+             * write a copy of the saved checkpoint record, thereby discarding
+             * any possible side effects from checkpoints performed from within
+             * the task itself.
              */
             final Lock lock = writeService.lock;
 
@@ -1067,6 +1078,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 
                     // success - checkpoint indices
                     checkpointIndices();
+                    
+                    // append to the serialization order.
+                    // FIXME NOW : writeService.addTaskToSerializationOrder(delegate);
                     
                 } finally {
                     
@@ -1401,6 +1415,70 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         }
 
     }
+
+    /**
+     * An action taken by a task to register or drop a named index. The purpose
+     * of this class is to isolate the changes to the set of named indices from
+     * concurrent tasks. This is done in coordination with the
+     * {@link IsolatedRegisterDropIndexJournal}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static abstract class Action {
+
+        final String name;
+        private Action priorAction = null;
+
+        private Action() {
+            throw new UnsupportedOperationException();
+        }
+        
+        Action(String name) {
+        
+            if (name == null)
+                throw new IllegalArgumentException();
+            
+            this.name = name;
+            
+        }
+        
+        abstract boolean isRegister();
+        
+        abstract boolean isDrop();
+        
+        final protected Action getPriorAction() {
+            
+            return priorAction;
+            
+        }
+        
+        abstract void doAction();
+        
+        /**
+         * Chains together actions on the same named index so that we can
+         * apply the actions in the same sequence in {@link #doAction()}
+         * during the commit.
+         * 
+         * @param priorAction
+         *            The previous action on the named index.
+         */
+        void setPreviousAction(Action priorAction) {
+
+            if (priorAction == null)
+                throw new IllegalArgumentException();
+            
+            if (this.priorAction != null) {
+
+                throw new IllegalStateException();
+                
+            }
+            
+            this.priorAction = priorAction;
+            
+        }
+        
+    }
     
     /**
      * A read-write view of an {@link IJournal} that is used to impose isolated
@@ -1421,64 +1499,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class AtomicRegisterDropJournal implements IJournal {
+    static class IsolatedRegisterDropIndexJournal implements IJournal {
         
         private final AbstractJournal delegate;
-        
-        abstract class Action {
-
-            final String name;
-            private Action priorAction = null;
-
-            private Action() {
-                throw new UnsupportedOperationException();
-            }
-            
-            Action(String name) {
-            
-                if (name == null)
-                    throw new IllegalArgumentException();
-                
-                this.name = name;
-                
-            }
-            
-            abstract boolean isRegister();
-            
-            abstract boolean isDrop();
-            
-            final protected Action getPriorAction() {
-                
-                return priorAction;
-                
-            }
-            
-            abstract void doAction();
-            
-            /**
-             * Chains together actions on the same named index so that we can
-             * apply the actions in the same sequence in {@link #doAction()}
-             * during the commit.
-             * 
-             * @param priorAction
-             *            The previous action on the named index.
-             */
-            void setPreviousAction(Action priorAction) {
-
-                if (priorAction == null)
-                    throw new IllegalArgumentException();
-                
-                if (this.priorAction != null) {
-
-                    throw new IllegalStateException();
-                    
-                }
-                
-                this.priorAction = priorAction;
-                
-            }
-            
-        }
         
         /**
          * Action to drop an index.
@@ -1575,7 +1598,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          * 
          * @param source
          */
-        public AtomicRegisterDropJournal(AbstractJournal source) {
+        public IsolatedRegisterDropIndexJournal(AbstractJournal source) {
 
             if (source == null)
                 throw new IllegalArgumentException();
@@ -1969,12 +1992,14 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     /**
      * A read-only view of an {@link IJournal} that is used to enforce read-only
      * semantics on tasks using {@link AbstractTask#getJournal()} to access the
-     * backing store.
+     * backing store. Methods that write on the journal, that expose the
+     * unisolated indices, or which are part of the commit protocol will throw
+     * an {@link UnsupportedOperationException}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class ReadOnlyJournal implements IJournal {
+    static class ReadOnlyJournal implements IJournal {
 
         private final IJournal delegate;
         
