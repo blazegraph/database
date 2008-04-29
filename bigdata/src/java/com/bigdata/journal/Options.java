@@ -177,6 +177,15 @@ public interface Options {
     String READ_CACHE_CAPACITY = "readCacheCapacity";
     
     /**
+     * An integer property whose value is the maximum size of a record that will
+     * be allowed into the optional read cache. Records larger than this size
+     * are always read from the backing store.
+     * 
+     * @see #DEFAULT_READ_CACHE_MAX_RECORD_SIZE
+     */
+    String READ_CACHE_MAX_RECORD_SIZE = "readCacheMaxRecordSize";
+    
+    /**
      * <code>writeCacheCapacity</code> - An integer property whose value
      * controls the size of the write cache (in bytes) used by the selected
      * {@link BufferMode} (default {@value #DEFAULT_WRITE_CACHE_CAPACITY}
@@ -426,9 +435,15 @@ public interface Options {
     int DEFAULT_WRITE_CACHE_CAPACITY = 10 * Bytes.megabyte32;
     
     /**
-     * The default for {@link #READ_CACHE_CAPACITY} (10000).
+     * The default for {@link #READ_CACHE_CAPACITY}.
      */
-    String DEFAULT_READ_CACHE_CAPACITY = ""+10000;
+    String DEFAULT_READ_CACHE_CAPACITY = "0";
+//  String DEFAULT_READ_CACHE_CAPACITY = "10000";
+    
+    /**
+     * The default for {@link #READ_CACHE_MAX_RECORD_SIZE}.
+     */
+    String DEFAULT_READ_CACHE_MAX_RECORD_SIZE = ""+2*Bytes.kilobyte;
     
     /**
      * The default initial extent for a new journal.

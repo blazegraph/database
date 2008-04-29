@@ -694,6 +694,30 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
     
     /**
+     * Flush the nodes of the {@link BTree} to the backing store. After invoking
+     * this method the root of the {@link BTree} will be clean.
+     * 
+     * @return <code>true</code> if anything was written.
+     */
+    public boolean flush() {
+
+        assertNotReadOnly();
+        
+        if (root != null && root.dirty) {
+
+            log.info("");
+            
+            writeNodeRecursive( root );
+            
+            return true;
+            
+        }
+        
+        return false;
+
+    }
+    
+    /**
      * Checkpoint operation writes dirty nodes using a post-order traversal that
      * first writes any dirty leaves and then (recursively) their parent nodes.
      * The parent nodes are guarenteed to be dirty if there is a dirty child so
@@ -721,11 +745,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
 //        assert root != null : "root is null"; // i.e., isOpen().
 
-        if (root != null && root.dirty) {
-
-            writeNodeRecursive( root );
-            
-        }
+        // flush any dirty nodes.
+        flush();
         
         // pre-condition: all nodes in the tree are clean.
         assert root == null || !root.dirty;

@@ -450,7 +450,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         FileMetadata fileMetadata = new FileMetadata(file, BufferMode.Disk,
                 useDirectBuffers, initialExtent, maximumDiskExtent, create,
                 isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                getOffsetBits(), 0/* readCacheCapacity */,
+                getOffsetBits(), 0/* readCacheCapacity */, 0/*readCacheMaxRecordSize*/,
                 null/* writeCache */, validateChecksum, createTime, checker);
 
         // Open the disk-based store file.
