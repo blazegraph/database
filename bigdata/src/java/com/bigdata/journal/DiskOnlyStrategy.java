@@ -199,6 +199,14 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     private LRUCache<Long, byte[]> readCache = null;
     
     /**
+     * The maximum size of a record that may enter the {@link #readCache}.
+     * Records larger than this are not cached.
+     * 
+     * @todo config.
+     */
+    private final int MAX_READ_CACHE_RECORD_SIZE = 2 * Bytes.kilobyte32;
+    
+    /**
      * Optional {@link WriteCache}.
      */
     private WriteCache writeCache = null;
@@ -737,8 +745,15 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                         }
                     });
 
-                    // % of writes that are buffered vs writing through to the
-                    // disk.
+                    /*
+                     * % of writes that are buffered vs writing through to the
+                     * disk.
+                     * 
+                     * Note: This will be 1.0 unless you are writing large
+                     * records. Large records are written directly to the disk
+                     * rather than first into the write cache. When this happens
+                     * the writeHitRate on the cache can be less than one.
+                     */
                     writeCache.addCounter("writeHitRate", new Instrument<Double>() {
                         public void sample() {
                             setValue(nwrites == 0L ? 0d : (double) ncacheWrite
@@ -1511,7 +1526,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             counters.elapsedReadNanos+=(System.nanoTime()-begin);
             counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
 
-            if (readCache != null) {
+            if (readCache != null && nbytes<MAX_READ_CACHE_RECORD_SIZE) {
                 
                 /*
                  * Put a copy of the record in the read cache.
