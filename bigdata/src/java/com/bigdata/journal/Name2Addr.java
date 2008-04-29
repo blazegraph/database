@@ -52,20 +52,19 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 
 /**
- * BTree mapping index names to the last metadata record committed for the named
- * index. The keys are Unicode strings using the default {@link Locale}. The
- * values are {@link Entry} objects recording the name of the index and the last
- * known address of the {@link IndexMetadata} record for the named index.
+ * A {@link BTree} mapping index names to an {@link Entry} containing the last
+ * {@link Checkpoint} record committed for the named index and the timestamp of
+ * that commit. The keys are Unicode strings using the default {@link Locale}.
  * <p>
- * Note: The {@link Journal} maintains an instance of this class that evolves
- * with each {@link Journal#commit()}. However, the journal also makes use of
- * historical states for the {@link Name2Addr} index in order to resolve the
- * historical state of a named index. Of necessity, the {@link Name2Addr}
- * objects used for this latter purpose MUST be distinct from the evolving
- * instance otherwise the current version of the named index would be resolved.
- * Note further that the historical {@link Name2Addr} states are accessed using
- * a canonicalizing mapping but that current evolving {@link Name2Addr} instance
- * is NOT part of that mapping.
+ * Note: The {@link AbstractJournal} maintains an instance of this class that
+ * evolves with each {@link AbstractJournal#commit()}. However, the journal
+ * also makes use of historical states for the {@link Name2Addr} index in order
+ * to resolve the historical state of a named index. Of necessity, the
+ * {@link Name2Addr} objects used for this latter purpose MUST be distinct from
+ * the evolving instance otherwise the current version of the named index would
+ * be resolved. Note further that the historical {@link Name2Addr} states are
+ * accessed using a canonicalizing mapping but that current evolving
+ * {@link Name2Addr} instance is NOT part of that mapping.
  */
 public class Name2Addr extends BTree {
 
@@ -267,7 +266,7 @@ public class Name2Addr extends BTree {
     public long handleCommit(final long commitTime) {
 
         // visit the indices on the commit list.
-        Iterator<DirtyListener> itr = commitList.values().iterator();
+        final Iterator<DirtyListener> itr = commitList.values().iterator();
         
         while(itr.hasNext()) {
             
@@ -422,8 +421,7 @@ public class Name2Addr extends BTree {
     }
     
     /**
-     * Return the address of the {@link Checkpoint} record from which the
-     * historical state of the named index may be loaded.
+     * Return the {@link Entry} for the named index.
      * <p>
      * Note: This is a lower-level access mechanism that is used by
      * {@link Journal#getIndex(String, ICommitRecord)} when accessing historical
@@ -434,7 +432,7 @@ public class Name2Addr extends BTree {
      * 
      * @return The {@link Entry} for the named index.
      */
-    protected Entry getEntry(String name) {
+    public Entry getEntry(String name) {
 
         if (addrCache != null) {
 
@@ -629,6 +627,46 @@ public class Name2Addr extends BTree {
          * commit records).
          */
         super.remove(key);
+
+    }
+    
+    /**
+     * Rollback the named index to the specified {@link Checkpoint} address.
+     * <p>
+     * The change will be immediately visible to uses of {@link Name2Addr} but
+     * will not be restart safe until the next commit.
+     * 
+     * @param entry
+     *            A historical {@link Entry} for a named index.
+     * 
+     * @todo if [entry] is <code>null</code> then treat as a drop?
+     */
+    public void rollback(Entry entry) {
+        
+        if (entry == null)
+            throw new IllegalArgumentException();
+        
+        final String name = entry.name;
+       
+        log.warn("name="+name+", entry="+entry);
+        
+        final byte[] key = getKey(name);
+
+        // @todo if the entry is equals then don't bother to update it.
+        
+        // update persistent mapping.
+        insert(key, EntrySerializer.INSTANCE.serialize(entry));
+
+        // update the transient cache.
+        if (addrCache != null) {
+
+            synchronized (addrCache) {
+
+                addrCache.put(name, entry);
+
+            }
+
+        }
 
     }
     

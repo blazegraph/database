@@ -122,6 +122,11 @@ public class FileMetadata {
     final int readCacheCapacity;
     
     /**
+     * The maximum size of a record that will be allowed into the read cache.
+     */
+    final int readCacheMaxRecordSize;
+    
+    /**
      * The optional {@link ByteBuffer} to be used as the write cache.
      */
     final ByteBuffer writeCache;
@@ -242,6 +247,9 @@ public class FileMetadata {
      *            Further note that most of the other {@link IBufferStrategy}s
      *            are already fully buffered and hence can not benefit from a
      *            read cache.
+     * @param readCacheMaxRecordSize
+     *            The maximum size of a record that will be allowed into the
+     *            optional read cache.
      * @param writeCache
      *            A direct {@link ByteBuffer} to be used as the write cache
      *            (optional). Note that this write cache is only used by the
@@ -268,6 +276,7 @@ public class FileMetadata {
             long initialExtent, long maximumExtent, boolean create,
             boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
             ForceEnum forceWrites, int offsetBits, int readCacheCapacity,
+            int readCacheMaxRecordSize,
             ByteBuffer writeCache,
             boolean validateChecksum, final long createTime,
             ChecksumUtility checker) throws RuntimeException {
@@ -308,6 +317,8 @@ public class FileMetadata {
         this.offsetBits = offsetBits;
 
         this.readCacheCapacity = readCacheCapacity;
+        
+        this.readCacheMaxRecordSize = readCacheMaxRecordSize;
         
         this.writeCache = writeCache;
         

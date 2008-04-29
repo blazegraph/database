@@ -195,16 +195,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * Written records are NOT entered into the read cache since (when the
      * {@link #writeCache} is enabled), recently written records are already in
      * the {@link #writeCache}.
+     * 
+     * @todo purge old entries based on last touched time?
      */
     private LRUCache<Long, byte[]> readCache = null;
     
     /**
      * The maximum size of a record that may enter the {@link #readCache}.
      * Records larger than this are not cached.
-     * 
-     * @todo config.
      */
-    private final int MAX_READ_CACHE_RECORD_SIZE = 2 * Bytes.kilobyte32;
+    private int readCacheMaxRecordSize = 0;
     
     /**
      * Optional {@link WriteCache}.
@@ -1122,8 +1122,14 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         if (fileMetadata.readCacheCapacity > 0) {
 
             log.info("Enabling read cache: capacity="
-                    + fileMetadata.readCacheCapacity);
+                    + fileMetadata.readCacheCapacity + ", maxRecordSize="
+                    + fileMetadata.readCacheMaxRecordSize);
 
+            if (fileMetadata.readCacheMaxRecordSize <= 0)
+                throw new IllegalArgumentException();
+
+            this.readCacheMaxRecordSize = fileMetadata.readCacheMaxRecordSize;
+            
             this.readCache = new LRUCache<Long, byte[]>(
                     fileMetadata.readCacheCapacity);
             
@@ -1526,23 +1532,32 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             counters.elapsedReadNanos+=(System.nanoTime()-begin);
             counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
 
-            if (readCache != null && nbytes<MAX_READ_CACHE_RECORD_SIZE) {
-                
-                /*
-                 * Put a copy of the record in the read cache.
-                 */
+            if (readCache != null && nbytes < readCacheMaxRecordSize) {
 
-                // new byte[] for the read cache.
-                final byte[] data = new byte[nbytes];
-                
-                // copy contents into the new byte[].
-                dst.get(data);
-                
-                // flip the buffer again so that it is read for re-reading.
-                dst.flip();
-                
-                // put the record into the read cache.
-                readCache.put(addr, data, false/*dirty*/);
+                /*
+                 * Note: make sure that the record is not in the cache (we have
+                 * to do this again since we were not synchronized on [this]
+                 * when we tested at the start of this method).
+                 */
+                if (readCache.get(addr) == null) {
+
+                    /*
+                     * Put a copy of the record in the read cache.
+                     */
+
+                    // new byte[] for the read cache.
+                    final byte[] data = new byte[nbytes];
+
+                    // copy contents into the new byte[].
+                    dst.get(data);
+
+                    // flip the buffer again so that it is read for re-reading.
+                    dst.flip();
+
+                    // put the record into the read cache.
+                    readCache.put(addr, data, false/* dirty */);
+
+                }
                 
             }
             

@@ -692,6 +692,19 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     + " must be non-negative");
         
         /*
+         * readCacheMaxRecordSize
+         */
+        final int readCacheMaxRecordSize = Integer.parseInt(properties.getProperty(
+                Options.READ_CACHE_MAX_RECORD_SIZE,
+                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE));
+
+        log.info(Options.READ_CACHE_MAX_RECORD_SIZE + "=" + readCacheMaxRecordSize);
+
+        if (readCacheMaxRecordSize <= 0)
+            throw new RuntimeException(Options.READ_CACHE_MAX_RECORD_SIZE
+                    + " must be positive");
+        
+        /*
          * "createTempFile"
          */
 
@@ -954,8 +967,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     BufferMode.Direct,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, 0/* readCacheCapacity */, null/* writeCache */, validateChecksum,
-                    createTime, checker);
+                    offsetBits, 0/* readCacheCapacity */,
+                    0/* readCacheMaxRecordSize */, null/* writeCache */,
+                    validateChecksum, createTime, checker);
 
             _bufferStrategy = new DirectBufferStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
@@ -976,8 +990,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, 0/*readCacheCapacity*/, null/* writeCache */, validateChecksum,
-                    createTime, checker);
+                    offsetBits, 0/*readCacheCapacity*/,
+                    0/* readCacheMaxRecordSize */, null/* writeCache */,
+                    validateChecksum, createTime, checker);
 
             /*
              * Note: the maximumExtent is a hard limit in this case only since
@@ -1002,7 +1017,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             fileMetadata = new FileMetadata(file, BufferMode.Disk,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, readCacheCapacity,
+                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
                     readOnly ? null : writeCache, validateChecksum,
                     createTime, checker);
 
@@ -1576,13 +1591,6 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     abstract public ILocalTransactionManager getLocalTransactionManager();
     
-//    /**
-//     * Note: This method can not be implemented by the {@link AbstractJournal}
-//     * since it lacks a commit timestamp factory, which is properly part of the
-//     * {@link ITimestampService} or a derived interface.
-//     * 
-//     * @see Journal#commit()
-//     */
     public long commit() {
         
         final long commitTime = getLocalTransactionManager().nextTimestampRobust();
@@ -1855,6 +1863,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * <p>
      * Subclasses MAY extend this method to discard their own committers but
      * MUST NOT override it completely.
+     * 
+     * @todo remove from {@link IJournal} (and all impls) and make [protected].
      */
     public void discardCommitters() {
 
@@ -1867,8 +1877,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * The basic implementation sets up the btree that is responsible for
      * resolving named btrees.
      * <p>
-     * Subclasses may extend this method to setup their own committers but MUST
-     * NOT override it completely.
+     * Subclasses may extend this method to setup their own committers.
+     * 
+     * @todo remove from {@link IJournal} (and all impls) and make [protected].
      */
     public void setupCommitters() {
 
@@ -1881,7 +1892,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
 
     /**
-     * Setup the btree that resolved named btrees.
+     * Setup the btree that resolves named indices.
      * 
      * @param addr
      *            The root address of the btree -or- 0L iff the btree has not
@@ -1889,7 +1900,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * 
      * @see Options#LIVE_INDEX_CACHE_CAPACITY
      */
-    private void setupName2AddrBTree(long addr) {
+    Name2Addr setupName2AddrBTree(long addr) {
 
         assert name2Addr == null;
 
@@ -1929,6 +1940,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // register for commit notices.
         setCommitter(ROOT_NAME2ADDR, name2Addr);
 
+        return name2Addr;
+        
     }
 
     /**

@@ -843,6 +843,22 @@ abstract public class OverflowManager extends IndexManager {
         }
 
         /*
+         * Cut over to the new journal.
+         */
+        {
+
+            this.liveJournal = newJournal;
+
+            addResource(newJournal.getResourceMetadata(), newJournal.getFile());
+            
+            storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal,
+                    false/* dirty */);
+            
+            log.info("Changed over to a new live journal");
+
+        }
+        
+        /*
          * Overflow each index by re-defining its view on the new journal.
          */
         int noverflow = 0;
@@ -1109,22 +1125,6 @@ abstract public class OverflowManager extends IndexManager {
 
             // make the index declarations restart safe on the new journal.
             firstCommitTime = newJournal.commit();
-
-        }
-
-        /*
-         * Cut over to the new journal.
-         */
-        {
-
-            this.liveJournal = newJournal;
-
-            addResource(newJournal.getResourceMetadata(), newJournal.getFile());
-            
-            storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal,
-                    false/* dirty */);
-            
-            log.info("Changed over to a new live journal");
 
         }
 

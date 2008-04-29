@@ -1214,7 +1214,7 @@ abstract public class MetadataService extends DataService implements
             
             log.info("Dropped "+ndropped+" index partitions for "+name);
 
-            // drop the metadata index as well.
+            // drop the metadata index as well. FIXME violates atomic change in visibility
             getJournal().dropIndex(getOnlyResource());
             
             return ndropped;
