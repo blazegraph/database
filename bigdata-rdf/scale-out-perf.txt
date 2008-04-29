@@ -389,17 +389,6 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
           The source data files will have to reside on NAS or a NSF
           mount or be pre-allocated to the different servers.
 
-      - try TestTripleStoreLoadRateLocalConcurrent on the server to
-        get a sense of the performance comparison between jini and an
-        embedded data service when both use concurrent data load.
-
-      - we do not appear to be memory capped on the server on U10.  On
-        U100 we are using 60% of the RAM on the server (2.2G).
-
-      - examine performance logs to see IO, CPU, etc. rates over time.
-
-      - try larger loads (U100, U1000)
-
     - Tune indices
 
       - The ids index should benefit from value compression since the
@@ -639,6 +628,201 @@ Short term tasks:
      - Done. Anything with "%" or "percent" in the name should be
        formatted as a percentage in [0.00:1.00].
 
+     - Done.  The data service should report its configuration
+       properties under "Info".
+
+       Done. This should be done for the other services as well.
+       Refactor the code in DataService, moving it into the counters
+       package.
+
+       Note: Servers should add their Jini configuration information
+       as well.  This probably has to be done explicitly for the
+       configuration items of interest.
+
+     - Done. Compute average response time.  Throughput is 1/average
+       response time.
+
+     - Done. Add counters for #of index partition split, move, and
+       join operations (OverflowManager).
+
+       Done. Also report #of errors during asynchronous overflow
+       processing.
+
+       Note: There should also be a counter of the #of index
+       partitions moved onto a data service.  However there is no
+       place in the code to easily note this on the target data
+       service since the move is made atomic by an action on the
+       metadata service.
+
+     - Done. Add counter to the write service that reports the #of
+       tasks which have their locks and are actually doing their work
+       concurrently (LockManager defines such a counter but we need
+       its moving average not the instantaneous value).  This is the
+       real concurrency of the tasks.  The #of active tasks in the
+       write service is a red herring since those tasks could be
+       waiting for their locks.
+
+     - Done. Add per-process counters for GarbageCollectorMXBeans.
+
+     - Done. (NanoHTTPD was not reporting errors in the serve() method
+       anywhere and was failing to send back an error to the client.)
+       For some reason a query for the hostname on host3 does not
+       return the counters in the browser.  Response is fast both
+       beneath that level at at the root.  Maybe the problem is in the
+       /host/CPU and /host/Info counter sets - those appear to hang
+       while /host/service is fine.... that does not seem to pay out
+       either.
+
+     - Done.  (I am assuming that Format was not thread safe - it was
+       being used concurrently by the Sar collector and the pidstat
+       collector, even with only one service). pidstat : Problem
+       parsing [02:08:24 PM] as a time for input string "".  This is
+       odd.  I can test this out and it works for the specified
+       format.  And it is the only error reported for pidstat parsing.
+       Ah.  Format is doubtless not thread-safe.
+
+     - Done. The per-process counters for linux are not being reported
+       under "service" but instead directly under the service UUID.
+
+     - Done (also fixed a bug where the LDS was not sending a join
+       message to the LBS and modified notify(), warn(), and urgent()
+       to invoke join() on the behalf of remote clients). The LBS
+       should add counters for the host scores.  This will provide
+       transparency in how it interprets the data from the various
+       hosts.
+
+     - Done. The client can discover the LBS and report data every so
+       often.  This would result in redundent reporting when there is
+       more than one client if the counter reflects the database
+       state, but there is no harm in that.
+
+     - Done. Could report the #of files read, #of triples processed,
+       triples in the db, average throughput rate for that client (or
+       all clients), etc
+
+       - (**??) tps appears low as reported by the client to the LBS
+         when compared to the final value computed by the client.
+         This may be a function of the outstanding writers that have
+         not yet completed, in which case the loader clearly needs to
+         force the report of the final counter values when a load
+         completes.
+
+         Maybe this is reporting the upper bound for statements?  That
+         does not make sense though since only deleted entries or
+         views with an index segment cause the upper bound to be
+         higher than the actual entey count.
+
+       - Compute bytes per statement in the db (requires a db op to
+         correlate the journal size with the #of stmts or #of terms)
+
+       - Expose the known triple stores, a view on the global sparse
+         row store, etc.
+
+       - (*) report success and errors from the concurrent data loader.
+
+     - (***) Report response time measures on the client, which will
+       require a class similar to TaskCounters that is intimate with
+       the ClientIndexView.  That will give a client perspective on
+       the latency of tasks, which will aggregate across the data
+       services that it uses and include the costs of RMI, in contrast
+       to a data service perspective, which aggregates across the
+       clients using that service and discount RMI.
+
+     - (*****) Debug overflow handling.
+
+       I believe that the problem lies in how new indices are being
+       created and the interaction with the index autoCommit,
+       checkpoint and group commit mechanisms.
+
+       It appears that indices are becoming available to concurrent
+       writers before the commit point (e.g., when the metadata
+       service has been notified but data service has not yet
+       committed), which breaks the concurrency control mechanisms.
+
+       The primary suspect is when registering or dropping an new
+       index since these activities have side-effects via Name2Addr
+       which are immediately visible to concurrent unisolated tasks or
+       to new read-committed tasks.
+
+       What is required in an atomic change in visibility for one or
+       more indices (register/drop) that is coordinated with the
+       commit protocol.
+
+       The changes to Name2Addr need to be buffered such that they
+       remain visible only to the task which executed those
+       operations, inconsistencies in the registered or dropped
+       indices across tasks within the same commit group need to be
+       eagerly detected, and the changes need to be applied atomically
+       with the next commit within Name2Addr's own commit protocol.
+
+       Problem exist with:
+
+       - MetadataService#RegisterScaleOutIndexTask - registers an index
+
+       - JoinIndexPartitionTask - drops the old index partition and
+         registers the new index partition.
+
+       - SplitIndexPartitionTask - registers the new index partitions
+         and drops the old index partition.
+
+       - AbstractResourceManagerTask - documents a potential problem
+         with MDI updates without 2-phase commits.  Look into this
+         further and see if this problem can be addressed without
+         using a full transaction.  If not, then we will need to use a
+         full transaction to avoid this issue.
+
+     - (**) The IndexManager should report the #of open indices.  We
+       can have an exact count of that if we use a static atomic
+       integer in AbstractBTree.
+       
+       Likewise, we can get the exact count of the #of open journals
+       vs index segment stores and BTree vs IndexSegments using the
+       same technique.
+
+       The statistics that are used by the overflow manager to compute
+       which indices are move candidates are not being exposed via the
+       counters to the LBS.  This includes all of the per-index bytes
+       read, bytes written, etc. data.
+
+     - (**) The IndexManager should report the index partitions on the
+       data service, at least until this exceeds 100s of indices.
+       This should be done not via counters but rather via the httpd
+       service itself making an RMI request to the data service and
+       listing out the named indices. Present additional information
+       when the service is a metadata service, e.g., by listing out
+       the tuples of the index, which are in fact the locators for the
+       index partitions.  Also, provide some aggregation over the MDI,
+       including the total #of partitions and tuples.
+
+     - (**) The per-host physical disk counters for linux are not
+       being collected.
+
+       Write the Sar, iostat, or vmstat utility to collect these data.
+       This is a bit more complex under Linux since the data are
+       reported by device and the relationship of the devices to the
+       file system should be explicated.
+
+       Use [df] to report the % free space remaining?  There should be
+       one value for the logical disk (perhaps), and there should be a
+       report of the % free space remaining on the volume on which the
+       dataDir is located and the volume on which the tmpDir is
+       located.
+
+     - The counters are overflowing to days before midnight.  Check
+       the locale and see when timestamp causes an overflow to the
+       next hour and the next day in some unit tests.
+
+     - When restoring the LBS counters from XML, the history on the
+       counters is being ignored.  Instead it should be read in using
+       history.add(val,timestamp) or historyInst. add(val,timestamp).
+
+     - Make it possible to have more than 60 minutes in the buffer but
+       still overflow after 60 minutes onto the hours.  This will
+       allow a longer reachback at a given level of aggregation.
+
+     - Add histograms of response time by task (on client and
+       service?).  E.g., AddIds, AddTerms, IndexWriteProx, etc.
+
      - Add UI elements to set the filter(s), depth, decimalFormat,
        etc.  These should be a FORM with a GET action.
 
@@ -660,116 +844,6 @@ Short term tasks:
 
      - Cache-Control (data are good up to 60 seconds after the
        counters were last updated) and auto-update of page/view?
-
-     - Done.  The data service should report its configuration
-       properties under "Info".
-
-       This should be done for the other services as well.  Refactor
-       the code in DataService, moving it into the counters package.
-
-       Servers should add their Jini configuration information as
-       well.  This probably has to be done explicitly for the
-       configuration items of interest.
-
-     - Add histograms of response time by task.  E.g., AddIds,
-       AddTerms, IndexWriteProx, etc.
-
-     - (**) Compute average response time and throughput as 1/average
-       response time.  And measure on the client as well so that we
-       can compute the RMI overhead.  Do this as a refactor of the
-       task that takes samples from a queue.
-
-     - Done. Add counters for #of index partition split, move, and
-       join operations (OverflowManager).
-
-       Done. Also report #of errors during asynchronous overflow
-       processing.
-
-       There should also be a counter of the #of index partitions
-       moved onto a data service.  However there is no place in the
-       code to easily note this on the target data service since the
-       move is made atomic by an action on the metadata service.
-
-     - Add a parameterized moving average computation to History with
-       a default weight.  This could be written into the UI tables for
-       easy of plotting.
-
-     - Add counter to the write service that reports the #of tasks
-       which have their locks and are actually doing their work
-       concurrently (LockManager defines such a counter but we need
-       its moving average not the instantaneous value).  This is the
-       real concurrency of the tasks.  The #of active tasks in the
-       write service is a red herring since those tasks could be
-       waiting for their locks.
-
-       Done, but report the averageQueueLength for both tasks holding
-       their locks and for all active tasks in the pool since both are
-       interesting data. For example, the averageQueueLength below is
-       .25 but the activeTaskSetSize is 20.  For this example this was
-       because there were two indices and many operations were forced
-       to be sequential.  Even though the commit group size was large
-       (committedTaskCount/groupCommitCount) =~ 20, the parallelism
-       was poor (average of .25 tasks executing in parallel!)
-
-       averageQueueLength=0.25841155522560005
-       (activeCountAverage=0.217179869184,queueSizeAverage=0.04123168604160004),
-       nsamples=20
-
-       WriteExecutorService{ paused=false, nrunning=8,
-       concurrentTaskCount=1, activeTaskSetSize=20, nwrites=12,
-       groupCommitFlag=true, abortFlag=false,
-       lockHeldByCurrentThread=false, lockHoldCount=0,
-       lockQueueLength=0, activeCount=20, queueSize=0, poolSize=200,
-       largestPoolSize=200, maxPoolSize=200, maxRunning=20,
-       maxCommitLatency=187, maxLatencyUntilCommit=125,
-       groupCommitCount=109, abortCount=0, failedTaskCount=0,
-       successTaskCount=2152, committedTaskCount=2140,
-       overflowCount=0}
-
-     - (****) I think that nearly all of these issues a problems with
-       the Sar, and to some extend the Pidstat, collectors.
-
-       The saved history is filling up the hours and days with zero
-       for some odd reason when you bring it up again under the
-       post-mortem mode.  E.g., CPU/% IO Wait.  This only happens for
-       the host-wide statistics reported by Sar.  The PidStat
-       statistics and the service specific statistics are fine.
-	    
-       Sar is the worst - lost samples and bad timestamps.
-
-       Parsing errors for sysstat utilities from time to time.  They
-       are mostly for the SarCpuUtilization utility.  "grep -i
-       exception nohup.out" will find them.
-
-       I am seeing a "ignoring sample WAY out of timestamp order"
-       warning.
-	    
-       PidStat appears to report Ok, but it does not aggregate to
-       hours or days correctly.  Or maybe I lost the history when
-       rolling over at midnight?  No.  It was a run from ~noon to
-       ~6pm. Other counters have all of those hours.
-
-     - Done. The per-process counters for linux are not being reported
-       under "service" but instead directly under the service UUID.
-
-     - The per-host physical disk counters for linux are not being
-       reported at all. In fact, I need to write the Sar or vmstat
-       utility to collect these data.
-
-     - For some reason a query for the hostname on host3 does not
-       return the counters in the browser.  Response is fast both
-       beneath that level at at the root.  Maybe the problem is in the
-       /host/CPU and /host/Info counter sets - those appear to hang
-       while /host/service is fine.... that does not seem to pay out
-       either.
-
-       (**) turn up the log level for the server and service and see
-       what's up with this.  I can direct the log to another file to
-       make this easy to see.
-
-     - Make it possible to have more than 60 minutes in the buffer but
-       still overflow after 60 minutes onto the hours.  This will
-       allow a longer reachback at a given level of aggregation.
 
      - syslogd integration so that I see ERROR and FATAL messages for
        the hosts in the federation.
@@ -884,6 +958,9 @@ Short term tasks:
         implemented.  Old store files will not be released as a
         result unless you explicitly set the release time.
 
+      - Should recognize a "disk full" situation and shutdown the data
+        service cleanly.
+
    - LockManager
 
        - Use a WeakValueCache to purge unused resources.  The size of
@@ -908,6 +985,24 @@ Short term tasks:
        Also, efficient nextLeaf could improve read performance by
        reducing node reads.
 
+       Write through to the write cache and flush through to the disk.
+       On read, test the read cache.  If not found, read the write
+       cache, then the disk.  These are simple layering semantics.
+
+       Use an LRU with a capacity of ~5k records.  The records are
+       read-only so we do not need to worry about a canonicalizing
+       mapping.
+
+       The read cache is specific to a journal.  Each journal gets its
+       own read cache.  Historical journals might have a smaller read
+       cache capacity, or maybe 2k records is enough for any journal.
+       Experiment and find out.
+
+       (***) Look at the effect [host3] on readSecs, on the ratio of
+       readSecs to writeSecs, and on IOWait, especially as the size of
+       the journal grows.  If the LRU is not paying its way then
+       disable it by default.
+
      - CounterSets
 
        - Add counters designed to give insight into whether the write
@@ -916,6 +1011,12 @@ Short term tasks:
          What I want to understand is whether the cache is too large
          and whether an asynchronous of the cache to the disk would be
          a benefit.
+
+	 *** #bytes/commit (measured delta in offset from commit to
+              commit).
+
+	      Also, #flushes / commit - when ~ 1:1 the write cache is
+	      at least large enough.
 
 	 Note that writes which would exceed the remaining cache size
          cause the existing cache to be flushed while writes that
@@ -932,6 +1033,10 @@ Short term tasks:
 
    - Consider thread pool size defaults, especially for the temporary
      stores such as the temp triple store.  What is a good policy?
+
+   - Provide option to pass in a write cache buffer for a temporary
+     store and use that buffer as the in-memory store before it
+     overflows onto the disk.
 
    - *** Batch API for extractor, allowing runs directly against the
      KB.  Form a single prefix-scan query from a sort of all simple
@@ -1135,9 +1240,6 @@ Short term tasks:
         iterator to handle atomic append for the key-range partitioned
         indices).
 
-      - the memory demand jumps up during overflow handling.  maybe I
-        need to throttle the thread pool more on the data service?
-
       - (****) Write script to allocate services to nodes.
 
         - N data services; 1 MDS; 1 LBS; 1 TS, etc.
@@ -1176,6 +1278,12 @@ Short term tasks:
           IndexSegment so that partial index segment writes can be
           recognized.
 
+	- (***) Add post-load validation to make sure that the
+	  concurrent data load is really correct and run that
+	  validation after a db restart.  This will probably require
+	  that I write the bulk term scan and get the validation unit
+	  tests running for scale-out modes.
+ 
 	  ============================================================
 
 	- Results:
@@ -1188,17 +1296,20 @@ Short term tasks:
 
 	  **** Try with overflow processing enabled.
 
+	       - (Verify again.) The memory demand jumps up during
+	         overflow handling.  maybe I need to throttle the
+	         thread pool more on the data service?
+
 	  **** Try with services running in distinct JVMs and on more
                than one host.
 
 	  **** Try w/o disabling flush so that each document is parsed
-               and written in a single pass.
+               and written in a single pass.  Also try w/ different
+               combinations of the statement buffer size and the #of
+               threads in the client.
 
-	  **** Try w/ the DiskMode write cache enabled (it's been
-               disabled for a lot of, but not all of, these runs).
-	       
-	  **** Try w/o checksum (i've enabled it in the
-               AbstractTripleStore as of 8:30am 4/25)
+	  **** Measure the effect of the WriteCache on U100 and U1000.
+               Measure again with the onboard disk cache disabled.
 
 	  http://192.168.20.28:8080/
 
@@ -1206,17 +1317,11 @@ Short term tasks:
 
 	- U10, host3, LDS, 10 threads: 16837/16389/16942 tps.
 
-	- U100, host3, LDS, 10 threads: ____ tps. OOM after 1098 tasks
-          completed with 2G RAM trying to flush the write cache to the
-          disk.  This occurred during a commit, resulting in an abort
-          which interrupted concurrent tasks.
+	- U100, host3, LDS, 10 threads, writeCache: 15490 tps.
 
-	  Evidentally the JVK requests a temporary direct byte buffer
-          for this purpose, at least this JDK on Linux.  Perhaps the
-          write cache SHOULD be a direct byte buffer to avoid this
-          allocation, but remember that release of direct buffers can
-          be a problem?
-
+	- U1000, host3, LDS, 10 threads, writeCache: _____  tps; no
+          problems until it runs out of disk space.
+	
 	- U10, host3, Jini, 20 threads: fails to progress.  (*) Why is
           the system so sensitive to the #of client threads?
 
@@ -1225,17 +1330,18 @@ Short term tasks:
 	- U100, host3, Jini, 10 threads: 11693 tps - saved copy of the
           log output.
 
-	- U1000, host3, Jini, 10 threads: ______ tps.
+	- U1000, host3, Jini, 10 threads, writeCache, no overflow:
+          ______ tps. (Should run until its out of disk now that the
+          write cache memory leak is fixed.  A run without the write
+          cache progressed fine until it ran out of disk after 6 hours
+          (U1000-host3-disk-full).  At that point it had loaded 17349
+          out of ~20000 files and consumed ~59G.)
 
 	  ----------------- overflow enabled --------------
 
 	- U10, host3, Jini, 10 threads: ______ tps.
 
-	- U100, host3, Jini, 10 threads: ______ tps.
-
 	  FIXME: 
-
-	  Note: Our write cache was disabled for this test!
 
 	  I have observed consistency problem in AddIds(line 159).
 	  This problem is definately linked to synchronous overflow
@@ -1269,25 +1375,6 @@ Short term tasks:
 	  is disabled.  When overflow is enabled, it triggers the
 	  consistency problem noted above and can also trigger a
 	  variety of other problems that I am documenting below.
-
-	  FIXME Continue testing with the embedded data service and
-	  overflow enabled with one data service and eager triggering
-	  with a low initial and maximum extent.
-
-	  FIXME Add post-load validation to make sure that the
-	  concurrent data load is really correct and run that
-	  validation after a db restart.  This will probably require
-	  that I write the bulk term scan and get the validation unit
-	  tests running for scale-out modes.
- 
-	- U1000, host3, Jini, 10 threads, no write cache, no overflow:
-          ______ tps.
-
-	     Note: I am re-running on host3 with some changes, but
-             overflow is still disabled.  The run appears to have
-             progressed fine until it ran out of disk after 6 hours
-             (U1000-host3-disk-full).  At that point it had loaded
-             17349 out of ~20000 files and consumed ~59G.
 
 ============================================================
 
@@ -1725,3 +1812,119 @@ java.lang.AssertionError: ndone=3, but #used=4 : [testIndex0#1, testIndex0#8, te
 	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
 	at java.lang.Thread.run()V(Unknown Source)
+
+
+I may have addressed this.  The problem was that the root COULD be
+null.  There is no requirement that the root was loaded.  I commented
+out the assert which was triggered below and modified the Checkpoint
+ctor to use the old root address if the root was null and otherwise to
+use the address on the root - without forcing the re-load of the root
+from its address, which getRoot() would do.
+
+Caused by: java.lang.AssertionError: root is null at
+	com.bigdata.btree.BTree.writeCheckpoint(BTree.java:722) at
+	com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.checkpointIndices(AbstractTask.java:1150)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1058)
+
+The following log does not make much sense.  I can see the that the
+testPOS root was written out in the first line and then the exception
+is thrown indicating that the root does not have its addr assigned...
+
+
+	***** Perhaps autoCommit was not getting turned off????
+
+	      Verify that getIndex() is the only way in which the
+	      indices are accessed.  For example, I am not sure which
+	      thread was running the commit not which index caused the
+	      exception below, but the checkpoint design for group
+	      commit is such that the checkpoint should already have
+	      been written before the commit, so it should not be
+	      possible to have to write a checkpoint during the
+	      commit.
+
+	      Add a log message to see which index this was thrown
+	      for.
+
+	      Review the async tasks, which create new indices.  I may
+	      have to do something additional in order to bring them
+	      under the control of the checkpoint / group commit
+	      design - not just register them against the journal
+	      because then they are really under the control of
+	      Name2Addr and I might expect them to be checkpointed
+	      during the commit.
+
+
+WARN : 62843  fae97ed4-f14f-4577-82fa-517f149e1ff6 com.bigdata.rdf.store.SPOIndexWriteProc [testPOS#0] 0 pool-1-thread-94 com.bigdata.btree.AbstractBTree.writeNodeRecursive(AbstractBTree.java:1918): wrote: 2 records (#nodes=1, #leaves=1) in 1140ms : addrRoot=230912809763181
+
+INFO : 63250  fae97ed4-f14f-4577-82fa-517f149e1ff6 com.bigdata.rdf.store.SPOIndexWriteProc [testPOS#0] 0 pool-1-thread-94 com.bigdata.resources.OverflowManager.shouldOverflow(OverflowManager.java:580): Asynchronous overflow still active
+
+ERROR: 63437  fae97ed4-f14f-4577-82fa-517f149e1ff6 com.bigdata.rdf.store.SPOIndexWriteProc [testPOS#0] 0 pool-1-thread-94 com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1486): Commit failed - will abort: java.lang.RuntimeException: java.lang.reflect.InvocationTargetException
+java.lang.RuntimeException: java.lang.reflect.InvocationTargetException
+	at com.bigdata.btree.IndexMetadata.newCheckpoint(IndexMetadata.java:1013)
+	at com.bigdata.btree.BTree.writeCheckpoint(BTree.java:748)
+	at com.bigdata.btree.BTree.handleCommit(BTree.java:938)
+	at com.bigdata.journal.Name2Addr.handleCommit(Name2Addr.java:283)
+	at com.bigdata.journal.AbstractJournal.notifyCommitters(AbstractJournal.java:1419)
+	at com.bigdata.journal.AbstractJournal.commitNow(AbstractJournal.java:1557)
+	at com.bigdata.journal.AbstractJournal.commit(AbstractJournal.java:1517)
+	at com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1470)
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:936)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:547)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:813)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:721)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:612)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run(Thread.java:595)
+Caused by: java.lang.reflect.InvocationTargetException
+	at sun.reflect.GeneratedConstructorAccessor1.newInstance(Unknown Source)
+	at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:27)
+	at java.lang.reflect.Constructor.newInstance(Constructor.java:494)
+	at com.bigdata.btree.IndexMetadata.newCheckpoint(IndexMetadata.java:1005)
+	... 17 more
+Caused by: java.lang.IllegalStateException
+	at com.bigdata.btree.PO.getIdentity(PO.java:64)
+	at com.bigdata.btree.Checkpoint.<init>(Checkpoint.java:227)
+	... 21 more
+
+And this is also weird.
+
+    ****** Maybe the problem is that newly created indices in the
+           overflow task are not under proper concurrency control
+           leading to the possibility of concurrent modification once
+           the metadata index is notified of the new views and until
+           the journal on which the view was re-defined has been
+           committed.
+
+	   This could help to explain why these problems only arise
+	   after an overflow event.
+
+
+java.lang.RuntimeException: Could not commit index: name=testids#1
+	at com.bigdata.journal.Name2Addr.handleCommit(Name2Addr.java:291)
+	at com.bigdata.journal.AbstractJournal.notifyCommitters(AbstractJournal.java:1419)
+	at com.bigdata.journal.AbstractJournal.commitNow(AbstractJournal.java:1557)
+	at com.bigdata.journal.AbstractJournal.commit(AbstractJournal.java:1517)
+	at com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1470)
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:936)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:547)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:813)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:721)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:612)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run(Thread.java:595)
+Caused by: java.lang.RuntimeException: Child is not persistent: index=29
+	at com.bigdata.btree.AddressSerializer.putChildAddresses(AddressSerializer.java:60)
+	at com.bigdata.btree.NodeSerializer.putNode2(NodeSerializer.java:794)
+	at com.bigdata.btree.NodeSerializer.putNode(NodeSerializer.java:723)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:2005)
+	at com.bigdata.btree.AbstractBTree.writeNodeRecursive(AbstractBTree.java:1895)
+	at com.bigdata.btree.BTree.writeCheckpoint(BTree.java:726)
+	at com.bigdata.btree.BTree.handleCommit(BTree.java:941)
+	at com.bigdata.journal.Name2Addr.handleCommit(Name2Addr.java:286)
+	... 14 more
