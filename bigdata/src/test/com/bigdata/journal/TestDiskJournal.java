@@ -102,6 +102,8 @@ public class TestDiskJournal extends AbstractTestCase {
 
         properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
+        properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
+        
         return properties;
 
     }
@@ -186,6 +188,8 @@ public class TestDiskJournal extends AbstractTestCase {
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
+
+            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
             
             return new Journal(properties).getBufferStrategy();
             
@@ -220,6 +224,8 @@ public class TestDiskJournal extends AbstractTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
             
+            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
+
             return new Journal(properties).getBufferStrategy();
             
         }
@@ -253,10 +259,22 @@ public class TestDiskJournal extends AbstractTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
             
+            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
+            
             return new Journal(properties).getBufferStrategy();
             
         }
         
     }
 
+    /**
+     * Note: Since the write cache is a direct ByteBuffer we have to make it
+     * very small (or disable it entirely) when running the test suite or the
+     * JVM will run out of memory - this is exactly the same (Sun) bug which
+     * motivates us to reuse the same ByteBuffer when we overflow a journal
+     * using a write cache. Since small write caches are disallowed, we wind up
+     * testing with the write cache disabled!
+     */
+    private static final int writeCacheCapacity = 0; // 512;
+    
 }

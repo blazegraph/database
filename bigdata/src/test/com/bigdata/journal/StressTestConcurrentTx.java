@@ -208,8 +208,11 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         { // Setup the named index and commit the journal.
             
-            journal.registerIndex(name, BTree.create(journal,
-                    new IndexMetadata(name, UUID.randomUUID())));
+            IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(name, BTree.create(journal, md));
             
             journal.commit();
             
