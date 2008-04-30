@@ -45,8 +45,10 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.resources.ResourceManager.Options;
@@ -381,6 +383,41 @@ public class AbstractResourceManagerTestCase extends
         public void destroy() throws IOException {
 
             throw new UnsupportedOperationException();
+
+        }
+
+    }
+
+    /**
+     * Utility method to register an index partition on the #resourceManager.
+     * 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     */
+    protected void registerIndex(String name) throws InterruptedException, ExecutionException {
+        
+        final IndexMetadata indexMetadata = new IndexMetadata(name, UUID.randomUUID());
+        {
+
+            // must support delete markers
+            indexMetadata.setDeleteMarkers(true);
+
+            // must be an index partition.
+            indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
+                    // partitionId (arbitrary since no metadata index).
+                    0,//
+                    new byte[] {}, // leftSeparator
+                    null, // rightSeparator
+                    new IResourceMetadata[] {//
+                            resourceManager.getLiveJournal().getResourceMetadata(), //
+                    }, //
+                    "" // history
+                    ));
+
+            // submit task to register the index and wait for it to complete.
+            concurrencyManager.submit(
+                    new RegisterIndexTask(concurrencyManager, name,
+                            indexMetadata)).get();
 
         }
 

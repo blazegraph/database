@@ -65,6 +65,28 @@ import com.bigdata.resources.ResourceManager;
  * be resolved. Note further that the historical {@link Name2Addr} states are
  * accessed using a canonicalizing mapping but that current evolving
  * {@link Name2Addr} instance is NOT part of that mapping.
+ * 
+ * FIXME Writes on {@link Name2Addr} are not isolated - they are immediately
+ * visible to any concurrent {@link AbstractTask}. When a task completes
+ * normally this is not a problem since {@link AbstractTask}s use exclusive
+ * locks to avoid concurrent access to the unisolated indices. However, if a
+ * task registers or drops an index and then fails its intention is not isolated
+ * on {@link Name2Addr} and WILL be visible to subsequent tasks unless the
+ * entire commit group is discarded.
+ * <p>
+ * One way to address this problem is to use a per-instance {@link ThreadLocal}
+ * to isolate the writes on {@link Name2Addr} for an {@link AbstractTask}. The
+ * task would then propagate those changes atomically onto the {@link Name2Addr}
+ * instance after it checkpoints its indices. At this point the task is done
+ * doing its work and any subsequent errors in the {@link Thread} running the
+ * task would be inside of the group commit protocol.
+ * <p>
+ * This per-instance {@link ThreadLocal} would be interposed between the task
+ * and the {@link #indexCache}.
+ * <p>
+ * The trick is how this might effect non-concurrent users of {@link Name2Addr} -
+ * those directly using the {@link IJournal} API rather than submitting tasks
+ * for concurrent execution.
  */
 public class Name2Addr extends BTree {
 

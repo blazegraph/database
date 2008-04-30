@@ -33,7 +33,6 @@ import java.io.InputStream;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.rmi.NoSuchObjectException;
-import java.util.Enumeration;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -42,7 +41,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -59,11 +57,8 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
-import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IProcessCounters;
 import com.bigdata.counters.Instrument;
-import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
@@ -185,43 +180,43 @@ abstract public class DataService extends AbstractService
             // @todo local tx manager options?
             {
      
-        /**
-         * The delay between scheduled invocations of the {@link StatusTask}.
-         * 
-         * @see #DEFAULT_STATUS_DELAY
-         */
-        String STATUS_DELAY = "statusDelay";
-        
-        /**
-         * The default {@link #STATUS_DELAY}.
-         */
-        String DEFAULT_STATUS_DELAY = "10000";
-    
-        /**
-         * An optional regular expression that will be used to filter the
-         * performance counters reported by the {@link StatusTask}. Some
-         * examples are:
-         * <dl>
-         * <dt>.*Unisolated.*</dt>
-         * <dd>All counters dealing with unisolated operations.</dd>
-         * <dt>.*Unisolated Write Service/#.*</dt>
-         * <dd>All counters for the unisolated write service.</dd>
-         * </dl>
-         * <p>
-         * Note: if the regular expression can not be compiled then an error
-         * message will be logged and ALL counters will be logged by the
-         * {@link StatusTask} (the filter will default to <code>null</code> in
-         * the case of an error).
-         * 
-         * @see #DEFAULT_STATUS_FILTER
-         */
-        String STATUS_FILTER = "statusFilter";
-        
-        /**
-         * @todo work up a more interesting default filter.
-         */
-        // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
-        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
+//        /**
+//         * The delay between scheduled invocations of the {@link StatusTask}.
+//         * 
+//         * @see #DEFAULT_STATUS_DELAY
+//         */
+//        String STATUS_DELAY = "statusDelay";
+//        
+//        /**
+//         * The default {@link #STATUS_DELAY}.
+//         */
+//        String DEFAULT_STATUS_DELAY = "10000";
+//    
+//        /**
+//         * An optional regular expression that will be used to filter the
+//         * performance counters reported by the {@link StatusTask}. Some
+//         * examples are:
+//         * <dl>
+//         * <dt>.*Unisolated.*</dt>
+//         * <dd>All counters dealing with unisolated operations.</dd>
+//         * <dt>.*Unisolated Write Service/#.*</dt>
+//         * <dd>All counters for the unisolated write service.</dd>
+//         * </dl>
+//         * <p>
+//         * Note: if the regular expression can not be compiled then an error
+//         * message will be logged and ALL counters will be logged by the
+//         * {@link StatusTask} (the filter will default to <code>null</code> in
+//         * the case of an error).
+//         * 
+//         * @see #DEFAULT_STATUS_FILTER
+//         */
+//        String STATUS_FILTER = "statusFilter";
+//        
+//        /**
+//         * @todo work up a more interesting default filter.
+//         */
+//        // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
+//        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
         
         /**
          * The delay between scheduled invocations of the {@link ReportTask} (60
@@ -290,11 +285,11 @@ abstract public class DataService extends AbstractService
      */
     protected AbstractStatisticsCollector statisticsCollector;
 
-    /**
-     * Runs a {@link StatusTask} printing out periodic service status
-     * information (counters).
-     */
-    final protected ScheduledExecutorService statusService;
+//    /**
+//     * Runs a {@link StatusTask} printing out periodic service status
+//     * information (counters).
+//     */
+//    final protected ScheduledExecutorService statusService;
     
     /**
      * Runs a {@link ReportTask} communicating performance counters on a
@@ -495,32 +490,32 @@ abstract public class DataService extends AbstractService
 
         }
         
-        // setup scheduled runnable for periodic status messages.
-        {
-
-            final long initialDelay = 100;
-            
-            final long delay = Long.parseLong(properties.getProperty(
-                    Options.STATUS_DELAY,
-                    Options.DEFAULT_STATUS_DELAY));
-
-            log.info(Options.STATUS_DELAY + "=" + delay);
-           
-            final String regex = properties.getProperty(Options.STATUS_FILTER,
-                    Options.DEFAULT_STATUS_FILTER);
-           
-            log.info(Options.STATUS_FILTER + "=" + regex);
-            
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-            statusService = Executors
-            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
-            
-            statusService.scheduleWithFixedDelay(new StatusTask(regex),
-                    initialDelay, delay, unit);
-
-        }
+//        // setup scheduled runnable for periodic status messages.
+//        {
+//
+//            final long initialDelay = 100;
+//            
+//            final long delay = Long.parseLong(properties.getProperty(
+//                    Options.STATUS_DELAY,
+//                    Options.DEFAULT_STATUS_DELAY));
+//
+//            log.info(Options.STATUS_DELAY + "=" + delay);
+//           
+//            final String regex = properties.getProperty(Options.STATUS_FILTER,
+//                    Options.DEFAULT_STATUS_FILTER);
+//           
+//            log.info(Options.STATUS_FILTER + "=" + regex);
+//            
+//            final TimeUnit unit = TimeUnit.MILLISECONDS;
+//
+//            statusService = Executors
+//            .newSingleThreadScheduledExecutor(DaemonThreadFactory
+//                    .defaultThreadFactory());
+//            
+//            statusService.scheduleWithFixedDelay(new StatusTask(regex),
+//                    initialDelay, delay, unit);
+//
+//        }
 
     }
     
@@ -570,7 +565,7 @@ abstract public class DataService extends AbstractService
 
         resourceManager.shutdown();
         
-        statusService.shutdown();
+//        statusService.shutdown();
 
         reportService.shutdown();
 
@@ -603,7 +598,7 @@ abstract public class DataService extends AbstractService
 
         resourceManager.shutdownNow();
 
-        statusService.shutdownNow();
+//        statusService.shutdownNow();
 
         reportService.shutdownNow();
 
@@ -870,110 +865,110 @@ abstract public class DataService extends AbstractService
         
     }
 
-    /**
-     * Writes out periodic status information.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
-    public class StatusTask implements Runnable {
-
-        /**
-         * Note: The logger is named for this class, but since it is an inner
-         * class the name uses a "$" delimiter (vs a ".") between the outer and
-         * the inner class names.
-         */
-        final protected Logger log = Logger.getLogger(StatusTask.class);
-
-        /**
-         * True iff the {@link #log} level is INFO or less.
-         */
-        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
-
-        protected final Pattern filter;
-
-        /**
-         * 
-         * @param regex
-         *            An optional regular expression. When non-<code>null</code>
-         *            and non-empty this will be compiled into a filter for
-         *            {@link ICounterSet#toString(Pattern)}.
-         */
-        public StatusTask(String regex) {
-
-            Pattern filter;
-            
-            if(regex!=null && regex.trim().length()>0) {
-            
-                try {
-
-                    filter = Pattern.compile(regex);
-                    
-                } catch(Exception ex) {
-                    
-                    log.error("Could not compile regex: ["+regex+"]", ex);
-                    
-                    filter = null;
-                    
-                }
-                
-            } else {
-                
-                filter = null;
-                
-            }
-            
-            this.filter = filter;
-
-        }
-
-        /**
-         * Note: Don't throw anything here since we don't want to have the task
-         * suppressed!
-         */
-        public void run() {
-
-            try {
-
-                if (INFO)
-                    log.info(getStatus());
-                
-            } catch (Throwable t) {
-
-                log.warn("Problem in status task?", t);
-
-            }
-
-        }
-        
-        protected String getStatus() {
-
-            if(!resourceManager.isRunning()) {
-                
-                return "Resource manager not running.";
-                
-            }
-            
-//            try {
-                if (getServiceUUID() != null) {
-                  
-                    return "Service UUID not available yet.";
-                    
-                }
-//            } catch (IOException e) {
-//                // Note: should not be thrown for a local function call.
-//                throw new RuntimeException(e);
+//    /**
+//     * Writes out periodic status information.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     * @version $Id$
+//     */
+//    public class StatusTask implements Runnable {
+//
+//        /**
+//         * Note: The logger is named for this class, but since it is an inner
+//         * class the name uses a "$" delimiter (vs a ".") between the outer and
+//         * the inner class names.
+//         */
+//        final protected Logger log = Logger.getLogger(StatusTask.class);
+//
+//        /**
+//         * True iff the {@link #log} level is INFO or less.
+//         */
+//        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+//                .toInt();
+//
+//        protected final Pattern filter;
+//
+//        /**
+//         * 
+//         * @param regex
+//         *            An optional regular expression. When non-<code>null</code>
+//         *            and non-empty this will be compiled into a filter for
+//         *            {@link ICounterSet#toString(Pattern)}.
+//         */
+//        public StatusTask(String regex) {
+//
+//            Pattern filter;
+//            
+//            if(regex!=null && regex.trim().length()>0) {
+//            
+//                try {
+//
+//                    filter = Pattern.compile(regex);
+//                    
+//                } catch(Exception ex) {
+//                    
+//                    log.error("Could not compile regex: ["+regex+"]", ex);
+//                    
+//                    filter = null;
+//                    
+//                }
+//                
+//            } else {
+//                
+//                filter = null;
+//                
 //            }
-            
-            final String s = getCounters().toString(filter);
-
-            return s;
-            
-        }
-        
-    }
+//            
+//            this.filter = filter;
+//
+//        }
+//
+//        /**
+//         * Note: Don't throw anything here since we don't want to have the task
+//         * suppressed!
+//         */
+//        public void run() {
+//
+//            try {
+//
+//                if (INFO)
+//                    log.info(getStatus());
+//                
+//            } catch (Throwable t) {
+//
+//                log.warn("Problem in status task?", t);
+//
+//            }
+//
+//        }
+//        
+//        protected String getStatus() {
+//
+//            if(!resourceManager.isRunning()) {
+//                
+//                return "Resource manager not running.";
+//                
+//            }
+//            
+////            try {
+//                if (getServiceUUID() != null) {
+//                  
+//                    return "Service UUID not available yet.";
+//                    
+//                }
+////            } catch (IOException e) {
+////                // Note: should not be thrown for a local function call.
+////                throw new RuntimeException(e);
+////            }
+//            
+//            final String s = getCounters().toString(filter);
+//
+//            return s;
+//            
+//        }
+//        
+//    }
 
     /**
      * This task runs periodically. Once {@link IDataService#getServiceUUID()}

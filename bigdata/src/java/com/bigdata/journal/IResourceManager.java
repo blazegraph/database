@@ -169,25 +169,25 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public IIndex getIndex(String name, long timestamp);
 
-    /**
-     * Return statistics about the named index. This method will report on all
-     * resources supporting the view of the index as of the specified timestamp.
-     * 
-     * @param name
-     *            The index name.
-     * @param timestamp
-     *            Either the startTime of an active transaction,
-     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-     *            <code>-timestamp</code> for a historical view no later than
-     *            the specified timestamp.
-     * 
-     * @return Statistics about that index -or- <code>null</code> if the index
-     *         is not defined as of that timestamp.
-     * 
-     * @todo report as XML or Object.
-     */
-    public String getStatistics(String name, long timestamp);
+//    /**
+//     * Return statistics about the named index. This method will report on all
+//     * resources supporting the view of the index as of the specified timestamp.
+//     * 
+//     * @param name
+//     *            The index name.
+//     * @param timestamp
+//     *            Either the startTime of an active transaction,
+//     *            {@link ITx#UNISOLATED} for the current unisolated index view,
+//     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
+//     *            <code>-timestamp</code> for a historical view no later than
+//     *            the specified timestamp.
+//     * 
+//     * @return Statistics about that index -or- <code>null</code> if the index
+//     *         is not defined as of that timestamp.
+//     * 
+//     * @todo report as XML or Object.
+//     */
+//    public String getStatistics(String name, long timestamp);
     
     /**
      * Statistics about the {@link IResourceManager}.
@@ -238,8 +238,9 @@ public interface IResourceManager extends IServiceShutdown {
     public void deleteResources();
 
     /**
-     * Notify the {@link IResourceManager} that resources having no data for the
-     * specified <i>releaseTime</i> MAY be released.
+     * Notify the {@link IResourceManager} that resources MAY be released as of
+     * this timestamp (and therefore implying that you will be unable to read
+     * resources as of that timestamp in the future).
      * <p>
      * This method is used by the {@link ITransactionManager} to notify the
      * {@link IResourceManager} as the earliest running transactions commit and
@@ -250,8 +251,12 @@ public interface IResourceManager extends IServiceShutdown {
      *            that has completed and whose resources may now be reclaimed.
      *            Resources whose lastCommitTime is LTE this timestamp MAY be
      *            released (deleted) by the resource manager. Note that the
-     *            createTime of an {@link IndexSegmentStore} is equivalent
-     *            to its lastCommitTime.
+     *            createTime of an {@link IndexSegmentStore} is equivalent to
+     *            its lastCommitTime.
+     * 
+     * @throws IllegalArgumentException
+     *             if there is an attempt to set the release time to an earlier
+     *             time (the release time can only increase).
      */
     public void setReleaseTime(long releaseTime);
     

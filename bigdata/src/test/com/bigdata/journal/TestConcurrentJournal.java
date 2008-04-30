@@ -973,6 +973,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * concurrent writers to abort. The test also verifies that the
      * {@link Checkpoint} record for the named index is NOT updated since none
      * of the tasks write anything on the index.
+     * 
+     * @todo The assumptions for this test may have been invalidated by the
+     *       recent (4/29) changes to the group commit and task commit protocol
+     *       and this test might need to be reworked or rewritten.
      */
     public void test_writeService001() throws Exception {
         

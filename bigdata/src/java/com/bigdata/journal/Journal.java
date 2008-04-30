@@ -702,14 +702,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    public String getStatistics(String name, long timestamp) {
-
-        IIndex ndx = getIndex(name, timestamp);
-        
-        if(ndx==null) return null;
-        
-        return ndx.getStatistics();
-        
-    }
+//    public String getStatistics(String name, long timestamp) {
+//
+//        IIndex ndx = getIndex(name, timestamp);
+//        
+//        if(ndx==null) return null;
+//        
+//        return ndx.getStatistics();
+//        
+//    }
 
 }

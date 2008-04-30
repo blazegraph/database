@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -184,6 +185,12 @@ abstract public class OverflowManager extends IndexManager {
      */
     protected final AtomicBoolean overflowAllowed = new AtomicBoolean(true);
 
+    /**
+     * A flag used to disable the asynchronous overflow processing for some unit
+     * tests.
+     */
+    protected final AtomicBoolean asyncOverflowEnabled = new AtomicBoolean(true);
+    
     /**
      * #of overflows that have taken place. This counter is incremented each
      * time the entire overflow operation is complete, including any
@@ -724,11 +731,21 @@ abstract public class OverflowManager extends IndexManager {
         final Map<String/* name */, Counters> indexCounters = concurrencyManager
                 .resetCounters();
 
-        log.info("Starting asynchronous overflow processing.");
-        
-        return overflowService.submit(new PostProcessOldJournalTask(
-                (ResourceManager) this, lastCommitTime, copied, totalCounters,
-                indexCounters));
+        if (asyncOverflowEnabled.get()) {
+
+            log.info("Starting asynchronous overflow processing.");
+
+            return overflowService.submit(new PostProcessOldJournalTask(
+                    (ResourceManager) this, lastCommitTime, copied,
+                    totalCounters, indexCounters));
+
+        } else {
+            
+            log.warn("Asynchronous overflow processing is disabled!");
+            
+            return null;
+            
+        }
 
     }
     

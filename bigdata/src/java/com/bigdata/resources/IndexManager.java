@@ -620,29 +620,29 @@ abstract public class IndexManager extends StoreManager {
 
     }
     
-    public String getStatistics(String name, long timestamp) {
-        
-        AbstractBTree[] sources = getIndexSources(name, timestamp);
-        
-        if(sources==null) {
-            
-            return null;
-            
-        }
-        
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append("name="+name+", timestamp="+timestamp);
-        
-        for(int i=0; i<sources.length; i++) {
-         
-            sb.append("\n"+sources[i].getStatistics());
-            
-        }
-        
-        return sb.toString();
-        
-    }
+//    public String getStatistics(String name, long timestamp) {
+//        
+//        AbstractBTree[] sources = getIndexSources(name, timestamp);
+//        
+//        if(sources==null) {
+//            
+//            return null;
+//            
+//        }
+//        
+//        StringBuilder sb = new StringBuilder();
+//        
+//        sb.append("name="+name+", timestamp="+timestamp);
+//        
+//        for(int i=0; i<sources.length; i++) {
+//         
+//            sb.append("\n"+sources[i].getStatistics());
+//            
+//        }
+//        
+//        return sb.toString();
+//        
+//    }
     
     /**
      * Note: logic duplicated by {@link Journal#getIndex(String, long)}
@@ -870,8 +870,11 @@ abstract public class IndexManager extends StoreManager {
      */
     public String listIndexPartitions(long timestamp) {
 
-        if (timestamp > 0)
-            throw new IllegalArgumentException();
+        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
+
+            timestamp = getLiveJournal().getRootBlockView().getLastCommitTime();
+
+        }
         
         StringBuilder sb = new StringBuilder();
 
@@ -879,7 +882,7 @@ abstract public class IndexManager extends StoreManager {
         
         sb.append("timestamp="+timestamp+"\njournal="+journal.getResourceMetadata());
 
-        final ITupleIterator itr = journal.getName2Addr().rangeIterator(
+        final ITupleIterator itr = journal.getName2Addr(timestamp).rangeIterator(
                 null, null);
         
         while (itr.hasNext()) {
@@ -893,21 +896,15 @@ abstract public class IndexManager extends StoreManager {
             final String name = entry.name;
 
             /*
-             * Open the historical view of that index at that time (not just
-             * the mutable BTree but the full view).
+             * Open the mutable BTree only (not the full view since we don't
+             * want to force the read of index segments from the disk).
              */
-            final IIndex view = getIndex(name, timestamp);
+            final BTree btree = journal.getIndex(entry.checkpointAddr);
 
-            if (view == null) {
-
-                throw new AssertionError(
-                        "Index not found? : name=" + name
-                                + ", timestamp=" + timestamp);
-
-            }
-
+            assert btree != null : entry.toString();
+            
             // index metadata for that index partition.
-            final IndexMetadata indexMetadata = view.getIndexMetadata();
+            final IndexMetadata indexMetadata = btree.getIndexMetadata();
 
             // index partition metadata
             final LocalPartitionMetadata pmd = indexMetadata

@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.Journal;
@@ -207,20 +208,27 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     public void sample() {setValue((long)getJournalCount());}
                 });
 
-                tmp.addCounter("Index Segment Count", new Instrument<Long>(){
+                tmp.addCounter("Segment Count", new Instrument<Long>(){
                     public void sample() {setValue((long)getIndexSegmentCount());}
                 });
 
-                tmp.addCounter("Minimum Release Age", new Instrument<Long>(){
-                    public void sample() {setValue(minReleaseAge);}
+                tmp.addCounter("Journal Open Count", new Instrument<Long>(){
+                    public void sample() {setValue(journalOpenCount.get());}
                 });
+
+                tmp.addCounter("Segment Open Count", new Instrument<Long>(){
+                    public void sample() {setValue(segmentOpenCount.get());}
+                });
+
+                tmp.addCounter("Minimum Release Age",
+                        new OneShotInstrument<Long>(minReleaseAge));
 
                 tmp.addCounter("Release Time", new Instrument<Long>(){
                     public void sample() {setValue(releaseTime);}
                 });
 
-                tmp.addCounter("Effective Release Time", new Instrument<Long>(){
-                    public void sample() {setValue(lastEffectiveReleaseTime);}
+                tmp.addCounter("Last Commit Time Preserved", new Instrument<Long>(){
+                    public void sample() {setValue(lastCommitTimePreserved);}
                 });
 
             }
