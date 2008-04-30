@@ -430,9 +430,9 @@ public interface Options {
     boolean DEFAULT_USE_DIRECT_BUFFERS = false;
 
     /**
-     * The default for {@link #WRITE_CACHE_CAPACITY} (10M).
+     * The default for {@link #WRITE_CACHE_CAPACITY} (1M).
      */
-    int DEFAULT_WRITE_CACHE_CAPACITY = 10 * Bytes.megabyte32;
+    int DEFAULT_WRITE_CACHE_CAPACITY = 1 * Bytes.megabyte32;
     
     /**
      * The default for {@link #READ_CACHE_CAPACITY}.

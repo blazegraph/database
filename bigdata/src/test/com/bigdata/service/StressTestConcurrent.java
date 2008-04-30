@@ -146,8 +146,8 @@ public class StressTestConcurrent extends
         // enable moves.
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
         
-        // @todo return to default (10000 ms)
-        properties.setProperty(Options.STATUS_DELAY,"10000");
+//        // @todo return to default (10000 ms)
+//        properties.setProperty(Options.STATUS_DELAY,"10000");
 
         // performance counter sampling interval.
         properties.setProperty(Options.INTERVAL,"5000");

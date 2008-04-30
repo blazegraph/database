@@ -70,12 +70,8 @@ public class TestAll extends TestCase {
          * unit tests together into that proxy test suite and its bootstrap
          * tests.
          * 
-         * FIXME write tests for join index partitions.
-         * 
-         * FIXME write tests for move index partition.
-         * 
-         * FIXME write tests for deleting old resources, including coordination
-         * of read locks with a transaction manager.
+         * @todo write tests for deleting old resources when coordinating read
+         * locks with a transaction manager.
          * 
          * @todo add tests for access to read-committed and fully isolated
          * indices.
@@ -94,6 +90,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestBuildTask.class);
         // test merge/split of index partitions.
         suite.addTestSuite(TestSplitTask.class);
+
+        // test release of old resources.
+        suite.addTestSuite(TestReleaseResources.TestWithCopyNoRelease.class);
+        suite.addTestSuite(TestReleaseResources.TestWithCopyImmediateRelease.class);
 
         return suite;
 

@@ -187,8 +187,14 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
         /**
          * @see #MAX_BYTES_TO_FULLY_BUFFER_NODES
+         * 
+         * FIXME The JVM will allocate a temporary direct buffer when reading in
+         * a large chunk from the store and then have problems releasing it.
+         * I've disabled buffering of nodes by default for now to avoid this
+         * memory leak.
          */
-        String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = ""+Bytes.megabyte*10;
+        //String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = ""+Bytes.megabyte*10;
+        String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = "1";
         
     }
     
@@ -708,6 +714,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          * operations after we read the data from the disk should be faster with
          * a heap buffer, so my expectation is that a heap buffer is the correct
          * choice here.
+         * 
+         * FIXME This would be true except that the JVM will allocate a
+         * temporary direct buffer and then have problems releasing it. I've
+         * disabled buffering of nodes by default for now to avoid this memory
+         * leak.
          */
 //        ByteBuffer buf = ByteBuffer.allocateDirect(nbytes);
         ByteBuffer buf = ByteBuffer.allocate(nbytes);

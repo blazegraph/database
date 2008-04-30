@@ -39,6 +39,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -333,10 +334,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     /**
      * A read-only view of the {@link Name2Addr} object mapping index names to
-     * the last metadata record committed for the named index. The keys are
+     * the most recent committed {@link Entry} for the named index. The keys are
      * index names (unicode strings). The values are {@link Entry}s containing
-     * the names and the last known address of the named {@link BTree} on the
-     * {@link Journal}.
+     * the names, commitTime, and last known {@link Checkpoint} address of the
+     * named {@link BTree} on the {@link Journal}.
      */
     public IIndex getName2Addr() {
 
@@ -354,6 +355,34 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * Wrap up in a read-only view since writes MUST NOT be allowed.
          */
         return new ReadOnlyIndex(btree);
+        
+    }
+    
+    /**
+     * Return a read-only view of the {@link Name2Addr} object as of the
+     * specified commit time.
+     * 
+     * @param commitTime
+     *            A commit time.
+     * 
+     * @return The read-only view -or- <code>null</code> if there is no commit
+     *         record for that commitTime.
+     * 
+     * @see #getName2Addr()
+     */
+    public IIndex getName2Addr(long commitTime) {
+        
+        final ICommitRecord commitRecord = getCommitRecord(commitTime);
+        
+        if (commitRecord == null) {
+
+            return null;
+            
+        }
+     
+        final long checkpointAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
+        
+        return new ReadOnlyIndex( getIndex(checkpointAddr) );
         
     }
 
@@ -454,6 +483,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * {@link #registerIndex(String)}.
      * 
      * @see Options#BRANCHING_FACTOR
+     * 
+     * @deprecated See {@link Options#BRANCHING_FACTOR}
      */
     public final int getDefaultBranchingFactor() {
         
@@ -1760,6 +1791,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         }
 
+        if(INFO)
         log.info("Done: commitTime="+commitTime+", nextOffset="+nextOffset);
         
         return commitTime;
@@ -2044,11 +2076,43 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     }
 
+    /**
+     * Return the first commit record whose timestamp is strictly greater than
+     * the given commitTime.
+     * 
+     * @param commitTime
+     *            The commit time.
+     * 
+     * @return The commit record -or- <code>null</code> if there is no commit
+     *         record whose timestamp is strictly greater than <i>commitTime</i>.
+     */
+    public ICommitRecord getCommitRecordStrictlyGreaterThan(long commitTime) {
+
+        assertOpen();
+
+        return _commitRecordIndex.findNext(commitTime);
+
+    }
+
+    /**
+     * @todo verify that {@link Journal#getIndex(String, long)} can in fact
+     *       return a view.
+     */
     public IIndex getIndex(String name, long commitTime) {
 
         assertOpen();
 
-        return getIndex(name, getCommitRecord(commitTime));
+        final ICommitRecord commitRecord = getCommitRecord(commitTime);
+
+        if (commitRecord == null) {
+            
+            log.info("No commit record for timestamp=" + commitTime);
+
+            return null;
+            
+        }
+        
+        return getIndex(name, commitRecord );
         
     }
     

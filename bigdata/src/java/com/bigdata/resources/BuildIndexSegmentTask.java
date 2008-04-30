@@ -19,9 +19,10 @@ import com.bigdata.mdi.SegmentMetadata;
  * Task builds an {@link IndexSegment} from the fused view of an index partition
  * as of some historical timestamp. This task is typically applied after an
  * {@link IResourceManager#overflow(boolean, boolean)} in order to produce a
- * compact view of the index as of the lastCommitTime on the old journal. Note
- * that the task by itself does not update the definition of the live index,
- * merely builds an {@link IndexSegment}.
+ * compact view of the index as of the lastCommitTime on the old journal. As its
+ * last action, this task submits a {@link AtomicUpdateBuildIndexSegmentTask}
+ * which replaces the view with one defined by the current {@link BTree} on the
+ * journal and the newly built {@link IndexSegment}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -107,6 +108,8 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         // the name under which the index partition is registered.
         final String name = getOnlyResource();
 
+        log.info("src="+name);
+        
         // The source view.
         final IIndex src = getIndex(name);
 
@@ -125,6 +128,8 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         // task will update the index partition view definition.
         final AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
                 concurrencyManager, name, result);
+
+        log.info("src="+name+", will run atomic update task");
 
         // submit task and wait for it to complete @todo config timeout?
         concurrencyManager.submit(task).get();
@@ -296,6 +301,21 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
 
             if(view instanceof BTree) {
                 
+                /*
+                 * Note: there is an expectation that this is not a simple BTree
+                 * because this the build task is supposed to be invoked after
+                 * an overflow event, and that event should have re-defined the
+                 * view to include the BTree on the new journal plus the
+                 * historical view.
+                 * 
+                 * One explanation for finding a simple view here is that the
+                 * view was a simple BTree on the old journal and the data was
+                 * copied from the old journal into the new journal and then
+                 * someone decided to do a build even through a copy had already
+                 * been done. However, this is not a very good explanation since
+                 * we try to avoid doing a build if we have already done a copy!
+                 */
+                
                 log.warn("View is only a B+Tree: name="
                         + buildResult.name + ", pmd="
                         + view.getIndexMetadata().getPartitionMetadata());
@@ -313,23 +333,29 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             /*
              * This is the old index partition definition.
              */
-            final LocalPartitionMetadata oldpmd = indexMetadata
-                    .getPartitionMetadata();
+            final LocalPartitionMetadata oldpmd = indexMetadata.getPartitionMetadata();
 
             // Check pre-conditions.
             {
 
-                assert oldpmd != null : "Not an index partition: "
-                        + getOnlyResource();
+                if (oldpmd == null) {
+                 
+                    throw new IllegalStateException("Not an index partition: "
+                            + getOnlyResource());
+                    
+                }
 
                 final IResourceMetadata[] oldResources = oldpmd.getResources();
 
-//                assert oldResources.length == 2 || oldResources.length == 3 : "Expecting either 2 or 3 resources: "
-//                        + Arrays.toString(oldResources);
-
-                assert oldResources[0].getUUID().equals(
-                        getJournal().getRootBlockView().getUUID()) : "Expecting live journal to the first resource: "
-                        + oldResources;
+                if (!oldResources[0].getUUID().equals(
+                        getJournal().getRootBlockView().getUUID())) {
+                 
+                    throw new IllegalStateException(
+                            "Expecting live journal to the first resource: "
+                                    + oldResources + ", but found "
+                                    + oldResources);
+                    
+                }
 
                 /*
                  * Note: I have commented out a bunch of pre-condition tests that are not 
@@ -378,7 +404,11 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
 
             // new view definition.
             final IResourceMetadata[] newResources = new IResourceMetadata[] {
-                    getJournal().getResourceMetadata(), segmentMetadata };
+                    // the live journal.
+                    getJournal().getResourceMetadata(),
+                    // the newly build index segment.
+                    segmentMetadata
+                    };
 
             // describe the index partition.
             indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//

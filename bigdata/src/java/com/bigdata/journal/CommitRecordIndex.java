@@ -226,7 +226,68 @@ public class CommitRecordIndex extends BTree {
             return null;
             
         }
+        
+        return valueAtIndex(index);
 
+    }
+
+    /**
+     * Find the first commit record strictly greater than the timestamp.
+     * 
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @return The commit record -or- <code>null</code> if there is no commit
+     *         record whose timestamp is strictly greater than <i>timestamp</i>.
+     */
+    synchronized public ICommitRecord findNext(long timestamp) {
+
+        if (timestamp == ITx.UNISOLATED) {
+
+            throw new IllegalArgumentException("Can not specify 'UNISOLATED' as timestamp");
+            
+        }
+
+        if (timestamp == ITx.READ_COMMITTED) {
+
+            throw new IllegalArgumentException("Can not specify 'READ_COMMITTED' as timestamp");
+            
+        }
+        
+        // find first strictly greater than.
+        final int index = findIndexOf(Math.abs(timestamp)) + 1;
+        
+//        if(index == -1) {
+//            
+//            // No match.
+//            
+//            return null;
+//            
+//        }
+
+        if (index == nentries) {
+
+            // No match.
+
+            return null;
+            
+        }
+        
+        return valueAtIndex(index);
+
+    }
+
+    /**
+     * Return the commit record at the index.
+     * 
+     * @param index
+     *            The index.
+     * @return
+     * 
+     * @see #findIndexOf(long)
+     */
+    private ICommitRecord valueAtIndex(int index) {
+        
         /*
          * Retrieve the entry for the commit record from the index.  This
          * also stores the actual commit time for the commit record.

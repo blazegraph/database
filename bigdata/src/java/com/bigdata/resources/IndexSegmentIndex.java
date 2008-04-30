@@ -37,11 +37,11 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * {@link BTree} mapping {@link IndexSegmentStore} commit times to
- * {@link IResourceMetadata} records. The keys are the long integers
- * (commitTimes) followed by the index segment UUID to break ties (this is not
- * the scale-out index UUID, but the UUID of the specific index segment). The
- * values are {@link IResourceMetadata} objects.
+ * {@link BTree} mapping {@link IndexSegmentStore} commit times (aka their
+ * create times) to {@link IResourceMetadata} records. The keys are the long
+ * integers (commitTimes) followed by the index segment UUID to break ties (this
+ * is not the scale-out index UUID, but the UUID of the specific index segment).
+ * The values are {@link IResourceMetadata} objects.
  * <p>
  * Note: Access to this object MUST be synchronized.
  * <p>
@@ -52,6 +52,8 @@ public class IndexSegmentIndex extends BTree {
 
     /**
      * Instance used to encode the timestamp into the key.
+     * 
+     * @todo use thread local instance 
      */
     private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG+Bytes.SIZEOF_UUID);
 
@@ -101,9 +103,6 @@ public class IndexSegmentIndex extends BTree {
      */
     protected byte[] getKey(long commitTime,UUID uuid) {
 
-        /*
-         * Note: The {@link UnicodeKeyBuilder} is NOT thread-safe
-         */
         return keyBuilder.reset().append(commitTime).append(uuid).getKey();
 
     }

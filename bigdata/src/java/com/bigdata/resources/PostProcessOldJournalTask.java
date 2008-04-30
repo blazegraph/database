@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BatchLookup;
@@ -1349,6 +1350,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     public Object call() throws Exception {
 
+        /*
+         * Mark the purpose of the thread using the same variable name as the
+         * AbstractTask.
+         */
+        MDC.put("taskname", "overflowService");
+        
         if (resourceManager.overflowAllowed.get()) {
 
             // overflow must be disabled while we run this task.
@@ -1360,7 +1367,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         try {
 
-            log.info("begin");
+            log.warn("begin");
 
             if(Thread.currentThread().isInterrupted()) return null;
             
@@ -1432,23 +1439,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         
                     } catch(Throwable t) {
                 
-                        if(Thread.currentThread().isInterrupted()) return null;
-                        
-                        if (InnerCause.isInnerCause(t,
-                                InterruptedException.class)
-                                || InnerCause.isInnerCause(t,
-                                        ClosedByInterruptException.class)
-                                || InnerCause.isInnerCause(t,
-                                        ClosedChannelException.class)
-                                || InnerCause.isInnerCause(t,
-                                        AsynchronousCloseException.class)) {
+                        if(isNormalShutdown(t)) { 
                             
-                            /*
-                             * These are all good indicators that the resource
-                             * manager was closed, e.g., by shutdown.
-                             */
-                            
-                            log.warn("Update task was interrupted.");
+                            log.warn("Normal shutdown? : "+t);
                             
                         } else {
                         
@@ -1500,7 +1493,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             final long elapsed = System.currentTimeMillis()-begin;
             
-            log.info("Done: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
+            log.info("warn: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
             
             return null;
             
@@ -1519,7 +1512,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             resourceManager.overflowFailedCounter.incrementAndGet();
             
-            log.error(t/*msg*/, t/*stack trace*/);
+            if(isNormalShutdown(t)) { 
+                
+                log.warn("Normal shutdown? : "+t);
+                
+            } else {
+                
+                log.error(t/*msg*/, t/*stack trace*/);
+                
+            }
 
             throw new RuntimeException( t );
             
@@ -1544,6 +1545,33 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
 
+    }
+
+    /**
+     * These are all good indicators that the data service was shutdown.
+     */
+    protected boolean isNormalShutdown(Throwable t) {
+       
+        if(Thread.currentThread().isInterrupted()) return true;
+        
+        if (!resourceManager.isRunning()
+                || !resourceManager.getConcurrencyManager()
+                        .isOpen()
+                || InnerCause.isInnerCause(t,
+                        InterruptedException.class)
+                || InnerCause.isInnerCause(t,
+                        ClosedByInterruptException.class)
+                || InnerCause.isInnerCause(t,
+                        ClosedChannelException.class)
+                || InnerCause.isInnerCause(t,
+                        AsynchronousCloseException.class)) {
+            
+            return true;
+            
+        }
+        
+        return false;
+            
     }
     
 }

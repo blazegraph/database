@@ -45,6 +45,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.rawstore.IRawStore;
@@ -561,7 +562,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // Note the thread running the task.
             active.put(t,r);
         
-            log.info("nrunning="+nrunning);
+            if (trackActiveSetInMDC) {
+
+                MDC.put("activeTasks", active.values().toString());
+                
+            }
+
+            MDC.put("taskState", "running");
+
+            MDC.put("commitCounter",Long.toString(ngroupCommits));
+
+            if(INFO)
+                log.info("nrunning="+nrunning);
             
         } finally {
             
@@ -570,6 +582,17 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
     
     }
+    
+    /**
+     * When <code>true</code>, writes the set of {@link #active} tasks into
+     * the {@link MDC} under the <code>activeTasks</code> key. This is of
+     * interest if you want to know which tasks are in the same commit group.
+     * 
+     * @todo the task should be decorated with information reflecting its state
+     *       in the {@link WriteExecutorService}, e.g., whether it is running,
+     *       waiting on a commit, etc.
+     */
+    final boolean trackActiveSetInMDC = true;
     
     /**
      * This is executed after {@link AbstractTask#doTask()}. If the task
@@ -599,6 +622,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             final int nrunning = this.nrunning.decrementAndGet(); // dec. counter.
 
+            MDC.remove("taskState");
+
             log.info("nrunning="+nrunning);
             
             assert nrunning >= 0;
@@ -623,6 +648,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                 // another task executed successfully.
                 successTaskCount++;
+
+                MDC.put("taskState","waitingOnCommit");
 
                 if (!groupCommit()) {
                     
@@ -661,6 +688,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                 failedTaskCount++;
                 
+                MDC.put("taskState","failure");
+
                 if (InnerCause.isInnerCause(t, ValidationError.class)) {
 
                     /*
@@ -731,6 +760,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // Remove since thread is no longer running the task.
             final ITask tmp = active.remove(Thread.currentThread());
 
+            if(trackActiveSetInMDC) {
+
+                MDC.put("activeTasks",active.values().toString());
+                
+            }
+
+            MDC.remove("taskState");
+
+            MDC.remove("commitCounter");
+            
             lock.unlock();
             
             assert tmp == r : "Expecting "+r+", but was "+tmp;
@@ -928,6 +967,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                 commit.await();
 
+                // did commit, so the commit counter was updated.
+                MDC.put("commitCounter",Long.toString(ngroupCommits));
+
                 return true;
 
             } catch (InterruptedException ex) {
@@ -1041,7 +1083,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                 log.info("Will do overflow now: nrunning="+nrunning);
 
+                // this task will do synchronous overflow processing.
+                MDC.put("taskState","doSyncOverflow");
+                
                 overflow();
+
+                MDC.put("taskState","didSyncOverflow");
 
                 log.info("Did overflow.");
                 
@@ -1550,10 +1597,17 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             final long timestamp = journal.commit();
 
             // #of commits that succeeded.
-            
             ngroupCommits++;
             
-            if(INFO) log.info("commit: #writes="+nwrites+", timestamp="+timestamp);
+            // did commit, so the commit counter was updated.
+            MDC.put("commitCounter",Long.toString(ngroupCommits));
+
+            // this task did the commit.
+            MDC.put("taskState", "didCommit");
+            
+            if (INFO)
+                log.info("commit: #writes=" + nwrites + ", timestamp="
+                        + timestamp);
             
             return true;
 

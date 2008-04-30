@@ -51,6 +51,8 @@ public class JournalIndex extends BTree {
 
     /**
      * Instance used to encode the timestamp into the key.
+     * 
+     * @todo use thread local instance
      */
     private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
 
@@ -98,9 +100,6 @@ public class JournalIndex extends BTree {
      */
     protected byte[] getKey(long commitTime) {
 
-        /*
-         * Note: The {@link UnicodeKeyBuilder} is NOT thread-safe
-         */
         return keyBuilder.reset().append(commitTime).getKey();
 
     }
