@@ -47,33 +47,32 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
- * This unisolated operation inserts terms into the terms index, assigning
- * identifiers to terms as a side-effect. The use of this operation MUST be
- * followed by the the use of {@link AddIds} to ensure that the reverse
- * mapping from id to term is defined before any statements are inserted
- * using the assigned term identifiers. The client MUST NOT make assertions
- * using the assigned term identifiers until the corresponding
- * {@link AddIds} operation has suceeded.
+ * This unisolated operation inserts terms into the <em>term:id</em> index,
+ * assigning identifiers to terms as a side-effect. The use of this operation
+ * MUST be followed by the the use of {@link Id2TermWriteProc} to ensure that
+ * the reverse mapping from id to term is defined before any statements are
+ * inserted using the assigned term identifiers. The client MUST NOT make
+ * assertions using the assigned term identifiers until the corresponding
+ * {@link Id2TermWriteProc} operation has suceeded.
  * <p>
  * In order for the lexicon to remain consistent if the client fails for any
- * reason after the forward mapping has been made restart-safe and before
- * the reverse mapping has been made restart-safe clients MUST always use a
- * successful {@link AddTerms} followed by a successful {@link AddIds}
- * before inserting statements using term identifiers into the statement
- * indices. In particular, a client MUST NOT treat lookup against the terms
- * index as satisifactory evidence that the term also exists in the reverse
- * mapping.
+ * reason after the forward mapping has been made restart-safe and before the
+ * reverse mapping has been made restart-safe clients MUST always use a
+ * successful {@link Term2IdWriteProc} followed by a successful
+ * {@link Id2TermWriteProc} before inserting statements using term identifiers
+ * into the statement indices. In particular, a client MUST NOT treat lookup
+ * against the terms index as satisifactory evidence that the term also exists
+ * in the reverse mapping.
  * <p>
- * Note that it is perfectly possible that a concurrent client will overlap
- * in the terms being inserted. The results will always be fully consistent
- * if the rules of the road are observed since (a) unisolated operations are
- * single-threaded; (b) term identifiers are assigned in an unisolated
- * atomic operation by {@link AddTerms}; and (c) the reverse mapping is
- * made consistent with the assignments made/discovered by the forward
- * mapping.
+ * Note that it is perfectly possible that a concurrent client will overlap in
+ * the terms being inserted. The results will always be fully consistent if the
+ * rules of the road are observed since (a) unisolated operations are
+ * single-threaded; (b) term identifiers are assigned in an unisolated atomic
+ * operation by {@link Term2IdWriteProc}; and (c) the reverse mapping is made
+ * consistent with the assignments made/discovered by the forward mapping.
  * <p>
- * Note: The {@link AddTerms} and {@link AddIds} operations may be analyzed
- * as a batch and variant of the following pseudocode.
+ * Note: The {@link Term2IdWriteProc} and {@link Id2TermWriteProc} operations
+ * may be analyzed as a batch and variant of the following pseudocode.
  * 
  * <pre>
  *  
@@ -99,13 +98,13 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  *  
  * </pre>
  * 
- * In addition, the actual operations against scale-out indices are
- * performed on index partitions rather than on the whole index.
+ * In addition, the actual operations against scale-out indices are performed on
+ * index partitions rather than on the whole index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AddTerms extends AbstractKeyArrayIndexProcedure implements
+public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure {
 
     /**
@@ -116,33 +115,33 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
     /**
      * De-serialization constructor.
      */
-    public AddTerms() {
+    public Term2IdWriteProc() {
         
     }
     
-    protected AddTerms(IDataSerializer keySer, int fromIndex, int toIndex,
+    protected Term2IdWriteProc(IDataSerializer keySer, int fromIndex, int toIndex,
             byte[][] keys) {
 
         super(keySer, null, fromIndex, toIndex, keys, null /* vals */);
         
     }
 
-    public static class AddTermsConstructor extends
-            AbstractIndexProcedureConstructor<AddTerms> {
+    public static class Term2IdWriteProcConstructor extends
+            AbstractIndexProcedureConstructor<Term2IdWriteProc> {
 
-        public static AddTermsConstructor INSTANCE = new AddTermsConstructor();
+        public static Term2IdWriteProcConstructor INSTANCE = new Term2IdWriteProcConstructor();
 
-        private AddTermsConstructor() {
+        private Term2IdWriteProcConstructor() {
             
         }
         
-        public AddTerms newInstance(IDataSerializer keySer,
+        public Term2IdWriteProc newInstance(IDataSerializer keySer,
                 IDataSerializer valSer,int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             assert vals == null;
             
-            return new AddTerms(keySer, fromIndex, toIndex, keys);
+            return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys);
 
         }
 

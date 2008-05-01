@@ -256,9 +256,9 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
         assertWritable();
         
-        final IndexMetadata idTermMetadata = getIdTermIndexMetadata(name+name_idTerm);
+        final IndexMetadata id2TermMetadata = getId2TermIndexMetadata(name+name_id2Term);
         
-        final IndexMetadata termIdMetadata = getTermIdIndexMetadata(name+name_termId);
+        final IndexMetadata term2IdMetadata = getTerm2IdIndexMetadata(name+name_term2Id);
         
         final IndexMetadata justMetadata = getJustIndexMetadata(name+name_just);
             
@@ -278,10 +278,10 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
             log.warn("Special case allocation for two data services");
             
-            fed.registerIndex(termIdMetadata,
+            fed.registerIndex(term2IdMetadata,
                     new byte[][] { new byte[] {} }, new UUID[] { uuids[0] });
             
-            fed.registerIndex(idTermMetadata,
+            fed.registerIndex(id2TermMetadata,
                     new byte[][] { new byte[] {} }, new UUID[] { uuids[1] });
             
             /*
@@ -333,9 +333,9 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
             if (lexicon) {
 
-                fed.registerIndex(termIdMetadata);
+                fed.registerIndex(term2IdMetadata);
 
-                fed.registerIndex(idTermMetadata);
+                fed.registerIndex(id2TermMetadata);
 
             }
 
@@ -371,8 +371,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
          * to ensure consistency without write-write conflicts.
          */
 
-        ids      = fed.getIndex(name+name_termId, ITx.UNISOLATED);
-        terms    = fed.getIndex(name+name_idTerm, ITx.UNISOLATED);
+        term2id      = fed.getIndex(name+name_term2Id, ITx.UNISOLATED);
+        id2term      = fed.getIndex(name+name_id2Term, ITx.UNISOLATED);
         
         /*
          * Note: if full transactions are to be used then the statement indices
@@ -423,9 +423,9 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (lexicon) {
          
-            fed.dropIndex(name+name_idTerm); ids = null;
+            fed.dropIndex(name+name_id2Term); id2term = null;
             
-            fed.dropIndex(name+name_termId); terms = null;
+            fed.dropIndex(name+name_term2Id); term2id = null;
         
             if(textIndex) {
                 
@@ -462,12 +462,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     /**
      * The terms index.
      */
-    private IIndex terms;
+    private IIndex term2id;
 
     /**
      * The ids index.
      */
-    private IIndex ids;
+    private IIndex id2term;
 
     /**
      * The statement indices for a triple store.
@@ -476,19 +476,19 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     private IIndex just;
     
-    final public IIndex getTermIdIndex() {
+    final public IIndex getTerm2IdIndex() {
 
-        if(terms==null) throw new IllegalStateException();
+        if(term2id==null) throw new IllegalStateException();
         
-        return terms;
+        return term2id;
 
     }
 
-    final public IIndex getIdTermIndex() {
+    final public IIndex getId2TermIndex() {
 
-        if(ids==null) throw new IllegalStateException();
+        if(id2term==null) throw new IllegalStateException();
 
-        return ids;
+        return id2term;
 
     }
 

@@ -56,7 +56,7 @@ import junit.framework.TestCase;
  * <p>
  * The term:id index is responsible for making a persistent assignment of term
  * identifiers for terms (including URIs, Literals, and Statement identifiers
- * but not blank nodes). This operation is performed by {@link AddTerms}. It is
+ * but not blank nodes). This operation is performed by {@link Term2IdWriteProc}. It is
  * an UNISOLATED task and is therefore atomic and SHOULD always be consistent.
  * 
  * @deprecated unless I can develop a unit test for this problem.  Right now this

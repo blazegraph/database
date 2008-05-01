@@ -88,7 +88,7 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
         // turn off the write cache.
-        properties.setProperty(Options.WRITE_CACHE_CAPACITY, "0");
+//        properties.setProperty(Options.WRITE_CACHE_CAPACITY, "0");
         
         // name data directory for the unit test.
         properties.setProperty(com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR, getName());
@@ -141,6 +141,19 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
     public void test_U10() {
         
         new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+
+            public boolean accept(File dir, String name) {
+                if(name.endsWith(".owl")) return true;
+                return false;
+            }
+            
+        });
+        
+    }
+
+    public void test_U50() {
+        
+        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U50"), new FilenameFilter(){
 
             public boolean accept(File dir, String name) {
                 if(name.endsWith(".owl")) return true;

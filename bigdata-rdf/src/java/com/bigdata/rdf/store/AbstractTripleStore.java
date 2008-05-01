@@ -121,8 +121,8 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOComparator;
-import com.bigdata.rdf.store.AddIds.AddIdsConstructor;
-import com.bigdata.rdf.store.AddTerms.AddTermsConstructor;
+import com.bigdata.rdf.store.Id2TermWriteProc.Id2TermWriteProcConstructor;
+import com.bigdata.rdf.store.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.store.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -167,7 +167,7 @@ import cutthecrap.utils.striterators.Striterator;
  * is during data load. We can do without bnodes in the forward index also as
  * long as we (a) keep a hash or btree whose scope is the data load (a btree
  * would be required for very large files); and (b) we hand the {@link BNode}s
- * to {@link AddTerms}s but it only assigns a one up term identifier and does
+ * to {@link Term2IdWriteProc}s but it only assigns a one up term identifier and does
  * NOT enter the bnode into the index. The local (file load scope only) bnode
  * resolution is the only context in which it is possible for two {@link BNode}
  * {@link BNode#getID() ID}s to be interpreted as the same ID and therefore
@@ -256,7 +256,7 @@ import cutthecrap.utils.striterators.Striterator;
  * FIXME There is a lot of cruft in the {@link _Value} class and in how it is
  * handled by the {@link AbstractTripleStore} which perhaps should be re-written
  * entirely in terms of {@link BigdataValue} and external metadata were
- * necessary for state during {@link AddTerms} or {@link AddIds}, etc.
+ * necessary for state during {@link Term2IdWriteProc} or {@link Id2TermWriteProc}, etc.
  * <p>
  * Save frequently seen terms in each batch for the next batch in order to
  * reduce unicode conversions and index access?
@@ -744,20 +744,20 @@ abstract public class AbstractTripleStore implements ITripleStore,
 //                20   // sampleRate
 //                );
         
-//        if (name.contains(name_idTerm)) {
-//            
-//            // An override that makes a split very likely.
-//            final ISplitHandler splitHandler = new DefaultSplitHandler(
-//                    10 * Bytes.kilobyte32, // minimumEntryCount
-//                    50 * Bytes.kilobyte32, // entryCountPerSplit
-//                    1.5, // overCapacityMultiplier
-//                    .75, // underCapacityMultiplier
-//                    20 // sampleRate
-//            );
-//            
-//            metadata.setSplitHandler(splitHandler);
-//            
-//        }
+        if (name.contains(name_id2Term)) {
+            
+            // An override that makes a split very likely.
+            final ISplitHandler splitHandler = new DefaultSplitHandler(
+                    10 * Bytes.kilobyte32, // minimumEntryCount
+                    50 * Bytes.kilobyte32, // entryCountPerSplit
+                    1.5, // overCapacityMultiplier
+                    .75, // underCapacityMultiplier
+                    20 // sampleRate
+            );
+            
+            metadata.setSplitHandler(splitHandler);
+            
+        }
         
 //        /*
 //         * paranoia option
@@ -771,9 +771,9 @@ abstract public class AbstractTripleStore implements ITripleStore,
     }
 
     /**
-     * Overrides for the {@link IRawTripleStore#getTermIdIndex()}.
+     * Overrides for the {@link IRawTripleStore#getTerm2IdIndex()}.
      */
-    protected IndexMetadata getTermIdIndexMetadata(String name) {
+    protected IndexMetadata getTerm2IdIndexMetadata(String name) {
 
         final IndexMetadata metadata = getIndexMetadata(name);
 
@@ -782,9 +782,9 @@ abstract public class AbstractTripleStore implements ITripleStore,
     }
 
     /**
-     * Overrides for the {@link IRawTripleStore#getIdTermIndex()}.
+     * Overrides for the {@link IRawTripleStore#getId2TermIndex()}.
      */
-    protected IndexMetadata getIdTermIndexMetadata(String name) {
+    protected IndexMetadata getId2TermIndexMetadata(String name) {
 
         final IndexMetadata metadata = getIndexMetadata(name);
 
@@ -961,7 +961,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
         byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (RdfKeyBuilder.TERM_CODE_BND + 1)) };
 
-        return getTermIdIndex().rangeCount(fromKey, toKey);
+        return getTerm2IdIndex().rangeCount(fromKey, toKey);
 
     }
 
@@ -973,7 +973,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
         byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (RdfKeyBuilder.TERM_CODE_URI + 1)) };
 
-        return getTermIdIndex().rangeCount(fromKey, toKey);
+        return getTerm2IdIndex().rangeCount(fromKey, toKey);
 
     }
 
@@ -987,7 +987,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
         byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (RdfKeyBuilder.TERM_CODE_DTL + 1)) };
 
-        return getTermIdIndex().rangeCount(fromKey, toKey);
+        return getTerm2IdIndex().rangeCount(fromKey, toKey);
 
     }
 
@@ -1000,7 +1000,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
         byte[] toKey = new byte[] { KeyBuilder
                 .encodeByte((byte) (RdfKeyBuilder.TERM_CODE_BND + 1)) };
 
-        return getTermIdIndex().rangeCount(fromKey, toKey);
+        return getTerm2IdIndex().rangeCount(fromKey, toKey);
 
     }
 
@@ -1133,7 +1133,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
         
         if(value != null) return value;
         
-        final IIndex ndx = getIdTermIndex();
+        final IIndex ndx = getId2TermIndex();
 
         // new KeyBuilder(Bytes.SIZEOF_LONG);
         final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;
@@ -1262,7 +1262,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
             }
 
             // the id:term index.
-            final IIndex ndx = getIdTermIndex();
+            final IIndex ndx = getId2TermIndex();
 
             // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
@@ -1354,7 +1354,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
-        final IIndex ndx = getTermIdIndex();
+        final IIndex ndx = getTerm2IdIndex();
 
         byte[] key ;
         
@@ -1507,7 +1507,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                 final long _begin = System.currentTimeMillis();
 
-                final IIndex termIdIndex = getTermIdIndex();
+                final IIndex termIdIndex = getTerm2IdIndex();
 
                 /*
                  * Create a key buffer holding the sort keys. This does not
@@ -1527,14 +1527,14 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                 // run the procedure.
                 termIdIndex.submit(0/* fromIndex */, numTerms/* toIndex */,
-                        keys, null/* vals */, AddTermsConstructor.INSTANCE,
-                        new IResultHandler<AddTerms.Result, Void>() {
+                        keys, null/* vals */, Term2IdWriteProcConstructor.INSTANCE,
+                        new IResultHandler<Term2IdWriteProc.Result, Void>() {
 
                             /**
                              * Copy the assigned/discovered term identifiers
                              * onto the corresponding elements of the terms[].
                              */
-                            public void aggregate(AddTerms.Result result,
+                            public void aggregate(Term2IdWriteProc.Result result,
                                     Split split) {
 
                                 for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
@@ -1591,7 +1591,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             final long _begin = System.currentTimeMillis();
 
-            final IIndex idTermIndex = getIdTermIndex();
+            final IIndex idTermIndex = getId2TermIndex();
 
             /*
              * Create a key buffer to hold the keys generated from the term
@@ -1639,7 +1639,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                 idTermIndex.submit(0/* fromIndex */,
                         nonBNodeCount/* toIndex */, keys, vals,
-                        AddIdsConstructor.INSTANCE,
+                        Id2TermWriteProcConstructor.INSTANCE,
                         new IResultHandler<Void, Void>() {
 
                             /**
@@ -1702,7 +1702,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * Assign unique statement identifiers to triples.
      * <p>
      * Each distinct {@link StatementEnum#Explicit} {s,p,o} is assigned a unique
-     * statement identifier using the {@link IRawTripleStore#getTermIdIndex()}.
+     * statement identifier using the {@link IRawTripleStore#getTerm2IdIndex()}.
      * The assignment of statement identifiers is <i>consistent</i> using an
      * unisolated atomic write operation similar to
      * {@link #addTerms(_Value[], int)}.
@@ -1822,21 +1822,21 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             final long _begin = System.currentTimeMillis();
 
-            final IIndex termIdIndex = getTermIdIndex();
+            final IIndex termIdIndex = getTerm2IdIndex();
 
             // run the procedure.
             if (nexplicit > 0) {
 
                 termIdIndex.submit(0/* fromIndex */, nexplicit/* toIndex */,
-                        keys, null/* vals */, AddTermsConstructor.INSTANCE,
-                        new IResultHandler<AddTerms.Result, Void>() {
+                        keys, null/* vals */, Term2IdWriteProcConstructor.INSTANCE,
+                        new IResultHandler<Term2IdWriteProc.Result, Void>() {
 
                             /**
                              * Copy the assigned / discovered statement
                              * identifiers onto the corresponding elements of
                              * the SPO[].
                              */
-                            public void aggregate(AddTerms.Result result,
+                            public void aggregate(Term2IdWriteProc.Result result,
                                     Split split) {
 
                                 for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
@@ -2538,7 +2538,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
     @SuppressWarnings("unchecked")
     public Iterator<Value> idTermIndexScan() {
 
-        final IIndex ndx = getIdTermIndex();
+        final IIndex ndx = getId2TermIndex();
 
         return new Striterator(ndx.rangeIterator(null, null, 0/* capacity */,
                 IRangeQuery.VALS, null/* filter */)).addFilter(new Resolver() {
@@ -2570,7 +2570,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
     @SuppressWarnings("unchecked")
     public Iterator<Long> termIdIndexScan() {
 
-        final IIndex ndx = getTermIdIndex();
+        final IIndex ndx = getTerm2IdIndex();
 
         return new Striterator(ndx.rangeIterator(null, null, 0/* capacity */,
                 IRangeQuery.VALS, null/* filter */)).addFilter(new Resolver() {
@@ -2660,8 +2660,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
                 + "\n"
                 + "\nsummary by index::\n"
                 + (lexicon //
-                ? "\n" + usage(name_termId, getTermIdIndex()) + "\n"
-                        + usage(name_idTerm, getIdTermIndex()) //
+                ? "\n" + usage(name_term2Id, getTerm2IdIndex()) + "\n"
+                        + usage(name_id2Term, getId2TermIndex()) //
                         : "")
                 //
                 + (oneAccessPath //

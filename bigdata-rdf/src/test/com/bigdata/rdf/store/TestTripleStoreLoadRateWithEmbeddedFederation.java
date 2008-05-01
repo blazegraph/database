@@ -38,6 +38,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 
@@ -88,6 +89,9 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
 //        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
         properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
         properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
+        
+        // Do not hold onto old resources.
+        properties.setProperty(StoreManager.Options.MIN_RELEASE_AGE, "0");
         
         // control the #of data services.
         properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
