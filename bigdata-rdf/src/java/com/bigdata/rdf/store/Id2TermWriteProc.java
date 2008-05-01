@@ -37,13 +37,13 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Unisolated write operation makes consistent assertions on the
- * <em>ids</em> index based on the data developed by the {@link AddTerms}
+ * <em>id:term</em> index based on the data developed by the {@link Term2IdWriteProc}
  * operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AddIds extends AbstractKeyArrayIndexProcedure implements
+public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure {
 
     /**
@@ -54,11 +54,11 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
     /**
      * De-serialization constructor.
      */
-    public AddIds() {
+    public Id2TermWriteProc() {
         
     }
     
-    protected AddIds(IDataSerializer keySer, IDataSerializer valSer,
+    protected Id2TermWriteProc(IDataSerializer keySer, IDataSerializer valSer,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, vals);
@@ -67,18 +67,18 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
         
     }
     
-    public static class AddIdsConstructor extends
-            AbstractIndexProcedureConstructor<AddIds> {
+    public static class Id2TermWriteProcConstructor extends
+            AbstractIndexProcedureConstructor<Id2TermWriteProc> {
 
-        public static AddIdsConstructor INSTANCE = new AddIdsConstructor();
+        public static Id2TermWriteProcConstructor INSTANCE = new Id2TermWriteProcConstructor();
 
-        private AddIdsConstructor() {}
+        private Id2TermWriteProcConstructor() {}
         
-        public AddIds newInstance(IDataSerializer keySer,
+        public Id2TermWriteProc newInstance(IDataSerializer keySer,
                 IDataSerializer valSer,int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
-            return new AddIds(keySer,valSer,fromIndex, toIndex, keys, vals);
+            return new Id2TermWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);
 
         }
 
@@ -178,6 +178,7 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
                         log.error("oldval=" + BytesUtil.toString(oldval));
                         log.error("val=" + _Value.deserialize(val));
                         log.error("oldval=" + _Value.deserialize(oldval));
+                        log.error(ndx.getIndexMetadata().getPartitionMetadata().toString());
                         
                         throw new RuntimeException("Consistency problem: id="+ id);
                         

@@ -74,8 +74,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      * place that hides the routing of btree api operations to the journals and
      * segments for each index partition.
      */
-    private IIndex ndx_termId;
-    private IIndex ndx_idTerm;
+    private IIndex ndx_term2Id;
+    private IIndex ndx_id2Term;
     private IIndex ndx_spo;
     private IIndex ndx_pos;
     private IIndex ndx_osp;
@@ -87,18 +87,18 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      * across overflow() events).
      */
     
-    final public IIndex getTermIdIndex() {
+    final public IIndex getTerm2IdIndex() {
 
         if(!lexicon) return null;
         
-        if(ndx_termId!=null) return ndx_termId;
+        if(ndx_term2Id!=null) return ndx_term2Id;
         
-        IIndex ndx = store.getIndex(name_termId);
+        IIndex ndx = store.getIndex(name_term2Id);
         
         if (ndx == null) {
             
-            ndx_termId = ndx = store.registerIndex(name_termId, BTree.create(
-                    store, getTermIdIndexMetadata(name_termId)));
+            ndx_term2Id = ndx = store.registerIndex(name_term2Id, BTree.create(
+                    store, getTerm2IdIndexMetadata(name_term2Id)));
             
         }
         
@@ -106,19 +106,19 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
     }
 
-    final public IIndex getIdTermIndex() {
+    final public IIndex getId2TermIndex() {
 
         if(!lexicon) return null;
 
-        if (ndx_idTerm != null)
-            return ndx_idTerm;
+        if (ndx_id2Term != null)
+            return ndx_id2Term;
 
-        IIndex ndx = store.getIndex(name_idTerm);
+        IIndex ndx = store.getIndex(name_id2Term);
 
         if (ndx == null) {
 
-            ndx_idTerm = ndx = store.registerIndex(name_idTerm, BTree.create(
-                    store, getIdTermIndexMetadata(name_idTerm)));
+            ndx_id2Term = ndx = store.registerIndex(name_id2Term, BTree.create(
+                    store, getId2TermIndexMetadata(name_id2Term)));
 
         }
 
@@ -234,8 +234,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
          * next time they are used.
          */
         
-        ndx_termId = null;
-        ndx_idTerm = null;
+        ndx_term2Id = null;
+        ndx_id2Term = null;
         ndx_spo = null;
         ndx_pos = null;
         ndx_osp = null;
@@ -259,8 +259,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         if(lexicon) {
         
-            store.dropIndex(name_idTerm); ndx_termId = null;
-            store.dropIndex(name_termId); ndx_idTerm = null;
+            store.dropIndex(name_id2Term); ndx_id2Term = null;
+            store.dropIndex(name_term2Id); ndx_term2Id = null;
             
             if(textIndex) {
                 
@@ -337,9 +337,9 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      */
     protected void registerIndices() {
 
-        getTermIdIndex();
+        getTerm2IdIndex();
         
-        getIdTermIndex();
+        getId2TermIndex();
         
         getSPOIndex();
         
@@ -529,12 +529,12 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 //        private IIndex ndx_osp;
 //        private IIndex ndx_just;
 
-        public IIndex getTermIdIndex() {
+        public IIndex getTerm2IdIndex() {
             
 //            if (ndx_termId == null) {
 
             // @todo cache hard reference to each of these views.
-            return db.store.getIndex(name_termId, ITx.READ_COMMITTED);
+            return db.store.getIndex(name_term2Id, ITx.READ_COMMITTED);
 
 //            }
             
@@ -542,9 +542,9 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             
         }
 
-        public IIndex getIdTermIndex() {
+        public IIndex getId2TermIndex() {
         
-            return db.store.getIndex(name_idTerm, ITx.READ_COMMITTED);
+            return db.store.getIndex(name_id2Term, ITx.READ_COMMITTED);
 
 //            if(ndx_idTerm==null) {
 //                

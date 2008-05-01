@@ -36,7 +36,7 @@ import org.openrdf.model.URI;
  * assigned term identifiers and which indicate directly (without consulting the
  * term index) whether a term is a URI, Literal, BNode, or Statement. This is
  * used to quickly test the type of a term identifier without requiring the term
- * value to be materialized from the id:term index.
+ * value to be materialized from the {@link IRawTripleStore#name_id2Term} index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -57,11 +57,6 @@ public interface ITermIdCodes {
     /**
      * The bit value used to indicate that a term identifier stands for a
      * {@link URI}.
-     * <p>
-     * Note: The lower two bits of a term identifier are reserved to indicate
-     * the type of thing for which the term identifier stands {URI, Literal,
-     * BNode, or Statement}. This is used to avoid lookup of the term in the
-     * {@link #name_idTerm} index when we only need to determine the term class.
      */
     static final public long TERMID_CODE_URI = 0x00L;
 

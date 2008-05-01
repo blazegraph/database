@@ -57,8 +57,8 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  */
 public class TempTripleStore extends AbstractLocalTripleStore implements ITripleStore {
 
-    private BTree ndx_termId;
-    private BTree ndx_idTerm;
+    private BTree ndx_term2Id;
+    private BTree ndx_id2Term;
 
     private BTree ndx_spo;
     private BTree ndx_pos;
@@ -94,15 +94,15 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
     }
 
-    final public IIndex getTermIdIndex() {
+    final public IIndex getTerm2IdIndex() {
 
-        return ndx_termId;
+        return ndx_term2Id;
         
     }
     
-    final public IIndex getIdTermIndex() {
+    final public IIndex getId2TermIndex() {
 
-        return ndx_idTerm;
+        return ndx_id2Term;
         
     }
 
@@ -144,8 +144,8 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
             if(lexicon) {
 
-                ndx_termId.removeAll();
-                ndx_idTerm.removeAll();
+                ndx_term2Id.removeAll();
+                ndx_id2Term.removeAll();
                 
                 if(textIndex) {
                     
@@ -303,11 +303,11 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
         if (lexicon) {
 
-            ndx_termId = (BTree) store.registerIndex(name_termId, BTree.create(
-                    store, getTermIdIndexMetadata(name_termId)));
+            ndx_term2Id = (BTree) store.registerIndex(name_term2Id, BTree.create(
+                    store, getTerm2IdIndexMetadata(name_term2Id)));
 
-            ndx_idTerm = (BTree) store.registerIndex(name_idTerm, BTree.create(
-                    store, getIdTermIndexMetadata(name_idTerm)));
+            ndx_id2Term = (BTree) store.registerIndex(name_id2Term, BTree.create(
+                    store, getId2TermIndexMetadata(name_id2Term)));
 
         }
 

@@ -327,7 +327,7 @@ abstract public class AbstractTestCase
 
             System.err.println("terms index (forward mapping).");
 
-            IIndex ndx = store.getTermIdIndex();
+            IIndex ndx = store.getTerm2IdIndex();
 
             ITupleIterator itr = ndx.rangeIterator(null, null);
 
@@ -372,7 +372,7 @@ abstract public class AbstractTestCase
 
             System.err.println("ids index (reverse mapping).");
 
-            IIndex ndx = store.getIdTermIndex();
+            IIndex ndx = store.getId2TermIndex();
 
             ITupleIterator itr = ndx.rangeIterator(null, null);
 

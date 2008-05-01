@@ -66,35 +66,35 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     /**
      * The name of the index mapping terms to term identifiers.
      */
-    static final public String name_termId = "terms";
+    static final public String name_term2Id = "_term2id";
     
     /**
      * The name of the index mapping term identifiers to terms.
      */
-    static final public String name_idTerm = "ids";
+    static final public String name_id2Term = "_id2term";
 
     /**
      * The name of the index providing full text lookup for terms.
      */
-    static final public String name_freeText = "text";
+    static final public String name_freeText = "_text";
     
     /*
      * The names of the various statement indices. 
      */
     
-    static final public String name_spo = KeyOrder.SPO.toString();
-    static final public String name_pos = KeyOrder.POS.toString();
-    static final public String name_osp = KeyOrder.OSP.toString();
+    static final public String name_spo = "_"+KeyOrder.SPO.toString();
+    static final public String name_pos = "_"+KeyOrder.POS.toString();
+    static final public String name_osp = "_"+KeyOrder.OSP.toString();
     
     /**
      * The name of the optional index in which {@link Justification}s are
      * stored.
      */
-    static final public String name_just = "just";
+    static final public String name_just = "_just";
 
-    abstract public IIndex getTermIdIndex();
+    abstract public IIndex getTerm2IdIndex();
 
-    abstract public IIndex getIdTermIndex();
+    abstract public IIndex getId2TermIndex();
 
     abstract public IIndex getSPOIndex();
 
