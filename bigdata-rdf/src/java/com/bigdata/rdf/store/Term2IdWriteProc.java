@@ -30,15 +30,19 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
@@ -106,12 +110,58 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  */
 public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure {
+    
+    protected static final Logger log = Logger.getLogger(Term2IdWriteProc.class);
 
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+//    static {
+//        if(DEBUG) {
+//         
+//            log.removeAllAppenders();
+//            
+//            try {
+//                log.addAppender(new FileAppender(new SimpleLayout(),"Term2IdWriteProc.log"));
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//            
+//        }
+//    }
+
+    private static ConcurrentHashMap<Long,byte[]> groundTruthId2Term;
+    private static ConcurrentHashMap<byte[],Long> groundTruthTerm2Id;
+    static {
+        
+        if(DEBUG) {
+        
+            log.warn("Will track ground truth assignments");
+            
+            // note: use a large initial capacity. default concurrency level is 16.
+            
+            groundTruthId2Term = new ConcurrentHashMap<Long,byte[]>(500000);
+
+            groundTruthTerm2Id = new ConcurrentHashMap<byte[],Long>(500000);
+            
+        }
+        
+    }
+    
     /**
      * 
      */
     private static final long serialVersionUID = -4736465754523655679L;
-
+    
     /**
      * De-serialization constructor.
      */
@@ -162,7 +212,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      *         term identifiers.
      */
     public Object apply(IIndex ndx) {
-
+        
         final int numTerms = getKeyCount();
         
         assert numTerms > 0 : "numTerms="+numTerms;
@@ -206,13 +256,21 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                  * pack the termId in a manner that does not allow negative
                  * integers. a different pack routine would allow us all bits.
                  */
-                long id = counter.incrementAndGet();
+                final long id0 = counter.incrementAndGet();
                 
                 // 0L is never used as a counter value.
-                assert id != IRawTripleStore.NULL;
+                assert id0 != IRawTripleStore.NULL;
 
-                // left shift two bits to make room for term type coding.
-                id = id << 2;
+                /*
+                 * left shift two bits to make room for term type coding.
+                 * 
+                 * Note: when using partitioned indices the partition identifier
+                 * is already in the high word like [partitionId|counter], so
+                 * this shifts everything left by two bits. The result is that
+                 * the #of partitions is reduced four-fold rather than the #of
+                 * distinct counter values within a given index partition.
+                 */
+                long id = id0 << 2;
                 
                 // this byte encodes the kind of term (URI, Literal, BNode, etc.)
                 final byte code = KeyBuilder.decodeByte(key[0]);
@@ -238,6 +296,66 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 
                 termId = id;
                 
+                if(DEBUG) {
+                    
+                    if(groundTruthId2Term.isEmpty()) {
+                        
+                        log.warn("Ground truth testing enabled.");
+                        
+                    }
+
+                    /*
+                     * Note: add to map if not present. returns the value
+                     * already stored in the map (and null if there was no value
+                     * in the map).
+                     */
+                    
+                    // remember the termId assigned to that key.
+                    final Long oldId = groundTruthTerm2Id.putIfAbsent(key, termId);
+                    
+                    if( oldId != null && oldId.longValue() != termId ) {
+
+                        /*
+                         * The assignment of the term identifier to the key is
+                         * not stable.
+                         */
+                        
+                        throw new AssertionError("different termId assigned"+//
+                                ": oldId=" + oldId + //
+                                ", newId=" + termId + //
+                                ", key=" + BytesUtil.toString(key)+//
+                                ", pmd="+ndx.getIndexMetadata().getPartitionMetadata());
+
+                    }
+
+                    // remember the key to which we assigned that termId.
+                    final byte[] oldKey = groundTruthId2Term.putIfAbsent(termId, key);
+                    
+                    if (oldKey != null && !BytesUtil.bytesEqual(oldKey, key)) {
+
+                        /*
+                         * The assignment of the term identifier to the key is
+                         * not unique.
+                         */
+                        
+                        // the partition identifier (assuming index is partitioned).
+                        final long pid = id0 >> 32;
+                        final long mask = 0xffffffffL;
+                        final int ctr = (int) (id0 & mask);
+                        
+                        throw new AssertionError("assignment not unique"+//
+                                ": termId=" + termId +//
+                                ", oldKey=" + BytesUtil.toString(oldKey) + //
+                                ", newKey=" + BytesUtil.toString(key)+//
+                                ", pmd="+ndx.getIndexMetadata().getPartitionMetadata()+//
+                                ", pid="+pid+", ctr="+ctr+//
+                                ", counter="+counter.getClass().getName());
+                        
+                    }
+                    
+
+                }
+                
                 // format as packed long integer.
                 try {
                     
@@ -247,7 +365,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                     
                     throw new RuntimeException(ex);
                     
-                    }
+                }
 
                 // insert into index.
                 if (ndx.insert(key, idbuf.toByteArray()) != null) {

@@ -62,6 +62,7 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.DataService.Options;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.SparseRowStore;
@@ -353,21 +354,33 @@ abstract public class AbstractFederation implements IBigdataFederation {
          * Start collecting performance counters from the OS.
          */
         {
+
+            final Properties p = client.getProperties();
             
-            final UUID clientUUID = client.getClientUUID();
-            
-            log.info("Starting performance counter collection: uuid="
-                            + clientUUID);
+            final boolean collectPlatformStatistics = Boolean.parseBoolean(p
+                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
 
-            Properties p = client.getProperties();
+            log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+                    + collectPlatformStatistics);
 
-            p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
-                    "client" + ICounterSet.pathSeparator
-                            + clientUUID.toString());
+            if (collectPlatformStatistics) {
+                
+                final UUID clientUUID = client.getClientUUID();
 
-            statisticsCollector = AbstractStatisticsCollector.newInstance(p);
+                log.info("Starting performance counter collection: uuid="
+                        + clientUUID);
 
-            statisticsCollector.start();
+                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
+                        "client" + ICounterSet.pathSeparator
+                                + clientUUID.toString());
+
+                statisticsCollector = AbstractStatisticsCollector
+                        .newInstance(p);
+
+                statisticsCollector.start();
+
+            }
         
         }
 

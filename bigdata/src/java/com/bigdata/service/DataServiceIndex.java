@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.IOException;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractIndexProcedureConstructor;
@@ -48,6 +46,9 @@ import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IResourceMetadata;
@@ -163,19 +164,37 @@ public class DataServiceIndex implements IClientIndex {
 
     }
 
-    public String getStatistics() {
+    /**
+     * FIXME populate with counters concerning the client's access to the index
+     * rather than the index's counters.  This should be basically the same for
+     * the {@link ClientIndexView} and the {@link DataServiceIndex}.
+     */
+    synchronized public ICounterSet getCounters() {
 
-        try {
+        if (counterSet == null) {
 
-            return dataService.getStatistics(name);
+            counterSet = new CounterSet();
+            
+            counterSet.addCounter("name", new OneShotInstrument<String>(name));
 
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
+            counterSet.addCounter("timestamp", new OneShotInstrument<Long>(timestamp));
 
         }
+        
+        return counterSet;
+        
+        //        try {
+//
+//            return dataService.getStatistics(name);
+//
+//        } catch (IOException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
 
     }
+    private CounterSet counterSet;
 
     public ICounter getCounter() {
         

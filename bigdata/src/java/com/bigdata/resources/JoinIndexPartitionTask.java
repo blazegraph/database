@@ -114,6 +114,9 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
          * created on the _live_ journal. It will be inaccessible to anyone
          * until it is registered. Until then we will just pass along the
          * checkpoint address (obtained below).
+         * 
+         * Note: the lower 32-bits of the counter will be zero. The high 32-bits
+         * will be the partition identifier assigned to the new index partition.
          */
         final BTree btree = BTree.create(resourceManager.getLiveJournal(), newMetadata);
 
@@ -206,7 +209,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                     getJournal().getResourceMetadata()//
                 },//
                 // new history line.
-                "join("+Arrays.toString(resources)+") "
+                "join("+Arrays.toString(resources)+"->"+partitionId+") "
                 ));
         
         /*
@@ -225,22 +228,25 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
          */
         final long checkpointAddr = btree.writeCheckpoint();
         
-        /*
-         * Note: We pass in the name of the new index partition (this has not
-         * been registered yet so naming this as a resource for the lock manager
-         * is a bit paranoid) and the names of the old index partitions. We will
-         * need an exclusive lock on all of those resources so that we can
-         * register the former and drop the latter in an atomic operation. We
-         * will update the metadata index within that atomic operation so that
-         * the total change over is atomic.
-         */
         final JoinResult result = new JoinResult( DataService.getIndexPartitionName(scaleOutIndexName,
                 partitionId), newMetadata, checkpointAddr, resources );
         
         {
             
-            // The array of index names on which we will need an exclusive
-            // lock.
+            /*
+             * The array of index names on which we will need an exclusive lock.
+             * 
+             * Note: We pass in the name of the new index partition (while this
+             * has not been registered yet we MUST name it as a resource for the
+             * lock manager to ensure that we are holding a lock on it once it
+             * IS registered otherwise a task could see the MDI update and
+             * obtain concurrent access to the unisolated index) and the names
+             * of the old index partitions. We will need an exclusive lock on
+             * all of those resources so that we can register the former and
+             * drop the latter in an atomic operation. We will update the
+             * metadata index within that atomic operation so that the total
+             * change over is atomic.
+             */
             final String[] names2 = new String[result.oldnames.length + 1];
 
             names2[0] = result.name;
@@ -346,6 +352,9 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
         @Override
         protected Object doTask() throws Exception {
        
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
             /*
              * Load the btree from the live journal that already contains all
              * data from the source index partitions to the merge as of the

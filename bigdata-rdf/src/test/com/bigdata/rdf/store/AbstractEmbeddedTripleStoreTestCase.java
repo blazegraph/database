@@ -70,7 +70,7 @@ public class AbstractEmbeddedTripleStoreTestCase extends
         super.setUp();
 
         // connect to the database.
-        store = new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
+        store = new ScaleOutTripleStore(client, "test_", ITx.UNISOLATED);
         
     }
 

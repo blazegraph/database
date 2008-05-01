@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.mdi;
 
+import java.io.File;
 import java.util.UUID;
 
 import com.bigdata.btree.IndexSegment;
@@ -59,8 +60,13 @@ public class SegmentMetadata extends AbstractResourceMetadata {
 
     }
 
-    public SegmentMetadata(String filename, long nbytes, UUID uuid,
-            long commitTime) {
+    public SegmentMetadata(File file, long nbytes, UUID uuid, long commitTime) {
+        
+        this(file.getName(),nbytes,uuid,commitTime);
+        
+    }
+
+    SegmentMetadata(String filename, long nbytes, UUID uuid, long commitTime) {
 
         super(filename, nbytes, uuid, commitTime);
 

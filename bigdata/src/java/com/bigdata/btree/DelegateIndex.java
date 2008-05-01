@@ -30,6 +30,7 @@ package com.bigdata.btree;
 
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 
 /**
@@ -74,8 +75,8 @@ public class DelegateIndex implements IIndex {
         return delegate.getResourceMetadata();
     }
 
-    public String getStatistics() {
-        return delegate.getStatistics();
+    public ICounterSet getCounters() {
+        return delegate.getCounters();
     }
 
     public byte[] insert(byte[] key, byte[] value) {

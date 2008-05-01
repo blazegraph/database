@@ -71,7 +71,7 @@ public class JournalMetadata extends AbstractResourceMetadata {
         if (file == null)
             return "";
         
-        return file.toString();
+        return file.getName();//toString();
                 
     }
     
@@ -84,13 +84,19 @@ public class JournalMetadata extends AbstractResourceMetadata {
 
     public JournalMetadata(AbstractJournal journal) {
 
-        super(getFileString(journal), journal.getBufferStrategy().getExtent(),
+        this(getFileString(journal), journal.getBufferStrategy().getExtent(),
                 journal.getRootBlockView().getUUID(), journal
                         .getRootBlockView().getCreateTime());
 
     }
 
-    public JournalMetadata(String file, long nbytes, UUID uuid, long commitTime) {
+    public JournalMetadata(File file, long nbytes, UUID uuid, long commitTime) {
+        
+        this(file.getName(),nbytes,uuid,commitTime);
+        
+    }
+
+    JournalMetadata(String file, long nbytes, UUID uuid, long commitTime) {
 
         super(file, nbytes, uuid, commitTime);
 

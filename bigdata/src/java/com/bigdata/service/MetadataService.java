@@ -1080,7 +1080,7 @@ abstract public class MetadataService extends DataService implements
                          /*
                           * History.
                           */
-                         "create() "
+                         "createScaleOutIndex(name="+scaleOutIndexName+") "
                     ));
                 
                 dataServices[i].registerIndex(DataService

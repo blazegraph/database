@@ -601,9 +601,9 @@ final public class MyBTree extends AbstractBTree {
             
             _nativeBTreeId = btree.writeCheckpoint();
             
-            log.info("Saving BTree: " + this + ", old address="
+            if(INFO) log.info("Saving BTree: " + this + ", old address="
                     + oldAddress + ", new address=" + _nativeBTreeId + "\n"
-                    + btree.getStatistics());
+                    + btree.getCounters().asXML(null/*filter*/));
 
         }
         

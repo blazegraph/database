@@ -677,7 +677,7 @@ public class DefaultSplitHandler implements ISplitHandler {
                      */
                     null,//
                     oldpmd.getHistory()+
-                    "split("+oldpmd.getPartitionId()+") "
+                    "chooseSplitPoint(oldPartitionId="+oldpmd.getPartitionId()+",newPartitionId="+partitionId+") "
                     );
 
             splits[i] = new Split(pmd, fromIndex, toIndex);

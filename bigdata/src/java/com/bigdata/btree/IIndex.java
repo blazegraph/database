@@ -27,6 +27,7 @@ import java.io.Serializable;
 
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
 
@@ -61,10 +62,17 @@ public interface IIndex extends ISimpleBTree {
      */
     public ICounter getCounter();
     
+//    /**
+//     * Interesting statistics about the index.
+//     * 
+//     * @deprecated by #getCounters().
+//     */
+//    public String getStatistics();
+    
     /**
      * Interesting statistics about the index.
      */
-    public String getStatistics();
+    public ICounterSet getCounters();
     
     /**
      * Submits an index procedure that operations on a single key to the

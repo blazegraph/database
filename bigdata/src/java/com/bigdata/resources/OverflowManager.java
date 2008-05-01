@@ -43,7 +43,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -995,7 +994,7 @@ abstract public class OverflowManager extends IndexManager {
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
                                     oldpmd.getHistory()+
-                                    "copy(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+") "
+                                    "copy(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+",counter="+oldBTree.getCounter().get()+") "
                             ));
 
                 } else {
@@ -1036,7 +1035,7 @@ abstract public class OverflowManager extends IndexManager {
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
                                     oldpmd.getHistory()+
-                                    "overflow(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+") "
+                                    "overflow(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+",counter="+oldBTree.getCounter().get()+") "
                             ));
 
                 }
@@ -1087,7 +1086,11 @@ abstract public class OverflowManager extends IndexManager {
                     final BTree newBTree = BTree.load(newJournal,
                             overflowCheckpoint.getCheckpointAddr());
 
-                    assert newBTree.getCounter().get() == oldCounter;
+                    final long newCounter = newBTree.getCounter().get();
+                    
+                    assert newCounter == oldCounter : "expected oldCounter="
+                            + oldCounter + ", but found newCounter="
+                            + newCounter;
                     
                     if(copyIndex) {
                         

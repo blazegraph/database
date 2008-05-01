@@ -47,7 +47,6 @@ import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
@@ -68,9 +67,11 @@ import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -346,88 +347,93 @@ public class ClientIndexView implements IClientIndex {
     }
 
     /**
-     * @todo Since scale-out indices can be very large this method should report
-     *       only on index partitions that are in the client's cache, hot on the
-     *       data service, etc. It does not attempt to re-locate index
-     *       partitions that have been split, joined, or moved.
-     * 
-     * @todo update javadoc, convert to XML counter representation.
-     * 
-     * @todo report on both the metadata index and the individual index
-     *       partitions. If we parallelize the index partition reporting then we
-     *       need to use a thread-safe {@link StringBuffer} rather than a
-     *       {@link StringBuilder}.
+     * FIXME Since scale-out indices can be very large this method should report
+     * only on aspects of the clients access to the scale-out index rather than
+     * attempting to aggregate the data from the various index partitions.
      */
-    public String getStatistics() {
+    synchronized public ICounterSet getCounters() {
 
-        StringBuilder sb = new StringBuilder();
+        if (counterSet == null) {
 
-        sb.append("scale-out index: name="+name);
-
-        /*
-         * Statistics for the metadata index.
-         */
-        try {
+            counterSet = new CounterSet();
             
-            String _name = MetadataService.getMetadataIndexName(name);
-            
-            sb.append("\n" + _name + " : "
-                    + getMetadataService().getStatistics(_name));
+            counterSet.addCounter("name", new OneShotInstrument<String>(name));
 
-        } catch (Exception ex) {
+            counterSet.addCounter("timestamp", new OneShotInstrument<Long>(timestamp));
 
-            throw new RuntimeException(ex);
-
-        }
-
-        /*
-         * Statistics for the index partitions (at least those that are cached
-         * by the client).
-         */
-        {
-            
-            final IMetadataIndex mdi = getMetadataIndex();
-            
-            final ITupleIterator itr = mdi.rangeIterator(null, null);
-            
-            while(itr.hasNext()) {
-                
-                final ITuple tuple = itr.next();
-                
-                final PartitionLocator pmd = (PartitionLocator) SerializerUtil.deserialize(tuple.getValue());
-                
-                final String _name = DataService.getIndexPartitionName(name, pmd.getPartitionId());
-                
-                sb.append("\npartition: " + _name);
-                sb.append("\ndataServices: " + Arrays.toString(pmd.getDataServices()));
-                
-                String _stats;
-                try {
-                    
-                    _stats = getDataService(pmd).getStatistics( _name);
-                
-                } catch (NoSuchIndexException e) {
-                    
-                    log.info("Index not found on data service, presumed moved: "+_name);
-
-                    continue;
-                    
-                } catch (Exception e) {
-                    
-                    _stats = "Could not obtain index partition statistics: "+e.toString();
-                    
-                }
-                
-                sb.append( "\nindexStats: "+_stats);
-                
-            }
-            
         }
         
-        return sb.toString();
+        return counterSet;
+        
+//        StringBuilder sb = new StringBuilder();
+//
+//        sb.append("scale-out index: name="+name);
+//
+//        /*
+//         * Statistics for the metadata index.
+//         */
+//        try {
+//            
+//            String _name = MetadataService.getMetadataIndexName(name);
+//            
+//            sb.append("\n" + _name + " : "
+//                    + getMetadataService().getStatistics(_name));
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        /*
+//         * Statistics for the index partitions (at least those that are cached
+//         * by the client).
+//         */
+//        {
+//            
+//            final IMetadataIndex mdi = getMetadataIndex();
+//            
+//            final ITupleIterator itr = mdi.rangeIterator(null, null);
+//            
+//            while(itr.hasNext()) {
+//                
+//                final ITuple tuple = itr.next();
+//                
+//                final PartitionLocator pmd = (PartitionLocator) SerializerUtil.deserialize(tuple.getValue());
+//                
+//                final String _name = DataService.getIndexPartitionName(name, pmd.getPartitionId());
+//                
+//                sb.append("\npartition: " + _name);
+//                sb.append("\ndataServices: " + Arrays.toString(pmd.getDataServices()));
+//                
+//                String _stats;
+//                try {
+//                    
+//                    _stats = getDataService(pmd).getStatistics( _name);
+//                
+//                } catch (NoSuchIndexException e) {
+//                    
+//                    log.info("Index not found on data service, presumed moved: "+_name);
+//
+//                    continue;
+//                    
+//                } catch (Exception e) {
+//                    
+//                    _stats = "Could not obtain index partition statistics: "+e.toString();
+//                    
+//                }
+//                
+//                sb.append( "\nindexStats: "+_stats);
+//                
+//            }
+//            
+//        }
+//        
+//        return sb.toString();
         
     }
-
+    private CounterSet counterSet;
+    
     public ICounter getCounter() {
         
         throw new UnsupportedOperationException();

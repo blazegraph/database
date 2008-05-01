@@ -35,6 +35,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -115,7 +116,7 @@ public class ConcurrentDataLoader {
     /**
      * Thread pool provinding concurrent load services.
      */
-    final ThreadPoolExecutor loadService;
+    ThreadPoolExecutor loadService;
 
     /**
      * The {@link Future}s from the {@link LoadTask}s.
@@ -154,6 +155,12 @@ public class ConcurrentDataLoader {
      */
     final boolean autoFlush;
 
+//    /**
+//     * When <code>true</code> the KB is validated against the source files
+//     * instead of loading the source files into the KB.
+//     */
+//    final boolean validate;
+    
     final int nclients;
     
     final int clientNum;
@@ -287,6 +294,7 @@ public class ConcurrentDataLoader {
     public ConcurrentDataLoader(AbstractTripleStore db, int nthreads,
             int bufferCapacity, File file, FilenameFilter filter,
             String baseURL, RDFFormat fallback, boolean autoFlush,
+//            boolean validate, 
             int nclients, int clientNum) {
 
         this.db = db;
@@ -300,6 +308,8 @@ public class ConcurrentDataLoader {
         this.fallback = fallback;
 
         this.autoFlush = autoFlush;
+        
+//        this.validate = validate;
 
         this.nclients = nclients;
         
@@ -526,6 +536,14 @@ public class ConcurrentDataLoader {
         }
 
         /*
+         * #Of tasks that complete, succeed, and fail respectively for both the
+         * load and the optional flush stages.
+         */
+        int ndone = 0;
+        int nok = 0;
+        int nerr = 0;
+
+        /*
          * Flush all statement buffers through to the database.
          */
         if (!autoFlush) {
@@ -539,42 +557,59 @@ public class ConcurrentDataLoader {
             StatementBuffer[] buffers = this.buffers.toArray(new StatementBuffer[nflush]);
 
             log.info("Flushing "+nflush+" buffers to the database");
-            
-            final ThreadPoolExecutor tmpService = (ThreadPoolExecutor) Executors
-                    .newFixedThreadPool(Math.min(nclients, nflush), DaemonThreadFactory
+
+            // Note: create a new service for running the flush tasks.
+            loadService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                    Math.min(nclients, nflush), DaemonThreadFactory
                             .defaultThreadFactory());
 
             final List<Future> futures = new ArrayList<Future>(nflush);
             
+            int i = 0;
             for(StatementBuffer buffer : buffers) {
                 
                 final StatementBuffer b = buffer;
                 
-                futures.add(tmpService.submit(new Runnable() {
+                final int index = i++;
+                
+                final int size = b.size();
+                
+                if(size==0) continue;
+                
+                futures.add(loadService.submit(new Runnable() {
+                    // Note: shows up if you dump the queue contents.
+                    public String toString() {
+                        return "[" + index + "] : flushing " + size
+                                + " statements";
+                    }
+
+                    // flush the statement buffer when the task runs.
                     public void run() {
-                        // flush the statement buffer when the task runs.
-                        log.info("Flushing "+b.size()+" statements to the database.");
+                        log.info("[" + index + "] : Flushing " + size
+                                + " statements to the database.");
                         final long begin = System.currentTimeMillis();
                         b.flush();
                         final long elapsed = System.currentTimeMillis() - begin;
-                        log.info("Flushed "+b.size()+" statements to the database in "+elapsed+"ms");
+                        log.info("[" + index + "] : Flushed " + size
+                                + " statements to the database in " + elapsed
+                                + "ms");
                     }
                 }));
                 
             }
 
             // normal shutdown.
-            tmpService.shutdown();
+            loadService.shutdown();
             
             // wait for the flush tasks to complete.
             while (true) {
 
                 log.info("Awaiting flush task termination: completed="
-                        + tmpService.getCompletedTaskCount() + ", active="
-                        + tmpService.getActiveCount()+ ", remaining="
-                        + tmpService.getQueue().size());
+                        + loadService.getCompletedTaskCount() + ", active="
+                        + loadService.getActiveCount()+ ", remaining="
+                        + loadService.getQueue().size());
 
-                if (tmpService.awaitTermination(20L/* secs */,
+                if (loadService.awaitTermination(20L/* secs */,
                         TimeUnit.SECONDS)) {
 
                     log.info("Flush tasks terminated normally.");
@@ -582,15 +617,18 @@ public class ConcurrentDataLoader {
                     break;
 
                 }
+                
+                log.info("Queue:\n"
+                        + Arrays.toString(loadService.getQueue().toArray()));
 
             }
 
             /*
              * Look for errors in the flush tasks.
              */
-            int ndone = 0;
-            int nok = 0;
-            int nerr = 0;
+//            int ndone = 0;
+//            int nok = 0;
+//            int nerr = 0;
 
             for (Future f : futures) {
 
@@ -599,6 +637,7 @@ public class ConcurrentDataLoader {
                     ndone++;
 
                     try {
+                        
                         f.get();
 
                         nok++;
@@ -619,7 +658,7 @@ public class ConcurrentDataLoader {
 
             log.info("Finished flush tasks: #flushed=" + nflush
                     + " buffers in " + elapsedFlush + " ms (#threads=" + nthreads
-                    + ", largestPoolSize=" + tmpService.getLargestPoolSize()
+                    + ", largestPoolSize=" + loadService.getLargestPoolSize()
                     + ", bufferCapacity=" + bufferCapacity + ", #done=" + ndone
                     + ", #ok=" + nok + ", #err=" + nerr + ")");
         
@@ -644,11 +683,12 @@ public class ConcurrentDataLoader {
 
         /*
          * Examine the futures from the load tasks and report any errors.
+         * 
+         * @todo The futures for the load tasks will grow without bound for very
+         * large data loads. We should really consume those futures using a
+         * queue to keep down the size of that data structure.
          */
         {
-            int ndone = 0;
-            int nok = 0;
-            int nerr = 0;
 
             for (Future f : futures) {
 
@@ -997,5 +1037,5 @@ public class ConcurrentDataLoader {
         }
 
     };
-
+    
 }
