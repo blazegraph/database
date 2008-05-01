@@ -1268,16 +1268,20 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             
         }
         
-        public long get() {
+        /**
+         * Range checks the source counter (it must fit in the lower 32-bit
+         * word) and then jambs the partition identifier into the high word.
+         * 
+         * @param tmp
+         *            The source counter value.
+         * 
+         * @return The partition-specific counter value.
+         * 
+         * @throws RuntimeException
+         *             if the source counter has overflowed.
+         */
+        private long wrap(long tmp) {
             
-            return src.get();
-            
-        }
-
-        public long incrementAndGet() {
-            
-            final long tmp = src.incrementAndGet();
-
             if (tmp > Integer.MAX_VALUE) {
 
                 throw new RuntimeException("Counter overflow");
@@ -1287,9 +1291,25 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             /*
              * Place the partition identifier into the high int32 word and place
              * the truncated counter value into the low int32 word.
+             * 
+             * Note: You MUST case [partitionId] to a long or left-shifting
+             * 32-bits will always clear it to zero.
              */
-            return partitionId << 32 | (int) tmp;
             
+            return (((long)partitionId) << 32) | (int) tmp;
+            
+        }
+        
+        public long get() {
+            
+            return wrap( src.get() );
+            
+        }
+
+        public long incrementAndGet() {
+            
+            return wrap( src.incrementAndGet() );
+
         }
         
     }

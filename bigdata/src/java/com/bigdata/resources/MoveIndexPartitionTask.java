@@ -124,6 +124,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
     @Override
     protected Object doTask() throws Exception {
 
+        if (resourceManager.isOverflowAllowed())
+            throw new IllegalStateException();
+
         // view of the source index partition.
         final IIndex src = getIndex(getOnlyResource());
         
@@ -463,6 +466,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
          */
         @Override
         protected Object doTask() throws Exception {
+
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
 
             final IDataService targetDataService = resourceManager
                     .getDataService(moveResult.targetDataServiceUUID);

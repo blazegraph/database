@@ -744,7 +744,10 @@ abstract public class AbstractTripleStore implements ITripleStore,
 //                20   // sampleRate
 //                );
         
-        if (name.contains(name_id2Term)) {
+      if (name.contains(name_term2Id)) // causes a problem 
+//      if (name.contains(name_id2Term)) // no problem.
+//        if(!name.contains(name_term2Id)) // no problem.
+            {
             
             // An override that makes a split very likely.
             final ISplitHandler splitHandler = new DefaultSplitHandler(
@@ -2652,6 +2655,10 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
     /**
      * Returns some usage information for the database.
+     * 
+     * @todo either convert to a full XML representation or get rid of this in
+     *       favor of the counters exposed by the LBS which also provide
+     *       historical and post-mortem data.
      */
     public String usage() {
 
@@ -2694,7 +2701,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
-        return name + " : " + ndx.getStatistics();
+        return name + " : " + ndx.getCounters().asXML(null/*filter*/);
 
     }
 

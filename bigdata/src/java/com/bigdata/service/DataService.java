@@ -217,6 +217,22 @@ abstract public class DataService extends AbstractService
 //         */
 //        // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
 //        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
+
+        /**
+         * Boolean option for the collection of statistics from the underlying
+         * operating system (default
+         * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
+         * 
+         * @see AbstractStatisticsCollector#newInstance(Properties)
+         * 
+         * @todo add option (default true) to run a local httpd service on a
+         *       random port and then advertise that port to the LBS via a
+         *       one-shot counter. You can then click through to the ds local
+         *       httpd service to see the live counters.
+         */
+        String COLLECT_PLATFORM_STATISTICS = "collectPlatformStatistics";
+
+        String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true"; 
         
         /**
          * The delay between scheduled invocations of the {@link ReportTask} (60
@@ -234,27 +250,11 @@ abstract public class DataService extends AbstractService
     }
     
     /**
-     * Note: U means {@link ITx#UNISOLATED}, RC means
-     * {@link ITx#READ_COMMITTED}, Tx means a fully isolated read or read write
-     * transaction, and HR means a historical read without isolation (no read
-     * locks and no coordination with a centralized time service).
+     * @todo improve reporting here and for block write as well (goes through
+     *       unisolated tasks at the present).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo tx commit/abort requests.
-     * 
-     * @todo counters from the {@link ConcurrencyManager}.
-     *       <p>
-     *       include #of tasks submitted, #of tasks failed, #of tasks suceeded,
-     *       min, max, and average latency to execution for Unisolated and all
-     *       other classes, average task duration for all timestamp classes,
-     *       min, max, and avg latency from work done to commit. commit
-     *       counters, etc.
-     * 
-     * @todo counters from the {@link ILocalTransactionManager}.
-     * 
-     * @todo counters from {@link DiskOnlyStrategy}
      */
     protected static class ReadBlockCounters {
         
@@ -285,6 +285,13 @@ abstract public class DataService extends AbstractService
      */
     protected AbstractStatisticsCollector statisticsCollector;
 
+    /**
+     * true if we will collect O/S statistics.
+     * 
+     * @see Options#COLLECT_PLATFORM_STATISTICS
+     */
+    final boolean collectPlatformStatistics;
+    
 //    /**
 //     * Runs a {@link StatusTask} printing out periodic service status
 //     * information (counters).
@@ -466,6 +473,17 @@ abstract public class DataService extends AbstractService
             ((ResourceManager) resourceManager)
                     .setConcurrencyManager(concurrencyManager);
 
+        }
+
+        {
+
+            collectPlatformStatistics = Boolean.parseBoolean(properties
+                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+
+            log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+                    + collectPlatformStatistics);
+            
         }
 
         /*
@@ -857,11 +875,7 @@ abstract public class DataService extends AbstractService
      */
     public String getStatistics() throws IOException {
         
-        StringWriter w = new StringWriter();
-        
-        getCounters().asXML(w, null/*filter*/);
-        
-        return w.toString();
+        return getCounters().asXML(null/*filter*/);
         
     }
 
@@ -1073,7 +1087,7 @@ abstract public class DataService extends AbstractService
             /*
              * Start collecting performance counters from the OS.
              */
-            {
+            if(collectPlatformStatistics) {
 
                 log.info("Service UUID was assigned - will start performance counter collection: uuid="
                                 + uuid);
@@ -1090,30 +1104,37 @@ abstract public class DataService extends AbstractService
 
                 statisticsCollector.start();
                 
+                /*
+                 * Attach the counters that will be reported by the statistics
+                 * collector service.
+                 */
+                ((CounterSet)getCounters()).attach(statisticsCollector.getCounters());
+
             }
             
-            
             /*
-             * Attach the counters that will be reported by the statistics
-             * collector service.
+             * Start task to report service and platform counters to the load
+             * balancer.
              */
-            ((CounterSet)getCounters()).attach(statisticsCollector.getCounters());
-
-            final long delay = Long.parseLong(properties.getProperty(
-                    Options.REPORT_DELAY,
-                    Options.DEFAULT_REPORT_DELAY));
-
-            log.info(Options.REPORT_DELAY + "=" + delay);
+            {
             
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
+                final long delay = Long.parseLong(properties.getProperty(
+                        Options.REPORT_DELAY, Options.DEFAULT_REPORT_DELAY));
 
-            // wait the normal amount of time before reporting in the first time.
-            final long initialDelay = delay;
+                log.info(Options.REPORT_DELAY + "=" + delay);
+
+                final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+                // wait the normal amount of time before reporting in the first
+                // time.
+                final long initialDelay = delay;
+
+                reportService.scheduleWithFixedDelay(new ReportTask(),
+                        initialDelay, delay, unit);
+
+                log.warn("Started ReportTask.");
             
-            reportService.scheduleWithFixedDelay(new ReportTask(),
-                    initialDelay, delay, unit);
-            
-            log.warn("Started ReportTask.");
+            }
             
             return true;
             
@@ -1349,54 +1370,54 @@ abstract public class DataService extends AbstractService
         
     }
 
-    /**
-     * This returns the counters for the index as reported by
-     * {@link ConcurrencyManager#getCounters(String)}.
-     * 
-     * FIXME Those counters are reset by each journal overflow event. It would
-     * be very nice to be able to report the counters over the life of an index
-     * partition (at least since the data service was started). This would
-     * require noticing when the index partition was dropped. Also, the only
-     * counters that we keep from task to task are the counters for the
-     * {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED} views of named
-     * indices. We should be able to report counters/costs for historical reads
-     * and transactions as well.
-     * 
-     * FIXME replace with serialized {@link ICounterSet} XML.
-     */
-    public String getStatistics(String name) throws IOException {
-
-        setupLoggingContext();
-        
-        try {
-
-            Counters counters = concurrencyManager.getCounters(name);
-            
-            if(counters == null) {
-                
-                /*
-                 * Note: A null return above is not an indication that the named
-                 * index does not exist, just an indication that there are no
-                 * counters for that index. This will happen if noone has
-                 * written on the index.
-                 */
-                return "No data for "+name;
-                
-//                throw new NoSuchIndexException(name);
-                
-            }
-            
-            String statistics = counters.toString();
-            
-            return statistics;
-            
-        } finally {
-            
-            clearLoggingContext();
-            
-        }
-        
-    }
+//    /**
+//     * This returns the counters for the index as reported by
+//     * {@link ConcurrencyManager#getCounters(String)}.
+//     * 
+//     * FIXME Those counters are reset by each journal overflow event. It would
+//     * be very nice to be able to report the counters over the life of an index
+//     * partition (at least since the data service was started). This would
+//     * require noticing when the index partition was dropped. Also, the only
+//     * counters that we keep from task to task are the counters for the
+//     * {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED} views of named
+//     * indices. We should be able to report counters/costs for historical reads
+//     * and transactions as well.
+//     * 
+//     * FIXME replace with serialized {@link ICounterSet} XML.
+//     */
+//    public String getStatistics(String name) throws IOException {
+//
+//        setupLoggingContext();
+//        
+//        try {
+//
+//            Counters counters = concurrencyManager.getCounters(name);
+//            
+//            if(counters == null) {
+//                
+//                /*
+//                 * Note: A null return above is not an indication that the named
+//                 * index does not exist, just an indication that there are no
+//                 * counters for that index. This will happen if noone has
+//                 * written on the index.
+//                 */
+//                return "No data for "+name;
+//                
+////                throw new NoSuchIndexException(name);
+//                
+//            }
+//            
+//            String statistics = counters.toString();
+//            
+//            return statistics;
+//            
+//        } finally {
+//            
+//            clearLoggingContext();
+//            
+//        }
+//        
+//    }
     
     /**
      * Note: This chooses {@link ITx#READ_COMMITTED} if the the index has

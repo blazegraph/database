@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.ITx;
 import com.bigdata.resources.StaleLocatorException;
 
@@ -268,6 +269,22 @@ public interface IBigdataClient {
          */
         String DEFAULT_CLIENT_INDEX_CACHE_CAPACITY = "20";
         
+        /**
+         * Boolean option for the collection of statistics from the underlying
+         * operating system (default
+         * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
+         * 
+         * @see AbstractStatisticsCollector#newInstance(Properties)
+         * 
+         * @todo add option (default true) to run a local httpd service on a
+         *       random port and then advertise that port to the LBS via a
+         *       one-shot counter. You can then click through to the ds local
+         *       httpd service to see the live counters.
+         */
+        String COLLECT_PLATFORM_STATISTICS = "collectPlatformStatistics";
+
+        String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true"; 
+
     };
 
 }

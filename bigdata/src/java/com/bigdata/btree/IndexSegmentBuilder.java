@@ -1529,7 +1529,7 @@ public class IndexSegmentBuilder {
                 log.info(md.toString());
 
             // save the index segment resource description for the caller.
-            this.segmentMetadata = new SegmentMetadata(outFile.toString(), out
+            this.segmentMetadata = new SegmentMetadata(outFile, out
                     .length(), segmentUUID, commitTime);
             
             return md;

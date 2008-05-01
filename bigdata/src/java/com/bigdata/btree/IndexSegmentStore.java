@@ -37,12 +37,13 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.RootBlockException;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.MetadataService;
 
@@ -328,7 +329,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
         if(!open) reopen();
 
-        return new SegmentMetadata(file.toString(), checkpoint.length,
+        return new SegmentMetadata(file, checkpoint.length,
                 checkpoint.segmentUUID, checkpoint.commitTime);
         
     }
@@ -603,6 +604,77 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         if(root==null) {
         
             root = new CounterSet();
+            
+            root.addCounter("file", new OneShotInstrument<String>(file
+                    .toString()));
+
+            // checkpoint
+            {
+                final CounterSet tmp = root.makePath("checkpoint");
+                
+                tmp.addCounter("segment UUID", new Instrument<String>() {
+                    protected void sample() {
+                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
+                        if (checkpoint != null) {
+                            setValue(checkpoint.segmentUUID.toString());
+                        }
+                    }
+                });
+
+                // length in bytes of the file.
+                tmp.addCounter("length", new Instrument<Long>() {
+                    protected void sample() {
+                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
+                        if (checkpoint != null) {
+                            setValue(checkpoint.length);
+                        }
+                    }
+                });
+
+                tmp.addCounter("entries", new Instrument<Integer>() {
+                    protected void sample() {
+                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
+                        if (checkpoint != null) {
+                            setValue(checkpoint.nentries);
+                        }
+                    }
+                });
+
+                tmp.addCounter("height", new Instrument<Integer>() {
+                    protected void sample() {
+                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
+                        if (checkpoint != null) {
+                            setValue(checkpoint.height);
+                        }
+                    }
+                });
+
+            }
+            
+            // metadata
+            {
+                
+                final CounterSet tmp = root.makePath("metadata");
+                
+                tmp.addCounter("name", new Instrument<String>() {
+                    protected void sample() {
+                        final IndexMetadata md = metadata;
+                        if (md != null) {
+                            setValue(md.getName());
+                        }
+                    }
+                });
+
+                tmp.addCounter("index UUID", new Instrument<String>() {
+                    protected void sample() {
+                        final IndexMetadata md = metadata;
+                        if (md != null) {
+                            setValue(md.getIndexUUID().toString());
+                        }
+                    }
+                });
+                
+            }
             
         }
         

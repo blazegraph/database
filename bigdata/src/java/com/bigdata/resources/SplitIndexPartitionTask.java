@@ -431,6 +431,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
         @Override
         protected Object doTask() throws Exception {
 
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
             final String name = getOnlyResource();
             
             final IIndex src = getIndex(name);
@@ -578,6 +581,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
         @Override
         protected Object doTask() throws Exception {
 
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
             // The name of the scale-out index.
             final String scaleOutIndexName = splitResult.indexMetadata.getName();
             
@@ -596,6 +602,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
              */
             final BTree src = (BTree) resourceManager.getIndexOnStore(name,
                     ITx.UNISOLATED, resourceManager.getLiveJournal()); 
+            
+            // the value of the counter on the source BTree.
+            final long oldCounter = src.getCounter().get();
             
             /*
              * Locators for the new index partitions.
@@ -617,6 +626,12 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
 
                 assert pmd.getResources() == null : "Not expecting resources for index segment: "
                         + pmd;
+
+                // the new partition identifier.
+                final int partitionId = pmd.getPartitionId();
+                
+                // name of the new index partition.
+                final String name2 = DataService.getIndexPartitionName(scaleOutIndexName, partitionId);
                 
                 /*
                  * form locator for the new index partition for this split..
@@ -664,17 +679,32 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                         /* 
                          * Note: history is record of the split.
                          */
-                        pmd.getHistory()
+                        pmd.getHistory()+
+                        "registerAfterSplit(name="+name2+",partitionId="+pmd.getPartitionId()+") "
                         ));
 
-                // create new btree.
+                /*
+                 * create new btree.
+                 * 
+                 * Note: the lower 32-bits of the counter will be zero. The high
+                 * 32-bits will be the partition identifier assigned to the new
+                 * index partition.
+                 */
                 final BTree btree = BTree.create(resourceManager.getLiveJournal(), md);
 
-                // the new partition identifier.
-                final int partitionId = pmd.getPartitionId();
+                // make sure the partition identifier was asserted.
+                assert partitionId == btree.getIndexMetadata().getPartitionMetadata().getPartitionId();
                 
-                // name of the new index partition.
-                final String name2 = DataService.getIndexPartitionName(scaleOutIndexName, partitionId);
+                final long newCounter = btree.getCounter().get();
+                
+                /*
+                 * Note: this is true because partition identifiers always
+                 * increase and the partition identifier is placed into the high
+                 * word of the counter value for an index partition.
+                 */
+                
+                assert newCounter > oldCounter : "newCounter=" + newCounter
+                        + " not GT oldCounter=" + oldCounter;
                 
                 // lower bound (inclusive) for copy.
                 final byte[] fromKey = pmd.getLeftSeparatorKey();

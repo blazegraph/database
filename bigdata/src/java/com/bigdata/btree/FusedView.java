@@ -35,6 +35,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
@@ -240,21 +242,30 @@ public class FusedView implements IIndex {
         
     }
     
-    final public String getStatistics() {
+    synchronized final public ICounterSet getCounters() {
 
-        StringBuilder sb = new StringBuilder();
+        if (counterSet == null) {
 
-        sb.append(getClass().getSimpleName());
+            counterSet = new CounterSet();
+
+            for(int i=0; i<srcs.length; i++) {
         
-        for(AbstractBTree ndx : srcs ) {
-        
-            sb.append("\n"+ndx.getStatistics());
+                /*
+                 * @todo might have to clone the counters from the index since
+                 * they could already have another parent.
+                 */
+                
+                counterSet.makePath("view[" + i + "]").attach(
+                        srcs[i].getCounters());
             
+            }
+
         }
         
-        return sb.toString();
+        return counterSet;
         
     }
+    private CounterSet counterSet;
 
     /**
      * The counter for the first source.

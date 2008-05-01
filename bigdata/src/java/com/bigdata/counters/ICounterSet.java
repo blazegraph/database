@@ -125,6 +125,17 @@ public interface ICounterSet extends ICounterNode {
     public void asXML(Writer w, Pattern filter) throws IOException;
 
     /**
+     * Writes out the {@link ICounterSet} as XML on a string and returns that
+     * string.
+     * 
+     * @param filter
+     *            An optional filter.
+     * 
+     * @throws IOException
+     */
+    public String asXML(Pattern filter);
+    
+    /**
      * A factory for {@link IInstrument}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

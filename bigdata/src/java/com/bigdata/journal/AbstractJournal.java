@@ -39,7 +39,6 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -55,6 +54,7 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.LazyEvaluationCounterSet;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
@@ -1170,53 +1170,53 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         
     }
     
-    /**
-     * Statistics describing the journal including IO, registered indices, etc.
-     * 
-     * @todo Since this reports on the registered indices as of the current
-     *       commit record it presents data which is not available via
-     *       {@link #getCounters()}. Is there any meaningful way to add that
-     *       data to {@link #getCounters()} since it is structurally dynamic?
-     * 
-     * @todo make this 100% XML by changing {@link BTree} to report counters as
-     *       XML and placing the index counters under a path corresponding to
-     *       the index name. indices are added and dropped, but the counter
-     *       reporting should probably be "at the instant" rather than modifying
-     *       the defined counter hierarchy as those indices are created and
-     *       destroyed just to keep down the memory profile if there happens to
-     *       be a large #of indices. the internal indices (name2addr and the
-     *       commit record index) could also be reported on in this manner.
-     */
-    public String getStatistics() {
-
-        StringBuilder sb = new StringBuilder();
-
-        sb.append(_bufferStrategy.getCounters().toString());
-        
-        /*
-         * Report on the registered indices.
-         */
-        synchronized(name2Addr) {
-            
-            ITupleIterator itr = name2Addr.entryIterator();
-
-            while (itr.hasNext()) {
-
-                ITuple tuple = itr.next();
-                
-                Entry entry = EntrySerializer.INSTANCE.deserialize(tuple.getValueStream());
-                
-                IIndex ndx = name2Addr.get(entry.name);
-                
-                sb.append("\nindex: name="+entry.name+" : "+ndx.getStatistics());
-                
-            }
-            
-        }
-
-        return sb.toString();
-        
-    }
+//    /**
+//     * Statistics describing the journal including IO, registered indices, etc.
+//     * 
+//     * @todo Since this reports on the registered indices as of the current
+//     *       commit record it presents data which is not available via
+//     *       {@link #getCounters()}. Is there any meaningful way to add that
+//     *       data to {@link #getCounters()} since it is structurally dynamic?
+//     * 
+//     * @todo make this 100% XML by changing {@link BTree} to report counters as
+//     *       XML and placing the index counters under a path corresponding to
+//     *       the index name. indices are added and dropped, but the counter
+//     *       reporting should probably be "at the instant" rather than modifying
+//     *       the defined counter hierarchy as those indices are created and
+//     *       destroyed just to keep down the memory profile if there happens to
+//     *       be a large #of indices. the internal indices (name2addr and the
+//     *       commit record index) could also be reported on in this manner.
+//     */
+//    public String getStatistics() {
+//
+//        StringBuilder sb = new StringBuilder();
+//
+//        sb.append(_bufferStrategy.getCounters().toString());
+//        
+//        /*
+//         * Report on the registered indices.
+//         */
+//        synchronized(name2Addr) {
+//            
+//            ITupleIterator itr = name2Addr.entryIterator();
+//
+//            while (itr.hasNext()) {
+//
+//                ITuple tuple = itr.next();
+//                
+//                Entry entry = EntrySerializer.INSTANCE.deserialize(tuple.getValueStream());
+//                
+//                IIndex ndx = name2Addr.get(entry.name);
+//                
+//                sb.append("\nindex: name="+entry.name+" : "+ndx.getStatistics());
+//                
+//            }
+//            
+//        }
+//
+//        return sb.toString();
+//        
+//    }
     
     /**
      * Return counters reporting on various aspects of the journal.
@@ -1233,8 +1233,61 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     setValue(file == null ? "N/A" : file.getAbsolutePath());
                 }
             });
-            
+
             counters.attach(_bufferStrategy.getCounters());
+
+            /*
+             * Report on the registered indices (read-committed view).
+             * 
+             * Note: this always re-generates the counter set for the indices
+             * since they can be added and dropped at any time.
+             * 
+             * FIXME Lazy evaluation is not working yet. attach() assumes that
+             * it is attaching a CounterSet and tries to copy the children.
+             */
+            if(false)
+            counters.makePath("indices").attach(new LazyEvaluationCounterSet(1000/*ms*/){
+                
+                public CounterSet refreshCounterSet() {
+
+                    log.info("Refreshing index counter set.");
+                    
+                    final CounterSet tmp = new CounterSet();
+
+                    if(!AbstractJournal.this.isOpen()) return tmp;
+                    
+                    final IIndex name2Addr = getName2Addr();
+
+                    final ITupleIterator itr = name2Addr.rangeIterator(null,
+                            null);
+
+                    while (itr.hasNext()) {
+
+                        final ITuple tuple = itr.next();
+
+                        final Entry entry = EntrySerializer.INSTANCE
+                                .deserialize(tuple.getValueStream());
+
+                        final IIndex ndx = getIndex(entry.checkpointAddr);
+
+                        /*
+                         * @todo might have to clone the counters since the
+                         * could already be attached.
+                         * 
+                         * @todo if the path separator shows up in the index
+                         * name then it will cause the path to be broken down
+                         * into more components than are warranted.
+                         */
+
+                        tmp.makePath(entry.name).attach(ndx.getCounters());
+
+                    }
+                    
+                    return tmp;
+
+                }
+                
+            });
 
         }
 
@@ -2362,7 +2415,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                                  * caller.
                                  */
                                 pmd.getHistory()+
-                                "register("+pmd.getPartitionId()+") "
+                                "register(name="+name+",partitionId="+pmd.getPartitionId()+") "
                                 ));
 
             } else {

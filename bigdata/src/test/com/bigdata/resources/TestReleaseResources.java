@@ -41,6 +41,8 @@ import com.bigdata.resources.StoreManager.Options;
 
 /**
  * Test release of old resources using {@link Options#MIN_RELEASE_AGE}.
+ *
+ * @todo write test where the [releaseAge] is set.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

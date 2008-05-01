@@ -26,21 +26,14 @@ package com.bigdata.btree;
 import java.text.NumberFormat;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.Instrument;
 
 /**
  * A helper class that collects statistics on an {@link AbstractBTree}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo add nano timers and track storage used by the index. The goal is to
- *       know how much of the time of the server is consumed by the index, what
- *       percentage of the store is dedicated to the index, how expensive it is
- *       to do some scan-based operations (merge down, delete of transactional
- *       isolated persistent index), and evaluate the buffer strategy by
- *       comparing accesses with IOs.
- * 
- * @todo report counters using {@link CounterSet}
  */
 public class Counters {
 
@@ -66,13 +59,19 @@ public class Counters {
      */
     public void add(Counters o) {
         
+        // IKeySearch
         nfinds += o.nfinds;
         nbloomRejects += o.nbloomRejects;
         ninserts += o.ninserts;
         nremoves += o.nremoves;
-        nindexOf += o.nindexOf;
+        // ILinearList
+        nindexOf += o.nindexOf; // Note: also does key search.
         ngetKey  += o.ngetKey;
         ngetValue += o.ngetValue;
+        // IRangeQuery
+        nrangeCount += o.nrangeCount;
+        nrangeIterator += o.nrangeIterator;
+        // Structural mutation.
         rootsSplit += o.rootsSplit;
         rootsJoined += o.rootsJoined;
         nodesSplit += o.nodesSplit;
@@ -81,6 +80,7 @@ public class Counters {
         leavesJoined += o.leavesJoined;
         nodesCopyOnWrite += o.nodesCopyOnWrite;
         leavesCopyOnWrite += o.leavesCopyOnWrite;
+        // IO
         nodesRead += o.nodesRead;
         leavesRead += o.leavesRead;
         nodesWritten += o.nodesWritten;
@@ -95,21 +95,28 @@ public class Counters {
         
     }
     
+    // IKeySearch
     int nfinds = 0; // #of keys looked up in the tree by lookup(key).
     int nbloomRejects = 0; // #of keys rejected by the bloom filter in lookup(key).
     int ninserts = 0;
     int nremoves = 0;
+    // ILinearList
     int nindexOf = 0;
     int ngetKey = 0;
     int ngetValue = 0;
+    // IRangeQuery
+    int nrangeCount = 0;
+    int nrangeIterator = 0;
+    // Structural change.
     int rootsSplit = 0;
     int rootsJoined = 0;
     int nodesSplit = 0;
     int nodesJoined = 0;
     int leavesSplit = 0;
-    int leavesJoined = 0; // @todo also merge vs redistribution of keys on remove (and insert if b*-tree)
+    int leavesJoined = 0;
     int nodesCopyOnWrite = 0;
     int leavesCopyOnWrite = 0;
+    // IO
     int nodesRead = 0;
     int leavesRead = 0;
     int nodesWritten = 0;
@@ -148,13 +155,6 @@ public class Counters {
      * materialize any given leaf.
      * 
      * @return The computed score.
-     * 
-     * @todo The leaf cache does not resize as the depth of the tree grows.
-     * 
-     * @todo instrument key search time.
-     * 
-     * @todo change to a raw record format to minimize de-serialization time and
-     *       heap allocations and thus indirectly minimize GC time as well.
      */
     public double computeRawScore() {
         
@@ -223,17 +223,217 @@ public class Counters {
         
     }
 
+    /**
+     * Return a {@link CounterSet} reporting on the various counters tracked in
+     * the instance fields of this class.
+     */
+    synchronized ICounterSet getCounters() {
+        
+        if(counterSet == null) {
+            
+            counterSet = new CounterSet();
+
+            /*
+             * ISimpleBTree
+             *
+             * @todo instrument key search time.
+             */
+            {
+                final CounterSet tmp = counterSet.makePath("keySearch");
+
+                tmp.addCounter("#find", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nfinds);
+                    }
+                });
+
+                tmp.addCounter("#bloomReject", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nbloomRejects);
+                    }
+                });
+
+                tmp.addCounter("#insert", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(ninserts);
+                    }
+                });
+
+                tmp.addCounter("#nremove", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nremoves);
+                    }
+                });
+            }
+            
+            /*
+             * ILinearList API.
+             */
+            {
+                
+                final CounterSet tmp = counterSet.makePath("linearList");
+
+                tmp.addCounter("#indexOf", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nindexOf);
+                    }
+                });
+
+                tmp.addCounter("#getKey", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(ngetKey);
+                    }
+                });
+
+                tmp.addCounter("#getValue", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(ngetValue);
+                    }
+                });
+                
+            }
+            
+            /*
+             * IRangeQuery
+             * 
+             * FIXME instrument the IRangeQuery API for times (must aggregate
+             * across hasNext() and next()). Note that rangeCount and rangeCopy
+             * both depend on rangeIterator so that is the only one for which we
+             * really need timing data. The iterator should report the
+             * cumulative service time when it is finalized.
+             */
+            {
+                
+                final CounterSet tmp = counterSet.makePath("rangeQuery");
+
+                tmp.addCounter("#rangeCount", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nrangeCount);
+                    }
+                });
+                
+                tmp.addCounter("#rangeIterator", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nrangeIterator);
+                    }
+                });
+                
+            }
+            
+            /*
+             * Structural mutation statistics.
+             * 
+             * @todo also merge vs redistribution of keys on remove (and insert
+             * if b*-tree)
+             */
+            {
+               
+                final CounterSet tmp = counterSet.makePath("structure");
+                
+                tmp.addCounter("#rootSplit", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(rootsSplit);
+                    }
+                });
+
+                tmp.addCounter("#rootJoined", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(rootsJoined);
+                    }
+                });
+
+                tmp.addCounter("#nodeSplit", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nodesSplit);
+                    }
+                });
+
+                tmp.addCounter("#nodeJoined", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nodesJoined);
+                    }
+                });
+
+                tmp.addCounter("#leafSplit", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(leavesSplit);
+                    }
+                });
+
+                tmp.addCounter("#leafJoined", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(leavesJoined);
+                    }
+                });
+
+                tmp.addCounter("#leafCopyOnWrite", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(leavesCopyOnWrite);
+                    }
+                });
+
+                tmp.addCounter("#nodeCopyOnWrite", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nodesCopyOnWrite);
+                    }
+                });
+
+            }
+         
+            /*
+             * IO stats.
+             * 
+             * FIXME track the serialization times explicitly and separate them
+             * from the writes on the store.
+             * 
+             * @todo add nano timers and track storage used by the index. The
+             * goal is to know how much of the time of the server is consumed by
+             * the index, what percentage of the store is dedicated to the
+             * index, how expensive it is to do some scan-based operations
+             * (merge down, delete of transactional isolated persistent index),
+             * and evaluate the buffer strategy by comparing accesses with IOs.
+             */
+            {
+                final CounterSet tmp = counterSet.makePath("IO");
+
+                tmp.addCounter("leafWriteCount", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(leavesWritten);
+                    }
+                });
+
+                tmp.addCounter("nodeWriteCount", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nodesWritten);
+                    }
+                });
+
+                // FIXME and per-sec also.
+                tmp.addCounter("bytesWritten", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(bytesWritten);
+                    }
+                });
+
+                tmp.addCounter("bytesRead", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(bytesRead);
+                    }
+                });
+
+            }
+
+        }
+        
+        return counterSet;
+        
+    }
+    private CounterSet counterSet;
+    
     public String toString() {
 
-        /*
-         * @todo find/insert/remove times?
-         * 
-         * @todo range iterator times? (must aggregate across hasNext() and next())
-         * 
-         * @todo key search times?
-         * 
-         * @todo data copy times?
-         */
+        // FIXME uncomment this - I am just looking for callers.
+        if(true) throw new UnsupportedOperationException();
         
         /*
          * store read/write times.

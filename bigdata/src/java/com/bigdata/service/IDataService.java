@@ -321,20 +321,20 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
     public IndexMetadata getIndexMetadata(String name, long timestamp)
             throws IOException, InterruptedException, ExecutionException;
 
-    /**
-     * Return various statistics about the named index.
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @return Statistics about the named index.
-     * 
-     * @throws IOException
-     * 
-     * @todo xml serialization of counters?  allow filter?
-     */
-    public String getStatistics(String name)
-            throws IOException, InterruptedException, ExecutionException;
+//    /**
+//     * Return various statistics about the named index.
+//     * 
+//     * @param name
+//     *            The index name.
+//     * 
+//     * @return Statistics about the named index.
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo xml serialization of counters?  allow filter?
+//     */
+//    public String getStatistics(String name)
+//            throws IOException, InterruptedException, ExecutionException;
         
     /**
      * Drops the named index.

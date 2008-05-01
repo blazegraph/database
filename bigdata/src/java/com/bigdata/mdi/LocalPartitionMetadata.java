@@ -90,17 +90,10 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     private IResourceMetadata[] resources;
 
     /**
-     * @todo Consider one of the following:
-     *       <p>
-     *       A history of operations giving rise to the current partition
-     *       metadata. E.g., register(timestamp), copyOnOverflow(timestamp),
-     *       split(timestamp), join(partitionId,partitionId,timestamp), etc.
-     *       This is truncated when serialized to keep it from growing without
-     *       bound.
-     *       <p>
-     *       Recording the timestamp and partitionId of the view from which this
-     *       view was derived so that we can trace things backwards by writing
-     *       some code.
+     * A history of operations giving rise to the current partition metadata.
+     * E.g., register(timestamp), copyOnOverflow(timestamp), split(timestamp),
+     * join(partitionId,partitionId,timestamp), etc. This is truncated when
+     * serialized to keep it from growing without bound.
      */
     private String history;
     

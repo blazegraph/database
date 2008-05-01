@@ -42,6 +42,10 @@ import com.bigdata.Banner;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IAtomicStore;
@@ -104,23 +108,23 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     protected static final Logger log = Logger.getLogger(AbstractBTree.class);
 
     /**
-     * Log for {@link BTree#dump(PrintStream)} and friends.
-     */
-    protected static final Logger dumpLog = Logger.getLogger(BTree.class
-            .getName()
-            + "#dump");
-
-    /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
+
+    /**
+     * Log for {@link BTree#dump(PrintStream)} and friends.
+     */
+    protected static final Logger dumpLog = Logger.getLogger(BTree.class
+            .getName()
+            + "#dump");
 
     /**
      * Flag turns on the use of {@link AbstractNode#assertInvariants()} and is
@@ -333,43 +337,85 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * Return some "statistics" about the btree.
      * 
      * @todo fold in {@link #getUtilization()} here.
-     * 
-     * @todo use an object or XML to send this data around with an eye towards
-     *       telemetry for the distributed database.
      */
-    public String getStatistics() {
+    synchronized public ICounterSet getCounters() {
+
+        if(counterSet==null) {
+
+            counterSet = new CounterSet();
+            
+            counterSet.addCounter("index UUID", new OneShotInstrument<String>(
+                    getIndexMetadata().getIndexUUID().toString()));
+            
+            counterSet.addCounter("branchingFactor",
+                    new OneShotInstrument<Integer>(branchingFactor));
+
+            counterSet.addCounter("class",
+                    new OneShotInstrument<String>(getClass().getName()));
+
+            counterSet.addCounter("queueCapacity",
+                    new OneShotInstrument<Integer>(
+                            getWriteRetentionQueueCapacity()));
+
+            counterSet.addCounter("#queueSize", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(getWriteRetentionQueueDistinctCount());
+                }
+            });
+
+            // the % utilization in [0:1] for the whole tree (nodes + leaves).
+            counterSet.addCounter("% utilization", new Instrument<Double>(){
+                protected void sample() {
+                    final int[] tmp = getUtilization();
+                    setValue(tmp[2] / 100d);
+                }
+            });
+            
+            counterSet.addCounter("height", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(getHeight());
+                }
+            });
+
+            counterSet.addCounter("#nnodes", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(getNodeCount());
+                }
+            });
+
+            counterSet.addCounter("#nleaves", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(getLeafCount());
+                }
+            });
+
+            counterSet.addCounter("#entries", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(getEntryCount());
+                }
+            });
+
+            counterSet.attach(counters.getCounters());
+    
+            /*
+             * @todo report on soft vs weak refs.
+             * 
+             * @todo report on readRetentionQueue iff used. track #distinct.
+             * 
+             * @todo track life time of nodes and leaves and #of touches during life
+             * time.
+             * 
+             * @todo estimate heap requirements for nodes and leaves based on their
+             * state (keys, values, and other arrays). report estimated heap
+             * consumption here.
+             */
         
-        StringBuilder sb = new StringBuilder();
-
-        // Note: This is basically the checkpoint record plus queue stats.
-        sb.append(   "#entries=" + getEntryCount());
-        sb.append( ", branchingFactor="+getBranchingFactor());
-        sb.append( ", height=" + getHeight());
-        sb.append( ", #nodes=" + getNodeCount() );
-        sb.append( ", #leaves=" + getLeafCount() );
-        sb.append( ", #(nodes+leaves)=" + (getNodeCount() + getLeafCount()));
-        sb.append( ", #distinctOnQueue=" + getWriteRetentionQueueDistinctCount());
-        sb.append( ", queueCapacity=" + getWriteRetentionQueueCapacity() );
-        sb.append( ", class="+getClass().getName());
-
-        sb.append(counters.toString());
-
-        /*
-         * @todo report on soft vs weak refs.
-         * 
-         * @todo report on readRetentionQueue iff used. track #distinct.
-         * 
-         * @todo track life time of nodes and leaves and #of touches during life
-         * time.
-         * 
-         * @todo estimate heap requirements for nodes and leaves based on their
-         * state (keys, values, and other arrays). report estimated heap
-         * consumption here.
-         */
+        }
         
-        return sb.toString();
+        return counterSet;
               
     }
+    private CounterSet counterSet;
     
     /**
      * @param store
@@ -1267,6 +1313,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             return getEntryCount();
 
         }
+
+        // only count the expensive ones.
+        counters.nrangeCount++;
         
         final AbstractNode root = getRoot();
 
@@ -1315,6 +1364,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, ITupleFilter filter) {
+
+        counters.nrangeIterator++;
 
         if ((flags & REMOVEALL) != 0) {
 
@@ -1610,8 +1661,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      *         <li>2 - the total utilization percentage [0:100]. This is the
      *         average of the leaf utilization and the node utilization.</li>
      *         </ul>
-     * 
-     * @deprecated integrate into an xml result for {@link #getStatistics()}.
      */
     public int[] getUtilization() {
 

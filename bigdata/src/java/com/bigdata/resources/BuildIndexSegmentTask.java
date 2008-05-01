@@ -1,6 +1,7 @@
 package com.bigdata.resources;
 
 import java.io.File;
+import java.util.Arrays;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
@@ -50,8 +51,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
      *            written.
      */
     public BuildIndexSegmentTask(ResourceManager resourceManager,
-            long lastCommitTime,
-            String name, File outFile) {
+            long lastCommitTime, String name, File outFile) {
 
         this(resourceManager, lastCommitTime, name, 
                 outFile, null/* fromKey */, null/* toKey */);
@@ -76,9 +76,9 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
      *            The first key that will not be counted (exclusive). When
      *            <code>null</code> there is no upper bound.
      */
-    public BuildIndexSegmentTask(ResourceManager resourceManager,
-            long lastCommitTime,
-            String name, File outFile, byte[] fromKey, byte[] toKey) {
+    private BuildIndexSegmentTask(ResourceManager resourceManager,
+            long lastCommitTime, String name, File outFile, byte[] fromKey,
+            byte[] toKey) {
 
         super(resourceManager, -lastCommitTime/*historical read*/, name);
 
@@ -285,6 +285,9 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         @Override
         protected Object doTask() throws Exception {
 
+            if (resourceManager.isOverflowAllowed())
+                throw new IllegalStateException();
+
             final SegmentMetadata segmentMetadata = buildResult.segmentMetadata;
 
             log.info("Begin: name="+getOnlyResource()+", newSegment="+segmentMetadata);
@@ -331,31 +334,102 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             final IndexMetadata indexMetadata = btree.getIndexMetadata().clone();
 
             /*
-             * This is the old index partition definition.
+             * This is the index partition definition on the live index - the
+             * one that will be replaced with a new view as the result of this
+             * atomic update.
              */
-            final LocalPartitionMetadata oldpmd = indexMetadata.getPartitionMetadata();
+            final LocalPartitionMetadata currentpmd = indexMetadata.getPartitionMetadata();
 
             // Check pre-conditions.
+            final IResourceMetadata[] currentResources = currentpmd.getResources();
             {
 
-                if (oldpmd == null) {
+                if (currentpmd == null) {
                  
                     throw new IllegalStateException("Not an index partition: "
                             + getOnlyResource());
                     
                 }
 
-                final IResourceMetadata[] oldResources = oldpmd.getResources();
-
-                if (!oldResources[0].getUUID().equals(
+                if (!currentResources[0].getUUID().equals(
                         getJournal().getRootBlockView().getUUID())) {
                  
                     throw new IllegalStateException(
-                            "Expecting live journal to the first resource: "
-                                    + oldResources + ", but found "
-                                    + oldResources);
+                            "Expecting live journal to be the first resource: "
+                                    + currentResources);
                     
                 }
+                
+                /*
+                 * The segment must have been built from the view that we are
+                 * going to replace. The only change which is allowed from the
+                 * time that we begin the segment build is the accumulation of
+                 * more writes on the mutable BTree on the live journal. There
+                 * MUST NOT be any change in the resources used by the view.
+                 * 
+                 * FIXME This is not correct. The source view is pre-overflow
+                 * (the last writes are on the old journal) while the current
+                 * view is post-overflow (reflects writes made since overflow).
+                 * What we are doing is replacing the pre-overflow history with
+                 * an index segement.
+                 * 
+                 * journal A
+                 * view={A}
+                 * ---- sync overflow begins ----
+                 * create journal B
+                 * view={B,A}
+                 * Begin build segment from view={A} (identified by the lastCommitTime)
+                 * ---- sync overflow ends ----
+                 * ... build continues ...
+                 * ... writes against view={B,A}
+                 * ... index segment S0 complete (based on view={A}).
+                 * ... 
+                 * atomic build update task runs: view={B,S0}
+                 * ... writes continue.
+                 */
+                if(false){
+                    
+                    final IResourceMetadata[] sourceResources = buildResult.indexMetadata
+                            .getPartitionMetadata().getResources();
+
+                    for (int i = 0; i < sourceResources.length; i++) {
+
+                        if (i >= currentResources.length) {
+
+                            throw new AssertionError("#of resources differs"
+                                    + "\nsourceResources=" + Arrays.toString(sourceResources)
+                                    + "\ncurrentResources=" + Arrays.toString(currentResources)
+                                    + "\ncurrentHistory="+currentpmd.getHistory());
+                            
+                        }
+                        
+                        final IResourceMetadata s = sourceResources[i];
+                        
+                        final IResourceMetadata c = currentResources[i];
+
+                        if(!s.equals(c) || !c.equals(s)) {
+
+                            throw new AssertionError("resources differ at index="+i
+                                    + "\nsourceResources=" + Arrays.toString(sourceResources)
+                                    + "\ncurrentResources=" + Arrays.toString(currentResources)
+                                    + "\ncurrentHistory="+currentpmd.getHistory());
+
+                        }
+                        
+                    }
+                    
+                    if(sourceResources.length!=currentResources.length) {
+                        
+                        throw new AssertionError("#of resources differs"
+                                + "\nsourceResources=" + Arrays.toString(sourceResources)
+                                + "\ncurrentResources=" + Arrays.toString(currentResources)
+                                + "\ncurrentHistory="+currentpmd.getHistory());
+                        
+                    }
+                    
+                    
+                }
+                
 
                 /*
                  * Note: I have commented out a bunch of pre-condition tests that are not 
@@ -406,20 +480,23 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             final IResourceMetadata[] newResources = new IResourceMetadata[] {
                     // the live journal.
                     getJournal().getResourceMetadata(),
-                    // the newly build index segment.
+                    // the newly built index segment.
                     segmentMetadata
                     };
 
             // describe the index partition.
             indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
-                    oldpmd.getPartitionId(),//
-                    oldpmd.getLeftSeparatorKey(),//
-                    oldpmd.getRightSeparatorKey(),//
+                    currentpmd.getPartitionId(),//
+                    currentpmd.getLeftSeparatorKey(),//
+                    currentpmd.getRightSeparatorKey(),//
                     newResources, //
-                    oldpmd.getHistory()+
-                    "replaceHistory(lastCommitTime="
-                            + segmentMetadata.getCreateTime() + ",segment="
-                            + segmentMetadata.getUUID() + ") "
+                    currentpmd.getHistory()+
+                    "replaceHistory"//
+                    +"(lastCommitTime="+ segmentMetadata.getCreateTime()//
+                    +",segment="+ segmentMetadata.getUUID()//
+                    +",counter="+btree.getCounter().get()//
+                    +",oldResources="+Arrays.toString(currentResources)// @todo does not conform to syntax.
+                    +") "
                     ));
 
             // update the metadata associated with the btree
@@ -435,6 +512,14 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
              * Note: The atomic commit point is when this task commits.
              */
             assert btree.needsCheckpoint();
+//            btree.writeCheckpoint();
+            {
+                final long id0 = btree.getCounter().get();
+                final long pid = id0 >> 32;
+                final long mask = 0xffffffffL;
+                final int ctr = (int) (id0 & mask);
+                log.warn("\nname="+getOnlyResource()+", counter="+id0+", pid="+pid+", ctr="+ctr);
+            }
 
             // notify successful index partition build.
             resourceManager.buildCounter.incrementAndGet();

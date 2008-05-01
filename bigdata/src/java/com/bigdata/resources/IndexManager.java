@@ -511,6 +511,7 @@ abstract public class IndexManager extends StoreManager {
      */
     public AbstractBTree[] getIndexSources(String name, long timestamp) {
 
+        if(INFO)
         log.info("name=" + name + ", timestamp=" + timestamp);
 
         /*
@@ -534,6 +535,7 @@ abstract public class IndexManager extends StoreManager {
 
             if (btree == null) {
 
+                if(INFO)
                 log.info("No such index: name=" + name + ", timestamp="
                         + timestamp);
 
@@ -541,7 +543,10 @@ abstract public class IndexManager extends StoreManager {
 
             }
 
-            log.info("View based on " + journal.getResourceMetadata());
+            if (INFO)
+                log.info("name=" + name + ", timestamp=" + timestamp
+                        + ", counter=" + btree.getCounter().get()
+                        + ", journal=" + journal.getResourceMetadata());
 
         }
 
@@ -1026,7 +1031,7 @@ abstract public class IndexManager extends StoreManager {
           * Describe the index segment.
           */
          final SegmentMetadata segmentMetadata = new SegmentMetadata(//
-                 "" + outFile, //
+                 outFile, //
                  outFile.length(),//
                  builder.segmentUUID,//
                  createTime//
