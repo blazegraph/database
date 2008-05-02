@@ -213,10 +213,10 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
     public String toString() {
         
         return getClass().getSimpleName()+
-        "{ size="+size()+
-        ", filename="+getFile()+
-        ", uuid="+getUUID()+
-        ", createTime="+getCreateTime()+
+        "{size="+size()+
+        ",filename="+getFile()+
+        ",uuid="+getUUID()+
+        ",createTime="+getCreateTime()+
         "}";
         
     }

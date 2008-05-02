@@ -1171,7 +1171,22 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
                 final boolean needsCheckpoint = btree.needsCheckpoint();
                 
-                if(INFO) log.info("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
+                if (INFO)
+                    log.info("name=" + name + ", needsCheckpoint="
+                            + needsCheckpoint + " : " + this);
+                
+                if (!needsCheckpoint) {
+                 
+                    /*
+                     * In general, you expect that an unisolated index will need
+                     * to be checkpointed if it was accessed since tasks which
+                     * do not require write access are normally read-committed.
+                     */
+                    
+                    log.warn("name=" + name + ", does not need checkpoint: "
+                            + btree.getCheckpoint());
+                    
+                }
                 
                 if(needsCheckpoint) {
                     
@@ -1185,7 +1200,30 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                     if(INFO) log.info("name=" + name + ", newCheckpointAddr="
                             + btree.getStore().toString(checkpointAddr) + " : "
                             + this);
+
+                    assert btree.getDirtyListener() != null;
                     
+                    if (!((AbstractJournal) getJournal()).name2Addr
+                            .willCommit(name)) {
+
+                        /*
+                         * FIXME There is a hole in the logic for name2addr,
+                         * btree, group commit, and the abstract task which is
+                         * allowing BTree#needsCheckpoint() to return true
+                         * without having notified Name2Addr via its listener
+                         * that the BTree is dirty. Put that way, its clearly
+                         * one of the methods on BTree which allows a state
+                         * change to the index metadata or the checkpoint
+                         * record.
+                         */
+                        
+                        log.error("index not on commit list: name=" + name
+                                + ", checkpoint=" + btree.getCheckpoint());
+
+                        btree.getDirtyListener().dirtyEvent(btree);
+
+                    }
+                            
                 }
 
             }

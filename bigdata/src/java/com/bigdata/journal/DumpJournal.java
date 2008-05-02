@@ -239,7 +239,7 @@ public class DumpJournal {
                     
                     System.err.println("----");
 
-                    final CommitRecordIndex.Entry entry = (CommitRecordIndex.Entry)itr.next();
+                    final CommitRecordIndex.Entry entry = commitRecordIndex.deserializeEntry(itr.next().getValueStream());
                     
                     System.err.print("Commit Record: " + entry.commitTime
                             + ", addr=" + journal.toString(entry.addr)+", ");
@@ -282,32 +282,32 @@ public class DumpJournal {
      * @param commitRecord
      */
     private static void dumpNamedIndicesMetadata(AbstractJournal journal,
-            ICommitRecord commitRecord,boolean dumpIndices) {
+            ICommitRecord commitRecord, boolean dumpIndices) {
 
-        IIndex name2Addr = journal.getName2Addr();
+        // view as of that commit record.
+        final IIndex name2Addr = journal.getName2Addr(commitRecord.getTimestamp());
 
-        ITupleIterator itr = name2Addr.rangeIterator(null,null);
+        final ITupleIterator itr = name2Addr.rangeIterator(null,null);
 
         while (itr.hasNext()) {
 
-            Name2Addr.Entry entry = (Name2Addr.Entry) itr.next();
+            // a registered index.
+            final Name2Addr.Entry entry = Name2Addr.EntrySerializer.INSTANCE
+                    .deserialize(itr.next().getValueStream());
 
-            System.err.print("name=" + entry.name + ", addr="
-                    + journal.toString(entry.checkpointAddr) + " : ");
+            System.err.println("name=" + entry.name + ", addr="
+                    + journal.toString(entry.checkpointAddr));
 
-            BTree ndx = (BTree) journal.getIndex(entry.name, commitRecord);
+            // load B+Tree from its checkpoint record.
+            final BTree ndx = (BTree) journal.getIndex(entry.checkpointAddr);
 
-            if(ndx == null) {
-                
-                System.err.println("created.");
-                
-            } else {
+            // show checkpoint record.
+            System.err.println("\t"+ndx.getCheckpoint());
+
+            // show metadata record.
+            System.err.println("\t"+ndx.getIndexMetadata());
             
-                System.err.println(ndx.getIndexMetadata().toString());
-                
-                if(dumpIndices) dumpIndex(ndx);
-                
-            }
+            if(dumpIndices) dumpIndex(ndx);
             
         }
         

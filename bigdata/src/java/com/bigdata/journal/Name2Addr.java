@@ -41,7 +41,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IDirtyListener;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
@@ -153,6 +152,16 @@ public class Name2Addr extends BTree {
             this.ndx = ndx;
             
         }
+        
+        /**
+         * Return the {@link Name2Addr} instance to which this listener is
+         * reporting.
+         */
+        private Name2Addr getName2Addr() {
+            
+            return Name2Addr.this;
+            
+        }
 
         /**
          * Add <i>this</i> to the {@link Name2Addr#commitList}.
@@ -165,7 +174,7 @@ public class Name2Addr extends BTree {
             
             {
                 
-                IIndex cached = indexCache.get(name);
+                final BTree cached = indexCache.get(name);
 
                 if (cached == null) {
 
@@ -399,9 +408,33 @@ public class Name2Addr extends BTree {
             throw new IllegalArgumentException();
         
         BTree btree = indexCache.get(name);
-        
-        if (btree != null)
+
+        if (btree != null) {
+
+            if (btree.getDirtyListener() == null) {
+
+                /*
+                 * Note: We can't return an unisolated view of a BTree to the
+                 * caller without having a dirty listener set on it that will
+                 * report any changes back to this name2addr instance.  An
+                 * exception thrown here indicates that the BTree was able to
+                 * remain in (or enter into) the indexCache without having its
+                 * dirty listener set.
+                 */
+
+                throw new AssertionError();
+
+            }
+
+            /*
+             * Further verify that the dirty listener is reporting to this
+             * name2addr instance.
+             */
+            assert ((DirtyListener)btree.getDirtyListener()).getName2Addr() == this;
+
             return btree;
+
+        }
 
         final byte[] val = super.lookup(getKey(name));
 
@@ -578,7 +611,7 @@ public class Name2Addr extends BTree {
         // add name -> btree mapping to the transient cache.
         indexCache.put(name, btree, true/*dirty*/);
         
-        DirtyListener l = new DirtyListener(name,btree);
+        final DirtyListener l = new DirtyListener(name,btree);
         
         // add to the commit list.
         commitList.put( name, l );
@@ -660,22 +693,18 @@ public class Name2Addr extends BTree {
      * 
      * @param entry
      *            A historical {@link Entry} for a named index.
-     * 
-     * @todo if [entry] is <code>null</code> then treat as a drop?
      */
     public void rollback(Entry entry) {
         
         if (entry == null)
             throw new IllegalArgumentException();
         
-        final String name = entry.name;
-       
-        log.warn("name="+name+", entry="+entry);
+        log.warn("entry="+entry);
         
-        final byte[] key = getKey(name);
+        final byte[] key = getKey(entry.name);
 
-        // @todo if the entry is equals then don't bother to update it.
-        
+        // @todo if the entry is equals then don't bother to update anything (rollback is NOP)?
+
         // update persistent mapping.
         insert(key, EntrySerializer.INSTANCE.serialize(entry));
 
@@ -684,11 +713,31 @@ public class Name2Addr extends BTree {
 
             synchronized (addrCache) {
 
-                addrCache.put(name, entry);
+                addrCache.put(entry.name, entry);
 
             }
 
         }
+
+        /*
+         * Remove from the cache.
+         */
+        final BTree btree = indexCache.remove(entry.name);
+
+        if (btree != null) {
+
+            // clear the dirty listener on the btree.
+            btree.setDirtyListener(null);
+
+        }
+        
+        /*
+         * Remove from the commit list.
+         * 
+         * Note: The index does not need to perform a commit after a rollback
+         * and the change is already buffered on name2addr's backing btree.
+         */
+        commitList.remove(entry.name);
 
     }
     

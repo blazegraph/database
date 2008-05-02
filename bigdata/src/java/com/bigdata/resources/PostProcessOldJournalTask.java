@@ -24,9 +24,11 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.Counters;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
@@ -525,7 +527,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final AbstractJournal oldJournal = resourceManager
                     .getJournal(lastCommitTime);
             
-            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
+            // the name2addr view as of that commit time.
+            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime).rangeIterator(
                     null, null);
 
             assert used.isEmpty() : "There are "+used.size()+" used index partitions";
@@ -1197,7 +1200,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             int nbuild = 0; // build task.
             int nsplit = 0; // split task.
 
-            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
+            // the name2addr view as of the last commit time.
+            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime).rangeIterator(
                     null, null);
 
             while (itr.hasNext()) {
@@ -1215,7 +1219,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  */
                 if(isUsed(name)) {
                     
-                    log.info("Skipping name="+name+" - already used.");
+                    log.info("was  handled: "+name);
                     
                     nskip++;
 
@@ -1228,6 +1232,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 /*
                  * Open the historical view of that index at that time (not just
                  * the mutable BTree but the full view).
+                 * 
+                 * @todo there is overhead in opening a view comprised of more
+                 * than just the mutable BTree. we should be able to get by with
+                 * lazy opening of the index segment, and perhaps even the index
+                 * segment store.
                  */
                 final IIndex view = resourceManager.getIndex(name,
                         -lastCommitTime);
@@ -1238,6 +1247,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             "Index not found? : name" + name
                                     + ", lastCommitTime=" + lastCommitTime);
 
+                }
+
+                // note: the mutable btree - accessed here for debugging only.
+                final BTree btree;
+                if (view instanceof AbstractBTree) {
+                    btree = (BTree) view;
+                } else {
+                    btree = (BTree) ((FusedView) view).getSources()[0];
                 }
 
                 // index metadata for that index partition.
@@ -1264,7 +1281,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     markUsed(name);
                     
-                    log.info("index split: " + name);
+                    log.info("will split  : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
 
                     nsplit++;
 
@@ -1277,7 +1294,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     markUsed(name);
 
-                    log.info("index was copied: " + name);
+                    log.info("was  copied : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
 
                     nskip++;
 
@@ -1305,7 +1322,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             resourceManager, lastCommitTime,
                             name, outFile);
 
-                    log.info("index build: " + name);
+                    log.info("will build  : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
 
                     // add to set of tasks to be run.
                     tasks.add(task);
@@ -1493,7 +1510,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             final long elapsed = System.currentTimeMillis()-begin;
             
-            log.info("warn: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
+            log.info("done: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
             
             return null;
             

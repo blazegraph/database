@@ -3,6 +3,7 @@ package com.bigdata.resources;
 import java.io.File;
 import java.util.Arrays;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
@@ -34,10 +35,6 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
 
     final protected File outFile;
 
-    final protected byte[] fromKey;
-
-    final protected byte[] toKey;
-
     /**
      * 
      * @param concurrencyManager
@@ -53,33 +50,6 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
     public BuildIndexSegmentTask(ResourceManager resourceManager,
             long lastCommitTime, String name, File outFile) {
 
-        this(resourceManager, lastCommitTime, name, 
-                outFile, null/* fromKey */, null/* toKey */);
-
-    }
-
-    /**
-     * 
-     * @param concurrencyManager
-     * @param lastCommitTime
-     *            The lastCommitTime of the journal whose view of the index
-     *            you wish to capture in the generated {@link IndexSegment}.
-     * @param name
-     *            The name of the index.
-     * @param outFile
-     *            The file on which the {@link IndexSegment} will be
-     *            written.
-     * @param fromKey
-     *            The lowest key that will be counted (inclusive). When
-     *            <code>null</code> there is no lower bound.
-     * @param toKey
-     *            The first key that will not be counted (exclusive). When
-     *            <code>null</code> there is no upper bound.
-     */
-    private BuildIndexSegmentTask(ResourceManager resourceManager,
-            long lastCommitTime, String name, File outFile, byte[] fromKey,
-            byte[] toKey) {
-
         super(resourceManager, -lastCommitTime/*historical read*/, name);
 
         this.lastCommitTime = lastCommitTime;
@@ -88,10 +58,6 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             throw new IllegalArgumentException();
 
         this.outFile = outFile;
-
-        this.fromKey = fromKey;
-
-        this.toKey = toKey;
 
     }
 
@@ -108,22 +74,21 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         // the name under which the index partition is registered.
         final String name = getOnlyResource();
 
-        log.info("src="+name);
-        
         // The source view.
         final IIndex src = getIndex(name);
 
-//        if (src instanceof BTree) {
-//
-//            // pre-condition.
-//            log.warn("View is only a B+Tree: name=" + name
-//                    + ", pmd=" + src.getIndexMetadata().getPartitionMetadata());
-//            
-//        }
+        // note: the mutable btree - accessed here for debugging only.
+        final BTree btree;
+        if (src instanceof AbstractBTree) {
+            btree = (BTree) src;
+        } else {
+            btree = (BTree) ((FusedView) src).getSources()[0];
+        }
+        log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+btree.getCheckpoint());
         
         // Build the index segment.
         final BuildResult result = resourceManager.buildIndexSegment(name, src,
-                outFile, lastCommitTime, fromKey, toKey);
+                outFile, lastCommitTime, null/*fromKey*/, null/*toKey*/);
 
         // task will update the index partition view definition.
         final AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
@@ -282,6 +247,11 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             
         }
 
+        /**
+         * Atomic update.
+         * 
+         * @return <code>null</code>
+         */
         @Override
         protected Object doTask() throws Exception {
 
@@ -327,6 +297,8 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             
             // The live B+Tree.
             final BTree btree = (BTree)(view instanceof FusedView?((FusedView)view).getSources()[0]:view);
+            
+            log.info("src="+getOnlyResource()+",counter="+view.getCounter().get()+",checkpoint="+btree.getCheckpoint());
 
             assert btree != null : "Expecting index: "+getOnlyResource();
             
@@ -518,7 +490,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
                 final long pid = id0 >> 32;
                 final long mask = 0xffffffffL;
                 final int ctr = (int) (id0 & mask);
-                log.warn("\nname="+getOnlyResource()+", counter="+id0+", pid="+pid+", ctr="+ctr);
+                log.warn("name="+getOnlyResource()+", counter="+id0+", pid="+pid+", ctr="+ctr);
             }
 
             // notify successful index partition build.

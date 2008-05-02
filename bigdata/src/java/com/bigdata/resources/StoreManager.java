@@ -56,6 +56,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -2208,8 +2209,8 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         final Set<UUID> resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
         
-        // and delete them.
-        deleteUnusedResources(resourcesInUse);
+        // and delete anything that is ((NOT in use) AND createTime<commitTimeToPreserve)
+        deleteUnusedResources(commitTimeToPreserve,resourcesInUse);
         
     }
     
@@ -2225,12 +2226,24 @@ abstract public class StoreManager extends ResourceEvents implements
      * <li>delete in the file system</li>
      * 
      * </ol>
+     * 
+     * @param commitTimeToPreserve
+     *            Resources created as of or later than this timestamp WILL NOT
+     *            be deleted.
+     * @param resourcesInUse
+     *            The set of resources required by views as of the
+     *            <i>commitTimeToPreserve</i>. These resources have create
+     *            times LTE to <i>commitTimeToPreserve</i> but are in use but
+     *            at least one view as of that commit time and therefore MUST
+     *            NOT be deleted.
      */
-    private void deleteUnusedResources(final Set<UUID> resourcesInUse) {
+    private void deleteUnusedResources(final long commitTimeToPreserve, final Set<UUID> resourcesInUse) {
         
         /*
          * Delete old journals.
          */
+        // #of journals deleted.
+        int njournals = 0;
         {
 
             /*
@@ -2249,6 +2262,20 @@ abstract public class StoreManager extends ResourceEvents implements
                 final IResourceMetadata resourceMetadata = (IResourceMetadata) SerializerUtil
                         .deserialize(tuple.getValue());
 
+                // the create timestamp for that resource.
+                final long createTime = resourceMetadata.getCreateTime();
+
+                if (createTime > commitTimeToPreserve) {
+
+                    /*
+                     * Do NOT delete any resources whose createTime is GTE the
+                     * given commit time.
+                     */
+                    
+                    break;
+                    
+                }
+                
                 final UUID uuid = resourceMetadata.getUUID();
 
                 if (resourcesInUse.contains(uuid)) {
@@ -2266,6 +2293,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 // add to set for batch remove.
                 keys.add(journalIndex.getKey(resourceMetadata.getCreateTime()));
 
+                njournals++;
+                
             }
 
             // remove entries from the journalIndex.
@@ -2284,6 +2313,8 @@ abstract public class StoreManager extends ResourceEvents implements
         /*
          * Delete old index segments.
          */
+        // #of segments deleted.
+        int nsegments = 0;
         {
 
             /*
@@ -2302,6 +2333,20 @@ abstract public class StoreManager extends ResourceEvents implements
                 final IResourceMetadata resourceMetadata = (IResourceMetadata) SerializerUtil
                         .deserialize(tuple.getValue());
 
+                // the create timestamp for that resource.
+                final long createTime = resourceMetadata.getCreateTime();
+
+                if (createTime > commitTimeToPreserve) {
+
+                    /*
+                     * Do NOT delete any resources whose createTime is GTE the
+                     * given commit time.
+                     */
+                    
+                    break;
+                    
+                }
+                
                 final UUID uuid = resourceMetadata.getUUID();
 
                 if (resourcesInUse.contains(uuid)) {
@@ -2319,6 +2364,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 
                 // add to set for batch remove.
                 keys.add(segmentIndex.getKey(resourceMetadata.getCreateTime(), uuid));
+
+                nsegments++;
                 
             }
 
@@ -2335,6 +2382,11 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
+        log.info("Given " + resourcesInUse.size()
+                + " resources that are in use as of timestamp="
+                + commitTimeToPreserve + ", deleted " + njournals
+                + " journals and " + nsegments + " segments");
+        
     }
     
     /**
