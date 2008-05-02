@@ -30,6 +30,7 @@ import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
@@ -43,8 +44,10 @@ import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -86,6 +89,42 @@ import com.bigdata.resources.ResourceManager;
  * The trick is how this might effect non-concurrent users of {@link Name2Addr} -
  * those directly using the {@link IJournal} API rather than submitting tasks
  * for concurrent execution.
+ * <p>
+ * AH HA!
+ * <p>
+ * The underlying problem has been in fact the visibility of changes to the
+ * commit list. This has been showing up primarily as lost notifications of
+ * dirty btrees. What happens is that a btree sends {@link Name2Addr} notice
+ * that it is dirty. If that notice is CONCURRENT with
+ * {@link #handleCommit(long)} then the notice is lost when the commit list is
+ * cleared. I've jiggled the code a bit and that specific problem no longer
+ * arises, but a notice can still arrive before a commit causing the named index
+ * to be cleared from the commit list before the task has actually finished
+ * execution - another we have another lost update! This is "patched" in
+ * AbstractTask which is explicitly jambing things onto the commit list, but the
+ * real change is to the visibility.
+ * <p>
+ * 
+ * A tasks intentions towards the {@link Name2Addr} index (adds, drops, and
+ * "hey, i'm dirty" MUST be buffered until the task completes and then
+ * atomically migrated down onto the {@link Name2Addr} object where it will be
+ * made restart safe with the next commit.
+ * 
+ * <pre>
+ * ERROR: 27498 pool-1-thread-40  9730ead2-3fd8-4b8b-8a5f-b716e8466fd1 commitCounter=9 com.bigdata.rdf.store.Term2IdWriteProc [test_term2id] 0 running  com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.checkpointIndices(AbstractTask.java:1216): index not on commit list: name=test_term2id, checkpoint(before)=Checkpoint{height=3,nnodes=100,nleaves=1605,nentries=25695,counter=25695,addrRoot=72660444774767,addrMetadata=183072981501,addrCheckpoint=72685073727568}
+ * ERROR: 27498 pool-1-thread-40  9730ead2-3fd8-4b8b-8a5f-b716e8466fd1 commitCounter=9 com.bigdata.rdf.store.Term2IdWriteProc [test_term2id] 0 running  com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.checkpointIndices(AbstractTask.java:1223): index not on commit list: name=test_term2id, checkpoint(after )=Checkpoint{height=3,nnodes=156,nleaves=2688,nentries=49649,counter=49649,addrRoot=288123451867591,addrMetadata=183072981501,addrCheckpoint=288153986400336}
+ * </pre>
+ * 
+ * Said another way:
+ * <p>
+ * The problem is concurrency in the data structure that keeps track of add/drop
+ * for named indices and when those indices become dirty. It was written back in
+ * the old single-threaded world and fails to account for concurrent tasks
+ * running during a commit. What I need to do is make the add/drop/dirty notices
+ * an atomic state change when the task completes and synchronization to prevent
+ * that happening concurrently with commit processing.
+ * </p>
+ * 
  */
 public class Name2Addr extends BTree {
 
@@ -204,9 +243,20 @@ public class Name2Addr extends BTree {
                 
             }
 
+            if(INFO)
             log.info("Adding dirty index to commit list: ndx=" + name);
 
-            commitList.putIfAbsent(name, this);
+            /*
+             * Note: This MUST be synchronized on the commitList to prevent loss
+             * of dirty notifications that arrive while a concurrent commit is
+             * in progress.
+             */
+            
+            synchronized(commitList) {
+
+                commitList.putIfAbsent(name, this);
+                
+            }
             
         }
 
@@ -276,14 +326,18 @@ public class Name2Addr extends BTree {
     }
     
     /**
-     * True iff the index is on the commit list.
+     * True iff the named index is on the commit list.
      * 
-     * @param btree
-     * 
-     * @return
+     * @param name
+     *            The index name.
      */
     boolean willCommit(String name) {
     
+        /*
+         * Note: does not need to be synchronized since the commitList is
+         * thread-safe.
+         */
+        
         return commitList.containsKey(name);
         
     }
@@ -296,8 +350,29 @@ public class Name2Addr extends BTree {
      */
     public long handleCommit(final long commitTime) {
 
-        // visit the indices on the commit list.
-        final Iterator<DirtyListener> itr = commitList.values().iterator();
+        /*
+         * Note: the commit list MUST be protected against concurrent
+         * modification during the commit (concurrent tasks could be reporting
+         * dirty btrees while we are doing a commit and those notices would be
+         * lost).
+         * 
+         * Indices get onto the commitList via the DirtyListener, so it is also
+         * synchronized on the commitList.
+         */
+        final DirtyListener[] a;
+        synchronized(commitList) {
+            
+            // snapshot the commit list to avoid concurrent mods.
+            a = commitList.values().toArray(new DirtyListener[]{});
+            
+            // clear the commit list.
+            commitList.clear();
+            
+        }
+
+        // visit the indices on the commit list. @todo just use for() loop.
+//        final Iterator<DirtyListener> itr = commitList.values().iterator();
+        final Iterator<DirtyListener> itr = Arrays.asList(a).iterator();
         
         while(itr.hasNext()) {
             
@@ -367,8 +442,8 @@ public class Name2Addr extends BTree {
             
         }
 
-        // Clear the commit list.
-        commitList.clear();
+//        // Clear the commit list.
+//        commitList.clear();
         
         // and flushes out this btree as well.
         return super.handleCommit(commitTime);
@@ -613,8 +688,17 @@ public class Name2Addr extends BTree {
         
         final DirtyListener l = new DirtyListener(name,btree);
         
-        // add to the commit list.
-        commitList.put( name, l );
+        /*
+         * Add to the commit list.
+         * 
+         * Note: MUST be synchronized since the change could otherwise be lost
+         * with a concurrent commit.
+         */
+        synchronized(commitList) {
+         
+            commitList.put( name, l );
+            
+        }
 
         // set listener on the btree as well.
         ((BTree)btree).setDirtyListener( l );
@@ -657,7 +741,6 @@ public class Name2Addr extends BTree {
              * Note: If the index is not in the index cache then it WILL NOT be
              * in the commit list.
              */
-            
             commitList.remove(name);
             
             // clear our listener.
@@ -738,6 +821,32 @@ public class Name2Addr extends BTree {
          * and the change is already buffered on name2addr's backing btree.
          */
         commitList.remove(entry.name);
+
+    }
+
+    /**
+     * Return a counter set reflecting the named indices that are currently open
+     * (more accurately, those open named indices whose references are in
+     * {@link Name2Addr}s internal {@link #indexCache}).
+     * 
+     * @return A new {@link CounterSet} reflecting the named indices that were
+     *         open as of the time that this method was invoked.
+     */
+    public CounterSet getNamedIndexCounters() {
+
+        final CounterSet tmp = new CounterSet();
+        
+        final Iterator<ICacheEntry<String,BTree>> itr = indexCache.entryIterator();
+        
+        while (itr.hasNext()) {
+
+            final ICacheEntry<String, BTree> entry = itr.next();
+
+            tmp.makePath(entry.getKey()).attach(entry.getObject().getCounters());
+
+        }
+        
+        return tmp;
 
     }
     

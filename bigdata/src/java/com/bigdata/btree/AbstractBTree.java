@@ -357,7 +357,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
                     new OneShotInstrument<Integer>(
                             getWriteRetentionQueueCapacity()));
 
-            counterSet.addCounter("#queueSize", new Instrument<Integer>() {
+            counterSet.addCounter("queueSize", new Instrument<Integer>() {
                 protected void sample() {
                     setValue(getWriteRetentionQueueDistinctCount());
                 }
@@ -2057,7 +2057,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
             }
             
-            counters.serializeTimeNanos += System.nanoTime() - begin;
+            counters.serializeNanos += System.nanoTime() - begin;
             
         }
         
@@ -2069,7 +2069,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             
             addr = store.write(buf);
 
-            counters.writeTimeNanos += System.nanoTime() - begin;
+            counters.writeNanos += System.nanoTime() - begin;
     
             counters.bytesWritten += store.getByteCount(addr);
 
@@ -2135,7 +2135,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
                     + tmp.limit() + ", byteCount(addr)="
                     + store.getByteCount(addr)+", addr="+store.toString(addr);
 
-            counters.readTimeNanos += System.nanoTime() - begin;
+            counters.readNanos += System.nanoTime() - begin;
             
             final int bytesRead = tmp.limit();
 
@@ -2153,7 +2153,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             
             node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
 
-            counters.deserializeTimeNanos += System.nanoTime() - begin;
+            counters.deserializeNanos += System.nanoTime() - begin;
             
         }
 

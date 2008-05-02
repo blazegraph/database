@@ -37,9 +37,12 @@ import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
@@ -139,11 +142,16 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 //        }
 //    }
 
+    /*
+     * Flag enables optional ground truth verification. This is not a scaleable
+     * option! It is only enabled at the DEBUG level IFF this flag is ALSO set.
+     */
+    private static boolean enableGroundTruth = false;
     private static ConcurrentHashMap<Long,byte[]> groundTruthId2Term;
     private static ConcurrentHashMap<byte[],Long> groundTruthTerm2Id;
     static {
         
-        if(DEBUG) {
+        if (DEBUG && enableGroundTruth) {
         
             log.warn("Will track ground truth assignments");
             
@@ -233,6 +241,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         // used to serialize term identifers.
         final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
         
+        // #of new terms (#of writes on the index).
+        int nnew = 0;
         for (int i = 0; i < numTerms; i++) {
 
             final byte[] key = getKey(i);
@@ -296,7 +306,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 
                 termId = id;
                 
-                if(DEBUG) {
+                if (DEBUG && enableGroundTruth) {
                     
                     if(groundTruthId2Term.isEmpty()) {
                         
@@ -373,6 +383,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                     throw new AssertionError();
 
                 }
+                
+                nnew++;
 
             } else { // found.
 
@@ -392,6 +404,37 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
+        /*
+         * comment out - this is for debugging (it does not actually rely on
+         * ground truth and was used to help track down a lost updates problem).
+         */
+        if (enableGroundTruth && ndx.getIndexMetadata().getPartitionMetadata() != null) {
+            
+            // the partition identifier (assuming index is partitioned).
+            final long id0 = counter.get();
+            final long pid = id0 >> 32;
+            final long mask = 0xffffffffL;
+            final int ctr = (int) (id0 & mask);
+
+            // note: the mutable btree - accessed here for debugging only.
+            final BTree btree;
+            if (ndx instanceof AbstractBTree) {
+                btree = (BTree) ndx;
+            } else {
+                btree = (BTree) ((FusedView) ndx).getSources()[0];
+            }
+            
+            log.warn("after task"+
+            ": nnew="+nnew+//
+            ", partitionId="+ndx.getIndexMetadata().getPartitionMetadata().getPartitionId()+//
+            ", pid="+pid+//
+            ", ctr="+ctr+//
+            ", counter="+counter.getClass().getName()+//
+            ", sourceCheckpoint="+btree.getCheckpoint()// btree was loaded from here.
+            );
+            
+        }
+        
         return new Result(ids);
 
     }

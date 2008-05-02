@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -1576,6 +1577,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         .isOpen()
                 || InnerCause.isInnerCause(t,
                         InterruptedException.class)
+                || InnerCause.isInnerCause(t,
+                        CancellationException.class)
                 || InnerCause.isInnerCause(t,
                         ClosedByInterruptException.class)
                 || InnerCause.isInnerCause(t,

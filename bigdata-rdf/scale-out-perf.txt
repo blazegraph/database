@@ -358,15 +358,32 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
           subdirectory?  Could work, but need to fiddle with the jini
           config and CLASSPATH.
 
-      - Try with dynamically determined index partitions.
+      - ***** dynamic index partitions.
 
-        Start with either single or double host placement of the
+        - Start with either single or double host placement of the
         initial index partitions.
 
-	Watch the load balancer and see how host utilization and
+	- Watch the load balancer and see how host utilization and
         service response time change as the run progresses, for
         different #of client threads, and as index splits occur, and
         as index moves occur.
+
+	- Do we need to load the full view to choose tasks?  to choose
+          joins?  This causes index segments to be loaded to support
+          that view.  We could get an approximate range count just
+          using the checkpoint record for the mutable BTree(s) and the
+          segment store(s).
+
+	- Review split point choices.  Do they split into key ranges
+          of more or less equal range counts?
+
+	- Implement constraint on split rule for the row store.
+
+	- Looks like overflow is being triggered way to soon
+          (examining DumpJournal output shows that the journal was not
+          nearly at its capacity).  This may be related to a lost
+          commit problem that I am working on (without that commit the
+          journal appears to be entering overflow too early).
 
 	Delay start of some data services, either on each host or on
         one of the hosts and then see how the load changes once we
@@ -779,12 +796,12 @@ Short term tasks:
        vs index segment stores and BTree vs IndexSegments using the
        same technique.
 
-       The statistics that are used by the overflow manager to compute
-       which indices are move candidates are not being exposed via the
-       counters to the LBS.  This includes all of the per-index bytes
-       read, bytes written, etc. data.
+       Done. The statistics that are used by the overflow manager to
+       compute which indices are move candidates are not being exposed
+       via the counters to the LBS.  This includes all of the
+       per-index bytes read, bytes written, etc. data.
 
-     - (**) The IndexManager should report the index partitions on the
+     - Done. The IndexManager should report the index partitions on the
        data service, at least until this exceeds 100s of indices.
        This should be done not via counters but rather via the httpd
        service itself making an RMI request to the data service and
@@ -836,6 +853,8 @@ Short term tasks:
        might be useful here so that the filter reads down to a service
        name or type and then back up to reveal the service.
 
+       &filter=Secs&depth=10  - shows the "time" counters for indices.
+
      - May be loosing some samples by running multiple typeperf's at
        once.  Explore.  If true, then trying combining all w/in same
        JVM using reference counter for process or identifying one
@@ -847,6 +866,13 @@ Short term tasks:
 
      - syslogd integration so that I see ERROR and FATAL messages for
        the hosts in the federation.
+
+     - Done. Add option to NOT run typeperf and use for the unit tests
+       of the services when performance counters are not required.
+
+     - Add reporting by the client on the indices that it is using.
+
+     - Add reporting to the concurrent data loader for #errors.
 
    - LocalTripleStoreWithEmbeddedDataService
 
@@ -953,10 +979,6 @@ Short term tasks:
       - Modify WeakValueCache to use ConcurrentHashMap and support an
         atomic putIfAbsent operation.  This will reduce the latency
         imposed when we need to re-open an index segment from a store.
-
-      - (***) StoreManager#getEarliestDependencyTimestamp() is not
-        implemented.  Old store files will not be released as a
-        result unless you explicitly set the release time.
 
       - Should recognize a "disk full" situation and shutdown the data
         service cleanly.
@@ -1230,10 +1252,15 @@ Short term tasks:
      split, move, and join.  See services/StressTestConcurrent. It can
      be parameterized for this purpose.
 
-   - streaming io for block read/write.  note that asynch IO for the
-     disk only strategy will not have an impact if we are doing
-     commits whose size fits within a single write cache (10M by
-     default).
+   - streaming io for block read/write.
+
+     - Asynch IO for the disk only strategy will not have an impact if
+       we are doing commits whose size fits within a single write
+       cache (10M by default).
+
+     - Use a pool of direct buffers for the data service and handle
+       all block io/out requests with that pool.  this will help about
+       OOM problems with "temporary" direct byte buffers.
 
    - write performance test drivers and run on cluster.
 
@@ -1281,12 +1308,6 @@ Short term tasks:
 	- Done. Verify that there is an atomic commit point for the
           IndexSegment so that partial index segment writes can be
           recognized.
-
-	- (***) Add post-load validation to make sure that the
-	  concurrent data load is really correct and run that
-	  validation after a db restart.  This will probably require
-	  that I write the bulk term scan and get the validation unit
-	  tests running for scale-out modes.
  
 	  ============================================================
 
@@ -1314,6 +1335,15 @@ Short term tasks:
 
 	  **** Measure the effect of the WriteCache on U100 and U1000.
                Measure again with the onboard disk cache disabled.
+
+	  **** Write logic to validate the KB load and run it against
+	       the result.  I will have to stop before I run out of
+	       space on the disk, so maybe U500 rather than U1000 - or
+	       maybe U1000 will be Ok with periodic index segment
+	       builds.
+
+          **** Compare performance with 1M and 10M write cache
+               capacity.
 
 	  http://192.168.20.28:8080/
 
@@ -1359,12 +1389,75 @@ Short term tasks:
 
 ============================================================
 
-**** Write logic to validate the KB load and run it against the
-     result.  I will have to stop before I run out of space on the
-     disk, so maybe U500 rather than U1000 - or maybe U1000 will be Ok
-     with periodic index segment builds.
 
-**** Compare performance with 1M and 10M write cache capacity.
+again: wrote a bunch of stuff on term2id#2.
 
-**** Add option to NOT run typeperf and use for the unit tests of the
-     services when performance counters are not required.
+WARN : 51885 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
+commitCounter=25 com.bigdata.rdf.store.Term2IdWriteProc
+[test_term2id#2] 0 running
+com.bigdata.rdf.store.Term2IdWriteProc.apply(Term2IdWriteProc.java:408):
+after task: nnew=68639, partitionId=2, pid=2, ctr=68639,
+counter=com.bigdata.btree.BTree$PartitionedCounter
+
+wrote the checkpoint: you can see the entries and the counter.
+
+WARN : 51901 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
+commitCounter=25 com.bigdata.rdf.store.Term2IdWriteProc
+[test_term2id#2] 0 running
+com.bigdata.btree.BTree.writeCheckpoint(BTree.java:798):
+name=test_term2id,
+wroteCheckpoint=Checkpoint{height=3,nnodes=515,nleaves=8272,nentries=132359,counter=68639,addrRoot=931326546936492,addrMetadata=640177223500687,addrCheckpoint=931372449398865}
+
+did a commit and paused the write service for overflow:
+
+WARN : 51948 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
+commitCounter=27 com.bigdata.rdf.store.Term2IdWriteProc
+[test_term2id#2] 0 didCommit
+com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1624):
+commit: #writes=1, timestamp=1209740862337, paused!
+
+closed the journal against further writes: has the same lastCommitTime.
+
+WARN : 51948 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
+commitCounter=27 com.bigdata.rdf.store.Term2IdWriteProc
+[test_term2id#2] 0 doSyncOverflow
+com.bigdata.journal.AbstractJournal.closeForWrites(AbstractJournal.java:1383):
+Closing journal for further writes: closeTime=1209740862384,
+lastCommitTime=1209740862337
+
+the precondition view of the _correct_ journal as of that lastCommitTime
+
+pre-condition views: overflowCounter=1
+timestamp=-1209740862337
+journal=JournalMetadata{size=38796624,filename=journal62594.jnl,uuid=22a942ff-c952-4675-a4e6-c90b8af1e0d9,createTime=1209740844620}
+
+shows the wrong checkpoint record:
+
+name=test_term2id#2, checkpoint=Checkpoint{height=3,nnodes=248,nleaves=3982,nentries=63720,counter=0,addrRoot=801045424898358,addrMetadata=640177223500687,addrCheckpoint=801066228645966}, pmd={ partitionId=2, leftSeparator=[134, 128, 0, 0, 0, 0, 0, 12, 252, 128, 0, 0, 0, 0, 0, 175, 32, 128, 0, 0, 0, 0, 0, 5, 76], rightSeparator=null, resourceMetadata=[JournalMetadata{size=38796624,filename=journal62594.jnl,uuid=22a942ff-c952-4675-a4e6-c90b8af1e0d9,createTime=1209740844620}, SegmentMetadata{size=1567071,filename=test_term2id_part00000_62601.seg,uuid=7481ea13-9fb5-4491-9ce4-e61288f687b7,createTime=1209740844542}], history=createScaleOutIndex(name=test_term2id) register(name=test_term2id#0,partitionId=0) chooseSplitPoint(oldPartitionId=0,nsplits=2,newPartitionId=2) registerAfterSplit(name=test_term2id#2,partitionId=2) }
+and a dump of the journal also shows the (same) wrong checkpoint record:
+
+name=test_term2id#2, addr={nbytes=78,offset=11936817}
+	Checkpoint{height=3,nnodes=248,nleaves=3982,nentries=63720,counter=0,addrRoot=801045424898358,addrMetadata=640177223500687,addrCheckpoint=801066228645966}
+
+Ergo, the checkpoint did not enter into the last commit.
+
+============================================================
+
+- ***** Index dirty but not on the commit list in AbstractTask.  This
+  is definately the source of the previous problem.
+
+- Visiblility problem in Name2Addr.  This becomes a problem when a
+  task fails since it could have had side-effects on Name2Addr that
+  are visible to other tasks.
+
+- ***** Modify AbstractTask to flush indices while it holds its locks.
+        This is especially important since we have to be synchronized
+        on Name2Addr during commit processing in order to have a
+        coherent view of the commitList.
+
+- Reduce StatementBuffer size so that writes have reasonable latency
+  (measure on the client index view's thread pool using counters)
+
+- Dumping of the Queue in the ConcurrentDataLoader is not enlightening
+  as the objects wrap our tasks.  Maybe they could be unwrapped?  The
+  purpose is too learn more about why a flush task sometimes stalls.

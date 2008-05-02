@@ -47,6 +47,9 @@ import org.xml.sax.SAXException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated Never implemented fully.  it's easier to periodically attach and
+ * detach the counters.
  */
 abstract public class LazyEvaluationCounterSet implements ICounterSet {
 
