@@ -125,6 +125,12 @@ import com.bigdata.resources.ResourceManager;
  * that happening concurrently with commit processing.
  * </p>
  * 
+ * Note: there needs to be additional synchronization when reading through to
+ * the underlying BTree since access to that object is no longer single threaded
+ * (commits concurrent with everything else). I've synchronized
+ * {@link #handleCommit(long)} for the moment which might do the trick, but this
+ * needs to be re-examined.
+ * 
  */
 public class Name2Addr extends BTree {
 
@@ -348,6 +354,7 @@ public class Name2Addr extends BTree {
      * within its internal mapping, and finally flushes itself and returns the
      * address from which this btree may be reloaded.
      */
+    synchronized
     public long handleCommit(final long commitTime) {
 
         /*
