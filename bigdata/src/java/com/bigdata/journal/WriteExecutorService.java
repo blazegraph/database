@@ -40,6 +40,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -142,6 +143,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
+    
+    /**
+     * When <code>true</code>, writes the set of {@link #active} tasks into
+     * the {@link MDC} under the <code>activeTasks</code> key. This is of
+     * interest if you want to know which tasks are in the same commit group.
+     */
+    final boolean trackActiveSetInMDC = false; // MUST be false for deploy
 
     private final IResourceManager resourceManager;
     
@@ -297,7 +305,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private long maxRunning = 0;
     private long maxLatencyUntilCommit = 0;
     private long maxCommitLatency = 0;
-    private long ngroupCommits = 0;
+    private AtomicLong ngroupCommits = new AtomicLong();
     private long naborts = 0;
     private long failedTaskCount = 0;
     private long successTaskCount = 0;
@@ -350,7 +358,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     public long getGroupCommitCount() {
         
-        return ngroupCommits;
+        return ngroupCommits.get();
         
     }
     
@@ -570,7 +578,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             MDC.put("taskState", "running");
 
-            MDC.put("commitCounter",Long.toString(ngroupCommits));
+            MDC.put("commitCounter","commitCounter="+ngroupCommits);
 
             if(INFO)
                 log.info("nrunning="+nrunning);
@@ -582,17 +590,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
     
     }
-    
-    /**
-     * When <code>true</code>, writes the set of {@link #active} tasks into
-     * the {@link MDC} under the <code>activeTasks</code> key. This is of
-     * interest if you want to know which tasks are in the same commit group.
-     * 
-     * @todo the task should be decorated with information reflecting its state
-     *       in the {@link WriteExecutorService}, e.g., whether it is running,
-     *       waiting on a commit, etc.
-     */
-    final boolean trackActiveSetInMDC = true;
     
     /**
      * This is executed after {@link AbstractTask#doTask()}. If the task
@@ -968,7 +965,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 commit.await();
 
                 // did commit, so the commit counter was updated.
-                MDC.put("commitCounter",Long.toString(ngroupCommits));
+                MDC.put("commitCounter","commitCounter="+ngroupCommits);
 
                 return true;
 
@@ -1594,21 +1591,55 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * journal to commit.
              */
 
+            if (paused) {
+                
+                /*
+                 * Note: the write service is paused before overflow processing
+                 * so this is the last commit before we overflow the journal.
+                 */
+                
+                log.warn("before: "+journal.getRootBlockView());
+                
+            }
+
             final long timestamp = journal.commit();
+            
+            if (timestamp == 0L) {
+
+                log.warn("Nothing to commit");
+
+                return true;
+                
+            }
 
             // #of commits that succeeded.
-            ngroupCommits++;
+            ngroupCommits.incrementAndGet();
             
             // did commit, so the commit counter was updated.
-            MDC.put("commitCounter",Long.toString(ngroupCommits));
+            MDC.put("commitCounter","commitCounter="+ngroupCommits);
 
             // this task did the commit.
             MDC.put("taskState", "didCommit");
             
-            if (INFO)
+            if (INFO) {
+            
                 log.info("commit: #writes=" + nwrites + ", timestamp="
                         + timestamp);
-            
+                
+            } else if (paused) {
+                
+                /*
+                 * Note: the write service is paused before overflow processing
+                 * so this is the last commit before we overflow the journal.
+                 */
+                
+                log.warn("commit: #writes=" + nwrites + ", timestamp="
+                        + timestamp + ", paused!");
+                
+                log.warn("after : "+journal.getRootBlockView());
+                
+            }
+
             return true;
 
         } catch (Throwable t) {

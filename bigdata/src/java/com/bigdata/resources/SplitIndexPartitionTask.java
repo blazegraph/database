@@ -6,8 +6,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Future;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
@@ -216,10 +218,18 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             throw new IllegalStateException();
 
         final String name = getOnlyResource();
-        
+                
+        // Note: fused view for the source index partition.
         final IIndex src = getIndex(name);
         
-        log.info("begin: name="+name);
+        // note: the mutable btree - accessed here for debugging only.
+        final BTree btree;
+        if (src instanceof AbstractBTree) {
+            btree = (BTree) src;
+        } else {
+            btree = (BTree) ((FusedView) src).getSources()[0];
+        }
+        log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+btree.getCheckpoint());
         
 //        final long createTime = Math.abs(startTime);
         
@@ -251,20 +261,27 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             /*
              * No splits were choosen so the index will not be split at this
              * time. Instead we do a normal index segment build task.
+             * 
+             * Note: The logic here is basically identical to the logic used by
+             * BuildIndexPartitionTask. In fact, we could just submit an
+             * instance of that task and return its result. This is not a
+             * problem since these tasks do not hold any locks until the atomic
+             * update task runs.
              */
             
             log.info("No splits were identified - will do build instead.");
-            
+
             // the file to be generated.
             final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
-
-            // build the index segment in this thread (we already have a read lock).
-            final BuildResult result = resourceManager.buildIndexSegment(
-                    name, src, outFile, lastCommitTime, null/* fromKey */, null/* toKey */);
+           
+            // build the index segment in this thread.
+            final BuildResult result = resourceManager
+                    .buildIndexSegment(name, src, outFile, lastCommitTime,
+                            null/* fromKey */, null/* toKey */);
             
             // create task that will update the index partition view definition.
-            final AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
-                    concurrencyManager, name, result);
+            final AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(
+                    resourceManager, concurrencyManager, name, result);
 
             // submit task and wait for it to complete @todo config timeout?
             concurrencyManager.submit(task).get();
@@ -386,8 +403,8 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
     }
     
     /**
-     * Task used to build an {@link IndexSegment} from a key-range of an index
-     * during a {@link SplitIndexPartitionTask}.
+     * Task used to build an {@link IndexSegment} from a restricted key-range of
+     * an index during a {@link SplitIndexPartitionTask}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -437,6 +454,15 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             final String name = getOnlyResource();
             
             final IIndex src = getIndex(name);
+
+            // note: the mutable btree - accessed here for debugging only.
+            final BTree btree;
+            if (src instanceof AbstractBTree) {
+                btree = (BTree) src;
+            } else {
+                btree = (BTree) ((FusedView) src).getSources()[0];
+            }
+            log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+btree.getCheckpoint());
 
             final LocalPartitionMetadata pmd = (LocalPartitionMetadata)split.pmd;
 
@@ -578,6 +604,11 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             
         }
 
+        /**
+         * Atomic update.
+         * 
+         * @return <code>null</code>.
+         */
         @Override
         protected Object doTask() throws Exception {
 
@@ -590,19 +621,21 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             // the name of the source index.
             final String name = splitResult.name;
             
-            log.info("atomic update: index=" + scaleOutIndexName
-                    + ", partition=" + name + ", splitResult=" + splitResult);
-            
             /*
              * Note: the source index is the BTree on the live journal that has
-             * been absorbing writes since the last overflow. This is NOT a
-             * fused view. All we are doing is re-distributing the buffered
-             * writes onto the B+Trees buffering writes for the new index
-             * partitions created by the split.
+             * been absorbing writes since the last overflow (while the split
+             * was running asynchronously). This is NOT a fused view. All we are
+             * doing is re-distributing the buffered writes onto the B+Trees
+             * buffering writes for the new index partitions created by the
+             * split.
              */
             final BTree src = (BTree) resourceManager.getIndexOnStore(name,
                     ITx.UNISOLATED, resourceManager.getLiveJournal()); 
             
+            log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+src.getCheckpoint());
+
+            log.info("src=" + name + ", splitResult=" + splitResult);
+
             // the value of the counter on the source BTree.
             final long oldCounter = src.getCounter().get();
             

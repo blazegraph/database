@@ -90,9 +90,17 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
                 .toString());
         
         // when the data are persistent use the test to name the data directory.
-        properties.setProperty(com.bigdata.service.EmbeddedClient.Options.DATA_DIR,
-                getName());
+        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
         
+        /*
+         * Disable the o/s specific statistics collection for the test run.
+         * 
+         * Note: You only need to enable this if you are trying to track the
+         * statistics or if you are testing index partition moves, since moves
+         * rely on the per-host counters collected from the o/s.
+         */
+        properties.setProperty(EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS,"false");
+
         // disable moves.
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"0");
         

@@ -887,6 +887,7 @@ abstract public class IndexManager extends StoreManager {
         
         sb.append("timestamp="+timestamp+"\njournal="+journal.getResourceMetadata());
 
+        // historical view of Name2Addr as of that timestamp.
         final ITupleIterator itr = journal.getName2Addr(timestamp).rangeIterator(
                 null, null);
         
@@ -915,7 +916,7 @@ abstract public class IndexManager extends StoreManager {
             final LocalPartitionMetadata pmd = indexMetadata
                     .getPartitionMetadata();
 
-            sb.append("\nname="+name+", pmd="+pmd);
+            sb.append("\nname="+name+", checkpoint="+btree.getCheckpoint()+", pmd="+pmd);
     
         }
 

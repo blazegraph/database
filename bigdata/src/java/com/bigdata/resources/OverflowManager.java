@@ -892,8 +892,10 @@ abstract public class OverflowManager extends IndexManager {
                     + getOverflowCount() + "\n"
                     + listIndexPartitions(-lastCommitTime));
 
+            // using read-committed view of Name2Addr
             final int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
 
+            // using read-committed view of Name2Addr
             final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(null,null);
 
             while (itr.hasNext()) {
@@ -1023,8 +1025,7 @@ abstract public class OverflowManager extends IndexManager {
                     System.arraycopy(oldResources, 0, newResources, 1,
                             oldResources.length);
 
-                    // new resource is listed first (reverse chronological
-                    // order)
+                    // new resource is listed first (reverse chronological order).
                     newResources[0] = newJournal.getResourceMetadata();
 
                     // describe the index partition.
@@ -1056,16 +1057,18 @@ abstract public class OverflowManager extends IndexManager {
                      */
                     indexMetadata.write(newJournal);
 
-                    // Propagate the counter to the new B+Tree.
+                    // note the current counter value.
                     final long oldCounter = oldBTree.getCounter().get();
 
                     if(INFO)
                     log.info("Re-defining view on new journal"//
                             + ": name=" + entry.name //
-                            + ", copyIndexThreashold=" + copyIndexThreshold //
-                            + ", entryCount=" + entryCount//
                             + ", copyIndex=" + copyIndex//
+//                            + ", copyIndexThreashold=" + copyIndexThreshold //
+                            + ", entryCount=" + entryCount//
                             + ", counter=" + oldCounter//
+                            + ", partitionId="+oldpmd.getPartitionId()//
+                            + ", checkpoint=" + oldBTree.getCheckpoint()//
                     );
 
                     // Create checkpoint for the new B+Tree.
@@ -1086,8 +1089,10 @@ abstract public class OverflowManager extends IndexManager {
                     final BTree newBTree = BTree.load(newJournal,
                             overflowCheckpoint.getCheckpointAddr());
 
+                    // Note the counter value on the new BTree.
                     final long newCounter = newBTree.getCounter().get();
                     
+                    // Verify the counter was propagated to the new BTree.
                     assert newCounter == oldCounter : "expected oldCounter="
                             + oldCounter + ", but found newCounter="
                             + newCounter;

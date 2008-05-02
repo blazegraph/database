@@ -1243,7 +1243,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
              * since they can be added and dropped at any time.
              * 
              * FIXME Lazy evaluation is not working yet. attach() assumes that
-             * it is attaching a CounterSet and tries to copy the children.
+             * it is attaching a CounterSet and tries to copy the children. This
+             * should be re-written to use detach() and attach() at a suitable
+             * period.  Perhaps when the ResourceManager runs its ReportTask in
+             * order to reflect the stats for the then-registered indices.
              */
             if(false)
             counters.makePath("indices").attach(new LazyEvaluationCounterSet(1000/*ms*/){
@@ -1256,6 +1259,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
                     if(!AbstractJournal.this.isOpen()) return tmp;
                     
+                    // read-committed view.
                     final IIndex name2Addr = getName2Addr();
 
                     final ITupleIterator itr = name2Addr.rangeIterator(null,
@@ -1382,6 +1386,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         
         log.warn("Closing journal for further writes: closeTime=" + closeTime
                 + ", lastCommitTime=" + _rootBlock.getLastCommitTime());
+
+        log.warn("before: "+_rootBlock);
         
         final IRootBlockView old = _rootBlock;
 
@@ -1402,12 +1408,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * non-zero commitCounter unless the commitRecordAddr and perhaps some
          * other stuff are non-zero as well.
          */
-        IRootBlockView newRootBlock = new RootBlockView(!old.isRootBlock0(),
-                old.getOffsetBits(), old.getNextOffset(), old
-                        .getFirstCommitTime(), old.getLastCommitTime(), old
-                        .getCommitCounter()+1, old.getCommitRecordAddr(), old
-                        .getCommitRecordIndexAddr(), old.getUUID(), old
-                        .getCreateTime(), closeTime, checker);
+        final IRootBlockView newRootBlock = new RootBlockView(//
+                !old.isRootBlock0(), old.getOffsetBits(), old.getNextOffset(),
+                old.getFirstCommitTime(), old.getLastCommitTime(), //
+                old.getCommitCounter() + 1, //
+                old.getCommitRecordAddr(), //
+                old.getCommitRecordIndexAddr(), //
+                old.getUUID(), //
+                old.getCreateTime(), closeTime, //
+                checker);
 
         /*
          * Write it on the store.
@@ -1426,6 +1435,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         
         // replace the root block reference.
         _rootBlock = newRootBlock;
+
+        log.warn("after: "+_rootBlock);
 
         // discard current commit record - can be re-read from the store.
         _commitRecord = null;
@@ -1815,7 +1826,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                  * store as read back from the current root block.
                  */
 
-                if(commitTime<= priorCommitTime) {
+                if (commitTime <= priorCommitTime) {
                     
                     throw new RuntimeException(
                             "Time goes backwards: commitTime=" + commitTime
@@ -1829,7 +1840,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             final long lastCommitTime = commitTime;
 
             // Create the new root block.
-            IRootBlockView newRootBlock = new RootBlockView(
+            final IRootBlockView newRootBlock = new RootBlockView(
                     !old.isRootBlock0(), old.getOffsetBits(), nextOffset,
                     firstCommitTime, lastCommitTime, newCommitCounter,
                     commitRecordAddr, commitRecordIndexAddr, old.getUUID(),

@@ -141,10 +141,16 @@ public class Checkpoint implements Externalizable {
      */
     public final String toString() {
 
-        return "Checkpoint{height=" + height + ",nnodes=" + nnodes
-                + ",nleaves=" + nleaves + ",nentries=" + nentries + ",counter="
-                + counter + ",addrRoot=" + addrRoot + ",addrMetadata="
-                + addrMetadata + ",addrCheckpoint=" + addrCheckpoint + "}";
+        return "Checkpoint" + //
+                "{height=" + height + //
+                ",nnodes=" + nnodes + //
+                ",nleaves=" + nleaves + //
+                ",nentries=" + nentries + //
+                ",counter=" + counter + //
+                ",addrRoot=" + addrRoot + //
+                ",addrMetadata=" + addrMetadata + //
+                ",addrCheckpoint=" + addrCheckpoint + //
+                "}";
         
     }
     
@@ -293,9 +299,9 @@ public class Checkpoint implements Externalizable {
      */
     public static Checkpoint load(IRawStore store, long addrCheckpoint) {
 
-        ByteBuffer buf = store.read(addrCheckpoint);
+        final ByteBuffer buf = store.read(addrCheckpoint);
 
-        Checkpoint checkpoint = (Checkpoint) SerializerUtil.deserialize(buf);
+        final Checkpoint checkpoint = (Checkpoint) SerializerUtil.deserialize(buf);
         
         checkpoint.addrCheckpoint = addrCheckpoint;
         

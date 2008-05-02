@@ -372,6 +372,10 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 
     /**
      * The mutable counter exposed by #getCounter()}.
+     * <p>
+     * Note: This is <code>protected</code> so that it will be visible to
+     * {@link Checkpoint} which needs to write the actual value store in this
+     * counter into its serialized record (without the partition identifier).
      */
     protected AtomicLong counter;
   
@@ -403,9 +407,18 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
                 metadata
                 );
         
-        assert checkpoint != null;
+        if (checkpoint == null) {
 
-        assert checkpoint.getMetadataAddr() == metadata.getMetadataAddr(); // must agree.
+            throw new IllegalArgumentException();
+            
+        }
+
+        if(checkpoint.getMetadataAddr() != metadata.getMetadataAddr()) {
+            
+            // must agree.
+            throw new IllegalArgumentException();
+            
+        }
 
         if (metadata.getConflictResolver() != null && !metadata.isIsolatable()) {
 
@@ -653,7 +666,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     /**
      * Return the {@link IDirtyListener}.
      */
-    final public IDirtyListener getListener() {
+    final public IDirtyListener getDirtyListener() {
         
         return listener;
         
@@ -774,7 +787,25 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         // write it on the store.
         checkpoint.write(store);
         
-        log.info("new checkpoint="+checkpoint);
+        if (true/*INFO*/) {
+            // FIXME remove this code - for debugging only and return the INFO
+        
+            // Note: this is the scale-out index name for a partitioned index.
+            final String name = metadata.getName();
+
+            if (name != null && name.contains("term2id")) {
+
+                log.warn("name=" + name + ", " + "wroteCheckpoint="
+                        + checkpoint);
+
+            } else {
+
+                log.info((name == null ? "" : "name=" + name + ", ")
+                        + "wroteCheckpoint=" + checkpoint);
+
+            }
+        
+        }
         
         // return address of that checkpoint record.
         return checkpoint.getCheckpointAddr();
@@ -789,6 +820,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     final public Checkpoint getCheckpoint() {
 
+        assert checkpoint != null;
+        
         return checkpoint;
         
     }
@@ -840,9 +873,34 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     public boolean needsCheckpoint() {
 
+        if(checkpoint.addrCheckpoint == 0L) {
+            
+            /*
+             * The checkpoint record needs to be written.
+             */
+            
+            return true;
+            
+        }
+        
         if(metadata.getMetadataAddr() == 0L) {
             
-            // The index metadata record was replaced.
+            /*
+             * The index metadata record was replaced and has not yet been
+             * written onto the store.
+             */
+            
+            return true;
+            
+        }
+        
+        if(metadata.getMetadataAddr() != checkpoint.getMetadataAddr()) {
+            
+            /*
+             * The index metadata record was replaced and has been written on
+             * the store but the checkpoint record does not reflect the new
+             * address yet.
+             */
             
             return true;
             
@@ -877,7 +935,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         }
 
         /*
-         * No apparant change in persistent state so we do NOT need to do a
+         * No apparent change in persistent state so we do NOT need to do a
          * checkpoint.
          */
         
@@ -1133,6 +1191,16 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
          */
         final IndexMetadata metadata = IndexMetadata.read(store,
                 checkpoint.getMetadataAddr());
+
+      if (INFO) {
+
+          // Note: this is the scale-out index name for a partitioned index.
+          final String name = metadata.getName();
+          
+          log.info((name == null ? "" : "name=" + name + ", ")
+                    + "readCheckpoint=" + checkpoint);
+          
+      }
 
         /*
          * Create B+Tree object instance.
