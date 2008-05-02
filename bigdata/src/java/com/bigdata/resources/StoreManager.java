@@ -1660,13 +1660,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        // @Override
-        // public long commit() {
-        //
-        // return commitNow(nextTimestamp());
-        //            
-        // }
-
     }
 
     /**

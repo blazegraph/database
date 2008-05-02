@@ -1236,69 +1236,29 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
             counters.attach(_bufferStrategy.getCounters());
 
-            /*
-             * Report on the registered indices (read-committed view).
-             * 
-             * Note: this always re-generates the counter set for the indices
-             * since they can be added and dropped at any time.
-             * 
-             * FIXME Lazy evaluation is not working yet. attach() assumes that
-             * it is attaching a CounterSet and tries to copy the children. This
-             * should be re-written to use detach() and attach() at a suitable
-             * period.  Perhaps when the ResourceManager runs its ReportTask in
-             * order to reflect the stats for the then-registered indices.
-             */
-            if(false)
-            counters.makePath("indices").attach(new LazyEvaluationCounterSet(1000/*ms*/){
-                
-                public CounterSet refreshCounterSet() {
-
-                    log.info("Refreshing index counter set.");
-                    
-                    final CounterSet tmp = new CounterSet();
-
-                    if(!AbstractJournal.this.isOpen()) return tmp;
-                    
-                    // read-committed view.
-                    final IIndex name2Addr = getName2Addr();
-
-                    final ITupleIterator itr = name2Addr.rangeIterator(null,
-                            null);
-
-                    while (itr.hasNext()) {
-
-                        final ITuple tuple = itr.next();
-
-                        final Entry entry = EntrySerializer.INSTANCE
-                                .deserialize(tuple.getValueStream());
-
-                        final IIndex ndx = getIndex(entry.checkpointAddr);
-
-                        /*
-                         * @todo might have to clone the counters since the
-                         * could already be attached.
-                         * 
-                         * @todo if the path separator shows up in the index
-                         * name then it will cause the path to be broken down
-                         * into more components than are warranted.
-                         */
-
-                        tmp.makePath(entry.name).attach(ndx.getCounters());
-
-                    }
-                    
-                    return tmp;
-
-                }
-                
-            });
-
         }
 
         return counters;
         
     }
     private CounterSet counters;
+
+    /**
+     * Returns a {@link CounterSet} that it reflects the counters for the
+     * currently open unisolated named indices as reported by
+     * {@link Name2Addr#getNamedIndexCounters()}.
+     */
+    public CounterSet getNamedIndexCounters() {
+
+        log.info("Refreshing index counter set.");
+
+        synchronized (name2Addr) {
+
+            return name2Addr.getNamedIndexCounters();
+
+        }
+            
+    }
     
     public File getFile() {
         
@@ -1376,7 +1336,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @throws IllegalStateException
      *             If there are no commits on the journal.
      * 
-     * FIXME There should also be an option to convert a journal from
+     * @todo There should also be an option to convert a journal from
      * {@link BufferMode#Direct} to {@link BufferMode#Disk}. We would want to
      * do that not when the journal is sealed but as soon as asynchronous
      * overflow processing is done. Ideally this will not require us to close

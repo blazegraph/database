@@ -744,7 +744,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 //                20   // sampleRate
 //                );
         
-      if (name.contains(name_term2Id)) // causes a problem 
+//      if (name.contains(name_term2Id)) // causes a problem 
 //      if (name.contains(name_id2Term)) // no problem.
 //        if(!name.contains(name_term2Id)) // no problem.
             {

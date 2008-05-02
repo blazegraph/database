@@ -173,6 +173,9 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                 
                 final CounterSet tmp = root.makePath("Index Manager");
 
+                // save a reference.
+                indexManagerRoot = tmp;
+                
                 tmp.addCounter("Stale Locator Cache Size",
                         new Instrument<Long>() {
                             public void sample() {
@@ -259,6 +262,22 @@ abstract public class ResourceManager extends OverflowManager implements IResour
         
     }
     private CounterSet root;
+    
+    /**
+     * The counter set that corresponds to the {@link IndexManager}.
+     */
+    public CounterSet getIndexManagerCounters() {
+        
+        if(indexManagerRoot ==null) {
+            
+            getCounters();
+            
+        }
+        
+        return indexManagerRoot;
+        
+    }
+    private CounterSet indexManagerRoot;
         
     /**
      * {@link ResourceManager} options.

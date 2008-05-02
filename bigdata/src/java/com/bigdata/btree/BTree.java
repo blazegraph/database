@@ -690,7 +690,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     final protected void fireDirtyEvent() {
         
-        IDirtyListener l = this.listener;
+        final IDirtyListener l = this.listener;
         
         if(l==null) return;
         
@@ -718,9 +718,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
         if (root != null && root.dirty) {
 
-            log.info("");
-            
             writeNodeRecursive( root );
+            
+            log.info("flushed root: addr="+root.identity);
             
             return true;
             
@@ -787,24 +787,14 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         // write it on the store.
         checkpoint.write(store);
         
-        if (true/*INFO*/) {
-            // FIXME remove this code - for debugging only and return the INFO
-        
+        if (INFO) {
+
             // Note: this is the scale-out index name for a partitioned index.
             final String name = metadata.getName();
 
-            if (name != null && name.contains("term2id")) {
-
-                log.warn("name=" + name + ", " + "wroteCheckpoint="
-                        + checkpoint);
-
-            } else {
-
-                log.info((name == null ? "" : "name=" + name + ", ")
+            log.info((name == null ? "" : "name=" + name + ", ")
                         + "wroteCheckpoint=" + checkpoint);
 
-            }
-        
         }
         
         // return address of that checkpoint record.
@@ -1294,6 +1284,18 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             
             final long counter = btree.counter.incrementAndGet();
             
+            if (counter == btree.checkpoint.getCounter() + 1) {
+
+                /*
+                 * The first time the counter is incremented beyond the value in
+                 * the checkpoint record we fire off a dirty event to put the
+                 * BTree on the commit list.
+                 */
+                
+                btree.fireDirtyEvent();
+                
+            }
+                
             if (counter == Long.MAX_VALUE) {
 
                 /*

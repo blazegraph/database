@@ -86,6 +86,15 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase
         properties.setProperty(EmbeddedClient.Options.DATA_DIR,
                 getName());
         
+        /*
+         * Disable the o/s specific statistics collection for the test run.
+         * 
+         * Note: You only need to enable this if you are trying to track the
+         * statistics or if you are testing index partition moves, since moves
+         * rely on the per-host counters collected from the o/s.
+         */
+        properties.setProperty(EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS,"false");
+        
         client = new EmbeddedClient(properties);
         
         client.connect();

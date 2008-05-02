@@ -30,7 +30,6 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.rmi.NoSuchObjectException;
 import java.util.Properties;
@@ -47,7 +46,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.Banner;
-import com.bigdata.btree.Counters;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
@@ -63,7 +61,6 @@ import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
@@ -793,7 +790,7 @@ abstract public class DataService extends AbstractService
         return countersRoot;
         
     }
-    private CounterSet countersRoot;    
+    private CounterSet countersRoot;
 
     /*
      * ITxCommitProtocol.
@@ -1167,6 +1164,7 @@ abstract public class DataService extends AbstractService
                 .toInt();
 
         public ReportTask() {
+
         }
 
         /**
@@ -1177,6 +1175,37 @@ abstract public class DataService extends AbstractService
 
             try {
 
+                /*
+                 * Dynamically detach and attach the counters for the named
+                 * indices underneath of the IndexManager.
+                 */
+                
+                CounterSet tmp = resourceManager.getIndexManagerCounters();
+                
+                assert tmp != null;
+                
+                synchronized(tmp) {
+                
+                    tmp.detach("indices");
+
+                    tmp.makePath("indices").attach(
+                            resourceManager.getLiveJournal()
+                                    .getNamedIndexCounters());
+                
+                }
+                
+            } catch(Throwable t) {
+                
+                log.warn("Problem trying to update index counter views?", t);
+                
+            }
+            
+            try {
+
+                /*
+                 * Report the performance counters to the load balancer.
+                 */
+                
                 reportPerformanceCounters();
                 
             } catch (Throwable t) {

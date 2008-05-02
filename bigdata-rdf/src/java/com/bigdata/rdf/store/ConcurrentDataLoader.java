@@ -687,6 +687,11 @@ public class ConcurrentDataLoader {
          * @todo The futures for the load tasks will grow without bound for very
          * large data loads. We should really consume those futures using a
          * queue to keep down the size of that data structure.
+         * 
+         * @todo Incremental examination of the futures will also let us set the
+         * success and error counters incrementally and those can be published
+         * out as counters (that could also be done from within the tasks
+         * themselves).
          */
         {
 

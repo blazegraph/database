@@ -1169,6 +1169,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
                 }
 
+                assert btree.getDirtyListener() != null : "No registered listener: name="
+                        + name;
+
                 final boolean needsCheckpoint = btree.needsCheckpoint();
                 
                 if (INFO)
@@ -1194,14 +1197,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                      * There are writes on the btree, so write a checkpoint
                      * record now that the task has completed successfully.
                      */
-                    
-                    final long checkpointAddr = btree.writeCheckpoint();
-                    
-                    if(INFO) log.info("name=" + name + ", newCheckpointAddr="
-                            + btree.getStore().toString(checkpointAddr) + " : "
-                            + this);
-
-                    assert btree.getDirtyListener() != null;
+                    final long checkpointAddr;
                     
                     if (!((AbstractJournal) getJournal()).name2Addr
                             .willCommit(name)) {
@@ -1218,12 +1214,25 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                          */
                         
                         log.error("index not on commit list: name=" + name
-                                + ", checkpoint=" + btree.getCheckpoint());
+                                + ", checkpoint(before)=" + btree.getCheckpoint());
 
                         btree.getDirtyListener().dirtyEvent(btree);
+                        
+                        checkpointAddr = btree.writeCheckpoint();
+                        
+                        log.error("index not on commit list: name=" + name
+                                + ", checkpoint(after )=" + btree.getCheckpoint());
 
-                    }
+                    } else {
                             
+                        checkpointAddr = btree.writeCheckpoint();
+                        
+                    }
+                    
+                    if(INFO) log.info("name=" + name + ", newCheckpointAddr="
+                            + btree.getStore().toString(checkpointAddr) + " : "
+                            + this);
+                    
                 }
 
             }

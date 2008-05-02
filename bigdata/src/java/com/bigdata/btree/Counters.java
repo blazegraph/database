@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import java.text.NumberFormat;
-
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -88,10 +86,10 @@ public class Counters {
         bytesRead += o.bytesRead;
         bytesWritten += o.bytesWritten;
         
-        serializeTimeNanos += o.serializeTimeNanos;
-        deserializeTimeNanos += o.deserializeTimeNanos;
-        writeTimeNanos += o.writeTimeNanos;
-        readTimeNanos += o.readTimeNanos;
+        serializeNanos += o.serializeNanos;
+        deserializeNanos += o.deserializeNanos;
+        writeNanos += o.writeNanos;
+        readNanos += o.readNanos;
         
     }
     
@@ -126,10 +124,10 @@ public class Counters {
     /*
      * Note: The nano time fields are for nodes+leaves.
      */
-    long serializeTimeNanos = 0;
-    long deserializeTimeNanos = 0;
-    long writeTimeNanos = 0;
-    long readTimeNanos = 0;
+    long serializeNanos = 0;
+    long deserializeNanos = 0;
+    long writeNanos = 0;
+    long readNanos = 0;
     
     /**
      * Return a score whose increasing value is correlated with the amount of
@@ -159,8 +157,8 @@ public class Counters {
     public double computeRawScore() {
         
         return //
-            (serializeTimeNanos + deserializeTimeNanos) + //
-            (writeTimeNanos + readTimeNanos)//
+            (serializeNanos + deserializeNanos) + //
+            (writeNanos + readNanos)//
             ;
         
     }
@@ -382,19 +380,26 @@ public class Counters {
          
             /*
              * IO stats.
-             * 
-             * FIXME track the serialization times explicitly and separate them
-             * from the writes on the store.
-             * 
-             * @todo add nano timers and track storage used by the index. The
-             * goal is to know how much of the time of the server is consumed by
-             * the index, what percentage of the store is dedicated to the
-             * index, how expensive it is to do some scan-based operations
-             * (merge down, delete of transactional isolated persistent index),
-             * and evaluate the buffer strategy by comparing accesses with IOs.
              */
             {
+
                 final CounterSet tmp = counterSet.makePath("IO");
+
+                /*
+                 * nodes/leaves read/written
+                 */
+
+                tmp.addCounter("leafReadCount", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(leavesRead);
+                    }
+                });
+
+                tmp.addCounter("nodeReadCount", new Instrument<Integer>() {
+                    protected void sample() {
+                        setValue(nodesRead);
+                    }
+                });
 
                 tmp.addCounter("leafWriteCount", new Instrument<Integer>() {
                     protected void sample() {
@@ -408,19 +413,96 @@ public class Counters {
                     }
                 });
 
-                // FIXME and per-sec also.
-                tmp.addCounter("bytesWritten", new Instrument<Long>() {
-                    protected void sample() {
-                        setValue(bytesWritten);
-                    }
-                });
-
+                /*
+                 * store reads (bytes)
+                 */
                 tmp.addCounter("bytesRead", new Instrument<Long>() {
                     protected void sample() {
                         setValue(bytesRead);
                     }
                 });
 
+                tmp.addCounter("readSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double elapsedReadSecs = (readNanos / 1000000000.);
+                        setValue(elapsedReadSecs);
+                    }
+                });
+
+                tmp.addCounter("bytesReadPerSec",
+                        new Instrument<Double>() {
+                            public void sample() {
+                                final double readSecs = (readNanos / 1000000000.);
+                                final double bytesReadPerSec = (readSecs == 0L ? 0d
+                                        : (bytesRead / readSecs));
+                                setValue(bytesReadPerSec);
+                            }
+                        });
+
+                /*
+                 * store writes (bytes)
+                 */
+                tmp.addCounter("bytesWritten", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(bytesWritten);
+                    }
+                });
+
+                tmp.addCounter("writeSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double writeSecs = (writeNanos / 1000000000.);
+                        setValue(writeSecs);
+                    }
+                });
+
+                tmp.addCounter("bytesWrittenPerSec",
+                        new Instrument<Double>() {
+                            public void sample() {
+                                final double writeSecs = (writeNanos/ 1000000000.);
+                                final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
+                                        : (bytesWritten / writeSecs));
+                                setValue(bytesWrittenPerSec);
+                            }
+                        });
+                
+                /*
+                 * node/leaf (de-)serialization times.
+                 */
+                
+                tmp.addCounter("serializeSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double serializeSecs = (serializeNanos / 1000000000.);
+                        setValue(serializeSecs);
+                    }
+                });
+
+                tmp.addCounter("serializePerSec",
+                        new Instrument<Double>() {
+                            public void sample() {
+                                final double serializeSecs = (serializeNanos / 1000000000.);
+                                final double serializePerSec = (serializeSecs== 0L ? 0d
+                                        : ((nodesRead+leavesRead) / serializeSecs));
+                                setValue(serializePerSec);
+                            }
+                        });
+
+                tmp.addCounter("deserializeSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double deserializeSecs = (deserializeNanos / 1000000000.);
+                        setValue(deserializeSecs);
+                    }
+                });
+
+                tmp.addCounter("deserializePerSec",
+                        new Instrument<Double>() {
+                            public void sample() {
+                                final double deserializeSecs = (deserializeNanos / 1000000000.);
+                                final double deserializePerSec = (deserializeSecs== 0L ? 0d
+                                        : ((nodesRead+leavesRead) / deserializeSecs));
+                                setValue(deserializePerSec);
+                            }
+                        });
+                
             }
 
         }
@@ -432,85 +514,92 @@ public class Counters {
     
     public String toString() {
 
-        // FIXME uncomment this - I am just looking for callers.
-        if(true) throw new UnsupportedOperationException();
-        
-        /*
-         * store read/write times.
-         */
-        final double readTimeSecs = (readTimeNanos / 1000000000.);
-
-        final String bytesReadPerSec = (readTimeSecs == 0L ? "N/A" : ""
-                + commaFormat.format(bytesRead / readTimeSecs));
-
-        final double writeTimeSecs = (writeTimeNanos / 1000000000.);
-
-        final String bytesWrittenPerSec = (writeTimeSecs == 0. ? "N/A"
-                : ""+ commaFormat.format(bytesWritten
-                                / writeTimeSecs));
-        
-        /*
-         * node/leaf (de-)serialization times.
-         */
-        final double serializeTimeSecs = (serializeTimeNanos / 1000000000.);
-
-        final String serializePerSec = (serializeTimeSecs == 0L ? "N/A" : ""
-                + commaFormat.format((nodesWritten+leavesWritten)/ serializeTimeSecs));
-
-        final double deserializeTimeSecs = (deserializeTimeNanos / 1000000000.);
-
-        final String deserializePerSec = (deserializeTimeSecs == 0. ? "N/A"
-                : ""+ commaFormat.format((nodesRead+leavesRead)
-                                / deserializeTimeSecs));
-
-        return 
-        "\n#find="+nfinds+
-        ", #bloomRejects="+nbloomRejects+
-        ", #insert="+ninserts+
-        ", #remove="+nremoves+
-        ", #indexOf="+nindexOf+
-        ", #getKey="+ngetKey+
-        ", #getValue="+ngetValue+
-        "\n#roots split="+rootsSplit+
-        ", #roots joined="+rootsJoined+
-        ", #nodes split="+nodesSplit+
-        ", #nodes joined="+nodesJoined+
-        ", #leaves split="+leavesSplit+
-        ", #leaves joined="+leavesJoined+
-        ", #nodes copyOnWrite="+nodesCopyOnWrite+
-        ", #leaves copyOnWrite="+leavesCopyOnWrite+
-        "\nread ("
-                + nodesRead + " nodes, " + leavesRead + " leaves, "
-                + commaFormat.format(bytesRead) + " bytes" + ", readSeconds="
-                + secondsFormat.format(readTimeSecs) + ", bytes/sec="
-                + bytesReadPerSec + ", deserializeSeconds="
-                + secondsFormat.format(deserializeTimeSecs)
-                + ", deserialized/sec=" + deserializePerSec + ")" +
-        "\nwrote ("
-                + nodesWritten + " nodes, " + leavesWritten + " leaves, "
-                + commaFormat.format(bytesWritten) + " bytes"
-                + ", writeSeconds=" + secondsFormat.format(writeTimeSecs)
-                + ", bytes/sec=" + bytesWrittenPerSec + ", serializeSeconds="
-                + secondsFormat.format(serializeTimeSecs) + ", serialized/sec="
-                + serializePerSec + ")" +
-        "\n"
-        ;
+        // in XML.
+        return getCounters().asXML(null/*filter*/);
         
     }
 
-    static private final NumberFormat commaFormat = NumberFormat.getInstance();
-//    static private final NumberFormat percentFormat = NumberFormat.getPercentInstance();
-    static private final NumberFormat secondsFormat = NumberFormat.getInstance();
-    
-    static
-    {
+//    public String toString() {
+//
+//        /*
+//         * store read/write times.
+//         */
+//        final double readSecs = (readNanos / 1000000000.);
+//
+//        final String bytesReadPerSec = (readSecs == 0L ? "N/A" : ""
+//                + commaFormat.format(bytesRead / readSecs));
+//
+//        final double writeTimeSecs = (writeNanos / 1000000000.);
+//
+//        final String bytesWrittenPerSec = (writeTimeSecs == 0. ? "N/A"
+//                : ""+ commaFormat.format(bytesWritten
+//                                / writeTimeSecs));
+//        
+//        /*
+//         * node/leaf (de-)serialization times.
+//         */
+//        final double serializeSecs = (serializeNanos / 1000000000.);
+//
+//        final String serializePerSec = (serializeSecs == 0L ? "N/A" : ""
+//                + commaFormat.format((nodesWritten+leavesWritten)/ serializeSecs));
+//
+//        final double deserializeSecs = (deserializeNanos / 1000000000.);
+//
+//        final String deserializePerSec = (deserializeSecs == 0. ? "N/A"
+//                : ""+ commaFormat.format((nodesRead+leavesRead)
+//                                / deserializeSecs));
+//
+//        // plain text.
+//        return 
+//        "\n#find="+nfinds+
+//        ", #bloomRejects="+nbloomRejects+
+//        ", #insert="+ninserts+
+//        ", #remove="+nremoves+
+//        ", #indexOf="+nindexOf+
+//        ", #getKey="+ngetKey+
+//        ", #getValue="+ngetValue+
+//        ", #rangeCount="+nrangeCount+
+//        ", #rangeIterator="+nrangeIterator+
+//        "\n#roots split="+rootsSplit+
+//        ", #roots joined="+rootsJoined+
+//        ", #nodes split="+nodesSplit+
+//        ", #nodes joined="+nodesJoined+
+//        ", #leaves split="+leavesSplit+
+//        ", #leaves joined="+leavesJoined+
+//        ", #nodes copyOnWrite="+nodesCopyOnWrite+
+//        ", #leaves copyOnWrite="+leavesCopyOnWrite+
+//        "\nread ("
+//                + nodesRead + " nodes, " + leavesRead + " leaves, "
+//                + commaFormat.format(bytesRead) + " bytes" + ", readSeconds="
+//                + secondsFormat.format(readSecs) + ", bytes/sec="
+//                + bytesReadPerSec + ", deserializeSeconds="
+//                + secondsFormat.format(deserializeSecs)
+//                + ", deserialized/sec=" + deserializePerSec + ")" +
+//        "\nwrote ("
+//                + nodesWritten + " nodes, " + leavesWritten + " leaves, "
+//                + commaFormat.format(bytesWritten) + " bytes"
+//                + ", writeSeconds=" + secondsFormat.format(writeTimeSecs)
+//                + ", bytes/sec=" + bytesWrittenPerSec + ", serializeSeconds="
+//                + secondsFormat.format(serializeSecs) + ", serialized/sec="
+//                + serializePerSec + ")" +
+//        "\n"
+//        ;
+//        
+//    }
 
-        commaFormat.setGroupingUsed(true);
-        commaFormat.setMaximumFractionDigits(0);
-        
-        secondsFormat.setMinimumFractionDigits(3);
-        secondsFormat.setMaximumFractionDigits(3);
-        
-    }
+//    static private final NumberFormat commaFormat = NumberFormat.getInstance();
+//    static private final NumberFormat secondsFormat = NumberFormat.getInstance();
+////  static private final NumberFormat percentFormat = NumberFormat.getPercentInstance();
+//    
+//    static
+//    {
+//
+//        commaFormat.setGroupingUsed(true);
+//        commaFormat.setMaximumFractionDigits(0);
+//        
+//        secondsFormat.setMinimumFractionDigits(3);
+//        secondsFormat.setMaximumFractionDigits(3);
+//        
+//    }
 
 }
