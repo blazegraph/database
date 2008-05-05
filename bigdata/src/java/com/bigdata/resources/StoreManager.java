@@ -56,7 +56,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -82,6 +81,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -188,6 +188,9 @@ abstract public class StoreManager extends ResourceEvents implements
         /**
          * How long you want to hold onto the database history (in milliseconds)
          * or {@link Long#MAX_VALUE} for an (effectively) immortal database.
+         * Note that you can eagerly trigger an overflow event using
+         * {@link IDataService#forceOverflow()}.
+         * <p>
          * Some convenience values have been declared.
          * 
          * @see #DEFAULT_MIN_RELEASE_AGE
@@ -197,6 +200,13 @@ abstract public class StoreManager extends ResourceEvents implements
          * @see #MIN_RELEASE_AGE_NEVER
          */
         String MIN_RELEASE_AGE = "minReleaseAge";
+        
+        /**
+         * Minimum release age is zero (0). A value of ZERO (0) implies that any
+         * history not required for the read-committed view is released each
+         * time the {@link ResourceManager} overflows.
+         */
+        String MIN_RELEASE_AGE_NO_HISTORY = "0";
         
         /** Minimum release age is one minutes. */
         String MIN_RELEASE_AGE_1M = "" + 1/* mn */* 60/* sec */* 1000/* ms */;

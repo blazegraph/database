@@ -1166,7 +1166,7 @@ abstract public class DataService extends AbstractService
              * HTTPD service reporting out statistics on a randomly assigned port.
              * The port is reported to the load balancer and also written into the
              * file system. The httpd service will be shutdown with the data
-             * service.
+             * service. @todo write port into the [serviceDir], but serviceDir needs to be declared!
              */
             {
                 
