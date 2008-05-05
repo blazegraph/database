@@ -78,7 +78,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
 
         // Disable index partition moves (between data services).
-        properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
+//        properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
         
         /*
          * setup overflow conditions - can be easily modified to trigger
@@ -94,7 +94,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         properties.setProperty(StoreManager.Options.MIN_RELEASE_AGE, "0");
         
         // control the #of data services.
-        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
+//        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
 
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());

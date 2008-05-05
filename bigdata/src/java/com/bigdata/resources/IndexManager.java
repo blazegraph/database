@@ -454,8 +454,7 @@ abstract public class IndexManager extends StoreManager {
 
                     if (seg == null) {
 
-                        log
-                                .warn("Loading index segment from store: name="
+                        log.info("Loading index segment from store: name="
                                         + name + ", file="
                                         + resourceMetadata.getFile());
 
@@ -596,7 +595,40 @@ abstract public class IndexManager extends StoreManager {
 
                 final IRawStore store = openStore(resource.getUUID());
 
-                final AbstractBTree ndx = getIndexOnStore(name, timestamp, store);
+                /*
+                 * Interpret UNISOLATED and READ_COMMITTED for a historical
+                 * store as the last committed data on that store.
+                 */
+                final long ts;
+                if (timestamp == ITx.UNISOLATED
+                        || timestamp == ITx.READ_COMMITTED) {
+
+                    if (store instanceof IndexSegmentStore) {
+
+                        // there is only one timestamp for an index segment store.
+                        ts = ((IndexSegmentStore) store).getCheckpoint().commitTime;
+
+                    } else {
+
+                        // the live journal should never appear in the 2nd+ position of a view.
+                        assert store != getLiveJournal();
+                        
+                        // the last commit time on the historical journal.
+                        ts = ((AbstractJournal) store).getRootBlockView()
+                                .getLastCommitTime();
+
+                    }
+                    
+                } else {
+                    
+                    ts = timestamp;
+                    
+                }
+                
+                assert ts != ITx.UNISOLATED;
+                assert ts != ITx.READ_COMMITTED;
+                
+                final AbstractBTree ndx = getIndexOnStore(name, ts, store);
 
                 if (ndx == null) {
 

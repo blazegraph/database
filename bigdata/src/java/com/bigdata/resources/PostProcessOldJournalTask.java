@@ -8,12 +8,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -208,8 +208,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * processing. This allows us to detect when a possible join candidate can
      * not in fact be joined because we have already applied another task to its
      * rightSibling.
+     * <p>
+     * Note: The {@link TreeMap} imposes an alpha order which is useful when
+     * debugging.
      */
-    private final Set<String> used = new HashSet<String>();
+    private final Map<String,String> used = new TreeMap<String,String>();
 
     /**
      * Return <code>true</code> if the named index partition has already been
@@ -224,7 +227,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         if (name == null)
             throw new IllegalArgumentException();
 
-        return used.contains(name);
+        return used.containsKey(name);
         
     }
     
@@ -240,18 +243,21 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      *             if the index partition was already used by some other
      *             operation.
      */
-    protected void markUsed(String name) {
+    protected void putUsed(String name,String action) {
         
         if (name == null)
             throw new IllegalArgumentException();
+
+        if (action == null)
+            throw new IllegalArgumentException();
         
-        if(used.contains(name)) {
+        if(used.containsKey(name)) {
             
             throw new IllegalStateException("Already used: "+name);
             
         }
         
-        used.add(name);
+        used.put(name,action);
         
     }
     
@@ -667,6 +673,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             assert used.isEmpty() : "There are "+used.size()+" used index partitions";
 
+            // this data service.
             final UUID sourceDataService = resourceManager.getDataServiceUUID();
 
             while (itr.hasNext()) {
@@ -721,7 +728,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     /*
                      * Note: the right separator key is also the key under which
                      * we will find the rightSibling.
-                     * 
                      */
                     
                     if (pmd.getRightSeparatorKey() == null) {
@@ -769,15 +775,34 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     
                 }
 
+                /*
+                 * Now that we know where the rightSiblings are, examine the
+                 * join candidates for the current scale-out index once and
+                 * decide whether the rightSibling is local (we can do a join)
+                 * or remote (we will move the underutilized index partition to
+                 * the same data service as the rightSibling).
+                 */
                 for (i = 0; i < ncandidates; i++) {
 
+                    // an underutilized index partition on this data service.
                     final LocalPartitionMetadata pmd = underUtilizedPartitions[i];
-                    
+
+                    // the locator for the rightSibling.
                     final PartitionLocator rightSiblingLocator = (PartitionLocator) SerializerUtil
                             .deserialize(resultBuffer.getResult(i));
 
                     final UUID targetDataServiceUUID = rightSiblingLocator.getDataServices()[0];
 
+                    final String[] resources = new String[2];
+
+                    // the underutilized index partition.
+                    resources[0] = DataService.getIndexPartitionName(
+                           scaleOutIndexName, pmd.getPartitionId());
+                    
+                    // its right sibling (may be local or remote).
+                    resources[1] = DataService.getIndexPartitionName(
+                            scaleOutIndexName, rightSiblingLocator.getPartitionId());
+                    
                     if (sourceDataService.equals(targetDataServiceUUID)) {
 
                         /*
@@ -790,15 +815,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                          * partitions are on the same data service, but that is
                          * a relatively unlikley combination of events.
                          */
-                        
-                        final String[] resources = new String[2];
-                        
-                        resources[0] = DataService
-                                .getIndexPartitionName(scaleOutIndexName,
-                                        underUtilizedPartitions[i].getPartitionId());
-                        
-                        resources[1] = DataService.getIndexPartitionName(
-                                scaleOutIndexName, rightSiblingLocator.getPartitionId());
+
+                        // e.g., already joined as the rightSibling with some
+                        // other index partition on this data service.
+                        if(isUsed(resources[0])) continue;
+
+                        // this case should not occur, but better safe than
+                        // sorry.
+                        if(isUsed(resources[1])) continue;
 
                         log.info("Will JOIN: " + Arrays.toString(resources));
                         
@@ -808,9 +832,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         // add to set of tasks to be run.
                         tasks.add(task);
                         
-                        markUsed(resources[0]);
+                        putUsed(resources[0], "willJoin(leftSibling="
+                                + resources[0] + ",rightSibling="
+                                + resources[1] + ")");
 
-                        markUsed(resources[1]);
+                        putUsed(resources[1], "willJoin(leftSibling="
+                                + resources[0] + ",rightSibling="
+                                + resources[1] + ")");
                         
                         njoin++;
 
@@ -821,6 +849,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                          * hosting the right sibling.
                          */
                         
+                        // e.g., already joined as the rightSibling with some
+                        // other index partition on this data service.
+                        if(isUsed(resources[0])) continue;
+                        
                         final String sourceIndexName = DataService
                                 .getIndexPartitionName(scaleOutIndexName, pmd
                                         .getPartitionId());
@@ -830,9 +862,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 sourceIndexName, targetDataServiceUUID);
 
                         tasks.add(task);
-                        
-                        markUsed(sourceIndexName);
-                        
+
+                        putUsed(resources[0], "willMoveToJoinWith(leftSibling="
+                                + resources[0] + ",rightSibling="
+                                + resources[1] + ",target="
+                                + targetDataServiceUUID + ")");
+
                         nmove++;
                         
                     }
@@ -1044,7 +1079,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 tasks.add(task);
 
-                markUsed(name);
+                putUsed(name, "willMove(name=" + name + ",target="
+                        + targetDataServiceUUID + ")");
 
                 nmove++;
 
@@ -1280,7 +1316,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     // add to set of tasks to be run.
                     tasks.add(task);
 
-                    markUsed(name);
+                    putUsed(name,"willSplit(name="+name+")");
                     
                     log.info("will split  : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
 
@@ -1293,7 +1329,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      * the new journal so we do not need to do a build.
                      */
 
-                    markUsed(name);
+                    putUsed(name,"wasCopied(name="+name+")");
 
                     log.info("was  copied : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
 
@@ -1328,7 +1364,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     // add to set of tasks to be run.
                     tasks.add(task);
 
-                    markUsed(name);
+                    putUsed(name,"willBuild(name="+name+")");
 
                     nbuild++;
 
@@ -1339,12 +1375,20 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             } // itr.hasNext()
 
             // verify counters.
-            assert ndone == nskip + nbuild + nsplit : "ndone=" + ndone
-                    + ", nskip=" + nskip + ", nbuild=" + nbuild + ", nsplit="
-                    + nsplit;
+            if (ndone != nskip + nbuild + nsplit) {
+                
+                log.warn("ndone=" + ndone + ", but : nskip=" + nskip
+                        + ", nbuild=" + nbuild + ", nsplit=" + nsplit);
+                
+            }
 
             // verify all indices were handled in one way or another.
-            assert ndone == used.size() : "ndone="+ndone+", but #used="+used.size()+" : "+used.toString();
+            if (ndone != used.size()) {
+
+                log.warn("ndone=" + ndone + ", but #used=" + used.size()
+                        + " : " + used.toString());
+                
+            }
             
         }
 

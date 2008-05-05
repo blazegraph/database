@@ -727,14 +727,13 @@ abstract public class DataService extends AbstractService
             final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
                        
             final String pathPrefix = ps + hostname + ps + "service" + ps
-                    + serviceUUID + ps;
+                    + getServiceIface().getName() + ps + serviceUUID + ps;
 
             final CounterSet serviceRoot = countersRoot.makePath(pathPrefix);
 
             /*
              * Service generic counters. 
              */
-            
             AbstractStatisticsCollector.addBasicServiceOrClientCounters(
                     serviceRoot, this, properties);
 
@@ -1091,10 +1090,10 @@ abstract public class DataService extends AbstractService
 
                 final Properties p = getProperties();
 
-                p.setProperty(
-                                AbstractStatisticsCollector.Options.PROCESS_NAME,
-                                "service" + ICounterSet.pathSeparator
-                                        + uuid.toString());
+                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
+                        "service" + ICounterSet.pathSeparator
+                                + getServiceIface().getName()
+                                + ICounterSet.pathSeparator + uuid.toString());
 
                 statisticsCollector = AbstractStatisticsCollector
                         .newInstance(p);
@@ -1257,21 +1256,9 @@ abstract public class DataService extends AbstractService
                     Bytes.kilobyte32 * 2);
 
             getCounters().asXML(baos, "UTF-8", null/* filter */);
-
-            final String serviceIface;
             
-            if(DataService.this instanceof IMetadataService) {
-            
-                serviceIface = IMetadataService.class.getName();
-                
-            } else {
-                
-                serviceIface = IDataService.class.getName();
-                
-            }
-            
-            loadBalancerService.notify("Hello", serviceUUID, serviceIface, baos
-                    .toByteArray());
+            loadBalancerService.notify("Hello", serviceUUID, getServiceIface()
+                    .getName(), baos.toByteArray());
 
             log.info("Notified the load balancer.");
             
@@ -1279,6 +1266,28 @@ abstract public class DataService extends AbstractService
 
     }
 
+    /**
+     * Returns either {@link IDataService} or {@link IMetadataService} as
+     * appropriate.
+     */
+    public Class getServiceIface() {
+
+        final Class serviceIface;
+        
+        if(DataService.this instanceof IMetadataService) {
+        
+            serviceIface = IMetadataService.class;
+            
+        } else {
+            
+            serviceIface = IDataService.class;
+            
+        }
+        
+        return serviceIface;
+
+    }
+    
     /**
      * Sets up the {@link MDC} logging context. You should do this on every
      * client facing point of entry and then call {@link #clearLoggingContext()}

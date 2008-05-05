@@ -48,7 +48,9 @@ import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
@@ -925,7 +927,10 @@ public class Name2Addr extends BTree {
     /**
      * Return a counter set reflecting the named indices that are currently open
      * (more accurately, those open named indices whose references are in
-     * {@link Name2Addr}s internal {@link #indexCache}).
+     * {@link Name2Addr}s internal {@link #indexCache}). When index partitions
+     * are in use their {@link CounterSet}s are reported under a path formed
+     * from name of the scale-out index and partition identifier. Otherwise the
+     * {@link CounterSet}s are reported directly under the index name.
      * 
      * @return A new {@link CounterSet} reflecting the named indices that were
      *         open as of the time that this method was invoked.
@@ -936,13 +941,34 @@ public class Name2Addr extends BTree {
 
         final CounterSet tmp = new CounterSet();
         
-        final Iterator<ICacheEntry<String,BTree>> itr = indexCache.entryIterator();
-        
+        final Iterator<ICacheEntry<String, BTree>> itr = indexCache
+                .entryIterator();
+
         while (itr.hasNext()) {
 
             final ICacheEntry<String, BTree> entry = itr.next();
 
-            tmp.makePath(entry.getKey()).attach(entry.getObject().getCounters());
+            final String name = entry.getKey();
+
+            final BTree btree = entry.getObject();
+
+            final IndexMetadata md = btree.getIndexMetadata();
+
+            LocalPartitionMetadata pmd = md.getPartitionMetadata();
+
+            final String path;
+            if (pmd != null) {
+
+                // Note: [name] already includes the partition identifier.
+                path = md.getName() + ICounterSet.pathSeparator + name;
+
+            } else {
+
+                path = name;
+
+            }
+
+            tmp.makePath(path).attach(btree.getCounters());
 
         }
         
