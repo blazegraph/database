@@ -194,7 +194,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
          */
         targetDataService.submit(ITx.UNISOLATED, targetIndexName,
                 new CopyIndexPartitionProcedure(sourceDataServiceUUIDs,
-                        sourceIndexName,-lastCommitTime));
+                        sourceIndexName,lastCommitTime));
         
         /*
          * At this point the historical view as of the [lastCommitTime] has been
