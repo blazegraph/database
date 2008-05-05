@@ -43,6 +43,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -139,6 +140,22 @@ public interface IResourceManager extends IServiceShutdown {
     public AbstractBTree[] getIndexSources(String name, long timestamp);
 
     /**
+     * Examine the partition metadata (if any) for the {@link BTree}. If the
+     * {@link BTree} is part of an index partition, then return all of the
+     * sources for a view of that index partition (the {@link BTree} will be the
+     * first element in the array and, if there are no more sources for the
+     * index partition, then it will also be the sole element of the array).
+     * Otherwise return an array consisting of a single element, which is the
+     * {@link BTree}.
+     * 
+     * @param btree
+     *            A {@link BTree}.
+     * 
+     * @return The source(s) for the view associated with that {@link BTree}.
+     */
+    public AbstractBTree[] getIndexSources(String name, long timestamp, BTree btree);
+    
+    /**
      * Return a view of the named index as of the specified timestamp.
      * <p>
      * Note: An index view loaded from a historical timestamp (vs the live
@@ -169,26 +186,19 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public IIndex getIndex(String name, long timestamp);
 
-//    /**
-//     * Return statistics about the named index. This method will report on all
-//     * resources supporting the view of the index as of the specified timestamp.
-//     * 
-//     * @param name
-//     *            The index name.
-//     * @param timestamp
-//     *            Either the startTime of an active transaction,
-//     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-//     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-//     *            <code>-timestamp</code> for a historical view no later than
-//     *            the specified timestamp.
-//     * 
-//     * @return Statistics about that index -or- <code>null</code> if the index
-//     *         is not defined as of that timestamp.
-//     * 
-//     * @todo report as XML or Object.
-//     */
-//    public String getStatistics(String name, long timestamp);
-    
+    /**
+     * Return non-<code>null</code> iff <i>name</i> is the name of an
+     * {@link ITx#UNISOLATED} index partition that was located on the associated
+     * {@link DataService} but which is now gone.
+     * 
+     * @param name
+     *            The name of an index partition.
+     * 
+     * @return The reason (split, join, or move) -or- <code>null</code> iff
+     *         the index partition is not known to be gone.
+     */
+    public String getIndexPartitionGone(String name);
+
     /**
      * Statistics about the {@link IResourceManager}.
      */

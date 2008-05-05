@@ -1389,75 +1389,40 @@ Short term tasks:
 
 ============================================================
 
-
-again: wrote a bunch of stuff on term2id#2.
-
-WARN : 51885 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
-commitCounter=25 com.bigdata.rdf.store.Term2IdWriteProc
-[test_term2id#2] 0 running
-com.bigdata.rdf.store.Term2IdWriteProc.apply(Term2IdWriteProc.java:408):
-after task: nnew=68639, partitionId=2, pid=2, ctr=68639,
-counter=com.bigdata.btree.BTree$PartitionedCounter
-
-wrote the checkpoint: you can see the entries and the counter.
-
-WARN : 51901 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
-commitCounter=25 com.bigdata.rdf.store.Term2IdWriteProc
-[test_term2id#2] 0 running
-com.bigdata.btree.BTree.writeCheckpoint(BTree.java:798):
-name=test_term2id,
-wroteCheckpoint=Checkpoint{height=3,nnodes=515,nleaves=8272,nentries=132359,counter=68639,addrRoot=931326546936492,addrMetadata=640177223500687,addrCheckpoint=931372449398865}
-
-did a commit and paused the write service for overflow:
-
-WARN : 51948 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
-commitCounter=27 com.bigdata.rdf.store.Term2IdWriteProc
-[test_term2id#2] 0 didCommit
-com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1624):
-commit: #writes=1, timestamp=1209740862337, paused!
-
-closed the journal against further writes: has the same lastCommitTime.
-
-WARN : 51948 pool-1-thread-102 0f00d602-d7ed-4fb9-96aa-d15e6aab22d4
-commitCounter=27 com.bigdata.rdf.store.Term2IdWriteProc
-[test_term2id#2] 0 doSyncOverflow
-com.bigdata.journal.AbstractJournal.closeForWrites(AbstractJournal.java:1383):
-Closing journal for further writes: closeTime=1209740862384,
-lastCommitTime=1209740862337
-
-the precondition view of the _correct_ journal as of that lastCommitTime
-
-pre-condition views: overflowCounter=1
-timestamp=-1209740862337
-journal=JournalMetadata{size=38796624,filename=journal62594.jnl,uuid=22a942ff-c952-4675-a4e6-c90b8af1e0d9,createTime=1209740844620}
-
-shows the wrong checkpoint record:
-
-name=test_term2id#2, checkpoint=Checkpoint{height=3,nnodes=248,nleaves=3982,nentries=63720,counter=0,addrRoot=801045424898358,addrMetadata=640177223500687,addrCheckpoint=801066228645966}, pmd={ partitionId=2, leftSeparator=[134, 128, 0, 0, 0, 0, 0, 12, 252, 128, 0, 0, 0, 0, 0, 175, 32, 128, 0, 0, 0, 0, 0, 5, 76], rightSeparator=null, resourceMetadata=[JournalMetadata{size=38796624,filename=journal62594.jnl,uuid=22a942ff-c952-4675-a4e6-c90b8af1e0d9,createTime=1209740844620}, SegmentMetadata{size=1567071,filename=test_term2id_part00000_62601.seg,uuid=7481ea13-9fb5-4491-9ce4-e61288f687b7,createTime=1209740844542}], history=createScaleOutIndex(name=test_term2id) register(name=test_term2id#0,partitionId=0) chooseSplitPoint(oldPartitionId=0,nsplits=2,newPartitionId=2) registerAfterSplit(name=test_term2id#2,partitionId=2) }
-and a dump of the journal also shows the (same) wrong checkpoint record:
-
-name=test_term2id#2, addr={nbytes=78,offset=11936817}
-	Checkpoint{height=3,nnodes=248,nleaves=3982,nentries=63720,counter=0,addrRoot=801045424898358,addrMetadata=640177223500687,addrCheckpoint=801066228645966}
-
-Ergo, the checkpoint did not enter into the last commit.
-
-============================================================
-
-- ***** Index dirty but not on the commit list in AbstractTask.  This
-  is definately the source of the previous problem.
-
-- Visiblility problem in Name2Addr.  This becomes a problem when a
-  task fails since it could have had side-effects on Name2Addr that
-  are visible to other tasks.
-
-- ***** Modify AbstractTask to flush indices while it holds its locks.
-        This is especially important since we have to be synchronized
-        on Name2Addr during commit processing in order to have a
-        coherent view of the commitList.
-
 - Reduce StatementBuffer size so that writes have reasonable latency
   (measure on the client index view's thread pool using counters)
 
 - Dumping of the Queue in the ConcurrentDataLoader is not enlightening
   as the objects wrap our tasks.  Maybe they could be unwrapped?  The
   purpose is too learn more about why a flush task sometimes stalls.
+
+- Remove the logging of the QueueStatisticsTask?
+
+- Need to aggregate statistics for the partitions of an index as
+  reported to the LBS for analytics.
+
+  Need to remove index partitions which are known to be stale from the
+  LBS after a bit, or at least allow them to be hidden.  The data will
+  eventually grow beyond what can be held by an LDS if we do nothing.
+
+  In a different direct, it would be nice to be able to drill down
+  into the index data.
+
+  Should show metadata about the open index segments in the
+  IndexManager
+
+- ** Validate host and service statistics with 2 services and test
+     move scenarios.  Start with everything on one data service and
+     then look for the moves to the 2nd.
+
+     The LDS (or a service-specific httpd) should allow browing of the
+     index move history.
+
+- Default split size needs to be adjusted with respect to the default
+  journal size.  I am getting several overflows that result in builds
+  before I see a split (but I have not verify the on disk size of the
+  generated index segments - ah, they are not close to 100M each yet
+  (but also nothing tests their actual size in bytes).
+
+- Problem remains with StressTestConcurrentTx.  Revisit this when I
+  overhaul the full transaction support.

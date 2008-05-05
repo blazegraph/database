@@ -60,8 +60,8 @@ import com.bigdata.resources.ResourceManager;
  * completes.
  * </p>
  * <p>
- * Each {@link IsolatedFusedView} is local to a transaction and is backed by its own
- * store. This means that concurrent transactions can execute without
+ * Each {@link IsolatedFusedView} is local to a transaction and is backed by its
+ * own store. This means that concurrent transactions can execute without
  * synchronization (real concurrency) up to the point where they
  * {@link #prepare()}. We do not need a read-lock on the indices isolated by
  * the transaction since they are <em>historical</em> states that will not
@@ -95,11 +95,14 @@ import com.bigdata.resources.ResourceManager;
  * @todo The various public methods on this API that have {@link RunState}
  *       constraints all eagerly force an abort when invoked from an illegal
  *       state. This is, perhaps, excessive. Futher, since this is used in a
- *       single-threaded server context, we are better off testing for illegal
- *       conditions and notifying clients without out generating expensive stack
- *       traces. This could be done by return flags or by the server checking
- *       pre-conditions itself and exceptions being thrown from here if the
- *       server failed to test the pre-conditions and they were not met
+ *       single-threaded server context (the {@link AbstractTask} needs to
+ *       manage resource locks for the isolated indices when there are
+ *       concurrent tasks executing for the same transaction), we are better off
+ *       testing for illegal conditions and notifying clients without out
+ *       generating expensive stack traces. This could be done by return flags
+ *       or by the server checking pre-conditions itself and exceptions being
+ *       thrown from here if the server failed to test the pre-conditions and
+ *       they were not met
  */
 public class Tx extends AbstractTx implements ITx {
 
@@ -166,6 +169,8 @@ public class Tx extends AbstractTx implements ITx {
      */
     protected void releaseResources() {
 
+        assert lock.isHeldByCurrentThread();
+        
         super.releaseResources();
 
         /*

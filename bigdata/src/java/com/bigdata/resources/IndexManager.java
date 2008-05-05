@@ -200,22 +200,13 @@ abstract public class IndexManager extends StoreManager {
     private final LRUCache<String/*name*/, String/*reason*/> staleLocatorCache = new LRUCache<String, String>(1000);  
     
     /**
-     * Return non-<code>null</code> iff <i>name</i> is the name of an index
-     * partition that was located on this data service but which is now gone.
-     * <p>
      * Note: this information is based on an LRU cache with a large fixed
      * capacity. It is expected that the cache size is sufficient to provide
      * good information to clients having queued write tasks.  If the index
      * partition split/move/join changes somehow outpace the cache size then
      * the client would see a {@link NoSuchIndexException} instead.
-     * 
-     * @param name
-     *            The name of an index partition.
-     * 
-     * @return The reason (split, join, or move) -or- <code>null</code> iff
-     *         the index partition is not known to be gone.
      */
-    private String getIndexPartitionGone(String name) {
+    public String getIndexPartitionGone(String name) {
     
         synchronized(staleLocatorCache) {
         
@@ -366,11 +357,11 @@ abstract public class IndexManager extends StoreManager {
                 
                 if (btree != null) {
 
-                    /*
-                     * Mark the B+Tree as read-only.
-                     */
-                    
-                    ((BTree)btree).setReadOnly(true);
+//                    /*
+//                     * Mark the B+Tree as read-only.
+//                     */
+//                    
+//                    ((BTree)btree).setReadOnly(true);
                     
                     assert ((BTree) btree).getLastCommitTime() != 0;
 //                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
@@ -404,11 +395,11 @@ abstract public class IndexManager extends StoreManager {
 
                 if (btree != null) {
 
-                    /*
-                     * Mark the B+Tree as read-only.
-                     */
-                    
-                    ((BTree)btree).setReadOnly(true);
+//                    /*
+//                     * Mark the B+Tree as read-only.
+//                     */
+//                    
+//                    ((BTree)btree).setReadOnly(true);
                     
                     assert ((BTree) btree).getLastCommitTime() != 0;
 //                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
@@ -517,7 +508,7 @@ abstract public class IndexManager extends StoreManager {
         /*
          * Open the index on the journal for that timestamp.
          */
-        final AbstractBTree btree;
+        final BTree btree;
         {
 
             // the corresponding journal (can be the live journal).
@@ -531,7 +522,7 @@ abstract public class IndexManager extends StoreManager {
                 
             }
             
-            btree = getIndexOnStore(name, timestamp, journal);
+            btree = (BTree) getIndexOnStore(name, timestamp, journal);
 
             if (btree == null) {
 
@@ -557,7 +548,13 @@ abstract public class IndexManager extends StoreManager {
             return null;
 
         }
+        
+        return getIndexSources(name,timestamp,btree);
 
+    }
+
+    public AbstractBTree[] getIndexSources(String name, long timestamp, BTree btree) {
+        
         /*
          * Get the index partition metadata (if any). If defined, then we know
          * that this is an index partition and that the view is defined by the
@@ -624,30 +621,6 @@ abstract public class IndexManager extends StoreManager {
         return sources;
 
     }
-    
-//    public String getStatistics(String name, long timestamp) {
-//        
-//        AbstractBTree[] sources = getIndexSources(name, timestamp);
-//        
-//        if(sources==null) {
-//            
-//            return null;
-//            
-//        }
-//        
-//        StringBuilder sb = new StringBuilder();
-//        
-//        sb.append("name="+name+", timestamp="+timestamp);
-//        
-//        for(int i=0; i<sources.length; i++) {
-//         
-//            sb.append("\n"+sources[i].getStatistics());
-//            
-//        }
-//        
-//        return sb.toString();
-//        
-//    }
     
     /**
      * Note: logic duplicated by {@link Journal#getIndex(String, long)}

@@ -103,11 +103,11 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 //        }
 
         doConcurrentClientTest(journal,//
-                5,// timeout
+                10,// timeout
                 20,// nresources
                 1, // minLocks
                 3, // maxLocks
-                100, // ntrials
+                1000, // ntrials
                 3, // keyLen
                 100, // nops
                 0.02d // failureRate
@@ -176,7 +176,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
         if(failureRate<0.0||failureRate>1.0) throw new IllegalArgumentException();
         
-        Random r = new Random();
+        final Random r = new Random();
 
         /*
          * Setup the named resources/indices.
@@ -203,9 +203,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          * Setup the tasks that we will submit.
          */
         
-        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(); 
+        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>(); 
 
-        ConcurrentHashMap<IIndex, Thread> btrees = new ConcurrentHashMap<IIndex, Thread>();
+        final ConcurrentHashMap<IIndex, Thread> btrees = new ConcurrentHashMap<IIndex, Thread>();
         
         for(int i=0; i<ntrials; i++) {
 
@@ -225,7 +225,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
             String[] resource = tmp.toArray(new String[nlocks]);
             
-            tasks.add(new WriteTask(journal, resource, keyLen, nops,
+            tasks.add(new WriteTask(journal, resource, i, keyLen, nops,
                     failureRate, btrees));
 
         }
@@ -245,7 +245,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         /*
          * Examine the futures to see how things went.
          */
-        Iterator<Future<Object>> itr = results.iterator();
+        final Iterator<Future<Object>> itr = results.iterator();
         
         int nfailed = 0; // #of tasks that failed.
 //        int nretry = 0; // #of tasks that threw RetryException
@@ -306,8 +306,6 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
         journal.shutdownNow();
         
-        journal.deleteResources();
-                
         /*
          * Compute bytes written per second.
          */
@@ -335,6 +333,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
         System.err.println(ret.toString(true/*newline*/));
         
+        journal.deleteResources();
+
         return ret;
        
     }
@@ -344,6 +344,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
      */
     public static class WriteTask extends AbstractTask {
 
+        private final int trial;
         private final int keyLen;
         private final int nops;
         private final double failureRate;
@@ -352,11 +353,13 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         final Random r = new Random();
         
         public WriteTask(IConcurrencyManager concurrencyManager,
-                String[] resource, int keyLen, int nops, double failureRate,
+                String[] resource, int trial, int keyLen, int nops, double failureRate,
                 ConcurrentHashMap<IIndex, Thread> btrees) {
 
             super(concurrencyManager, ITx.UNISOLATED, resource);
 
+            this.trial = trial;
+            
             this.keyLen = keyLen;
             
             this.nops = nops;
@@ -367,6 +370,12 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
         }
 
+        protected String getTaskName() {
+            
+            return super.getTaskName()+"#"+trial;
+            
+        }
+        
         /**
          * Executes random operation on a named unisolated index.
          * 
@@ -377,13 +386,15 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             // the index names on which the writer holds a lock.
             final String[] resource = getResource();
             
-            IIndex[] indices = new IIndex[resource.length];
+            final IIndex[] indices = new IIndex[resource.length];
             
             for (int i = 0; i < resource.length; i++) {
 
                 indices[i] = getJournal().getIndex(resource[i]);
 
-                if (btrees.put(indices[i], Thread.currentThread()) != null) {
+                final Thread t = Thread.currentThread();
+                
+                if (btrees.putIfAbsent(indices[i], t) != null) {
 
                     throw new AssertionError(
                             "Unisolated index already in use: " + resource[i]);
@@ -398,9 +409,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
                 for (int i = 0; i < nops; i++) {
 
-                    IIndex ndx = indices[i % resource.length];
+                    final IIndex ndx = indices[i % resource.length];
                     
-                    byte[] key = new byte[keyLen];
+                    final byte[] key = new byte[keyLen];
 
                     r.nextBytes(key);
 
@@ -432,9 +443,10 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
                 for(int i=0; i<resource.length; i++) {
 
-                    IIndex ndx = indices[i];
+                    final IIndex ndx = indices[i];
                     
-                    if(ndx!=null) btrees.remove(ndx);
+                    if (ndx != null)
+                        btrees.remove(ndx);
                     
                 }
 

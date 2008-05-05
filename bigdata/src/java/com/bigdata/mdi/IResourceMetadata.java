@@ -55,11 +55,11 @@ public interface IResourceMetadata extends Cloneable {
     /**
      * The name of the file containing the resource (this is always relative to
      * some local data directory).
-     * 
-     * @deprecated drop this field - the {@link ResourceManager} does not appear to need
-     * this as it builds up the mapping from resource UUID to local filename during
-     * startup which greatly simplifies the alignment of files within working directories
-     * on different file systems.
+     * <p>
+     * Note: This property is primarily used for debugging. It is NOT used by
+     * the {@link ResourceManager}. Instead, the {@link ResourceManager} builds
+     * up the mapping from resource {@link UUID} to local filename during
+     * startup.
      */
     public String getFile();
     

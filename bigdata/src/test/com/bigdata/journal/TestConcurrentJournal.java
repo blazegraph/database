@@ -28,11 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -49,6 +49,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase.InterruptMyselfTask;
 import com.bigdata.journal.AbstractTask.ResubmitException;
@@ -992,7 +993,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final long checkpointAddr0;
             {
 
-                journal.registerIndex(name);
+                journal.registerIndex(name,new IndexMetadata(name,UUID.randomUUID()));
                 
                 journal.commit();
                 
@@ -1001,9 +1002,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 
             }
     
-            final WriteExecutorService writeService = journal
-            .getConcurrencyManager().getWriteService();
-                
             // the list of tasks to be run.
             final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
 
@@ -1047,6 +1045,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final long commitCounter0 = journal.getRootBlockView()
                     .getCommitCounter();
 
+            // the write service on which the tasks execute.
+            final WriteExecutorService writeService = journal
+                    .getConcurrencyManager().getWriteService();
+        
             // the group commit count before we submit the tasks.
             final long groupCommitCount0 = writeService.getGroupCommitCount();
 
@@ -1062,12 +1064,12 @@ public class TestConcurrentJournal extends ProxyTestCase {
             // the #of successfully committed tasks before we submit the tasks.
             final long committedTaskCount0 = writeService.getTaskCommittedCount();
             
-            // submit the tasks.
+            // submit the tasks and await their completion.
             final List<Future<Object>> futures = journal.invokeAll( tasks );
 
             /*
-             * verify the #of group commits (zero since nothing is written by
-             * any of these tasks).
+             * verify the #of commits on the journal is unchanged since nothing
+             * is written by any of these tasks.
              * 
              * The expectation is that the tasks that succeed make it into the
              * same commit group while the task that throws an exception does
@@ -1171,7 +1173,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final long checkpointAddr0;
             {
 
-                journal.registerIndex(name);
+                journal.registerIndex(new IndexMetadata(name,UUID.randomUUID()));
                 
                 journal.commit();
                 
@@ -1182,12 +1184,22 @@ public class TestConcurrentJournal extends ProxyTestCase {
             // Submit task that writes on the index and wait for the commit.
             journal.submit(new AbstractTask(journal,ITx.UNISOLATED,name){
                 protected Object doTask() throws Exception {
-                    BTree ndx = (BTree)getIndex(name);
+                    
+                    final BTree ndx = (BTree)getIndex(name);
+                    
+                    // verify checkpoint unchanged.
                     assertEquals(checkpointAddr0,ndx.getCheckpoint().getCheckpointAddr());
+                    
+                    // write on the index.
                     ndx.insert(new byte[]{1}, new byte[]{1});
+                    
                     return null;
                 }
-            }).get();
+            }).get(); // wait for the commit.
+            
+            // verify checkpoint was updated.
+            assertNotSame(checkpointAddr0, journal.getIndex(name)
+                    .getCheckpoint().getCheckpointAddr());
             
         } finally {
             
@@ -1465,56 +1477,56 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
     }
     
-    /**
-     * Correctness test of task retry when another task causes a commit group to
-     * be discarded.
-     * 
-     * @todo implement retry and maxLatencyFromSubmit and move the tests for
-     *       those features into their own test suites.
-     *       
-     * @todo Test retry of tasks (read only or read write) when they are part of
-     *       a commit group in which some other task fails so they get
-     *       interrupted and have to abort.
-     * 
-     * @todo also test specifically with isolated tasks to make sure that the
-     *       isolated indices are being rolled back to the last commit when the
-     *       task is aborted.
-     */
-    public void test_retry_readService() {
-
-        fail("write this test");
-        
-    }
-    
-    public void test_retry_writeService() {
-
-        fail("write this test");
-        
-    }
-
-    public void test_retry_txService_readOnly() {
-
-        fail("write this test");
-        
-    }
-
-    /*
-     * note: the difference between readOnly and readCommitted is that the
-     * latter MUST read from whatever the committed state of the index is at the
-     * time that it executes (or re-retries?) while the formed always reads from
-     * the state of the index as of the transaction start time.
-     */
-    public void test_retry_txService_readCommitted() {
-
-        fail("write this test");
-        
-    }
-
-    public void test_retry_txService_readWrite() {
-
-        fail("write this test");
-        
-    }
+//    /**
+//     * Correctness test of task retry when another task causes a commit group to
+//     * be discarded.
+//     * 
+//     * @todo implement retry and maxLatencyFromSubmit and move the tests for
+//     *       those features into their own test suites.
+//     *       
+//     * @todo Test retry of tasks (read only or read write) when they are part of
+//     *       a commit group in which some other task fails so they get
+//     *       interrupted and have to abort.
+//     * 
+//     * @todo also test specifically with isolated tasks to make sure that the
+//     *       isolated indices are being rolled back to the last commit when the
+//     *       task is aborted.
+//     */
+//    public void test_retry_readService() {
+//
+//        fail("write this test");
+//        
+//    }
+//    
+//    public void test_retry_writeService() {
+//
+//        fail("write this test");
+//        
+//    }
+//
+//    public void test_retry_txService_readOnly() {
+//
+//        fail("write this test");
+//        
+//    }
+//
+//    /*
+//     * note: the difference between readOnly and readCommitted is that the
+//     * latter MUST read from whatever the committed state of the index is at the
+//     * time that it executes (or re-retries?) while the formed always reads from
+//     * the state of the index as of the transaction start time.
+//     */
+//    public void test_retry_txService_readCommitted() {
+//
+//        fail("write this test");
+//        
+//    }
+//
+//    public void test_retry_txService_readWrite() {
+//
+//        fail("write this test");
+//        
+//    }
     
 //     Note: I can not think of any way to write this test.
 //    
@@ -1612,13 +1624,14 @@ public class TestConcurrentJournal extends ProxyTestCase {
 //    }
     
     /**
-     * A stress test that runs concurrent unisolated readers and writers and
-     * verifies that readers are able to transparently continue to read against
-     * the same state of the named indices if the backing {@link FileChannel} is
-     * closed by an interrupt as part of the abort protocol for the commit
-     * group. In order for this test to succeed the backing {@link FileChannel}
-     * must be transparently re-opened in a thread-safe manner if it is closed
-     * asynchronously (i.e., closed while the buffer strategy is still open).
+     * A stress test that runs concurrent {@link ITx#READ_COMMITTED} readers and
+     * {@link ITx#UNISOLATED} writers and verifies that readers are able to
+     * transparently continue to read against the named indices if the backing
+     * {@link FileChannel} is closed by an interrupt noticed during an IO on
+     * that {@link FileChannel}. In order for this test to succeed the backing
+     * {@link FileChannel} must be transparently re-opened in a thread-safe
+     * manner if it is closed asynchronously (i.e., closed while the buffer
+     * strategy is still open).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1651,7 +1664,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 KeyBuilder keyBuilder = new KeyBuilder(4);
                 for (int i = 0; i < resource.length; i++) {
                     resource[i] = "index#" + i;
-                    IIndex ndx = journal.registerIndex(resource[i]);
+                    final IIndex ndx = journal.registerIndex(resource[i], new IndexMetadata(resource[i],UUID.randomUUID()));
                     for (int j = 0; j < NWRITES; j++) {
                         byte[] val = (resource[i] + "#" + j).getBytes();
                         ndx.insert(keyBuilder.reset().append(j).getKey(), val);
@@ -1663,14 +1676,17 @@ public class TestConcurrentJournal extends ProxyTestCase {
                     + " named indices with " + NWRITES + " records each");
 
             /**
-             * Does an unisolated index scan on a named index using the last
-             * committed state of the named index.
+             * Does an {@link ITx#READ_COMMITTED} index scan on a named index
+             * using the last committed state of the named index.
              * <p>
-             * The read tasks MUST NOT throw any exceptions since we are
-             * expecting transparent re-opening of the store. This means that
-             * the buffer strategy implementation must notice when the store was
-             * closed asynchronously, obtain a lock, re-open the store, and then
-             * re-try the operation.
+             * Note: The expectation is that the read tasks WILL NOT throw
+             * exceptions related to the asynchronous close of the
+             * {@link FileChannel} in response to a writer interrupted during a
+             * FileChannel IO since we are expecting transparent re-opening of
+             * the store. In practice this means that the buffer strategy
+             * implementation must notice when the store was closed
+             * asynchronously, obtain a lock, re-open the store, and then re-try
+             * the operation.
              * 
              * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
              *         Thompson</a>
@@ -1687,7 +1703,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
                 protected Object doTask() throws Exception {
 
-                    IIndex ndx = getIndex(getOnlyResource());
+                    final IIndex ndx = getIndex(getOnlyResource());
 
                     // verify writes not allowed.
                     try {
@@ -1698,7 +1714,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                     }
 //                    assertTrue(ndx instanceof ReadOnlyIndex);
                     
-                    ITupleIterator itr = ndx.rangeIterator(null, null);
+                    final ITupleIterator itr = ndx.rangeIterator(null, null);
 
                     int n = 0;
 
@@ -1728,8 +1744,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
              * Submit tasks to the single threaded service that will in turn
              * feed them on by one to the journal's writeService. When run on
              * the journal's writeService the tasks will interrupt themselves
-             * causing the commit group to be discarded and provoking the JDK to
-             * close the FileChannel backing the journal.
+             * and, depending on whether or not the interrupt occurs during a
+             * FileChannel IO, provoke the JDK to close the FileChannel backing
+             * the journal.
              */
             for (int i = 0; i < 10; i++) {
                 final String theResource = resource[i % resource.length];

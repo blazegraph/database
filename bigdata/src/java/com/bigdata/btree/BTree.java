@@ -274,25 +274,25 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     static public final int DEFAULT_READ_RETENTION_QUEUE_SCAN = 20;
 
-    public int getHeight() {
+    final public int getHeight() {
         
         return height;
         
     }
 
-    public int getNodeCount() {
+    final public int getNodeCount() {
         
         return nnodes;
         
     }
 
-    public int getLeafCount() {
+    final public int getLeafCount() {
         
         return nleaves;
         
     }
 
-    public int getEntryCount() {
+    final public int getEntryCount() {
         
         return nentries;
         
@@ -472,7 +472,12 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         // Note: Counter is unchanged!
 //        counter = new AtomicLong( 0L );
 
-        if(!wasDirty) {
+        /*
+         * Note: a new root leaf is created when an empty btree is (re-)opened.
+         * However, if the BTree is marked as read-only then do not fire off a
+         * dirty event.
+         */
+        if(!wasDirty && !readOnly) {
             
             fireDirtyEvent();
             
@@ -586,30 +591,30 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
     transient private boolean readOnly = false;
     
-    /**
-     * Return <code>true</code> if the {@link BTree} will participate in
-     * commits requested via {@link #handleCommit()}.
-     */
-    final public boolean getAutoCommit() {
-        
-        return autoCommit;
-        
-    }
-
-    /**
-     * Sets the auto-commit flag (default <code>true</code>). When
-     * <code>false</code> the {@link BTree} will NOT write a checkpoint record
-     * in response to a {@link #handleCommit()} request.
-     * 
-     * @param autoCommit
-     *            The new value for the auto-commit flag.
-     */
-    final public void setAutoCommit(boolean autoCommit) {
-        
-        this.autoCommit = autoCommit;
-        
-    }
-    transient private boolean autoCommit = true;
+//    /**
+//     * Return <code>true</code> if the {@link BTree} will participate in
+//     * commits requested via {@link #handleCommit()}.
+//     */
+//    final public boolean getAutoCommit() {
+//        
+//        return autoCommit;
+//        
+//    }
+//
+//    /**
+//     * Sets the auto-commit flag (default <code>true</code>). When
+//     * <code>false</code> the {@link BTree} will NOT write a checkpoint record
+//     * in response to a {@link #handleCommit()} request.
+//     * 
+//     * @param autoCommit
+//     *            The new value for the auto-commit flag.
+//     */
+//    final public void setAutoCommit(boolean autoCommit) {
+//        
+//        this.autoCommit = autoCommit;
+//        
+//    }
+//    transient private boolean autoCommit = true;
     
     final public long getLastCommitTime() {
         
@@ -624,8 +629,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * {@link AbstractJournal} and {@link Name2Addr} based on the actual
      * commitTime of the commit during which an {@link Entry} for that index was
      * last committed. It is set for both historical index reads and unisolated
-     * index reads. The lastCommitTime for an unisolated index will advance as
-     * commits are performed with that index.
+     * index reads using {@link Entry#commitTime}. The lastCommitTime for an
+     * unisolated index will advance as commits are performed with that index.
      * 
      * @param lastCommitTime
      *            The timestamp of the last committed state of this index.
@@ -679,6 +684,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     final public void setDirtyListener(IDirtyListener listener) {
 
+        assertNotReadOnly();
+        
         this.listener = listener;
         
     }
@@ -689,6 +696,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * Fire an event to the listener (iff set).
      */
     final protected void fireDirtyEvent() {
+        
+        assertNotReadOnly();
         
         final IDirtyListener l = this.listener;
         
@@ -712,7 +721,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * 
      * @return <code>true</code> if anything was written.
      */
-    public boolean flush() {
+    final public boolean flush() {
 
         assertNotReadOnly();
         
@@ -752,9 +761,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     final public long writeCheckpoint() {
         
-        log.info("begin");
-        
         assertNotReadOnly();
+        
+        log.info("begin");
         
 //        assert root != null : "root is null"; // i.e., isOpen().
 
@@ -968,13 +977,13 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     final public void setIndexMetadata(IndexMetadata indexMetadata) {
         
+        assertNotReadOnly();
+
         if (indexMetadata == null)
             throw new IllegalArgumentException();
 
         if (indexMetadata.getMetadataAddr() != 0)
             throw new IllegalArgumentException();
-
-        assertNotReadOnly();
 
         this.metadata = indexMetadata;
         
@@ -999,7 +1008,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     public long handleCommit(final long commitTime) {
 
-        if (autoCommit && needsCheckpoint()) {
+        assertNotReadOnly();
+
+        if (/*autoCommit &&*/ needsCheckpoint()) {
 
             /*
              * Flush the btree, write a checkpoint record, and return the
@@ -1043,6 +1054,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * {@link BTree}.
      */
     final public void removeAll() {
+
+        assertNotReadOnly();
 
         if (getIndexMetadata().getDeleteMarkers()) {
             

@@ -34,11 +34,10 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ReadOnlyFusedView;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Tuple;
 import com.bigdata.journal.ITx;
 

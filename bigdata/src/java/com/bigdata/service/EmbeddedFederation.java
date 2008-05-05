@@ -43,6 +43,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.service.EmbeddedClient.Options;
@@ -670,9 +672,18 @@ public class EmbeddedFederation extends AbstractFederation {
         // The metadata service.
         final MetadataService metadataService = (MetadataService) getMetadataService();
         
-        // The sources for the view as of that timestamp.
-        final AbstractBTree[] sources = metadataService.getResourceManager()
-                .getIndexSources(metadataName, timestamp);
+        /*
+         * The sources for the view as of that timestamp.
+         * 
+         * Note: We force READ-COMMITTED semantics if the request was
+         * UNISOLATED.
+         */
+        final AbstractBTree[] sources = metadataService
+                .getResourceManager()
+                .getIndexSources(
+                        metadataName,
+                        TimestampUtility.isUnisolated(timestamp) ? ITx.READ_COMMITTED
+                                : timestamp);
         
         if (sources.length != 1) {
             

@@ -166,7 +166,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
         synchronized(name2Addr) {
 
-            return name2Addr.get(name);
+            return name2Addr.getIndex(name);
             
         }
 

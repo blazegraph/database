@@ -252,9 +252,9 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             } catch(Exception ex) {
 
-                log.warn("Provoked exception: "+ex,ex);
-                
                 assertTrue(isInnerCause(ex, ClosedByInterruptException.class));
+
+                log.info("Provoked expected root cause exception: " + ex);
                 
                 throw ex;
                 

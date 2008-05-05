@@ -36,6 +36,11 @@ import com.bigdata.service.IDataService;
 /**
  * Extended to allow direct registration of a named {@link BTree}.
  * 
+ * @todo change registerIndex() methods to return void and have people use
+ *       {@link #getIndex(String)} to obtain the view after they have registered
+ *       the index. This will make it somewhat easier to handle things like the
+ *       registration of an index partition reading from multiple resources.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

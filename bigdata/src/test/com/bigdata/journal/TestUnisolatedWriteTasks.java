@@ -130,6 +130,8 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                         
                         final IIndex ndx = getIndex(getOnlyResource());
 
+                        assert ndx != null;
+                        
                         assertEquals("indexUUID",indexUUID,ndx.getIndexMetadata().getIndexUUID());
                         
 //                        // Note: clone values since replaced with old values by the batch op.
