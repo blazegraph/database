@@ -94,5 +94,10 @@ abstract public class AbstractService implements IService {
         return serviceUUID;
 
     }
+    
+    /**
+     * Return the most interesting interface for the service.
+     */
+    abstract public Class getServiceIface();
 
 }

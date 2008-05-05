@@ -787,10 +787,10 @@ abstract public class MetadataService extends DataService implements
             log.info("name=" + getOnlyResource() + ", oldLocator=" + oldLocator
                     + ", newLocator=" + newLocator);
 
-            MetadataIndex mdi = (MetadataIndex) getIndex(getOnlyResource());
+            final MetadataIndex mdi = (MetadataIndex) getIndex(getOnlyResource());
 
             // remove the old locators from the metadata index.
-            PartitionLocator pmd = (PartitionLocator) SerializerUtil
+            final PartitionLocator pmd = (PartitionLocator) SerializerUtil
                     .deserialize(mdi.remove(oldLocator.getLeftSeparatorKey()));
 
             if (!oldLocator.equals(pmd)) {
@@ -1105,8 +1105,6 @@ abstract public class MetadataService extends DataService implements
             /*
              * Register the metadata index with the metadata service. This
              * registration will not be restart safe until the task commits.
-             * 
-             * FIXME violates atomic change in visibility
              */
             getJournal().registerIndex(metadataName, mdi);
 
@@ -1214,7 +1212,7 @@ abstract public class MetadataService extends DataService implements
             
             log.info("Dropped "+ndropped+" index partitions for "+name);
 
-            // drop the metadata index as well. FIXME violates atomic change in visibility
+            // drop the metadata index as well.
             getJournal().dropIndex(getOnlyResource());
             
             return ndropped;

@@ -886,7 +886,8 @@ abstract public class OverflowManager extends IndexManager {
         final long firstCommitTime;
         {
 
-            log.warn("doOverflow(): lastCommitTime=" + lastCommitTime + "\nfile="
+            if(INFO)
+            log.info("doOverflow(): lastCommitTime=" + lastCommitTime + "\nfile="
                     + oldJournal.getFile()
                     + "\npre-condition views: overflowCounter="
                     + getOverflowCount() + "\n"
@@ -1158,7 +1159,8 @@ abstract public class OverflowManager extends IndexManager {
          * this before we cut over then the data will still be read from the old
          * journal.
          */
-        log.warn("\ndoOverflow(): firstCommitTime=" + firstCommitTime
+        if(INFO)
+        log.info("\ndoOverflow(): firstCommitTime=" + firstCommitTime
                 + "\nfile=" + newJournal.getFile()
                 + "\npost-condition views: overflowCounter="
                 + getOverflowCount() + "\n"

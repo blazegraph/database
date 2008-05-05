@@ -409,7 +409,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                  */
                 btree.rangeCopy(src, null, null, false/*overflow*/);
                 
-                // drop the old index partition : FIXME violates atomic change in visibility.
+                // drop the old index partition
                 getJournal().dropIndex(name);
                 
                 // will notify tasks that index partition was joined.
@@ -417,7 +417,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                 
             }
             
-            // register the new index partition : FIXME violates atomic change in visibility.
+            // register the new index partition
             getJournal().registerIndex(result.name, btree);
 
             final LocalPartitionMetadata pmd = btree.getIndexMetadata().getPartitionMetadata();

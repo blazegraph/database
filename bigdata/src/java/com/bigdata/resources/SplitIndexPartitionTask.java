@@ -760,13 +760,13 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                         + " index entries from the live index " + name
                         + " onto " + name2);
                 
-                // register it on the live journal : FIXME violates atomic change in visibility.
+                // register it on the live journal
                 log.info("Registering index: "+name2);
                 getJournal().registerIndex(name2, btree);
                 
             }
 
-            // drop the source index (the old index partition) : FIXME violates atomic change in visibility.
+            // drop the source index (the old index partition)
             log.info("Dropping source index: "+name);
             getJournal().dropIndex(name);
             

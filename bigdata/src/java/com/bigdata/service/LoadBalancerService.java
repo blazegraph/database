@@ -669,7 +669,7 @@ abstract public class LoadBalancerService extends AbstractService
         final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
                    
         final String pathPrefix = ps + hostname + ps + "service" + ps
-                + serviceUUID + ps;
+                + getServiceIface().getName() + ps + serviceUUID + ps;
 
         final CounterSet serviceRoot = counters.makePath(pathPrefix);
 
@@ -680,6 +680,15 @@ abstract public class LoadBalancerService extends AbstractService
         AbstractStatisticsCollector.addBasicServiceOrClientCounters(
                 serviceRoot, this, properties);
 
+    }
+    
+    /**
+     * Returns {@link ILoadBalancerService}.
+     */
+    public Class getServiceIface() {
+        
+        return ILoadBalancerService.class;
+        
     }
     
     /**
@@ -926,91 +935,108 @@ abstract public class LoadBalancerService extends AbstractService
                     
                 }
 
-                final CounterSet servicesCounterSet = (CounterSet) hostCounterSet
+                // lookup path: /hostname/service
+                final CounterSet serviceIfacesCounterSet = (CounterSet) hostCounterSet
                         .getPath("service");
 
-                if (servicesCounterSet == null) {
+                if (serviceIfacesCounterSet == null) {
 
-                    log.warn("No services? hostname=" + hostname);
+                    log.warn("No services interfaces? hostname=" + hostname);
 
                     continue;
 
                 }
 
-                // For each service.
-                final Iterator<ICounterSet> itrs = servicesCounterSet
+                // for each service interface type: /hostname/service/iface
+                final Iterator<ICounterSet> itrx = serviceIfacesCounterSet
                         .counterSetIterator();
-                
-                while(itrs.hasNext()) {
 
-                    final CounterSet serviceCounterSet = (CounterSet) itrs.next();
+                // for each service under that interface type
+                while (itrx.hasNext()) {
 
-                    // Note: name on serviceCounterSet is the serviceUUID.
-                    final String serviceName = serviceCounterSet.getName();
-                    final UUID serviceUUID;
-                    try {
-                        serviceUUID = UUID.fromString(serviceName);
-                    } catch(Exception ex) {
-                        log.error("Could not parse service name as UUID?\n"
-                                + "hostname=" + hostname
-                                + ", serviceCounterSet.path="
-                                + serviceCounterSet.getPath()
-                                + ", serviceCounterSet.name="
-                                + serviceCounterSet.getName(), ex);
-                        continue;
-                    }
-                    
-                    if(!activeServices.containsKey(serviceUUID)) {
+                    // path: /hostname/service/iface/UUID
+                    final CounterSet servicesCounterSet = (CounterSet) itrx
+                            .next();
 
-                        /*
-                         * @todo I am seeing some services reported here as not active???
-                         */
-                        
-                        log.info("Service is not active: "+serviceCounterSet.getPath());
-                        
-                        continue;
-                        
-                    }
+                    // For each service.
+                    final Iterator<ICounterSet> itrs = servicesCounterSet
+                            .counterSetIterator();
 
-                    /*
-                     * Compute the score for that service.
-                     */
-                    ServiceScore score;
-                    try {
+                    while (itrs.hasNext()) {
 
-                        score = computeScore(hostScore, serviceUUID,
-                                hostCounterSet, serviceCounterSet);
+                        final CounterSet serviceCounterSet = (CounterSet) itrs
+                                .next();
 
-                    } catch (Exception ex) {
-
-                        log.error("Problem computing service score: "
-                                + serviceCounterSet.getPath(), ex);
-
-                        /*
-                         * Keep the old score if we were not able to compute
-                         * a new score.
-                         * 
-                         * Note: if the returned value is null then the
-                         * service asynchronously was removed from the set
-                         * of active services.
-                         */
-                        score = activeServices.get(serviceUUID);
-                        
-                        if (score == null) {
-                            
-                            log.info("Service leave during update task: "
-                                    + serviceCounterSet.getPath());
-                            
+                        // Note: name on serviceCounterSet is the serviceUUID.
+                        final String serviceName = serviceCounterSet.getName();
+                        final UUID serviceUUID;
+                        try {
+                            serviceUUID = UUID.fromString(serviceName);
+                        } catch (Exception ex) {
+                            log.error("Could not parse service name as UUID?\n"
+                                    + "hostname=" + hostname
+                                    + ", serviceCounterSet.path="
+                                    + serviceCounterSet.getPath()
+                                    + ", serviceCounterSet.name="
+                                    + serviceCounterSet.getName(), ex);
                             continue;
-                            
                         }
 
-                    }
+                        if (!activeServices.containsKey(serviceUUID)) {
 
-                    /*
-                     * Add to collection of scores.
-                     */
-                    scores.add(score);
+                            /*
+                             * @todo I am seeing some services reported here as
+                             * not active???
+                             */
+
+                            log.info("Service is not active: "
+                                    + serviceCounterSet.getPath());
+
+                            continue;
+
+                        }
+
+                        /*
+                         * Compute the score for that service.
+                         */
+                        ServiceScore score;
+                        try {
+
+                            score = computeScore(hostScore, serviceUUID,
+                                    hostCounterSet, serviceCounterSet);
+
+                        } catch (Exception ex) {
+
+                            log.error("Problem computing service score: "
+                                    + serviceCounterSet.getPath(), ex);
+
+                            /*
+                             * Keep the old score if we were not able to compute
+                             * a new score.
+                             * 
+                             * Note: if the returned value is null then the
+                             * service asynchronously was removed from the set
+                             * of active services.
+                             */
+                            score = activeServices.get(serviceUUID);
+
+                            if (score == null) {
+
+                                log.info("Service leave during update task: "
+                                        + serviceCounterSet.getPath());
+
+                                continue;
+
+                            }
+
+                        }
+
+                        /*
+                         * Add to collection of scores.
+                         */
+                        scores.add(score);
+
+                    }
 
                 }
 
@@ -1351,7 +1377,7 @@ abstract public class LoadBalancerService extends AbstractService
             }
             
             final String pathPrefix = ps + hostname + ps + "service" + ps
-                    + serviceUUID + ps;
+                    + getServiceIface().getName() + ps + serviceUUID + ps;
 
             final CounterSet serviceRoot = counters.makePath(pathPrefix);
 
@@ -1562,9 +1588,18 @@ abstract public class LoadBalancerService extends AbstractService
             log.info("New service joined: hostname="+hostname+", serviceUUID="+serviceUUID);
             
             /*
-             * Create history in counters - path is /host/serviceUUID.
+             * Create history in counters.
+             * 
+             * path: /host/service/iface/serviceUUID.
              */
-            counters.makePath(hostname+ICounterSet.pathSeparator+serviceUUID);
+            counters.makePath(//
+                    hostname + //
+                    ICounterSet.pathSeparator + //
+                    "service" + //
+                    ICounterSet.pathSeparator+ //
+                    IDataService.class.getName() + //
+                    ICounterSet.pathSeparator
+                    + serviceUUID);
 
             joined.signal();
             

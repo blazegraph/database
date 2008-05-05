@@ -309,7 +309,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                     .getName(), metadata.getPartitionMetadata()
                     .getPartitionId());
 
-            log.warn("Closing index segment store: " + name + ", file="
+            log.info("Closing index segment store: " + name + ", file="
                     + getFile());
             
             close();

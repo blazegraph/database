@@ -267,8 +267,8 @@ abstract public class ResourceManager extends OverflowManager implements IResour
      * The counter set that corresponds to the {@link IndexManager}.
      */
     public CounterSet getIndexManagerCounters() {
-        
-        if(indexManagerRoot ==null) {
+
+        if (indexManagerRoot == null) {
             
             getCounters();
             
