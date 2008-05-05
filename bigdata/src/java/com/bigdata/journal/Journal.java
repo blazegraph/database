@@ -35,13 +35,12 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -49,6 +48,13 @@ import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * Concrete implementation suitable for a local and unpartitioned database.
+ * <p>
+ * Note: This implementation does NOT not support partitioned indices. Because
+ * all data must reside on a single journal resource there is no point to a
+ * view. Views are designed to have data on a mixture of the live journal, one
+ * or more historical journals, and one or more {@link IndexSegment}s.
+ * 
+ * @see ResourceManager, which supports views.
  */
 public class Journal extends AbstractJournal implements IConcurrencyManager,
         ILocalTransactionManager, IResourceManager {
@@ -214,11 +220,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
             if (btree != null) {
 
-                /*
-                 * Mark the B+Tree as read-only.
-                 */
-                
-                btree.setReadOnly(true);
+//                /*
+//                 * Mark the B+Tree as read-only.
+//                 */
+//                
+//                btree.setReadOnly(true);
 
                 assert ((BTree) btree).getLastCommitTime() != 0;
 //                btree.setLastCommitTime(commitRecord.getTimestamp());
@@ -248,11 +254,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
             if (btree != null) {
 
-                /*
-                 * Mark the B+Tree as read-only.
-                 */
-                
-                btree.setReadOnly(true);
+//                /*
+//                 * Mark the B+Tree as read-only.
+//                 */
+//                
+//                btree.setReadOnly(true);
                 
                 assert ((BTree) btree).getLastCommitTime() != 0;
 //                btree.setLastCommitTime(commitRecord.getTimestamp());
@@ -319,9 +325,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         localTransactionManager.completedTx(tx);
     }
 
-    /**
-     * Note: logic copied from {@link ResourceManager#getIndex(String, long)}.
-     */
     public IIndex getIndex(String name, long timestamp) {
         
         if (name == null) {
@@ -417,30 +420,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     return null;
 
                 }
-
-                assert sources.length > 0;
                 
                 assert sources[0].isReadOnly();
 
-                if (sources.length == 1) {
-                    
-                    tmp = sources[0];
-                    
-                } else {
-                    
-                    tmp = new FusedView(sources);
-                    
-                }
-                
-//                if (sources.length == 1) {
-//
-//                    tmp = new ReadOnlyIndex(sources[0]);
-//
-//                } else {
-//
-//                    tmp = new ReadOnlyFusedView(sources);
-//
-//                }
+                tmp = (BTree) sources[0];
                             
             } else {
                 
@@ -464,15 +447,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     
                 }
 
-                if (sources.length == 1) {
+                assert ! sources[0].isReadOnly();
 
-                    tmp = sources[0];
-                    
-                } else {
-                    
-                    tmp = new FusedView( sources );
-                    
-                }
+                tmp = (BTree) sources[0];
 
             }
 
@@ -480,6 +457,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         return tmp;
 
+    }
+
+    /**
+     * Always returns the {@link BTree} as the sole element of the array since
+     * partitioned indices are not supported.
+     */
+    public AbstractBTree[] getIndexSources(String name, long timestamp,
+            BTree btree) {
+        
+        return new AbstractBTree[] { btree };
+        
     }
 
     public ITx getTx(long startTime) {
@@ -702,14 +690,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-//    public String getStatistics(String name, long timestamp) {
-//
-//        IIndex ndx = getIndex(name, timestamp);
-//        
-//        if(ndx==null) return null;
-//        
-//        return ndx.getStatistics();
-//        
-//    }
+    /**
+     * Always returns <code>null</code> since index partition moves are not
+     * supported.
+     */
+    public String getIndexPartitionGone(String name) {
+        
+        return null;
+        
+    }
 
 }

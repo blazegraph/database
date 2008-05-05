@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager.Options;
+import com.bigdata.service.StressTestConcurrent;
 
 /**
  * Test release of old resources using {@link Options#MIN_RELEASE_AGE}.
@@ -46,6 +47,9 @@ import com.bigdata.resources.StoreManager.Options;
  *       [commitTimeToPreserve] and verify that those resources are NOT deleted
  *       even though they are not required by any view as of that
  *       [commitTimeToPreserve].
+ * 
+ * FIXME write test where the minimum release time is non-zero, e.g., one minute
+ *       or one day.  Then rerun {@link StressTestConcurrent}.
  * 
  * @todo write test where the [releaseAge] is set.
  * 

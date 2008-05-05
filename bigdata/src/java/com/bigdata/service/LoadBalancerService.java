@@ -473,14 +473,14 @@ abstract public class LoadBalancerService extends AbstractService
     
         /**
          * The port on which the load balancer will run its <code>httpd</code>
-         * service (default {@value #DEFAULT_HTTPD_PORT}) -or-
-         * ZERO (0) to NOT start the <code>httpd</code> service. This service
-         * may be used to view the telemetry reported by the various services in
-         * the federation that are, or have been, joined with the load balancer.
+         * service (default {@value #DEFAULT_HTTPD_PORT}) -or- ZERO (0) to NOT
+         * start the <code>httpd</code> service. This service may be used to
+         * view the telemetry reported by the various services in the federation
+         * that are, or have been, joined with the load balancer.
          */
         String HTTPD_PORT = "httpd.port";
         
-        String DEFAULT_HTTPD_PORT = "80";
+        String DEFAULT_HTTPD_PORT = "8080";
      
         /**
          * The path of the directory where the load balancer will log a copy of

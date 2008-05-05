@@ -115,8 +115,11 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
             final int len = history.length();
             
-            final int fromIndex = len - maxHistoryLength - 3;
+            final int fromIndex = len - (maxHistoryLength - 3);
 
+            assert fromIndex > 0 : "len=" + len + ", fromIndex=" + fromIndex
+                    + ", maxHistoryLength=" + maxHistoryLength;
+            
             history = "..." + history.substring(fromIndex, len);
             
         }

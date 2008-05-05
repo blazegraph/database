@@ -139,7 +139,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             
         }
 
-        doConcurrentClientTest(journal, 5, 20, 100, 3, 100, .10);
+        doConcurrentClientTest(journal, 10, 20, 1000, 3, 100, .10);
         
     }
 
@@ -225,7 +225,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         for(int i=0; i<ntrials; i++) {
             
-            tasks.add(new Task(journal, name, keyLen, nops, abortRate));
+            tasks.add(new Task(journal, name, i, keyLen, nops, abortRate));
             
         }
 
@@ -238,6 +238,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         List<Future<Long>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
 
         final long elapsed = System.currentTimeMillis() - begin;
+
+        executorService.shutdownNow();
         
         Iterator<Future<Long>> itr = results.iterator();
         
@@ -309,14 +311,10 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             }
             
         }
-
-        executorService.shutdownNow();
         
         // immediately terminate any tasks that are still running.
         log.warn("Shutting down now!");
         journal.shutdownNow();
-        
-        journal.deleteResources();
         
         Result ret = new Result();
         
@@ -340,6 +338,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         ret.put("bytesWritten/sec", ""+(int)(bytesWritten*1000d/elapsed));
         
         System.err.println(ret.toString(true/*newline*/));
+
+        journal.deleteResources();
         
         return ret;
        
@@ -356,23 +356,32 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
         private final Journal journal;
         private final String name;
+        private final int trial;
         private final int keyLen;
         private final int nops;
         private final double abortRate;
         
         final Random r = new Random();
         
-        public Task(Journal journal,String name, int keyLen, int nops, double abortRate) {
+        public Task(Journal journal,String name, int trial, int keyLen, int nops, double abortRate) {
 
             this.journal = journal;
 
             this.name = name;
+            
+            this.trial = trial;
             
             this.keyLen = keyLen;
             
             this.nops = nops;
 
             this.abortRate = abortRate;
+            
+        }
+        
+        public String toString() {
+            
+            return super.toString()+"#"+trial;
             
         }
 

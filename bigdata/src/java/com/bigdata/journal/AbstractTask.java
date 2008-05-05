@@ -38,19 +38,21 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
+import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
@@ -152,8 +154,12 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 return null;
                 
             }
-            
-            if (readOnly) {
+
+            if (timestamp == ITx.UNISOLATED) {
+
+                journal = new IsolatedActionJournal((AbstractJournal) journal);
+
+            } else if (readOnly) {
 
                 // disallow writes.
                 journal = new ReadOnlyJournal(journal);
@@ -206,12 +212,772 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     protected final ITx tx;
     
     /**
-     * Cache of resolved named indices.
+     * Cache of named indices resolved by this task for its {@link #timestamp}.
      * 
      * @see #getIndex(String name)
      */
     final private Map<String,IIndex> indexCache;
 
+    /**
+     * Read-only copy of a {@link Name2Addr.Entry} with additional flags to
+     * track whether an index has been registered or dropped by the task.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo are these bits (combined with the replacement of the {@link Entry}
+     *       in {@link #n2a}) sufficiently flexible to allow a task to do a
+     *       drop/add sequence, or a more general {add,drop}+ sequence.
+     */
+    private class Entry extends Name2Addr.Entry {
+        
+        boolean registeredIndex = false;
+        boolean droppedIndex = false;
+        
+        Entry(Name2Addr.Entry entry) {
+            
+            super(entry.name, entry.checkpointAddr, entry.commitTime);
+            
+        }
+
+        /**
+         * Ctor used when registering an index.
+         * 
+         * @param name
+         * @param checkpointAddr
+         * @param commitTime
+         */
+        Entry(String name, long checkpointAddr, long commitTime) {
+            
+            super(name, checkpointAddr, commitTime);
+            
+            registeredIndex = true;
+            
+        }
+
+    }
+    
+    /**
+     * A map containing the {@link Entry}s for resources declared by
+     * {@link ITx#UNISOLATED} tasks. The map is populated atomically by
+     * {@link #setupIndices()} before the user task begins to execute.
+     * <p>
+     * There are several special cases designed to handle add and drop of named
+     * indices in combination with transient flags on the {@link Entry}:
+     * <ol>
+     * 
+     * <li>If an resource was declared by the task and there was no such index
+     * in existence when the task began to execute, then there will NOT be an
+     * {@link Entry} for the resource in this map.</li>
+     * 
+     * <li>If an existing index was dropped by the task, then then the resource
+     * will be associated with a {@link Entry} whose [droppedIndex] flag is set
+     * but the index will NOT be on the {@link #commitList}. When the task
+     * checkpoints the indices, that [dropppedIndex] flag will be used to drop
+     * the named index from the {@link ITx#UNISOLATED} {@link Name2Addr} object
+     * (and it is an error if the named index does not exist in
+     * {@link Name2Addr} at that time).</li>
+     * 
+     * <li>If an index is registered by a task, then either there MUST NOT be
+     * an entry in {@link #n2a} as of the time that the task registers the index
+     * -or- the entry MUST have the [droppedIndex] flag set. </li>
+     * 
+     * </ol>
+     */
+    private Map<String,Entry> n2a;
+    
+    /**
+     * The commit list contains metadata for all indices that were made dirty by
+     * an {@link ITx#UNISOLATED} task.
+     */
+    private ConcurrentHashMap<String,DirtyListener> commitList;
+    
+    /**
+     * Atomic read of {@link Entry}s for declares resources into {@link #n2a}.
+     * This is done before an {@link ITx#UNISOLATED} task executes. If the task
+     * executes successfully then changes to {@link #n2a} are applied to the
+     * unisolated {@link Name2Addr} object when the task completes. If the task
+     * fails, then {@link #n2a} is simply discarded (since we have not written
+     * on the unisolated {@link Name2Addr} we do not need to rollback any
+     * changes).
+     */
+    private void setupIndices() {
+
+        if (n2a != null)
+            throw new IllegalStateException();
+        
+        n2a = new HashMap<String,Entry>(resource.length);
+
+        /*
+         * Note: getIndex() sets the listener on the BTree. That listener is
+         * reponsible for putting dirty indices onto the commit list.
+         */
+        commitList = new ConcurrentHashMap<String,DirtyListener>(resource.length);
+        
+        // the unisolated name2Addr object.
+        final Name2Addr name2Addr = resourceManager.getLiveJournal().name2Addr;
+        
+        /*
+         * Copy entries to provide an isolated view of name2Addr as of
+         * the time that this task begins to execute.
+         */
+        synchronized(name2Addr) {
+            
+            for(String s : resource) {
+                
+                final Name2Addr.Entry tmp = name2Addr.getEntry(s);
+                
+                if(tmp != null) {
+                
+                    /*
+                     * Add a read-only copy of the entry with additional state
+                     * for tracking registration and dropping of named indices.
+                     * 
+                     * Note: We do NOT fetch the indices here, just copy their
+                     * last checkpoint metadata from Name2Addr.
+                     */
+                    
+                    n2a.put(s, new Entry(tmp));
+                    
+                }
+                
+            }
+            
+        }
+        
+    }
+    
+    /**
+     * An instance of this {@link DirtyListener} is registered with each
+     * {@link ITx#UNISOLATED} named index that we administer to listen for
+     * events indicating that the index is dirty. When we get that event we
+     * stick the {@link DirtyListener} on the {@link #commitList}. This makes
+     * the commit protocol simpler since the {@link DirtyListener} has both the
+     * name of the index and the reference to the index and we need both on hand
+     * to do the commit.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class DirtyListener implements IDirtyListener {
+        
+        final String name;
+        final BTree btree;
+        
+        public String toString() {
+            
+            return "DirtyListener{name="+name+"}";
+            //return "DirtyListener{name="+name+", btree="+btree.getCheckpoint()+"}";
+            
+        }
+
+        DirtyListener(String name, BTree ndx) {
+            
+            assert name!=null;
+            
+            assert ndx!=null;
+            
+            this.name = name;
+            
+            this.btree = ndx;
+            
+        }
+        
+        /**
+         * Add <i>this</i> to the {@link AbstractTask#commitList}.
+         * 
+         * @param btree
+         *            The {@link BTree} reporting that it is dirty.
+         */
+        public void dirtyEvent(BTree btree) {
+
+            assert btree == this.btree;
+
+            if (commitList.put(name, this) != null) {
+
+                if (INFO)
+                    log.info("Added index to commit list: name=" + name);
+
+            }
+            
+        }
+
+    }
+
+    /**
+     * Release hard references to named indices to facilitate GC.
+     */
+    private void clearIndexCache() {
+
+        if (INFO)
+            log.info("Clearing hard reference cache: " + indexCache.size()
+                    + " indices accessed");
+        
+        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
+            
+            /*
+             * Report counters for unisolated and read-committed indices.
+             */
+            
+            Iterator<Map.Entry<String, IIndex>> itr = indexCache.entrySet()
+                    .iterator();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<String, IIndex> entry = itr.next();
+
+                final String name = entry.getKey();
+
+                final IIndex ndx = entry.getValue();
+
+                ((ConcurrencyManager) concurrencyManager)
+                        .addCounters(name, ndx);
+                
+            }
+        
+        }
+        
+        indexCache.clear();
+        
+        if (commitList != null) {
+
+            /*
+             * Clear the commit list so that we do not hold hard references.
+             * 
+             * Note: it is important to do this here since this code will be
+             * executed even if the task fails so the commit list will always be
+             * cleared and we will not hold hard references to indices accessed
+             * by the task.
+             */
+            commitList.clear();
+            
+        }
+
+    }
+
+    /**
+     * Return a view of the named index appropriate for the timestamp associated
+     * with this task.
+     * <p>
+     * Note: There are two ways in which a task may access an
+     * {@link ITx#UNISOLATED} index, but in all cases access to the index is
+     * delegated to this method. First, the task can use this method directly.
+     * Second, the task can use {@link #getJournal()} and then use
+     * {@link IJournal#getIndex(String)} on that journal, which is simply
+     * delegated to this method.  See {@link IsolatedActionJournal}.
+     * 
+     * @param name
+     *            The name of the index.
+     * 
+     * @throws NullPointerException
+     *             if <i>name</i> is <code>null</code>.
+     * @throws IllegalStateException
+     *             if <i>name</i> is not a declared resource.
+     * @throws StaleLocatorException
+     *             if <i>name</i> identifies an index partition which has been
+     *             split, joined, or moved.
+     * @throws NoSuchIndexException
+     *             if the named index is not registered as of the timestamp.
+     * 
+     * @return The index.
+     * 
+     * @todo modify to return <code>null</code> if the index is not
+     *       registered?
+     */
+    synchronized final public IIndex getIndex(String name) {
+
+        if (name == null) {
+
+            // @todo change to IllegalArgumentException for API consistency?
+            throw new NullPointerException();
+            
+        }
+        
+        // validate that this is a declared index.
+        assertResource(name);
+
+        // verify still running.
+        assertRunning();
+        
+        /*
+         * Test the named index cache first.
+         */
+        {
+
+            final IIndex index = indexCache.get(name);
+
+            if (index != null) {
+
+                // Cached value.
+                return index;
+
+            }
+
+        }
+
+        if (timestamp == ITx.UNISOLATED) {
+
+            final String reason = resourceManager.getIndexPartitionGone(name);
+            
+            if (reason != null) {
+
+                throw new StaleLocatorException(name, reason);
+                
+            }
+            
+            // entry from isolated view of Name2Addr as of task startup.
+            final Entry entry = n2a.get(name);
+
+            if (entry == null) {
+
+                // index does not exist at this time.
+                throw new NoSuchIndexException(name);
+
+            }
+
+            /*
+             * Note: At this point we have an exclusive lock on the named
+             * unisolated index. We recover the unisolated index from
+             * Name2Addr's cache. If not found, then we load the unisolated from
+             * the store, set the [lastCommitTime], and enter it into the
+             * unisolated Name2Addr's cache of unisolated indices.
+             */
+            BTree btree;
+            
+            // the unisolated name2Addr object.
+            final Name2Addr name2Addr = resourceManager.getLiveJournal().name2Addr;
+
+            synchronized (name2Addr) {
+
+                // recover from unisolated index cache.
+                btree = name2Addr.getIndexCache(name);
+                
+                if (btree == null) {
+
+                    // re-load btree from the store.
+                    btree = BTree.load(//
+                            resourceManager.getLiveJournal(),//
+                            entry.checkpointAddr//
+                            );
+
+                    // set the lastCommitTime on the index.
+                    btree.setLastCommitTime(entry.commitTime);
+
+                    // add to the unisolated index cache (must not exist).
+                    name2Addr.putIndexCache(name, btree, false/* replace */);
+
+                }
+
+            }
+
+            return getUnisolatedIndexView(name, btree);
+
+        } else {
+
+            final IIndex tmp = resourceManager.getIndex(name, timestamp);
+
+            if (tmp == null) {
+
+                // Presume client has made a bad request
+                throw new NoSuchIndexException(name + ", timestamp="
+                        + timestamp);
+                // return null; // @todo return null to conform with Journal#getIndex(name)?
+
+            }
+
+            /*
+             * Put the index into a hard reference cache under its name so that
+             * we can hold onto it for the duration of the operation.
+             */
+
+            indexCache.put(name, tmp);
+
+            return tmp;
+
+        }
+        
+    }
+    
+    /**
+     * Given the name of an index and a {@link BTree}, obtain the view for all
+     * source(s) described by the {@link BTree}s index partition metadata (if
+     * any),insert that view into the {@link #indexCache}, and return the view.
+     * <p>
+     * Note: This method is used both when registering a new index ({@link #registerIndex(String, BTree)})
+     * and when reading an index view from the source ({@link #getIndex(String)}).
+     * 
+     * @param name
+     *            The index name.
+     * @param btree
+     *            The {@link BTree}.
+     * 
+     * @return The view.
+     */
+    private IIndex getUnisolatedIndexView(String name, BTree btree) {
+        
+        // setup the task as the listener for dirty notices.
+        btree.setDirtyListener(new DirtyListener(name,btree));
+        
+        // find all sources if a partitioned index.
+        final AbstractBTree[] sources = resourceManager.getIndexSources(name,
+                ITx.UNISOLATED, btree);
+
+        assert !sources[0].isReadOnly();
+
+        final IIndex view;
+        if (sources.length == 1) {
+
+            view = sources[0];
+
+        } else {
+
+            view = new FusedView(sources);
+
+        }
+        
+        // put the index in our hard reference cache.
+        indexCache.put(name, view);
+        
+        return view;
+        
+    }
+
+    /**
+     * Registers an index
+     * 
+     * @param name
+     *            The index name.
+     * @param btree
+     *            The {@link BTree} that will absorb writes for the index.
+     * 
+     * @return The index on which writes may be made. Note that if the
+     *         {@link BTree} describes an index partition with multiple sources
+     *         then the returned object is a {@link FusedView} for that index
+     *         partition as would be returned by
+     *         {@link IResourceManager#getIndex(String, long)}.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless the task is {@link ITx#UNISOLATED}
+     * @throws IndexExistsException
+     *             if the index was already registered as of the time that this
+     *             task began to execute.
+     * 
+     * @todo should allow add/drop of indices within fully isolated read-write
+     *       transactions as well.
+     * 
+     * @see IBTreeManager#registerIndex(String, BTree)
+     */
+    synchronized public IIndex registerIndex(String name, BTree btree) {
+        
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        if (btree == null)
+            throw new IllegalArgumentException();
+
+        // task must be unisolated.
+        assertUnisolated();
+        
+        // must be a declared resource.
+        assertResource(name);
+
+        // verify still running.
+        assertRunning();
+
+        if(n2a.containsKey(name)) {
+
+            final Entry entry = n2a.get(name);
+            
+            if(!entry.droppedIndex) {
+            
+                throw new IndexExistsException(name);
+                
+            }
+            
+            // FALL THROUGH IFF INDEX WAS DROPPED BY THE TASK.
+            
+        }
+
+        /*
+         * Note: logic is parallel to that in Name2Addr.
+         */
+        
+        // flush btree to the store to get the checkpoint record address.
+        final long checkpointAddr = btree.writeCheckpoint();
+
+        /*
+         * Create new Entry.
+         * 
+         * Note: Entry has [registeredIndex := true].
+         * 
+         * Note: The commit time here is a placeholder. It will be replaced with
+         * the actual commit time if the entry is propagated to Name2Addr and
+         * Name2Addr does a commit.
+         */
+        
+        final Entry entry = new Entry(name, checkpointAddr, 0L/* commitTime */);
+
+        /*
+         * Add entry to our isolated view (can replace an old [droppedIndex]
+         * entry).
+         */
+        n2a.put(name, entry);
+
+        /*
+         * Note: delegate logic to materialize the view in case BTree is an
+         * index partition with more than one source. This will also get the
+         * index view into [indexCache].
+         */
+
+        final IIndex view = getUnisolatedIndexView(name, btree);
+        
+        /*
+         * Verify that the caller's [btree] is part of the returned view.
+         */
+        if(view instanceof AbstractBTree) {
+            
+            assert btree == view;
+            
+        } else {
+         
+            assert btree == ((FusedView)view).getSources()[0];
+            
+        }
+        
+        /*
+         * Fire the listener which will get the btree onto the commit list.
+         * 
+         * Note: We MUST put the newly registered BTree on the commit list even
+         * if nothing else gets written on that BTree.
+         */
+
+        ((DirtyListener)btree.getDirtyListener()).dirtyEvent(btree);
+                
+        return view;
+        
+    }
+
+    /**
+     * Drops the named index.
+     * 
+     * @param name
+     *            The name of the index.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
+     * @throws UnsupportedOperationException
+     *             unless the task is {@link ITx#UNISOLATED}
+     * @throws NoSuchIndexException
+     *             if the named index is not registered as of the time that this
+     *             task began to execute.
+     *             
+     * @see IIndexManager#dropIndex(String)
+     */
+    synchronized public void dropIndex(String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        // task must be unisolated.
+        assertUnisolated();
+        
+        // must be a declared resource.
+        assertResource(name);
+
+        // verify still running.
+        assertRunning();
+
+        if(!n2a.containsKey(name)) {
+
+            throw new NoSuchIndexException(name);
+            
+        }
+
+        // The entry for that index in our isolated view of name2Addr.
+        final Entry entry = n2a.get(name);
+        
+        if(entry.droppedIndex) {
+            
+            // its already been dropped by the task.
+            throw new NoSuchIndexException(name);
+            
+        }
+        
+        entry.droppedIndex = true;
+
+        // clear from the index cache.
+        indexCache.remove(name);
+
+        // clear from the commit list.
+        commitList.remove(name);
+        
+        /*
+         * Note: Since the dropped indices are NOT on the commit list, when the
+         * task is checkpointed we MUST scan n2a and then drop any dropped
+         * indices without regard to whether they are on the commitList.
+         */
+        
+    }
+
+    /**
+     * Flushes any writes on unisolated indices touched by the task (those found
+     * on the {@link #commitList}) and reconciles {@link #n2a} (our isolated
+     * view of {@link Name2Addr}) with the {@link ITx#UNISOLATED}
+     * {@link Name2Addr} object.
+     * <p>
+     * This method is invoked after an {@link ITx#UNISOLATED} task has
+     * successfully completed its work, but while the task still has its locks
+     * and before it acquires an exclusive lock on the write service. The timing
+     * is designed to reduce the latency imposed on other tasks by the exclusive
+     * lock on the write service for IO required to flush the dirty indices.
+     */
+    private void checkpointTask() {
+
+        assertUnisolated();
+        
+        assertRunning();
+        
+        /*
+         * Checkpoint the dirty indices.
+         */
+        final int ndirty = commitList.size();
+        
+        final long begin = System.currentTimeMillis();
+        
+        if (INFO) {
+
+            log.info("There are " + ndirty + " dirty indices "
+                    + commitList.keySet() + " : " + this);
+                     
+        }
+
+        for (final DirtyListener l : commitList.values()) {
+
+            assert indexCache.containsKey(l.name) : "Index not in cache? name="
+                    + l.name;
+            
+            if(INFO)
+                log.info("Writing checkpoint: "+l.name);
+            
+            l.btree.writeCheckpoint();
+
+        }
+        
+        if(INFO) { 
+
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            log.info("Flushed "+ndirty+" indices in "+elapsed+"ms");
+            
+        }
+        
+        /*
+         * Atomically apply changes to Name2Addr. When the next groupCommit
+         * rolls around it will cause name2addr to run its commit protocol
+         * (which will be a NOP since it SHOULD NOT be a dirty listener when
+         * using the concurrency control) and then checkpoint itself, writing
+         * the updated Entry records as part of its own index state. Finally the
+         * AbstractJournal will record the checkpoint address of Name2Addr as
+         * part of the commit record, etc. Until then, the changes written on
+         * Name2Addr here will become visible as soon as we leave the
+         * synchronized(name2addr) block.
+         * 
+         * Note: I've choosen to apply the changes to Name2Addr after the
+         * indices have been checkpointed. This means that you will do all the
+         * IO for the index checkpoints before you learn whether or not there is
+         * a conflict with an add/drop for an index. However, the alternative is
+         * to remain synchronized on [name2addr] during the index checkpoint,
+         * which is overly constraining on concurrency. (If you validate first
+         * but do not remained synchronized on name2addr then the validation can
+         * be invalidated by concurrent tasks completing.)
+         * 
+         * However, unisolated tasks obtain exclusive locks for resources, so it
+         * SHOULD NOT be possible to fail validation here. If validation does
+         * fail (if the add/drop changes can not be propagated to name2addr)
+         * then either the logic for add/drop using our isolated [n2a] is
+         * busted, someone has gone around the concurrency control mechanisms to
+         * access name2addr directly, or there is someplace where access to
+         * name2addr is not synchronized.
+         */
+
+        // the unisolated name2Addr object.
+        final Name2Addr name2Addr = resourceManager.getLiveJournal().name2Addr;
+
+        synchronized(name2Addr) {
+
+            for( final Entry entry : n2a.values() ) {
+
+                if(entry.droppedIndex) {
+                    
+                    if(INFO) log.info("Dropping index on Name2Addr: "+entry.name);
+                    
+                    name2Addr.dropIndex(entry.name);
+                    
+                } else if(entry.registeredIndex) {
+
+                    if(INFO) log.info("Registering index on Name2Addr: "+entry.name);
+
+                    name2Addr.registerIndex(entry.name, commitList
+                            .get(entry.name).btree);
+
+                } else {
+
+                    final DirtyListener l = commitList.get(entry.name);
+
+                    if (l != null) {
+                     
+                        /*
+                         * Force the BTree onto name2addr's commit list.
+                         * 
+                         * Note: This will also change the dirty listener to be
+                         * [Name2Addr].
+                         * 
+                         * Note: We checkpointed the index above. Therefore we
+                         * mark it here as NOT needing to be checkpointed by
+                         * Name2Addr. This flag is very important. Name2Addr
+                         * DOES NOT acquire an exclusive lock on the unisolated
+                         * index before attempting to checkpoint the index. The
+                         * flag is set [false] here indicating to Name2Addr that
+                         * it will write the current checkpoint record address
+                         * on its next commit rather than attempting to
+                         * checkpoint the index itself, which could lead to a
+                         * concurrent modification problem.
+                         */
+
+                        if(INFO) log.info("Transferring to Name2Addr commitList: "
+                                + entry.name);
+
+                        name2Addr
+                                .putOnCommitList(l.name, l.btree, false/*needsCheckpoint*/);
+
+                    }
+                    
+                }
+                
+            }
+
+        }
+
+        // clear n2a.
+        n2a.clear();
+        
+        // clear the commit list.
+        commitList.clear();
+        
+        if(INFO) { 
+
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            log.info("End task checkpoint after "+elapsed+"ms");
+            
+        }
+        
+    }
+
+    /*
+     * End isolation support for name2addr.
+     */
+    
     /**
      * Flag is cleared if the task is aborted.  This is used to refuse
      * access to resources for tasks that ignore interrupts.
@@ -443,20 +1209,28 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     }
     
     /**
-     * Returns Task{taskName,timestamp,resource[]}
+     * Return <code>true</code> iff the task declared this as a resource.
+     * 
+     * @param name
+     *            The name of a resource.
+     * 
+     * @return <code>true</code> iff <i>name</i> is a declared resource.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
      */
-    public String toString() {
+    public boolean isResource(String name) {
         
-        return "Task{"+getTaskName()+",timestamp="+timestamp+",resource="+Arrays.toString(resource)+"}";
+        if (name == null)
+            throw new IllegalArgumentException();
         
-    }
-    
-    /**
-     * Returns the name of the class by default.
-     */
-    protected String getTaskName() {
+        for(String s : resource) {
+            
+            if(s.equals(name)) return true;
+            
+        }
         
-        return getClass().getName();
+        return false;
         
     }
     
@@ -474,21 +1248,74 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      *                if the <i>resource</i> was not declared to the
      *                constructor.
      */
-    protected String assertResource(String resource) {
+    protected String assertResource(final String resource) {
         
-        final String[] a = this.resource;
+        if (isResource(resource))
+            return resource;
+
+        throw new IllegalStateException("Not declared by task: " + resource);
         
-        for(int i=0; i<a.length; i++) {
+    }
+    
+    /**
+     * Assert that the task is {@link ITx#UNISOLATED}.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless the task is {@link ITx#UNISOLATED}
+     */
+    protected void assertUnisolated() {
+
+        if (timestamp == ITx.UNISOLATED) {
+
+            return;
             
-            if(a[i].equals(resource)) {
-                
-                return resource;
-                
-            }
+        }
+
+        throw new UnsupportedOperationException("Task is not unisolated");
+
+    }
+    
+    /**
+     * Assert that the task is still running ({@link #aborted} is
+     * <code>false</code>).
+     * 
+     * @throws RuntimeException
+     *             wrapping an {@link InterruptedException} if the task has been
+     *             interrupted.
+     */
+    protected void assertRunning() {
+        
+        if(aborted) {
+            
+            /*
+             * The task has been interrupted by the write service which also
+             * sets the [aborted] flag since the interrupt status may have been
+             * cleared by looking at it.
+             */
+
+            throw new RuntimeException(new InterruptedException());
             
         }
         
-        throw new IllegalStateException("Not declared by task: "+resource);
+    }
+    
+    /**
+     * Returns Task{taskName,timestamp,resource[]}
+     */
+    public String toString() {
+        
+        return "Task{" + getTaskName() + ",timestamp="
+                + TimestampUtility.toString(timestamp) + ",resource="
+                + Arrays.toString(resource) + "}";
+        
+    }
+    
+    /**
+     * Returns the name of the class by default.
+     */
+    protected String getTaskName() {
+        
+        return getClass().getName();
         
     }
     
@@ -703,7 +1530,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                     
                     clearIndexCache();
                 
-                    log.info("Reader is done: "+this);
+                    if(INFO) log.info("Reader is done: "+this);
                     
                 }
 
@@ -724,7 +1551,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
             nanoTime_allDone = System.currentTimeMillis();
             
-            log.info("done: "+this);
+            if(INFO) log.info("done: "+this);
 
         }
 
@@ -745,7 +1572,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         // resource(s) to lock (exclusive locks are used).
 
-        log.info("Unisolated write task: "+this+", thread="+Thread.currentThread());
+        if(INFO) log.info("Unisolated write task: "+this+", thread="+Thread.currentThread());
 
         // declare resource(s).
         lockManager.addResource(resource);
@@ -797,7 +1624,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             // set flag.
             ran = true;
 
-            log.info("Task Ok: class=" + this);
+            if(INFO) log.info("Task Ok: class=" + this);
                       
             /*
              * Note: The WriteServiceExecutor will await a commit signal before
@@ -818,7 +1645,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
                 // Do not re-invoke it afterTask failed above.
 
-                log.info("Task failed: class="+this+" : "+t);
+                if(INFO) log.info("Task failed: class="+this+" : "+t);
                 
                 writeService.afterTask(this, t);
 
@@ -903,37 +1730,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     /**
      * Inner class used to wrap up the call to {@link AbstractTask#doTask()} for
      * {@link IsolationEnum#ReadWrite} transactions.
-     * 
-     * FIXME take note of which indices the transaction actually _writes_ on and
-     * then inform the transaction manager which needs to keep track of that
-     * information. Notify the transaction manager in the post-processing for
-     * each isolated transaction, but only if a new index is introduced into the
-     * write set of the transaction.
-     * 
-     * FIXME In order to allow concurrent tasks to do work on the same
-     * transaction we need to use a per-transaction {@link LockManager} to
-     * produce a partial order that governs access to the isolated (vs mutable
-     * unisolated) indices accessed by that transaction for the
-     * <strong>txService</strong>.
-     * <p>
-     * Make sure that the {@link TemporaryRawStore} supports an appropriate
-     * level of concurrency to allow concurrent writers on distinct isolated
-     * indices that are being buffered on that store for a given transaction
-     * (MRMW). Reads and writes are currently serialized in order to support
-     * overflow from memory to disk.
-     * <p>
-     * The {@link Tx} needs to be thread-safe when instantiating the temporary
-     * store and when granting a view of an index (the read-committed and
-     * read-only txs should also be thread safe in this regard).
-     * <p>
-     * The txService must be a {@link WriteExecutorService} so that it will
-     * correctly handle aborts and commits of writes on isolated indices.
-     * 
-     * FIXME The transaction write service needs to be paused during synchronous
-     * overflow handling and buffered transaction write sets need to be split
-     * and moved with their index partitions since validation depends on an
-     * unisolated operation comparing the local write set for an index partition
-     * with the local index partition.
      */
     static protected class InnerReadWriteTxServiceCallable extends DelegateTask {
 
@@ -1013,107 +1809,36 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          */
         public Object call() throws Exception {
 
+            // setup view of the declared resources.
+            delegate.setupIndices();
+            
             delegate.nanoTime_beginWork = System.nanoTime();
-
-            // The write service on which this task is running.
-            final WriteExecutorService writeService = delegate.concurrencyManager.getWriteService();
-
-            /*
-             * Get reference to lock (this is just a reference - we acquire the
-             * lock itself below).
-             * 
-             * Note: this object is used to ensure that checkpoints and
-             * rollbacks are coordinated with the write service. In particular,
-             * this ensures that checkpoint and rollback operations do NOT
-             * overlap a group commit. Since indices do not participate in group
-             * commits until we write their checkpoint records and since we do
-             * not write their checkpoint records until we have this lock, we
-             * are able to guarentee that the write set of a task is made
-             * restart safe atomically by the next group commit.
-             * 
-             * FIXME NOW : Rather than fooling around with [autoCommit],
-             * getIndex() could simply NOT register the index with Name2Addr as
-             * a listener. The index cache would be preserved until the group
-             * commit and would then be directly updated on Name2Addr using
-             * logic exactly parallel to the handleCommit() logic, but without
-             * entering the named indices onto the dirtyList.
-             * 
-             * Another way to do this is to simply register a Name2Addr subclass
-             * by overriding AbstractJournal#setupCommitters(). The subclass
-             * would not use a dirtyList.
-             * 
-             * FIXME NOW : when the task succeeds, it should be possible to
-             * flush the index to the store before we obtain the lock in order
-             * to reduce the latency when we write the checkpoint record. (if
-             * the task fails, the rollback is a light weight operation.)
-             * 
-             * FIXME NOW : In fact, the checkpoint and rollback actions then
-             * become simply recording the new checkpoint record. for
-             * checkpoint, it has the new root address and (if changed) the new
-             * metadata address. for rollback, we simply close the index and
-             * write a copy of the saved checkpoint record, thereby discarding
-             * any possible side effects from checkpoints performed from within
-             * the task itself.
-             * 
-             * FIXME NOW : There is an isolation problem with Name2Addr. See
-             * that class for details.  This is a more correct statement of 
-             * the problem that a lot of what is above.
-             * 
-             * FIXME NOW : I've sketched out a lot of the changes to this class
-             * in another file, including the flush() before releasing the
-             * locks. Those changes need to be merged in selectively.
-             */
-            final Lock lock = writeService.lock;
 
             try {
 
-                if(INFO)
-                log.info("Running with resource lock(s): "+this);
+                if (INFO)
+                    log.info("Running with resource lock(s): " + this);
+
+                // The write service on which this task is running.
+                final WriteExecutorService writeService = delegate.concurrencyManager
+                        .getWriteService();
 
                 writeService.concurrentTaskCount.incrementAndGet();
-                
+
                 // invoke doTask() on AbstractTask with locks.
                 final Object ret = delegate.doTask();
 
+                /*
+                 * checkpoint while holding locks.
+                 */
+                delegate.checkpointTask();
+
                 writeService.concurrentTaskCount.decrementAndGet();
 
-                if(INFO)
-                log.info("Did run with resource lock(s): "+this);
-                
-                lock.lock();
-                
-                try {
-                
-                    // success - checkpoint indices
-                    checkpointIndices();
-                    
-                    // append to the serialization order.
-                    // FIXME NOW : writeService.addTaskToSerializationOrder(delegate);
-                    
-                } finally {
-                    
-                    lock.unlock();
-                    
-                }
+                if (INFO)
+                    log.info("Did run with resource lock(s): " + this);
 
                 return ret;
-                
-            } catch(Throwable t) {
-                
-                lock.lock();
-                
-                try {
-                
-                    // failure - discard partial writes.
-                    rollbackIndices();
-                    
-                } finally {
-                    
-                    lock.unlock();
-                    
-                }
-                
-                throw new RuntimeException(t);
                 
             } finally {
                 
@@ -1131,318 +1856,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
         
-        /**
-         * Checkpoint each index accessed by the UNISOLATED task (this is necessary
-         * in order to have the writes become restart safe since autoCommit is
-         * disabled for UNISOLATED tasks). The task will participate in the next
-         * commit. Since the index(s) for the task have already been checkpointed,
-         * the commit will just record the address of that checkpoint record.
-         * <p>
-         * Note: This has the effect of flushing dirty indices to the store
-         * immediately when the task completes. However, the nodes and leaves are
-         * still in the cache on the index and will remain available if the index is
-         * reused.
-         */
-        private void checkpointIndices() {
-
-            if(INFO) log.info("Task accessed "+delegate.indexCache.size()+" indices: "+this);
-            
-            final Iterator<Map.Entry<String,IIndex>> itr = delegate.indexCache.entrySet().iterator();
-
-            while (itr.hasNext()) {
-
-                final Map.Entry<String, IIndex> entry = itr.next();
-                
-                final String name = entry.getKey();
-                
-                final IIndex tmp = entry.getValue();
-
-                final BTree btree;
-                
-                if (tmp instanceof BTree) {
-
-                    btree = ((BTree) tmp);
-
-                } else {
-
-                    btree = ((BTree) ((FusedView) tmp).getSources()[0]);
-
-                }
-
-                assert btree.getDirtyListener() != null : "No registered listener: name="
-                        + name;
-
-                final boolean needsCheckpoint = btree.needsCheckpoint();
-                
-                if (INFO)
-                    log.info("name=" + name + ", needsCheckpoint="
-                            + needsCheckpoint + " : " + this);
-                
-                if (!needsCheckpoint) {
-                 
-                    /*
-                     * In general, you expect that an unisolated index will need
-                     * to be checkpointed if it was accessed since tasks which
-                     * do not require write access are normally read-committed.
-                     */
-                    
-                    log.warn("name=" + name + ", does not need checkpoint: "
-                            + btree.getCheckpoint());
-                    
-                }
-                
-                if(needsCheckpoint) {
-                    
-                    /*
-                     * There are writes on the btree, so write a checkpoint
-                     * record now that the task has completed successfully.
-                     */
-                    final long checkpointAddr;
-                    
-                    if (!((AbstractJournal) getJournal()).name2Addr
-                            .willCommit(name)) {
-
-                        /*
-                         * FIXME There is a hole in the logic for name2addr,
-                         * btree, group commit, and the abstract task which is
-                         * allowing BTree#needsCheckpoint() to return true
-                         * without having notified Name2Addr via its listener
-                         * that the BTree is dirty. Put that way, its clearly
-                         * one of the methods on BTree which allows a state
-                         * change to the index metadata or the checkpoint
-                         * record.
-                         */
-                        
-                        log.error("index not on commit list: name=" + name
-                                + ", checkpoint(before)=" + btree.getCheckpoint());
-
-                        btree.getDirtyListener().dirtyEvent(btree);
-                        
-                        checkpointAddr = btree.writeCheckpoint();
-                        
-                        log.error("index not on commit list: name=" + name
-                                + ", checkpoint(after )=" + btree.getCheckpoint());
-
-                    } else {
-                            
-                        checkpointAddr = btree.writeCheckpoint();
-                        
-                    }
-                    
-                    if(INFO) log.info("name=" + name + ", newCheckpointAddr="
-                            + btree.getStore().toString(checkpointAddr) + " : "
-                            + this);
-                    
-                }
-
-            }
-            
-        }
-        
-        /**
-         * If the index(s) is dirty then we close it. The next time the index is
-         * requested this will force the reload of the index from its last
-         * checkpoint address as recorded in the last commit record. While the index
-         * may have written data on the journal we just ignore it since it is
-         * inaccessible and will disappear when the journal
-         */
-        private void rollbackIndices() {
-
-            if(INFO) log.info("Rolling back "+delegate.indexCache.size()+" indices: "+this);
-            
-            final Iterator<Map.Entry<String,IIndex>> itr = delegate.indexCache.entrySet().iterator();
-
-            while (itr.hasNext()) {
-
-                final Map.Entry<String, IIndex> entry = itr.next();
-                
-                final String name = entry.getKey();
-                
-                final IIndex tmp = entry.getValue();
-
-                final BTree btree;
-                
-                if (tmp instanceof BTree) {
-
-                    btree = ((BTree) tmp);
-
-                } else {
-
-                    btree = ((BTree) ((FusedView) tmp).getSources()[0]);
-
-                }
-                
-                final boolean needsCheckpoint = btree.needsCheckpoint();
-                
-                if(DEBUG) log.debug("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
-                
-                if(needsCheckpoint) {
-                    
-                    /*
-                     * FIXME NOW : rollback semantics when task checkpoints indices.
-                     * 
-                     * This is not the precisely correct rollback condition. The
-                     * issue is if the task itself checkpoints the index then
-                     * the rollback point will be moved forward to that
-                     * checkpoint since the btree will re-open from its last
-                     * written checkpoint record. The solution is to keep a
-                     * transient map from index name to the address of the
-                     * rollback checkpoint. Changes to that map should be made
-                     * atomically for all indices that were accessed by the
-                     * UNISOLATED task using a scan of the [indexCache]. This
-                     * can be made atomic using a lock governing access to the
-                     * checkpoint rollback addresses.
-                     */
-                    
-                    if(INFO) log.info("Rolling back index: "+name+" : "+this);
-                    
-                    if(btree.isOpen()) {
-                        try {
-                            btree.close();
-                        } catch(Exception ex) {
-                            log.warn("While rolling back index: "+name+" : "+this+" : "+ex);
-                        }
-                    }
-                    
-                }
-
-            }
-            
-        }
-
-    }
-    
-    /**
-     * Return a view of the named index appropriate for the timestamp associated
-     * with this task.
-     * 
-     * @param name
-     *            The name of the index.
-     * 
-     * @throws NullPointerException
-     *             if name is null.
-     * @throws StaleLocatorException
-     *             if the named index partition has been split, joined, or
-     *             moved.
-     * @throws NoSuchIndexException
-     *             if the named index is not registered as of the timestamp.
-     */
-    final public IIndex getIndex(String name) {
-
-        if (name == null) {
-
-            throw new NullPointerException();
-            
-        }
-        
-        if(aborted) {
-            
-            /*
-             * The task has been interrupted by the write service which also
-             * sets the [aborted] flag since the interrupt status may have been
-             * cleared by looking at it.
-             */
-
-            throw new RuntimeException(new InterruptedException());
-            
-        }
-        
-        /*
-         * Test the named index cache first.
-         */
-        {
-
-            final IIndex index = indexCache.get(name);
-
-            if (index != null) {
-
-                // Cached value.
-                return index;
-
-            }
-
-        }
-
-        // validate that this is a declared index.
-        assertResource(name);
-        
-        final IIndex tmp = resourceManager.getIndex(name, timestamp);
-        
-        if (tmp == null) {
-
-            // Presume client has made a bad request.
-            throw new NoSuchIndexException(name + ", timestamp=" + timestamp);
-
-        }
-        
-        /*
-         * We turn off auto-commit on the index for UNISOLATED writers. This is
-         * critical to prevent partial writes from being made restart safe when
-         * a task fails.
-         */
-        
-        if (timestamp == ITx.UNISOLATED) {
-
-            log.debug("Disabling autoCommit: "+name+" : "+this);
-            
-            if (tmp instanceof BTree) {
-
-                ((BTree) tmp).setAutoCommit(false);
-
-            } else {
-
-                ((BTree) ((FusedView) tmp).getSources()[0])
-                        .setAutoCommit(false);
-
-            }
-
-        }
-        
-        /*
-         * Put the index into a hard reference cache under its name so that we
-         * can hold onto it for the duration of the operation.
-         */
-
-        indexCache.put(name, tmp);
-
-        return tmp;
-
-    }
-
-    /**
-     * Release hard references to named indices. Dirty indices will exist on the
-     * Name2Addr's commitList until the next commit.
-     */
-    private void clearIndexCache() {
-
-        log.info("Clearing hard reference cache: "+indexCache.size()+" indices accessed");
-        
-        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
-            
-            /*
-             * Report counters for unisolated and read-committed indices.
-             */
-            
-            Iterator<Map.Entry<String, IIndex>> itr = indexCache.entrySet()
-                    .iterator();
-
-            while (itr.hasNext()) {
-
-                final Map.Entry<String, IIndex> entry = itr.next();
-
-                final String name = entry.getKey();
-
-                final IIndex ndx = entry.getValue();
-
-                ((ConcurrencyManager) concurrencyManager)
-                        .addCounters(name, ndx);
-                
-            }
-        
-        }
-        
-        indexCache.clear();
-
     }
     
     /**
@@ -1470,22 +1883,38 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         }
 
     }
-
+    
     /**
-     * A read-only view of an {@link IJournal} that is used to enforce read-only
-     * semantics on tasks using {@link AbstractTask#getJournal()} to access the
-     * backing store. Methods that write on the journal, that expose the
-     * unisolated indices, or which are part of the commit protocol will throw
-     * an {@link UnsupportedOperationException}.
+     * A read-write view of an {@link IJournal} that is used to impose isolated
+     * and atomic changes for {@link ITx#UNISOLATED} tasks that register or drop
+     * indices. The intentions of the task are buffered locally (by this class)
+     * for that task such that the index appears to have been registered or
+     * dropped immediately. Those intentions are propagated to {@link Name2Addr}
+     * on a task-by-task basis only when (a) this task is part of the current
+     * commit group; and (b) the {@link WriteExecutorService} performs a group
+     * commit. If there is a conflict between the state of {@link Name2Addr} at
+     * the time of the commit and the intentions of the tasks in the commit
+     * group (for example, if two tasks try to drop the same index), then the
+     * 2nd task will be interrupted. The enumeration of the intentions of tasks
+     * always begins with the task executed by the thread performing the commit
+     * so that no other task's intention could cause the commit itself to be
+     * interrupted.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class ReadOnlyJournal implements IJournal {
-
-        private final IJournal delegate;
+    class IsolatedActionJournal implements IJournal {
         
-        public ReadOnlyJournal(IJournal source) {
+        private final AbstractJournal delegate;
+                
+        /**
+         * This class prevents {@link ITx#UNISOLATED} tasks from having direct
+         * access to the {@link AbstractJournal} using
+         * {@link CopyOfAbstractTask#getJournal()}.
+         * 
+         * @param source
+         */
+        public IsolatedActionJournal(AbstractJournal source) {
 
             if (source == null)
                 throw new IllegalArgumentException();
@@ -1494,6 +1923,89 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         }
 
+        /*
+         * Overriden methods for registering or dropping indices.
+         */
+        
+        /**
+         * Delegates to the {@link AbstractTask}.
+         */
+        public void dropIndex(String name) {
+
+            AbstractTask.this.dropIndex(name);
+            
+        }
+
+        /**
+         * Note: This is the core implementation for registering an index - it
+         * delegates to the {@link AbstractTask}.
+         */
+        public IIndex registerIndex(String name, BTree btree) {
+            
+            return AbstractTask.this.registerIndex(name,btree);
+            
+        }
+
+        public void registerIndex(IndexMetadata indexMetadata) {
+         
+            // delegate to core impl.
+            registerIndex(indexMetadata.getName(), indexMetadata);
+            
+        }
+
+        public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
+            
+            // Note: handles constraints and defaults for index partitions.
+            delegate.validateIndexMetadata(name, indexMetadata);
+            
+            // Note: create on the _delegate_.
+            final BTree btree = BTree.create(delegate, indexMetadata);
+
+            // delegate to core impl.
+            return registerIndex(name, btree);
+            
+        }
+
+        /**
+         * Note: access to an unisolated index is governed by the AbstractTask.
+         */
+        public IIndex getIndex(String name) {
+
+            try {
+
+                return AbstractTask.this.getIndex(name);
+                
+            } catch(NoSuchIndexException ex) {
+                
+                // api conformance.
+                return null;
+                
+            }
+            
+        }
+
+        /**
+         * Note: you are allowed access to historical indices without having to
+         * declare a lock - such views will always be read-only and support
+         * concurrent readers.
+         */
+        public IIndex getIndex(String name, long timestamp) {
+
+            if (timestamp == ITx.UNISOLATED) {
+                
+                return getIndex(name);
+                
+            }
+            
+            // the index view is obtained from the resource manager.
+            return resourceManager.getIndex(name, timestamp);
+            
+        }
+
+        /*
+         * Disallowed methods (commit protocol and shutdown protocol).
+         */
+        
         public void abort() {
             throw new UnsupportedOperationException();
         }
@@ -1506,14 +2018,34 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             throw new UnsupportedOperationException();
         }
 
-        public long commit() {
-            throw new UnsupportedOperationException();
-        }
-
         public void deleteResources() {
             throw new UnsupportedOperationException();
         }
 
+        public long commit() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void setCommitter(int index, ICommitter committer) {
+            throw new UnsupportedOperationException();
+        }
+
+        public void setupCommitters() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void shutdown() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void shutdownNow() {
+            throw new UnsupportedOperationException();
+        }
+
+        /*
+         * Methods which delegate directly to the live journal.
+         */
+        
         public Object deserialize(byte[] b, int off, int len) {
             return delegate.deserialize(b, off, len);
         }
@@ -1530,12 +2062,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             throw new UnsupportedOperationException();
         }
 
-        public void dropIndex(String name) {
-            throw new UnsupportedOperationException();
-        }
-
         public void force(boolean metadata) {
-            throw new UnsupportedOperationException();
+            delegate.force(metadata);
         }
 
         public int getByteCount(long addr) {
@@ -1552,26 +2080,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         public File getFile() {
             return delegate.getFile();
-        }
-
-        /**
-         * Note: Does not allow access to {@link ITx#UNISOLATED} indices.
-         */
-        public IIndex getIndex(String name, long timestamp) {
-
-            if (timestamp == ITx.UNISOLATED)
-                throw new UnsupportedOperationException();
-
-            return delegate.getIndex(name, timestamp);
-
-        }
-
-        /**
-         * Note: Not supported since this method returns the {@link ITx#UNISOLATED}
-         * index.
-         */
-        public IIndex getIndex(String name) {
-            throw new UnsupportedOperationException();
         }
 
         public long getOffset(long addr) {
@@ -1618,36 +2126,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             return delegate.read(addr);
         }
 
-        public void registerIndex(IndexMetadata indexMetadata) {
-            throw new UnsupportedOperationException();
-        }
-
-        public IIndex registerIndex(String name, BTree btree) {
-            throw new UnsupportedOperationException();
-        }
-
-        public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
-            throw new UnsupportedOperationException();
-        }
-
         public byte[] serialize(Object obj) {
             return delegate.serialize(obj);
-        }
-
-        public void setCommitter(int index, ICommitter committer) {
-            delegate.setCommitter(index, committer);
-        }
-
-        public void setupCommitters() {
-            delegate.setupCommitters();
-        }
-
-        public void shutdown() {
-            delegate.shutdown();
-        }
-
-        public void shutdownNow() {
-            delegate.shutdownNow();
         }
 
         public long size() {
@@ -1667,7 +2147,245 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         }
 
         public long write(ByteBuffer data) {
+            return delegate.write(data);
+        }
+
+    }
+
+    /**
+     * A read-only view of an {@link IJournal} that is used to enforce read-only
+     * semantics on tasks using {@link AbstractTask#getJournal()} to access the
+     * backing store. Methods that write on the journal, that expose the
+     * unisolated indices, or which are part of the commit protocol will throw
+     * an {@link UnsupportedOperationException}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class ReadOnlyJournal implements IJournal {
+
+        private final IJournal delegate;
+        
+        public ReadOnlyJournal(IJournal source) {
+
+            if (source == null)
+                throw new IllegalArgumentException();
+
+            this.delegate = source;
+
+        }
+
+        /*
+         * Index access methods (overriden or disallowed depending on what they
+         * do).
+         */
+        
+        /**
+         * Note: Does not allow access to {@link ITx#UNISOLATED} indices.
+         */
+        public IIndex getIndex(String name, long timestamp) {
+
+            if (timestamp == ITx.UNISOLATED)
+                throw new UnsupportedOperationException();
+
+            if(timestamp == AbstractTask.this.timestamp) {
+                
+                // to the AbstractTask
+                try {
+
+                    return AbstractTask.this.getIndex(name);
+                    
+                } catch(NoSuchIndexException ex) {
+                    
+                    // api conformance.
+                    return null;
+                    
+                }
+                
+            }
+            
+            // to the backing journal.
+            return delegate.getIndex(name, timestamp);
+
+        }
+
+        /**
+         * Note: Not supported since this method returns the
+         * {@link ITx#UNISOLATED} index.
+         */
+        public IIndex getIndex(String name) {
+
             throw new UnsupportedOperationException();
+            
+        }
+        
+        public void dropIndex(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+
+        public void registerIndex(IndexMetadata indexMetadata) {
+            throw new UnsupportedOperationException();
+        }
+
+        public IIndex registerIndex(String name, BTree btree) {
+            throw new UnsupportedOperationException();
+        }
+
+        public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
+            throw new UnsupportedOperationException();
+        }
+
+        /*
+         * Disallowed methods (commit and shutdown protocols).
+         */
+        
+        public void abort() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void close() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void closeAndDelete() {
+            throw new UnsupportedOperationException();
+        }
+
+        public long commit() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void deleteResources() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void discardCommitters() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void setCommitter(int index, ICommitter committer) {
+            throw new UnsupportedOperationException();
+        }
+
+        public void setupCommitters() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void shutdown() {
+            throw new UnsupportedOperationException();
+        }
+
+        public void shutdownNow() {
+            throw new UnsupportedOperationException();
+        }
+
+        /*
+         * Disallowed methods (methods that write on the store).
+         */
+
+        public void force(boolean metadata) {
+            throw new UnsupportedOperationException();
+        }
+
+        public long write(ByteBuffer data) {
+            throw new UnsupportedOperationException();
+        }
+        
+        /*
+         * Methods that delegate directly to the backing journal.
+         */
+        
+        public Object deserialize(byte[] b, int off, int len) {
+            return delegate.deserialize(b, off, len);
+        }
+
+        public Object deserialize(byte[] b) {
+            return delegate.deserialize(b);
+        }
+
+        public Object deserialize(ByteBuffer buf) {
+            return delegate.deserialize(buf);
+        }
+
+        public int getByteCount(long addr) {
+            return delegate.getByteCount(addr);
+        }
+
+        public ICommitRecord getCommitRecord(long timestamp) {
+            return delegate.getCommitRecord(timestamp);
+        }
+
+        public CounterSet getCounters() {
+            return delegate.getCounters();
+        }
+
+        public File getFile() {
+            return delegate.getFile();
+        }
+
+        public long getOffset(long addr) {
+            return delegate.getOffset(addr);
+        }
+
+        public Properties getProperties() {
+            return delegate.getProperties();
+        }
+
+        public IResourceMetadata getResourceMetadata() {
+            return delegate.getResourceMetadata();
+        }
+
+        public long getRootAddr(int index) {
+            return delegate.getRootAddr(index);
+        }
+
+        public IRootBlockView getRootBlockView() {
+            return delegate.getRootBlockView();
+        }
+
+        public boolean isFullyBuffered() {
+            return delegate.isFullyBuffered();
+        }
+
+        public boolean isOpen() {
+            return delegate.isOpen();
+        }
+
+        public boolean isReadOnly() {
+            return delegate.isReadOnly();
+        }
+
+        public boolean isStable() {
+            return delegate.isStable();
+        }
+
+        public void packAddr(DataOutput out, long addr) throws IOException {
+            delegate.packAddr(out, addr);
+        }
+
+        public ByteBuffer read(long addr) {
+            return delegate.read(addr);
+        }
+
+        public byte[] serialize(Object obj) {
+            return delegate.serialize(obj);
+        }
+
+        public long size() {
+            return delegate.size();
+        }
+
+        public long toAddr(int nbytes, long offset) {
+            return delegate.toAddr(nbytes, offset);
+        }
+
+        public String toString(long addr) {
+            return delegate.toString(addr);
+        }
+
+        public long unpackAddr(DataInput in) throws IOException {
+            return delegate.unpackAddr(in);
         }
 
     }

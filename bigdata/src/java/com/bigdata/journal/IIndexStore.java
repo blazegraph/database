@@ -34,15 +34,15 @@ import com.bigdata.btree.IIndex;
 public interface IIndexStore {
 
     /**
-     * Return a view of the named index as of the specified timestamp.
+     * Return a read-only view of the named index as of the specified timestamp.
      * 
      * @param name
      *            The index name.
      * @param timestamp
-     *            The timestamp - see {@link ITx}.
+     *            The timestamp.
      * 
      * @return The index or <code>null</code> iff there is no index registered
-     *         with that name.
+     *         with that name for that timestamp.
      */
     public IIndex getIndex(String name, long timestamp);
 

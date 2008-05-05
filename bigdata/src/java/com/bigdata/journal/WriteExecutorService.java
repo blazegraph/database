@@ -25,10 +25,14 @@ package com.bigdata.journal;
 
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -604,7 +608,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *            The exception thrown -or- <code>null</code> if the task
      *            completed successfully.
      */
-    protected void afterTask(ITask r, Throwable t) {
+    protected void afterTask(AbstractTask r, Throwable t) {
         
         if (r == null)
             throw new NullPointerException();
@@ -1872,3 +1876,197 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
 
 }
+
+///**
+// * This applies isolated operations (add, drop, and checkpoint of named
+// * indices) in the {@link #serializationOrder}. If any task fails during
+// * this commit protocol then the transitive closure of all dependent tasks
+// * are interrupted and removed from the {@link #serializationOrder}.
+// * <p>
+// * This process always starts with the first task in the
+// * {@link #serializationOrder}. This MUST be the task executed by the
+// * thread running the group commit. The process is applied to each task in
+// * the {@link #serializationOrder} in sequence. Tasks are removed from the
+// * {@link #serializationOrder} either when they have been successfully
+// * processed or when one of their pre-condition tasks has failed during this
+// * per-task commit processing.
+// * <p>
+// * The commit will continue as long as at least one task was able to apply
+// * its isolated actions successfully.
+// * 
+// * @return The #of tasks whose per-task commit processing was successfully
+// *         applied.
+// * 
+// * @see #serializationOrder
+// */
+//private int doPerTaskCommitProcessing() {
+//    
+//    // the current thread holds the lock.
+//    assert lock.isHeldByCurrentThread();
+//
+//    // there is at least one task in the commit group.
+//    assert !serializationOrder.isEmpty();
+//    
+//    // group commit is executed by the first task in the serialization order.
+//    assert active.get(Thread.currentThread()) == serializationOrder.get(0);
+//
+//    int nsuccess = 0, nfailed = 0;
+//    
+//    // #of tasks in the commit group (on entry).
+//    final int ntasks = serializationOrder.size();
+//    
+////    final AbstractJournal journal = resourceManager.getLiveJournal();
+////    
+////    Name2Addr name2Addr = journal.name2Addr;
+//    
+//    while(!serializationOrder.isEmpty()) {
+//
+////        /*
+////         * write name2Addr checkpoint so that the actions can be made
+////         * atomic.
+////         * 
+////         * FIXME This is going around the dirtyList, but in fact I want to
+////         * have the changes to name2addr applied so this needs to be more
+////         * like handleCommit(long commitTime), but we do not have the
+////         * commitTime on hand yet.  Until this is resolved the only solution
+////         * is to abort() rather than commit(), which discards all tasks rather
+////         * than just the ones whose preconditions are violated. (another approach
+////         * would be to no allow tasks to run in the same commit group against the
+////         * same indices).
+////         */
+////        final long rollbackAddr = name2Addr.writeCheckpoint();
+////        final long rollbackAddr = name2Addr.handleCommit(commitTime);
+//        
+//        // remove the head of the list.
+//        final AbstractTask task = serializationOrder.remove();
+//        
+//        assert task != null;
+//
+//        try {
+//         
+//            task.doIsolatedActions();
+//            
+//            nsuccess++;
+//            
+//        } catch (Throwable t) {
+//            
+//            log.warn("Per-task commit protocol error: task=" + task, t);
+//            
+////log.warn(
+////                    "Per-task commit protocol error - rolling back name2Addr: task="
+////                            + task, t);
+////            
+////            try {
+////                
+////                // reload from the last checkpoint which we took above.
+////
+////                journal.name2Addr = null;
+////                
+////                name2Addr = journal.setupName2AddrBTree(rollbackAddr);
+////                
+////            } catch(Throwable t2) {
+////                
+////                log.error("Unable to rollback name2Addr - will abort: " + t2, t2);
+////
+////                abort();
+////                
+////                return 0;// Nothing was committed.
+////                
+////            }
+//
+//            if(true) {
+//
+//                /*
+//                 * Discard the entire commit group.
+//                 */
+//                
+//                abort();
+//                
+//            } else {
+//
+//            /*
+//             * Find all tasks with a precondition on the failed task and
+//             * force them to fail as well.
+//             */
+//
+//            // find tasks dependent on this one (map uses Thread for key presuming that Thread is hashable:-)
+//            final Map<Thread,AbstractTask> dependentTasks = new HashMap<Thread,AbstractTask>();
+//            
+//            // the set of resources whose preconditions are violated.
+//            final Set<String> resources = new HashSet<String>();
+//            
+//            // seed with this task.
+//            dependentTasks.put(task.thread,task);
+//            
+//            // seed with resources used by this task.
+//            Collections.addAll(resources, task.getResource());
+//            
+//            // consider remaining tasks.
+//            for( AbstractTask tmp : serializationOrder) {
+//                
+//                // consider each resource used by a remaining task.
+//                for(String r : tmp.getResource()) {
+//                    
+//                    // if the resource is in the collected set then the pre-condition has failed.
+//                    if(resources.contains(r)) {
+//
+//                        // add this task.
+//                        dependentTasks.put(tmp.thread,tmp);
+//                        
+//                        // add the resources used by this task.
+//                        Collections.addAll(resources, tmp.getResource());
+//
+//                        // consider the next task in the serialization order.
+//                        break;
+//                        
+//                    }
+//                    
+//                } // consider next resource on task.
+//                
+//            } // consider next task in serialization order.
+//
+//            /*
+//             * Now interrupt each task whose preconditions were violated and
+//             * remove it from the serializationOrder since it can no longer
+//             * be committed.
+//             */
+//
+//            if (INFO)
+//                log.info("Identified " + dependentTasks.size()
+//                        + " tasks with a precondition on " + task);
+//            
+//            for(final AbstractTask tmp : dependentTasks.values()) {
+//                
+//                nfailed++;
+//
+//                // set the cause.
+//                task.setError(t);
+//                
+//                // interrupt the task - will cause it to throw an exception back to the caller.
+//                task.thread.interrupt();
+//                
+//                if (tmp != task) {
+//
+//                    // Note: [task] was already removed above.
+//                    serializationOrder.remove(tmp);
+//
+//                }
+//                
+//            }
+//            
+//            }//if false
+//            
+//        }
+//        
+//    }
+//
+//    if (DEBUG)
+//        log.debug("nsuccess=" + nsuccess + ", nfailed=" + nfailed
+//                + ", ntasks=" + ntasks);
+//    
+//    assert ntasks == (nsuccess + nfailed) : "nsuccess=" + nsuccess
+//            + ", nfailed=" + nfailed + ", ntasks=" + ntasks;
+//    
+//    return nsuccess;
+//    
+//}

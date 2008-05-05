@@ -734,7 +734,9 @@ abstract public class AbstractTripleStore implements ITripleStore,
         /*
          * The defaults.
          * 
-         * @todo play around with override of the split handler.
+         * @todo play around with override of the split handler. one rule of
+         * thumb is to split when the height of the generated segment would be
+         * at least N.
          */
 //        final ISplitHandler splitHandler = new DefaultSplitHandler(
 //                1 * Bytes.megabyte32, // minimumEntryCount
@@ -747,7 +749,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 //      if (name.contains(name_term2Id)) // causes a problem 
 //      if (name.contains(name_id2Term)) // no problem.
 //        if(!name.contains(name_term2Id)) // no problem.
-            {
+            if(true){
             
             // An override that makes a split very likely.
             final ISplitHandler splitHandler = new DefaultSplitHandler(

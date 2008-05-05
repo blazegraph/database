@@ -44,8 +44,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
@@ -54,9 +52,7 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.counters.LazyEvaluationCounterSet;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -2118,10 +2114,6 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     }
 
-    /**
-     * @todo verify that {@link Journal#getIndex(String, long)} can in fact
-     *       return a view.
-     */
     public IIndex getIndex(String name, long commitTime) {
 
         assertOpen();
@@ -2129,31 +2121,23 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         final ICommitRecord commitRecord = getCommitRecord(commitTime);
 
         if (commitRecord == null) {
-            
+
             log.info("No commit record for timestamp=" + commitTime);
 
             return null;
-            
+
         }
-        
-        return getIndex(name, commitRecord );
+
+        return getIndex(name, commitRecord);
         
     }
     
     /**
-     * Returns a read-only named index loaded from the given root block. This
-     * method imposes a canonicalizing mapping and contracts that there will be
-     * at most one instance of the historical index at a time. This contract is
-     * used to facilitate buffer management. Writes on the index will NOT be
-     * made persistent and the index will NOT participate in commits.
-     * <p>
-     * Note: since this is always a request for historical read-only data, this
-     * method MUST NOT register a committer and the returned btree MUST NOT
-     * participate in the commit protocol.
-     * <p>
-     * Note: The caller MUST take care not to permit writes since they could be
-     * visible to other users of the same read-only index. This is typically
-     * accomplished using {@link BTree#setReadOnly(boolean)}.
+     * Returns a read-only named index loaded from a {@link ICommitRecord}. The
+     * {@link BTree} will be marked as read-only, it will NOT permit writes, and
+     * {@link BTree#getLastCommitTime(long)} will report the value associated
+     * with {@link Entry#commitTime} for the historical {@link Name2Addr}
+     * instance for that {@link ICommitRecord}.
      * 
      * @return The named index -or- <code>null</code> iff the named index did
      *         not exist as of that commit record.
@@ -2223,16 +2207,31 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     }
     
     /**
-     * A canonicalizing mapping for {@link BTree}s.
+     * A canonicalizing mapping for <em>historical</em> {@link BTree}s.
+     * <p>
+     * Note: This method imposes a canonicalizing mapping and ensures that there
+     * will be at most one instance of the historical index at a time. This
+     * guarentee is used to facilitate buffer management. Writes on the index
+     * are NOT allowed.
+     * <p>
+     * Note: This method makes the {@link BTree} as read-only but does not set
+     * {@link BTree#setLastCommitTime(long)} since it does not have access to
+     * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr.
+     * See {@link #getIndex(String, ICommitRecord)} which does set
+     * {@link BTree#setLastCommitTime(long)}.
+     * <p>
+     * Note: The canonicalizing mapping for unisolated {@link BTree}s is
+     * maintained by the {@link ITx#UNISOLATED} {@link Name2Addr} instance.
      * 
      * @param checkpointAddr
-     *            The address of the {@link Checkpoint} record for the {@link BTree}.
-     *            
+     *            The address of the {@link Checkpoint} record for the
+     *            {@link BTree}.
+     * 
      * @return The {@link BTree} loaded from that {@link Checkpoint}.
      * 
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
-    final public BTree getIndex(long checkpointAddr) {
+    final public BTree getIndex(final long checkpointAddr) {
         
         synchronized (historicalIndexCache) {
 
@@ -2242,6 +2241,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
                 // Note: Does not set lastCommitTime.
                 obj = BTree.load(this, checkpointAddr);
+             
+                obj.setReadOnly(true);
                 
             }
             
@@ -2252,27 +2253,6 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         }
         
     }
-
-//    /**
-//     * Insert or touch an object in the object cache.
-//     * 
-//     * @param addr
-//     *            The {@link Addr address} of the object in the store.
-//     * @param obj
-//     *            The object.
-//     * 
-//     * @see #getIndex(long), which provides a canonicalizing mapping for index
-//     *      objects using the object cache.
-//     */
-//    final protected void touch(long addr,Object obj) {
-//        
-//        synchronized(objectCache) {
-//            
-//            objectCache.put(addr, (ICommitter)obj, false/*dirty*/);
-//            
-//        }
-//        
-//    }
 
     /**
      * Registers a named index. Once registered the index will participate in
@@ -2435,34 +2415,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     public BTree registerIndex(String name, BTree ndx) {
 
         assertOpen();
-
-        /*
-         * This is a minor performance tweak. It flushes the index to the
-         * backing store before we synchronize on [name2addr] in order to afford
-         * greater concurrency.
-         * 
-         * Note: this is wasted effort only in the case where the index is
-         * pre-existing as we would NOT flush it to disk in that case. In the
-         * index to be registered is empty or if indices are not normally
-         * pre-existing then this should be a performance win where a large #of
-         * indices are created concurrently.
-         * 
-         * Note: in the case where the index is pre-existing, this will also
-         * force a commit since the caller's index is flushed to the backing
-         * store before we know that the index already exists. For this reason I
-         * recommend against this (and it will break some unit tests in
-         * TestAddDropIndex if you do this).
-         */
-
-//        ((ICommitter)ndx).handleCommit();
         
         synchronized (name2Addr) {
                 
             // add to the persistent name map.
             name2Addr.registerIndex(name, ndx);
-
-            // report event (the application has access to the named index).
-            ResourceManager.openUnisolatedBTree(name);
 
         }
 
@@ -2485,22 +2442,20 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             // drop from the persistent name map.
             name2Addr.dropIndex(name);
 
-            // report event.
-            ResourceManager.dropUnisolatedBTree(name);
-
         }
 
     }
     
     /**
-     * Return the mutable view of the named index (aka the "live" index). This
-     * object is NOT thread-safe. You MUST NOT write on this index unless you
-     * KNOW that you are the only writer. See {@link ConcurrencyManager}, which
-     * handles exclusive locks for unisolated indices. Other consumers SHOULD
-     * use {@link BTree#setReadOnly(boolean)} to avoid the possibility of
-     * mishap.
+     * Return the mutable view of the named index (aka the "live" or
+     * {@link ITx#UNISOLATED} index). This object is NOT thread-safe. You MUST
+     * NOT write on this index unless you KNOW that you are the only writer. See
+     * {@link ConcurrencyManager}, which handles exclusive locks for
+     * {@link ITx#UNISOLATED} indices.
      * 
      * @return The mutable view of the index.
+     * 
+     * @see #getIndex(String, long)
      */
     public BTree getIndex(String name) {
 
@@ -2518,7 +2473,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // Note: NullPointerException can be thrown here if asynchronously closed.
         synchronized (name2Addr) {
 
-            return name2Addr.get(name);
+            return name2Addr.getIndex(name);
 
         }
 

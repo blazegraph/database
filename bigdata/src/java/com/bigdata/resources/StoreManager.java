@@ -2152,7 +2152,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             releaseTime = maxReleaseTime;
 
-            log.info("releaseTime is not set: using maxReleaseTime="
+            log.warn("releaseTime is not set: using maxReleaseTime="
                     + maxReleaseTime);
 
         } else {
@@ -2163,7 +2163,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
             releaseTime = Math.min(maxReleaseTime, this.releaseTime);
 
-            log.info("releaseTime=" + releaseTime);
+            log.warn("Choosen releaseTime=" + releaseTime
+                    + " : min(maxReleaseTime=" + maxReleaseTime
+                    + ", set releaseTime=" + releaseTime + ")");
 
         }
         
@@ -2177,7 +2179,7 @@ abstract public class StoreManager extends ResourceEvents implements
              * we choose the [lastCommitTime] instead.
              */
 
-            log.info("Choosing the last commit time for the live journal");
+            log.warn("Choosing the last commit time for the live journal");
             
             commitTimeToPreserve = getLiveJournal().getRootBlockView()
                     .getLastCommitTime();
@@ -2517,11 +2519,11 @@ abstract public class StoreManager extends ResourceEvents implements
      *         strictly greater than <i>releaseTime</i>.
      * 
      * @throws IllegalArgumentException
-     *             if there is no commit point that is strictly greater than the
-     *             releaseTime is not spanned by any journal (this implies that
-     *             the release time is either in the future or, if the
-     *             releaseTime is equal to the last commitTime, that you are
-     *             trying to release everything in the database).
+     *             If there is no commit point that is strictly greater than the
+     *             releaseTime. This implies that the release time is either in
+     *             the future or, if the releaseTime is equal to the last
+     *             commitTime, that you are trying to release everything in the
+     *             database.
      */
     protected long getCommitTimeStrictlyGreaterThan(final long releaseTime) {
 

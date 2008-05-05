@@ -1186,6 +1186,10 @@ abstract public class OverflowManager extends IndexManager {
 
         /*
          * Cause old resources to be deleted on the file system.
+         * 
+         * Note: This is run while we have a lock on the write executor service
+         * so that we can guarentee that no tasks are running with access to
+         * historical views which might be deleted when we purge old resources.
          */
         purgeOldResources();
         

@@ -1129,7 +1129,7 @@ abstract public class DataService extends AbstractService
                 reportService.scheduleWithFixedDelay(new ReportTask(),
                         initialDelay, delay, unit);
 
-                log.warn("Started ReportTask.");
+                log.info("Started ReportTask.");
             
             }
             

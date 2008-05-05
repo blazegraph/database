@@ -1,6 +1,7 @@
 package com.bigdata.journal;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -34,7 +35,7 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractLocalTransactionManager implements
+abstract public class AbstractLocalTransactionManager extends TimestampUtility implements
         ILocalTransactionManager {
 
     /**
@@ -480,12 +481,18 @@ abstract public class AbstractLocalTransactionManager implements
          */
         public Object doTask() throws Exception {
 
+            log.info("resource="+Arrays.toString(getResource()));
+            
             /*
              * The commit time is assigned when we prepare the transaction.
              */
 
-            final long commitTime = nextTimestamp();
+            final long commitTime = nextTimestampRobust();
 
+            /*
+             * @todo should I acquire AbstractTx.lock around the prepare/commit?
+             */
+            
             tx.prepare(commitTime);
 
             return Long.valueOf(tx.commit());
