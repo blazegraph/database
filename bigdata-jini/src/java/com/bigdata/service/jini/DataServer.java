@@ -143,50 +143,6 @@ public class DataServer extends AbstractServer {
     
     protected Remote newService(Properties properties) {
 
-//        synchronized(this) {
-//
-//            if (timestampServiceClient == null) {
-//
-//                /*
-//                 * Note: We need the timestamp service client to be available
-//                 * before we can initialize the data service.
-//                 * 
-//                 * Note: This is initialized here rather than in the ctor since
-//                 * newService() is invoked from the ctor of the base class -
-//                 * before the ctor of this class has started its initialization.
-//                 * 
-//                 * FIXME Change to run DataService#start() in a thread so that
-//                 * it can await the timestamp service with a timeout.
-//                 */
-//                
-//                timestampServiceClient = new TimestampServiceClient(getDiscoveryManagement());
-//                
-//                final int maxtries = 3;
-//                
-//                int ntries;
-//                
-//                for(ntries=0; ntries<maxtries; ntries++) {
-//                    
-//                    if (timestampServiceClient.getTimestampService() != null) {
-//
-//                        break;
-//                        
-//                    }
-//                    
-//                }
-//                
-//                if (timestampServiceClient.getTimestampService() == null) {
-//                    
-//                   throw new RuntimeException(
-//                            "Could not discover timestamp service after: "
-//                                    + ntries);
-//                    
-//                }
-//                
-//            }
-//
-//        }
-        
         return new AdministrableDataService(this,properties);
         
     }
