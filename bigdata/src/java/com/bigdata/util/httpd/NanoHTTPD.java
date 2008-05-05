@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
@@ -245,12 +246,35 @@ public class NanoHTTPD implements IServiceShutdown
      * Starts a HTTP server to given port.
      * <p>
      * Throws an IOException if the socket is already in use
+     * 
+     * @param port
+     *            The port. If <code>0</code> the the server will start on a
+     *            random port. The actual port is available from #getPort().
      */
 	public NanoHTTPD( int port ) throws IOException
 	{
-		myTcpPort = port;
+        
+        // The server socket.
+        final ServerSocket ss;
+        if(port != 0 ) {
 
-        final ServerSocket ss = new ServerSocket(myTcpPort);
+            /*
+             * Use the specified port.
+             */
+            myTcpPort = port;
+
+            ss = new ServerSocket(myTcpPort);
+            
+        } else {
+            
+            /*
+             * Use any open port.
+             */
+            ss = new ServerSocket(0);
+
+            myTcpPort = ss.getLocalPort();
+            
+        }
         
         log.info("Running on port=" + port);
 
@@ -717,6 +741,15 @@ public class NanoHTTPD implements IServiceShutdown
 	private int myTcpPort;
 	File myFileDir;
 
+    /**
+     * The port on which the service was started.
+     */
+    public int getPort() {
+        
+        return myTcpPort;
+        
+    }
+    
 	// ==================================================
 	// File server code
 	// ==================================================

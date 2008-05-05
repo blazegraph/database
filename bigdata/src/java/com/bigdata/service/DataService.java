@@ -30,6 +30,8 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.BindException;
+import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.rmi.NoSuchObjectException;
 import java.util.Properties;
@@ -57,6 +59,8 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
@@ -77,6 +81,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
@@ -272,6 +277,12 @@ abstract public class DataService extends AbstractService
     final protected ResourceManager resourceManager;
     final protected ConcurrencyManager concurrencyManager;
     final protected AbstractLocalTransactionManager localTransactionManager;
+    
+    /**
+     * Local httpd service exposing the live {@link CounterSet} for the
+     * {@link DataService}.
+     */
+    protected AbstractHTTPD httpd;
     
     /**
      * Note: this value is not bound until the {@link #getServiceUUID()} reports
@@ -533,7 +544,7 @@ abstract public class DataService extends AbstractService
 //        }
 
     }
-    
+
     /**
      * A clone of properties specified to the ctor.
      */
@@ -591,6 +602,14 @@ abstract public class DataService extends AbstractService
             statisticsCollector = null;
 
         }
+
+        if( httpd != null) {
+            
+            httpd.shutdown();
+            
+            httpd = null;
+            
+        }
         
 // if (INFO)
 //            log.info(getCounters().toString());
@@ -625,6 +644,14 @@ abstract public class DataService extends AbstractService
             
         }
 
+        if( httpd != null) {
+            
+            httpd.shutdownNow();
+            
+            httpd = null;
+            
+        }
+        
 //        if (INFO)
 //            log.info(getCounters().toString());
         
@@ -677,8 +704,10 @@ abstract public class DataService extends AbstractService
      * method is called.
      * <p>
      * The prefix for the counter hierarchy will be
-     * <code>hostname/service/serviceUUID</code>. This method therefore has a
-     * dependency on {@link #getServiceUUID()} and must be invoked after the
+     * <code>hostname/service/<i>serviceIface</i>/serviceUUID</code> where
+     * <i>serviceIface</i> is the name of the class returned by
+     * {@link #getServiceIface()}. This method therefore has a dependency on
+     * {@link #getServiceUUID()} and must be invoked after the
      * <code>serviceUUID</code> is known. The timing of that event depends on
      * whether the service is embedded or using a distributed services framework
      * such as <code>jini</code>.
@@ -729,7 +758,7 @@ abstract public class DataService extends AbstractService
             final String pathPrefix = ps + hostname + ps + "service" + ps
                     + getServiceIface().getName() + ps + serviceUUID + ps;
 
-            final CounterSet serviceRoot = countersRoot.makePath(pathPrefix);
+            serviceRoot = countersRoot.makePath(pathPrefix);
 
             /*
              * Service generic counters. 
@@ -790,7 +819,8 @@ abstract public class DataService extends AbstractService
         
     }
     private CounterSet countersRoot;
-
+    private CounterSet serviceRoot; 
+    
     /*
      * ITxCommitProtocol.
      */
@@ -1132,6 +1162,38 @@ abstract public class DataService extends AbstractService
             
             }
             
+            /*
+             * HTTPD service reporting out statistics on a randomly assigned port.
+             * The port is reported to the load balancer and also written into the
+             * file system. The httpd service will be shutdown with the data
+             * service.
+             */
+            {
+                
+                try {
+
+                    final CounterSet counterSet = (CounterSet) getCounters();
+                    
+                    DataService.this.httpd = new CounterSetHTTPD(
+                            0/* random port */, counterSet );
+                    
+                    // the URL that may be used to access the local httpd.
+                    final String url = "http://"
+                            + AbstractStatisticsCollector.fullyQualifiedHostName
+                            + ":" + DataService.this.httpd.getPort();
+                    
+                    // add counter reporting that url to the load balancer.
+                    DataService.this.serviceRoot.addCounter("Local httpd", 
+                            new OneShotInstrument<String>(url));
+                    
+                } catch (IOException e) {
+                    
+                    log.error("Could not start httpd", e);
+                    
+                }
+                
+            }
+
             return true;
             
         }
