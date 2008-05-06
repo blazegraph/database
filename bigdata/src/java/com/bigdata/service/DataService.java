@@ -1233,34 +1233,26 @@ abstract public class DataService extends AbstractService
         final long elapsed = now - lastReattachMillis;
 
         if (elapsed > 1000/* ms */) {
-            
-            try {
 
-                CounterSet tmp = resourceManager.getIndexManagerCounters();
+            CounterSet tmp = resourceManager.getIndexManagerCounters();
 
-                assert tmp != null;
+            assert tmp != null;
 
-                synchronized (tmp) {
+            synchronized (tmp) {
 
-                    tmp.detach("indices");
+                tmp.detach("indices");
 
-                    tmp.makePath("indices").attach(
-                            concurrencyManager.getIndexCounters()
-//                            resourceManager.getLiveJournal().getNamedIndexCounters()
-                                    );
-
-                }
-
-            } catch (Throwable t) {
-
-                log.warn("Problem trying to update index counter views?", t);
+                tmp.makePath("indices").attach(
+                        concurrencyManager.getIndexCounters()
+                // resourceManager.getLiveJournal().getNamedIndexCounters()
+                        );
 
             }
 
             lastReattachMillis = now;
-            
+
         }
-        
+
     }
     private long lastReattachMillis = 0L;
     
@@ -1298,7 +1290,15 @@ abstract public class DataService extends AbstractService
          */
         public void run() {
 
-            reattachDynamicCounters();
+            try {
+                
+                reattachDynamicCounters();
+
+            } catch (Throwable t) {
+
+                log.warn("Problem trying to update index counter views?", t);
+
+            }
             
             try {
 

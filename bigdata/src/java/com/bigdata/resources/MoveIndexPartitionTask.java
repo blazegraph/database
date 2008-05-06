@@ -528,9 +528,6 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             // drop the old index partition.
             getJournal().dropIndex(getOnlyResource());
             
-            // will notify tasks that index partition has moved.
-            resourceManager.setIndexPartitionGone(getOnlyResource(), "move");
-            
             final LocalPartitionMetadata pmd = src.getIndexMetadata()
                     .getPartitionMetadata();
             
@@ -554,6 +551,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             // atomic update on the metadata server.
             resourceManager.getMetadataService().moveIndexPartition(
                     scaleOutIndexName, oldLocator, newLocator);
+            
+            // will notify tasks that index partition has moved.
+            resourceManager.setIndexPartitionGone(getOnlyResource(), "move");
             
             // notify successful index partition move.
             resourceManager.moveCounter.incrementAndGet();

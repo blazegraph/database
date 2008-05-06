@@ -214,13 +214,13 @@ public class StressTestConcurrent extends
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
                 nops, insertRate, nindices, testCorrectness );
 
-        log.info("dataService0\n" + dataService0.getStatistics());
-       
-        if (dataService1 != null) {
-            
-            log.info("dataService1\n" + dataService1.getStatistics());
-            
-        }
+//        log.info("dataService0\n" + dataService0.getStatistics());
+//       
+//        if (dataService1 != null) {
+//            
+//            log.info("dataService1\n" + dataService1.getStatistics());
+//            
+//        }
         
     }
 
