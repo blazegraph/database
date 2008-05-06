@@ -701,6 +701,8 @@ Short term tasks:
      - Done. The per-process counters for linux are not being reported
        under "service" but instead directly under the service UUID.
 
+     - Done. Group services under their service type in the counters.
+
      - Done (also fixed a bug where the LDS was not sending a join
        message to the LBS and modified notify(), warn(), and urgent()
        to invoke join() on the behalf of remote clients). The LBS
@@ -745,49 +747,26 @@ Short term tasks:
        to a data service perspective, which aggregates across the
        clients using that service and discount RMI.
 
-     - (*****) Debug overflow handling.
+     - Done. Need to aggregate statistics for the partitions of an
+       index as reported to the LBS for analytics.
 
-       I believe that the problem lies in how new indices are being
-       created and the interaction with the index autoCommit,
-       checkpoint and group commit mechanisms.
+     - Need to remove index partitions which are known to be stale
+       from the LBS after a bit, or at least allow them to be hidden.
+       The data will eventually grow beyond what can be held by an LDS
+       if we do nothing.
 
-       It appears that indices are becoming available to concurrent
-       writers before the commit point (e.g., when the metadata
-       service has been notified but data service has not yet
-       committed), which breaks the concurrency control mechanisms.
+     - It would be nice to be able to drill down into the index data.
 
-       The primary suspect is when registering or dropping an new
-       index since these activities have side-effects via Name2Addr
-       which are immediately visible to concurrent unisolated tasks or
-       to new read-committed tasks.
+     - Done. Show metadata about the open index segments in the
+       IndexManager
 
-       What is required in an atomic change in visibility for one or
-       more indices (register/drop) that is coordinated with the
-       commit protocol.
+     - Done. Send stale locator notices to the LBS and replace the
+       counters (or nest them under) on the LBS when the index
+       partition is reported as stale.
 
-       The changes to Name2Addr need to be buffered such that they
-       remain visible only to the task which executed those
-       operations, inconsistencies in the registered or dropped
-       indices across tasks within the same commit group need to be
-       eagerly detected, and the changes need to be applied atomically
-       with the next commit within Name2Addr's own commit protocol.
-
-       Problem exist with:
-
-       - MetadataService#RegisterScaleOutIndexTask - registers an index
-
-       - JoinIndexPartitionTask - drops the old index partition and
-         registers the new index partition.
-
-       - SplitIndexPartitionTask - registers the new index partitions
-         and drops the old index partition.
-
-       - AbstractResourceManagerTask - documents a potential problem
-         with MDI updates without 2-phase commits.  Look into this
-         further and see if this problem can be addressed without
-         using a full transaction.  If not, then we will need to use a
-         full transaction to avoid this issue.
-
+       Done. Note: having a local httpd for the data service would
+       make it much easier to inspect the indices.
+    
      - (**) The IndexManager should report the #of open indices.  We
        can have an exact count of that if we use a static atomic
        integer in AbstractBTree.
@@ -874,6 +853,61 @@ Short term tasks:
 
      - Add reporting to the concurrent data loader for #errors.
 
+   - Transaction support.
+
+     - Overhaul transaction processing and support full, 2-/3- phase
+       transactions.
+
+     - A problem is reported by StressTestConcurrentTx.  Revisit this
+       when I overhaul the full transaction support.
+
+     - Transaction identifiers need to be "symbols" that respect the
+       timestamp ordering for historical reads and the transaction
+       start time.  Since the timestamps are discrete it is possible
+       that the factory will have to wait until it can assign a
+       transaction identifier for the interval implied by some desired
+       historical start time.
+
+     - ** Change tx timestamps to negative and use positive timestamps
+       for historical reads.  Changes to AbstractTask, ITx,
+       ITransactionManager, StoreFileManager, IsolationEnum, and the
+       post-processing tasks.  This will greatly simplify thinking
+       about historical read operations since they will simply use the
+       actual commit time while transactions will use a free
+       (-timestamp) value selected by the transaction manager.
+
+     - AbstractResourceManagerTask - documents a potential problem
+       with MDI updates without 2-phase commits.  Look into this
+       further and see if this problem can be addressed without using
+       a full transaction.  If not, then we will need to use a full
+       transaction to avoid this issue.
+
+     - (*****) The consistentRead option used by the
+       PartitionedIndexRangeIterator needs to use the most recent
+       commit time for the federation.
+
+       Currently it uses the lastCommitTime for the first index
+       partition which it scans.  However, it is quite possible that
+       there have been writes on other index partitions since which
+       would not be reflected in BTree#lastCommitTime.  The
+       consistentRead would therefore reflect an older history rather
+       than the most recent writes when it moved onto the other index
+       partitions.
+
+       In order to fix this the data services MUST discover and use a
+       centralized timeservice.  This can be essentially a stripped
+       down centralized transaction manager.  The data services will
+       obtain their commitTime timestamps from this centralized time
+       service and MUST also notify the centralized timeservice once
+       they have successfully committed.  The PartitionedRangeIterator
+       will then query the centralized time service for the last
+       commit time for the federation as a whole and use that as the
+       time for a consistentRead operation.
+
+       As an alternative, the data services could periodically publish
+       their commit times.  I need to see how much of a bottleneck it
+       is for clients calling nextTimestamp().
+
    - LocalTripleStoreWithEmbeddedDataService
 
      - Benchmark with owl:sameAs backchainer.
@@ -932,32 +966,6 @@ Short term tasks:
        am seeing a lot of tasks in the concurrency manager for the
        metadata service, but few commits on the live journal.  What
        the heck is the being reported for the metadata service?
-
-   - (*****) The consistentRead option used by the
-     PartitionedIndexRangeIterator needs to use the most recent commit
-     time for the federation.
-
-     Currently it uses the lastCommitTime for the first index
-     partition which it scans.  However, it is quite possible that
-     there have been writes on other index partitions since which
-     would not be reflected in BTree#lastCommitTime.  The
-     consistentRead would therefore reflect an older history rather
-     than the most recent writes when it moved onto the other index
-     partitions.
-
-     In order to fix this the data services MUST discover and use a
-     centralized timeservice.  This can be essentially a stripped down
-     centralized transaction manager.  The data services will obtain
-     their commitTime timestamps from this centralized time service
-     and MUST also notify the centralized timeservice once they have
-     successfully committed.  The PartitionedRangeIterator will then
-     query the centralized time service for the last commit time for
-     the federation as a whole and use that as the time for a
-     consistentRead operation.
-
-     As an alternative, the data services could periodically publish
-     their commit times.  I need to see how much of a bottleneck it is
-     for clients calling nextTimestamp().
 
    - OverflowManager
 
@@ -1069,16 +1077,8 @@ Short term tasks:
      terms in the document and then piece together the phrases from
      the result.
 
-   - ** Change tx timestamps to negative and use positive timestamps for
-     historical reads.  Changes to AbstractTask, ITx,
-     ITransactionManager, StoreFileManager, IsolationEnum, and the
-     post-processing tasks.  This will greatly simplify thinking about
-     historical read operations since they will simply use the actual
-     commit time while transactions will use a free (-timestamp) value
-     selected by the transaction manager.
-
-   - Modify to have an observable event or callback that assigns the
-     service UUID and that indicates when the resource manager is
+   - Done? Modify to have an observable event or callback that assigns
+     the service UUID and that indicates when the resource manager is
      running and refactor the LDS and DS startup logic to use that to
      configure the reporting of counters and an optional httpd service
      (at least for the LDS). The relevant Jini method is
@@ -1389,27 +1389,15 @@ Short term tasks:
 
 ============================================================
 
-- Reduce StatementBuffer size so that writes have reasonable latency
-  (measure on the client index view's thread pool using counters)
+- ** Reduce StatementBuffer size so that writes have reasonable
+  latency (measure on the client index view's thread pool using
+  counters)
 
 - Dumping of the Queue in the ConcurrentDataLoader is not enlightening
   as the objects wrap our tasks.  Maybe they could be unwrapped?  The
   purpose is too learn more about why a flush task sometimes stalls.
 
 - Remove the logging of the QueueStatisticsTask?
-
-- Need to aggregate statistics for the partitions of an index as
-  reported to the LBS for analytics.
-
-  Need to remove index partitions which are known to be stale from the
-  LBS after a bit, or at least allow them to be hidden.  The data will
-  eventually grow beyond what can be held by an LDS if we do nothing.
-
-  In a different direct, it would be nice to be able to drill down
-  into the index data.
-
-  Should show metadata about the open index segments in the
-  IndexManager
 
 - ** Validate host and service statistics with 2 services and test
      move scenarios.  Start with everything on one data service and
@@ -1424,5 +1412,76 @@ Short term tasks:
   generated index segments - ah, they are not close to 100M each yet
   (but also nothing tests their actual size in bytes).
 
-- Problem remains with StressTestConcurrentTx.  Revisit this when I
-  overhaul the full transaction support.
+host3
+
+LDS 12.8k on U10
+
+JDS 10.3k on U10 (2 data services)
+
+JDS 13.6k on U100 (2 data services; w/o overflow)
+
+JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
+
+    - Done. (There was a fence post when the releaseTime was less than
+      the first commit time for any journal.) Saw "no data for release
+      time" error.  Twice.  This will prevent overflow from succeeding
+      since it occurs during synchronous overflow.  I have changed the
+      configuration for the data services to set [minReleaseAge = 0],
+      which is probably more appropriate for this test, but this needs
+      to be debugged.
+
+    - **** Must validate the KB after load (already validing
+           split/move/join on standard indices).
+
+    - Done. Get the basic overflow tests running.
+
+    - Done. ClientIndexView : retry count exceeded - need to report
+      the underlying cause(s)
+
+    - **** Configure larger sizes for the various index caches on a
+           server platform.  However large caches with the JVM default
+           heap cause the concurrent data load test to run out of
+           memory (when the overflow rate is also high).
+
+    - * Review the LBS host and service scores.  Can they predict host
+        and service load well enough to move index partitions around
+        without the host-based physical disk counters under linux?
+
+    - Done. Dynamically refresh the httpd view for the data service to
+      make the counter set for the index manager live.
+
+	Done. Modify to report the counters retained by the
+	concurrency manager as they are longer lived.
+
+	Done. Report partition metadata for the view, including the
+	checkpoints for the index segments.
+
+	Done. Report stale locators.
+
+	*** I am not seeing StaleLocatorExceptions for read-committed
+            views, at least not in the counter set generated by the
+            concurrency manager.  Part of the problem is that the fast
+            overflow rate is making the views update very quickly.
+
+Note: Must edit the DataServer[01].properties files to change overflow
+behavior, etc.
+
+
+============================================================
+
+**** The group commit behavior when interrupted during shutdown needs
+     to be reviewed with respect to the recent changes to AbstractTask
+     and Name2Addr.
+
+ERROR: 397768 pool-1-thread-559   commitCounter=397 com.bigdata.resources.SplitIndexPartitionTask$AtomicUpdateSplitIndexPartitionTask [test_POS#18, test_POS#40, test_POS#41] 0 waitingOnCommit  com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:1102): Problem with commit? : java.lang.InterruptedException
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:1878)
+	at com.bigdata.journal.WriteExecutorService.waitForRunningTasks(WriteExecutorService.java:1230)
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:1024)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:655)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:1638)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1546)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1437)
+
+
+============================================================

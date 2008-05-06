@@ -143,11 +143,8 @@ public class StressTestConcurrent extends
         properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);
 
-        // enable moves.
+        // enable moves (overrides value set in the test setup for the super class)
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
-        
-//        // @todo return to default (10000 ms)
-//        properties.setProperty(Options.STATUS_DELAY,"10000");
 
         // performance counter sampling interval.
         properties.setProperty(Options.INTERVAL,"5000");
@@ -208,7 +205,7 @@ public class StressTestConcurrent extends
         int keyLen = 4; // @todo not used right now.
         int nops = 100; // 100
         double insertRate = .8d;
-        int nindices = 1;
+        int nindices = 10;
         boolean testCorrectness = true;
 
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
