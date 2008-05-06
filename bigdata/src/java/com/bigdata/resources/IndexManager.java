@@ -785,8 +785,10 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources == null) {
 
-                        log.warn("No such index: name=" + name + ", timestamp="
-                                + timestamp);
+                        log.info("No such index: name=" + name + ", timestamp="
+                                + timestamp
+//                                , new RuntimeException("stacktrace")
+                        );
 
                         return null;
 

@@ -776,95 +776,116 @@ abstract public class OverflowManager extends IndexManager {
         final long createTime = nextTimestampRobust();
         final long closeTime = createTime;
         
-        /*
-         * Close out the old journal.
-         * 
-         * Note: closeForWrites() does NOT "close" the old journal in order to
-         * avoid disturbing concurrent readers (we only have an exclusive lock
-         * on the writeService, NOT the readService or the txWriteService).
-         * 
-         * Note: The old journal MUST be closed out before we open the new
-         * journal since the journal will use the SAME direct ByteBuffer
-         * instance for their write cache.
-         */
         final AbstractJournal oldJournal = getLiveJournal();
-        {
-            
-            // writes no longer accepted.
-            oldJournal.closeForWrites(closeTime);
-
-//            // remove from list of open journals.
-//            storeCache.remove(oldJournal.getRootBlockView().getUUID());
-
-            log.info("Closed out the old journal.");
-            
-        }
-        
-        /*
-         * Create the new journal.
-         * 
-         * @todo this is not using the temp filename mechanism in a manner that
-         * truely guarentees an atomic file create. The CREATE_TEMP_FILE option
-         * should probably be extended with a CREATE_DIR option that allows you
-         * to override the directory in which the journal is created. That will
-         * allow the atomic creation of the journal in the desired directory
-         * without changing the existing semantics for CREATE_TEMP_FILE.
-         * 
-         * See StoreFileManager#start() which has very similar logic with the
-         * same problem.
-         */
         final ManagedJournal newJournal;
-        {
 
-            final File file;
-            try {
-                file = File.createTempFile("journal", // prefix
-                        Options.JNL,// suffix
-                        journalsDir // directory
-                        ).getCanonicalFile();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+        /*
+         * Note: A lock is obtained before we close out the old journal against
+         * further writes so that getLiveJournal() will never return a reference
+         * to a read-only "live" journal.
+         */
+        
+        liveJournalLock.lock(); 
+        
+        try {
+
+            /*
+             * Close out the old journal.
+             * 
+             * Note: closeForWrites() does NOT "close" the old journal in order
+             * to avoid disturbing concurrent readers (we only have an exclusive
+             * lock on the writeService, NOT the readService or the
+             * txWriteService).
+             * 
+             * Note: The old journal MUST be closed out before we open the new
+             * journal since the journal will use the SAME direct ByteBuffer
+             * instance for their write cache.
+             */
+            {
+
+                // writes no longer accepted.
+                oldJournal.closeForWrites(closeTime);
+
+                // // remove from list of open journals.
+                // storeCache.remove(oldJournal.getRootBlockView().getUUID());
+
+                log.info("Closed out the old journal.");
+
             }
 
-            file.delete();
+            /*
+             * Create the new journal.
+             * 
+             * @todo this is not using the temp filename mechanism in a manner
+             * that truely guarentees an atomic file create. The
+             * CREATE_TEMP_FILE option should probably be extended with a
+             * CREATE_DIR option that allows you to override the directory in
+             * which the journal is created. That will allow the atomic creation
+             * of the journal in the desired directory without changing the
+             * existing semantics for CREATE_TEMP_FILE.
+             * 
+             * See StoreFileManager#start() which has very similar logic with
+             * the same problem.
+             */
+            {
 
-            final Properties p = getProperties();
+                final File file;
+                try {
+                    file = File.createTempFile("journal", // prefix
+                            Options.JNL,// suffix
+                            journalsDir // directory
+                            ).getCanonicalFile();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
 
-            p.setProperty(Options.FILE, file.toString());
+                file.delete();
+
+                final Properties p = getProperties();
+
+                p.setProperty(Options.FILE, file.toString());
+
+                /*
+                 * Set the create time on the new journal.
+                 */
+                p.setProperty(Options.CREATE_TIME, "" + createTime);
+
+                /*
+                 * Note: the new journal will be handed the write cache from the
+                 * old journal so the old journal MUST have been closed for
+                 * writes before this point in order to ensure that it can no
+                 * longer write on that write cache.
+                 */
+                assert oldJournal.getRootBlockView().getCloseTime() != 0L : "Old journal has not been closed for writes";
+
+                newJournal = new ManagedJournal(p);
+
+                assert createTime == newJournal.getRootBlockView()
+                        .getCreateTime();
+
+            }
 
             /*
-             * Set the create time on the new journal.
+             * Cut over to the new journal.
              */
-            p.setProperty(Options.CREATE_TIME, ""+createTime);
+            {
 
-            /*
-             * Note: the new journal will be handed the write cache from the old
-             * journal so the old journal MUST have been closed for writes
-             * before this point in order to ensure that it can no longer write
-             * on that write cache.
-             */
-            assert oldJournal.getRootBlockView().getCloseTime() != 0L : "Old journal has not been closed for writes";
+                this.liveJournal = newJournal;
+
+                addResource(newJournal.getResourceMetadata(), newJournal
+                        .getFile());
+
+                storeCache.put(newJournal.getRootBlockView().getUUID(),
+                        newJournal, false/* dirty */);
+
+                log.info("Changed over to a new live journal");
+
+            }
+
+        } finally {
+
+            liveJournalLock.unlock();
             
-            newJournal = new ManagedJournal(p);
-            
-            assert createTime == newJournal.getRootBlockView().getCreateTime();
-
-        }
-
-        /*
-         * Cut over to the new journal.
-         */
-        {
-
-            this.liveJournal = newJournal;
-
-            addResource(newJournal.getResourceMetadata(), newJournal.getFile());
-            
-            storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal,
-                    false/* dirty */);
-            
-            log.info("Changed over to a new live journal");
-
         }
         
         /*

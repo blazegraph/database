@@ -44,6 +44,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
@@ -886,9 +887,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
     }
     
-    @SuppressWarnings("unchecked")
-    private final List<AbstractTask> EMPTY_LIST = Collections.EMPTY_LIST; 
-    
     protected List<AbstractTask> chooseIndexPartitionMoves() {
         
         /*
@@ -1051,6 +1049,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxMoves);
 
+        // the old journal (pre-overflow).
+        final AbstractJournal oldJournal = resourceManager.getJournal(lastCommitTime);
+        
         for (int i = 0; i < scores.length && nmove < maxMoves; i++) {
 
             final Score score = scores[i];
@@ -1059,6 +1060,41 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             if(isUsed(name)) continue;
 
+            // test for indices that have been split, joined, or moved.
+            final String reason = resourceManager
+                    .getIndexPartitionGone(score.name);
+
+            if (reason != null) {
+                
+                /*
+                 * Note: The counters are accumulated over the live of the
+                 * journal. This tells us that the named index was moved, split,
+                 * or joined sometimes during the live of that old journal.
+                 * Since it is gone we skip over it here.
+                 */
+                
+                log.info("Skipping index: name="+score.name + ", reason="+ reason);
+                
+                continue;
+                
+            }
+            
+            if (resourceManager.getIndexOnStore(score.name, lastCommitTime,
+                    oldJournal) == null) {
+
+                /*
+                 * Note: The counters are accumulated over the live of the
+                 * journal. This tells us that the named index dropped sometimes
+                 * during the live of that old journal. Since it is gone we skip
+                 * over it here.
+                 */
+                
+                log.info("Skipping index: name=" + name + ", reason=dropped");
+                
+                continue;
+                
+            }
+            
             log.info("Considering move candidate: "+score);
             
             if (score.drank > .3 && score.drank < .8) {
@@ -1359,12 +1395,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             resourceManager, lastCommitTime,
                             name, outFile);
 
-                    log.info("will build  : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
-
                     // add to set of tasks to be run.
                     tasks.add(task);
 
                     putUsed(name,"willBuild(name="+name+")");
+
+                    log.info("will build  : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
 
                     nbuild++;
 
@@ -1385,9 +1421,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // verify all indices were handled in one way or another.
             if (ndone != used.size()) {
 
-                log.warn("ndone=" + ndone + ", but #used=" + used.size()
-                        + " : " + used.toString());
+                log.warn("ndone=" + ndone + ", but #used=" + used.size());
                 
+            }
+
+            // log the selected post-processing decisions at a high level.
+            {
+                final StringBuilder sb = new StringBuilder();
+                final Iterator<Map.Entry<String,String>> itrx = used.entrySet().iterator();
+                while(itrx.hasNext()) {
+                    final Map.Entry<String,String> entry = itrx.next();
+                    sb.append("\n"+entry.getKey()+"\t = "+entry.getValue());
+                }
+                log.warn("\nlastCommitTime="+lastCommitTime+ sb);
             }
             
         }
@@ -1637,5 +1683,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         return false;
             
     }
+    
+    @SuppressWarnings("unchecked")
+    private final List<AbstractTask> EMPTY_LIST = Collections.EMPTY_LIST; 
     
 }

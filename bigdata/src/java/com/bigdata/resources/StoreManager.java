@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -1685,13 +1686,39 @@ abstract public class StoreManager extends ResourceEvents implements
      *             if the {@link StoreManager} is still starting up.
      */
     public AbstractJournal getLiveJournal() {
-
+        
         assertRunning();
 
-        return liveJournal;
+        liveJournalLock.lock();
+
+        try {
+
+            assert liveJournal != null : "open=" + isOpen() + ", starting="
+                    + isStarting() + ", dataDir=" + dataDir;
+            assert liveJournal.isOpen();
+            assert !liveJournal.isReadOnly();
+
+            return liveJournal;
+
+        } finally {
+
+            liveJournalLock.unlock();
+            
+        }
 
     }
 
+    /**
+     * This lock is used to prevent asynchronous processes such as
+     * {@link ConcurrencyManager#getIndexCounters()} from acquiring the live
+     * journal during the period between when we close out the old journal
+     * against future writes and when the new live journal is in place.
+     * <p>
+     * Note: {@link AbstractJournal#closeForWrites(long)} does not disturb
+     * concurrent readers.
+     */
+    protected ReentrantLock liveJournalLock = new ReentrantLock();
+    
     /**
      * @throws IllegalStateException
      *             if the {@link StoreManager} is not open.
@@ -1717,11 +1744,6 @@ abstract public class StoreManager extends ResourceEvents implements
              * closed. Therefore we NEVER cause the live journal to be opened
              * from the disk in this method.
              */
-
-            assert liveJournal != null : "open=" + isOpen() + ", starting="
-                    + isStarting() + ", dataDir=" + dataDir;
-            assert liveJournal.isOpen();
-            assert !liveJournal.isReadOnly();
 
             return getLiveJournal();
 

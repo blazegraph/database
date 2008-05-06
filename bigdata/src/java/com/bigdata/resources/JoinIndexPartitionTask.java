@@ -416,9 +416,6 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                 // drop the old index partition
                 getJournal().dropIndex(name);
                 
-                // will notify tasks that index partition was joined.
-                resourceManager.setIndexPartitionGone(name, "join");
-                
             }
             
             // register the new index partition
@@ -437,6 +434,13 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
             
             resourceManager.getMetadataService().joinIndexPartition(scaleOutIndexName, oldLocators, newLocator);
 
+            for(String name : result.oldnames) {
+                
+                // will notify tasks that the index partition was joined.
+                resourceManager.setIndexPartitionGone(name, "join");
+                
+            }
+            
             // notify successful index partition join.
             resourceManager.joinCounter.incrementAndGet();
 

@@ -770,9 +770,6 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             log.info("Dropping source index: "+name);
             getJournal().dropIndex(name);
             
-            // will notify tasks that index partition was split.
-            resourceManager.setIndexPartitionGone(name, "split");
-           
             /*
              * Notify the metadata service that the index partition has been
              * split.
@@ -796,6 +793,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             log.info("Notified metadata service: name=" + name
                     + " was split into " + Arrays.toString(locators));
 
+            // will notify tasks that index partition was split.
+            resourceManager.setIndexPartitionGone(name, "split");
+           
             // notify successful index partition split.
             resourceManager.splitCounter.incrementAndGet();
 
