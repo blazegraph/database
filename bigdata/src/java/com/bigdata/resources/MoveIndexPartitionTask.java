@@ -189,12 +189,14 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         targetDataService.registerIndex(targetIndexName, newMetadata);
 
         /*
-         * Run procedure that will copy data from the old index partition to the
-         * new index partition as of the [lastCommitTime] of the old journal.
+         * Run procedure on the target data service that will copy data from the
+         * old index partition (on this data service) to the new index partition
+         * (on the target data service) as of the [lastCommitTime] of the old
+         * journal.
          */
         targetDataService.submit(ITx.UNISOLATED, targetIndexName,
                 new CopyIndexPartitionProcedure(sourceDataServiceUUIDs,
-                        sourceIndexName,lastCommitTime));
+                        sourceIndexName, lastCommitTime));
         
         /*
          * At this point the historical view as of the [lastCommitTime] has been
@@ -290,7 +292,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
          * 
          */
         public CopyIndexPartitionProcedure(UUID[] sourceDataServiceUUIDs,
-                String sourceIndexName,long lastCommitTime) {
+                String sourceIndexName, long lastCommitTime) {
 
             if (sourceDataServiceUUIDs == null) {
 
@@ -329,7 +331,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
          }
         
         /**
-         * Copy the non-delete index entries from the source index view
+         * Copy the non-deleted index entries from the source index view
          * <P>
          * Note: We copy only the non-deleted keys and values since this is the
          * initial state of this view on this data service.
@@ -338,6 +340,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
          * being used to support transactions.
          * 
          * @return The #of index entries copied.
+         * 
+         * FIXME Must apply overflowHandler - see AbstractBTree#rangeCopy.
          */
         public Object apply(IIndex ndx) {
 
@@ -355,7 +359,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             final ITupleIterator itr = new RawDataServiceRangeIterator(
                     sourceDataService, //
                     sourceIndexName, //
-                    lastCommitTime,//
+                    -lastCommitTime,// Note: historical read.
                     true, // readConsistent,
                     null, // fromKey
                     null, // toKey

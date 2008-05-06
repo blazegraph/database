@@ -33,6 +33,8 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.log4j.Level;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.IRangeQuery;
@@ -40,6 +42,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KV;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -49,6 +52,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.LoadBalancerService.ServiceScore;
 
 /**
  * Some unit tests for moving an index partition.
@@ -95,7 +99,7 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         return properties;
         
     }
-
+    
     /**
      * Test forces a move of an index partition and validates the scale-out
      * after the move against ground truth.
@@ -103,10 +107,6 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
      * @throws IOException
      * @throws ExecutionException
      * @throws InterruptedException
-     * 
-     * FIXME This test needs to override the {@link ILoadBalancerService} in
-     * order to setup the pre-conditions for the move (the source data service
-     * is "highly utilized" and the target data service is "under utilized").
      */
     public void test_move() throws IOException, InterruptedException, ExecutionException {
         
@@ -276,6 +276,31 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
 
         /*
+         * Fake out the load balancer so that it will report the source data
+         * service (dataService0) is "highly utilized" and the target data
+         * service (dataService1) is "under utilized".
+         */
+        {
+
+            EmbeddedLoadBalancerService lbs = ((EmbeddedLoadBalancerService)((EmbeddedFederation)fed).getLoadBalancerService());
+
+            lbs.log.setLevel(Level.INFO);
+            
+            ServiceScore[] fakeServiceScores = new ServiceScore[2];
+
+            fakeServiceScores[0] = new ServiceScore(
+                    AbstractStatisticsCollector.fullyQualifiedHostName,
+                    dataService0.getServiceUUID(), 1.0/* rawScore */);
+
+            fakeServiceScores[1] = new ServiceScore(
+                    AbstractStatisticsCollector.fullyQualifiedHostName,
+                    dataService1.getServiceUUID(), 0.0/* rawScore */);
+            
+            lbs.setServiceScores(fakeServiceScores);
+            
+        }
+
+        /*
          * Continue to populate index until we can provoke another overflow.
          * Since there are now 2 index partitions and 2 data services and since
          * we have configured the various thresholds appropriately this overflow
@@ -428,5 +453,5 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
 
     }
-
+    
 }

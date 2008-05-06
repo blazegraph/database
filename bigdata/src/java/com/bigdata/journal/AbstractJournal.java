@@ -48,6 +48,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.ReadOnlyIndex;
+import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -1240,9 +1241,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     private CounterSet counters;
 
     /**
-     * Returns a {@link CounterSet} that it reflects the counters for the
-     * currently open unisolated named indices as reported by
-     * {@link Name2Addr#getNamedIndexCounters()}.
+     * Returns a {@link CounterSet} that it reflects the {@link Counter}s for
+     * the currently open unisolated named indices as reported by
+     * {@link Name2Addr#getIndexCounters()}.
      */
     public CounterSet getNamedIndexCounters() {
 
@@ -1250,7 +1251,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         synchronized (name2Addr) {
 
-            return name2Addr.getNamedIndexCounters();
+            return name2Addr.getIndexCounters();
 
         }
             
@@ -1340,10 +1341,12 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public void closeForWrites(long closeTime) {
         
-        log.warn("Closing journal for further writes: closeTime=" + closeTime
+        if(INFO)
+        log.info("Closing journal for further writes: closeTime=" + closeTime
                 + ", lastCommitTime=" + _rootBlock.getLastCommitTime());
 
-        log.warn("before: "+_rootBlock);
+        if(DEBUG)
+        log.debug("before: "+_rootBlock);
         
         final IRootBlockView old = _rootBlock;
 
@@ -1392,7 +1395,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // replace the root block reference.
         _rootBlock = newRootBlock;
 
-        log.warn("after: "+_rootBlock);
+        if(DEBUG)log.debug("after: "+_rootBlock);
 
         // discard current commit record - can be re-read from the store.
         _commitRecord = null;

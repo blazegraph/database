@@ -303,8 +303,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
         final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
 
-        final String pathPrefix = ps + hostname + ps + "client" + ps
-                + clientUUID + ps;
+        final String pathPrefix = ps + hostname + ps + "service" + ps
+                + IBigdataClient.class.getName() + ps + clientUUID + ps;
 
         return pathPrefix;
 

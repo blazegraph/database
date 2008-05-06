@@ -165,7 +165,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             Set<String> copied = new HashSet<String>();
             
             // do overflow.
-            resourceManager.doOverflow(copied);
+            resourceManager.doSynchronousOverflow(copied);
 
             // Not expecting the index partition to be copied over.
             assertEquals(0,copied.size());

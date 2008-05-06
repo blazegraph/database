@@ -82,8 +82,6 @@ public class TestAll extends TestCase {
          */
         // bootstrap tests of the resource manager
         suite.addTestSuite(TestResourceManagerBootstrap.class);
-        // test basics.
-        suite.addTestSuite(TestResourceManagerBasics.class);
         // test overflow handling.
         suite.addTestSuite(TestOverflow.class);
         // test of index segment build and full compacting merge tasks.

@@ -1105,7 +1105,11 @@ abstract public class StoreManager extends ResourceEvents implements
                     // lookup absolute file for that resource.
                     file = resourceFiles.get(resource.getUUID());
 
-                    assert file != null : "No file? : resource=" + resource;
+                    if (file == null) {
+
+                        throw new NoSuchStoreException(resource.getUUID());
+                        
+                    }
 
                     log.info("Opening most recent journal: " + file
                             + ", resource=" + resource);
@@ -1807,8 +1811,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     if (file == null) {
 
-                        throw new RuntimeException("Unknown resource: uuid="
-                                + uuid);
+                        throw new NoSuchStoreException(uuid);
 
                     }
 
@@ -1859,7 +1862,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (file == null) {
 
-                throw new RuntimeException("Unknown resource: uuid=" + uuid);
+                throw new NoSuchStoreException(uuid);
 
             }
 
@@ -1952,6 +1955,28 @@ abstract public class StoreManager extends ResourceEvents implements
 
     }
 
+    /**
+     * An instance of this class is thrown when a {@link UUID} does not identify
+     * any store known to the {@link StoreManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class NoSuchStoreException extends RuntimeException {
+        
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -4200720776469568430L;
+
+        public NoSuchStoreException(UUID uuid) {
+            
+            super(uuid.toString());
+            
+        }
+        
+    }
+    
     /**
      * Report the next timestamp assigned by the
      * {@link ILocalTransactionManager}.
@@ -2162,7 +2187,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             releaseTime = maxReleaseTime;
 
-            log.warn("releaseTime is not set: using maxReleaseTime="
+            log.info("releaseTime is not set: using maxReleaseTime="
                     + maxReleaseTime);
 
         } else {
@@ -2173,26 +2198,65 @@ abstract public class StoreManager extends ResourceEvents implements
 
             releaseTime = Math.min(maxReleaseTime, this.releaseTime);
 
-            log.warn("Choosen releaseTime=" + releaseTime
+            log.info("Choosen releaseTime=" + releaseTime
                     + " : min(maxReleaseTime=" + maxReleaseTime
                     + ", set releaseTime=" + releaseTime + ")");
 
         }
+
+        /*
+         * The earliest commit time on record in any journal available to the
+         * StoreManager.
+         */
+        final long firstCommitTime;
+        {
+
+            // the earliest journal available to the store manager.
+            final IResourceMetadata resource = journalIndex.findNext(0L);
+
+            // open that journal.
+            final AbstractJournal j0 = (AbstractJournal) openStore(resource
+                    .getUUID());
+
+            // the first commit time on the earliest journal available.
+            firstCommitTime = j0.getRootBlockView().getFirstCommitTime();
+            
+        }
         
+        /*
+         * The last commit time on record in the live journal.
+         */
+        final long lastCommitTime = getLiveJournal().getRootBlockView().getLastCommitTime(); 
+
+        /*
+         * Find the commitTime that we are going to preserve.
+         */
         final long commitTimeToPreserve;
-        if (releaseTime > getLiveJournal().getRootBlockView()
-                .getLastCommitTime()) {
+        if( releaseTime < firstCommitTime ) {
 
             /*
-             * When [minReleaseAge] is small (e.g., zero), the [currentTime] can
-             * be greater than the [lastCommitTime] on the live journal and so
-             * we choose the [lastCommitTime] instead.
+             * If the computed [releaseTime] is before the first commit record
+             * on the earliest available journal then we use the
+             * [firstCommitTime] on that journal instead.
              */
 
-            log.warn("Choosing the last commit time for the live journal");
+            log.info("Choosing commitTimeToPreserve as the firstCommitTime for the earliest journal: "+firstCommitTime);
             
-            commitTimeToPreserve = getLiveJournal().getRootBlockView()
-                    .getLastCommitTime();
+            commitTimeToPreserve = firstCommitTime;
+
+        } else if (releaseTime > lastCommitTime ) {
+
+            /*
+             * If the computed [releaseTime] is after the last commit record
+             * then we choose the [lastCommitTime] instead.
+             * 
+             * Note: This situation can arise when the [minReleaseAge] is small
+             * or zero as the [currentTime] can be after the lastCommitTime.
+             */
+
+            log.info("Choosing commitTimeToPreserve as the lastCommitTime for the live journal: "+lastCommitTime);
+            
+            commitTimeToPreserve = lastCommitTime;
 
         } else {
 
@@ -2200,9 +2264,14 @@ abstract public class StoreManager extends ResourceEvents implements
              * Find the timestamp for the commit record that is strictly greater
              * than the release time.
              */
+
+            log.info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "+releaseTime);
+
             commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(releaseTime);
         
         }
+        
+        log.info("commitTimeToPreserve="+commitTimeToPreserve);
         
         /*
          * Make a note for reporting purposes.
@@ -2210,12 +2279,20 @@ abstract public class StoreManager extends ResourceEvents implements
         this.lastCommitTimePreserved = commitTimeToPreserve;
         
         /*
-         * Find resources that are still in use as of that commitTime.
+         * Find resources that were in use as of that commitTime.
          */
         final Set<UUID> resourcesInUse = getResourcesForTimestamp(commitTimeToPreserve);
         
-        // and delete anything that is ((NOT in use) AND createTime<commitTimeToPreserve)
-        deleteUnusedResources(commitTimeToPreserve,resourcesInUse);
+        /*
+         * Delete anything that is: 
+         * 
+         * ( NOT in use ) 
+         * 
+         * AND
+         * 
+         * ( createTime < commitTimeToPreserve )
+         */
+        deleteUnusedResources(commitTimeToPreserve, resourcesInUse);
         
     }
     
@@ -2457,7 +2534,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (file == null) {
 
-                throw new RuntimeException("No file for resource? uuid=" + uuid);
+                throw new NoSuchStoreException(uuid);
 
             } else {
 

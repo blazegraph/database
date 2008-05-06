@@ -46,15 +46,16 @@ import com.bigdata.service.DataService;
  * Task joins one or more index partitions and should be invoked when their is
  * strong evidence that the index partitions have shrunk enough to warrant their
  * being combined into a single index partition. The index partitions MUST be
- * partitions of the same scale-out index and MUST be siblings (their left and
- * right separators must cover a continuous interval).
+ * partitions of the same scale-out index, MUST be siblings (their left and
+ * right separators must cover a continuous interval), and MUST reside on the
+ * same {@link DataService}.
  * <p>
  * The task reads from the lastCommitTime of the old journal and builds a single
  * {@link BTree} from the merged read of the source index partitions as of that
- * timestamp and returns a {@link JoinResult}.
- * 
- * @see UpdateJoinIndexPartition, which performs the atomic update of the view
- *      definitions on the live journal and the {@link MetadataIndex}.
+ * timestamp and returns a {@link JoinResult}. The task automatically submits,
+ * and awaits the completion of, an {@link AtomicUpdateJoinIndexPartition},
+ * which performs the atomic update of the view definitions on the live journal
+ * and the {@link MetadataIndex}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -367,9 +368,12 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
              * writes absorbed by those index partitions now that we have an
              * exclusive lock on everyone on the new journal.
              */
-            final BTree btree = resourceManager.getLiveJournal().getIndex(result.checkpointAddr); 
+            final BTree btree = BTree.load(resourceManager.getLiveJournal(), result.checkpointAddr);
+//            resourceManager.getLiveJournal().getIndex(result.checkpointAddr); 
             
             assert btree != null;
+            
+            assert ! btree.isReadOnly();
             
             final String scaleOutIndexName = btree.getIndexMetadata().getName();
             

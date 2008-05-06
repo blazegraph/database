@@ -25,14 +25,10 @@ package com.bigdata.journal;
 
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -133,21 +129,43 @@ import com.bigdata.util.InnerCause;
  */
 public class WriteExecutorService extends ThreadPoolExecutor {
 
+    /**
+     * Main log for the {@link WriteExecutorService}.
+     */
     protected static final Logger log = Logger
             .getLogger(WriteExecutorService.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
-    
+
+    /**
+     * Uses the {@link OverflowManager} log for things relating to synchronous
+     * overflow processing.
+     */
+    protected static final Logger overflowLog = Logger
+            .getLogger(OverflowManager.class);
+
+    /**
+     * True iff the {@link #overflowLog} level is INFO or less.
+     */
+    final protected static boolean OVERFLOW_INFO = overflowLog
+            .getEffectiveLevel().toInt() <= Level.INFO.toInt();
+
+    /**
+     * True iff the {@link #overflowLog} level is DEBUG or less.
+     */
+    final protected static boolean OVERFLOW_DEBUG = overflowLog
+            .getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+
     /**
      * When <code>true</code>, writes the set of {@link #active} tasks into
      * the {@link MDC} under the <code>activeTasks</code> key. This is of
@@ -1016,7 +1034,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             final boolean shouldOverflow = (forceOverflow.get() || resourceManager.shouldOverflow());
 
             if (shouldOverflow)
-                log.warn("Should overflow - will try to pause the write service.");
+                overflowLog.info("Should overflow - will try to pause the write service.");
 
             /*
              * Wait for some or all running tasks to join the commit group.
@@ -1392,20 +1410,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            log.info("Doing overflow");
+            overflowLog.info("Doing overflow");
         
-            /*
-             * @todo should the active set be empty? that is, have all tasks
-             * waiting on commit reached a state where they will neither effect
-             * or be effected by an overflow onto another journal?
-             */
-            log.warn("active="+active.entrySet());
+//            /*
+//             * @todo should the active set be empty? that is, have all tasks
+//             * waiting on commit reached a state where they will neither effect
+//             * or be effected by an overflow onto another journal?
+//             */
+//            log.info("active="+active.entrySet());
             
             resourceManager.overflow();
         
             noverflow++;
-
-            log.info("Did overflow");
+            
+            overflowLog.info("Did overflow");
 
         } catch (Throwable t) {
 
@@ -1601,8 +1619,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                  * Note: the write service is paused before overflow processing
                  * so this is the last commit before we overflow the journal.
                  */
-                
-                log.warn("before: "+journal.getRootBlockView());
+                if (OVERFLOW_DEBUG)
+                    overflowLog.debug("before: "+journal.getRootBlockView());
                 
             }
 
@@ -1610,7 +1628,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             if (timestamp == 0L) {
 
-                log.warn("Nothing to commit");
+                log.info("Nothing to commit");
 
                 return true;
                 
@@ -1630,17 +1648,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 log.info("commit: #writes=" + nwrites + ", timestamp="
                         + timestamp);
                 
-            } else if (paused) {
+            }
+            
+            if (paused) {
                 
                 /*
                  * Note: the write service is paused before overflow processing
                  * so this is the last commit before we overflow the journal.
                  */
-                
-                log.warn("commit: #writes=" + nwrites + ", timestamp="
+                if(OVERFLOW_INFO)
+                overflowLog.info("commit: #writes=" + nwrites + ", timestamp="
                         + timestamp + ", paused!");
                 
-                log.warn("after : "+journal.getRootBlockView());
+                if(OVERFLOW_DEBUG)
+                overflowLog.debug("after : "+journal.getRootBlockView());
                 
             }
 

@@ -342,58 +342,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         if(counterSet==null) {
 
-            counterSet = new CounterSet();
-            
-            counterSet.addCounter("index UUID", new OneShotInstrument<String>(
-                    getIndexMetadata().getIndexUUID().toString()));
-            
-            counterSet.addCounter("branchingFactor",
-                    new OneShotInstrument<Integer>(branchingFactor));
-
-            counterSet.addCounter("class",
-                    new OneShotInstrument<String>(getClass().getName()));
-
-            counterSet.addCounter("queueCapacity",
-                    new OneShotInstrument<Integer>(
-                            getWriteRetentionQueueCapacity()));
-
-            counterSet.addCounter("queueSize", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(getWriteRetentionQueueDistinctCount());
-                }
-            });
-
-            // the % utilization in [0:1] for the whole tree (nodes + leaves).
-            counterSet.addCounter("% utilization", new Instrument<Double>(){
-                protected void sample() {
-                    final int[] tmp = getUtilization();
-                    setValue(tmp[2] / 100d);
-                }
-            });
-            
-            counterSet.addCounter("height", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(getHeight());
-                }
-            });
-
-            counterSet.addCounter("#nnodes", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(getNodeCount());
-                }
-            });
-
-            counterSet.addCounter("#nleaves", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(getLeafCount());
-                }
-            });
-
-            counterSet.addCounter("#entries", new Instrument<Integer>() {
-                protected void sample() {
-                    setValue(getEntryCount());
-                }
-            });
+            counterSet = getBasicCounterSet();
 
             counterSet.attach(counters.getCounters());
     
@@ -416,6 +365,76 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
               
     }
     private CounterSet counterSet;
+   
+    /**
+     * Return a new {@link CounterSet} containing counters for the
+     * {@link Checkpoint} record, aspects of the {@link IndexMetadata}, and
+     * aspects of the node/leaf hard reference queue.
+     * <p>
+     * Note: The returned {@link CounterSet} does NOT include the
+     * {@link Counters}. This apparently meaningless distinction allows us to
+     * report the basic counters with different aggregations of the
+     * {@link Counters}, including those that span re-opening of the
+     * {@link AbstractBTree}.
+     */
+    public CounterSet getBasicCounterSet() {
+
+        final CounterSet counterSet = new CounterSet();
+        
+        counterSet.addCounter("index UUID", new OneShotInstrument<String>(
+                getIndexMetadata().getIndexUUID().toString()));
+        
+        counterSet.addCounter("branchingFactor",
+                new OneShotInstrument<Integer>(branchingFactor));
+
+        counterSet.addCounter("class",
+                new OneShotInstrument<String>(getClass().getName()));
+
+        counterSet.addCounter("queueCapacity",
+                new OneShotInstrument<Integer>(
+                        getWriteRetentionQueueCapacity()));
+
+        counterSet.addCounter("queueSize", new Instrument<Integer>() {
+            protected void sample() {
+                setValue(getWriteRetentionQueueDistinctCount());
+            }
+        });
+
+        // the % utilization in [0:1] for the whole tree (nodes + leaves).
+        counterSet.addCounter("% utilization", new Instrument<Double>(){
+            protected void sample() {
+                final int[] tmp = getUtilization();
+                setValue(tmp[2] / 100d);
+            }
+        });
+        
+        counterSet.addCounter("height", new Instrument<Integer>() {
+            protected void sample() {
+                setValue(getHeight());
+            }
+        });
+
+        counterSet.addCounter("#nnodes", new Instrument<Integer>() {
+            protected void sample() {
+                setValue(getNodeCount());
+            }
+        });
+
+        counterSet.addCounter("#nleaves", new Instrument<Integer>() {
+            protected void sample() {
+                setValue(getLeafCount());
+            }
+        });
+
+        counterSet.addCounter("#entries", new Instrument<Integer>() {
+            protected void sample() {
+                setValue(getEntryCount());
+            }
+        });
+
+        return counterSet;
+        
+    }
     
     /**
      * @param store
@@ -1435,6 +1454,14 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * supported by the source and target. The goal is an exact copy of the data
      * in the source btree.
      * 
+     * @param src
+     *            The source index.
+     * @param fromKey
+     *            The first key that will be copied (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will NOT be copied (exclusive). When
+     *            <code>null</code> there is no upper bound.
      * @param overflow
      *            When <code>true</code> the {@link IOverflowHandler} defined
      *            for the source index (if any) will be applied to copy raw
@@ -1455,7 +1482,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * @todo write tests for all variations (delete markers, timestamps,
      *       overflow handler, etc).
      */
-    public long rangeCopy(IIndex src, byte[] fromKey, byte[] toKey, boolean overflow) {
+    public long rangeCopy(final IIndex src, final byte[] fromKey,
+            final byte[] toKey, final boolean overflow) {
 
         assertNotReadOnly();
 

@@ -316,7 +316,17 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
 
             final long elapsed = System.currentTimeMillis() - begin;
             
-            if(elapsed > 2000) fail("No overflow after "+elapsed+"ms?");
+            /*
+             * Note: You can change this constant if you are debugging so that
+             * the test will not terminate too soon, but change it back so that
+             * the test will terminate quickly when run automatically.  The
+             * value should be [2000] ms.
+             */
+            if (elapsed > 2000) {
+             
+                fail("No overflow after " + elapsed + "ms?");
+                
+            }
             
         }
 

@@ -159,7 +159,7 @@ abstract public class IndexManager extends StoreManager {
         /**
          * The default for the {@link #INDEX_SEGMEWNT_CACHE_CAPACITY} option.
          */
-        String DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY = "20";
+        String DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY = "60";
 
     }
     
@@ -197,7 +197,8 @@ abstract public class IndexManager extends StoreManager {
      * identifier) either on the same or on another data service. The value is a
      * reason, e.g., "split", "join", or "move".
      */
-    private final LRUCache<String/*name*/, String/*reason*/> staleLocatorCache = new LRUCache<String, String>(1000);  
+//    private // @todo exposed for counters - should be private.
+    protected final LRUCache<String/*name*/, String/*reason*/> staleLocatorCache = new LRUCache<String, String>(1000);  
     
     /**
      * Note: this information is based on an LRU cache with a large fixed
