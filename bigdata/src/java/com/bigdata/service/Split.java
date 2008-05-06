@@ -73,8 +73,8 @@ public class Split {
 
         this.pmd = pmd;
 
-        assert fromIndex >= 0;
-        assert toIndex >= fromIndex;
+        assert fromIndex >= 0 : "fromIndex="+fromIndex;
+        assert toIndex >= fromIndex : "fromIndex="+fromIndex+", toIndex="+toIndex;
 
         this.fromIndex = fromIndex;
 

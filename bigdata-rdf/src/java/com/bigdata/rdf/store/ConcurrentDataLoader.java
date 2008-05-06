@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
@@ -107,6 +108,18 @@ public class ConcurrentDataLoader {
 
     protected static final Logger log = Logger
             .getLogger(ConcurrentDataLoader.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * The database on which the data will be written.
@@ -832,6 +845,8 @@ public class ConcurrentDataLoader {
         
         final LoadTask task = new LoadTask(file);
 
+        long begin = System.currentTimeMillis();
+        
         while (true) {
 
             try {
@@ -846,13 +861,31 @@ public class ConcurrentDataLoader {
                 
             } catch (RejectedExecutionException ex) {
 
-                log.info("loadService queue full"//
+                final long now = System.currentTimeMillis();
+                
+                final long elapsed = now - begin;
+                
+                if(elapsed > 5000) {
+                
+                    /*
+                     * Only issue log statements every 5 seconds.
+                     */
+                
+                    // reset 
+                    begin = now;
+                    
+                    if(INFO)
+                    log.info("loadService queue full"//
                         + ": queueSize="+ loadService.getQueue().size()//
                         + ", poolSize=" + loadService.getPoolSize()//
                         + ", active="+ loadService.getActiveCount()//
                         + ", tasked="+ ntasked //
                         + ", completed="+ loadService.getCompletedTaskCount()//
                         );
+                
+                }
+                
+                // But retry the task every 1/4 second.
                 
                 Thread.sleep(250/*ms*/);
                 

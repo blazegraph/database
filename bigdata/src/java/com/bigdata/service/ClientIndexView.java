@@ -152,13 +152,13 @@ public class ClientIndexView implements IClientIndex {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
     private final IBigdataFederation fed;
