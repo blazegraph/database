@@ -526,12 +526,12 @@ public interface Options {
     /**
      * The default for the {@link #HISTORICAL_INDEX_CACHE_CAPACITY} option.
      */
-    String DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY = "20";
+    String DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY = "60";
 
     /**
      * The default for the {@link #LIVE_INDEX_CACHE_CAPACITY} option.
      */
-    String DEFAULT_LIVE_INDEX_CACHE_CAPACITY = "20";
+    String DEFAULT_LIVE_INDEX_CACHE_CAPACITY = "60";
     
     /**
      * The recommended extension for journal files.

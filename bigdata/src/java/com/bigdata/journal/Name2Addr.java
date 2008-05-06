@@ -925,17 +925,20 @@ public class Name2Addr extends BTree {
     }
     
     /**
-     * Return a counter set reflecting the named indices that are currently open
-     * (more accurately, those open named indices whose references are in
-     * {@link Name2Addr}s internal {@link #indexCache}). When index partitions
-     * are in use their {@link CounterSet}s are reported under a path formed
-     * from name of the scale-out index and partition identifier. Otherwise the
-     * {@link CounterSet}s are reported directly under the index name.
+     * Return a {@link CounterSet} reflecting the named indices that are
+     * currently open (more accurately, those open named indices whose
+     * references are in {@link Name2Addr}s internal {@link #indexCache}).
+     * When index partitions are in use their {@link CounterSet}s are reported
+     * under a path formed from name of the scale-out index and partition
+     * identifier. Otherwise the {@link CounterSet}s are reported directly
+     * under the index name.
      * 
      * @return A new {@link CounterSet} reflecting the named indices that were
      *         open as of the time that this method was invoked.
+     * 
+     * @see ConcurrencyManager#getIndexCounters()
      */
-    public CounterSet getNamedIndexCounters() {
+    public CounterSet getIndexCounters() {
 
         assertUnisolatedInstance();
 

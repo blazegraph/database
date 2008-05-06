@@ -621,6 +621,14 @@ abstract public class LoadBalancerService extends AbstractService
         
     }
     
+    protected void finalized() throws Throwable {
+        
+        super.finalize();
+        
+        shutdownNow();
+        
+    }
+    
     synchronized public void shutdown() {
 
         if(!isOpen()) return;
@@ -689,6 +697,50 @@ abstract public class LoadBalancerService extends AbstractService
         
         return ILoadBalancerService.class;
         
+    }
+    
+    /**
+     * Normalizes the {@link ServiceScore}s and set them in place.
+     * 
+     * @param a
+     *            The new service scores.
+     */
+    protected void setServiceScores(ServiceScore[] a) {
+        
+        log.info("#serviceScores=" + a.length);
+        
+        /*
+         * sort scores into ascending order (least utilized to most utilized).
+         */
+        Arrays.sort(a);
+
+        /*
+         * compute normalized score, rank, and drank.
+         */
+        for (int i = 0; i < a.length; i++) {
+            
+            final ServiceScore score = a[i];
+            
+            score.rank = i;
+            
+            score.drank = ((double)i)/a.length;
+           
+            // update score in global map.
+            activeServices.put(score.serviceUUID, score);
+
+            log.info(score.toString()); //@todo debug?
+
+        }
+        
+        log.info("The most active service was: " + a[a.length - 1]);
+
+        log.info("The least active service was: " + a[0]);
+        
+        // Atomic replace of the old scores.
+        LoadBalancerService.this.serviceScores.set( a );
+
+        log.info("Updated scores for "+a.length+" services");
+
     }
     
     /**
@@ -1052,40 +1104,12 @@ abstract public class LoadBalancerService extends AbstractService
                 return;
                 
             }
-            
+
             // scores as an array.
             final ServiceScore[] a = scores.toArray(new ServiceScore[] {});
 
-            // sort scores into ascending order (least utilized to most
-            // utilized).
-            Arrays.sort(a);
-
-            /*
-             * compute normalized score, rank, and drank.
-             */
-            for (int i = 0; i < a.length; i++) {
-                
-                final ServiceScore score = a[i];
-                
-                score.rank = i;
-                
-                score.drank = ((double)i)/a.length;
-               
-                // update score in global map.
-                activeServices.put(score.serviceUUID, score);
-
-                log.info(score.toString()); //@todo debug?
-
-            }
-            
-            log.info("The most active service was: " + a[a.length - 1]);
-
-            log.info("The least active service was: " + a[0]);
-            
-            // Atomic replace of the old scores.
-            LoadBalancerService.this.serviceScores.set( a );
-
-            log.info("Updated scores for "+a.length+" services");
+            // normalize and set in place.
+            setServiceScores(a);
 
         }
         

@@ -225,7 +225,7 @@ public class Counters {
      * Return a {@link CounterSet} reporting on the various counters tracked in
      * the instance fields of this class.
      */
-    synchronized ICounterSet getCounters() {
+    synchronized public ICounterSet getCounters() {
         
         if(counterSet == null) {
             

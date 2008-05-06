@@ -431,7 +431,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 final IIndex ndx = entry.getValue();
 
                 ((ConcurrencyManager) concurrencyManager)
-                        .addCounters(name, ndx);
+                        .addIndexCounters(name, ndx);
                 
             }
         

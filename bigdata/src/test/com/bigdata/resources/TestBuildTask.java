@@ -59,16 +59,7 @@ import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 
 /**
  * Basic test of building an index segment from an index partition on overflow.
- * 
- * @todo verify a repeat of the operation where we again do an overflow, merge
- *       task, and update the view - this checks the path where the view already
- *       includes an index segment.
- * 
- * @todo verify that we do not generate a new index segment if there have been
- *       no writes on a named index on a given journal. I need to figure out how
- *       to test for that. This case applies to the resource manager's thread
- *       that runs these tasks automatically.
- * 
+ *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -189,7 +180,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         final Set<String> copied = new HashSet<String>();
         
         // force overflow onto a new journal.
-        resourceManager.doOverflow( copied );
+        resourceManager.doSynchronousOverflow( copied );
         
         // nothing should have been copied to the new journal.
         assertEquals(0,copied.size());
@@ -246,30 +237,36 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             System.err.println(segmentMetadata.toString());
 
-            // verify file exists.
-            assertTrue(new File(segmentMetadata.getFile()).exists());
+            // verify index segment can be opened.
+            resourceManager.openStore(segmentMetadata.getUUID());
+            
+            // Note: this assertion only works if we store the file path vs its basename.
+//            assertTrue(new File(segmentMetadata.getFile()).exists());
 
             // verify createTime == lastCommitTime on the old journal.
             assertEquals("createTime", oldJournal.getRootBlockView()
                     .getLastCommitTime(), segmentMetadata.getCreateTime());
 
-        }
+            // verify segment has all data in the groundTruth btree.
+            {
 
-        // verify segment has all data in the groundTruth btree.
-        {
+                IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
+                        .openStore(segmentMetadata.getUUID());
 
-            IndexSegmentStore segStore = new IndexSegmentStore(
-                    new File(result.segmentMetadata.getFile()));
+                IndexSegment seg = segStore.loadIndexSegment();
 
-            IndexSegment seg = segStore.loadIndexSegment();
+                AbstractBTreeTestCase.assertSameBTree(groundTruth, seg);
 
-            AbstractBTreeTestCase.assertSameBTree(groundTruth, seg);
+            }
 
         }
 
         // run task that re-defines the index partition view.
         {
 
+            // fake out the task so that it will run (it can only run during asyn overflow).
+            resourceManager.overflowAllowed.set(false);
+            
             AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
                     concurrencyManager, name, result);
 

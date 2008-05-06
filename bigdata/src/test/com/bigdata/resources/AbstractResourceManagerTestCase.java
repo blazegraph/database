@@ -30,7 +30,9 @@ package com.bigdata.resources;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,6 +53,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
@@ -389,7 +392,7 @@ public class AbstractResourceManagerTestCase extends
     }
 
     /**
-     * Utility method to register an index partition on the #resourceManager.
+     * Utility method to register an index partition on the {@link #resourceManager}.
      * 
      * @throws ExecutionException 
      * @throws InterruptedException 
@@ -423,4 +426,33 @@ public class AbstractResourceManagerTestCase extends
 
     }
     
+    /**
+     * Test helper.
+     * 
+     * @param expected
+     * @param actual
+     */
+    protected void assertSameResources(IRawStore[] expected, Set<UUID> actual) {
+        
+        // copy to avoid side-effects.
+        final Set<UUID> tmp = new HashSet<UUID>(actual);
+        
+        for(int i=0; i<expected.length; i++) {
+
+            final UUID uuid = expected[i].getResourceMetadata().getUUID();
+            
+            assertFalse(tmp.isEmpty());
+
+            if(!tmp.remove(uuid)) {
+                
+                fail("Expecting "+expected[i].getResourceMetadata());
+                
+            }
+            
+        }
+
+        assertTrue(tmp.isEmpty());
+        
+    }
+
 }

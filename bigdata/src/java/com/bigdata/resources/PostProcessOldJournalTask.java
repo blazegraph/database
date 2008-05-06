@@ -183,15 +183,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     
     private IRawStore tmpStore;
 
-    /** Aggregated counters for the named indices. */ 
-    private final Counters totalCounters;
-    
+//    /** Aggregated counters for the named indices. */ 
+//    private final Counters totalCounters;
+//    
+//    /** Individual counters for the named indices. */
+//    private final Map<String/*name*/,Counters> indexCounters;
+
     /** Raw score computed for those aggregated counters. */
     private final double totalRawStore;
     
-    /** Individual counters for the named indices. */
-    private final Map<String/*name*/,Counters> indexCounters;
-
     /**
      * Scores computed for each named index in order by ascending score
      * (increased activity).
@@ -432,9 +432,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 //        // copied indices are used and should not be processed further.
 //        used.addAll(copied);
         
-        this.totalCounters = totalCounters;
-        
-        this.indexCounters = indexCounters;
+//        this.totalCounters = totalCounters;
+//        
+//        this.indexCounters = indexCounters;
 
         final int nscores = indexCounters.size();
         

@@ -257,14 +257,6 @@ public class CommitRecordIndex extends BTree {
         // find first strictly greater than.
         final int index = findIndexOf(Math.abs(timestamp)) + 1;
         
-//        if(index == -1) {
-//            
-//            // No match.
-//            
-//            return null;
-//            
-//        }
-
         if (index == nentries) {
 
             // No match.

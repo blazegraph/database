@@ -29,6 +29,7 @@ package com.bigdata.service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -982,7 +983,7 @@ public class ClientIndexView implements IClientIndex {
         
         int nfailed = 0;
         
-        Throwable cause = null;
+        final LinkedList<Throwable> causes = new LinkedList<Throwable>();
         
         try {
 
@@ -1007,12 +1008,7 @@ public class ClientIndexView implements IClientIndex {
                     
                     log.error("Execution failed: task=" + task, e);
                     
-                    if (cause == null) {
-
-                        // Note the first cause.
-                        cause = e.getCause();
-                        
-                    }
+                    causes.addAll(task.causes);
                     
                     nfailed++;
                     
@@ -1028,10 +1024,8 @@ public class ClientIndexView implements IClientIndex {
         
         if (nfailed > 0) {
             
-            // Note: will report only the first cause.
-            
-            throw new RuntimeException("Execution failed: ntasks="
-                    + tasks.size() + ", nfailed=" + nfailed, cause);
+            throw new ClientException("Execution failed: ntasks="
+                    + tasks.size() + ", nfailed=" + nfailed, causes);
             
         }
 
@@ -1073,7 +1067,7 @@ public class ClientIndexView implements IClientIndex {
         
                 log.error("Execution failed: task=" + task, e);
 
-                throw new RuntimeException(e);
+                throw new ClientException("Execution failed: " + task, e, task.causes);
 
             }
 
@@ -1089,7 +1083,7 @@ public class ClientIndexView implements IClientIndex {
      */
     protected void runInCallersThread(ArrayList<Callable<Void>> tasks) {
         
-        log.info("Running " + tasks.size()
+        log.warn("Running " + tasks.size()
                 + " tasks in caller's thread: recursionDepth="
                 + getRecursionDepth().get());
 
@@ -1106,11 +1100,101 @@ public class ClientIndexView implements IClientIndex {
                 
             } catch (Exception e) {
                 
-                throw new RuntimeException(e);
+                throw new ClientException("Execution failed: " + task, e, task.causes);
                 
             }
             
         }
+
+    }
+    
+    /**
+     * Exposes a linked list of retry exceptions leading to the failure of an
+     * {@link AbstractDataServiceProcedureTask}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ClientException extends RuntimeException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 7802533953100817726L;
+        
+        private List<Throwable> causes;
+
+        /**
+         * The list of causes, one per failed attempt.
+         * 
+         * @return
+         * 
+         * @see #getCause()
+         */
+        public List<Throwable> getCauses() {
+
+            if (causes == null)
+                return Collections.EMPTY_LIST;
+
+            return causes;
+            
+        }
+        
+        /**
+         * The final exception thrown which caused the task to fail. Normally
+         * this will indicate that the retry count has been exceeded and
+         * {@link #getCauses()} will report the underlying problem(s) which the
+         * task encountered.
+         * 
+         * @see #getCauses()
+         */
+        public Throwable getCause() {
+            
+            return super.getCause();
+            
+        }
+        
+//        /**
+//         *  
+//         */
+//        public ClientException() {
+//            super();
+//        }
+
+        /**
+         * @param msg
+         * @param cause
+         */
+        public ClientException(String msg, Throwable cause,
+                List<Throwable> causes) {
+
+            super(msg+(causes==null?"":", causes="+causes), cause);
+
+            this.causes = causes;
+
+        }
+
+        /**
+         * @param msg
+         */
+        public ClientException(String msg, List<Throwable> causes) {
+
+            super(msg+(causes==null?"":", causes="+causes));
+
+            this.causes = causes;
+
+        }
+
+//        /**
+//         * @param cause
+//         */
+//        public ClientException(Throwable cause, List<Throwable> causes) {
+//
+//            super((causes==null?"":", causes="+causes),cause);
+//
+//            this.causes = causes;
+//            
+//        }
 
     }
     
@@ -1143,6 +1227,12 @@ public class ClientIndexView implements IClientIndex {
         protected final Split split;
         protected final IIndexProcedure proc;
         protected final IResultHandler resultHandler;
+        
+        /**
+         * If the task fails then this will be populated with an ordered list of
+         * the exceptions. There will be one exception per-retry of the task.
+         */
+        protected List<Throwable> causes = null;
         
         /**
          * A human friendly representation.
@@ -1236,8 +1326,13 @@ public class ClientIndexView implements IClientIndex {
                 
             } catch(Exception ex) {
                 
+                if (causes == null)
+                    causes = new LinkedList<Throwable>();
+                
+                causes.add(ex);
+                
                 if(InnerCause.isInnerCause(ex, StaleLocatorException.class)) {
-                                        
+                    
                     if(Thread.interrupted()) throw new InterruptedException();
                     
                     if(INFO)

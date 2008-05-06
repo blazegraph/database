@@ -27,11 +27,14 @@
 
 package com.bigdata.resources;
 
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.cache.ICacheEntry;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -180,6 +183,24 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                         new Instrument<Long>() {
                             public void sample() {
                                 setValue((long) getStaleLocatorCount());
+                            }
+                        });
+                
+                if(true)
+                    tmp.addCounter("Stale Locators",
+                        new Instrument<String>() {
+                            public void sample() {
+                                StringBuilder sb = new StringBuilder();
+                                Iterator<ICacheEntry<String/*name*/,String/*reason*/>> itr = staleLocatorCache.entryIterator();
+                                while(itr.hasNext()) {
+                                    try {
+                                    ICacheEntry<String/*name*/,String/*reason*/> entry = itr.next();
+                                    sb.append(entry.getKey()+"="+entry.getObject()+"\n");
+                                    } catch(NoSuchElementException ex) {
+                                        // Ignore - concurrent modification.
+                                    }
+                                }
+                                setValue(sb.toString());
                             }
                         });
                 

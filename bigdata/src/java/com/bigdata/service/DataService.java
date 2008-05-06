@@ -30,12 +30,12 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.BindException;
-import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.rmi.NoSuchObjectException;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -78,6 +78,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -1163,10 +1164,17 @@ abstract public class DataService extends AbstractService
             }
             
             /*
-             * HTTPD service reporting out statistics on a randomly assigned port.
-             * The port is reported to the load balancer and also written into the
-             * file system. The httpd service will be shutdown with the data
-             * service. @todo write port into the [serviceDir], but serviceDir needs to be declared!
+             * HTTPD service reporting out statistics on a randomly assigned
+             * port. The port is reported to the load balancer and also written
+             * into the file system. The httpd service will be shutdown with the
+             * data service.
+             * 
+             * Note: some counter sets need to be dynamically (re-)attached in
+             * order to present a current view. This httpd instance overrides
+             * doGet() in order to refresh the data before generating the view.
+             * 
+             * @todo write port into the [serviceDir], but serviceDir needs to
+             * be declared!
              */
             {
                 
@@ -1175,7 +1183,18 @@ abstract public class DataService extends AbstractService
                     final CounterSet counterSet = (CounterSet) getCounters();
                     
                     DataService.this.httpd = new CounterSetHTTPD(
-                            0/* random port */, counterSet );
+                            0/* random port */, counterSet ) {
+                        
+                        public Response doGet(String uri, String method, Properties header,
+                                Map<String, Vector<String>> parms) throws Exception {
+                            
+                            reattachDynamicCounters();
+                            
+                            return super.doGet(uri, method, header, parms);
+                            
+                        }
+                        
+                    };
                     
                     // the URL that may be used to access the local httpd.
                     final String url = "http://"
@@ -1199,6 +1218,51 @@ abstract public class DataService extends AbstractService
         }
         
     }
+    
+    /**
+     * Dynamically detach and attach the counters for the named indices
+     * underneath of the {@link IndexManager}.
+     * <p>
+     * Note: This method limits the frequency of update to no more than once per
+     * second.
+     */
+    synchronized protected void reattachDynamicCounters() {
+
+        final long now = System.currentTimeMillis();
+
+        final long elapsed = now - lastReattachMillis;
+
+        if (elapsed > 1000/* ms */) {
+            
+            try {
+
+                CounterSet tmp = resourceManager.getIndexManagerCounters();
+
+                assert tmp != null;
+
+                synchronized (tmp) {
+
+                    tmp.detach("indices");
+
+                    tmp.makePath("indices").attach(
+                            concurrencyManager.getIndexCounters()
+//                            resourceManager.getLiveJournal().getNamedIndexCounters()
+                                    );
+
+                }
+
+            } catch (Throwable t) {
+
+                log.warn("Problem trying to update index counter views?", t);
+
+            }
+
+            lastReattachMillis = now;
+            
+        }
+        
+    }
+    private long lastReattachMillis = 0L;
     
     /**
      * Periodically send performance counter data to the
@@ -1234,32 +1298,7 @@ abstract public class DataService extends AbstractService
          */
         public void run() {
 
-            try {
-
-                /*
-                 * Dynamically detach and attach the counters for the named
-                 * indices underneath of the IndexManager.
-                 */
-                
-                CounterSet tmp = resourceManager.getIndexManagerCounters();
-                
-                assert tmp != null;
-                
-                synchronized(tmp) {
-                
-                    tmp.detach("indices");
-
-                    tmp.makePath("indices").attach(
-                            resourceManager.getLiveJournal()
-                                    .getNamedIndexCounters());
-                
-                }
-                
-            } catch(Throwable t) {
-                
-                log.warn("Problem trying to update index counter views?", t);
-                
-            }
+            reattachDynamicCounters();
             
             try {
 

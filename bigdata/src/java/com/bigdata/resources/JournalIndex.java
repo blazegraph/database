@@ -33,6 +33,7 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -120,7 +121,7 @@ public class JournalIndex extends BTree {
      *         satisify the probe.
      * 
      * @throws IllegalArgumentException
-     *             if <i>timestamp</i> is less than or equal to ZERO (0L).
+     *             if <i>timestamp</i> is less than or equals to ZERO (0L).
      */
     synchronized public IResourceMetadata find(long timestamp) {
 
@@ -138,9 +139,15 @@ public class JournalIndex extends BTree {
             
         }
 
-        /*
-         * Retrieve the entry from the index.
-         */
+        return valueAtIndex(index);
+        
+    }
+
+    /**
+     * Retrieve the entry from the index.
+     */
+    private IResourceMetadata valueAtIndex(int index) {
+
         final IResourceMetadata entry = (IResourceMetadata) SerializerUtil
                 .deserialize(super.valueAt(index));
 
@@ -148,6 +155,36 @@ public class JournalIndex extends BTree {
 
     }
     
+    /**
+     * Find the first journal strictly greater than the timestamp.
+     * 
+     * @param timestamp
+     *            The timestamp. A value of ZERO (0) may be used to find the
+     *            first journal.
+     * 
+     * @return The commit record -or- <code>null</code> if there is no commit
+     *         record whose timestamp is strictly greater than <i>timestamp</i>.
+     */
+    synchronized public IResourceMetadata findNext(long timestamp) {
+
+        if (timestamp < 0L)
+            throw new IllegalArgumentException();
+        
+        // find first strictly greater than.
+        final int index = findIndexOf(Math.abs(timestamp)) + 1;
+        
+        if (index == nentries) {
+
+            // No match.
+
+            return null;
+            
+        }
+        
+        return valueAtIndex(index);
+
+    }
+
     /**
      * Find the index of the {@link ICommitRecord} having the largest timestamp
      * that is less than or equal to the given timestamp.

@@ -193,7 +193,7 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * #of overflows that have taken place. This counter is incremented each
      * time the entire overflow operation is complete, including any
-     * post-processing of the old journal.
+     * asynchronous post-processing of the old journal.
      */
     protected final AtomicLong overflowCounter = new AtomicLong(0L);
 
@@ -679,60 +679,46 @@ abstract public class OverflowManager extends IndexManager {
          */
         final long lastCommitTime;
         final Set<String> copied = new HashSet<String>();
-//        try {
 
-            // Do overflow processing.
-            lastCommitTime = doOverflow(copied);
-            
-//        } finally {
-//            
-//            /*
-//             * Allow the write service to resume executing tasks on the new
-//             * journal.
-//             * 
-//             * Note: We need to do this in order to start asynchronous
-//             * processing.
-//             */
-//
-//            log.info("Resuming write service.");
-//
-//            concurrencyManager.getWriteService().resume();
-//
-//            log.info("Resumed write service.");
-//
-//        }
-        
-          // Note: commented out to protect access to the new journal until the write service is resumed.
-//        // report event.
+        // Do overflow processing.
+        lastCommitTime = doSynchronousOverflow(copied);
+                    
+        // Note: commented out to protect access to the new journal until the write service is resumed.
+        // report event.
 //        notifyJournalOverflowEvent(getLiveJournal());
-
-        /*
-         * Start the asynchronous processing of the named indices on the old
-         * journal.
-         */
-        if(!overflowAllowed.compareAndSet(true/*expect*/, false/*set*/)) {
-
-            throw new AssertionError();
-            
-        }
-        
-        /*
-         * Submit task on private service that will run asynchronously and clear
-         * [overflowAllowed] when done.
-         * 
-         * Note: No one ever checks the Future returned by this method. Instead
-         * the PostProcessOldJournalTask logs anything that it throws in its
-         * call() method.
-         */
-
-        final Counters totalCounters = concurrencyManager.getTotalCounters();
-
-        final Map<String/* name */, Counters> indexCounters = concurrencyManager
-                .resetCounters();
 
         if (asyncOverflowEnabled.get()) {
 
-            log.info("Starting asynchronous overflow processing.");
+            log.info("Will start asynchronous overflow processing.");
+
+            /*
+             * Start the asynchronous processing of the named indices on the old
+             * journal.
+             */
+            if(!overflowAllowed.compareAndSet(true/*expect*/, false/*set*/)) {
+
+                throw new AssertionError();
+                
+            }
+            
+            /*
+             * Aggregate the statistics for the named indices and reset the
+             * various counters for those indices. These statistics are used to
+             * decide which indices are "hot" and which are not.
+             */
+            final Counters totalCounters = concurrencyManager.getTotalIndexCounters();
+
+            final Map<String/* name */, Counters> indexCounters = concurrencyManager
+                    .resetIndexCounters();
+
+            /*
+             * Submit task on private service that will run asynchronously and clear
+             * [overflowAllowed] when done.
+             * 
+             * Note: No one ever checks the Future returned by this method. Instead
+             * the PostProcessOldJournalTask logs anything that it throws in its
+             * call() method.
+             */
 
             return overflowService.submit(new PostProcessOldJournalTask(
                     (ResourceManager) this, lastCommitTime, copied,
@@ -741,6 +727,13 @@ abstract public class OverflowManager extends IndexManager {
         } else {
             
             log.warn("Asynchronous overflow processing is disabled!");
+
+            /*
+             * Note: increment the counter now since we will not do asynchronous
+             * overflow processing.
+             */
+            
+            overflowCounter.incrementAndGet();
             
             return null;
             
@@ -772,7 +765,7 @@ abstract public class OverflowManager extends IndexManager {
      * 
      * @return The lastCommitTime of the old journal.
      */
-    protected long doOverflow(Set<String> copied) {
+    protected long doSynchronousOverflow(Set<String> copied) {
         
         log.info("begin");
         

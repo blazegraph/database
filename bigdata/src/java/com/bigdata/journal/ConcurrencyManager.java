@@ -2,6 +2,7 @@ package com.bigdata.journal;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -19,21 +20,26 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Counters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.counters.InstrumentDelta;
-import com.bigdata.counters.InstrumentInstantaneousAverage;
+import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -1250,23 +1256,41 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Per index counters.
      */
 
+    /**
+     * Per index {@link Counters}.
+     */
     private Map<String/* name */, Counters> indexCounters = new HashMap<String, Counters>();
 
+    /**
+     * Total {@link Counters} across all accessed indices.
+     */
     private Counters totalCounters = new Counters();
+
+    /**
+     * Lock used to coordinate access to the {@link #indexCounters} and the
+     * {@link #totalCounters}.
+     */
+    private ReentrantLock countersLock = new ReentrantLock();
     
     /**
      * Return the aggregated counters for all named indices accessed by an
      * {@link AbstractTask} with either {@link ITx#UNISOLATED} or
-     * {@link ITx#READ_COMMITTED} isolation since the {@link #resetCounters()}
+     * {@link ITx#READ_COMMITTED} isolation since the {@link #resetIndexCounters()}
      * was last invoked (typically at the last journal overflow event).
      * 
      * @see ResourceManager#overflow()
      */
-    public Counters getTotalCounters() {
+    public Counters getTotalIndexCounters() {
         
-        synchronized(totalCounters) {
+        countersLock.lock();
+        
+        try {
 
             return new Counters(totalCounters);
+            
+        } finally {
+            
+            countersLock.unlock();
             
         }
         
@@ -1277,7 +1301,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * {@link AbstractTask} with either {@link ITx#UNISOLATED} or
      * {@link ITx#READ_COMMITTED} isolation.
      * <p>
-     * Note: The per-index counters are reset by {@link #resetCounters()}
+     * Note: The per-index counters are reset by {@link #resetIndexCounters()}
      * 
      * @param name
      *            The name of the index.
@@ -1287,9 +1311,19 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *         {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} isolation
      *         since the counters were last reset.
      */
-    public Counters getCounters(String name) {
+    public Counters getIndexCounters(String name) {
+
+        countersLock.lock();
         
-        return indexCounters.get(name);
+        try {
+
+            return indexCounters.get(name);
+                
+        } finally {
+            
+            countersLock.unlock();
+            
+        }
         
     }
 
@@ -1298,21 +1332,25 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * indices accessed by an {@link AbstractTask} with either
      * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} isolation.
      */
-    public Map<String/* name */, Counters> resetCounters() {
+    public Map<String/* name */, Counters> resetIndexCounters() {
 
-        final Map<String,Counters> tmp;
+        countersLock.lock();
         
-        synchronized (totalCounters) {
+        try {
 
-            tmp = indexCounters;
+            final Map<String,Counters> tmp = indexCounters;
             
             indexCounters = new HashMap<String,Counters>();
 
             totalCounters = new Counters();
 
+            return tmp;
+            
+        } finally {
+            
+            countersLock.unlock();
+            
         }
-        
-        return tmp;
         
     }
     
@@ -1328,8 +1366,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @todo this does not account for writes isolated by a transaction.
      */
-    protected void addCounters(String name, IIndex ndx) {
-        
+    protected void addIndexCounters(String name, IIndex ndx) {
+    
         final Counters c;
         if(ndx instanceof AbstractBTree) {
             
@@ -1351,10 +1389,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
                     
-        synchronized(totalCounters) {
+        countersLock.lock();
+        
+        try {
             
             totalCounters.add(c);
-
+        
             Counters tmp = indexCounters.get(name);
             
             if (tmp == null) {
@@ -1366,6 +1406,180 @@ public class ConcurrencyManager implements IConcurrencyManager {
             }
             
             tmp.add(c);
+            
+        } finally {
+            
+            countersLock.unlock();
+            
+        }
+        
+    }
+    
+    /**
+     * Return a {@link CounterSet} reflecting use of named indices since the
+     * last overflow (more accurately, since the last
+     * {@link #resetIndexCounters()}). When index partitions are in use their
+     * {@link CounterSet}s are reported under a path formed from name of the
+     * scale-out index and partition identifier. Otherwise the
+     * {@link CounterSet}s are reported directly under the index name.
+     * 
+     * @return A new {@link CounterSet} reflecting the use of the named indices.
+     */
+    public CounterSet getIndexCounters() {
+        
+        countersLock.lock();
+        
+        try {
+
+            final CounterSet tmp = new CounterSet();
+
+            final Iterator<Map.Entry<String, Counters>> itr = indexCounters
+                    .entrySet().iterator();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<String, Counters> entry = itr.next();
+
+                final String name = entry.getKey();
+
+                final Counters counters = entry.getValue();
+                
+                assert counters != null : "name=" + name;
+
+                /*
+                 * Note: this is a hack. We parse the index name in order to
+                 * recognize whether or not it is an index partition since we
+                 * want to know that even if the we get a StaleLocatorException
+                 * from the ResourceManager. This will work fine as long as the
+                 * the basename of the index does not use a '#' character.
+                 */
+                final String path;
+                final int indexOf = name.lastIndexOf('#');
+                if (indexOf != -1) {
+
+                    path = name.substring(0, indexOf)
+                            + ICounterSet.pathSeparator + name;
+
+                } else {
+
+                    path = name;
+
+                }
+
+                // create counter set for this index / index partition.
+                final CounterSet t = tmp.makePath(path);
+                
+                // attach the counter for the index / index partition.
+                t.attach(counters.getCounters());
+
+                final IIndex view;
+                try {
+
+                    /*
+                     * Request the read-committed view of the index from the
+                     * resource manager.
+                     */
+                    
+                    view = resourceManager.getIndex(name, ITx.READ_COMMITTED);
+                    
+                    if(view == null) {
+                        
+                        /*
+                         * Note: the read-committed view can be unavailable
+                         * either because the index was concurrently registered
+                         * and has not been committed yet or because the index
+                         * has been dropped.  However, if an index partition was
+                         * moved, split, or joined then a StaleLocatorException
+                         * will be reported instead, which is handled below.
+                         */
+                        
+                        t.addCounter("No data", new OneShotInstrument<String>(
+                                "Read committed view not available"));
+                        
+                        continue;
+                        
+                    }
+                    
+                    final LocalPartitionMetadata pmd = view.getIndexMetadata()
+                            .getPartitionMetadata();
+
+                    if (pmd == null) {
+                        
+                        /*
+                         * An unpartitioned index.
+                         */
+                        
+                        t.attach(((AbstractBTree)view).getBasicCounterSet());
+                        
+                    } else {
+                        
+                        /*
+                         * A partitioned index.
+                         */
+                        
+                        final CounterSet pmdcs = t.makePath("pmd");
+                        
+                        pmdcs.addCounter("leftSeparatorKey",
+                                new OneShotInstrument<String>(BytesUtil
+                                        .toString(pmd.getLeftSeparatorKey())));
+                        
+                        pmdcs.addCounter("rightSeparatorKey",
+                                new OneShotInstrument<String>(BytesUtil
+                                        .toString(pmd.getRightSeparatorKey())));
+                        
+                        pmdcs.addCounter("history",
+                                        new OneShotInstrument<String>(pmd
+                                                .getHistory()));
+                        
+                        final IResourceMetadata[] resources = pmd.getResources();
+                        
+                        for(int i=0; i<resources.length; i++) {
+                            
+                            final IResourceMetadata resource = resources[i];
+                            
+                            final CounterSet rescs = pmdcs.makePath("resource["+i+"]");
+                            
+                            rescs.addCounter("file", new OneShotInstrument<String>(resource.getFile()));
+
+                            rescs.addCounter("uuid", new OneShotInstrument<String>(resource.getUUID().toString()));
+
+                            rescs.addCounter("size", new OneShotInstrument<String>(""+resource.size()));
+
+                            rescs.addCounter("createTime", new OneShotInstrument<String>(""+resource.getCreateTime()));
+
+                            final AbstractBTree source;
+                            if(view instanceof AbstractBTree) {
+                                assert i == 0 : "i="+i; // only the first resource in the view.
+                                source = (BTree)view;
+                            } else {
+                                source = ((FusedView) view).getSources()[i];
+                            }
+                            
+                            rescs.attach(source.getBasicCounterSet());
+                            
+                        }
+                        
+                    }
+                    
+                } catch (StaleLocatorException ex) {
+
+                    /*
+                     * Note that the index partition is gone.
+                     */
+                    
+                    t.addCounter("pmd" + ICounterSet.pathSeparator
+                            + "StaleLocator", new OneShotInstrument<String>(ex
+                            .getReason()));
+                    
+                }
+
+            }
+
+            return tmp;
+
+        } finally {
+
+            countersLock.unlock();
             
         }
         

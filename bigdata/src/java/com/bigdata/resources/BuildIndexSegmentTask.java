@@ -485,13 +485,13 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
              */
             assert btree.needsCheckpoint();
 //            btree.writeCheckpoint();
-            {
-                final long id0 = btree.getCounter().get();
-                final long pid = id0 >> 32;
-                final long mask = 0xffffffffL;
-                final int ctr = (int) (id0 & mask);
-                log.warn("name="+getOnlyResource()+", counter="+id0+", pid="+pid+", ctr="+ctr);
-            }
+//            {
+//                final long id0 = btree.getCounter().get();
+//                final long pid = id0 >> 32;
+//                final long mask = 0xffffffffL;
+//                final int ctr = (int) (id0 & mask);
+//                log.warn("name="+getOnlyResource()+", counter="+id0+", pid="+pid+", ctr="+ctr);
+//            }
 
             // notify successful index partition build.
             resourceManager.buildCounter.incrementAndGet();
