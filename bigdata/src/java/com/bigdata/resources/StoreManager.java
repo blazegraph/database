@@ -1805,16 +1805,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         /*
          * Check to see if the given resource is already open.
-         * 
-         * Note: The live journal remains open except during overflow, when it
-         * is changed to a new journal and the old live journal is closed.
-         * Therefore we NEVER cause the live journal to be opened from the disk
-         * in this method.
          */
-
-        assert liveJournal != null;
-        assert liveJournal.isOpen();
-        assert !liveJournal.isReadOnly();
 
         IRawStore store = storeCache.get(uuid);
 

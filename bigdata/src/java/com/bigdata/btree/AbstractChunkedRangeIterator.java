@@ -287,8 +287,14 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
         // initial query.
         rset = getResultSet(getTimestamp(), fromKey, toKey, capacity, flags, filter);
 
-        // Note: will be 0L if reading on a local index.
-        commitTime = rset.getCommitTime();
+        /*
+         * Note: will be 0L if reading on a local index.
+         * 
+         * Note: converts a non-zero commitTime to a historical read.
+         * 
+         * @issue HistoricalRead
+         */
+        commitTime = -rset.getCommitTime();
         
         // reset index into the ResultSet.
         lastVisited = -1;
