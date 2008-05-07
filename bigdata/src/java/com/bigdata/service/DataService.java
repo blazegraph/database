@@ -1032,16 +1032,8 @@ abstract public class DataService extends AbstractService
          * the inner class names.
          */
         final protected Logger log = Logger.getLogger(StartPerformanceCounterCollectionTask.class);
-
-//        private final Properties properties;
         
         public StartPerformanceCounterCollectionTask() {
-        
-//            if (properties == null)
-//                throw new IllegalArgumentException();
-//            
-//            // prevent modification of the caller's properties.
-//            this.properties = new Properties( properties );
         
         }
 
@@ -1161,6 +1153,35 @@ abstract public class DataService extends AbstractService
 
                 log.info("Started ReportTask.");
             
+                /*
+                 * Run the ReportTask immediately so that we will notify() the
+                 * load balancer service and the data service will enter into
+                 * its set of active services.
+                 * 
+                 * Note: If the data service does not notify() the load balancer
+                 * service then the load balancer will be unable to recommend a
+                 * data service on which to register an index and a new
+                 * application will not be able to get started.
+                 * 
+                 * Note: The ReportTask() will be re-run automatically. During
+                 * new federation startup it is critical that at least one data
+                 * service and the metadata service have discovered and notify()
+                 * the load balancer service.
+                 * 
+                 * Note: This logic is also executed for the MetadataService,
+                 * which is just a subclass of the DataService.
+                 */
+                try {
+                    
+                    new ReportTask().run();
+                    
+                } catch(Throwable t) {
+                    
+                    log.warn("Could not join the load balancer service: " + t,
+                            t);
+                    
+                }
+                
             }
             
             /*

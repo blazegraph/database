@@ -30,6 +30,7 @@ package com.bigdata.counters.linux;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -289,6 +290,41 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
             
         }
 
+        /**
+         * Splits a data line into fields based on whitespace and skipping over
+         * the date field (index zero (0) is the index of the first non-date
+         * field).
+         * <p>
+         * Note: Some fields can overflow, e.g., RSS. When this happens the
+         * fields in the data lines wind up eating into the whitespace to their
+         * <em>right</em>. This means that it is more robust to split the
+         * lines based on whitespace once we have skipped over the date field.
+         * Since we specify using
+         * {@link SarCpuUtilizationCollector#setEnvironment(Map)} that we want
+         * an ISO date format, we know that the date field is 11 characters. The
+         * data lines are broken up by whitespace after that.
+         * <p>
+         * Note: Since we split on whitespace, the resulting strings are already
+         * trimmed.
+         * 
+         * @return The fields.
+         */
+        public String[] splitDataLine(String data) {
+            
+            final String s = data.substring(11);
+            
+            final String[] fields = s.split("[\\s+]");
+            
+            if(DEBUG) {
+                
+                log.debug("fields="+Arrays.toString(fields));
+                
+            }
+
+            return fields;
+            
+        }
+        
         @Override
         protected void readProcess() throws Exception {
             
@@ -358,13 +394,22 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
                         lastModified = System.currentTimeMillis();
                     }
                 }
-                                
-                final String user = data.substring(20-1, 30-1);
-//                final String nice = data.substring(30-1, 40-1);
-                final String system = data.substring(40-1, 50-1);
-                final String iowait = data.substring(50-1, 60-1);
-//                final String steal = data.substring(60-1, 70-1);
-                final String idle = data.substring(70-1, 80-1);
+
+//                final String user = data.substring(20-1, 30-1);
+////              final String nice = data.substring(30-1, 40-1);
+//              final String system = data.substring(40-1, 50-1);
+//              final String iowait = data.substring(50-1, 60-1);
+////              final String steal = data.substring(60-1, 70-1);
+//              final String idle = data.substring(70-1, 80-1);
+
+                final String[] fields = splitDataLine(data);
+                
+                final String user = fields[1];
+//                final String nice = fields[2];
+                final String system = fields[3];
+                final String iowait = fields[4];
+//                final String steal = fields[5];
+                final String idle = fields[6];
 
                 if (INFO)
                     log.info("\n%user=" + user + ", %system=" + system

@@ -27,6 +27,7 @@ package com.bigdata.service;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -50,7 +51,18 @@ import com.bigdata.sparse.SparseRowStore;
  */
 public interface IBigdataFederation extends IIndexManager {
 
-    public static final Logger log = Logger.getLogger(IBigdataFederation.class);
+    public Logger log = Logger.getLogger(IBigdataFederation.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * Return the client object that was used to connect to the federation.

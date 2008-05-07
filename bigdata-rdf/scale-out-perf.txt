@@ -440,26 +440,6 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
            SPO index.
 
     - BTree
-
-      - bug sometimes demonstrated by com.bigdata.service.StressTestConcurrent_stressTest1.  The parent
-        of the split is being marked as "clean" when the code assumes that it should be dirty. This sort
-        of thing tends to involve touches driving evictions resulting in a node asynchronously being made
-        persistent (and hence not dirty).  Verify that there are no concurrent readers executing by mistake
-        against the live index (e.g., read_committed reads must not read on the live index). This could be
-        related to the change in the group commit policy as well since that changes when we record a commit
-        point for an index.
-      
-		Caused by: java.lang.AssertionError
-			at com.bigdata.btree.Node.insertChild(Node.java:1515)
-			at com.bigdata.btree.Leaf.split(Leaf.java:665)
-			at com.bigdata.btree.Leaf.insert(Leaf.java:472)
-			at com.bigdata.btree.Node.insert(Node.java:637)
-			at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:995)
-			at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:940)
-			at com.bigdata.btree.AbstractBTree.rangeCopy(AbstractBTree.java:1477)
-			at com.bigdata.resources.SplitIndexPartitionTask$UpdateSplitIndexPartition.doTask(SplitIndexPartitionTask.java:534)
-			at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1035)
-			... 9 more
 			
      - Support copy in/out of keys and vals in lookup(), insert(),
        remove(), and rangeIterator so that we can (a) be more
@@ -495,7 +475,10 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 
 	 - logical row scan for headers of documents in a key range.
 
-    - Map/Reduce demo jobs.
+    - (**) Map/Reduce demo jobs.
+
+      - Rework the map/reduce implementation to use local writes and
+        distributed gathers.
 
       - Download, prepare, extract.
 
@@ -551,6 +534,8 @@ Short term tasks:
    
       - Change over to subversion so that the edit trail does not get
         lost (complex process).
+
+      - add alternative license.
 
       - Maven 2.x build
       
@@ -698,6 +683,11 @@ Short term tasks:
        format.  And it is the only error reported for pidstat parsing.
        Ah.  Format is doubtless not thread-safe.
 
+     - Done. Fixed issue where sar and pidstat would overflow the
+       field, eating into whitespace to the right.  The data lines are
+       now split based on whitespace after first skipping over a date
+       field (based on the ISO date format).
+
      - Done. The per-process counters for linux are not being reported
        under "service" but instead directly under the service UUID.
 
@@ -739,7 +729,10 @@ Short term tasks:
 
        - (*) report success and errors from the concurrent data loader.
 
-     - (***) Report response time measures on the client, which will
+       - (*) incremental evaulate futures for the concurrent data
+         loader.
+
+     - (*****) Report response time measures on the client, which will
        require a class similar to TaskCounters that is intimate with
        the ClientIndexView.  That will give a client perspective on
        the latency of tasks, which will aggregate across the data
@@ -1328,10 +1321,11 @@ Short term tasks:
 	  **** Try with services running in distinct JVMs and on more
                than one host.
 
-	  **** Try w/o disabling flush so that each document is parsed
-               and written in a single pass.  Also try w/ different
-               combinations of the statement buffer size and the #of
-               threads in the client.
+	  **** (Set true by default on 5/7/08) Try w/ autoFlush==true
+               so that each document is parsed and written in a single
+               pass.  Also try w/ different combinations of the
+               statement buffer size and the #of threads in the
+               client.
 
 	  **** Measure the effect of the WriteCache on U100 and U1000.
                Measure again with the onboard disk cache disabled.
@@ -1438,6 +1432,21 @@ JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
     - Done. ClientIndexView : retry count exceeded - need to report
       the underlying cause(s)
 
+    - **** Fence post for DefaultSplitHandler (#ntuples == 0)
+
+    - Done (DataService needed to notify() the LBS during startup).
+      Jini client is not reporting counters on either machine.  The
+      problem is the client configuration.
+
+    - **** Change the AbstractTripleStore split defaults and re-run on
+           host3.  This will change the timing of splits, reducing how
+           common they are in comparison to builds.
+
+    - **** Try running each DataService in its own JVM.  This will
+           increase the heap available and should reduce the effect of
+           GC by separating out GC related to each service into its
+           own JVM.
+
     - **** Configure larger sizes for the various index caches on a
            server platform.  However large caches with the JVM default
            heap cause the concurrent data load test to run out of
@@ -1465,6 +1474,8 @@ JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
 
 Note: Must edit the DataServer[01].properties files to change overflow
 behavior, etc.
+
+
 
 
 ============================================================

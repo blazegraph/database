@@ -2040,8 +2040,13 @@ abstract public class LoadBalancerService extends AbstractService
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            if (elapsed > JOIN_TIMEOUT)
+            if (elapsed > JOIN_TIMEOUT) {
+
+                log.warn("Timeout waiting for service to join.");
+                
                 throw new TimeoutException();
+                
+            }
 
             // all services that we know about right now.
             final UUID[] knownServiceUUIDs = activeServices.keySet().toArray(
