@@ -229,7 +229,10 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
         } else {
             btree = (BTree) ((FusedView) src).getSources()[0];
         }
-        log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+btree.getCheckpoint());
+        
+        if (INFO)
+            log.info("src=" + name + ",counter=" + src.getCounter().get()
+                    + ",checkpoint=" + btree.getCheckpoint());
         
 //        final long createTime = Math.abs(startTime);
         
@@ -254,8 +257,27 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
          * the source index partitions key range. There MUST NOT be any
          * overlap in the key ranges for the splits.
          */
-        final Split[] splits = splitHandler.getSplits(resourceManager,src);
+        Split[] splits;
+        try {
         
+            splits = splitHandler.getSplits(resourceManager, src);
+            
+        } catch (Exception ex) {
+
+            /*
+             * Note: this makes the asynchronous overflow more robust to a
+             * failure in the split handler. However, if the split handler never
+             * succeeds then the index will never get split and it will
+             * eventually dominate the data service on which it resides.
+             */
+            
+            log.error("Split handler failure - will do build instead: name="
+                    + name + " : " + ex, ex);
+            
+            splits = null;
+            
+        }
+
         if (splits == null) {
             
             /*

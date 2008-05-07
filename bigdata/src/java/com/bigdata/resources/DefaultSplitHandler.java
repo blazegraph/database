@@ -721,7 +721,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         
         if (splitCount <= 1) {
 
-            log.warn("No splits!");
+            log.warn("No splits! splitCount="+splitCount);
             
             return null;
             
