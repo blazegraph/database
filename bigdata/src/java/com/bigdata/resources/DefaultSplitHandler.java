@@ -333,6 +333,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         if (rangeCount >= (getOverCapacityMultiplier() * entryCountPerSplit)) {
 
+            if(INFO)
             log.info("Recommending split: rangeCount(" + rangeCount
                     + ") >= (entryCountPerSplit(" + entryCountPerSplit
                     + ") * overCapacityMultiplier("
@@ -414,6 +415,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         
         final int sampleEveryNTuples = rangeCount / numSamplesEstimate;
         
+        if(INFO)
         log.info("Estimating " + numSplitsEstimate + " with sampleRate="
                 + getSampleRate() + " yeilding ~ " + numSamplesEstimate
                 + " samples with one sample every " + sampleEveryNTuples
@@ -448,6 +450,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
                 final Sample sample = new Sample(tuple.getKey(), (int) offset);
 
+                if(INFO)
                 log.info("samples[" + samples.size() + "] = " + sample);
 
                 samples.add(sample);
@@ -464,6 +467,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         // the actual #of index entries in the view.
         nvisited.set(tuple == null ? 0L : tuple.getVisitCount());
 
+        if(INFO)
         log.info("Collected " + samples.size() + " samples from " + nvisited
                 + " index entries; estimatedSplitCount=" + numSplitsEstimate
                 + ", sampleRate=" + getSampleRate() + ", sampling every "
@@ -500,6 +504,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         if (nvisited.get() < overCapacityMultiplier * getEntryCountPerSplit()) {
 
+            if(INFO)
             log.info("Will not split : nvisited=" + nvisited + " is less than "
                     + overCapacityMultiplier + " * entryCountPerSplit("
                     + entryCountPerSplit + ")");
@@ -522,6 +527,7 @@ public class DefaultSplitHandler implements ISplitHandler {
              * splits for the configured undercapacity multiplier.
              */
 
+            if(INFO)
             log.info("Will not split : nsplits(" + nsplits
                     + ") := floor(nvisited(" + nvisited
                     + ") / underCapacityMultiplier("
@@ -537,49 +543,48 @@ public class DefaultSplitHandler implements ISplitHandler {
     }
 
     /**
-     * Examine the {@link Sample}s choosing {@link Split}s that best
-     * capture the target #of splits to be made.
+     * Examine the {@link Sample}s choosing {@link Split}s that best capture
+     * the target #of splits to be made.
      * <p>
      * Note: If you are trying to write a custom split rule then consider
-     * subclassing this method and adjust the split points to as to obey any
-     * application constraint such as not splitting a primary key across
-     * index partitions. In general, the split rule can scan forward or
-     * backward until it finds a suitable adjusted split point.
+     * subclassing this method and adjust the split points so as to obey any
+     * application constraint, such as not splitting a primary key across index
+     * partitions. In general, the split rule can scan forward or backward until
+     * it finds a suitable adjusted split point.
      * <p>
-     * Note: The caller MUST disregard the {@link IResourceMetadata}[]
-     * attached to {@link Split#pmd} since we do not have that information
-     * on hand here. The correct {@link IResourceMetadata}[] is available
-     * locally to {@link AtomicUpdateSplitIndexPartitionTask}.
+     * Note: The caller MUST disregard the {@link IResourceMetadata}[] attached
+     * to {@link Split#pmd} since we do not have that information on hand here.
+     * The correct {@link IResourceMetadata}[] is available locally to
+     * {@link AtomicUpdateSplitIndexPartitionTask}.
      * 
      * @param ndx
      *            The source index partition.
      * @param nsplits
-     *            The target #of splits. If necessary or desired, the #of
-     *            splits MAY be changed simply by returning an array with a
-     *            different #of splits -or- <code>null</code> iff you
-     *            decide that you do not want the index partition to be
-     *            split at this time.
+     *            The target #of splits. If necessary or desired, the #of splits
+     *            MAY be changed simply by returning an array with a different
+     *            #of splits -or- <code>null</code> iff you decide that you do
+     *            not want the index partition to be split at this time.
      * @param samples
      *            An ordered array of samples from the index partition. See
      *            {@link #sampleIndex(IIndex, AtomicLong)}.
      * @param nvisited
-     *            The #of index entries that were visited when generating
-     *            those samples. This is capped at {@link Integer#MAX_VALUE}
-     *            by {@link #sampleIndex(IIndex, AtomicLong)}.
+     *            The #of index entries that were visited when generating those
+     *            samples. This is capped at {@link Integer#MAX_VALUE} by
+     *            {@link #sampleIndex(IIndex, AtomicLong)}.
      * 
-     * @return A {@link Split}[] array contains everything that we need to
-     *         define the new index partitions <em>except</em> the
-     *         partition identifiers -or- <code>null</code> if a more
-     *         detailed examination reveals that the index SHOULD NOT be
-     *         split at this time.
+     * @return A {@link Split}[] array containing everything that we need to
+     *         define the new index partitions (including the new partition
+     *         identifiers assigned by the {@link IMetadataService}) -or-
+     *         <code>null</code> if a more detailed examination reveals that
+     *         the index SHOULD NOT be split at this time.
      * 
      * @see #getEntryCountPerSplit()
      * @see #getUnderCapacityMultiplier()
      * 
      * @todo there are a lot of edge conditions in this -- write tests!
      */
-    protected Split[] getSplits(IResourceManager resourceManager, IIndex ndx,
-            int nsplits, Sample[] samples, long nvisited) {
+    protected Split[] getSplits(final IResourceManager resourceManager, final IIndex ndx,
+            final int nsplits, final Sample[] samples, final long nvisited) {
 
         // The source index partition metadata.
         final IndexMetadata indexMetadata = ndx.getIndexMetadata();
@@ -587,8 +592,10 @@ public class DefaultSplitHandler implements ISplitHandler {
         // The target #of index entries per split.
         final int targetCapacity = (int) (getEntryCountPerSplit() * getUnderCapacityMultiplier());
 
-        final Split[] splits = new Split[nsplits];
+        // The splits that we will generate.
+        final List<Split> splits = new ArrayList<Split>(nsplits);
 
+        // The metadata for the index partition that is being split. 
         final LocalPartitionMetadata oldpmd = ndx.getIndexMetadata().getPartitionMetadata();
         
         // index into the samples[].
@@ -609,10 +616,11 @@ public class DefaultSplitHandler implements ISplitHandler {
 
                 sample = samples[j];
 
-                int count = sample.offset - nused;
+                final int count = sample.offset - nused;
 
                 if (count >= targetCapacity) {
 
+                    if(INFO)
                     log.info("Filled split[" + i + "] with " + count
                             + " entries: targetCapacity=" + targetCapacity
                             + ", samples[j]=" + sample);
@@ -630,7 +638,7 @@ public class DefaultSplitHandler implements ISplitHandler {
             final int toIndex;
             if (sample == null) {
 
-                assert j == samples.length;
+                assert j == samples.length : "j="+j+", samples.length="+samples.length;
 
                 toIndex = 0;
 
@@ -640,6 +648,26 @@ public class DefaultSplitHandler implements ISplitHandler {
 
             }
 
+            if (fromIndex == toIndex) {
+
+                /*
+                 * Note: I've seen what appears to be an empty Split, which is
+                 * illegal, so I added this to get some more information on when
+                 * that occurs and added detail to the asserts in the Split()
+                 * ctor. If you see this warning look into it a bit further and
+                 * see what the fence post conditions are.
+                 */
+                
+                log
+                        .warn("Skipping over an empty split: fromIndex="
+                                + fromIndex + ", toIndex=" + toIndex + ", j="
+                                + j + ", nused=" + nused + ", fromKey="
+                                + fromKey + ", sample=" + sample);
+
+                continue;
+                
+            }
+            
             final byte[] toKey;
             if (i == nsplits - 1) {
 
@@ -656,8 +684,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
             }
 
-            // get the next partition identifier for the named scale-out
-            // index.
+            // Get the next partition identifier for the named scale-out index.
             final IMetadataService mds = resourceManager.getMetadataService();
             final int partitionId;
             try {
@@ -670,25 +697,27 @@ public class DefaultSplitHandler implements ISplitHandler {
 
             }
 
-            LocalPartitionMetadata pmd = new LocalPartitionMetadata(
+            final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
                     partitionId, fromKey, toKey,
                     /*
                      * Note: no resources for an index segment
                      */
                     null,//
                     oldpmd.getHistory()+
-                    "chooseSplitPoint(oldPartitionId="+oldpmd.getPartitionId()+",nsplits="+nsplits+",newPartitionId="+partitionId+") "
+                    "chooseSplitPoint(oldPartitionId="
+                            + oldpmd.getPartitionId() + ",nsplits=" + nsplits
+                            + ",newPartitionId=" + partitionId + ") "
                     );
 
-            splits[i] = new Split(pmd, fromIndex, toIndex);
+            splits.add( new Split(pmd, fromIndex, toIndex) );
 
             fromKey = toKey;
 
             fromIndex = toIndex;
 
-        }
+        } // next split.
 
-        return splits;
+        return splits.toArray(new Split[] {});
 
     }
 
