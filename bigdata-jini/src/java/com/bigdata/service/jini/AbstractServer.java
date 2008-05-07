@@ -62,6 +62,7 @@ import net.jini.lookup.DiscoveryAdmin;
 import net.jini.lookup.JoinManager;
 import net.jini.lookup.ServiceIDListener;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
@@ -136,6 +137,18 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
     
     public static final transient Logger log = Logger
             .getLogger(AbstractServer.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * The label in the {@link Configuration} file for the service
@@ -267,7 +280,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
        
         log.fatal(msg, t);
         
-        shutdownNow();
+        try {
+
+            shutdownNow();
+            
+        } catch (Throwable t2) {
+            
+            log.error(t2.getMessage(), t2);
+            
+        }
         
         throw new RuntimeException( msg, t );
         
@@ -480,8 +501,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
 
         } catch (ExportException ex) {
-
-            shutdownNow();
 
             fatal("Export error: "+ex, ex);
             

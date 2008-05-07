@@ -84,7 +84,15 @@ public class MapServer extends AbstractServer {
 
                 log.fatal(msg, t);
 
-                shutdownNow();
+                try {
+
+                    shutdownNow();
+                    
+                } catch (Throwable t2) {
+                    
+                    log.error(t2.getMessage(), t2);
+                    
+                }
 
                 System.exit(1);
 

@@ -52,7 +52,15 @@ public class LoadBalancerServer extends AbstractServer {
 
         super(args);
         
-        dataServicesClient = new DataServicesClient(getDiscoveryManagement());
+        try {
+
+            dataServicesClient = new DataServicesClient(getDiscoveryManagement());
+            
+        } catch(Exception ex) {
+            
+            fatal("Problem initiating service discovery: " + ex.getMessage(), ex);
+            
+        }
         
     }
     
@@ -87,7 +95,15 @@ public class LoadBalancerServer extends AbstractServer {
 
                 log.fatal(msg, t);
 
-                shutdownNow();
+                try {
+
+                    shutdownNow();
+                    
+                } catch (Throwable t2) {
+                    
+                    log.error(t2.getMessage(), t2);
+                    
+                }
 
                 System.exit(1);
 

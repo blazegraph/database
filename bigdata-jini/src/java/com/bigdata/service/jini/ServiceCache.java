@@ -40,6 +40,7 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 /**
@@ -61,6 +62,18 @@ public class ServiceCache implements ServiceDiscoveryListener {
 
     public static final transient Logger log = Logger
             .getLogger(ServiceCache.class);
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
     
     private Map<ServiceID, ServiceItem> serviceIdMap = new ConcurrentHashMap<ServiceID, ServiceItem>();
 
@@ -83,7 +96,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceAdded(ServiceDiscoveryEvent e) {
         
-        log.info("" + e + ", class="
+        if(INFO) log.info("" + e + ", class="
                 + e.getPostEventServiceItem().toString());
         
         serviceIdMap.put(e.getPostEventServiceItem().serviceID, e
@@ -96,7 +109,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceChanged(ServiceDiscoveryEvent e) {
 
-        log.info(""+e+", class="
+        if(INFO) log.info(""+e+", class="
                 + e.getPostEventServiceItem().toString());
         
         serviceIdMap.put(e.getPostEventServiceItem().serviceID, e
@@ -109,7 +122,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceRemoved(ServiceDiscoveryEvent e) {
 
-        log.info(""+e+", class="
+        if(INFO) log.info(""+e+", class="
                 + e.getPreEventServiceItem().toString());
 
         serviceIdMap.remove(e.getPreEventServiceItem().serviceID);
@@ -180,7 +193,12 @@ public class ServiceCache implements ServiceDiscoveryListener {
             
         }
         
-        return v.toArray(new ServiceItem[v.size()]);
+        final int m = v.size();
+
+        if (INFO)
+            log.info("found " + m + " matching service items");
+
+        return v.toArray(new ServiceItem[m]);
         
     }
     

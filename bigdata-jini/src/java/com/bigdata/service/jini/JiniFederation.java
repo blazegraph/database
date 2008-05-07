@@ -77,13 +77,11 @@ public class JiniFederation extends AbstractRemoteFederation {
 
         super(client);
     
+        if(INFO) log.info(jiniConfig.toString());
+        
         final String[] groups = jiniConfig.groups;
         
         final LookupLocator[] lookupLocators = jiniConfig.lookupLocators;
-
-        timestampServiceClient = new TimestampServiceClient(discoveryManager);
-        
-        loadBalancerClient = new LoadBalancerClient(discoveryManager);
 
         try {
 
@@ -98,19 +96,34 @@ public class JiniFederation extends AbstractRemoteFederation {
                     lookupLocators, null /* DiscoveryListener */
             );
 
-            /*
-             * Start discovery for data and metadata services.
-             */
+            // Start discovery for data and metadata services.
             dataServicesClient = new DataServicesClient(discoveryManager);
+
+            // Start discovery for the timestamp service.
+            timestampServiceClient = new TimestampServiceClient(
+                    discoveryManager);
+
+            // Start discovery for the load balancer service.
+            loadBalancerClient = new LoadBalancerClient(discoveryManager);
 
         } catch (Exception ex) {
 
             log.fatal("Problem initiating service discovery: " + ex.getMessage(), ex);
 
-            shutdownNow();
+            try {
 
+                shutdownNow();
+                
+            } catch (Throwable t) {
+                
+                log.error(t.getMessage(), t);
+                
+            }
+
+            throw new RuntimeException(ex);
+            
         }
-
+        
     }
 
     public JiniClient getClient() {

@@ -40,6 +40,7 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.service.DataService;
@@ -56,9 +57,21 @@ import com.bigdata.service.MetadataService;
  */
 public class DataServicesClient {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(DataServicesClient.class);
 
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+    
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
 
     private LookupCache serviceLookupCache = null;
@@ -432,6 +445,7 @@ public class DataServicesClient {
 
         }
 
+        if(INFO)
         log.info("Found: " + item);
 
         return item;
@@ -453,6 +467,7 @@ public class DataServicesClient {
         ServiceItem[] items = serviceMap.getServiceItems(maxCount,
                 DataServiceFilter.INSTANCE);
         
+        if(INFO)
         log.info("There are at least " + items.length
                 + " data services : maxCount=" + maxCount);
         

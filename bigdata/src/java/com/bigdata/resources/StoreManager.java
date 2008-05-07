@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
@@ -412,9 +413,9 @@ abstract public class StoreManager extends ResourceEvents implements
     protected final ByteBuffer writeCache;
 
     /**
-     * A hard reference to the live journal.
+     * A atomic hard reference to the live journal.
      */
-    protected ManagedJournal liveJournal;
+    final protected AtomicReference<ManagedJournal> liveJournalRef = new AtomicReference<ManagedJournal>(null);
 
     /**
      * <code>true</code> initially and remains <code>true</code> until the
@@ -1131,24 +1132,30 @@ abstract public class StoreManager extends ResourceEvents implements
                         + newJournal + ", file=" + file);
 
                 // Create/open journal.
+                {
+                    
                 if (Thread.interrupted())
-                    throw new InterruptedException();
-                liveJournal = new ManagedJournal(p);
+                        throw new InterruptedException();
 
-                if (newJournal) {
+                    final ManagedJournal tmp = new ManagedJournal(p);
 
-                    // add to the set of managed resources.
-                    addResource(liveJournal.getResourceMetadata(), liveJournal
-                            .getFile());
+                    if (newJournal) {
 
+                        // add to the set of managed resources.
+                        addResource(tmp.getResourceMetadata(), tmp.getFile());
+
+                    }
+
+                    // add to set of open stores.
+                    storeCache
+                            .put(tmp.getRootBlockView().getUUID(), tmp, false/* dirty */);
+
+                    if (Thread.interrupted())
+                        throw new InterruptedException();
+
+                    liveJournalRef.set(tmp);
+                    
                 }
-
-                // add to set of open stores.
-                storeCache.put(liveJournal.getRootBlockView().getUUID(),
-                        liveJournal, false/* dirty */);
-
-                if (Thread.interrupted())
-                    throw new InterruptedException();
 
             }
 
@@ -1689,22 +1696,24 @@ abstract public class StoreManager extends ResourceEvents implements
         
         assertRunning();
 
-        liveJournalLock.lock();
+        AbstractJournal tmp = liveJournalRef.get();
+        
+        assert tmp != null : "open=" + isOpen() + ", starting="
+                + isStarting() + ", dataDir=" + dataDir;
+        assert tmp.isOpen();
 
-        try {
+        /*
+         * Note: There is a brief period when we close out writes on the live
+         * journal before we cut over to the new live journal. Therefore this
+         * assertion can not be made since it is violated during that brief
+         * period.
+         * 
+         * Note: Concurrent readers are always allowed, even during that brief
+         * period.
+         */
+//        assert !liveJournal.isReadOnly();
 
-            assert liveJournal != null : "open=" + isOpen() + ", starting="
-                    + isStarting() + ", dataDir=" + dataDir;
-            assert liveJournal.isOpen();
-            assert !liveJournal.isReadOnly();
-
-            return liveJournal;
-
-        } finally {
-
-            liveJournalLock.unlock();
-            
-        }
+        return tmp;
 
     }
 

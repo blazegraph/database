@@ -256,7 +256,7 @@ public class ConcurrentDataLoader {
             File file, FilenameFilter filter) {
         
         this(db, nthreads, bufferCapacity, file, filter, ""/* baseURL */,
-                null/* fallback */, false/* autoFlush */, 1/* nclients */, 0/* clientNum */);
+                null/* fallback */, true/* autoFlush */, 1/* nclients */, 0/* clientNum */);
 
     }
     

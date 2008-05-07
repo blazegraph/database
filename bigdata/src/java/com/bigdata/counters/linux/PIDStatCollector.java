@@ -31,6 +31,7 @@ package com.bigdata.counters.linux;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -356,7 +357,8 @@ public class PIDStatCollector extends AbstractProcessCollector implements
     }
 
     /**
-     * Reads  <code>pidstat</code> output and extracts and updates counter values.
+     * Reads <code>pidstat</code> output and extracts and updates counter
+     * values.
      * <p>
      * Sample <code>pidstat</code> output.
      * 
@@ -376,8 +378,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      *         06:35:15 AM       501      0.00      0.00  kjournald
      * </pre>
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     protected class PIDStatReader extends ProcessReaderHelper {
@@ -395,6 +396,40 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             
             super();
 
+        }
+
+        /**
+         * Splits a data line into fields based on whitespace and skipping over
+         * the date field (index zero (0) is the index of the first non-date
+         * field).
+         * <p>
+         * Note: Some fields can overflow, e.g., RSS. When this happens the
+         * fields in the data lines wind up eating into the whitespace to their
+         * <em>right</em>. This means that it is more robust to split the
+         * lines based on whitespace once we have skipped over the date field.
+         * Since we specify using {@link PIDStatCollector#setEnvironment(Map)}
+         * that we want an ISO date format, we know that the date field is 11
+         * characters. The data lines are broken up by whitespace after that.
+         * <p>
+         * Note: Since we split on whitespace, the resulting strings are already
+         * trimmed.
+         * 
+         * @return The fields.
+         */
+        public String[] splitDataLine(String data) {
+            
+            final String s = data.substring(11);
+            
+            final String[] fields = s.split("[\\s+]");
+            
+            if(DEBUG) {
+                
+                log.debug("fields="+Arrays.toString(fields));
+                
+            }
+
+            return fields;
+            
         }
         
         /**
@@ -481,9 +516,15 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 // 06:35:15 AM       PID   %user %system    %CPU   CPU  Command
                 // 06:35:15 AM       501    0.00    0.01    0.00     1  kjournald
                 
-                final String user    = data.substring(22-1,30-1).trim();
-                final String system  = data.substring(30-1,38-1).trim();
-                final String cpu     = data.substring(38-1,46-1).trim();
+//                final String user    = data.substring(22-1,30-1).trim();
+//                final String system  = data.substring(30-1,38-1).trim();
+//                final String cpu     = data.substring(38-1,46-1).trim();
+                
+                final String[] fields = splitDataLine(data);
+                
+                final String user   = fields[1];
+                final String system = fields[2];
+                final String cpu    = fields[3];
                 
                 if (INFO)
                         log.info("\n%user=" + user + ", %system=" + system
@@ -508,11 +549,19 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 //                  *       06:35:15 AM       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command
 //                  *       06:35:15 AM       501      0.00      0.00       0      0   0.00  kjournald
               
-                final String minorFaultsPerSec = data.substring(22-1,32-1).trim();
-                final String majorFaultsPerSec = data.substring(32-1,42-1).trim();
-                final String virtualSize       = data.substring(42-1,50-1).trim();
-                final String residentSetSize   = data.substring(50-1,57-1).trim();
-                final String percentMemory     = data.substring(57-1,64-1).trim();
+//                final String minorFaultsPerSec = data.substring(22-1,32-1).trim();
+//                final String majorFaultsPerSec = data.substring(32-1,42-1).trim();
+//                final String virtualSize       = data.substring(42-1,50-1).trim();
+//                final String residentSetSize   = data.substring(50-1,57-1).trim();
+//                final String percentMemory     = data.substring(57-1,64-1).trim();
+                
+                final String[] fields = splitDataLine(data);
+                
+                final String minorFaultsPerSec = fields[1];
+                final String majorFaultsPerSec = fields[2];
+                final String virtualSize       = fields[3];
+                final String residentSetSize   = fields[4];
+                final String percentMemory     = fields[5];
 
                 if(INFO)
                     log.info("\nminorFaultsPerSec="
@@ -547,8 +596,13 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 //                    *         06:35:15 AM       PID   kB_rd/s   kB_wr/s kB_ccwr/s  Command
 //                    *         06:35:15 AM       501      0.00      1.13      0.00  kjournald
 
-                final String kBrdS = data.substring(22-1, 32-1).trim();
-                final String kBwrS = data.substring(32-1, 42-1).trim();
+//                final String kBrdS = data.substring(22-1, 32-1).trim();
+//                final String kBwrS = data.substring(32-1, 42-1).trim();
+                
+                final String[] fields = splitDataLine(data);
+                
+                final String kBrdS = fields[1];
+                final String kBwrS = fields[2];
 
                 if(INFO)
                 log.info("\nkB_rd/s=" + kBrdS + ", kB_wr/s="

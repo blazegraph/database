@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
@@ -160,6 +161,18 @@ public class JiniClient extends AbstractClient {
 
         }
 
+        public String toString() {
+            
+            return "JiniConfig"//
+                    + "{groups="
+                    + (groups == null ? "N/A" : "" + Arrays.toString(groups))//
+                    + ",locators="
+                    + (lookupLocators == null ? "N/A" : ""
+                            + Arrays.toString(lookupLocators))//
+                    + "}";
+            
+        }
+        
     }
 
     /**

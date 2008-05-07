@@ -204,6 +204,8 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
           }
       }
       assertNotNull("No metadata service?", fed.getMetadataService());
+      assertNotNull("No timestamp service?", fed.getTimestampService());
+      assertNotNull("No load balancer service?", fed.getLoadBalancerService());
 
     }
 
