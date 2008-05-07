@@ -717,7 +717,17 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         } // next split.
 
-        return splits.toArray(new Split[] {});
+        final int splitCount = splits.size();
+        
+        if (splitCount <= 1) {
+
+            log.warn("No splits!");
+            
+            return null;
+            
+        }
+        
+        return splits.toArray(new Split[splitCount]);
 
     }
 
