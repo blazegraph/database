@@ -26,24 +26,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.store;
 
+import java.beans.Statement;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.net.MalformedURLException;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -55,38 +48,73 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
+import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.QueueStatisticsTask;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
-import com.bigdata.rdf.rio.RioLoaderEvent;
-import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOBuffer;
+import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.sun.org.apache.xerces.internal.util.URI;
 
 /**
  * This is a utility class designed for concurrent load of recursively processed
  * files and directories.
  * <p>
- * Note: The concurrent data loader can combine small files within the same
- * thread in order to get better performance on ordered writes by NOT explicitly
- * flushing the {@link StatementBuffer}s in the {@link LoadTask}s - instead it
- * waits until all files have been processed and flushs the buffers when the
- * thread pool is shutdown.
- * <p>
  * Note: Distributed concurrent load may be realized using a pre-defined hash
  * function, e.g., of the file name, modulo the #of hosts on which the loader
  * will run in order to have each file processed by one out of N hosts in a
- * cluster.
+ * cluster. There are two basic ways to go about this:
+ * <ol>
+ * 
+ * <li> First, each host has a directory containing the data to be loaded by a
+ * client running on that host. In this case, the clients are started up and run
+ * independently.</li>
+ * 
+ * <li> The data to be loaded are on Network Attached Storage (NAS) or in a
+ * {@link BigdataRepository}. {@link #nclients} is set to the #of clients that
+ * will be run, each assigned a distinct {@link #clientNum}, and N clients are
+ * started, typically each on its own host. Those clients will then read from
+ * the central source and each client will accept the file for processing iff
+ * <code>hash(file) % nclients == clientNum</code>. This distributes the
+ * processing load among the clients using the hash of the file name.</li>
+ * 
+ * </ol>
+ * 
+ * <p>
+ * 
+ * Note: if individual file load tasks fail, they will be automatically retried
+ * up to {@link #maxtries} times. If only some tasks succeed then the caller
+ * decide what to do about the data load. Your basic options are to rollback to
+ * a known state before the data load, drop the target
+ * {@link AbstractTripleStore}, or accept that you have a partial data load and
+ * that you can live with that outcome (realistic for large data sets). The
+ * worst problem that you might expect is that not all statements will be found
+ * on all access paths.
+ * 
  * <p>
  * Note: Closure is NOT maintained during the load operation. However, you can
  * perform a database at once closure afterwards if you are bulk loading some
  * dataset into an empty database.
+ * 
+ * @todo refactor further and reconcile with map/reduce processsing, the
+ *       {@link BigdataRepository}, etc.
  * 
  * @todo As an alternative to indexing the locally loaded data, we could just
  *       fill {@link StatementBuffer}s, convert to {@link ISPOBuffer}s (using
@@ -96,10 +124,22 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       the scale-out SPO index. The same process could then be done for each
  *       of the other access paths (OSP, POS).
  * 
- * @todo if this proves useful promote it into the main source code (it is in
- *       with the test suites right now).
+ * @todo support a {@link BigdataRepository} as a source.
  * 
- * @todo look into error handling (backing out from a partial load).
+ * @todo support as a map/reduce job assigning files from a
+ *       {@link BigdataRepository} to clients so the source is a queue of files
+ *       assigned to that map task.
+ * 
+ * @todo the tps counter should halt once we are done loading data, but there is
+ *       no way to signal that right now - this is only apparent if you are also
+ *       running validation. Also, once we are done loading data the client
+ *       should be told to flush its counters to the load balancer so that we
+ *       have the final state snapshot once it is ready.
+ * 
+ * @todo I am no longer seeing the {@link QueueStatisticsTask} counters.
+ * 
+ * @todo reporting for tasks that fail after retry - perhaps on a file? Leave to
+ *       the caller? (available from the {@link #failedQueue}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -122,19 +162,40 @@ public class ConcurrentDataLoader {
             .toInt();
 
     /**
-     * The database on which the data will be written.
-     */
-    final AbstractTripleStore db;
-
-    /**
      * Thread pool provinding concurrent load services.
      */
-    ThreadPoolExecutor loadService;
+    final ThreadPoolExecutor loadService;
 
     /**
-     * The {@link Future}s from the {@link LoadTask}s.
+     * Counters for aggregated {@link WorkflowTask} progress.
      */
-    final List<Future> futures = new LinkedList<Future>();
+    final WorkflowTaskCounters counters = new WorkflowTaskCounters();
+    
+    /**
+     * Tasks on the {@link #successQueue} have completed successfully, but may
+     * have been retried before they succeeded.
+     */
+    final LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>> successQueue = new LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>>(
+    /* unbounded capacity */);
+
+    /**
+     * Tasks on the {@link #errorQueue} will be retried.
+     */
+    final LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>> errorQueue = new LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>>(
+    /* unbounded capacity */);
+
+    /**
+     * Tasks on the {@link #failedQueue} will not be retried.
+     */
+    final LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>> failedQueue = new LinkedBlockingQueue<WorkflowTask<ReaderTask, Object>>(
+    /* unbounded capacity */);
+
+    /**
+     * The maximum #of times an attempt will be made to load any given file.
+     * 
+     * @todo ctor param.
+     */
+    final int maxtries = 3;
     
     /**
      * The #of threads given to the ctor (the pool can be using a different
@@ -143,137 +204,40 @@ public class ConcurrentDataLoader {
     final int nthreads;
     
     /**
-     * Capacity of the {@link StatementBuffer}.
+     * The #of clients when running as a distributed client (more than one
+     * {@link ConcurrentDataLoader} instance, typically on more than one host).
      */
-    final int bufferCapacity;
-    
-    /**
-     * The baseURL and "" if none is needed.
-     */
-    final String baseURL;
-    
-    /**
-     * An attempt will be made to determine the interchange syntax using
-     * {@link RDFFormat}. If no determination can be made then the loader will
-     * presume that the files are in the format specified by this parameter (if
-     * any). Files whose format can not be determined will be logged as errors.
-     */
-    final RDFFormat fallback;
-
-    /**
-     * When <code>true</code> the {@link StatementBuffer}s are flushed as
-     * each file is loaded. When <code>false</code> the buffers are reused by
-     * each file loaded by the same thread, flush when they overflow, and are
-     * explictly flushed once no more files remain to be loaded.
-     */
-    final boolean autoFlush;
-
-//    /**
-//     * When <code>true</code> the KB is validated against the source files
-//     * instead of loading the source files into the KB.
-//     */
-//    final boolean validate;
-    
     final int nclients;
     
+    /**
+     * The identified assigned to this client in the half-open interval [0:{@link #nclients}).
+     */
     final int clientNum;
 
     /**
-     * The time when the ctor is executed - this is used to compute told triples
-     * per second.
+     * The #of files scanned.
+     * 
+     * @deprecated this is only a little ahead of the {@link #loadService} and
+     *             the more I isolate these things the less it belongs here. It
+     *             should be with the logic to scan the file system (vs some
+     *             other source).
      */
-    final long begin = System.currentTimeMillis();
-
-    AtomicInteger nscanned = new AtomicInteger(0);
-
-    AtomicInteger ntasked = new AtomicInteger(0);
+    final AtomicInteger nscanned = new AtomicInteger(0);
     
-    /**
-     * #of told triples loaded into the database.
-     */
-    AtomicLong toldTriples = new AtomicLong(0);
-
-    /**
-     * Validation of RDF by the RIO parser is disabled.
-     */
-    final boolean verifyData = false;
-
-
-    /**
-     * A collection of buffers that need to be flushed once the {@link LoadTask}s
-     * are over (iff {@link #autoFlush} is <code>false</code>).
-     */
-    protected Set<StatementBuffer> buffers;
+    final AbstractFederation fed;
     
-    /**
-     * Return the statement buffer to be used for a load task.
-     */
-    protected StatementBuffer getStatementBuffer() {
+    final ScheduledFuture loadServiceStatisticsFuture;
 
-        /*
-         * Note: this is a thread-local so the same buffer object is always
-         * reused by the same thread.
-         */
-
-        return threadLocal.get();
-        
-    }
-    
-    private ThreadLocal<StatementBuffer> threadLocal = new ThreadLocal<StatementBuffer>() {
-
-        protected synchronized StatementBuffer initialValue() {
-
-            StatementBuffer buffer = new StatementBuffer(db, bufferCapacity);
-            
-            if (buffers != null) {
-
-                buffers.add(buffer);
-
-            }
-            
-            return buffer;
-
-        }
-
-    };
-    
     /**
      * Create and run a concurrent data load operation.
      * 
-     * @param db
-     *            The database on which the data will be written.
+     * @param client
+     *            ...
      * @param nthreads
      *            The #of concurrent loaders.
      * @param bufferCapacity
      *            The capacity of the {@link StatementBuffer} (the #of
      *            statements that are buffered into a batch operation).
-     * @param file
-     *            The file or directory to be loaded.
-     * @param filter
-     *            An optional filter used to select the files to be loaded.
-     */
-    public ConcurrentDataLoader(AbstractTripleStore db, int nthreads, int bufferCapacity,
-            File file, FilenameFilter filter) {
-        
-        this(db, nthreads, bufferCapacity, file, filter, ""/* baseURL */,
-                null/* fallback */, true/* autoFlush */, 1/* nclients */, 0/* clientNum */);
-
-    }
-    
-    /**
-     * Create and run a concurrent data load operation.
-     * 
-     * @param db
-     *            The database on which the data will be written.
-     * @param nthreads
-     *            The #of concurrent loaders.
-     * @param bufferCapacity
-     *            The capacity of the {@link StatementBuffer} (the #of
-     *            statements that are buffered into a batch operation).
-     * @param file
-     *            The file or directory to be loaded.
-     * @param filter
-     *            An optional filter used to select the files to be loaded.
      * @param baseURL
      *            The baseURL and <code>""</code> if none is required.
      * @param fallback
@@ -282,18 +246,11 @@ public class ConcurrentDataLoader {
      *            the loader will presume that the files are in the format
      *            specified by this parameter (if any). Files whose format can
      *            not be determined will be logged as errors.
-     * @param autoFlush
-     *            When <code>true</code> the {@link StatementBuffer}s are
-     *            flushed as each file is loaded. When <code>false</code> the
-     *            buffers are reused by each file loaded by the same thread,
-     *            flush when they overflow, and are explictly flushed once no
-     *            more files remain to be loaded.
      * @param nclients
      *            The #of client processes that will share the data load
      *            process. Each client process MUST be started independently in
      *            its own JVM. All clients MUST have access to the files to be
      *            loaded.
-     * 
      * @param clientNum
      *            The client host identifier in [0:nclients-1]. The clients will
      *            load files where
@@ -303,45 +260,22 @@ public class ConcurrentDataLoader {
      *            equally among the clients. (If the data to be loaded are
      *            pre-partitioned then you do not need to specify either
      *            <i>nclients</i> or <i>clientNum</i>.)
+     * 
+     * @todo the baseURL is ignored and probably should either be dropped or
+     *       made part of the visitation pattern for something with richer
+     *       metadata than a file system. right now it always uses the
+     *       individual file to be loaded as the baseURL for that file.
      */
-    public ConcurrentDataLoader(AbstractTripleStore db, int nthreads,
-            int bufferCapacity, File file, FilenameFilter filter,
-            String baseURL, RDFFormat fallback, boolean autoFlush,
-//            boolean validate, 
+    public ConcurrentDataLoader(IBigdataClient client, int nthreads,
             int nclients, int clientNum) {
 
-        this.db = db;
-
+        this.fed = (AbstractFederation) client.getFederation();
+        
         this.nthreads = nthreads;
         
-        this.bufferCapacity = bufferCapacity;
-
-        this.baseURL = baseURL;
-        
-        this.fallback = fallback;
-
-        this.autoFlush = autoFlush;
-        
-//        this.validate = validate;
-
         this.nclients = nclients;
         
         this.clientNum = clientNum;
-       
-        if (autoFlush) {
-
-            buffers = null;
-            
-        } else {
-
-            /*
-             * A collection of buffers that we need to flush once the main load
-             * is over.
-             */
-            buffers = Collections.synchronizedSet(new HashSet<StatementBuffer>(
-                    nthreads + nthreads << 2));
-            
-        }
         
         /*
          * Setup the load service. We will run the tasks that read the data and
@@ -350,430 +284,347 @@ public class ConcurrentDataLoader {
          * Note: we limit the #of tasks waiting in the queue so that we don't
          * let the file scan get too far ahead of the executing tasks. This
          * reduces the latency for startup and the memory overhead significantly
-         * when reading a large collection of files.  There is a minimum queue
+         * when reading a large collection of files. There is a minimum queue
          * size so that we can be efficient for the file system reads.
          */
-        
-//        loadService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-//                nthreads, DaemonThreadFactory.defaultThreadFactory());
-        
+
+        // loadService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+        // nthreads, DaemonThreadFactory.defaultThreadFactory());
         final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(
                 Math.max(100, nthreads * 2));
-        
+
         loadService = new ThreadPoolExecutor(nthreads, nthreads,
                 Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
-                DaemonThreadFactory.defaultThreadFactory()); 
-
+                DaemonThreadFactory.defaultThreadFactory());
+        
         /*
-         * Setup reporting to the load balancer on the client progress if using
-         * a federation.
+         * Setup reporting to the load balancer.
          */
-        AbstractFederation fed = null;
-        ScheduledFuture loadServiceStatisticsFuture = null;
-        try {
+        final CounterSet tmp = getCounters(fed);
 
-            if (db instanceof ScaleOutTripleStore) {
+        final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
+                "Load Service", loadService);
 
-                // if using the federation api.
-                fed = (AbstractFederation) ((ScaleOutTripleStore) db)
-                        .getFederation();
+        // task reports interesting statistics for the [loadService]
+        loadServiceStatisticsFuture = fed.addScheduledStatisticsTask(
+                loadServiceStatisticsTask, 60/* initialDelay */,
+                60/* delay */, TimeUnit.SECONDS);
 
-                final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
-                        "Load Service", loadService);
-
-                loadServiceStatisticsFuture = fed.addScheduledStatisticsTask(
-                        loadServiceStatisticsTask, 60, 60, TimeUnit.SECONDS);
-
-                final CounterSet tmp = fed.getCounterSet().makePath(
-                        fed.getClientCounterPathPrefix()
-                                + "Concurrent Data Loader");
-
-                tmp.addCounter("#scanned", new Instrument<Long>() {
-
-                    @Override
-                    protected void sample() {
-
-                        setValue((long) nscanned.get());
-
-                    }
-                });
-
-                loadServiceStatisticsTask.addCounters(tmp
-                        .makePath("Load Service"));
-
-                tmp.addCounter("toldTriples", new Instrument<Long>() {
-
-                    @Override
-                    protected void sample() {
-
-                        setValue(toldTriples.get());
-
-                    }
-                });
-
-                tmp.addCounter("elapsed", new Instrument<Long>() {
-
-                    @Override
-                    protected void sample() {
-
-                        final long elapsed = System.currentTimeMillis() - begin;
-
-                        setValue(elapsed);
-
-                    }
-                });
-
-                /*
-                 * Note: This is the told triples per second rate for _this_
-                 * client only. When you are loading using multiple instances of
-                 * the concurrent data loader, then the total told triples per
-                 * second rate is the aggregation across all of those instances.
-                 */
-                tmp.addCounter("toldTriplesPerSec", new Instrument<Long>() {
-
-                    @Override
-                    protected void sample() {
-
-                        final long elapsed = System.currentTimeMillis() - begin;
-
-                        final double tps = (long) (((double) toldTriples.get())
-                                / ((double) elapsed) * 1000d);
-
-                        setValue((long) tps);
-
-                    }
-                });
-
-            }
-
-            try {
-
-                /*
-                 * Scans the files, creating LoadTasks and then awaits
-                 * completion of the load tasks. The thread pool is shutdown
-                 * once all tasks have been run and some statistics are
-                 * reported.
-                 */
-
-                process(file, filter);
-
-            } catch (Throwable t) {
-
-                /*
-                 * Some uncorrectable problem during data load.
-                 */
-                log.fatal(t);
-
-                try {
-
-                    // immediate shutdown.
-                    loadService.shutdownNow();
-
-                } catch (Throwable t2) {
-
-                    log.warn("Problems during shutdown: " + t2);
-
-                }
-
-                // rethrow the exception.
-                throw new RuntimeException(t);
-
-            }
-
-        } finally {
-
-            // make sure that the thread pool is shutdown.
-            loadService.shutdown();
-
-            // cancel the statistics task if it's still running.
-            if (loadServiceStatisticsFuture != null) {
-
-                loadServiceStatisticsFuture.cancel(true/* mayInterrupt */);
-
-            }
-
-            if (fed != null) {
-
-                // report out the final counter set state.
-                fed.reportCounters();
-
-            }
-
-        }
+        // add the queue statistics task counters to those defined
+        // above.
+        loadServiceStatisticsTask.addCounters(tmp
+                .makePath("Load Service"));
 
     }
 
     /**
-     * Scans file(s) recursively starting with the named file, creates a
-     * {@link LoadTask} for each file that passes the filter and then awaits
-     * completion of the {@link LoadTask}s. The thread pool is shutdown once
-     * all tasks have been run and some statistics are reported.
+     * Cancel the statistics task if it's still running.
+     */
+    protected void finalize() throws Throwable {
+
+        super.finalize();
+
+        loadServiceStatisticsFuture.cancel(true/* mayInterrupt */);
+
+    }
+    
+    public void shutdown() {
+        
+        // make sure this thread pool is shutdown.
+        loadService.shutdown();
+
+        // report out the final counter set state.
+        fed.reportCounters();
+
+    }
+
+    public void shutdownNow() {
+
+        loadService.shutdownNow();
+        
+    }
+    
+    /**
+     * Setup the {@link CounterSet} to be reported to the
+     * {@link ILoadBalancerService}.
+     * <p>
+     * Note: This add the counters to be reported to the client's counter set -
+     * they will be reported when the client reports its own counters.
+     * 
+     * @param fed
+     * 
+     * @return The {@link CounterSet} for the {@link ConcurrentDataLoader}.
+     */
+    public CounterSet getCounters(IBigdataFederation fed) {
+
+        final String path = fed.getClientCounterPathPrefix()
+                + "Concurrent Data Loader";
+
+        /*
+         * detach if pre-existing (if you run two instances once for a given
+         * client one will detach the other's counters).
+         */
+        fed.getCounterSet().detach(path);
+        
+        // make path to the counter set for the data loader.
+        final CounterSet tmp = fed.getCounterSet().makePath(path);
+
+        tmp.addCounter("#clients", new OneShotInstrument<Integer>(nclients));
+
+        tmp.addCounter("clientNum", new OneShotInstrument<Integer>(clientNum));
+
+        tmp.addCounter("#scanned", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue((long) nscanned.get());
+
+            }
+        });
+        tmp.addCounter("#submit", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue((long) counters.nsubmit.get());
+
+            }
+        });
+        tmp.addCounter("#complete", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue((long) counters.ncomplete.get());
+
+            }
+        });
+        tmp.addCounter("#success", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue((long) counters.nsuccess.get());
+
+            }
+        });
+        tmp.addCounter("#error", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue((long) counters.nerror.get());
+
+            }
+        });
+        tmp.addCounter("#fail", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue((long) counters.nfail.get());
+
+            }
+        });
+        tmp.addCounter("#retry", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue((long) counters.nretry.get());
+
+            }
+        });
+
+        return tmp;
+        
+    }
+    
+    /**
+     * If there is a task on the {@link #errorQueue} then re-submit it.
+     * 
+     * @return <code>true</code> if an error task was re-submitted.
+     * 
+     * @throws InterruptedException
+     */
+    public boolean consumeErrorTask() throws InterruptedException {
+
+        // Note: remove head of queue iff present (does not block).
+        final WorkflowTask<ReaderTask, Object> errorTask = errorQueue.poll();
+
+        if (errorTask != null) {
+
+            log.info("Re-submitting task="+errorTask.target);
+            
+            // re-submit a task that produced an error.
+            new WorkflowTask<ReaderTask, Object>(errorTask).submit();
+
+            counters.nretry.incrementAndGet();
+
+            return true;
+
+        }
+
+        return false;
+ 
+    }
+    
+    /**
+     * Wait for the {@link #loadService} to be "complete" AND for the
+     * {@link #futuresQueue} to be empty.
+     * <P>
+     * Note: We have to hack what it means for the {@link #loadService} to be
+     * complete. We can not rely on
+     * {@link ExecutorService#awaitTermination(long, TimeUnit)} to wait until
+     * all tasks are done because the {@link FuturesTask} will re-submit tasks
+     * that fail up to {@link #maxtries} times.
+     * <P>
+     * Note: The {@link #futuresLock} is used to make the test atomic with
+     * respect to the {@link #futuresLock} and the activity of the
+     * {@link FuturesTask} (especially with respect to the take()/put() behavior
+     * used to re-submit failed tasks).
+     * <P>
+     * Note: There is no way to make the test atomic with respect to the
+     * <code>loadService.getActiveCount()</code> and
+     * <code>loadService.getQueue().isEmpty()</code> so we wait until the test
+     * succeeds a few times in a row.
+     * 
+     * @throws InterruptedException
+     * 
+     * FIXME This is not bullet proof. awaitCompletion() can return immediately
+     * when the loadService is just starting up if it does its tests after the
+     * load service does a take() on its queue and before the task has been
+     * assigned to a worker thread. The same problem can arise near the end of a
+     * run, in which case the last task might not execute.
+     */
+    public boolean awaitCompletion(long timeout, TimeUnit unit) throws InterruptedException {
+
+        log.info(counters.toString());
+        
+        final long beginWait = System.currentTimeMillis();
+        
+        long lastNoticeMillis = beginWait;
+        
+        while (true) {
+            
+            final int loadActiveCount = loadService.getActiveCount();
+            final int loadQueueSize = loadService.getQueue().size();
+            final int errorQueueSize = errorQueue.size();
+            final int failedQueueSize = failedQueue.size();
+
+            final long now = System.currentTimeMillis();
+
+            if (DEBUG) {
+
+                log.debug("Awaiting completion" //
+                        + ": loadActiveCount=" + loadActiveCount //
+                        + ", loadQueueSize=" + loadQueueSize //
+                        + ", errorQueueSize=" + errorQueueSize//
+                        + ", failedQueueSize=" + failedQueueSize//
+                        + ", elapsedWait=" + (now - beginWait)//
+                        + ", " + counters);
+                
+            }
+
+            // consume any error tasks (re-submit them).
+            if(consumeErrorTask()) continue;
+
+            if (loadActiveCount == 0 && loadQueueSize == 0 && errorQueueSize == 0) {
+
+                log.info("complete");
+
+                return true;
+                
+            }
+
+            {
+                
+                final long elapsed = System.currentTimeMillis() - beginWait;
+                
+                if(TimeUnit.NANOSECONDS.convert(elapsed, unit)>timeout) {
+                
+                    log.warn("timeout");
+
+                    return false;
+                    
+                }
+                
+            }
+            
+            if (INFO) {
+
+                final long elapsed = now - lastNoticeMillis;
+
+                if (elapsed > 5000) {
+
+                    lastNoticeMillis = now;
+
+                    log.info("Awaiting completion" //
+                            + ": loadActiveCount=" + loadActiveCount //
+                            + ", loadQueueSize=" + loadQueueSize //
+                            + ", errorQueueSize=" + errorQueueSize//
+                            + ", failedQueueSize=" + failedQueueSize//
+                            + ", elapsedWait=" + (now - beginWait)//
+                            + ", " + counters);
+
+                }
+
+            }
+
+            Thread.sleep(100/* ms */);
+
+        }
+        
+    }
+    
+    /**
+     * Scans file(s) recursively starting with the named file, creates a task
+     * using the {@link ITaskFactory} for each file that passes the filter, and
+     * submits the task.
      * 
      * @param file
      *            Either a plain file or directory containing files to be
      *            processed.
      * @param filter
      *            An optional filter.
-     * 
-     * @throws IOException
-     */
-    private void process(File file, FilenameFilter filter) throws IOException,
-            InterruptedException {
-
-        process2(file, filter);
-
-        log.info("All files scanned: nscanned="+nscanned+", ntasked=" + ntasked);
-
-        // normal termination - all queued tasks will complete.
-        loadService.shutdown();
-
-        /*
-         * wait for the load tasks to complete.
-         */
-        while (true) {
-
-            log.info("Awaiting load task termination: completed="
-                    + loadService.getCompletedTaskCount() + ", active="
-                    + loadService.getActiveCount() + ", remaining="
-                    + loadService.getQueue().size());
-
-            if (loadService.awaitTermination(60L/* 1 minute */,
-                    TimeUnit.SECONDS)) {
-
-                log.info("Load tasks terminated normally.");
-                
-                break;
-
-            }
-
-        }
-
-        /*
-         * #Of tasks that complete, succeed, and fail respectively for both the
-         * load and the optional flush stages.
-         */
-        int ndone = 0;
-        int nok = 0;
-        int nerr = 0;
-
-        /*
-         * Flush all statement buffers through to the database.
-         */
-        if (!autoFlush) {
-
-            final long beginFlush = System.currentTimeMillis();
-            
-            // #of buffers to be flushed.
-            final int nflush = this.buffers.size();
-            
-            // array of all statement buffers.
-            StatementBuffer[] buffers = this.buffers.toArray(new StatementBuffer[nflush]);
-
-            log.info("Flushing "+nflush+" buffers to the database");
-
-            // Note: create a new service for running the flush tasks.
-            loadService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    Math.min(nclients, nflush), DaemonThreadFactory
-                            .defaultThreadFactory());
-
-            final List<Future> futures = new ArrayList<Future>(nflush);
-            
-            int i = 0;
-            for(StatementBuffer buffer : buffers) {
-                
-                final StatementBuffer b = buffer;
-                
-                final int index = i++;
-                
-                final int size = b.size();
-                
-                if(size==0) continue;
-                
-                futures.add(loadService.submit(new Runnable() {
-                    // Note: shows up if you dump the queue contents.
-                    public String toString() {
-                        return "[" + index + "] : flushing " + size
-                                + " statements";
-                    }
-
-                    // flush the statement buffer when the task runs.
-                    public void run() {
-                        log.info("[" + index + "] : Flushing " + size
-                                + " statements to the database.");
-                        final long begin = System.currentTimeMillis();
-                        b.flush();
-                        final long elapsed = System.currentTimeMillis() - begin;
-                        log.info("[" + index + "] : Flushed " + size
-                                + " statements to the database in " + elapsed
-                                + "ms");
-                    }
-                }));
-                
-            }
-
-            // normal shutdown.
-            loadService.shutdown();
-            
-            // wait for the flush tasks to complete.
-            while (true) {
-
-                log.info("Awaiting flush task termination: completed="
-                        + loadService.getCompletedTaskCount() + ", active="
-                        + loadService.getActiveCount()+ ", remaining="
-                        + loadService.getQueue().size());
-
-                if (loadService.awaitTermination(20L/* secs */,
-                        TimeUnit.SECONDS)) {
-
-                    log.info("Flush tasks terminated normally.");
-
-                    break;
-
-                }
-                
-                log.info("Queue:\n"
-                        + Arrays.toString(loadService.getQueue().toArray()));
-
-            }
-
-            /*
-             * Look for errors in the flush tasks.
-             */
-//            int ndone = 0;
-//            int nok = 0;
-//            int nerr = 0;
-
-            for (Future f : futures) {
-
-                if (f.isDone()) {
-
-                    ndone++;
-
-                    try {
-                        
-                        f.get();
-
-                        nok++;
-
-                    } catch (ExecutionException ex) {
-
-                        nerr++;
-
-                        log.warn("Error: " + ex, ex);
-
-                    }
-
-                }
-
-            }
-            
-            final long elapsedFlush = System.currentTimeMillis() - beginFlush;
-
-            log.info("Finished flush tasks: #flushed=" + nflush
-                    + " buffers in " + elapsedFlush + " ms (#threads=" + nthreads
-                    + ", largestPoolSize=" + loadService.getLargestPoolSize()
-                    + ", bufferCapacity=" + bufferCapacity + ", #done=" + ndone
-                    + ", #ok=" + nok + ", #err=" + nerr + ")");
-        
-        }
-
-        /*
-         * commit the database.
-         */
-        {
-
-            log.info("Doing commit.");
-
-            final long beginCommit = System.currentTimeMillis();
-            
-            db.commit();
-            
-            final long elapsedCommit = System.currentTimeMillis() - beginCommit;
-            
-            log.info("Commit latency=" + elapsedCommit + "ms");
-            
-        }
-
-        /*
-         * Examine the futures from the load tasks and report any errors.
-         * 
-         * @todo The futures for the load tasks will grow without bound for very
-         * large data loads. We should really consume those futures using a
-         * queue to keep down the size of that data structure.
-         * 
-         * @todo Incremental examination of the futures will also let us set the
-         * success and error counters incrementally and those can be published
-         * out as counters (that could also be done from within the tasks
-         * themselves).
-         */
-        {
-
-            for (Future f : futures) {
-
-                if (f.isDone()) {
-
-                    ndone++;
-
-                    try {
-                        f.get();
-
-                        nok++;
-
-                    } catch (ExecutionException ex) {
-
-                        nerr++;
-
-                        log.warn("Error: " + ex);
-
-                    }
-
-                }
-
-            }
-
-            // total run time.
-            final long elapsed = System.currentTimeMillis() - begin;
-
-            final long nterms = db.getTermCount();
-
-            final long nstmts = db.getStatementCount();
-            
-            final double tps = (long) (((double) nstmts) / ((double) elapsed) * 1000d);
-
-            log.info("All done: #loaded=" + ntasked + " files in " + elapsed
-                    + " ms, #terms=" + nterms + ", #stmts=" + nstmts
-                    + ", rate=" + tps + " (#threads=" + nthreads + ", class="
-                    + db.getClass().getSimpleName() + ", largestPoolSize="
-                    + loadService.getLargestPoolSize() + ", bufferCapacity="
-                    + bufferCapacity + ", autoFlush=" + autoFlush + ", #done="
-                    + ndone + ", #ok=" + nok + ", #err=" + nerr + ")");
-
-        }
-        
-    }
-
-    /**
-     * Scan the files, creating the tasks to be run and submitting them to the
-     * {@link #loadService}.
-     * 
-     * @param file
-     * @param filter
+     * @param taskFactory
      * 
      * @throws InterruptedException
      *             if the thread is interrupted while queuing tasks.
      */
-    private void process2(File file, FilenameFilter filter) throws InterruptedException {
+    public void process(File file, FilenameFilter filter,
+            ITaskFactory taskFactory) throws InterruptedException {
+
+        if (file == null)
+            throw new IllegalArgumentException();
+
+        if (taskFactory == null)
+            throw new IllegalArgumentException();
+
+        process2(file, filter, taskFactory);
+
+        /* Let some tasks at least get submitted.
+         * 
+         * FIXME This is a hack for awaitCompletion()
+         */
+        Thread.sleep(1000);
+
+    }
+    
+    private void process2(File file, FilenameFilter filter,
+            ITaskFactory taskFactory) throws InterruptedException {
 
         if (file.isDirectory()) {
 
             log.info("Scanning directory: " + file);
 
-            File[] files = filter == null ? file.listFiles() : file
+            final File[] files = filter == null ? file.listFiles() : file
                     .listFiles(filter);
 
-            for (File f : files) {
+            for (final File f : files) {
 
-                process2(f, filter);
+                process2(f, filter, taskFactory);
 
             }
 
@@ -787,7 +638,7 @@ public class ConcurrentDataLoader {
 
             nscanned.incrementAndGet();
 
-            if(nclients>1) {
+            if (nclients > 1) {
 
                 /*
                  * More than one client will run so we need to allocate the
@@ -815,7 +666,7 @@ public class ConcurrentDataLoader {
 
                     log.info("Client" + clientNum + " tasked: " + file);
 
-                    submitTask(file);
+                    submitTask(file.toString(), taskFactory );
 
                 }   
             
@@ -825,7 +676,7 @@ public class ConcurrentDataLoader {
                  * Only one client so it loads all of the files.
                  */
 
-                submitTask(file);
+                submitTask(file.toString(), taskFactory);
 
             }
                 
@@ -834,33 +685,69 @@ public class ConcurrentDataLoader {
     }
 
     /**
-     * Submits a task to the {@link #loadService} to load the file into the
-     * database.
+     * Submits a task to the {@link #loadService}.
      * 
-     * @param file
+     * @param resource
      * 
      * @throws InterruptedException
      */
-    private void submitTask(File file) throws InterruptedException {
+    public void submitTask(String resource,ITaskFactory taskFactory) throws InterruptedException {
         
-        final LoadTask task = new LoadTask(file);
+        log.info("Processing: resource=" + resource);
+        
+        final Runnable target;
+        try {
 
+            target = taskFactory.newTask(resource);
+        
+        } catch(Exception ex) {
+            
+            log.warn("Could not start task: resource=" + resource + " : " + ex);
+            
+            return;
+            
+        }
+
+        // Note: reset every time we log a rejected exception message.
         long begin = System.currentTimeMillis();
         
         while (true) {
 
             try {
 
-                final Future f = loadService.submit(task);
+                // wrap as a WorkflowTask.
+                final WorkflowTask workflowTask = new WorkflowTask(target,
+                        loadService, successQueue, errorQueue, failedQueue,
+                        counters, maxtries);
 
-                futures.add( f );
+                // submit the task.
+                workflowTask.submit();
+                
+                /*
+                 * If there is an error task then consume (re-submit) it now.
+                 * This keeps the errorQueue from building up while we are
+                 * scanning the source files.
+                 */
+                consumeErrorTask();
 
-                ntasked.incrementAndGet();
-                
-                break;
-                
+                return;
+
             } catch (RejectedExecutionException ex) {
 
+                /*
+                 * Note: This makes the submit of the original input for
+                 * processing robust.
+                 * 
+                 * Note: The retry is already robust since the error queue is
+                 * consumed by polling (a) when still reading the inputs; and
+                 * (b) when awaiting completion.
+                 * 
+                 * @todo move the rejected ex handler inside of the workflow
+                 * task but allow override of the retry policy?
+                 */
+                
+                // the task could not be submitted.
+                
                 final long now = System.currentTimeMillis();
                 
                 final long elapsed = now - begin;
@@ -879,8 +766,8 @@ public class ConcurrentDataLoader {
                         + ": queueSize="+ loadService.getQueue().size()//
                         + ", poolSize=" + loadService.getPoolSize()//
                         + ", active="+ loadService.getActiveCount()//
-                        + ", tasked="+ ntasked //
                         + ", completed="+ loadService.getCompletedTaskCount()//
+                        + ", "+counters
                         );
                 
                 }
@@ -896,123 +783,535 @@ public class ConcurrentDataLoader {
     }
     
     /**
-     * Tasks loads a single file.
+     * A class designed to pass a task from queue to queue treating the queues
+     * as workflow states. Tasks begin on the
+     * {@link ConcurrentDataLoader#loadService} (which has its own queue of
+     * submitted but not yet running tasks) and are moved onto either the
+     * {@link ConcurrentDataLoader#successQueue} or the
+     * {@link ConcurrentDataLoader#errorQueue} as appropriate. Tasks which can
+     * be retried are re-submitted to the
+     * {@link ConcurrentDataLoader#loadService} while tasks which can no longer
+     * be retried are placed on the {@link ConcurrentDataLoader#failedQueue}.
+     * 
+     * @param T
+     *            The type of the target (T) task.
+     * @param F
+     *            The return type of the task's {@link Future} (F).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class LoadTask implements Runnable {
+    static class WorkflowTask<T extends Runnable,F> implements Runnable {
+        
+        protected static final Logger log = Logger
+                .getLogger(WorkflowTask.class);
 
-        final File file;
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
 
-        public LoadTask(File file) {
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+                .toInt();
 
-            this.file = file;
+        /**
+         * The {@link Future} for this {@link ReaderTask}.
+         * <p>
+         * Note: this field is set each time the {@link ReaderTask} is submitted
+         * to the {@link ConcurrentDataLoader#loadService}. It is never
+         * cleared, so it always reflects the last {@link Future}.
+         */
+        private Future<F> future;
 
+        /**
+         * The time when the task was first created and on retry set to the time
+         * when the task was queued for retry (this may be used to identify
+         * tasks that are not terminating).
+         */
+        final long beginTime;
+
+        final int maxtries;
+        
+        /**
+         * The #of tries so far (0 on the first try).
+         */
+        final int ntries;
+        
+        final T target;
+        
+        final ExecutorService service;
+        
+        final BlockingQueue<WorkflowTask<T, F>> successQueue;
+        
+        final BlockingQueue<WorkflowTask<T, F>> errorQueue;
+        
+        final BlockingQueue<WorkflowTask<T, F>> failedQueue;
+               
+        final WorkflowTaskCounters counters;
+
+        /**
+         * Ctor for retry of a failed task.
+         * 
+         * @param t
+         *            The failed task.
+         */
+        public WorkflowTask(WorkflowTask<T, F> t) {
+            
+            this(t.target, t.service, t.successQueue, t.errorQueue, t.failedQueue, t.counters,
+                    t.maxtries, t.ntries);
+            
+        }
+
+        /**
+         * Ctor for a new task.
+         * 
+         * @param target
+         * @param service
+         * @param successQueue
+         * @param errorQueue
+         * @param counters
+         * @param maxtries
+         */
+        public WorkflowTask(T target,
+                ExecutorService service,
+                BlockingQueue<WorkflowTask<T, F>> successQueue,
+                BlockingQueue<WorkflowTask<T, F>> errorQueue,
+                BlockingQueue<WorkflowTask<T, F>> failedQueue,
+                WorkflowTaskCounters counters, int maxtries) {
+
+            this(target, service, successQueue, errorQueue, failedQueue, counters, maxtries, 0/* ntries */);
+            
+        }
+
+        /**
+         * Core impl.
+         * 
+         * @param target
+         * @param service
+         * @param successQueue
+         * @param errorQueue
+         * @param failedQueue
+         * @param counters
+         * @param maxtries
+         * @param ntries
+         */
+        protected WorkflowTask(T target,
+                ExecutorService service,
+                BlockingQueue<WorkflowTask<T, F>> successQueue,
+                BlockingQueue<WorkflowTask<T, F>> errorQueue,
+                BlockingQueue<WorkflowTask<T, F>> failedQueue,
+                WorkflowTaskCounters counters, int maxtries, int ntries) {
+
+            if (target == null)
+                throw new IllegalArgumentException();
+        
+            if (service == null)
+                throw new IllegalArgumentException();
+            
+            if (successQueue == null)
+                throw new IllegalArgumentException();
+            
+            if (errorQueue == null)
+                throw new IllegalArgumentException();
+            
+            if (failedQueue == null)
+                throw new IllegalArgumentException();
+            
+            if (counters == null)
+                throw new IllegalArgumentException();
+            
+            if( maxtries < 0)
+                throw new IllegalArgumentException();
+            
+            if (ntries >= maxtries)
+                throw new IllegalArgumentException();
+            
+            this.beginTime = System.currentTimeMillis();
+
+            this.target = target;
+            
+            this.service = service;
+            
+            this.successQueue = successQueue;
+
+            this.errorQueue = errorQueue;
+
+            this.failedQueue = failedQueue;
+
+            this.counters = counters;
+        
+            this.maxtries = maxtries;
+            
+            this.ntries = ntries + 1;
+            
+        }
+        
+        /**
+         * Submit the task for execution on the {@link #service}
+         * 
+         * @return The {@link Future}, which is also available from
+         *         {@link #getFuture()}.
+         */
+        public Future<F> submit() {
+
+            if (future != null) {
+
+                // task was already submitted.
+                throw new IllegalStateException();
+            
+            }
+            
+            log.info("Submitting task=" + target + " : " + counters);
+
+            // attempt to submit the task.
+            future = (Future<F>) service.submit(this);
+
+            // increment the counter.
+            counters.nsubmit.incrementAndGet();
+
+            log.info("Submitted task="+target+" : "+counters);
+
+            return future;
+
+        }
+        
+        /**
+         * Return the {@link Future} of the target.
+         * 
+         * @throws IllegalStateException
+         *             if the {@link Future} has not been set.
+         */
+        public Future<F> getFuture() {
+
+            if (future == null)
+                throw new IllegalStateException();
+            
+            return future;
+            
         }
 
         public void run() {
 
-            log.info("Processing file: " + file);
+            try {
+                
+                runTarget();
 
-            final RDFFormat rdfFormat = fallback == null //
-                    ? RDFFormat.forFileName(file.getName()) //
-                    : RDFFormat.forFileName(file.getName(), fallback)//
-                    ;
+            } catch (InterruptedException e) {
+                
+                // quit on interrupt.
+                return;
+                
+            }
+            
+        }
+        
+        protected void runTarget() throws InterruptedException {
+            
+            log.info("Running task="+target+" : "+counters);
+            
+            try {
 
-            if (rdfFormat == null) {
+                target.run();
 
-                throw new RuntimeException(
-                        "Could not determine interchange syntax: " + file);
+                success();
+                
+            } catch(RuntimeException ex) {
+                
+                error(ex);
+                
+                throw ex;
+                
+            } catch (Exception ex) {
+
+                error(ex);
+                
+                throw new RuntimeException(ex);
+                
+            } catch (Throwable ex) {
+
+                error(ex);
+                
+                throw new RuntimeException(ex);
+                                
+            }
+            
+        }
+        
+        protected void success() throws InterruptedException {
+            
+            counters.ncomplete.incrementAndGet();
+
+            counters.nsuccess.incrementAndGet();
+
+            log.info("Success task="+target+" : "+counters);
+
+            // may block.
+            successQueue.put(this);
+            
+        }
+        
+        protected void error(Throwable t) throws InterruptedException {
+
+            counters.ncomplete.incrementAndGet();
+
+            counters.nerror.incrementAndGet();
+
+            if (ntries < maxtries) {
+
+                // note: w/o stack trace since we will retry.
+                log.warn("error: task=" + target + ", cause="+t);
+
+                // may block
+                errorQueue.put(this);
+
+            } else {
+
+                // note: with stack trace on final error.
+                log.error("failed: task=" + target+", cause="+t, t);
+
+                counters.nfail.incrementAndGet();
+
+                // may block.
+                failedQueue.put(this);
 
             }
+            
+        }
+                
+    }
+    
+    /**
+     * Counters updated by a {@link WorkflowTask}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo extract a common interface or impl for the
+     *       {@link QueueStatisticsTask} so that we can report the response
+     *       times here.
+     */
+    public static class WorkflowTaskCounters {
+        
+        final public AtomicInteger nsubmit = new AtomicInteger(0);
+
+        final public AtomicInteger ncomplete = new AtomicInteger(0);
+        
+        final public AtomicInteger nsuccess = new AtomicInteger(0);
+        
+        final public AtomicInteger nerror = new AtomicInteger(0);
+        
+        final public AtomicInteger nretry = new AtomicInteger(0);
+        
+        final public AtomicInteger nfail = new AtomicInteger(0);
+        
+        public String toString() {
+         
+            return "#submit=" + nsubmit + ", #complete=" + ncomplete
+                    + ", #success=" + nsuccess + ", #error=" + nerror
+                    + ", #retry=" + nretry+", #fail="+nfail;
+            
+        }
+        
+    }
+    
+    /*
+     * RDF SPECIFIC STUFF
+     */
+    
+    /**
+     * A factory for {@link Runnable} tasks.
+     */
+    public static interface ITaskFactory {
+        
+        public Runnable newTask(String file) throws Exception;
+        
+    }
+    
+    /**
+     * A factory for {@link StatementBuffer}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IStatementBufferFactory {
+
+        /**
+         * Return the {@link StatementBuffer} to be used for a task.
+         */
+        public StatementBuffer getStatementBuffer();
+        
+    }
+    
+    /**
+     * Tasks either loads a RDF resource or verifies that the told triples found
+     * in that resource are present in the database. The difference between data
+     * load and data verify is just the behavior of the {@link StatementBuffer}
+     * returned by {@link ConcurrentDataLoader#getStatementBuffer()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class ReaderTask implements Runnable {
+
+        protected static final Logger log = Logger.getLogger(ReaderTask.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+                .toInt();
+
+        /**
+         * The resource to be loaded.
+         */
+        final String resource;
+        
+        /**
+         * The base URL for that resource.
+         */
+        final String baseURL;
+        
+        /**
+         * The RDF interchange syntax that the file uses.
+         */
+        final RDFFormat rdfFormat;
+
+        /**
+         * Validate the RDF interchange syntax when <code>true</code>.
+         */
+        final boolean verifyData;
+        
+        final IStatementBufferFactory bufferFactory;
+        
+        final AtomicLong toldTriples;
+        
+        /**
+         * The time when the task was first created.
+         */
+        final long createTime;
+        
+        public String toString() {
+            
+            return "LoadTask"//
+            +"{ resource="+resource
+            +", elapsed="+(System.currentTimeMillis()-createTime)//
+            +"}"//
+            ;
+            
+        }
+        
+        /**
+         * 
+         * Note: Updates to <i>toldTriples</i> MUST NOT occur unless the task
+         * succeeds, otherwise tasks which error and then retry will cause
+         * double-counting.
+         * 
+         * @param resource
+         * @param baseURL
+         * @param rdfFormat
+         * @param verifyData
+         * @param bufferFactory
+         * @param toldTriples
+         */
+        public ReaderTask(String resource, String baseURL, RDFFormat rdfFormat,
+                boolean verifyData, IStatementBufferFactory bufferFactory, AtomicLong toldTriples) {
+
+            if (resource == null)
+                throw new IllegalArgumentException();
+
+            if (baseURL == null)
+                throw new IllegalArgumentException();
+
+            if (rdfFormat == null)
+                throw new IllegalArgumentException();
+            
+            if (bufferFactory == null)
+                throw new IllegalArgumentException();
+
+            if (toldTriples == null)
+                throw new IllegalArgumentException();
+            
+            this.resource = resource;
+            
+            this.baseURL = baseURL;
+
+            this.rdfFormat = rdfFormat;
+
+            this.verifyData = verifyData;
+            
+            this.bufferFactory = bufferFactory;
+            
+            this.toldTriples = toldTriples;
+            
+            this.createTime = System.currentTimeMillis();
+            
+        }
+
+        public void run() {
 
             final LoadStats loadStats;
             try {
 
-                // FIXME resolve what the baseURL SHOULD be.
-                loadStats = loadData2(file.toString(), 
-//                        baseURL,
-                        file.toURI().toString(),
-                        rdfFormat);
+                loadStats = readData();
 
-            } catch (IOException e) {
+            } catch (Exception e) {
 
-                log.error("file=" + file + ", error=" + e);
+                /*
+                 * Note: no stack trace and only a warning - we will either
+                 * retry or declare the input as filed.
+                 */
+                log.warn("resource=" + resource + ", error=" + e);
 
-                throw new RuntimeException(e);
+                throw new RuntimeException("resource=" + resource + " : " + e, e);
 
             }
             
+            // Note: IFF the task succeeds!
             toldTriples.addAndGet(loadStats.toldTriples);
 
         }
 
         /**
-         * Load an RDF resource into the database.
+         * Reads an RDF resource and either loads it into the database or
+         * verifies that the triples in the resource are found in the database.
          */
-        protected LoadStats loadData2(String resource, String baseURL,
-                RDFFormat rdfFormat) throws IOException {
+        protected LoadStats readData() throws Exception {
 
             final long begin = System.currentTimeMillis();
 
-            StatementBuffer buffer = getStatementBuffer();
+            // get buffer - determines data load vs database validate.
+            final StatementBuffer buffer = bufferFactory.getStatementBuffer();
             
-            LoadStats stats = new LoadStats();
-
+            // make sure that the buffer is empty.
+            buffer.clear();
+            
             log.info("loading: " + resource);
 
-            PresortRioLoader loader = new PresortRioLoader(buffer);
-
-            if (!autoFlush) {
-
-                /*
-                 * disable auto-flush - caller will handle flush of the buffer.
-                 */
-                
-                loader.setFlush(false);
-                
-            }
-
-            /*
-             * Note: The data logged by this listener reflects the throughput of
-             * the parser only (vs the throughput to the database, which is
-             * always much lower).
-             */
-
-            if (false) {
-
-                loader.addRioLoaderListener(new RioLoaderListener() {
-
-                    public void processingNotification(RioLoaderEvent e) {
-
-                        log.info("parser: file=" + file + ", "
-                                + e.getStatementsProcessed()
-                                + " stmts parsed in "
-                                + (e.getTimeElapsed() / 1000d)
-                                + " secs, rate= " + e.getInsertRate());
-
-                    }
-
-                });
-                
-            }
+            final PresortRioLoader loader = new PresortRioLoader(buffer);
 
             // open reader on the file.
             final InputStream rdfStream = new FileInputStream(resource);
 
-            /*
-             * Obtain a buffered reader on the input stream.
-             * 
-             * @todo reuse the backing buffer to minimize heap churn.
-             */ 
-            final Reader reader = new BufferedReader(new InputStreamReader(rdfStream)
-            //                       , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
-            );
+            // Obtain a buffered reader on the input stream.
+            final Reader reader = new BufferedReader(new InputStreamReader(
+                    rdfStream));
 
             try {
 
+                final LoadStats stats = new LoadStats();
+
                 // run the parser.
+                // @todo reuse the same underlying parser instance?
                 loader.loadRdf(reader, baseURL, rdfFormat, verifyData);
 
                 long nstmts = loader.getStatementsAdded();
@@ -1036,33 +1335,14 @@ public class ConcurrentDataLoader {
 
             } catch (Exception ex) {
 
-                log.error("file="+file+" : "+ex, ex);
-                
                 /*
-                 * Note: discard anything in the buffer when auto-flush is
-                 * enabled. This prevents the buffer from retaining data after a
-                 * failed load operation.
-                 * 
-                 * @todo The caller must still handle the thrown exception by
-                 * discarding the writes already on the backing store. Since
-                 * this is a bulk load utility, that generally means dropping
-                 * the database.
-                 * 
-                 * @todo We can't just clear the buffer if we have turned off
-                 * auto-flush since that will discard buffer statements from the
-                 * previous file processed by this thread. Proper error handling
-                 * probably requires either discarding the entire bulk load,
-                 * re-trying the failed file(s), or accepting that the data load
-                 * may be incomplete (could work for some scenarios).
+                 * Note: discard anything in the buffer. This prevents the
+                 * buffer from retaining data after a failed load operation.
                  */
-
-                if (autoFlush) {
-
-                    buffer.clear();
-
-                }
-
-                throw new RuntimeException("While loading: " + resource, ex);
+                buffer.clear();
+                
+                // rethrow the exception.
+                throw ex;
 
             } finally {
 
@@ -1075,5 +1355,580 @@ public class ConcurrentDataLoader {
         }
 
     };
+
+    /**
+     * Statements inserted into the buffer are verified against the database. No
+     * new {@link Value}s or {@link Statement}s will be written on the
+     * database by this class. The #of {@link URI}, {@link Literal}, and told
+     * triples not found in the database are reported by various counters.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * FIXME The counters are being updated on each incremental write rather
+     * than tracked on a per-task basis and then updated iff the task as a whole
+     * succeeds. This causes double-counting of both found and not found totals
+     * when a task errors and then retries. The counters need to be attached to
+     * the task and the task logic extended to capture them rather than to the
+     * statement buffer (a bit of a mess).
+     */
+    public static class VerifyStatementBuffer extends StatementBuffer {
+
+        final protected static Logger log = Logger.getLogger(VerifyStatementBuffer.class);
+        
+        /**
+         * True iff the {@link #log} level is WARN or less.
+         */
+        final protected  static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+                .toInt();
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected  static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+                .toInt();
+
+        final AtomicLong nterms, ntermsNotFound, ntriples, ntriplesNotFound;
+        
+        /**
+         * @param database
+         * @param capacity
+         */
+        public VerifyStatementBuffer(AbstractTripleStore database,
+                int capacity, AtomicLong nterms, AtomicLong ntermsNotFound,
+                AtomicLong ntriples, AtomicLong ntriplesNotFound) {
+            
+            super(database, capacity);
+
+            this.nterms = nterms;
+            
+            this.ntermsNotFound = ntermsNotFound;
+            
+            this.ntriples = ntriples;
+            
+            this.ntriplesNotFound = ntriplesNotFound;
+            
+        }
+        
+        /**
+         * Overriden to batch verify the terms and statements in the buffer.
+         * 
+         * FIXME Verify that {@link StatementBuffer#flush()} is doing the right
+         * thing for this case (esp, how it handles bnodes when appearing as
+         * {s,p,o} or when appearing as the statement identifier).
+         */
+        protected void incrementalWrite() {
+
+            if (INFO) {
+                log.info("numValues=" + numValues + ", numStmts=" + numStmts);
+            }
+
+            // Verify terms (batch operation).
+            if (numValues > 0) {
+
+                database.addTerms(values, numValues, true/* readOnly */);
+
+            }
+
+            for( int i=0; i<numValues; i++ ) {
+                
+                final _Value v = values[i];
+
+                nterms.incrementAndGet();
+
+                if (v.termId == IRawTripleStore.NULL) {
+                    
+                    if(WARN) log.warn("Unknown term: "+v);
+
+                    ntermsNotFound.incrementAndGet();
+
+                }
+                
+            }
+            
+            // Verify statements (batch operation).
+            if (numStmts > 0) {
+
+                final SPO[] a = new SPO[numStmts];
+                final _Statement[] b = new _Statement[numStmts];
+                
+                // #of SPOs generated for testing.
+                int n = 0;
+                
+                for(int i=0; i<numStmts; i++) {
+                  
+                    final _Statement s = stmts[i];
+
+                    ntriples.incrementAndGet();
+
+                    if (s.s.termId == IRawTripleStore.NULL
+                            || s.p.termId == IRawTripleStore.NULL
+                            || s.o.termId == IRawTripleStore.NULL) {
+                        
+                        if(WARN) log.warn("Unknown statement (one or more unknown terms) "+s);
+                        
+                        ntriplesNotFound.incrementAndGet();
+                        
+                        continue;
+                        
+                    }
+                    
+                    a[n] = new SPO(s.s.termId,s.p.termId,s.o.termId);
+                    
+                    b[n] = s;
+                    
+                    n++;
+                    
+                }
+                
+                ISPOIterator itr = database.bulkCompleteStatements(a, n);
+                
+                while(itr.hasNext()) {
+                    
+                    itr.next();
+                    
+                }
+
+                for (int i = 0; i < n; i++) {
+
+                    final SPO spo = a[i];
+
+                    if (!spo.hasStatementType()) {
+
+                        ntriplesNotFound.incrementAndGet();
+
+                        if(WARN)
+                        log.warn("Statement not in database: " + b[i]+" ("+spo+")");
+
+                        continue;
+
+                    }
+
+                    if (spo.getType() != StatementEnum.Explicit) {
+                        
+                        ntriplesNotFound.incrementAndGet();
+
+                        if(WARN)
+                        log.warn("Statement not explicit database: "+b[i]+" is marked as "+spo.getType());
+                        
+                        continue;
+                        
+                    }
+                    
+                }
+                
+            }
+            
+            // Reset the state of the buffer (but not the bnodes nor deferred stmts).
+            _clear();
+
+        }
+        
+    }
+
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class LoadStatementBufferFactory implements IStatementBufferFactory {
+
+        private final AbstractTripleStore db;
+
+        private final int bufferCapacity;
+
+        public LoadStatementBufferFactory(AbstractTripleStore db,
+                int bufferCapacity) {
+
+            this.db = db;
+           
+            this.bufferCapacity = bufferCapacity;
+            
+        }
+        
+        /**
+         * Return the {@link ThreadLocal} {@link StatementBuffer} to be used for a
+         * task.
+         */
+        public StatementBuffer getStatementBuffer() {
+
+            /*
+             * Note: this is a thread-local so the same buffer object is always
+             * reused by the same thread.
+             */
+
+            return threadLocal.get();
+            
+        }
+        
+        private ThreadLocal<StatementBuffer> threadLocal = new ThreadLocal<StatementBuffer>() {
+
+            protected synchronized StatementBuffer initialValue() {
+                
+                return new StatementBuffer(db, bufferCapacity);
+                
+            }
+
+        };
+        
+    }
+
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class VerifyStatementBufferFactory implements IStatementBufferFactory {
+
+        private final AbstractTripleStore db;
+
+        private final int bufferCapacity;
+
+        public final AtomicLong nterms = new AtomicLong(),
+                ntermsNotFound = new AtomicLong(), ntriples = new AtomicLong(),
+                ntriplesNotFound = new AtomicLong();
+
+        public VerifyStatementBufferFactory(AbstractTripleStore db,
+                int bufferCapacity) {
+
+            this.db = db;
+           
+            this.bufferCapacity = bufferCapacity;
+            
+        }
+        
+        /**
+         * Return the {@link ThreadLocal} {@link StatementBuffer} to be used for a
+         * task.
+         */
+        public StatementBuffer getStatementBuffer() {
+
+            /*
+             * Note: this is a thread-local so the same buffer object is always
+             * reused by the same thread.
+             */
+
+            return threadLocal.get();
+            
+        }
+        
+        private ThreadLocal<StatementBuffer> threadLocal = new ThreadLocal<StatementBuffer>() {
+
+            protected synchronized StatementBuffer initialValue() {
+
+                return new VerifyStatementBuffer(db, bufferCapacity, nterms,
+                        ntermsNotFound, ntriples, ntriplesNotFound);
+                
+            }
+
+        };
+        
+    }
+
+    /**
+     * Factory for tasks for loading RDF resources into a database or validating
+     * RDF resources against a database.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo report the #of resources processed in each case.
+     */
+    public static class AbstractRDFTaskFactory implements ITaskFactory {
+
+        protected static final Logger log = Logger
+                .getLogger(RDFLoadTaskFactory.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+                .toInt();
+
+        /**
+         * The database on which the data will be written.
+         */
+        final AbstractTripleStore db;
+
+        /**
+         * The time when the ctor is executed - this is used to compute told
+         * triples per second.
+         */
+        final long begin = System.currentTimeMillis();
+
+//      /**
+//      * The baseURL and "" if none is needed.
+//      */
+//     final String baseURL;
+     
+        /**
+         * An attempt will be made to determine the interchange syntax using
+         * {@link RDFFormat}. If no determination can be made then the loader
+         * will presume that the files are in the format specified by this
+         * parameter (if any). Files whose format can not be determined will be
+         * logged as errors.
+         */
+        final RDFFormat fallback;
+
+        /**
+         * Validation of RDF by the RIO parser is disabled.
+         */
+        final boolean verifyData;
+
+        final IStatementBufferFactory bufferFactory;
+
+        /**
+         * #of told triples loaded into the database by successfully completed {@link ReaderTask}s.
+         */
+        final AtomicLong toldTriples = new AtomicLong(0);
+
+        /**
+         * Guess at the {@link RDFFormat}.
+         * 
+         * @param filename
+         *            Some filename.
+         * 
+         * @return The {@link RDFFormat} -or- <code>null</code> iff
+         *         {@link #fallback} is <code>null</code> and the no format
+         *         was recognized for the <i>filename</i>
+         */
+        public RDFFormat getRDFFormat(String filename) {
+
+            final RDFFormat rdfFormat = //
+            fallback == null //
+            ? RDFFormat.forFileName(filename) //
+                    : RDFFormat.forFileName(filename, fallback)//
+            ;
+
+            return rdfFormat;
+
+        }
+
+        protected AbstractRDFTaskFactory(AbstractTripleStore db,
+                boolean verifyData, RDFFormat fallback,
+                IStatementBufferFactory bufferFactory) {
+
+            this.db = db;
+            
+            this.verifyData = verifyData;
+
+            this.fallback = fallback;
+            
+            this.bufferFactory = bufferFactory;
+            
+        }
+
+        public Runnable newTask(String resource) throws Exception {
+            
+            log.info("resource="+resource);
+            
+            final RDFFormat rdfFormat = getRDFFormat( resource );
+            
+            if (rdfFormat == null) {
+
+                throw new RuntimeException(
+                        "Could not determine interchange syntax - skipping : file="
+                                + resource);
+
+            }
+
+            /*
+             * FIXME resolve what the baseURL SHOULD be and generalize for
+             * alternative source (bigdata repo, file system, map/reduce master,
+             * etc.)
+             * 
+             * Note: conversion is to a URL.
+             */
+            final String baseURL;
+
+            try {
+
+                baseURL = new File(resource).toURL().toString();
+
+            } catch (MalformedURLException e) {
+
+                throw new RuntimeException("resource=" + resource);
+
+            }
+            
+            return new ReaderTask(resource, baseURL, rdfFormat,
+                    verifyData, bufferFactory, toldTriples );
+            
+        }
+        
+    }
+
+    /**
+     * Factory for tasks for verifying a database against RDF resources.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class RDFVerifyTaskFactory extends AbstractRDFTaskFactory {
+
+        public RDFVerifyTaskFactory(AbstractTripleStore db, int bufferCapacity,
+                boolean verifyData, RDFFormat fallback) {
+
+            super(db, verifyData, fallback, new VerifyStatementBufferFactory(
+                    db, bufferCapacity));
+
+        }
+
+        public long getTermCount() {
+            
+            return ((VerifyStatementBufferFactory)bufferFactory).nterms.get();
+            
+        }
+        
+        public long getTermNotFoundCount() {
+            
+            return ((VerifyStatementBufferFactory)bufferFactory).ntermsNotFound.get();
+            
+        }
+        
+        public long getTripleCount() {
+            
+            return ((VerifyStatementBufferFactory)bufferFactory).ntriples.get();
+            
+        }
+        
+        public long getTripleNotFoundCount() {
+            
+            return ((VerifyStatementBufferFactory)bufferFactory).ntriplesNotFound.get();
+            
+        }
+        
+        /**
+         * Report on #terms and #stmts not found as well as #triples processed
+         * and found.
+         */
+        public String reportTotals() {
+
+            // total run time.
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            final long tripleCount = getTripleCount();
+
+            final double tps = (long) (((double) tripleCount) / ((double) elapsed) * 1000d);
+
+            return "Processed: #terms=" + getTermCount() + " ("
+                    + getTermNotFoundCount() + " not found), #stmts="
+                    + tripleCount + " (" + getTripleNotFoundCount()
+                    + " not found)" + ", rate=" + tps + " in " + elapsed
+                    + " ms.";
+                
+        }
+        
+    }
+    
+    /**
+     * Factory for tasks for loading RDF resources into a database.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class RDFLoadTaskFactory extends AbstractRDFTaskFactory {
+
+        public RDFLoadTaskFactory(AbstractTripleStore db, int bufferCapacity,
+                boolean verifyData, RDFFormat fallback) {
+
+            super(db, verifyData, fallback, new LoadStatementBufferFactory(db,
+                    bufferCapacity));
+
+        }
+
+        /**
+         * Sets up some additional counters for reporting by the client to the
+         * {@link ILoadBalancerService}.
+         * 
+         * @todo in the base class also?
+         * 
+         * @param tmp
+         */
+        public void setupCounters(CounterSet tmp) {
+            
+            tmp.addCounter("toldTriples", new Instrument<Long>() {
+
+                @Override
+                protected void sample() {
+
+                    setValue(toldTriples.get());
+
+                }
+            });
+
+            tmp.addCounter("elapsed", new Instrument<Long>() {
+
+                @Override
+                protected void sample() {
+
+                    final long elapsed = System.currentTimeMillis() - begin;
+
+                    setValue(elapsed);
+
+                }
+            });
+
+            /*
+             * Note: This is the told triples per second rate for _this_ client
+             * only. When you are loading using multiple instances of the concurrent
+             * data loader, then the total told triples per second rate is the
+             * aggregation across all of those instances.
+             */
+            tmp.addCounter("toldTriplesPerSec", new Instrument<Long>() {
+
+                @Override
+                protected void sample() {
+
+                    final long elapsed = System.currentTimeMillis() - begin;
+
+                    final double tps = (long) (((double) toldTriples.get())
+                            / ((double) elapsed) * 1000d);
+
+                    setValue((long) tps);
+
+                }
+            });
+
+        }
+        
+        /**
+         * Report totals.
+         * <p>
+         * Note: these totals reflect the actual state of the database, not just
+         * the #of triples written by this client. Therefore if there are
+         * concurent writes then the apparent TPS here will be higher than was
+         * reported by the counters for just this client -- all writes on the
+         * database will have been attributed to just this client.
+         */
+        public String reportTotals() {
+
+            // total run time.
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            final long nterms = db.getTermCount();
+
+            final long nstmts = db.getStatementCount();
+
+            final double tps = (long) (((double) nstmts) / ((double) elapsed) * 1000d);
+
+            return "Database: #terms=" + nterms + ", #stmts=" + nstmts
+                    + ", rate=" + tps + " in " + elapsed + " ms.";
+                
+        }
+        
+    }
     
 }

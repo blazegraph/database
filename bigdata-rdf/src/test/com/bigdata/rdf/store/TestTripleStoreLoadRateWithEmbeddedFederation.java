@@ -39,7 +39,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.resources.StoreManager;
-import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 
 /**
@@ -123,47 +122,113 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         
     }
 
-    public void test_U1() {
-        
-        new ConcurrentDataLoader(store, 3/*nthreads*/, 10000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U1"), new FilenameFilter(){
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+    final int nthreads = 10;
+    
+    final int bufferCapacity = 100000;
+    
+    final boolean validate = true;
+    
+    final FilenameFilter filter = new FilenameFilter() {
+
+        public boolean accept(File dir, String name) {
+            if (name.endsWith(".owl"))
+                return true;
+            return false;
+        }
+
+    };
+
+    public void test_U1() throws InterruptedException {
+        
+        final File file = new File("../rdf-data/lehigh/U1");
+//      final File file = new File("../rdf-data/lehigh/U1/University0_0.owl");
+      
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
     
-    /**
-     * @todo setup an experiment driver to explore the parameter space for
-     *       nthreads, buffer size, LUBM size, federation parameters, etc?
-     */
-    public void test_U10() {
-        
-        new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+    public void test_U10() throws InterruptedException {
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+        final File file = new File("../rdf-data/lehigh/U10");
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+        
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
 
-    public void test_U20() {
-        
-        new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U20"), new FilenameFilter(){
+    public void test_U50() throws InterruptedException {
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+        final File file = new File("../rdf-data/lehigh/U50");
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
+    
+//    public void test_U1() {
+//        
+//        new ConcurrentDataLoader(store, 3/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U1"), new FilenameFilter(){
+//
+//            public boolean accept(File dir, String name) {
+//                if(name.endsWith(".owl")) return true;
+//                return false;
+//            }
+//            
+//        });
+//        
+//    }
+//    
+//    /**
+//     * @todo setup an experiment driver to explore the parameter space for
+//     *       nthreads, buffer size, LUBM size, federation parameters, etc?
+//     */
+//    public void test_U10() {
+//        
+//        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+//
+//            public boolean accept(File dir, String name) {
+//                if(name.endsWith(".owl")) return true;
+//                return false;
+//            }
+//            
+//        });
+//        
+//    }
+//
+//    public void test_U20() {
+//        
+//        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U20"), new FilenameFilter(){
+//
+//            public boolean accept(File dir, String name) {
+//                if(name.endsWith(".owl")) return true;
+//                return false;
+//            }
+//            
+//        });
+//        
+//    }
     
 }

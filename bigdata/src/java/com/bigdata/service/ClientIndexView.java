@@ -36,9 +36,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
@@ -172,11 +172,18 @@ public class ClientIndexView implements IClientIndex {
     /**
      * The thread pool exposed by {@link IBigdataFederation#getThreadPool()}
      */
-    protected ExecutorService getThreadPool() {
+    protected ThreadPoolExecutor getThreadPool() {
 
-        return fed.getThreadPool();
+        return (ThreadPoolExecutor)fed.getThreadPool();
 
     }
+
+    /**
+     * The timeout in milliseconds for tasks run on an {@link IDataService}.
+     * 
+     * @see Options#CLIENT_TASK_TIMEOUT
+     */
+    private final long taskTimeout;
     
     /**
      * 
@@ -322,6 +329,8 @@ public class ClientIndexView implements IClientIndex {
         this.capacity = fed.getClient().getDefaultRangeQueryCapacity();
         
         this.batchOnly = fed.getClient().getBatchApiOnly();
+
+        this.taskTimeout = fed.getClient().getTaskTimeout();
         
     }
 
@@ -635,7 +644,7 @@ public class ClientIndexView implements IClientIndex {
                     key, new Split(locator, 0, 0), proc, resultHandler);
 
             // submit procedure and await completion.
-            getThreadPool().submit(task).get();
+            getThreadPool().submit(task).get(taskTimeout, TimeUnit.MILLISECONDS);
 
             // the singleton result.
             Object result = resultHandler.getResult();
@@ -707,6 +716,7 @@ public class ClientIndexView implements IClientIndex {
 //            : 0 // historical read or fully isolated (default capacity)
 //            ;
         
+        if(INFO)
         log.info("Querying metadata index: name=" + name + ", fromKey="
                 + BytesUtil.toString(fromKey) + ", toKey="
                 + BytesUtil.toString(toKey) + ", capacity=" + capacity);
@@ -761,6 +771,7 @@ public class ClientIndexView implements IClientIndex {
         // true iff the procedure is known to be parallelizable.
         final boolean parallel = proc instanceof IParallelizableIndexProcedure;
         
+        if(INFO)
         log.info("Procedure " + proc.getClass().getName()
                 + " will be mapped across index partitions in "
                 + (parallel ? "parallel" : "sequence"));
@@ -822,6 +833,7 @@ public class ClientIndexView implements IClientIndex {
         
         }
 
+        if(INFO)
         log.info("Procedure " + proc.getClass().getName() + " mapped across "
                 + nparts + " index partitions in "
                 + (parallel ? "parallel" : "sequence"));
@@ -899,9 +911,10 @@ public class ClientIndexView implements IClientIndex {
             
         }
 
-        log.info("Procedures created by " + ctor.getClass().getName()
-                + " will run on " + nsplits + " index partitions in "
-                + (parallel ? "parallel" : "sequence"));
+        if (INFO)
+            log.info("Procedures created by " + ctor.getClass().getName()
+                    + " will run on " + nsplits + " index partitions in "
+                    + (parallel ? "parallel" : "sequence"));
         
         runTasks(parallel, tasks);
         
@@ -977,9 +990,11 @@ public class ClientIndexView implements IClientIndex {
 
         final long begin = System.currentTimeMillis();
         
-        log.info("Running "+tasks.size()+" tasks in parallel: "+tasks.get(0).toString());
-        
-        final ExecutorService service = getThreadPool();
+        if(INFO)
+        log.info("Running " + tasks.size() + " tasks in parallel (#active="
+                + getThreadPool().getActiveCount() + ", queueSize="
+                + getThreadPool().getQueue().size() + ") : "
+                + tasks.get(0).toString());
         
         int nfailed = 0;
         
@@ -987,7 +1002,8 @@ public class ClientIndexView implements IClientIndex {
         
         try {
 
-            final List<Future<Void>> futures = service.invokeAll(tasks);
+            final List<Future<Void>> futures = getThreadPool().invokeAll(tasks,
+                    taskTimeout, TimeUnit.MILLISECONDS);
             
             final Iterator<Future<Void>> itr = futures.iterator();
            
@@ -1006,7 +1022,7 @@ public class ClientIndexView implements IClientIndex {
                     AbstractDataServiceProcedureTask task = (AbstractDataServiceProcedureTask) tasks
                             .get(i);
                     
-                    log.error("Execution failed: task=" + task, e);
+                    if(INFO) log.info("Execution failed: task=" + task, e);
                     
                     causes.addAll(task.causes);
                     
@@ -1029,6 +1045,7 @@ public class ClientIndexView implements IClientIndex {
             
         }
 
+        if(INFO)
         log.info("Ran " + tasks.size() + " tasks in parallel: elapsed="
                 + (System.currentTimeMillis() - begin));
 
@@ -1045,10 +1062,12 @@ public class ClientIndexView implements IClientIndex {
      */
     protected void runSequence(ArrayList<Callable<Void>> tasks) {
 
-        log.info("Running "+tasks.size()+" tasks in sequence");
+        if (INFO)
+            log.info("Running " + tasks.size() + " tasks in sequence (#active="
+                    + getThreadPool().getActiveCount() + ", queueSize="
+                    + getThreadPool().getQueue().size() + ") : "
+                    + tasks.get(0).toString());
 
-        final ExecutorService service = getThreadPool();
-        
         final Iterator<Callable<Void>> itr = tasks.iterator();
 
         while (itr.hasNext()) {
@@ -1058,14 +1077,14 @@ public class ClientIndexView implements IClientIndex {
 
             try {
 
-                final Future<Void> f = service.submit(task);
+                final Future<Void> f = getThreadPool().submit(task);
                 
                 // await completion of the task.
-                f.get();
+                f.get(taskTimeout, TimeUnit.MILLISECONDS);
 
             } catch (Exception e) {
         
-                log.error("Execution failed: task=" + task, e);
+                if(INFO) log.info("Execution failed: task=" + task, e);
 
                 throw new ClientException("Execution failed: " + task, e, task.causes);
 
@@ -1085,7 +1104,10 @@ public class ClientIndexView implements IClientIndex {
         
         log.warn("Running " + tasks.size()
                 + " tasks in caller's thread: recursionDepth="
-                + getRecursionDepth().get());
+                + getRecursionDepth().get() + "(#active="
+                + getThreadPool().getActiveCount() + ", queueSize="
+                + getThreadPool().getQueue().size() + ") : "
+                + tasks.get(0).toString());
 
         final Iterator<Callable<Void>> itr = tasks.iterator();
 
@@ -1099,7 +1121,9 @@ public class ClientIndexView implements IClientIndex {
                 task.call();
                 
             } catch (Exception e) {
-                
+
+                if(INFO) log.info("Execution failed: task=" + task, e);
+
                 throw new ClientException("Execution failed: " + task, e, task.causes);
                 
             }

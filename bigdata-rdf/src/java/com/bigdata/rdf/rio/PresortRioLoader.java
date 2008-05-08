@@ -76,10 +76,11 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      * 
      * @return The current value.
      * 
-     * FIXME The use of this flag can introduce unexpected dependencies between
-     * source documents since they will use the same canonicalizing mapping for
-     * blank nodes and, when statement identifiers are used, statements using
-     * blank nodes will be deferred beyond the end of the source document.
+     * @deprecated The use of this flag can introduce unexpected dependencies
+     *             between source documents since they will use the same
+     *             canonicalizing mapping for blank nodes and, when statement
+     *             identifiers are used, statements using blank nodes will be
+     *             deferred beyond the end of the source document.
      */
     public boolean getFlush() {
         

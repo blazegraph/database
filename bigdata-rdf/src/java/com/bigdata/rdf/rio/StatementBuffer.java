@@ -89,18 +89,18 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  */
 public class StatementBuffer implements IStatementBuffer {
 
-    protected static final Logger log = Logger.getLogger(StatementBuffer.class);
+    final protected static Logger log = Logger.getLogger(StatementBuffer.class);
    
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
     
     /**
@@ -191,7 +191,7 @@ public class StatementBuffer implements IStatementBuffer {
      * {@link #statementStore} is <code>null</code>, statements will be
      * written into this store as well.
      */
-    private final AbstractTripleStore database;
+    protected final AbstractTripleStore database;
     
     /**
      * The database that will be used to resolve terms.  When {@link #getStatementStore()}

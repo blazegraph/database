@@ -121,46 +121,68 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         
     }
 
-    public void test_U1() {
-        
-        new ConcurrentDataLoader(store, 10/*nthreads*/, 10000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U1"), new FilenameFilter(){
+    final int nthreads = 10;
+    
+    final int bufferCapacity = 100000;
+    
+    final boolean validate = true;
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+    final FilenameFilter filter = new FilenameFilter() {
+
+        public boolean accept(File dir, String name) {
+            if (name.endsWith(".owl"))
+                return true;
+            return false;
+        }
+
+    };
+
+    public void test_U1() throws InterruptedException {
+        
+        final File file = new File("../rdf-data/lehigh/U1");
+//      final File file = new File("../rdf-data/lehigh/U1/University0_0.owl");
+      
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+        
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
     
-    /**
-     * @todo setup an experiment driver to explore the parameter space for
-     *       nthreads, buffer size, LUBM size, federation parameters, etc?
-     */
-    public void test_U10() {
-        
-        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+    public void test_U10() throws InterruptedException {
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+        final File file = new File("../rdf-data/lehigh/U10");
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+        
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
 
-    public void test_U50() {
-        
-        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U50"), new FilenameFilter(){
+    public void test_U50() throws InterruptedException {
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+        final File file = new File("../rdf-data/lehigh/U50");
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+        
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
 
@@ -201,29 +223,38 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
      */
     public static void main(String[] args) throws Exception {
 
-        final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
-        
-        final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
-        
-        final String file = System.getProperty("documents.directory");
-  
-        if(file==null) throw new RuntimeException("Required property 'documents.directory' was not specified");
-        
-        TestTripleStoreLoadRateWithLocalDataServiceFederation test = new TestTripleStoreLoadRateWithLocalDataServiceFederation("test");
-        
-        test.setUp();
-        
-        new ConcurrentDataLoader(test.store, nthreads, bufferCapacity,
-                new File(file), new FilenameFilter() {
+        final int nthreads = Integer.parseInt(System.getProperty("nthreads",
+                "20"));
 
-            public boolean accept(File dir, String name) {
-//                if(name.endsWith(".owl")) return true;
-                return true;
-//                return false;
-            }
-            
-        });
-        
+        final int bufferCapacity = Integer.parseInt(System.getProperty(
+                "bufferCapacity", "100000"));
+
+        final boolean validate = Boolean.parseBoolean(System.getProperty("validate",
+                "false"));
+
+        final String fileStr = System.getProperty("documents.directory");
+
+        if (fileStr == null)
+            throw new RuntimeException(
+                    "Required property 'documents.directory' was not specified");
+
+        final File file = new File(fileStr);
+
+        TestTripleStoreLoadRateWithLocalDataServiceFederation test = new TestTripleStoreLoadRateWithLocalDataServiceFederation(
+                "test");
+
+        test.setUp();
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
+                test.client, nthreads, bufferCapacity, file, test.filter);
+
+        helper.load(test.store);
+
+        if(validate)
+        helper.validate(test.store);
+
+        helper.shutdownNow();
+
         test.tearDown();
         
         System.out.println("Exiting normally.");

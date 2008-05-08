@@ -160,6 +160,14 @@ public interface IBigdataClient {
     public int getMaxParallelTasksPerRequest();
 
     /**
+     * The timeout in milliseconds for a task submitted to an
+     * {@link IDataService}.
+     * 
+     * @see Options#CLIENT_TASK_TIMEOUT
+     */
+    public long getTaskTimeout();
+    
+    /**
      * The capacity of the client's {@link IIndex} proxy cache.
      * 
      * @see Options#CLIENT_INDEX_CACHE_CAPACITY
@@ -225,6 +233,19 @@ public interface IBigdataClient {
 
         String DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "100";
 
+        /**
+         * The timeout in millseconds for a task submitting to an
+         * {@link IDataService} (default {@value #DEFAULT_CLIENT_TASK_TIMEOUT}).
+         */
+        String CLIENT_TASK_TIMEOUT = "client.taskTimeout";
+        
+        /**
+         * The default timeout in milliseconds.
+         * 
+         * @see #CLIENT_TASK_TIMEOUT
+         */
+        String DEFAULT_CLIENT_TASK_TIMEOUT = ""+20*1000L;
+        
         /**
          * The default capacity used when a client issues a range query request
          * (50000).

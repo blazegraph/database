@@ -57,6 +57,8 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.QueueStatisticsTask;
@@ -68,6 +70,7 @@ import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Abstract base class for common functionality for {@link IBigdataFederation}s.
@@ -107,17 +110,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
         log.info("begin");
 
-        // terminate sampling and reporting tasks.
-        sampleService.shutdown();
-
-        if (statisticsCollector != null) {
-
-            statisticsCollector.stop();
-
-            statisticsCollector = null;
-
-        }
-
         // allow client requests to finish normally.
         threadPool.shutdown();
 
@@ -133,6 +125,24 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             log.warn("Interrupted awaiting thread pool termination.", e);
 
+        }
+        
+        if (statisticsCollector != null) {
+
+            statisticsCollector.stop();
+
+            statisticsCollector = null;
+
+        }
+
+        // terminate sampling and reporting tasks.
+        sampleService.shutdown();
+
+        // optional httpd service for the local counters. 
+        if( httpd != null) {
+            
+            httpd.shutdown();
+            
         }
         
         // @todo run a final ReportTask?
@@ -181,6 +191,13 @@ abstract public class AbstractFederation implements IBigdataFederation {
         // terminate sampling and reporting tasks immediately.
         sampleService.shutdownNow();
 
+        // terminate the optional httpd service for the client's live counters.
+        if( httpd != null) {
+            
+            httpd.shutdownNow();
+            
+        }
+        
         log.info("done: elapsed="+(System.currentTimeMillis()-begin));
         
         client = null;
@@ -213,6 +230,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
     private final ScheduledExecutorService sampleService = Executors
             .newSingleThreadScheduledExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
+    
+    /**
+     * httpd reporting the live counters for the client while it is connected to
+     * the federation.
+     */
+    private AbstractHTTPD httpd;
     
     /**
      * Collects interesting statistics about the {@link #getThreadPool()}
@@ -276,8 +299,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             }
 
-            final CounterSet clientRoot = countersRoot
-                    .makePath(getClientCounterPathPrefix());
+            clientRoot = countersRoot.makePath(getClientCounterPathPrefix());
 
             /*
              * Basic counters.
@@ -294,6 +316,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
     }
     private CounterSet countersRoot;
+    private CounterSet clientRoot;
     
     public String getClientCounterPathPrefix() {
 
@@ -389,7 +412,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
          */
         {
 
-            {
             final long initialDelay = 0; // initial delay in ms.
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
@@ -399,10 +421,55 @@ abstract public class AbstractFederation implements IBigdataFederation {
             
             addScheduledStatisticsTask(queueStatisticsTask, initialDelay,
                     delay, unit);
-            }
 
-            addScheduledStatisticsTask(new ReportTask(), 60/* initialDelay */,
+            /*
+             * Note: the short initial delay means that we will run the
+             * ReportTask immediately after which has the effect of notify()ing
+             * the load balancer service that this client is now running.
+             * 
+             * Note: the initialDelay is not zero because we may have to
+             * discover the load balancer service and that is done within a
+             * subclass and is an asynchronous process in anycase.
+             */
+            addScheduledStatisticsTask(new ReportTask(), 3/* initialDelay */,
                     60/* delay */, TimeUnit.SECONDS);
+            
+        }
+
+        /*
+         * HTTPD service reporting out statistics on a randomly assigned
+         * port. The port is reported to the load balancer and also written
+         * into the file system. The httpd service will be shutdown with the
+         * connection to the federation.
+         * 
+         * @todo write port into the [serviceDir], but serviceDir needs to
+         * be declared!
+         * 
+         * @todo option to disable this service (and also for the data service).
+         */
+        {
+            
+            try {
+
+                final CounterSet counterSet = (CounterSet) getCounterSet();
+                
+                httpd = new CounterSetHTTPD(
+                        0/* random port */, counterSet );
+                
+                // the URL that may be used to access the local httpd.
+                final String url = "http://"
+                        + AbstractStatisticsCollector.fullyQualifiedHostName
+                        + ":" + httpd.getPort();
+                
+                // add counter reporting that url to the load balancer.
+                clientRoot.addCounter("Local httpd",
+                        new OneShotInstrument<String>(url));
+                
+            } catch (IOException e) {
+                
+                log.error("Could not start httpd", e);
+                
+            }
             
         }
 

@@ -918,6 +918,21 @@ Short term tasks:
 
    - ScaleOutTripleStore
 
+     - ConcurrentDataLoader
+
+       - ? stagger the entrance of the first few tasks to help stagger
+         the nature of the their work.
+
+       - retry long running tasks (map/reduce style).  In fact, this
+         already happens because the ClientIndexView times out the
+         request to the data service which results in a
+         CancelledException and the task is marked as an error and
+         then retried.
+
+       - More cleanup.
+
+       - Reconcile with m/r architecture and bigdata repo.
+
      - (*****) Optimized JOIN for the scale-out triple store.  It
        needs to block up a set of right hand tuples that will be
        joined against data on a given data service and then send those
@@ -1432,7 +1447,8 @@ JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
     - Done. ClientIndexView : retry count exceeded - need to report
       the underlying cause(s)
 
-    - **** Fence post for DefaultSplitHandler (#ntuples == 0)
+    - Done. (Added more detailed warnings and made robust to such
+      failures) Fence post for DefaultSplitHandler (#ntuples == 0)
 
     - Done (DataService needed to notify() the LBS during startup).
       Jini client is not reporting counters on either machine.  The
@@ -1475,9 +1491,6 @@ JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
 Note: Must edit the DataServer[01].properties files to change overflow
 behavior, etc.
 
-
-
-
 ============================================================
 
 **** The group commit behavior when interrupted during shutdown needs
@@ -1496,3 +1509,27 @@ java.lang.InterruptedException
 
 
 ============================================================
+
+This indicates passing an old locator that could not be found in the
+MDI.  I've modified the code to report back the old locator in the
+exception.
+
+Caused by: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
+	at com.bigdata.service.MetadataService.splitIndexPartition(MetadataService.java:280)
+	at com.bigdata.resources.SplitIndexPartitionTask$AtomicUpdateSplitIndexPartitionTask.doTask(SplitIndexPartitionTask.java:805)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1829)
+	at com.bigdata.concurrent.LockManagerTask.call(LockManagerTask.java:325)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:1605)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1546)
+	... 6 more
+Caused by: java.lang.NullPointerException
+	at com.bigdata.mdi.PartitionLocator.equals(PartitionLocator.java:231)
+	at com.bigdata.service.MetadataService$SplitIndexPartitionTask.doTask(MetadataService.java:502)
+	... 10 more
+============================================================
+
+1. Run U10, U100 on host3.
+
+2. Write script and run U10, U100, U1000 on host{1,2,3}.

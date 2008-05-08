@@ -65,6 +65,7 @@ abstract public class AbstractClient implements IBigdataClient {
     private final int threadPoolSize;
     private final int maxStaleLocatorRetries; 
     private final int maxParallelTasksPerRequest;
+    private final long taskTimeout;
     private final int indexCacheCapacity;
     
     /*
@@ -98,6 +99,12 @@ abstract public class AbstractClient implements IBigdataClient {
     public int getMaxParallelTasksPerRequest() {
         
         return maxParallelTasksPerRequest;
+        
+    }
+    
+    public long getTaskTimeout() {
+        
+        return taskTimeout;
         
     }
     
@@ -174,7 +181,18 @@ abstract public class AbstractClient implements IBigdataClient {
             }
             
         }
-        
+
+        // task timeout
+        {
+         
+            taskTimeout = Long.parseLong(properties.getProperty(
+                    Options.CLIENT_TASK_TIMEOUT,
+                    Options.DEFAULT_CLIENT_TASK_TIMEOUT));
+
+            log.info(Options.CLIENT_TASK_TIMEOUT + "=" + taskTimeout);
+
+        }
+
         // defaultRangeQueryCapacity
         {
          

@@ -732,24 +732,9 @@ abstract public class AbstractTripleStore implements ITripleStore,
         metadata.setBranchingFactor(branchingFactor);
 
         /*
-         * The defaults.
-         * 
-         * @todo play around with override of the split handler. one rule of
-         * thumb is to split when the height of the generated segment would be
-         * at least N.
+         * Note: Mainly used for torture testing.
          */
-//        final ISplitHandler splitHandler = new DefaultSplitHandler(
-//                1 * Bytes.megabyte32, // minimumEntryCount
-//                5 * Bytes.megabyte32, // entryCountPerSplit
-//                1.5, // overCapacityMultiplier
-//                .75, // underCapacityMultiplier
-//                20   // sampleRate
-//                );
-        
-//      if (name.contains(name_term2Id)) // causes a problem 
-//      if (name.contains(name_id2Term)) // no problem.
-//        if(!name.contains(name_term2Id)) // no problem.
-            if(true){
+        if(false){
             
             // An override that makes a split very likely.
             final ISplitHandler splitHandler = new DefaultSplitHandler(
@@ -763,14 +748,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
             metadata.setSplitHandler(splitHandler);
             
         }
-        
-//        /*
-//         * paranoia option
-//         * 
-//         * FIXME disable here and make a record level option on the store.
-//         */
-//        metadata.setUseChecksum(true);
-        
+                
         return metadata;
 
     }
@@ -1454,6 +1432,21 @@ abstract public class AbstractTripleStore implements ITripleStore,
      */
     public void addTerms(final _Value[] terms, final int numTerms) {
 
+        addTerms( terms, numTerms, false/*readOnly*/);
+        
+    }
+
+    /**
+     * 
+     * @param terms
+     * @param numTerms
+     * @param readOnly
+     *            When <code>true</code>, unknown terms will not be inserted
+     *            into the database. Otherwise unknown terms are inserted into
+     *            the database.
+     */
+    public void addTerms(final _Value[] terms, final int numTerms, boolean readOnly) {
+
         if (numTerms == 0)
             return;
 
@@ -1532,7 +1525,9 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
                 // run the procedure.
                 termIdIndex.submit(0/* fromIndex */, numTerms/* toIndex */,
-                        keys, null/* vals */, Term2IdWriteProcConstructor.INSTANCE,
+                        keys, null/* vals */,
+                        (readOnly ? Term2IdWriteProcConstructor.READ_ONLY
+                                : Term2IdWriteProcConstructor.READ_WRITE),
                         new IResultHandler<Term2IdWriteProc.Result, Void>() {
 
                             /**
@@ -1564,137 +1559,140 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         }
 
-        {
-
-            /*
-             * Sort terms based on their assigned termId (when interpreted as
-             * unsigned long integers).
-             */
-
-            long _begin = System.currentTimeMillis();
-
-            Arrays.sort(terms, 0, numTerms, TermIdComparator.INSTANCE);
-
-            sortTime += System.currentTimeMillis() - _begin;
-
-        }
-
-        {
-
-            /*
-             * Add terms to the reverse index, which is the index that we use to
-             * lookup the RDF value by its termId to serialize some data as
-             * RDF/XML or the like.
-             * 
-             * Note: Every term asserted against the forward mapping [terms]
-             * MUST be asserted against the reverse mapping [ids] EVERY time.
-             * This is required in order to guarentee that the reverse index
-             * remains complete and consistent. Otherwise a client that writes
-             * on the terms index and fails before writing on the ids index
-             * would cause those terms to remain undefined in the reverse index.
-             */
-
-            final long _begin = System.currentTimeMillis();
-
-            final IIndex idTermIndex = getId2TermIndex();
-
-            /*
-             * Create a key buffer to hold the keys generated from the term
-             * identifers and then generate those keys. The terms are already in
-             * sorted order by their term identifiers from the previous step.
-             * 
-             * Note: We DO NOT write BNodes on the reverse index.
-             */
-            final byte[][] keys = new byte[numTerms][];
-            final byte[][] vals = new byte[numTerms][];
-            int nonBNodeCount = 0; // #of non-bnodes.
+        if(!readOnly) {
+                
             {
-
-                // thread-local key builder removes single-threaded constraint.
-                final IKeyBuilder tmp = getKeyBuilder().keyBuilder; // new
-                                                                    // KeyBuilder(Bytes.SIZEOF_LONG);
-
-                // buffer is reused for each serialized term.
-                final DataOutputBuffer out = new DataOutputBuffer();
-
-                for (int i = 0; i < numTerms; i++) {
-
-                    if (terms[i] instanceof BNode) {
-
-                        terms[i].known = true;
-
-                        continue;
-
+    
+                /*
+                 * Sort terms based on their assigned termId (when interpreted as
+                 * unsigned long integers).
+                 */
+    
+                long _begin = System.currentTimeMillis();
+    
+                Arrays.sort(terms, 0, numTerms, TermIdComparator.INSTANCE);
+    
+                sortTime += System.currentTimeMillis() - _begin;
+    
+            }
+    
+            {
+    
+                /*
+                 * Add terms to the reverse index, which is the index that we use to
+                 * lookup the RDF value by its termId to serialize some data as
+                 * RDF/XML or the like.
+                 * 
+                 * Note: Every term asserted against the forward mapping [terms]
+                 * MUST be asserted against the reverse mapping [ids] EVERY time.
+                 * This is required in order to guarentee that the reverse index
+                 * remains complete and consistent. Otherwise a client that writes
+                 * on the terms index and fails before writing on the ids index
+                 * would cause those terms to remain undefined in the reverse index.
+                 */
+    
+                final long _begin = System.currentTimeMillis();
+    
+                final IIndex idTermIndex = getId2TermIndex();
+    
+                /*
+                 * Create a key buffer to hold the keys generated from the term
+                 * identifers and then generate those keys. The terms are already in
+                 * sorted order by their term identifiers from the previous step.
+                 * 
+                 * Note: We DO NOT write BNodes on the reverse index.
+                 */
+                final byte[][] keys = new byte[numTerms][];
+                final byte[][] vals = new byte[numTerms][];
+                int nonBNodeCount = 0; // #of non-bnodes.
+                {
+    
+                    // thread-local key builder removes single-threaded constraint.
+                    final IKeyBuilder tmp = getKeyBuilder().keyBuilder; // new
+                                                                        // KeyBuilder(Bytes.SIZEOF_LONG);
+    
+                    // buffer is reused for each serialized term.
+                    final DataOutputBuffer out = new DataOutputBuffer();
+    
+                    for (int i = 0; i < numTerms; i++) {
+    
+                        if (terms[i] instanceof BNode) {
+    
+                            terms[i].known = true;
+    
+                            continue;
+    
+                        }
+    
+                        keys[nonBNodeCount] = tmp.reset().append(terms[i].termId)
+                                .getKey();
+    
+                        // Serialize the term.
+                        vals[nonBNodeCount] = terms[i].serialize(out.reset());
+    
+                        nonBNodeCount++;
+    
                     }
-
-                    keys[nonBNodeCount] = tmp.reset().append(terms[i].termId)
-                            .getKey();
-
-                    // Serialize the term.
-                    vals[nonBNodeCount] = terms[i].serialize(out.reset());
-
-                    nonBNodeCount++;
-
+    
                 }
-
-            }
-
-            // run the procedure on the index.
-            if (nonBNodeCount > 0) {
-
-                idTermIndex.submit(0/* fromIndex */,
-                        nonBNodeCount/* toIndex */, keys, vals,
-                        Id2TermWriteProcConstructor.INSTANCE,
-                        new IResultHandler<Void, Void>() {
-
-                            /**
-                             * Since the unisolated write succeeded the client
-                             * knows that the term is now in both the forward
-                             * and reverse indices. We codify that knowledge by
-                             * setting the [known] flag on the term.
-                             */
-                            public void aggregate(Void result, Split split) {
-
-                                for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
-
-                                    terms[i].known = true;
-
+    
+                // run the procedure on the index.
+                if (nonBNodeCount > 0) {
+    
+                    idTermIndex.submit(0/* fromIndex */,
+                            nonBNodeCount/* toIndex */, keys, vals,
+                            Id2TermWriteProcConstructor.INSTANCE,
+                            new IResultHandler<Void, Void>() {
+    
+                                /**
+                                 * Since the unisolated write succeeded the client
+                                 * knows that the term is now in both the forward
+                                 * and reverse indices. We codify that knowledge by
+                                 * setting the [known] flag on the term.
+                                 */
+                                public void aggregate(Void result, Split split) {
+    
+                                    for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
+    
+                                        terms[i].known = true;
+    
+                                    }
+    
                                 }
-
-                            }
-
-                            public Void getResult() {
-
-                                return null;
-
-                            }
-                        });
-
+    
+                                public Void getResult() {
+    
+                                    return null;
+    
+                                }
+                            });
+    
+                }
+    
+                insertTime += System.currentTimeMillis() - _begin;
+    
             }
-
-            insertTime += System.currentTimeMillis() - _begin;
-
-        }
-
-        /*
-         * Index the terms for keyword search.
-         */
-        if (textIndex && getSearchEngine() != null) {
-
-            final long _begin = System.currentTimeMillis();
-
-            indexTermText(terms, numTerms);
-
-            indexerTime = System.currentTimeMillis() - _begin;
-
-        }
+    
+            /*
+             * Index the terms for keyword search.
+             */
+            if (textIndex && getSearchEngine() != null) {
+    
+                final long _begin = System.currentTimeMillis();
+    
+                indexTermText(terms, numTerms);
+    
+                indexerTime = System.currentTimeMillis() - _begin;
+    
+            }
+    
+        } // if(!readOnly)
 
         final long elapsed = System.currentTimeMillis() - begin;
 
         if (numTerms > 1000 || elapsed > 3000) {
 
-            log
-                    .info("Wrote " + numTerms + " in " + elapsed
+            log.info("Processed " + numTerms + " in " + elapsed
                             + "ms; keygen=" + keyGenTime + "ms, sort="
                             + sortTime + "ms, insert=" + insertTime + "ms"
                             + ", indexerTime=" + indexerTime + "ms");
@@ -1833,7 +1831,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
             if (nexplicit > 0) {
 
                 termIdIndex.submit(0/* fromIndex */, nexplicit/* toIndex */,
-                        keys, null/* vals */, Term2IdWriteProcConstructor.INSTANCE,
+                        keys, null/* vals */, Term2IdWriteProcConstructor.READ_WRITE,
                         new IResultHandler<Term2IdWriteProc.Result, Void>() {
 
                             /**
