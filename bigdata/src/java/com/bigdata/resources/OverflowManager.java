@@ -225,6 +225,13 @@ abstract public class OverflowManager extends IndexManager {
     protected final AtomicLong moveCounter = new AtomicLong(0L);
     
     /**
+     * The timeout for asynchronous overflow processing.
+     * 
+     * @see Options#OVERFLOW_TIMEOUT
+     */
+    protected final long overflowTimeout;
+    
+    /**
      * #of overflows that have taken place. This counter is incremented each
      * time the entire overflow operation is complete, including any
      * post-processing of the old journal.
@@ -346,6 +353,26 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "3";
 
+        /**
+         * The timeout in milliseconds for asynchronous overflow processing to
+         * complete (default {@link #DEFAULT_OVERFLOW_TIMEOUT}). Any overflow
+         * task that does not complete within this timeout will be cancelled.
+         * <p>
+         * Note: Asynchronous overflow processing is responsible for splitting,
+         * moving, and joining index partitions. The asynchronous overflow tasks
+         * are written to be fail "safe". Also, each task may succeed or fail on
+         * its own. Iff the task succeeds, then its effect is made restart safe.
+         * Otherwise clients continue to use the old view of the index
+         * partition.
+         */
+        String OVERFLOW_TIMEOUT = "overflow.timeout";
+        
+        /**
+         * The default timeout for asynchronous overflow processing is 10
+         * minutes.
+         */
+        String DEFAULT_OVERFLOW_TIMEOUT = "" + 10 * 1000 * 60L;
+        
     }
     
     /**
@@ -366,7 +393,19 @@ abstract public class OverflowManager extends IndexManager {
             log.info(Options.OVERFLOW_ENABLED+"="+overflowEnabled);
             
         }
-        
+
+        // overflowTimeout
+        {
+            
+            overflowTimeout = Long
+                    .parseLong(properties.getProperty(
+                            Options.OVERFLOW_TIMEOUT,
+                            Options.DEFAULT_OVERFLOW_TIMEOUT));
+
+            log.info(Options.OVERFLOW_TIMEOUT + "=" + overflowTimeout);
+            
+        }
+
         // index segment build threshold
         {
 

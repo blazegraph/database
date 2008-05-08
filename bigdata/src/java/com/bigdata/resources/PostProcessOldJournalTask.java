@@ -44,7 +44,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
@@ -1509,11 +1508,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Note: The update tasks should be relatively fast, excepting possibly
                  * moves of a hot index partition since there could be a lot of buffered
                  * writes.
-                 * 
-                 * @todo config param for timeout.
                  */
                 final List<Future<Object>> futures = resourceManager
-                        .getConcurrencyManager().invokeAll(tasks, 60*1, TimeUnit.SECONDS);
+                        .getConcurrencyManager().invokeAll(tasks,
+                                resourceManager.overflowTimeout,
+                                TimeUnit.MILLISECONDS);
 
                 if(Thread.currentThread().isInterrupted()) return null;
                 
@@ -1530,24 +1529,24 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      */
                     try {
 
-                        /*
-                         * Note: Don't wait long - we already gave the tasks a chance to
-                         * complete up above.
-                         * 
-                         * @todo Verify that no problems can arise if we allow
-                         * post-processing to complete while update tasks are still
-                         * executing. Ideally the atomic update operations will either
-                         * succeed fully or fail, and failure will mean that the view
-                         * was not changed.
-                         */
-                        
                         if(Thread.currentThread().isInterrupted()) return null;
                         
-                        f.get(100,TimeUnit.MILLISECONDS);
+                        /*
+                         * Note: Don't wait long - we already gave the tasks a
+                         * chance to complete up above. If the overflowTimeout
+                         * has elapsed then the rest of the tasks were probably
+                         * cancelled in anycase.
+                         */
+
+                        f.get(100, TimeUnit.MILLISECONDS);
                         
                     } catch(Throwable t) {
-                
-                        if(isNormalShutdown(t)) { 
+
+                        if(t instanceof CancellationException) {
+                            
+                            log.warn("Task cancelled: "+t);
+                            
+                        } else if(isNormalShutdown(t)) { 
                             
                             log.warn("Normal shutdown? : "+t);
                             
@@ -1667,8 +1666,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         .isOpen()
                 || InnerCause.isInnerCause(t,
                         InterruptedException.class)
-                || InnerCause.isInnerCause(t,
-                        CancellationException.class)
+// Note: cancelled indicates that overflow was timed out.
+//                || InnerCause.isInnerCause(t,
+//                        CancellationException.class)
                 || InnerCause.isInnerCause(t,
                         ClosedByInterruptException.class)
                 || InnerCause.isInnerCause(t,

@@ -169,6 +169,12 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      */
     private static final long serialVersionUID = -4736465754523655679L;
+
+    /**
+     * Serialized as extended metadata. When <code>true</code> unknown terms
+     * are NOT added to the database.
+     */
+    private boolean readOnly;
     
     /**
      * De-serialization constructor.
@@ -178,18 +184,26 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     }
     
     protected Term2IdWriteProc(IDataSerializer keySer, int fromIndex, int toIndex,
-            byte[][] keys) {
+            byte[][] keys, boolean readOnly) {
 
         super(keySer, null, fromIndex, toIndex, keys, null /* vals */);
+        
+        this.readOnly = readOnly;
         
     }
 
     public static class Term2IdWriteProcConstructor extends
             AbstractIndexProcedureConstructor<Term2IdWriteProc> {
 
-        public static Term2IdWriteProcConstructor INSTANCE = new Term2IdWriteProcConstructor();
+        public static Term2IdWriteProcConstructor READ_WRITE = new Term2IdWriteProcConstructor(false);
+        
+        public static Term2IdWriteProcConstructor READ_ONLY = new Term2IdWriteProcConstructor(true);
 
-        private Term2IdWriteProcConstructor() {
+        private final boolean readOnly;
+        
+        private Term2IdWriteProcConstructor(boolean readOnly) {
+            
+            this.readOnly = readOnly;
             
         }
         
@@ -199,7 +213,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             assert vals == null;
             
-            return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys);
+            return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys, readOnly);
 
         }
 
@@ -253,6 +267,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             final byte[] tmp = ndx.lookup(key);
 
             if (tmp == null) {
+
+                if(readOnly) continue;
                 
                 /*
                  * Not found - assign the termId.
@@ -438,7 +454,33 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         return new Result(ids);
 
     }
+    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
+        
+        super.readMetadata(in);
+        
+        readOnly = in.readBoolean();
+        
+    }
 
+    /**
+     * Writes metadata (not the keys or values, but just other metadata used by
+     * the procedure).
+     * <p>
+     * The default implementation writes <code>toIndex - fromIndex</code>, which
+     * is the #of keys.
+     * 
+     * @param out
+     * 
+     * @throws IOException
+     */
+    protected void writeMetadata(ObjectOutput out) throws IOException {
+        
+        super.writeMetadata(out);
+        
+        out.writeBoolean(readOnly);
+        
+    }
+    
     /**
      * Object encapsulates the discovered / assigned term identifiers and
      * provides efficient serialization for communication of those data to

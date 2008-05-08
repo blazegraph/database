@@ -646,13 +646,22 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             /*
              * Note: the source index is the BTree on the live journal that has
              * been absorbing writes since the last overflow (while the split
-             * was running asynchronously). This is NOT a fused view. All we are
-             * doing is re-distributing the buffered writes onto the B+Trees
-             * buffering writes for the new index partitions created by the
-             * split.
+             * was running asynchronously).
              */
-            final BTree src = (BTree) resourceManager.getIndexOnStore(name,
-                    ITx.UNISOLATED, resourceManager.getLiveJournal()); 
+            final IIndex srcView = getIndex(name);
+            /*
+             * This is NOT a fused view. All we are doing is re-distributing the
+             * buffered writes onto the B+Trees buffering writes for the new
+             * index partitions created by the split.
+             */
+            final BTree src;
+            if(srcView instanceof AbstractBTree) {
+                src = (BTree)srcView;
+            } else {
+                src = (BTree)((FusedView)srcView).getSources()[0];
+            }
+//            final BTree src = (BTree) resourceManager.getIndexOnStore(name,
+//                    ITx.UNISOLATED, resourceManager.getLiveJournal()); 
             
             log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+src.getCheckpoint());
 

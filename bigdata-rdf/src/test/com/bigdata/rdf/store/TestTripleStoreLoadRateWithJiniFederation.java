@@ -30,16 +30,8 @@ package com.bigdata.rdf.store;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
-
-import com.bigdata.journal.BufferMode;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
-import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedClient;
 
 /**
  * Note: The commit flag is ignored for the {@link ScaleOutTripleStore}.
@@ -112,43 +104,69 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         
     }
 
-    public void test_U1() {
-        
-        new ConcurrentDataLoader(store, 20/*nthreads*/, 10000 /*bufferCapacity*/,  new File("../rdf-data/lehigh/U1"), new FilenameFilter(){
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+    final int nthreads = 10;
+    
+    final int bufferCapacity = 100000;
+    
+    final boolean validate = true;
+    
+    final FilenameFilter filter = new FilenameFilter() {
+
+        public boolean accept(File dir, String name) {
+            if (name.endsWith(".owl"))
+                return true;
+            return false;
+        }
+
+    };
+    
+    public void test_U1() throws InterruptedException {
+        
+        final File file = new File("../rdf-data/lehigh/U1");
+//      final File file = new File("../rdf-data/lehigh/U1/University0_0.owl");
+      
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
     
-    public void test_U10() {
-        
-        new ConcurrentDataLoader(store, 10/*nthreads*/, 20000 /*bufferCapacity*/,  new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+    public void test_U10() throws InterruptedException {
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+        final File file = new File("../rdf-data/lehigh/U10");
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+        
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
 
-    
-    public void test_U50() {
-        
-        new ConcurrentDataLoader(store, 10/*nthreads*/, 20000 /*bufferCapacity*/,  new File("../rdf-data/lehigh/U50"), new FilenameFilter(){
+    public void test_U50() throws InterruptedException {
 
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
+        final File file = new File("../rdf-data/lehigh/U50");
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client,
+                nthreads, bufferCapacity, file, filter);
+
+        helper.load(store);
+
+        if(validate)
+        helper.validate(store);
+        
+        helper.shutdownNow();
         
     }
 
@@ -193,24 +211,30 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         
         final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
         
-        final String file = System.getProperty("documents.directory");
-  
-        if(file==null) throw new RuntimeException("Required property 'documents.directory' was not specified");
-        
+        final boolean validate = Boolean.parseBoolean(System.getProperty("validate",
+                "false"));
+
+        final String fileStr = System.getProperty("documents.directory");
+
+        if (fileStr == null)
+            throw new RuntimeException(
+                    "Required property 'documents.directory' was not specified");
+
+        final File file = new File(fileStr);
+
         TestTripleStoreLoadRateWithJiniFederation test = new TestTripleStoreLoadRateWithJiniFederation("test");
         
         test.setUp();
-        
-        new ConcurrentDataLoader(test.store, nthreads, bufferCapacity,
-                new File(file), new FilenameFilter() {
 
-            public boolean accept(File dir, String name) {
-//                if(name.endsWith(".owl")) return true;
-                return true;
-//                return false;
-            }
-            
-        });
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
+                test.client, nthreads, bufferCapacity, file, test.filter);
+
+        helper.load(test.store);
+
+        if(validate)
+        helper.validate(test.store);
+
+        helper.shutdownNow();
         
         test.tearDown();
         

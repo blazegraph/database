@@ -31,7 +31,6 @@ import java.io.File;
 import java.io.FilenameFilter;
 
 import org.apache.log4j.Logger;
-import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.service.jini.JiniClient;
@@ -120,14 +119,21 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         
         final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
         
+        final boolean validate = Boolean.parseBoolean(System.getProperty("validate",
+        "false"));
+
         final int nclients = Integer.parseInt(System.getProperty("nclients","1"));
 
         final int clientNum = Integer.parseInt(System.getProperty("clientNum","0"));
         
-        final String file = System.getProperty("documents.directory");
-  
-        if(file==null) throw new RuntimeException("Required property 'documents.directory' was not specified");
-        
+        final String fileStr = System.getProperty("documents.directory");
+
+        if (fileStr == null)
+            throw new RuntimeException(
+                    "Required property 'documents.directory' was not specified");
+
+        final File file = new File(fileStr);
+
         /**
          * Starts in {@link #setUp()}.
          */
@@ -148,17 +154,25 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
 
         ScaleOutTripleStore store = new ScaleOutTripleStore(client,"test",ITx.UNISOLATED);
 
-        new ConcurrentDataLoader(store, nthreads, bufferCapacity,
-                new File(file), new FilenameFilter() {
+        final FilenameFilter filter = new FilenameFilter() {
 
             public boolean accept(File dir, String name) {
-//                if(name.endsWith(".owl")) return true;
-                return true;
-//                return false;
+                if (name.endsWith(".owl"))
+                    return true;
+                return false;
             }
-            
-        }, ""/* baseURL */, RDFFormat.RDFXML/* fallback */,
-                false/* autoFlush */, nclients, clientNum);
+
+        };
+        
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
+                client, nthreads, bufferCapacity, file, filter, nclients, clientNum);
+
+        helper.load(store);
+
+        if(validate)
+        helper.validate(store);
+
+        helper.shutdownNow();
         
         client.disconnect(true/*immediateShutdown*/);
         

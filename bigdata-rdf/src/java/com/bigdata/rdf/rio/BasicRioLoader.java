@@ -212,8 +212,6 @@ public class BasicRioLoader implements IRioLoader {
 
             insertTime += System.currentTimeMillis() - insertStart;
             
-            log.error("While parsing: " + ex, ex);
-
             try {
                 error(ex);
             } catch (Exception ex2) {
@@ -249,6 +247,8 @@ public class BasicRioLoader implements IRioLoader {
      */
     protected void error(Exception ex) {
         
+        log.error("While parsing: " + ex);
+
     }
     
     /**

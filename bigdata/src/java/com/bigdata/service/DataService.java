@@ -1144,44 +1144,30 @@ abstract public class DataService extends AbstractService
 
                 final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-                // wait the normal amount of time before reporting in the first
-                // time.
-                final long initialDelay = delay;
-
-                reportService.scheduleWithFixedDelay(new ReportTask(),
-                        initialDelay, delay, unit);
-
-                log.info("Started ReportTask.");
-            
                 /*
-                 * Run the ReportTask immediately so that we will notify() the
-                 * load balancer service and the data service will enter into
-                 * its set of active services.
+                 * Note: We set [initialDelay := 0] so that we run the
+                 * ReportTask immediately. This is needed in order to notify()
+                 * the load balancer service so that the data service will enter
+                 * into its set of active services.
                  * 
                  * Note: If the data service does not notify() the load balancer
                  * service then the load balancer will be unable to recommend a
                  * data service on which to register an index and a new
-                 * application will not be able to get started.
-                 * 
-                 * Note: The ReportTask() will be re-run automatically. During
-                 * new federation startup it is critical that at least one data
+                 * application will not be able to get started. During new
+                 * federation startup it is critical that at least one data
                  * service and the metadata service have discovered and notify()
                  * the load balancer service.
                  * 
                  * Note: This logic is also executed for the MetadataService,
                  * which is just a subclass of the DataService.
                  */
-                try {
-                    
-                    new ReportTask().run();
-                    
-                } catch(Throwable t) {
-                    
-                    log.warn("Could not join the load balancer service: " + t,
-                            t);
-                    
-                }
-                
+                final long initialDelay = 0; // Note: Immediate notify()!
+
+                reportService.scheduleWithFixedDelay(new ReportTask(),
+                        initialDelay, delay, unit);
+
+                log.info("Started ReportTask.");
+            
             }
             
             /*

@@ -226,7 +226,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
         if (this == o)
             return true;
 
-        PartitionLocator o2 = (PartitionLocator) o;
+        final PartitionLocator o2 = (PartitionLocator) o;
 
         if (partitionId != o2.partitionId)
             return false;

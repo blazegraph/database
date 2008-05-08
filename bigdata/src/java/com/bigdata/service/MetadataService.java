@@ -491,13 +491,20 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
+            if(INFO)
             log.info("name=" + getOnlyResource() + ", oldLocator=" + oldLocator
                     + ", locators=" + Arrays.toString(newLocators));
             
-            MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
+            final MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
             
-            PartitionLocator pmd = (PartitionLocator) SerializerUtil
+            final PartitionLocator pmd = (PartitionLocator) SerializerUtil
                     .deserialize(mdi.remove(oldLocator.getLeftSeparatorKey()));
+            
+            if (pmd == null) {
+                
+                throw new RuntimeException("No such locator: "+oldLocator);
+                
+            }
             
             if(!oldLocator.equals(pmd)) {
 

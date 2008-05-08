@@ -89,7 +89,7 @@ public interface IRequiredHostCounters extends ICounterHierarchy {
      * FIXME not collected for linux right now.
      */
     String Memory_majorFaultsPerSecond = Memory + ps
-            + "Page Faults Per Second";
+            + "Major Page Faults Per Second";
 
     /*
      * LogicalDisk
