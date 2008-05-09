@@ -395,7 +395,9 @@ abstract public class AbstractFederation implements IBigdataFederation {
                         + clientUUID);
 
                 p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
-                        "client" + ICounterSet.pathSeparator
+                        "service" + ICounterSet.pathSeparator
+                                + IBigdataClient.class.getName()
+                                + ICounterSet.pathSeparator
                                 + clientUUID.toString());
 
                 statisticsCollector = AbstractStatisticsCollector
