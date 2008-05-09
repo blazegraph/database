@@ -153,68 +153,28 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
     }
     
     /**
-     * Task updates the definition of an index partition such that the specified
-     * index segment is used in place of any older index segments and any
-     * journal last commitTime is less than or equal to the createTime of the
-     * new index segment.
      * <p>
-     * The use case for this task is that you have just done an overflow on a
-     * journal, placing empty indices on the new journal and defining their
-     * views to read from the new index and the old journal. Then you built an
-     * index segment from the last committed state of the index on the old
-     * journal. Finally you use this task to update the view on the new journal
-     * such that the index now reads from the new index segment rather than the
-     * old journal.
-     * <p>
-     * Note: this implementation only works with a full compacting merge
-     * scenario. It does NOT handle the case when multiple index segments are
-     * required to complete the index partition view. the presumption is that
-     * the new index segment was built from the fused view as of the last
-     * committed state on the old journal, not just from the {@link BTree} on
-     * the old journal.
-     * <h2>Pre-conditions</h2>
+     * The source view is pre-overflow (the last writes are on the old journal)
+     * while the current view is post-overflow (reflects writes made since
+     * overflow). What we are doing is replacing the pre-overflow history with
+     * an {@link IndexSegment}.
+     * </p>
      * 
-     * <ol>
-     * 
-     * <li> The view is comprised of:
-     * <ol>
-     * 
-     * <li>the live journal</li>
-     * <li>the previous journal (optional)</li>
-     * <li>an index segment having data for some times earlier than the old
-     * journal (optional) </li>
-     * </ol>
-     * </li>
-     * 
-     * <li> The createTime on the live journal MUST be GT the createTime on the
-     * previous journal (it MUST be newer).</li>
-     * 
-     * <li> The createTime of the new index segment MUST be LTE the
-     * firstCommitTime on the live journal. (The new index segment should have
-     * been built from a view that did not read on the live journal. In fact,
-     * the createTime on the new index segment should be exactly the
-     * lastCommitTime on the oldJournal.)</li>
-     * 
-     * <li> The optional index segment in the view MUST have a createTime LTE to
-     * the createTime of the previous journal. (That is, it must have been from
-     * a prior overflow operation and does not include any data from the prior
-     * journal.)
-     * </ol>
-     * 
-     * <h2>Post-conditions</h2>
-     * 
-     * The view is comprised of:
-     * <ol>
-     * <li>the live journal</li>
-     * <li>the new index segment</li>
-     * </ol>
-     * 
-     * @todo modify to support view consisting of more than one historical
-     *       component so that we can do incremental builds (just the buffered
-     *       writes) as well as full builds (the index view). Incremental build
-     *       index segments need to be marked as such in the {@link BuildResult}
-     *       and would only replace the old journal rather than all historical
-     *       entries in the view.
+     * <pre>
+     * journal A
+     * view={A}
+     * ---- sync overflow begins ----
+     * create journal B
+     * view={B,A}
+     * Begin build segment from view={A} (identified by the lastCommitTime)
+     * ---- sync overflow ends ----
+     * ... build continues ...
+     * ... writes against view={B,A}
+     * ... index segment S0 complete (based on view={A}).
+     * ... 
+     * atomic build update task runs: view={B,S0}
+     * ... writes continue.
+     * </pre>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -248,7 +208,9 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         }
 
         /**
+         * <p>
          * Atomic update.
+         * </p>
          * 
          * @return <code>null</code>
          */
@@ -333,77 +295,6 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
                 }
                 
                 /*
-                 * The segment must have been built from the view that we are
-                 * going to replace. The only change which is allowed from the
-                 * time that we begin the segment build is the accumulation of
-                 * more writes on the mutable BTree on the live journal. There
-                 * MUST NOT be any change in the resources used by the view.
-                 * 
-                 * FIXME This is not correct. The source view is pre-overflow
-                 * (the last writes are on the old journal) while the current
-                 * view is post-overflow (reflects writes made since overflow).
-                 * What we are doing is replacing the pre-overflow history with
-                 * an index segement.
-                 * 
-                 * journal A
-                 * view={A}
-                 * ---- sync overflow begins ----
-                 * create journal B
-                 * view={B,A}
-                 * Begin build segment from view={A} (identified by the lastCommitTime)
-                 * ---- sync overflow ends ----
-                 * ... build continues ...
-                 * ... writes against view={B,A}
-                 * ... index segment S0 complete (based on view={A}).
-                 * ... 
-                 * atomic build update task runs: view={B,S0}
-                 * ... writes continue.
-                 */
-                if(false){
-                    
-                    final IResourceMetadata[] sourceResources = buildResult.indexMetadata
-                            .getPartitionMetadata().getResources();
-
-                    for (int i = 0; i < sourceResources.length; i++) {
-
-                        if (i >= currentResources.length) {
-
-                            throw new AssertionError("#of resources differs"
-                                    + "\nsourceResources=" + Arrays.toString(sourceResources)
-                                    + "\ncurrentResources=" + Arrays.toString(currentResources)
-                                    + "\ncurrentHistory="+currentpmd.getHistory());
-                            
-                        }
-                        
-                        final IResourceMetadata s = sourceResources[i];
-                        
-                        final IResourceMetadata c = currentResources[i];
-
-                        if(!s.equals(c) || !c.equals(s)) {
-
-                            throw new AssertionError("resources differ at index="+i
-                                    + "\nsourceResources=" + Arrays.toString(sourceResources)
-                                    + "\ncurrentResources=" + Arrays.toString(currentResources)
-                                    + "\ncurrentHistory="+currentpmd.getHistory());
-
-                        }
-                        
-                    }
-                    
-                    if(sourceResources.length!=currentResources.length) {
-                        
-                        throw new AssertionError("#of resources differs"
-                                + "\nsourceResources=" + Arrays.toString(sourceResources)
-                                + "\ncurrentResources=" + Arrays.toString(currentResources)
-                                + "\ncurrentHistory="+currentpmd.getHistory());
-                        
-                    }
-                    
-                    
-                }
-                
-
-                /*
                  * Note: I have commented out a bunch of pre-condition tests that are not 
                  * valid for histories such as:
                  * 
@@ -467,7 +358,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
                     +"(lastCommitTime="+ segmentMetadata.getCreateTime()//
                     +",segment="+ segmentMetadata.getUUID()//
                     +",counter="+btree.getCounter().get()//
-                    +",oldResources="+Arrays.toString(currentResources)// @todo does not conform to syntax.
+                    +",oldResources="+Arrays.toString(currentResources)
                     +") "
                     ));
 
