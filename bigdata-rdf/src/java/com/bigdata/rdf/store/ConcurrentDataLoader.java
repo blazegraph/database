@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
@@ -71,7 +72,6 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.sun.org.apache.xerces.internal.util.URI;
 
 /**
  * This is a utility class designed for concurrent load of recursively processed
@@ -113,16 +113,18 @@ import com.sun.org.apache.xerces.internal.util.URI;
  * perform a database at once closure afterwards if you are bulk loading some
  * dataset into an empty database.
  * 
+ * @todo experiment with varying #clients and buffer capacity.
+ * 
+ * @todo As an alternative to indexing the locally loaded data, experiment with
+ *       converting {@link StatementBuffer}s to {@link ISPOBuffer}s (using the
+ *       distributed terms indices), and then write out the long[3] data into a
+ *       raw file. Once the local data have been converted to long[]s we can
+ *       sort them into total SPO order (by chunks if necessary) and build the
+ *       scale-out SPO index. The same process could then be done for each of
+ *       the other access paths (OSP, POS).
+ * 
  * @todo refactor further and reconcile with map/reduce processsing, the
  *       {@link BigdataRepository}, etc.
- * 
- * @todo As an alternative to indexing the locally loaded data, we could just
- *       fill {@link StatementBuffer}s, convert to {@link ISPOBuffer}s (using
- *       the distributed terms indices), and then write out the long[3] data
- *       into a raw file. Once the local data have been converted to long[]s we
- *       can sort them into total SPO order (by chunks if necessary) and build
- *       the scale-out SPO index. The same process could then be done for each
- *       of the other access paths (OSP, POS).
  * 
  * @todo support a {@link BigdataRepository} as a source.
  * 

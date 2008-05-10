@@ -1533,3 +1533,83 @@ Caused by: java.lang.NullPointerException
 1. Run U10, U100 on host3.
 
 2. Write script and run U10, U100, U1000 on host{1,2,3}.
+
+   - Done. pidstat is reporting under /host/client/UUID not
+     /host/service/iface/UUID
+
+   - Done. sar/pidstat parsing problem.
+
+   - verify syslogd reporting and configure on host{2,3}.
+   
+     I need to look further into how the stuff gets logged by syslog
+     and what, if anything, needs to be configured for this to work.
+     This is only interesting to obtain a combined log of the services
+     - and primarily to obtained a combined log of their ERROR level
+     messages.
+
+   - Done. reduce log levels (review log4j config).
+
+   - Done. Reduced the branching factor default for the indices as it
+     was overflowing the maximum record size.
+
+   - document setup.
+
+   - jini class setup, httpd, and codebase property.
+   
+   - The various server setups either all need to be copied into
+     appropriate locations on the host on which they will run or they
+     need to specify a dataDir that is local to the host on which they
+     will run, e.g., /var/bigdata/DataServer0
+
+   - Done. verify jini using nio.
+
+   - (****) response times for client (both the fed thread pool and
+     the concurrent data loader thread pool)
+
+   - timestamp service should notify the load balancer.  this will be
+     extended to be the transaction service and that will have things
+     to report.
+
+   - the server startup for bigdata should be more event driven.  You
+     should be able to discover jini itself and then any of the
+     services in any order.  some services clearly must wait for a
+     join (e.g., the client and the data service must wait for the
+     timestamp service) while others can come and go as they like (if
+     the load balancer is not there then things should run anyway but
+     centralized reporting will not work and index partition moves
+     will not happen).
+
+   - review jdk (1.6.0_03), sysstat (8.0.3) {version 7 on host{1,2}},
+     /etc/hosts, /etc/fstab{/NAS vs /nas}, jini (not really required
+     on all hosts since we are bundling the jars) for consistency.
+     also emacs install.
+
+   - Done. problem with multicase. solved using unicast to host3.
+
+   - Run multiple clients as well as multiple servers specifying
+     nclients=3 and clientNum={0,1,2}
+
+     *** writing the nohup.out files onto NAS in unfortunate.  Is
+         there a way to specify another location for that file? I
+         don't think so...  Well, if the server description was copied
+         onto the local host for execution then it would ALL BE LOCAL
+
+     *** verify that the older version of sysstat does not cause a
+         problem or remove and replace with the newer. I might need
+         LeeV to look into this on hosts{1,2}.
+
+   - (***) Test performance with local file system reads for U10,
+     U100.  NAS seems to be quite slow in comparison.
+
+   - The byte count needs to be a long, not an int.  with an int it
+     can only use 32bits so the bit split must always favor the offset
+     in that model.
+   
+LDS U10 13.6k
+
+    - Compare this with 16k tps with autoFlush=false.  Experiment more
+      with buffer sizes, combining writes, etc.
+
+JF host3 U10 7.7k
+
+JF host3 U10 startAll 6.7k

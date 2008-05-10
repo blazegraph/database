@@ -1085,6 +1085,25 @@ abstract public class DataService extends AbstractService
          */
         protected boolean startCollection() throws IOException {
 
+            if(!resourceManager.isOpen()) {
+                
+                /*
+                 * This will happen if the store manager is unable to discover
+                 * the timestamp service. It will halt its startup process and
+                 * report that it is closed. At that point the data service can
+                 * not start and will shutdown.
+                 */
+                
+                log.fatal("Store manager not open - will shutdown.");
+                
+                // shutdown the data service.
+                DataService.this.shutdownNow();
+
+                // collection was not started.
+                return false;
+                
+            }
+            
             final UUID uuid = getServiceUUID();
 
             if (uuid == null) {

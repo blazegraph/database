@@ -35,6 +35,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
+import net.jini.discovery.DiscoveryManagement;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -72,17 +73,17 @@ public class DataServer extends AbstractServer {
      * Handles discovery of the {@link DataService}s and
      * {@link MetadataService}s.
      */
-    protected DataServicesClient dataServicesClient = null;
+    protected DataServicesClient dataServicesClient;
 
     /**
      * Handles discovery of the {@link ILoadBalancerService}.
      */
-    protected LoadBalancerClient loadBalancerClient = null;
+    protected LoadBalancerClient loadBalancerClient;
     
     /**
      * Handles discovery of the {@link ITimestampService}.
      */
-    protected TimestampServiceClient timestampServiceClient = null;
+    protected TimestampServiceClient timestampServiceClient;
     
     /**
      * Creates a new {@link DataServer}.
@@ -94,24 +95,6 @@ public class DataServer extends AbstractServer {
 
         super(args);
 
-        try {
-
-            timestampServiceClient = new TimestampServiceClient(
-                    getDiscoveryManagement());
-
-            dataServicesClient = new DataServicesClient(
-                    getDiscoveryManagement());
-
-            loadBalancerClient = new LoadBalancerClient(
-                    getDiscoveryManagement());
-
-        } catch (Exception ex) {
-
-            fatal("Problem initiating service discovery: "
-                    + ex.getMessage(), ex);
-
-        }
-        
     }
     
 //    public DataServer(String[] args, LifeCycle lifeCycle) {
@@ -159,6 +142,25 @@ public class DataServer extends AbstractServer {
             
         }.run();
         
+    }
+    
+    /**
+     * Initialize the {@link #timestampServiceClient},
+     * {@link #dataServicesClient}, and {@link #loadBalancerClient}. This is a
+     * pre-condition for actually instantiating the
+     * {@link #newService(Properties)}.
+     */
+    protected void setupClients(DiscoveryManagement discoveryManager)
+            throws Exception {
+
+        assert discoveryManager != null;
+
+        timestampServiceClient = new TimestampServiceClient(discoveryManager);
+
+        dataServicesClient = new DataServicesClient(discoveryManager);
+
+        loadBalancerClient = new LoadBalancerClient(discoveryManager);
+
     }
     
     protected Remote newService(Properties properties) {

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 14, 2006
  */
 
-package com.bigdata.counters;
+package com.bigdata.counters.linux;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -59,14 +59,10 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("counters");
+        TestSuite suite = new TestSuite("linux");
        
-        suite.addTestSuite(TestCounters.class);
-
-        suite.addTestSuite(TestHistoryInstrument.class);
-
-        suite.addTest(com.bigdata.counters.linux.TestAll.suite());
-
+        suite.addTestSuite(TestParsing.class);
+        
         return suite;
         
     }

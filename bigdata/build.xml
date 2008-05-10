@@ -153,7 +153,7 @@
 	<target name="deploy" depends="jar">
 		<copy toDir="${deploy.dir}">
 			<fileset dir="${bigdata.dir}/lib">
-				<!-- review necessar jini dependencies for deployment. 
+				<!-- review necessary jini dependencies for deployment. 
 			    <exclude name="reggie.jar" />
 				<exclude name="sun-util.jar" />
 				<exclude name="jini-core.jar" />

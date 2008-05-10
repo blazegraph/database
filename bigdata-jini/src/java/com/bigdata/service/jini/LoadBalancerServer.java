@@ -9,6 +9,7 @@ import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 
 import net.jini.config.Configuration;
+import net.jini.discovery.DiscoveryManagement;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -40,7 +41,7 @@ public class LoadBalancerServer extends AbstractServer {
      * Handles discovery of the {@link DataService}s and
      * {@link MetadataService}s.
      */
-    protected DataServicesClient dataServicesClient = null;
+    protected DataServicesClient dataServicesClient;
     
     /**
      * Creates a new {@link DataServer}.
@@ -51,16 +52,6 @@ public class LoadBalancerServer extends AbstractServer {
     public LoadBalancerServer(String[] args) {
 
         super(args);
-        
-        try {
-
-            dataServicesClient = new DataServicesClient(getDiscoveryManagement());
-            
-        } catch(Exception ex) {
-            
-            fatal("Problem initiating service discovery: " + ex.getMessage(), ex);
-            
-        }
         
     }
     
@@ -113,6 +104,14 @@ public class LoadBalancerServer extends AbstractServer {
         
     }
     
+    @Override
+    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
+        
+        dataServicesClient = new DataServicesClient(getDiscoveryManagement());
+        
+    }
+
+    @Override
     protected Remote newService(Properties properties) {
         
         return new AdministrableLoadBalancer(this, properties);

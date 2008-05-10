@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
+import net.jini.discovery.DiscoveryManagement;
 
 import org.apache.log4j.MDC;
 
@@ -101,7 +102,12 @@ public class ReduceServer extends AbstractServer {
         }.run();
         
     }
-    
+   
+    @Override
+    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
+        
+    }
+
     protected Remote newService(Properties properties) {
         
         return new AdministrableReduceService(this,properties);

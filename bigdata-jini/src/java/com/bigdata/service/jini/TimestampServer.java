@@ -35,6 +35,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
+import net.jini.discovery.DiscoveryManagement;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -105,6 +106,11 @@ public class TimestampServer extends AbstractServer {
 
     }
 
+    @Override
+    protected void setupClients(DiscoveryManagement discoveryManager) {
+        
+    }
+    
     @Override
     protected Remote newService(Properties properties) {
         

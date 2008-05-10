@@ -228,6 +228,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
     protected DiscoveryManagement getDiscoveryManagement() {
         
+        if (discoveryManager == null)
+            throw new IllegalStateException();
+        
         return discoveryManager;
         
     }
@@ -467,14 +470,54 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
 
         /*
-         * Create the service object.
-         * 
-         * Note: By creating the service object here rather than outside of the
-         * constructor we potentially create problems for subclasses of
-         * AbstractServer since their own constructor will not have been
-         * executed yet.
+         * Start service discovery.
          */
         try {
+            /*
+             * Note: This class will perform multicast discovery if ALL_GROUPS
+             * is specified and otherwise requires you to specify one or more
+             * unicast locators (URIs of hosts running discovery services). As
+             * an alternative, you can use LookupDiscovery, which always does
+             * multicast discovery.
+             */
+            discoveryManager = new LookupDiscoveryManager(
+                    groups, unicastLocators, null /*DiscoveryListener*/
+            );
+
+//          DiscoveryManagement discoveryManager = new LookupDiscovery(
+//                  groups);
+            
+        } catch (IOException e) {
+            
+            fatal("Could not start service discovery: "+e, e);
+            
+        }
+        
+        /*
+         * Create the service object.
+         */
+        try {
+            
+            /*
+             * Allow the server to configure various helper "clients".
+             * 
+             * Note: By creating the service object here rather than outside of
+             * the constructor we potentially create problems for subclasses of
+             * AbstractServer since their own constructor will not have been
+             * executed yet.
+             * 
+             * Some of those problems are worked around using setupClients().
+             * 
+             * FIXME If you explicitly assign values to those clients when the
+             * fields are declared, e.g., [timestampServiceClient=null] then the
+             * ctor will overwrite the values set by [newService] since it is
+             * running before those initializations are performed. This is
+             * really crufty, may be JVM dependent, and needs to be refactored
+             * to avoid this subclass ctor init problem.
+             */
+            assert discoveryManager != null;
+
+            setupClients(discoveryManager);
             
             impl = newService(properties);
 
@@ -482,9 +525,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             
         } catch(Exception ex) {
         
-            try {terminate();} catch(Throwable t) {/*ignore*/}
-            
-            log.fatal("Could not start service: "+ex, ex);
+            fatal("Could not start service: "+ex, ex);
             
         }
 
@@ -507,23 +548,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         }
         
         /*
-         * Start service discovery and the join manager. 
+         * Start the join manager. 
          */
         try {
 
-            /*
-             * Note: This class will perform multicast discovery if ALL_GROUPS
-             * is specified and otherwise requires you to specify one or more
-             * unicast locators (URIs of hosts running discovery services). As
-             * an alternative, you can use LookupDiscovery, which always does
-             * multicast discovery.
-             */
-            discoveryManager = new LookupDiscoveryManager(
-                    groups, unicastLocators, null /*DiscoveryListener*/
-            );
-
-//            DiscoveryManagement discoveryManager = new LookupDiscovery(
-//                    groups);
+            assert proxy != null;
             
             if (serviceID != null) {
                 /*
@@ -546,12 +575,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             }
             
         } catch (IOException ex) {
-            
-            try {
-                terminate();
-            } catch (Throwable t) {
-                /* ignore */
-            }
             
             fatal("Lookup service discovery error: "+ex, ex);
             
@@ -1009,7 +1032,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             } catch (InterruptedException ex) {
                 
                 log.info(""+ex);
-                
+
             } finally {
                 
                 // terminate.
@@ -1160,6 +1183,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 //        }
 //        
 //    }
+
+    /**
+     * Invoked before {@link #newService(Properties)} in order to give a subclass
+     * of {@link AbstractServer} a chance to setup any service discover clients
+     * on which it depends, e.g., a {@li 
+     * @param discoveryManager
+     * @return
+     */
+    abstract protected void setupClients(DiscoveryManagement discoveryManager ) throws Exception;
 
     /**
      * This method is responsible for creating the remote service implementation

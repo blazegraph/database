@@ -70,7 +70,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
     protected static final String ps = ICounterSet.pathSeparator;
     
-    static protected final Logger log = Logger
+    final protected static Logger log = Logger
             .getLogger(AbstractStatisticsCollector.class);
 
     /**

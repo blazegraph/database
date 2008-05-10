@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.linux;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Map;
 
@@ -97,6 +99,21 @@ public class SysstatUtil {
         }
     
         return fields;
+        
+    }
+
+    /**
+     * Used to parse the timestamp associated with each row of sysstat output.
+     * <p>
+     * Note: This assumes that you have controlled the date format using the
+     * sysstat ISO date option.
+     * <p>
+     * Note: This is not thread-safe - use a distinct instance for each
+     * {@link PIDStatCollector} or {@link SarCpuUtilizationCollector}.
+     */
+    static public DateFormat newDateFormat() {
+        
+        return new SimpleDateFormat("hh:mm:ss aa");
         
     }
 

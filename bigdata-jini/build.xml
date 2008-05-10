@@ -1,4 +1,4 @@
-<project name="bigdata-rdf" default="jar" basedir=".">
+<project name="bigdata-jini" default="jar" basedir=".">
 
     <property file="build.properties"/>
 
@@ -7,9 +7,6 @@
             <include name="**/*.jar"/>
         </fileset>
         <fileset dir="${bigdata.jini.dir}/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-        <fileset dir="${bigdata.rdf.dir}/lib">
             <include name="**/*.jar"/>
         </fileset>
     </path>
@@ -36,18 +33,12 @@
             <src path="${bigdata.dir}/src/test"/>
             <src path="${bigdata.jini.dir}/src/java"/>
             <src path="${bigdata.jini.dir}/src/test"/>
-            <src path="${bigdata.rdf.dir}/src/java"/>
-            <src path="${bigdata.rdf.dir}/src/test"/>
         </javac>
-    	<!-- copy resources. -->
         <copy toDir="${build.dir}/classes">
             <fileset dir="${bigdata.dir}/src/java">
                 <exclude name="**/*.java"/>
             </fileset>
             <fileset dir="${bigdata.jini.dir}/src/java">
-                <exclude name="**/*.java"/>
-            </fileset>
-            <fileset dir="${bigdata.rdf.dir}/src/java">
                 <exclude name="**/*.java"/>
             </fileset>
         </copy>

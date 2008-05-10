@@ -247,7 +247,7 @@ public class BasicRioLoader implements IRioLoader {
      */
     protected void error(Exception ex) {
         
-        log.error("While parsing: " + ex);
+//        log.error("While parsing: " + ex);
 
     }
     

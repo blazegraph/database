@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
+import net.jini.discovery.DiscoveryManagement;
 
 import org.apache.log4j.MDC;
 
@@ -102,6 +103,11 @@ public class MapServer extends AbstractServer {
         
     }
     
+    @Override
+    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
+        
+    }
+
     protected Remote newService(Properties properties) {
 
         return new AdministrableMapService(this, properties);
