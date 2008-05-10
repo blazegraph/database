@@ -1,8 +1,5 @@
 package com.bigdata.counters.linux;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.UUID;
 
 import com.bigdata.counters.AbstractStatisticsCollector;

@@ -84,16 +84,18 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
          * overflow early or late or to disable overflow all together.
          */
 //      properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
+//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
+//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
+//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*100);
+//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*100);
 //      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
 //        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
-        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
-        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
         
         // Do not hold onto old resources.
         properties.setProperty(StoreManager.Options.MIN_RELEASE_AGE, "0");
         
         // control the #of data services.
-//        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
+        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
 
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
@@ -127,7 +129,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
     
     final int bufferCapacity = 100000;
     
-    final boolean validate = true;
+    final boolean validate = false;
     
     final FilenameFilter filter = new FilenameFilter() {
 

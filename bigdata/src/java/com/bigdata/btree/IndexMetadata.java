@@ -294,6 +294,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * will be given a {@link #clone()} of this {@link IndexMetadata} and the
      * actual branching factor for the {@link IndexSegment} be set on the
      * {@link #getBranchingFactor()} at that time.
+     * <p>
+     * Note: a branching factor of 256 for an index segment and split limits of
+     * (1M,5M) imply an average B+Tree height of 1.5 to 1.8. With a 10ms seek
+     * time and NO CACHE that is between 15 and 18ms average seek time.
+     * <p>
+     * Note: a branching factor of 512 for an index segment and split limits of
+     * (1M,5M) imply an average B+Tree height of 1.2 to 1.5. With a 10ms seek
+     * time and NO CACHE that is between 12 and 15ms average seek time.
+     * <p>
+     * Note: the actual size of the index segment of course depends heavily on
+     * (a) whether or now block references are being stored since the referenced
+     * blocks are also stored in the index segment; (b) the size of the keys and
+     * values stored in the index; and (c) the key, value, and record
+     * compression options in use.
      */
     public final int getIndexSegmentBranchingFactor() {return indexSegmentBranchingFactor;}
     
@@ -583,7 +597,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         this.branchingFactor = BTree.DEFAULT_BRANCHING_FACTOR;
 
-        this.indexSegmentBranchingFactor = 4096;
+        this.indexSegmentBranchingFactor = 512;
 
         // Note: default assumes NOT an index partition.
         this.pmd = null;

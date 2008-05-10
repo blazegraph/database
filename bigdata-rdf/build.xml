@@ -3,11 +3,14 @@
     <property file="build.properties"/>
 
     <path id="build.classpath">
-        <fileset dir="${bigdata.rdf.dir}/lib">
-            <include name="*.jar"/>
-        </fileset>
         <fileset dir="${bigdata.dir}/lib">
-            <include name="*.jar"/>
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.jini.dir}/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${bigdata.rdf.dir}/lib">
+            <include name="**/*.jar"/>
         </fileset>
     </path>
 
@@ -31,26 +34,30 @@
                debug="on">
             <src path="${bigdata.dir}/src/java"/>
             <src path="${bigdata.dir}/src/test"/>
+            <src path="${bigdata.jini.dir}/src/java"/>
+            <src path="${bigdata.jini.dir}/src/test"/>
             <src path="${bigdata.rdf.dir}/src/java"/>
             <src path="${bigdata.rdf.dir}/src/test"/>
-        	<!-- Do not compile the Sesame 1.x SAIL tests by default since they
-        	     have a dependency on the Sesame 1.x _test_ suite. -->
-	        <exclude name="com/bigdata/rdf/sail/**"/>
         </javac>
-<!--
+    	<!-- copy resources. -->
         <copy toDir="${build.dir}/classes">
-            <fileset dir="${src.dir}">
+            <fileset dir="${bigdata.dir}/src/java">
+                <exclude name="**/*.java"/>
+            </fileset>
+            <fileset dir="${bigdata.jini.dir}/src/java">
+                <exclude name="**/*.java"/>
+            </fileset>
+            <fileset dir="${bigdata.rdf.dir}/src/java">
                 <exclude name="**/*.java"/>
             </fileset>
         </copy>
--->        
     </target>
 
     <target name="jar" depends="compile">
         <jar destfile="${jar.name}">
             <fileset dir="${build.dir}"/>
             <manifest>
-                <attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>
+                <!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
             </manifest>
         </jar>
     </target>

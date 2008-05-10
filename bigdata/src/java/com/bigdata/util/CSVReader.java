@@ -63,6 +63,9 @@ import com.bigdata.rawstore.Bytes;
  * caller), then default headers named by the origin ONE column indices will be
  * used.
  * 
+ * @todo replace with <a href="http://flatpack.sourceforge.net/">flatpack</a>?
+ *       It uses an Apache 2 license.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

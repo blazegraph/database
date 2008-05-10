@@ -29,10 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters.linux;
 
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
+import java.text.DateFormat;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -397,40 +394,6 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             super();
 
         }
-
-        /**
-         * Splits a data line into fields based on whitespace and skipping over
-         * the date field (index zero (0) is the index of the first non-date
-         * field).
-         * <p>
-         * Note: Some fields can overflow, e.g., RSS. When this happens the
-         * fields in the data lines wind up eating into the whitespace to their
-         * <em>right</em>. This means that it is more robust to split the
-         * lines based on whitespace once we have skipped over the date field.
-         * Since we specify using {@link PIDStatCollector#setEnvironment(Map)}
-         * that we want an ISO date format, we know that the date field is 11
-         * characters. The data lines are broken up by whitespace after that.
-         * <p>
-         * Note: Since we split on whitespace, the resulting strings are already
-         * trimmed.
-         * 
-         * @return The fields.
-         */
-        public String[] splitDataLine(String data) {
-            
-            final String s = data.substring(11);
-            
-            final String[] fields = s.split("[\\s+]");
-            
-            if(DEBUG) {
-                
-                log.debug("fields="+Arrays.toString(fields));
-                
-            }
-
-            return fields;
-            
-        }
         
         /**
          * The input arrives as an initial banner and a sequence of data
@@ -520,11 +483,11 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 //                final String system  = data.substring(30-1,38-1).trim();
 //                final String cpu     = data.substring(38-1,46-1).trim();
                 
-                final String[] fields = splitDataLine(data);
+                final String[] fields = SysstatUtil.splitDataLine(data);
                 
-                final String user   = fields[1];
-                final String system = fields[2];
-                final String cpu    = fields[3];
+                final String user   = fields[2];
+                final String system = fields[3];
+                final String cpu    = fields[4];
                 
                 if (INFO)
                         log.info("\n%user=" + user + ", %system=" + system
@@ -555,13 +518,13 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 //                final String residentSetSize   = data.substring(50-1,57-1).trim();
 //                final String percentMemory     = data.substring(57-1,64-1).trim();
                 
-                final String[] fields = splitDataLine(data);
+                final String[] fields = SysstatUtil.splitDataLine(data);
                 
-                final String minorFaultsPerSec = fields[1];
-                final String majorFaultsPerSec = fields[2];
-                final String virtualSize       = fields[3];
-                final String residentSetSize   = fields[4];
-                final String percentMemory     = fields[5];
+                final String minorFaultsPerSec = fields[2];
+                final String majorFaultsPerSec = fields[3];
+                final String virtualSize       = fields[4];
+                final String residentSetSize   = fields[5];
+                final String percentMemory     = fields[6];
 
                 if(INFO)
                     log.info("\nminorFaultsPerSec="
@@ -599,10 +562,10 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 //                final String kBrdS = data.substring(22-1, 32-1).trim();
 //                final String kBwrS = data.substring(32-1, 42-1).trim();
                 
-                final String[] fields = splitDataLine(data);
+                final String[] fields = SysstatUtil.splitDataLine(data);
                 
-                final String kBrdS = fields[1];
-                final String kBwrS = fields[2];
+                final String kBrdS = fields[2];
+                final String kBwrS = fields[3];
 
                 if(INFO)
                 log.info("\nkB_rd/s=" + kBrdS + ", kB_wr/s="
@@ -648,32 +611,6 @@ public class PIDStatCollector extends AbstractProcessCollector implements
      * Used to parse the timestamp associated with each row of the [pidstat]
      * output.
      */
-    protected final SimpleDateFormat f;
-    {
-
-        f = new SimpleDateFormat("hh:mm:ss aa");
-
-        /*
-         * Code may be enabled for a runtime test of the date format.
-         */
-        if (true) {
-
-            System.err.println("Format: " + f.format(new Date()));
-
-            try {
-
-                System.err.println("Parsed: " + f.parse("06:35:15 AM"));
-                
-                System.err.println("Parsed: " + f.parse("02:08:24 PM"));
-                
-            } catch (ParseException e) {
-
-                log.error("Could not parse?");
-
-            }
-
-        }
-        
-    }
+    protected final DateFormat f = SysstatUtil.newDateFormat();
     
 }

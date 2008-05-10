@@ -110,6 +110,13 @@ abstract public class ResourceManager extends OverflowManager implements IResour
 
             root = new CounterSet();
 
+            // ResourceManager
+            {
+
+                // ... nothing really - its all under other headings.
+                
+            }
+            
             // OverflowManager
             {
 
@@ -222,6 +229,18 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     public void sample() {
                         setValue(dataDir==null?"N/A":dataDir.getAbsolutePath());
                     }
+                });
+
+                tmp.addCounter("isOpen", new Instrument<Boolean>(){
+                    public void sample() {setValue(isOpen());}
+                });
+                
+                tmp.addCounter("isStarting", new Instrument<Boolean>(){
+                    public void sample() {setValue(isStarting());}
+                });
+
+                tmp.addCounter("isRunning", new Instrument<Boolean>(){
+                    public void sample() {setValue(isRunning());}
                 });
 
                 tmp.addCounter("Store Cache Size", new Instrument<Long>(){
