@@ -38,11 +38,13 @@ import org.apache.log4j.Logger;
 /**
  * Unbounded queue of operations waiting to gain an exclusive lock on a
  * resource. By default, the queue imposes a "fair" schedule for access to the
- * resource. Deadlocks are detected using a WAITS_FOR graph that is shared by
- * all resources and transactions for a given database instance.
+ * resource. Deadlocks among resources are detected using a
+ * <code>WAITS_FOR</code> graph that is shared by all resources and
+ * transactions for a given database instance.
  * <p>
  * Note: deadlock detection MAY be disabled when all lock requests are (a)
- * pre-declared; and (b) sorted.
+ * pre-declared; and (b) sorted. When disabled the <code>WAITS_FOR</code>
+ * graph is NOT maintained.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -237,7 +239,9 @@ public class ResourceQueue<R, T> {
     private final void assertOwnsLock(Object tx) {
 
         if (queue.peek() != tx) {
+            
             throw new IllegalStateException("Does not hold lock: " + tx);
+            
         }
 
     }
@@ -288,7 +292,7 @@ public class ResourceQueue<R, T> {
      *             if the request would cause a deadlock among the running
      *             transactions.
      */
-    public void lock(T tx, long timeout) throws InterruptedException,
+    public void lock(final T tx, final long timeout) throws InterruptedException,
             DeadlockException {
 
         /*
@@ -302,11 +306,14 @@ public class ResourceQueue<R, T> {
         if (timeout < 0L)
             throw new IllegalArgumentException();
 
-        log.debug("enter: tx=" + tx + ", queue=" + this);
+        if (log.isDebugEnabled())
+            log.debug("enter: tx=" + tx + ", queue=" + this);
 
+        // obtain the private lock.
         lock.lock();
 
-        log.debug("have private lock: tx=" + tx + ", queue=" + this);
+        if (log.isDebugEnabled())
+            log.debug("have private lock: tx=" + tx + ", queue=" + this);
 
         final long begin = System.currentTimeMillis();
 
@@ -317,7 +324,8 @@ public class ResourceQueue<R, T> {
             // already locked.
             if (queue.peek() == tx) {
 
-                log.info("Already owns lock: tx=" + tx + ", queue=" + this);
+                if (log.isInfoEnabled())
+                    log.info("Already owns lock: tx=" + tx + ", queue=" + this);
 
                 return;
 
@@ -329,8 +337,9 @@ public class ResourceQueue<R, T> {
 
                 queue.add(tx);
 
-                log.info("Granted lock with empty queue: tx=" + tx + ", queue="
-                        + this);
+                if (log.isInfoEnabled())
+                    log.info("Granted lock with empty queue: tx=" + tx
+                            + ", queue=" + this);
 
                 return;
 
@@ -350,7 +359,7 @@ public class ResourceQueue<R, T> {
              */
             if (waitsFor != null) {
 
-                Object[] predecessors = queue.toArray();
+                final Object[] predecessors = queue.toArray();
                 
                 try {
 
@@ -377,7 +386,9 @@ public class ResourceQueue<R, T> {
 
             /*
              * Now that we know that the request does not directly cause a
-             * deadlock we add the request to the queue.
+             * deadlock we add the request to the queue and wait until either
+             * (a) the request times out; or (b) the request has progressed to
+             * the head of the queue.
              */
 
             queue.add(tx);
@@ -386,7 +397,7 @@ public class ResourceQueue<R, T> {
 
                 while (true) {
     
-                    long elapsed = System.currentTimeMillis() - begin;
+                    final long elapsed = System.currentTimeMillis() - begin;
     
                     if (timeout != 0L && elapsed >= timeout) {
     
@@ -395,7 +406,9 @@ public class ResourceQueue<R, T> {
     
                     }
     
-                    log.info("Awaiting resource: tx=" + tx + ", queue=" + this);
+                    if (log.isInfoEnabled())
+                        log.info("Awaiting resource: tx=" + tx + ", queue="
+                                + this);
     
                     final long remaining = timeout - elapsed;
     
@@ -424,7 +437,9 @@ public class ResourceQueue<R, T> {
                      * a timeout (handled above) -or- for no reason.
                      */
     
-                    log.info("Continuing after wait: tx=" + tx + ", queue=" + this);
+                    if (log.isInfoEnabled())
+                        log.info("Continuing after wait: tx=" + tx + ", queue="
+                                + this);
     
                     if (dead.get()) {
     
@@ -440,8 +455,9 @@ public class ResourceQueue<R, T> {
                          * the lock.
                          */
     
-                        log.info("Lock granted after wait: tx=" + tx + ", queue="
-                                + this);
+                        if (log.isInfoEnabled())
+                            log.info("Lock granted after wait: tx=" + tx
+                                    + ", queue=" + this);
     
                         return;
     
@@ -526,7 +542,9 @@ public class ResourceQueue<R, T> {
 
             lock.unlock();
 
-            log.debug("released private lock: tx=" + tx + ", queue=" + this);
+            if (log.isDebugEnabled())
+                log.debug("released private lock: tx=" + tx + ", queue="
+                                + this);
 
         }
 
@@ -571,13 +589,13 @@ public class ResourceQueue<R, T> {
             
             if (waitsFor != null) {
 
-                Iterator<T> itr = queue.iterator();
+                final Iterator<T> itr = queue.iterator();
 
                 synchronized (waitsFor) {
 
                     while (itr.hasNext()) {
 
-                        T pendingTx = itr.next();
+                        final T pendingTx = itr.next();
 
                         try {
 

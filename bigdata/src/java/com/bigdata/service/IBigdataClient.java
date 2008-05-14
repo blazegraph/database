@@ -236,6 +236,9 @@ public interface IBigdataClient {
         /**
          * The timeout in millseconds for a task submitting to an
          * {@link IDataService} (default {@value #DEFAULT_CLIENT_TASK_TIMEOUT}).
+         * <p>
+         * Note: Use {@value Long#MAX_VALUE} for NO timeout (the maximum value
+         * for a {@link Long}).
          */
         String CLIENT_TASK_TIMEOUT = "client.taskTimeout";
         

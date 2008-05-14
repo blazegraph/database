@@ -59,9 +59,7 @@ public class DefaultInstrumentFactory implements IInstrumentFactory {
             
         } else if( type == String.class ) {
             
-            return new Instrument<String>() {
-                public void sample() {}
-            };
+            return new StringInstrument();
             
         } else {
             
@@ -70,5 +68,11 @@ public class DefaultInstrumentFactory implements IInstrumentFactory {
         }
         
     }
+
+    static class StringInstrument extends Instrument<String> {
+      
+        public void sample() {}
+        
+    };
     
 }

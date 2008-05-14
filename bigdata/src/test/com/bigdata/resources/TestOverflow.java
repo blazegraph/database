@@ -158,9 +158,9 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
 
             IJournal oldJ = resourceManager.getLiveJournal();
             
-            assertEquals(1, resourceManager.getJournalCount());
+            assertEquals(1, resourceManager.getManagedJournalCount());
 
-            assertEquals(0, resourceManager.getIndexSegmentCount());
+            assertEquals(0, resourceManager.getManagedIndexSegmentCount());
             
             Set<String> copied = new HashSet<String>();
             
@@ -170,9 +170,9 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             // Not expecting the index partition to be copied over.
             assertEquals(0,copied.size());
             
-            assertEquals(2, resourceManager.getJournalCount());
+            assertEquals(2, resourceManager.getManagedJournalCount());
 
-            assertEquals(0, resourceManager.getIndexSegmentCount());
+            assertEquals(0, resourceManager.getManagedIndexSegmentCount());
 
             // verify live journal is a different instance.
             assertTrue(oldJ != resourceManager.getLiveJournal());

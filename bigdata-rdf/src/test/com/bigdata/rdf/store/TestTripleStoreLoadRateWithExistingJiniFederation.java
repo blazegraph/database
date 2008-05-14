@@ -103,6 +103,10 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
      * </pre>
      * 
      * as well.
+     * <p>
+     * 
+     * Finally, you must specify the path of the Jini configuration file for
+     * the client on the command line (as an argument to the program).
      * 
      * @todo support load of the ontology as well?
      * 
@@ -134,11 +138,23 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
 
         final File file = new File(fileStr);
 
+        if (args.length == 0) {
+
+            System.err.println("usage: config");
+
+            System.exit(1);
+
+        }
+
+        final String jiniConfig = args[0]; 
+
+        System.out.println("Using: "+jiniConfig);
+        
         /**
          * Starts in {@link #setUp()}.
          */
         JiniClient client = JiniClient.newInstance(
-                new String[] { "src/resources/config/standalone/Client.config"
+                new String[] { jiniConfig
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });
 

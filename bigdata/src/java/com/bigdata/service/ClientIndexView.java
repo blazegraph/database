@@ -73,6 +73,7 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TaskCounters;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -161,9 +162,9 @@ public class ClientIndexView implements IClientIndex {
     final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-    private final IBigdataFederation fed;
+    private final AbstractFederation fed;
 
-    public IBigdataFederation getFederation() {
+    public AbstractFederation getFederation() {
         
         return fed;
         
@@ -318,7 +319,7 @@ public class ClientIndexView implements IClientIndex {
         if (metadataIndexMetadata == null)
             throw new IllegalArgumentException();
         
-        this.fed = fed;
+        this.fed = (AbstractFederation) fed;
 
         this.name = name;
 
@@ -1251,6 +1252,13 @@ public class ClientIndexView implements IClientIndex {
         protected final Split split;
         protected final IIndexProcedure proc;
         protected final IResultHandler resultHandler;
+        private final TaskCounters taskCounters;
+//        protected final TaskCounters taskCountersByProc;
+//        protected final TaskCounters taskCountersByIndex;
+        
+        private long nanoTime_submitTask;
+        private long nanoTime_beginWork;
+        private long nanoTime_finishedWork;
         
         /**
          * If the task fails then this will be populated with an ordered list of
@@ -1297,6 +1305,14 @@ public class ClientIndexView implements IClientIndex {
             this.proc = proc;
 
             this.resultHandler = resultHandler;
+
+            this.taskCounters = fed.getTaskCounters();
+            
+//            this.taskCountersByProc = fed.getTaskCounters(proc);
+//            
+//            this.taskCountersByIndex = fed.getTaskCounters(ClientIndexView.this);
+
+            nanoTime_submitTask = System.nanoTime();
             
         }
         
@@ -1305,7 +1321,53 @@ public class ClientIndexView implements IClientIndex {
             // the index partition locator.
             final PartitionLocator locator = (PartitionLocator) split.pmd;
 
-            submit(locator);
+            taskCounters.taskSubmitCount.incrementAndGet();
+//            taskCountersByProc.taskSubmitCount.incrementAndGet();
+//            taskCountersByIndex.taskSubmitCount.incrementAndGet();
+
+            nanoTime_beginWork = System.nanoTime();
+            final long queueWaitingTime = nanoTime_beginWork - nanoTime_submitTask;
+            taskCounters.queueWaitingTime.addAndGet(queueWaitingTime);
+//            taskCountersByProc.queueWaitingTime.addAndGet(queueWaitingTime);
+//            taskCountersByIndex.queueWaitingTime.addAndGet(queueWaitingTime);
+            
+            try {
+
+                submit(locator);
+                
+                taskCounters.taskSuccessCount.incrementAndGet();
+//                taskCountersByProc.taskSuccessCount.incrementAndGet();
+//                taskCountersByIndex.taskSuccessCount.incrementAndGet();
+
+            } catch(Exception ex) {
+
+                taskCounters.taskFailCount.incrementAndGet();
+//                taskCountersByProc.taskFailCount.incrementAndGet();
+//                taskCountersByIndex.taskFailCount.incrementAndGet();
+
+                throw ex;
+                
+            } finally {
+
+                nanoTime_finishedWork = System.nanoTime();
+
+                taskCounters.taskCompleteCount.incrementAndGet();
+//                taskCountersByProc.taskCompleteCount.incrementAndGet();
+//                taskCountersByIndex.taskCompleteCount.incrementAndGet();
+
+                // increment by the amount of time that the task was executing.
+                final long serviceNanoTime = nanoTime_finishedWork - nanoTime_beginWork;
+                taskCounters.serviceNanoTime.addAndGet(serviceNanoTime);
+//                taskCountersByProc.serviceNanoTime.addAndGet(serviceNanoTime);
+//                taskCountersByIndex.serviceNanoTime.addAndGet(serviceNanoTime);
+
+                // increment by the total time from submit to completion.
+                final long queuingNanoTime = nanoTime_finishedWork - nanoTime_submitTask;
+                taskCounters.queuingNanoTime.addAndGet(queuingNanoTime);
+//                taskCountersByProc.queuingNanoTime.addAndGet(queuingNanoTime);
+//                taskCountersByIndex.queuingNanoTime.addAndGet(queuingNanoTime);
+
+            }
             
             return null;
 
@@ -1347,9 +1409,9 @@ public class ClientIndexView implements IClientIndex {
                 if(Thread.interrupted()) throw new InterruptedException();
 
                 submit(dataService, name);
-                
+
             } catch(Exception ex) {
-                
+
                 if (causes == null)
                     causes = new LinkedList<Throwable>();
                 
@@ -1371,12 +1433,12 @@ public class ClientIndexView implements IClientIndex {
                 }
                 
             }
-
+            
         }
         
         /**
          * Submit the procedure to the {@link IDataService} and aggregate the
-         * result with the caller's {@link IResultHandler}.
+         * result with the caller's {@link IResultHandler} (if specified).
          * 
          * @param dataService
          *            The data service on which the procedure will be executed.
@@ -1390,7 +1452,7 @@ public class ClientIndexView implements IClientIndex {
          *       {@link ISimpleIndexProcedure}.
          */
         @SuppressWarnings("unchecked")
-        protected void submit(IDataService dataService, String name) throws Exception {
+        final private void submit(IDataService dataService, String name) throws Exception {
 
             final Object result = dataService.submit(timestamp, name, proc);
 

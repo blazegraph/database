@@ -35,7 +35,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.service.IServiceShutdown;
 
@@ -199,10 +198,4 @@ public interface IConcurrencyManager extends IServiceShutdown {
      */
     public WriteExecutorService getWriteService();
     
-    /**
-     * The object that coordinates exclusive access to the resources on the
-     * {@link #getWriteService()}.
-     */
-    public LockManager<String> getLockManager();
-
 }

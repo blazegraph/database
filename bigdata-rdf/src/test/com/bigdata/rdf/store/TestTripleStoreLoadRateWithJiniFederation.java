@@ -232,7 +232,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         helper.load(test.store);
 
         if(validate)
-        helper.validate(test.store);
+            helper.validate(test.store);
 
         helper.shutdownNow();
         

@@ -57,6 +57,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.QueueStatisticsTask;
+import com.bigdata.journal.TaskCounters;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -305,15 +306,14 @@ public class ConcurrentDataLoader {
         final CounterSet tmp = getCounters(fed);
 
         final QueueStatisticsTask loadServiceStatisticsTask = new QueueStatisticsTask(
-                "Load Service", loadService);
+                "Load Service", loadService, counters);
 
-        // task reports interesting statistics for the [loadService]
+        // setup sampling for the [loadService]
         loadServiceStatisticsFuture = fed.addScheduledStatisticsTask(
-                loadServiceStatisticsTask, 60/* initialDelay */,
-                60/* delay */, TimeUnit.SECONDS);
+                loadServiceStatisticsTask, 0/* initialDelay */,
+                1000/* delay */, TimeUnit.MILLISECONDS);
 
-        // add the queue statistics task counters to those defined
-        // above.
+        // add sampled counters to those reported by the client.
         loadServiceStatisticsTask.addCounters(tmp
                 .makePath("Load Service"));
 
@@ -350,98 +350,79 @@ public class ConcurrentDataLoader {
      * Setup the {@link CounterSet} to be reported to the
      * {@link ILoadBalancerService}.
      * <p>
-     * Note: This add the counters to be reported to the client's counter set -
-     * they will be reported when the client reports its own counters.
+     * Note: This add the counters to be reported to the client's counter set.
+     * The added counters will be reported when the client reports its own
+     * counters.
      * 
      * @param fed
      * 
      * @return The {@link CounterSet} for the {@link ConcurrentDataLoader}.
      */
-    public CounterSet getCounters(IBigdataFederation fed) {
+    synchronized public CounterSet getCounters(IBigdataFederation fed) {
 
-        final String path = fed.getClientCounterPathPrefix()
-                + "Concurrent Data Loader";
+        if (ourCounterSet == null) {
 
-        /*
-         * detach if pre-existing (if you run two instances once for a given
-         * client one will detach the other's counters).
-         */
-        fed.getCounterSet().detach(path);
+            final String path = fed.getClientCounterPathPrefix()
+                    + "Concurrent Data Loader";
+
+            // make path to the counter set for the data loader.
+            ourCounterSet = fed.getCounterSet().makePath(path);
+
+            ourCounterSet.addCounter("#clients", new OneShotInstrument<Integer>(
+                            nclients));
+
+            ourCounterSet.addCounter("clientNum", new OneShotInstrument<Integer>(
+                    clientNum));
+
+            {
+
+                CounterSet tmp = ourCounterSet.makePath("Load Service");
+                
+                tmp.addCounter("#scanned", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue((long) nscanned.get());
+
+                    }
+                });
+                tmp.addCounter("taskRejectCount", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue((long) counters.taskRejectCount.get());
+
+                    }
+                });
+                tmp.addCounter("taskRetryCount", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue((long) counters.taskRetryCount.get());
+
+                    }
+                });
+                tmp.addCounter("taskFatalCount", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue((long) counters.taskFatalCount.get());
+
+                    }
+                });
+                
+            }
+
+        }
         
-        // make path to the counter set for the data loader.
-        final CounterSet tmp = fed.getCounterSet().makePath(path);
-
-        tmp.addCounter("#clients", new OneShotInstrument<Integer>(nclients));
-
-        tmp.addCounter("clientNum", new OneShotInstrument<Integer>(clientNum));
-
-        tmp.addCounter("#scanned", new Instrument<Long>() {
-
-            @Override
-            protected void sample() {
-
-                setValue((long) nscanned.get());
-
-            }
-        });
-        tmp.addCounter("#submit", new Instrument<Long>() {
-
-            @Override
-            protected void sample() {
-
-                setValue((long) counters.nsubmit.get());
-
-            }
-        });
-        tmp.addCounter("#complete", new Instrument<Long>() {
-
-            @Override
-            protected void sample() {
-
-                setValue((long) counters.ncomplete.get());
-
-            }
-        });
-        tmp.addCounter("#success", new Instrument<Long>() {
-
-            @Override
-            protected void sample() {
-
-                setValue((long) counters.nsuccess.get());
-
-            }
-        });
-        tmp.addCounter("#error", new Instrument<Long>() {
-
-            @Override
-            protected void sample() {
-
-                setValue((long) counters.nerror.get());
-
-            }
-        });
-        tmp.addCounter("#fail", new Instrument<Long>() {
-
-            @Override
-            protected void sample() {
-
-                setValue((long) counters.nfail.get());
-
-            }
-        });
-        tmp.addCounter("#retry", new Instrument<Long>() {
-
-            @Override
-            protected void sample() {
-
-                setValue((long) counters.nretry.get());
-
-            }
-        });
-
-        return tmp;
+        return ourCounterSet;
         
     }
+    private CounterSet ourCounterSet;
     
     /**
      * If there is a task on the {@link #errorQueue} then re-submit it.
@@ -462,7 +443,7 @@ public class ConcurrentDataLoader {
             // re-submit a task that produced an error.
             new WorkflowTask<ReaderTask, Object>(errorTask).submit();
 
-            counters.nretry.incrementAndGet();
+            counters.taskRetryCount.incrementAndGet();
 
             return true;
 
@@ -715,6 +696,15 @@ public class ConcurrentDataLoader {
         
         while (true) {
 
+//            final long submitCount = counters.taskSubmitCount.get();
+//            
+//            if (submitCount > 0 && submitCount < 20) {
+//
+//                // stagger the first few tasks.
+//                Thread.sleep(50/* ms */);
+//                
+//            }
+            
             try {
 
                 // wrap as a WorkflowTask.
@@ -746,6 +736,11 @@ public class ConcurrentDataLoader {
                  * 
                  * @todo move the rejected ex handler inside of the workflow
                  * task but allow override of the retry policy?
+                 * 
+                 * Note: the rejected execution exists because we are capping
+                 * the maximum size of the queue feeding the [loadService]. You
+                 * need to keep this in mind when interpreting the average queue
+                 * size for the [loadService].
                  */
                 
                 // the task could not be submitted.
@@ -836,6 +831,10 @@ public class ConcurrentDataLoader {
          */
         final long beginTime;
 
+        /**
+         * The maximum #of times this task will be retried on error before
+         * failing.
+         */
         final int maxtries;
         
         /**
@@ -855,6 +854,10 @@ public class ConcurrentDataLoader {
                
         final WorkflowTaskCounters counters;
 
+        private long nanoTime_submitTask;
+        private long nanoTime_beginWork;
+        private long nanoTime_finishedWork;
+        
         /**
          * Ctor for retry of a failed task.
          * 
@@ -967,15 +970,29 @@ public class ConcurrentDataLoader {
             
             }
             
-            log.info("Submitting task=" + target + " : " + counters);
+            if (log.isInfoEnabled())
+                log.info("Submitting task=" + target + " : " + counters);
 
             // attempt to submit the task.
-            future = (Future<F>) service.submit(this);
+            try {
+                // note submit time.
+                nanoTime_submitTask = System.nanoTime();
+                // increment the counter.
+                counters.taskSubmitCount.incrementAndGet();
+                // submit task.
+                future = (Future<F>) service.submit(this);
+            } catch(RejectedExecutionException ex) {
+                // task was rejected.
+                // clear submit time.
+                nanoTime_submitTask = 0L;
+                // and back out the #of submitted tasks.
+                counters.taskSubmitCount.decrementAndGet();
+                counters.taskRejectCount.incrementAndGet();
+                throw ex;
+            }
 
-            // increment the counter.
-            counters.nsubmit.incrementAndGet();
-
-            log.info("Submitted task="+target+" : "+counters);
+            if (log.isInfoEnabled())
+                log.info("Submitted task="+target+" : "+counters);
 
             return future;
 
@@ -1015,23 +1032,14 @@ public class ConcurrentDataLoader {
             
             log.info("Running task="+target+" : "+counters);
             
+            nanoTime_beginWork = System.nanoTime();
+            counters.queueWaitingTime.addAndGet(nanoTime_beginWork - nanoTime_submitTask);
+
             try {
 
                 target.run();
 
                 success();
-                
-            } catch(RuntimeException ex) {
-                
-                error(ex);
-                
-                throw ex;
-                
-            } catch (Exception ex) {
-
-                error(ex);
-                
-                throw new RuntimeException(ex);
                 
             } catch (Throwable ex) {
 
@@ -1039,17 +1047,28 @@ public class ConcurrentDataLoader {
                 
                 throw new RuntimeException(ex);
                                 
+            } finally {
+
+                nanoTime_finishedWork = System.nanoTime();
+                
+                // increment by the amount of time that the task was executing.
+                counters.serviceNanoTime.addAndGet(nanoTime_finishedWork - nanoTime_beginWork);
+
+                // increment by the total time from submit to completion.
+                counters.queuingNanoTime.addAndGet(nanoTime_finishedWork - nanoTime_submitTask);
+
             }
             
         }
         
         protected void success() throws InterruptedException {
             
-            counters.ncomplete.incrementAndGet();
+            counters.taskCompleteCount.incrementAndGet();
 
-            counters.nsuccess.incrementAndGet();
+            counters.taskSuccessCount.incrementAndGet();
 
-            log.info("Success task="+target+" : "+counters);
+            if (log.isInfoEnabled())
+                log.info("Success task="+target+" : "+counters);
 
             // may block.
             successQueue.put(this);
@@ -1058,9 +1077,9 @@ public class ConcurrentDataLoader {
         
         protected void error(Throwable t) throws InterruptedException {
 
-            counters.ncomplete.incrementAndGet();
+            counters.taskCompleteCount.incrementAndGet();
 
-            counters.nerror.incrementAndGet();
+            counters.taskFailCount.incrementAndGet();
 
             if (ntries < maxtries) {
 
@@ -1075,7 +1094,7 @@ public class ConcurrentDataLoader {
                 // note: with stack trace on final error.
                 log.error("failed: task=" + target+", cause="+t, t);
 
-                counters.nfail.incrementAndGet();
+                counters.taskFatalCount.incrementAndGet();
 
                 // may block.
                 failedQueue.put(this);
@@ -1096,25 +1115,19 @@ public class ConcurrentDataLoader {
      *       {@link QueueStatisticsTask} so that we can report the response
      *       times here.
      */
-    public static class WorkflowTaskCounters {
+    public static class WorkflowTaskCounters extends TaskCounters {
         
-        final public AtomicInteger nsubmit = new AtomicInteger(0);
+        final public AtomicInteger taskRejectCount = new AtomicInteger(0);
 
-        final public AtomicInteger ncomplete = new AtomicInteger(0);
+        final public AtomicInteger taskRetryCount = new AtomicInteger(0);
         
-        final public AtomicInteger nsuccess = new AtomicInteger(0);
-        
-        final public AtomicInteger nerror = new AtomicInteger(0);
-        
-        final public AtomicInteger nretry = new AtomicInteger(0);
-        
-        final public AtomicInteger nfail = new AtomicInteger(0);
+        final public AtomicInteger taskFatalCount = new AtomicInteger(0);
         
         public String toString() {
          
-            return "#submit=" + nsubmit + ", #complete=" + ncomplete
-                    + ", #success=" + nsuccess + ", #error=" + nerror
-                    + ", #retry=" + nretry+", #fail="+nfail;
+            return super.toString() + ", #reject=" + taskRejectCount
+                    + ", #retry=" + taskRetryCount + ", #fatal="
+                    + taskFatalCount;
             
         }
         

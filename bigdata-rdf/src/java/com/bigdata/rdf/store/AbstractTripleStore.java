@@ -1498,8 +1498,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             /*
              * For each term that does not have a pre-assigned term identifier,
-             * execute a remote unisolated batch operation that assigns the term
-             * identifier.
+             * add it to a remote unisolated batch operation that assigns term
+             * identifiers.
              */
             {
 
@@ -1674,7 +1674,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
             }
     
             /*
-             * Index the terms for keyword search.
+             * Index the terms for keyword search : @todo parallelize w/ reverse index write.
              */
             if (textIndex && getSearchEngine() != null) {
     

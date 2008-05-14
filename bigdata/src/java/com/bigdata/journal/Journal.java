@@ -38,7 +38,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.IDataService;
@@ -569,12 +568,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks) throws InterruptedException {
         
         return concurrencyManager.invokeAll(tasks);
-        
-    }
-
-    public LockManager<String> getLockManager() {
-
-        return concurrencyManager.getLockManager();
         
     }
 

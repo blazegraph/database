@@ -988,7 +988,13 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * The {@link AbstractTask} increments various counters of interest to the
      * {@link ConcurrencyManager} using this object.
      */
-    final TaskCounters counters;
+    protected TaskCounters taskCounters;
+    
+    public TaskCounters getTaskCounters() {
+        
+        return taskCounters;
+        
+    }
     
     /*
      * Timing data for this task.
@@ -1018,11 +1024,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * still do abort processing or await the next commit group.
      */
     public long nanoTime_finishedWork;
-    
-    /**
-     * The time at which the task was done. 
-     */
-    public long nanoTime_allDone;
     
     /**
      * Convenience constructor variant for one named resource.
@@ -1145,7 +1146,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
             readOnly = tx.isReadOnly();
             
-            counters = this.concurrencyManager.countersTX;
+            taskCounters = this.concurrencyManager.countersTX;
             
         } else if (timestamp < ITx.UNISOLATED) {
 
@@ -1163,7 +1164,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             readOnly = true;
 
-            counters = this.concurrencyManager.countersHR;
+            taskCounters = this.concurrencyManager.countersHR;
             
         } else {
 
@@ -1175,7 +1176,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             readOnly = false;
 
-            counters = this.concurrencyManager.countersUN;
+            taskCounters = this.concurrencyManager.countersUN;
             
         }
 
@@ -1430,7 +1431,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             final long waitingTime = (System.nanoTime() - nanoTime_submitTask);
             
-            counters.queueWaitingTime += waitingTime;
+            taskCounters.queueWaitingTime.addAndGet(waitingTime);
             
             setupLoggingContext();
             
@@ -1438,7 +1439,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             clearLoggingContext();
 
-            counters.taskSuccessCount++;
+            taskCounters.taskSuccessCount.incrementAndGet();
 
             return ret;
 
@@ -1449,19 +1450,31 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              * hierarchy (which you are not supposed to catch).
              */
             
-            counters.tailFailCount++;
+            taskCounters.taskFailCount.incrementAndGet();
             
             throw e;
             
         } finally {
 
-            counters.taskCompleteCount++;
+            taskCounters.taskCompleteCount.incrementAndGet();
             
             // increment by the amount of time that the task was executing.
-            counters.serviceNanoTime += (nanoTime_finishedWork - nanoTime_beginWork);
+            taskCounters.serviceNanoTime.addAndGet(nanoTime_finishedWork - nanoTime_beginWork);
 
-            // increment by the total time from submit to completion.
-            counters.queuingNanoTime += (nanoTime_finishedWork - nanoTime_submitTask);
+            /*
+             * Increment by the total time from submit to completion.
+             * 
+             * Note: This measure would not report the commit waiting time or
+             * the commit service time. Therefore the [queuingNanoTime] is
+             * special cased for the WriteExecutorService - see afterTask() on
+             * that class.
+             */
+            if (timestamp != ITx.UNISOLATED) {
+
+                taskCounters.queuingNanoTime.addAndGet(nanoTime_finishedWork
+                        - nanoTime_submitTask);
+
+            }
             
         }
 
@@ -1549,8 +1562,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         } finally {
 
-            nanoTime_allDone = System.currentTimeMillis();
-            
             if(INFO) log.info("done: "+this);
 
         }
@@ -1568,7 +1579,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     private Object doUnisolatedReadWriteTask() throws Exception {
         
         // lock manager.
-        final LockManager<String> lockManager = concurrencyManager.getLockManager();
+        final LockManager<String> lockManager = concurrencyManager.getWriteService().getLockManager();
 
         // resource(s) to lock (exclusive locks are used).
 
@@ -1611,7 +1622,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                  * acquire its lock(s).
                  */
 
-                counters.lockWaitingTime += delegate.getLockLatency();
+                taskCounters.lockWaitingTime.addAndGet( delegate.getLockLatency() );
                 
             }
 
@@ -1719,6 +1730,12 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
                 
+        public TaskCounters getTaskCounters() {
+            
+            return delegate.getTaskCounters();
+            
+        }
+        
         public String toString() {
             
             return getClass().getName()+"("+delegate.toString()+")";

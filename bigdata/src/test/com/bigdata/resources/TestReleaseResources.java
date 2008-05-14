@@ -151,10 +151,10 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
                     .getUUID()));
             
             // 2 journals.
-            assertEquals(2,resourceManager.getJournalCount());
+            assertEquals(2,resourceManager.getManagedJournalCount());
 
             // no index segments.
-            assertEquals(0,resourceManager.getIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
             
             /*
              * Verify that we can the first commit record when we provide the
@@ -291,10 +291,10 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertTrue(j1 == resourceManager.openStore(uuid1));
 
             // one journal remaining.
-            assertEquals(1,resourceManager.getJournalCount());
+            assertEquals(1,resourceManager.getManagedJournalCount());
 
             // no index segments.
-            assertEquals(0,resourceManager.getIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
             
             /*
              * Verify that the resources required for [A] after overflow are
@@ -402,10 +402,10 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertEquals(1,resourceManager.getOverflowCount());
 
             // two journals.
-            assertEquals(2,resourceManager.getJournalCount());
+            assertEquals(2,resourceManager.getManagedJournalCount());
             
             // no index segments.
-            assertEquals(0,resourceManager.getIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
             
             // should have been closed against further writes but NOT deleted.
             assertTrue(resourceManager.openStore(uuid0).isReadOnly());
@@ -450,10 +450,10 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertFalse(j0.isOpen());
             
             // two journals (the original journal should have been deleted).
-            assertEquals(2,resourceManager.getJournalCount());
+            assertEquals(2,resourceManager.getManagedJournalCount());
             
             // no index segments.
-            assertEquals(0,resourceManager.getIndexSegmentCount());
+            assertEquals(0,resourceManager.getManagedIndexSegmentCount());
             
             // should have been closed against further writes but NOT deleted.
             assertTrue(resourceManager.openStore(uuid1).isReadOnly());

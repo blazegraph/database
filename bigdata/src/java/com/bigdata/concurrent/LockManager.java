@@ -27,10 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.concurrent;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -188,6 +188,13 @@ public class LockManager</*T,*/R extends Comparable<R>> {
                 }
             });
             
+            // Note: #that are seeking to acquire or waiting on their locks.
+            root.addCounter("nwaiting", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nwaiting.get());
+                }
+            });
+            
             // Note: #that have acquired locks are executing concurrently.
             root.addCounter("nrunning", new Instrument<Long>() {
                 public void sample() {
@@ -195,6 +202,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
                 }
             });
             
+            // the maximum observed value for [nrunning].
             root.addCounter("maxRunning", new Instrument<Long>() {
                 public void sample() {
                     setValue(maxrunning.get());
@@ -213,45 +221,47 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * {@link LockManagerTask#call()}). This counter is incremented
      * BEFORE the task attempts to acquire its resource lock(s).
      */
-    AtomicLong nstarted = new AtomicLong(0);
+    final AtomicLong nstarted = new AtomicLong(0);
 
     /**
      * The #of tasks that end execution (exit
      * {@link LockManagerTask#call()}).
      */
-    AtomicLong nended = new AtomicLong(0);
+    final AtomicLong nended = new AtomicLong(0);
 
     /**
      * The #of tasks that had an error condition.
      */
-    AtomicLong nerror = new AtomicLong(0);
+    final AtomicLong nerror = new AtomicLong(0);
 
     /**
      * The #of tasks that deadlocked when they attempted to acquire their
      * locks. Note that a task MAY retry lock acquisition and this counter
      * will be incremented each time it does so and then deadlocks.
      */
-    AtomicLong ndeadlock = new AtomicLong(0);
+    final AtomicLong ndeadlock = new AtomicLong(0);
 
     /**
      * The #of tasks that timed out when they attempted to acquire their
      * locks. Note that a task MAY retry lock acquisition and this counter
      * will be incremented each time it does so and then times out.
      */
-    AtomicLong ntimeout = new AtomicLong(0);
+    final AtomicLong ntimeout = new AtomicLong(0);
+
+    /**
+     * #of tasks that are either waiting on locks or attempting to acquire their locks.
+     */
+    final AtomicLong nwaiting = new AtomicLong(0);
 
     /**
      * #of tasks that have acquired their locks and are concurrently executing.
-     * 
-     * @todo sample and track this with a moving average to measure the real
-     *       concurrency of the system.
      */
-    AtomicLong nrunning = new AtomicLong(0);
+    final AtomicLong nrunning = new AtomicLong(0);
 
     /**
      * The maximum observed value of {@link #nrunning}.
      */
-    AtomicLong maxrunning = new AtomicLong(0);
+    final AtomicLong maxrunning = new AtomicLong(0);
 
     /**
      * Create a lock manager for resources and concurrent operations.
@@ -280,29 +290,30 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * Create a lock manager for resources and concurrent operations.
      * <p>
      * Note that there is no concurrency limit imposed by the
-     * {@link LockManager} when predeclareLocks is true as deadlocks are
-     * impossible and we do not maintain a WAITS_FOR graph.
+     * {@link LockManager} when <i>predeclareLocks</i> is <code>true</code>
+     * as deadlocks are impossible and we do not maintain a
+     * <code>WAITS_FOR</code> graph.
      * 
      * @param maxConcurrency
      *            The maximum multi-programming level (ignored if
      *            predeclareLocks is true).
      * 
      * @param predeclareLocks
-     *            When true operations MUST declare all locks before they
-     *            begin to execute. This makes possible several efficiencies
-     *            and by sorting the resources in each lock request into a
-     *            common order we are able to avoid deadlocks entirely.
+     *            When true operations MUST declare all locks before they begin
+     *            to execute. This makes possible several efficiencies and by
+     *            sorting the resources in each lock request into a common order
+     *            we are able to avoid deadlocks entirely.
      * 
      * @param sortLockRequests
-     *            This option indicates whether or not the resources in a
-     *            lock request will be sorted before attempting to acquire
-     *            the locks for those resources. Normally <code>true</code>
-     *            this option MAY be disabled for testing purposes. It is an
-     *            error to disable this option if <i>predeclareLocks</i> is
+     *            This option indicates whether or not the resources in a lock
+     *            request will be sorted before attempting to acquire the locks
+     *            for those resources. Normally <code>true</code> this option
+     *            MAY be disabled for testing purposes. It is an error to
+     *            disable this option if <i>predeclareLocks</i> is
      *            <code>false</code>.
      */
-    LockManager(int maxConcurrency, boolean predeclareLocks,
-            boolean sortLockRequests) {
+    LockManager(final int maxConcurrency, final boolean predeclareLocks,
+            final boolean sortLockRequests) {
 
         if (maxConcurrency < 2 && !predeclareLocks) {
 
@@ -504,7 +515,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      *             If locks are being predeclared and there are already
      *             locks held by the operation.
      */
-    void lock(R[] resource, long timeout) throws InterruptedException,
+    void lock(R[] resource, final long timeout) throws InterruptedException,
             DeadlockException, TimeoutException {
 
         if (resource == null) {
@@ -529,12 +540,12 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         if (resource.length == 0)
             return; // NOP.
 
-        Thread tx = Thread.currentThread();
+        final Thread tx = Thread.currentThread();
 
         if (predeclareLocks) {
 
             // verify that no locks are held for this operation.
-            Collection<R> resources = lockedResources.get(tx);
+            final Collection<R> resources = lockedResources.get(tx);
 
             if (resources != null) {
 
@@ -570,6 +581,19 @@ public class LockManager</*T,*/R extends Comparable<R>> {
         if(INFO) {
 
             log.info("Acquiring lock(s): " + Arrays.toString(resource));
+            
+        }
+
+        if (lockedResources.get(tx) == null) {
+
+            /*
+             * Note: This is optimized for the case when the task has
+             * pre-declared its locks and puts an ArrayList of the exact
+             * capacity into place.
+             */
+            
+            lockedResources.put(tx, new ArrayList<R>(resource.length));
+
         }
 
         for (int i = 0; i < resource.length; i++) {
@@ -596,30 +620,25 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * 
      * @throws InterruptedException
      */
-    private void lock(Thread tx, R resource, long timeout)
+    private void lock(final Thread tx, final R resource, final long timeout)
             throws InterruptedException {
 
         //            resourceManagementLock.lock();
 
         //            try {
 
-        ResourceQueue<R, Thread> resourceQueue = resourceQueues.get(resource);
+        final ResourceQueue<R, Thread> resourceQueue = resourceQueues
+                .get(resource);
 
         if (resourceQueue == null)
             throw new IllegalArgumentException("No such resource: " + resource);
 
         resourceQueue.lock(tx, timeout);
 
-        Collection<R> resources = lockedResources.get(tx);
+        final Collection<R> resources = lockedResources.get(tx);
 
-        if (resources == null) {
-
-            resources = new LinkedList<R>();
-
-            lockedResources.put(tx, resources);
-
-        }
-
+        assert resources != null;
+        
         resources.add(resource);
 
         //            } finally {
@@ -655,17 +674,17 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         //            resourceManagementLock.lock();
 
-        Thread tx = Thread.currentThread();
+        final Thread tx = Thread.currentThread();
 
         try {
 
             log.info("Releasing locks");
 
-            Collection<R> resources = lockedResources.remove(tx);
+            final Collection<R> resources = lockedResources.remove(tx);
 
             if (resources == null) {
 
-                log.info("No locks: " + tx);
+                if(INFO) log.info("No locks: " + tx);
 
                 return;
 
@@ -679,15 +698,15 @@ public class LockManager</*T,*/R extends Comparable<R>> {
              * there are any negative consequences to this.
              */
 
-            log.info("Releasing resource locks: resources=" + resources);
+            if(INFO) log.info("Releasing resource locks: resources=" + resources);
 
-            Iterator<R> itr = resources.iterator();
+            final Iterator<R> itr = resources.iterator();
 
             while (itr.hasNext()) {
 
-                R resource = itr.next();
+                final R resource = itr.next();
 
-                ResourceQueue<R, Thread> resourceQueue = resourceQueues
+                final ResourceQueue<R, Thread> resourceQueue = resourceQueues
                         .get(resource);
 
                 if (resourceQueue == null)
@@ -710,16 +729,15 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
                 }
 
-                log.info("Released lock: "+resource);
+                if(INFO) log.info("Released lock: "+resource);
 
             }
 
-            log.info("Released resource locks: resources=" + resources);
+            if(INFO) log.info("Released resource locks: resources=" + resources);
 
         } catch (Throwable t) {
 
-            log
-                    .error("Could not release locks: " + t, t);
+            log.error("Could not release locks: " + t, t);
 
         } finally {
 
@@ -753,7 +771,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         nstarted.incrementAndGet();
 
-        log.info("Started: nstarted=" + nstarted);
+        if(INFO) log.info("Started: nstarted=" + nstarted);
 
     }
 
@@ -785,7 +803,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         }
 
-        log.info("Ended: nended=" + nended);
+        if(INFO) log.info("Ended: nended=" + nended);
 
     }
 
@@ -806,7 +824,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      */
     void didAbort(Callable<Object> task, Throwable t, boolean waiting) {
 
-        log.info("Begin: nended=" + nended);
+        if(INFO) log.info("Begin: nended=" + nended);
 
         nerror.incrementAndGet();
 
@@ -826,7 +844,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         }
 
-        log.info("Ended: nended=" + nended);
+        if(INFO) log.info("Ended: nended=" + nended);
 
     }
 

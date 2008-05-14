@@ -312,10 +312,10 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         assertTrue(resourceManager.getLiveJournal()==resourceManager.getLiveJournal());
         
         // verify #of journals discovered.
-        assertEquals(2,resourceManager.getJournalCount());
+        assertEquals(2,resourceManager.getManagedJournalCount());
 
         // verify no index segments discovered.
-        assertEquals(0,resourceManager.getIndexSegmentCount());
+        assertEquals(0,resourceManager.getManagedIndexSegmentCount());
         
         // open one journal.
         assertNotNull(resourceManager.openStore(journalMetadata1.getUUID()));
@@ -450,10 +450,10 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
          */
         
         // verify #of journals discovered.
-        assertEquals(1, resourceManager.getJournalCount());
+        assertEquals(1, resourceManager.getManagedJournalCount());
 
         // #of index segments discovered.
-        assertEquals(nsegments, resourceManager.getIndexSegmentCount());
+        assertEquals(nsegments, resourceManager.getManagedIndexSegmentCount());
 
         // verify index segments discovered.
         for(int i=0; i<nsegments; i++) {
@@ -684,7 +684,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
          */
         
         // verify journal discovered.
-        assertEquals(1, resourceManager.getJournalCount());
+        assertEquals(1, resourceManager.getManagedJournalCount());
         
         // open the journal.
         IJournal journal = resourceManager.getLiveJournal();
@@ -697,7 +697,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                 0L/* timestamp */, journal));
 
         // an index segment was found.
-        assertEquals(1, resourceManager.getIndexSegmentCount());
+        assertEquals(1, resourceManager.getManagedIndexSegmentCount());
 
         // verify index segment discovered.
         IndexSegmentStore segStore = (IndexSegmentStore) resourceManager

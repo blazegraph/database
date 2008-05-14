@@ -30,6 +30,7 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.rmi.NoSuchObjectException;
 import java.util.Map;
@@ -58,6 +59,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
@@ -1214,7 +1216,21 @@ abstract public class DataService extends AbstractService
                         public Response doGet(String uri, String method, Properties header,
                                 Map<String, Vector<String>> parms) throws Exception {
                             
-                            reattachDynamicCounters();
+                            try {
+                                
+                                reattachDynamicCounters();
+                                
+                            } catch(Exception ex) {
+                                
+                                /*
+                                 * Typically this is because the live journal
+                                 * has been concurrently closed during the
+                                 * request.
+                                 */
+                                
+                                log.warn("Could not re-attach dynamic counters: "+ex, ex);
+                                
+                            }
                             
                             return super.doGet(uri, method, header, parms);
                             
@@ -1225,10 +1241,11 @@ abstract public class DataService extends AbstractService
                     // the URL that may be used to access the local httpd.
                     final String url = "http://"
                             + AbstractStatisticsCollector.fullyQualifiedHostName
-                            + ":" + DataService.this.httpd.getPort();
+                            + ":" + DataService.this.httpd.getPort()
+                            + "?path="+URLEncoder.encode(serviceRoot.getPath(),"UTF-8");
                     
                     // add counter reporting that url to the load balancer.
-                    DataService.this.serviceRoot.addCounter("Local httpd", 
+                    DataService.this.serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD, 
                             new OneShotInstrument<String>(url));
                     
                 } catch (IOException e) {
