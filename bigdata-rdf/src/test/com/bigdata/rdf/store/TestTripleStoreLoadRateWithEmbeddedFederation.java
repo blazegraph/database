@@ -84,8 +84,8 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
          * overflow early or late or to disable overflow all together.
          */
 //      properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
-//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
-//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
+        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
+        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
 //        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*100);
 //        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*100);
 //      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
@@ -190,47 +190,57 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         
     }
     
-//    public void test_U1() {
-//        
-//        new ConcurrentDataLoader(store, 3/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U1"), new FilenameFilter(){
-//
-//            public boolean accept(File dir, String name) {
-//                if(name.endsWith(".owl")) return true;
-//                return false;
-//            }
-//            
-//        });
-//        
-//    }
-//    
-//    /**
-//     * @todo setup an experiment driver to explore the parameter space for
-//     *       nthreads, buffer size, LUBM size, federation parameters, etc?
-//     */
-//    public void test_U10() {
-//        
-//        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
-//
-//            public boolean accept(File dir, String name) {
-//                if(name.endsWith(".owl")) return true;
-//                return false;
-//            }
-//            
-//        });
-//        
-//    }
-//
-//    public void test_U20() {
-//        
-//        new ConcurrentDataLoader(store, 10/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U20"), new FilenameFilter(){
-//
-//            public boolean accept(File dir, String name) {
-//                if(name.endsWith(".owl")) return true;
-//                return false;
-//            }
-//            
-//        });
-//        
-//    }
-    
+    /**
+     * 
+     * <dl>
+     * <dt>-Dnthreads</dt>
+     * <dd>#of threads to use.</dd>
+     * <dt>-DbufferCapacity</dt>
+     * <dd>Capacity of the statement buffers.</dd>
+     * <dt>-Ddocuments.directory</dr>
+     * <dd>The file or directory to be loaded (recursive processing).</dd>
+     * </dl>
+     * 
+     * @param args
+     * @throws Exception
+     */
+    public static void main(String[] args) throws Exception {
+
+        final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
+        
+        final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
+        
+        final boolean validate = Boolean.parseBoolean(System.getProperty("validate",
+                "false"));
+
+        final String fileStr = System.getProperty("documents.directory");
+
+        if (fileStr == null)
+            throw new RuntimeException(
+                    "Required property 'documents.directory' was not specified");
+
+        final File file = new File(fileStr);
+
+        TestTripleStoreLoadRateWithEmbeddedFederation test = new TestTripleStoreLoadRateWithEmbeddedFederation("test");
+        
+        test.setUp();
+
+        RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(
+                test.client, nthreads, bufferCapacity, file, test.filter);
+
+        helper.load(test.store);
+
+        if(validate)
+            helper.validate(test.store);
+
+        helper.shutdownNow();
+        
+        test.tearDown();
+        
+        System.out.println("Exiting normally.");
+        
+        System.exit(0);
+        
+    }
+        
 }

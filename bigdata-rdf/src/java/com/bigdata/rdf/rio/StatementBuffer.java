@@ -240,19 +240,18 @@ public class StatementBuffer implements IStatementBuffer {
 
     /**
      * Create a buffer that converts Sesame {@link Value} objects to {@link SPO}s
-     * and writes on the <i>database</i> when it is {@link #flush()}ed.  This may
-     * be used to perform efficient batch write of Sesame {@link Value}s or
-     * {@link Statement}s onto the <i>database</i>.  If you already have {@link SPO}s
-     * then use {@link IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)} and
+     * and writes on the <i>database</i> when it is {@link #flush()}ed. This
+     * may be used to perform efficient batch write of Sesame {@link Value}s or
+     * {@link Statement}s onto the <i>database</i>. If you already have
+     * {@link SPO}s then use
+     * {@link IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)} and
      * friends.
      * 
      * @param database
      *            The database into which the terma and statements will be
      *            inserted.
      * @param capacity
-     *            The maximum #of Statements, URIs, Literals, or BNodes that the
-     *            buffer can hold. The minimum capacity is three (3) since that
-     *            corresponds to a single triple where all terms are URIs.
+     *            The #of statements that the buffer can hold.
      */
     public StatementBuffer(AbstractTripleStore database, int capacity) {
 
@@ -279,9 +278,7 @@ public class StatementBuffer implements IStatementBuffer {
      *            both terms and statements will be inserted into the
      *            <i>database</i>.
      * @param capacity
-     *            The maximum #of Statements, URIs, Literals, or BNodes that the
-     *            buffer can hold. The minimum capacity is three (3) since that
-     *            corresponds to a single triple where all terms are URIs.
+     *            The #of statements that the buffer can hold.
      */
     public StatementBuffer(TempTripleStore statementStore, AbstractTripleStore database, int capacity) {
         

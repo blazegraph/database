@@ -183,8 +183,9 @@ public class NanoHTTPD implements IServiceShutdown
 		{
 			this.status = status;
 			this.mimeType = mimeType;
-			this.data = new ByteArrayInputStream( txt.getBytes());
-		}
+			this.data = new ByteArrayInputStream(txt == null ? new byte[] {}
+                    : txt.getBytes());
+        }
 
 		/**
 		 * Adds given line to the header.

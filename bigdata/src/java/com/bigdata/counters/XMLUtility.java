@@ -43,6 +43,7 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.util.HTMLUtility;
 
@@ -187,7 +188,7 @@ public class XMLUtility {
 //                w.write(" type=\"" + type + "\"");
             w.write("\n>");
             
-            final Iterator<IHistoryEntry> itr = h.iterator();
+            final SampleIterator itr = h.iterator();
 
             while (itr.hasNext()) {
 
@@ -406,7 +407,7 @@ public class XMLUtility {
                      * history support).
                      */
                     
-                    log.warn("Ignoring history: "+counter);
+                    log.warn("Ignoring history: inst="+counter.getInstrument().getClass().getName()+", path"+counter);
                     
                     return;
                     

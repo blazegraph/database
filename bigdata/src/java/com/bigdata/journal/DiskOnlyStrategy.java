@@ -1088,6 +1088,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * 
          * Note: If the file has been closed for writes (closeTime != 0L), then
          * the file is read-only regardless of the mode in which it was opened.
+         * 
+         * Note: NIO always (at least up to Java 6) allocates a "temporary"
+         * direct byte buffer for disk read/write operations on a heap buffer
+         * AND there is a bug in the release of those buffers. Therefore do NOT
+         * pass in a heap byte buffer for the write cache!!!
          */
         if (fileMetadata.writeCache != null && !fileMetadata.readOnly
                 && fileMetadata.closeTime == 0L) {

@@ -40,7 +40,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
- * Test suite for {@link TemporaryRawStore}.
+ * Test suite for {@link TemporaryStore} (temporary store with named indices).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

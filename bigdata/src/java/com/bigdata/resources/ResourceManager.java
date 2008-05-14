@@ -243,24 +243,35 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     public void sample() {setValue(isRunning());}
                 });
 
+                tmp.addCounter("Store Cache Capacity",
+                        new OneShotInstrument<Integer>(storeCache.capacity()));
+
                 tmp.addCounter("Store Cache Size", new Instrument<Long>(){
                     public void sample() {setValue((long)getStoreCacheSize());}
                 });
 
-                tmp.addCounter("Journal Count", new Instrument<Long>(){
-                    public void sample() {setValue((long)getJournalCount());}
+                tmp.addCounter("Managed Journal Count", new Instrument<Long>(){
+                    public void sample() {setValue((long)getManagedJournalCount());}
                 });
 
-                tmp.addCounter("Segment Count", new Instrument<Long>(){
-                    public void sample() {setValue((long)getIndexSegmentCount());}
+                tmp.addCounter("Managed Segment Store Count", new Instrument<Long>(){
+                    public void sample() {setValue((long)getManagedIndexSegmentCount());}
                 });
 
-                tmp.addCounter("Journal Open Count", new Instrument<Long>(){
-                    public void sample() {setValue(journalOpenCount.get());}
+                tmp.addCounter("Journal (Re-)open Count", new Instrument<Long>(){
+                    public void sample() {setValue(journalReopenCount.get());}
                 });
 
-                tmp.addCounter("Segment Open Count", new Instrument<Long>(){
-                    public void sample() {setValue(segmentOpenCount.get());}
+                tmp.addCounter("Segment Store (Re-)open Count", new Instrument<Long>(){
+                    public void sample() {setValue(segmentStoreReopenCount.get());}
+                });
+
+                tmp.addCounter("Journal Delete Count", new Instrument<Long>(){
+                    public void sample() {setValue(journalDeleteCount.get());}
+                });
+
+                tmp.addCounter("Segment Store Delete Count", new Instrument<Long>(){
+                    public void sample() {setValue(segmentStoreDeleteCount.get());}
                 });
 
                 tmp.addCounter("Minimum Release Age",

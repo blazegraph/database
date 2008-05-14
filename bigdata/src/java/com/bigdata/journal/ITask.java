@@ -140,4 +140,9 @@ public interface ITask extends Callable<Object> {
      */
     public IIndex getIndex(String name);
 
+    /**
+     * The object used to track events and times for the task.
+     */
+    public TaskCounters getTaskCounters();
+    
 }

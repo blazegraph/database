@@ -26,8 +26,6 @@ package com.bigdata.journal;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
@@ -49,6 +47,7 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.concurrent.LockManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
@@ -175,6 +174,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     private final IResourceManager resourceManager;
     
+    /**
+     * The object that coordinates exclusive access to the resources.
+     */
+    public LockManager<String> getLockManager() {
+        
+        return lockManager;
+        
+    }
+    private final LockManager<String> lockManager;
+
     public WriteExecutorService(IResourceManager resourceManager,
             int corePoolSize, int maximumPoolSize,
             BlockingQueue<Runnable> queue, ThreadFactory threadFactory) {
@@ -185,6 +194,27 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         if (resourceManager == null)
             throw new IllegalArgumentException();
         
+        // Setup the lock manager used by the write service.
+        {
+
+            /*
+             * Create the lock manager. Since we pre-declare locks,
+             * deadlocks are NOT possible and the capacity parameter is
+             * unused.
+             * 
+             * Note: pre-declaring locks means that any operation that
+             * writes on unisolated indices MUST specify in advance those
+             * index(s) on which it will write. This is enforced by the
+             * AbstractTask API.
+             */
+
+            lockManager = new LockManager<String>(//
+                    maximumPoolSize, // capacity
+                    true // predeclareLocks
+            );
+            
+        }
+
         this.resourceManager = resourceManager;
         
     }
@@ -234,90 +264,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     
     /** True iff we are executing an abort. */
     final private AtomicBoolean abort = new AtomicBoolean(false);
-    
-    /**
-     * The {@link Thread} that is executing the group commit and
-     * <code>null</code> if group commit is not being executed.
-     */
-    private Thread groupCommitThread = null;
-    
-    /**
-     * A list of the {@link ITx#UNISOLATED} AbstractTask}s executed by this
-     * {@link WriteExecutorService} in the order in which their commits are
-     * serialized.
-     * <p>
-     * {@link AbstractTask}s are already executed in a partial ordered
-     * determined by their exclusive resource locks. This partial order is
-     * sufficient to guarentee that concurrent tasks do not read or write on the
-     * same unisolated index. In addition, the {@link AbstractTask} itself
-     * coordinates a post-task checkpoint using the {@link #lock}, which
-     * imposes a total serialization order over the {@link AbstractTask}s.
-     * <p>
-     * Tasks are added to this list after they have successfully checkpointed
-     * themselves and are removed during the group commit protocol. If a task
-     * fails during its normal execution, then it is never entered into this
-     * list. If a task succeeds and writes its checkpoint record(s), then other
-     * tasks MAY begin to execute that depend on the same resources and hence on
-     * the checkpoint(s) written by that task. If a task fails or fails to write
-     * its checkpoint record(s) then its write set is rolled back and it is NOT
-     * entered onto this list since its write set will not be visible and can
-     * not become a precondition for other tasks.
-     * <p>
-     * During the group commit, there is a per-task commit protocol that
-     * atomically updates the {@link Name2Addr} object on the live journal to
-     * reflect (a) named indices registered by the task; (b) named indices
-     * dropped by the task; and (c) checkpoint records for named indices written
-     * by the task.
-     * <p>
-     * If this per-task commit protocol fails for a given task, then the
-     * transitive closure of downstream tasks in the {@link #serializationOrder}
-     * having a dependency (a lock on a resource that was accessed by the
-     * pre-condition task) MUST fail since its preconditions have not been made
-     * restart safe. Note that this transitive closure expands the set of
-     * resources as well as the set of downstream tasks since each resource lock
-     * can cause new preconditions to exists. Task whose preconditions have not
-     * been made restart safe are made to fail by interrupting the thread in
-     * which they are executing.
-     * <p>
-     * During the group commit, tasks are removed from the
-     * {@link #serializationOrder} as their post-commit processing is performed.
-     * After a group commit, the serialization order will always be empty. This
-     * is because tasks require the {@link #lock} in order to add themselves to
-     * the {@link #serializationOrder} but the group commit will hold the lock
-     * once the commit group is stabilized thereby preventing any tasks not in
-     * the commit group from entering the {@link #serializationOrder}.
-     * <p>
-     * Note: This list is not thread-safe. In order to read or write on this
-     * list you MUST own the {@link #lock}.
-     * 
-     * @todo does anything strictly prevent a task that is executed after
-     *       another task and with overlapping resource locks from becoming the
-     *       task to run the group commit? Probably not, in which case modify
-     *       the logic that chooses the group commit thread to require that the
-     *       thread is the one whose task is first in the serialization order!
-     */
-    private final List<AbstractTask> serializationOrder = new LinkedList<AbstractTask>();
-
-    /**
-     * Appends the task to the {@link #serializationOrder}.
-     * 
-     * @param task
-     */
-    void addTaskToSerializationOrder(AbstractTask task) {
-        
-        if (task == null)
-            throw new IllegalArgumentException();
-
-        log.info("#tasks=" + serializationOrder.size() + ", task="
-                + task.toString());
-       
-        // the lock MUST be held by the thread before you can touch this list.
-        assert lock.isHeldByCurrentThread();
-        
-        // add to the end of the list.
-        serializationOrder.add(task);
-        
-    }
     
     /*
      * Counters
@@ -600,6 +546,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             MDC.put("taskState", "running");
 
+            /*
+             * Note: This is the commit counter at the instant that this task
+             * was starting to execute. It could be compared to the
+             * commitCounter at after the task had executed to see how many
+             * group commits were made while this task was running.
+             */
             MDC.put("commitCounter","commitCounter="+ngroupCommits);
 
             if(INFO)
@@ -792,7 +744,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             lock.unlock();
             
             assert tmp == r : "Expecting "+r+", but was "+tmp;
-            
+
+            /*
+             * Note: This reflects the total task queuing time including the
+             * commit (or abort). The task service time without the commit is
+             * handled by AbstractTask directly.
+             */
+
+            r.taskCounters.queuingNanoTime.addAndGet(System.nanoTime()
+                    - r.nanoTime_submitTask);
+
         }
 
     }
@@ -1017,9 +978,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             assert groupCommit.get();
 
-            // save a reference to the thread that is running the group commit.
-            groupCommitThread = Thread.currentThread();
+            // used to track the commit waiting and commit service times.
+            final TaskCounters taskCounters = r.getTaskCounters();
+
+            assert taskCounters != null;
             
+            // note: the task counters use nanos rather than millis.
+            final long nanoTime_beginWait = System.nanoTime();
+
             log.info("This thread will run group commit: "+Thread.currentThread()+" : "+r);
 
             /*
@@ -1073,12 +1039,33 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // timestamp used to measure commit latency.
             final long beginCommit = System.currentTimeMillis();
 
-            // commit the store (note: does NOT throw exceptions).
-            if (!commit()) {
+            /*
+             * Note: Only the task that actually runs the commit will note the
+             * time waiting for the commit. This is always the first task to
+             * join the commit group and waits for other tasks to join the same
+             * commit group. The elapsed time from when this task initiates
+             * commit processing until we are ready to delegate the commit to
+             * the journal is the elapsed time awaiting the group commit.
+             */
+            taskCounters.commitWaitingTime.addAndGet(System.nanoTime()
+                    - nanoTime_beginWait);
 
-                // commit failed.
-                return false;
+            final long nanoTime_beginCommit = System.nanoTime();
 
+            try {
+                
+                // commit the store (note: does NOT throw exceptions).
+                if (!commit()) {
+
+                    // commit failed.
+                    return false;
+
+                }
+                
+            } finally {
+                
+                taskCounters.commitServiceTime.addAndGet(System.nanoTime()-nanoTime_beginCommit);
+                
             }
 
             // track #of safely committed tasks.
@@ -1143,9 +1130,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // atomically clear the [groupCommit] flag.
             groupCommit.set(false);
 
-            // group commit is not being run.
-            groupCommitThread = null;
-            
             /*
              * Allow new tasks to run.
              */
@@ -1179,8 +1163,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *       submit (likewise, do not start task if it has already execeeded its
      *       maximum latency from submit).
      */
-    private void waitForRunningTasks(boolean pauseWriteService)
-            throws InterruptedException {
+    private void waitForRunningTasks(final boolean pauseWriteService) throws InterruptedException {
 
         assert lock.isHeldByCurrentThread();
         
@@ -1188,7 +1171,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         // timestamp from which we measure the latency until the commit begins.
         final long beginWait = System.currentTimeMillis();
-
+        
         if (pauseWriteService) {
 
             if (INFO)
@@ -1254,7 +1237,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
 
         final long endWait = System.currentTimeMillis();
-
+        
         final long latencyUntilCommit = endWait - beginWait;
 
         if (latencyUntilCommit > maxLatencyUntilCommit) {
@@ -1897,197 +1880,3 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
 
 }
-
-///**
-// * This applies isolated operations (add, drop, and checkpoint of named
-// * indices) in the {@link #serializationOrder}. If any task fails during
-// * this commit protocol then the transitive closure of all dependent tasks
-// * are interrupted and removed from the {@link #serializationOrder}.
-// * <p>
-// * This process always starts with the first task in the
-// * {@link #serializationOrder}. This MUST be the task executed by the
-// * thread running the group commit. The process is applied to each task in
-// * the {@link #serializationOrder} in sequence. Tasks are removed from the
-// * {@link #serializationOrder} either when they have been successfully
-// * processed or when one of their pre-condition tasks has failed during this
-// * per-task commit processing.
-// * <p>
-// * The commit will continue as long as at least one task was able to apply
-// * its isolated actions successfully.
-// * 
-// * @return The #of tasks whose per-task commit processing was successfully
-// *         applied.
-// * 
-// * @see #serializationOrder
-// */
-//private int doPerTaskCommitProcessing() {
-//    
-//    // the current thread holds the lock.
-//    assert lock.isHeldByCurrentThread();
-//
-//    // there is at least one task in the commit group.
-//    assert !serializationOrder.isEmpty();
-//    
-//    // group commit is executed by the first task in the serialization order.
-//    assert active.get(Thread.currentThread()) == serializationOrder.get(0);
-//
-//    int nsuccess = 0, nfailed = 0;
-//    
-//    // #of tasks in the commit group (on entry).
-//    final int ntasks = serializationOrder.size();
-//    
-////    final AbstractJournal journal = resourceManager.getLiveJournal();
-////    
-////    Name2Addr name2Addr = journal.name2Addr;
-//    
-//    while(!serializationOrder.isEmpty()) {
-//
-////        /*
-////         * write name2Addr checkpoint so that the actions can be made
-////         * atomic.
-////         * 
-////         * FIXME This is going around the dirtyList, but in fact I want to
-////         * have the changes to name2addr applied so this needs to be more
-////         * like handleCommit(long commitTime), but we do not have the
-////         * commitTime on hand yet.  Until this is resolved the only solution
-////         * is to abort() rather than commit(), which discards all tasks rather
-////         * than just the ones whose preconditions are violated. (another approach
-////         * would be to no allow tasks to run in the same commit group against the
-////         * same indices).
-////         */
-////        final long rollbackAddr = name2Addr.writeCheckpoint();
-////        final long rollbackAddr = name2Addr.handleCommit(commitTime);
-//        
-//        // remove the head of the list.
-//        final AbstractTask task = serializationOrder.remove();
-//        
-//        assert task != null;
-//
-//        try {
-//         
-//            task.doIsolatedActions();
-//            
-//            nsuccess++;
-//            
-//        } catch (Throwable t) {
-//            
-//            log.warn("Per-task commit protocol error: task=" + task, t);
-//            
-////log.warn(
-////                    "Per-task commit protocol error - rolling back name2Addr: task="
-////                            + task, t);
-////            
-////            try {
-////                
-////                // reload from the last checkpoint which we took above.
-////
-////                journal.name2Addr = null;
-////                
-////                name2Addr = journal.setupName2AddrBTree(rollbackAddr);
-////                
-////            } catch(Throwable t2) {
-////                
-////                log.error("Unable to rollback name2Addr - will abort: " + t2, t2);
-////
-////                abort();
-////                
-////                return 0;// Nothing was committed.
-////                
-////            }
-//
-//            if(true) {
-//
-//                /*
-//                 * Discard the entire commit group.
-//                 */
-//                
-//                abort();
-//                
-//            } else {
-//
-//            /*
-//             * Find all tasks with a precondition on the failed task and
-//             * force them to fail as well.
-//             */
-//
-//            // find tasks dependent on this one (map uses Thread for key presuming that Thread is hashable:-)
-//            final Map<Thread,AbstractTask> dependentTasks = new HashMap<Thread,AbstractTask>();
-//            
-//            // the set of resources whose preconditions are violated.
-//            final Set<String> resources = new HashSet<String>();
-//            
-//            // seed with this task.
-//            dependentTasks.put(task.thread,task);
-//            
-//            // seed with resources used by this task.
-//            Collections.addAll(resources, task.getResource());
-//            
-//            // consider remaining tasks.
-//            for( AbstractTask tmp : serializationOrder) {
-//                
-//                // consider each resource used by a remaining task.
-//                for(String r : tmp.getResource()) {
-//                    
-//                    // if the resource is in the collected set then the pre-condition has failed.
-//                    if(resources.contains(r)) {
-//
-//                        // add this task.
-//                        dependentTasks.put(tmp.thread,tmp);
-//                        
-//                        // add the resources used by this task.
-//                        Collections.addAll(resources, tmp.getResource());
-//
-//                        // consider the next task in the serialization order.
-//                        break;
-//                        
-//                    }
-//                    
-//                } // consider next resource on task.
-//                
-//            } // consider next task in serialization order.
-//
-//            /*
-//             * Now interrupt each task whose preconditions were violated and
-//             * remove it from the serializationOrder since it can no longer
-//             * be committed.
-//             */
-//
-//            if (INFO)
-//                log.info("Identified " + dependentTasks.size()
-//                        + " tasks with a precondition on " + task);
-//            
-//            for(final AbstractTask tmp : dependentTasks.values()) {
-//                
-//                nfailed++;
-//
-//                // set the cause.
-//                task.setError(t);
-//                
-//                // interrupt the task - will cause it to throw an exception back to the caller.
-//                task.thread.interrupt();
-//                
-//                if (tmp != task) {
-//
-//                    // Note: [task] was already removed above.
-//                    serializationOrder.remove(tmp);
-//
-//                }
-//                
-//            }
-//            
-//            }//if false
-//            
-//        }
-//        
-//    }
-//
-//    if (DEBUG)
-//        log.debug("nsuccess=" + nsuccess + ", nfailed=" + nfailed
-//                + ", ntasks=" + ntasks);
-//    
-//    assert ntasks == (nsuccess + nfailed) : "nsuccess=" + nsuccess
-//            + ", nfailed=" + nfailed + ", ntasks=" + ntasks;
-//    
-//    return nsuccess;
-//    
-//}

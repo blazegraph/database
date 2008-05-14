@@ -111,7 +111,7 @@ public class History<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class EntryIterator implements Iterator<IHistoryEntry<T>> {
+    public class SampleIterator implements Iterator<IHistoryEntry<T>> {
 
         private final int n;
 
@@ -125,6 +125,66 @@ public class History<T> {
 
         private final Entry entry = new Entry();
 
+        /**
+         * The #of slots with sampled data.
+         */
+        public int getSampleCount() {
+            
+            return n;
+            
+        }
+        
+        /**
+         * The timestamp associated with the first sample.
+         * 
+         * @return The timestamp -or- <code>-1</code> if there are no samples.
+         */
+        public long getFirstSampleTime() {
+            
+            if (n == 0)
+                return -1L;
+            
+            return _timestamps[0];
+            
+        }
+
+        /**
+         * The timestamp associated with the last sample.
+         * 
+         * @return The timestamp -or- <code>-1</code> if there are no samples.
+         */
+        public long getLastSampleTime() {
+            
+            if (n == 0)
+                return -1L;
+
+            return _timestamps[n - 1];
+            
+        }
+
+//        public Entry getEntry(long timestamp) {
+//            
+//        }
+//
+//        public Entry getEntry(int index) {
+//            
+//            if (index < 0 || index > n) {
+//
+//                throw new IndexOutOfBoundsException("index=" + index
+//                        + " must be in [0:" + n + ")");
+//
+//            }
+//
+//            if (data[index] == null) {
+//
+//                return null;
+//
+//            }
+//            
+//            return new Entry(index);
+//
+//        }
+        
         private class Entry implements IHistoryEntry<T> {
 
             public long lastModified() {
@@ -175,12 +235,12 @@ public class History<T> {
         }
 
         @SuppressWarnings("unchecked")
-        protected EntryIterator() {
+        protected SampleIterator() {
 
             if (lastLogicalSlot == -1) {
 
                 n = 0;
-
+                
                 _timestamps = null;
 
                 _counts = null;
@@ -396,9 +456,9 @@ public class History<T> {
      * This includes all non-missing samples over the last N periods, where
      * N is the capacity of the buffer.
      */
-    synchronized public Iterator<IHistoryEntry<T>> iterator() {
+    synchronized public SampleIterator iterator() {
 
-        return new EntryIterator();
+        return new SampleIterator();
 
     }
 

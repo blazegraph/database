@@ -31,6 +31,29 @@ public class HistoryInstrument<T> implements IInstrument<T> {
     public final History<T> days;
 
     /**
+     * Return the {@link History} for the specified base period.
+     * 
+     * @param basePeriod
+     *            The base period.
+     *            
+     * @return The history having samples with that base period.
+     */
+    public History<T> getHistory(PeriodEnum basePeriod) {
+        
+        switch (basePeriod) {
+        case Minutes:
+            return minutes;
+        case Hours:
+            return hours;
+        case Days:
+            return days;
+        default:
+            throw new AssertionError();
+        }
+        
+    }
+    
+    /**
      * 
      * @param minutes
      *            An array of the desired data type. If the array does not have
@@ -54,8 +77,8 @@ public class HistoryInstrument<T> implements IInstrument<T> {
         /*
          * Note: The base period is one minute in milliseconds
          */
-        final long basePeriod = 60 * 1000;
-        this.minutes = new History<T>(minutes, basePeriod);
+        this.minutes = new History<T>(minutes, PeriodEnum.Minutes
+                .getBasePeriodMillis());
 
         // 24 hours in a day
         this.hours = new History<T>(24, this.minutes);

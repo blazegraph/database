@@ -1520,12 +1520,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 for (Future<Object> f : futures) {
 
                     /*
-                     * Note: An error here, like an error in the build/split/join/move
-                     * tasks above, MAY be ignored. The consequences are exactly like
-                     * those above. The index partition will remain coherent and valid
-                     * but its view will continue to have a dependency on the old
-                     * journal until a post-processing task for that index partition
-                     * succeeds.
+                     * Note: An error here MAY be ignored. The index partition
+                     * will remain coherent and valid but its view will continue
+                     * to have a dependency on the old journal until a
+                     * post-processing task for that index partition succeeds.
                      */
                     try {
 

@@ -33,7 +33,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
 
 /**
- * Client-side {@link IIndex} interface.
+ * {@link IBigdataClient}-side {@link IIndex} interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

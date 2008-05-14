@@ -30,10 +30,7 @@ package com.bigdata.concurrent;
  * transaction which is aborted to prevent deadlock.
  * 
  * @author thompsonbry
- * 
- * @see org.CognitiveWeb.concurrent.locking.Queue#lock(short, long, int)
  */
-
 public class DeadlockException extends RuntimeException {
 
     /**

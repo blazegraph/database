@@ -320,11 +320,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
     final long shutdownTimeout;
 
     /**
-     * Manages 2PL locking for writes on unisolated named indices.
-     */
-    final protected LockManager<String> lockManager;
-
-    /**
      * An object wrapping the properties specified to the ctor.
      */
     public Properties getProperties() {
@@ -348,13 +343,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
         
     }
     
-    public LockManager<String> getLockManager() {
-        
-        assertOpen();
-        
-        return lockManager;
-        
-    }
+//    public LockManager<String> getLockManager() {
+//        
+//        assertOpen();
+//        
+//        return lockManager;
+//        
+//    }
     
     public ILocalTransactionManager getTransactionManager() {
         
@@ -611,7 +606,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             final int writeServiceMaximumPoolSize;
             final int writeServiceQueueCapacity;
             final boolean writeServicePrestart;
-
+            
             // writeServiceCorePoolSize
             {
 
@@ -709,27 +704,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 
             }
             
-            // Setup the lock manager used by the write service.
-            {
-
-                /*
-                 * Create the lock manager. Since we pre-declare locks,
-                 * deadlocks are NOT possible and the capacity parameter is
-                 * unused.
-                 * 
-                 * Note: pre-declaring locks means that any operation that
-                 * writes on unisolated indices MUST specify in advance those
-                 * index(s) on which it will write.  This is enforced by the
-                 * AbstractTask API.
-                 */
-
-                lockManager = new LockManager<String>(
-                        writeServiceMaximumPoolSize, // capacity
-                        true // predeclareLocks
-                        );
-
-            }
-            
         }
         
         // Setup once-per-second sampling for some counters.
@@ -800,7 +774,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
             // readService
             {
-                CounterSet tmp = readServiceQueueStatisticsTask
+                readServiceQueueStatisticsTask
                         .addCounters(countersRoot.makePath("Read Service"));
 
             }
@@ -808,7 +782,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             // txWriteService
             {
 
-                CounterSet tmp = txWriteServiceQueueStatisticsTask
+                txWriteServiceQueueStatisticsTask
                         .addCounters(countersRoot
                                 .makePath("Transaction Write Service"));
 
@@ -825,7 +799,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * The lock manager for the write service.
                  */
 
-                tmp.makePath("LockManager").attach(lockManager.getCounters());
+                tmp.makePath("LockManager").attach(writeService.getLockManager().getCounters());
 
             }
             
@@ -965,16 +939,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *            The service.
      * 
      * @return The {@link Future}.
-     * 
-     * @todo revisit the question of imposed latency here based on performance
-     *       analysis (of queue length vs response time) for the federation
-     *       under a variety of workloads (tasks such as rdf data load, rdf data
-     *       query, bigdata repository workloads, etc.).
      */
     private Future<Object> submitWithDynamicLatency(AbstractTask task,
             ExecutorService service, TaskCounters taskCounters) {
 
-        taskCounters.taskSubmitCount++;
+        taskCounters.taskSubmitCount.incrementAndGet();
         
         /*
          * Note: The StoreManager (part of the ResourceManager) has some
@@ -995,7 +964,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
 
-        if(service instanceof ThreadPoolExecutor) {
+        if(backoff && service instanceof ThreadPoolExecutor) {
 
             BlockingQueue<Runnable> queue = ((ThreadPoolExecutor)service).getQueue();
         
@@ -1028,6 +997,16 @@ public class ConcurrencyManager implements IConcurrencyManager {
         return service.submit(task);
 
     }
+    /**
+     * When <code>true</code> imposes dynamic latency on ariving tasks in
+     * {@link #submitWithDynamicLatency(AbstractTask, ExecutorService, TaskCounters)}.
+     * 
+     * @todo revisit the question of imposed latency here based on performance
+     *       analysis (of queue length vs response time) for the federation
+     *       under a variety of workloads (tasks such as rdf data load, rdf data
+     *       query, bigdata repository workloads, etc.).
+     */
+    private final boolean backoff = true;
 
     /**
      * Executes the given tasks, returning a list of Futures holding their

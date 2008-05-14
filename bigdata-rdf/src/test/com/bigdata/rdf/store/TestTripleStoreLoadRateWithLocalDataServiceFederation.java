@@ -100,8 +100,11 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
 
+        // turn off statement identifiers.
+        properties.setProperty(Options.STATEMENT_IDENTIFIERS,"false");
+
         // turn off text indexing.
-//        properties.setProperty(Options.TEXT_INDEX,"false");
+        properties.setProperty(Options.TEXT_INDEX,"false");
 
         // change the default port for httpd exposed by the load balancer. 
         properties.setProperty(com.bigdata.service.LoadBalancerService.Options.HTTPD_PORT,"8080");
@@ -121,17 +124,21 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         
     }
 
-    final int nthreads = 10;
+    final int nthreads = 20;
     
-    final int bufferCapacity = 100000;
-    
+    final int bufferCapacity = 200000;
+
+//    final int nthreads = 30;
+//    
+//    final int bufferCapacity = 1000;
+
     final boolean validate = true;
 
     final FilenameFilter filter = new FilenameFilter() {
 
         public boolean accept(File dir, String name) {
             if (name.endsWith(".owl"))
-                return true;
+                 return true;
             return false;
         }
 

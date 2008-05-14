@@ -46,22 +46,25 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
      */
     private int currentRootBlock = 0;
     
+    /**
+     * Note: I have not observed much performance gain from the use of a direct
+     * buffer for the transient mode. Further, there is a BUG related to release
+     * of direct {@link ByteBuffer}s so they are NOT in general recommended
+     * here.
+     */
     TransientBufferStrategy(int offsetBits,long initialExtent, long maximumExtent,
             boolean useDirectBuffers) {
         
-        /*
-         * Note: I have not observed much performance gain from the use of
-         * a direct buffer for the transient mode.
-         */
         super(  maximumExtent,
                 offsetBits,
                 0, // nextOffset
                 0, // headerSize
                 initialExtent, //
                 BufferMode.Transient, //
-                (useDirectBuffers ? ByteBuffer
-                        .allocateDirect((int) initialExtent) : ByteBuffer
-                        .allocate((int) initialExtent)),
+                (useDirectBuffers //
+                        ? ByteBuffer.allocateDirect((int) initialExtent)//
+                        : ByteBuffer.allocate((int) initialExtent)//
+                ),
                 false// readOnly
         );
         

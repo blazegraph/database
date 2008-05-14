@@ -328,83 +328,7 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 [INFO ][memory ] old collections
 [INFO ][memory ]     total GC time =         666.388 s (pause 100.395 s)
 
-*** Jini tuning:
-
-    - Server runs:
-
-      - Since jini is so fast on the server, try to get asynchronous
-        writes to disk working in DiskOnlyStrategy - it might have a
-        big impact since we loose all concurrency when a write to disk
-        occurs (however, disk writes will always be at group commits
-        if the write cache is large enough so this might have NO
-        impact).
-
-      - Try U10000 reading the data from NAS with 2 clients, 10
-        threads each and 2 servers.  See if scale-out holds as we
-        increase the data size.  The point of comparison is the 1B run
-        that we did on server2 (single host, non-scale-out
-        architecture, non-concurrent load).
-
-	- I am not seeing the 2nd data service on the current U10000
-          run.  That is super weird. 
-
-        - Make sure that yum-updatesd does not run on the servers.  It
-          absorbs an entire CPU for quite a while.
-
-	- Make sure that each process writes on its own nohup_xxx.out
-          file.  Hum - there is no way to do that.  Try creating a
-          command group using (...) and running that group with nohup
-          - probably won't work either.  How about run each in its own
-          subdirectory?  Could work, but need to fiddle with the jini
-          config and CLASSPATH.
-
-      - ***** dynamic index partitions.
-
-        - Start with either single or double host placement of the
-        initial index partitions.
-
-	- Watch the load balancer and see how host utilization and
-        service response time change as the run progresses, for
-        different #of client threads, and as index splits occur, and
-        as index moves occur.
-
-	- Do we need to load the full view to choose tasks?  to choose
-          joins?  This causes index segments to be loaded to support
-          that view.  We could get an approximate range count just
-          using the checkpoint record for the mutable BTree(s) and the
-          segment store(s).
-
-	- Review split point choices.  Do they split into key ranges
-          of more or less equal range counts?
-
-	- Implement constraint on split rule for the row store.
-
-	- Looks like overflow is being triggered way to soon
-          (examining DumpJournal output shows that the journal was not
-          nearly at its capacity).  This may be related to a lost
-          commit problem that I am working on (without that commit the
-          journal appears to be entering overflow too early).
-
-	Delay start of some data services, either on each host or on
-        one of the hosts and then see how the load changes once we
-        start additional data services.
-
-	Observe the metadata service response time and verify that it
-        does not become a bottleneck since the current implementation
-        is NOT caching.
-
-      - Run single client with the metadata service (its lightly
-        loaded) and one data service on one server and the other data
-        service on another server.
-
-	- Move the client and metadata server to server3, running the
-          data services on server1 and server2.
-
-        - Have a client on each machine connect to the same federation
-          (using hash(filename) MOD 2) to select the files to be
-          loaded (distributed clients doing a concurrent batch load).
-          The source data files will have to reside on NAS or a NSF
-          mount or be pre-allocated to the different servers.
+============================================================
 
     - Tune indices
 
@@ -481,6 +405,8 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
         distributed gathers.
 
       - Download, prepare, extract.
+
+      - Concurrent RDF data load as a map/reduce job.
 
     - Tune network IO
 
@@ -724,21 +650,22 @@ Short term tasks:
        - Compute bytes per statement in the db (requires a db op to
          correlate the journal size with the #of stmts or #of terms)
 
-       - Expose the known triple stores, a view on the global sparse
-         row store, etc.
-
-       - (*) report success and errors from the concurrent data loader.
-
-       - (*) incremental evaulate futures for the concurrent data
+       - Done. report success and errors from the concurrent data
          loader.
 
-     - (*****) Report response time measures on the client, which will
+       - Done. incremental evaulate futures for the concurrent data
+         loader.
+
+     - Done. Report response time measures on the client, which will
        require a class similar to TaskCounters that is intimate with
        the ClientIndexView.  That will give a client perspective on
        the latency of tasks, which will aggregate across the data
        services that it uses and include the costs of RMI, in contrast
        to a data service perspective, which aggregates across the
        clients using that service and discount RMI.
+
+       Note: The LDS does not use RMI - it submits tasks directly to
+       the data service queues.
 
      - Done. Need to aggregate statistics for the partitions of an
        index as reported to the LBS for analytics.
@@ -747,8 +674,6 @@ Short term tasks:
        from the LBS after a bit, or at least allow them to be hidden.
        The data will eventually grow beyond what can be held by an LDS
        if we do nothing.
-
-     - It would be nice to be able to drill down into the index data.
 
      - Done. Show metadata about the open index segments in the
        IndexManager
@@ -801,31 +726,16 @@ Short term tasks:
        the locale and see when timestamp causes an overflow to the
        next hour and the next day in some unit tests.
 
-     - When restoring the LBS counters from XML, the history on the
-       counters is being ignored.  Instead it should be read in using
-       history.add(val,timestamp) or historyInst. add(val,timestamp).
+     - Done. When restoring the LBS counters from XML, the history on
+       the counters is being ignored.
 
-     - Make it possible to have more than 60 minutes in the buffer but
-       still overflow after 60 minutes onto the hours.  This will
-       allow a longer reachback at a given level of aggregation.
-
-     - Add histograms of response time by task (on client and
-       service?).  E.g., AddIds, AddTerms, IndexWriteProx, etc.
+     - (****) Make it possible to have more than 60 minutes in the
+       buffer but still overflow after 60 minutes onto the hours.
+       This will allow a longer reachback at a given level of
+       aggregation.
 
      - Add UI elements to set the filter(s), depth, decimalFormat,
        etc.  These should be a FORM with a GET action.
-
-     - The services should be translated (or annotated) by the
-       hostname and service info.  This will make the information more
-       interesting than just staring at UUIDs.
-
-     - I should be able to bookmark interesting counter sets, but the
-       service name needs to be there or the bookmarks will depend
-       only on filters, such as all unisolated counters.  An xpath
-       might be useful here so that the filter reads down to a service
-       name or type and then back up to reveal the service.
-
-       &filter=Secs&depth=10  - shows the "time" counters for indices.
 
      - May be loosing some samples by running multiple typeperf's at
        once.  Explore.  If true, then trying combining all w/in same
@@ -833,23 +743,31 @@ Short term tasks:
        process in the JVM which will have responsibility for those
        counters.
 
-     - Cache-Control (data are good up to 60 seconds after the
-       counters were last updated) and auto-update of page/view?
-
      - syslogd integration so that I see ERROR and FATAL messages for
        the hosts in the federation.
 
      - Done. Add option to NOT run typeperf and use for the unit tests
        of the services when performance counters are not required.
 
-     - Add reporting by the client on the indices that it is using.
+     - Done. Add reporting by the client on the indices that it is
+       using.
 
-     - Add reporting to the concurrent data loader for #errors.
+     - Done. Add reporting to the concurrent data loader for #errors.
+
+   - Admin UI
+   
+     - It would be nice to be able to drill down into the index data,
+       but that should be an admin UI not the counters UI.
+
+     - Expose the known triple stores, a view on the global sparse row
+       store, etc.
+
+     - Offer commands to force overflow of a data service.
 
    - Transaction support.
 
      - Overhaul transaction processing and support full, 2-/3- phase
-       transactions.
+       transactions
 
      - A problem is reported by StressTestConcurrentTx.  Revisit this
        when I overhaul the full transaction support.
@@ -948,8 +866,8 @@ Short term tasks:
        Consider batching a set of rangeQueries together in a single
        operation vs parallel submits.
 
-     - The distinct term scan (really, the prefix scan) needs to be
-       optimized for the data service and the federation use cases.
+     - (***) The distinct term scan (really, the prefix scan) needs to
+       be optimized for the data service and the federation use cases.
        This also effects the sparse row store.  Also, the sparse row
        store needs to use an extended split handler that always
        chooses a split point which is on a logical row boundary.
@@ -1085,14 +1003,6 @@ Short term tasks:
      terms in the document and then piece together the phrases from
      the result.
 
-   - Done? Modify to have an observable event or callback that assigns
-     the service UUID and that indicates when the resource manager is
-     running and refactor the LDS and DS startup logic to use that to
-     configure the reporting of counters and an optional httpd service
-     (at least for the LDS). The relevant Jini method is
-     ServiceIDNotify().  For the moment I have disabled the httpd for
-     the LDS.
-
    - Consider dropping the BasicRioLoader, PresortRioLoader, etc.  All
      of the benefit is in the use of the StatementBuffer.  These
      loaders just obscure the RIO mechanism and make them harder to
@@ -1191,13 +1101,13 @@ Short term tasks:
       
       2. Done. RDF/XML w/ statement identifiers in/out.
 
-         - @todo reduce to only an "explicit" flag rather than
-           {explicit, axiom, inferred} since we can not differentiate
-           between constructed statements and inferences.
+         - Reduce to only an "explicit" flag rather than {explicit,
+           axiom, inferred} since we can not differentiate between
+           constructed statements and inferences.
 
       3. High level query for reading variable bindings out.
 
-	 - Verify a CONSTRUCT query.
+	 - Done. Verify a CONSTRUCT query.
 
 	 - Done. Verify a SELECT query using statement identifiers.
 
@@ -1254,8 +1164,6 @@ Short term tasks:
 	 are dynamically determined prefixes, application specified
 	 compression generally can't be used.
 
-   - SemTech08 submission?
-
    - Done.  Correctness testing for scale-out with index partition
      split, move, and join.  See services/StressTestConcurrent. It can
      be parameterized for this purpose.
@@ -1301,10 +1209,13 @@ Short term tasks:
           as installing from a pre-touched version fixing the
           LD_ASSUME_KERNEL_VERSION bug.
 
-	- Get clusterondemand account.
+	- (***) Get clusterondemand account.
 
 	- Support downloadable code in the configuration, including a
           an optional security model.
+
+        - Make sure that yum-updatesd does not run on the servers.  It
+          absorbs an entire CPU for quite a while.
 
       - (*******) rdf concurrent data load.
 
@@ -1324,17 +1235,7 @@ Short term tasks:
 	  Note: writing on local disk but reading the classpath and
           data from NAS.
 
-	  Note: test on host1/host2 and get a sense of the platform
-	  differences.
-
 	  **** Try with overflow processing enabled.
-
-	       - (Verify again.) The memory demand jumps up during
-	         overflow handling.  maybe I need to throttle the
-	         thread pool more on the data service?
-
-	  **** Try with services running in distinct JVMs and on more
-               than one host.
 
 	  **** (Set true by default on 5/7/08) Try w/ autoFlush==true
                so that each document is parsed and written in a single
@@ -1344,15 +1245,6 @@ Short term tasks:
 
 	  **** Measure the effect of the WriteCache on U100 and U1000.
                Measure again with the onboard disk cache disabled.
-
-	  **** Write logic to validate the KB load and run it against
-	       the result.  I will have to stop before I run out of
-	       space on the disk, so maybe U500 rather than U1000 - or
-	       maybe U1000 will be Ok with periodic index segment
-	       builds.
-
-          **** Compare performance with 1M and 10M write cache
-               capacity.
 
 	  http://192.168.20.28:8080/
 
@@ -1398,29 +1290,6 @@ Short term tasks:
 
 ============================================================
 
-- ** Reduce StatementBuffer size so that writes have reasonable
-  latency (measure on the client index view's thread pool using
-  counters)
-
-- Dumping of the Queue in the ConcurrentDataLoader is not enlightening
-  as the objects wrap our tasks.  Maybe they could be unwrapped?  The
-  purpose is too learn more about why a flush task sometimes stalls.
-
-- Remove the logging of the QueueStatisticsTask?
-
-- ** Validate host and service statistics with 2 services and test
-     move scenarios.  Start with everything on one data service and
-     then look for the moves to the 2nd.
-
-     The LDS (or a service-specific httpd) should allow browing of the
-     index move history.
-
-- Default split size needs to be adjusted with respect to the default
-  journal size.  I am getting several overflows that result in builds
-  before I see a split (but I have not verify the on disk size of the
-  generated index segments - ah, they are not close to 100M each yet
-  (but also nothing tests their actual size in bytes).
-
 host3
 
 LDS 12.8k on U10
@@ -1439,9 +1308,6 @@ JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
       which is probably more appropriate for this test, but this needs
       to be debugged.
 
-    - **** Must validate the KB after load (already validing
-           split/move/join on standard indices).
-
     - Done. Get the basic overflow tests running.
 
     - Done. ClientIndexView : retry count exceeded - need to report
@@ -1453,20 +1319,6 @@ JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
     - Done (DataService needed to notify() the LBS during startup).
       Jini client is not reporting counters on either machine.  The
       problem is the client configuration.
-
-    - **** Change the AbstractTripleStore split defaults and re-run on
-           host3.  This will change the timing of splits, reducing how
-           common they are in comparison to builds.
-
-    - **** Try running each DataService in its own JVM.  This will
-           increase the heap available and should reduce the effect of
-           GC by separating out GC related to each service into its
-           own JVM.
-
-    - **** Configure larger sizes for the various index caches on a
-           server platform.  However large caches with the JVM default
-           heap cause the concurrent data load test to run out of
-           memory (when the overflow rate is also high).
 
     - * Review the LBS host and service scores.  Can they predict host
         and service load well enough to move index partitions around
@@ -1487,9 +1339,6 @@ JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
             views, at least not in the counter set generated by the
             concurrency manager.  Part of the problem is that the fast
             overflow rate is making the views update very quickly.
-
-Note: Must edit the DataServer[01].properties files to change overflow
-behavior, etc.
 
 ============================================================
 
@@ -1528,6 +1377,23 @@ Caused by: java.lang.NullPointerException
 	at com.bigdata.mdi.PartitionLocator.equals(PartitionLocator.java:231)
 	at com.bigdata.service.MetadataService$SplitIndexPartitionTask.doTask(MetadataService.java:502)
 	... 10 more
+
+============================================================
+
+Observed once: clearly a timing issue.
+
+ERROR: 62 pool-1-thread-5         com.bigdata.resources.StoreManager$Startup.run(StoreManager.java:895): Problem during startup? : java.lang.IllegalStateException
+java.lang.IllegalStateException
+	at com.bigdata.resources.ResourceManager.getConcurrencyManager(ResourceManager.java:340)
+	at com.bigdata.resources.StoreManager$Startup.start(StoreManager.java:963)
+	at com.bigdata.resources.StoreManager$Startup.run(StoreManager.java:888)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:417)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)
+
 ============================================================
 
 1. Run U10, U100 on host3.
@@ -1556,30 +1422,38 @@ Caused by: java.lang.NullPointerException
 
    - jini class setup, httpd, and codebase property.
    
-   - The various server setups either all need to be copied into
+   - Done. The various server setups either all need to be copied into
      appropriate locations on the host on which they will run or they
      need to specify a dataDir that is local to the host on which they
      will run, e.g., /var/bigdata/DataServer0
 
    - Done. verify jini using nio.
 
-   - (****) response times for client (both the fed thread pool and
-     the concurrent data loader thread pool)
-
    - timestamp service should notify the load balancer.  this will be
      extended to be the transaction service and that will have things
      to report.
 
-   - the server startup for bigdata should be more event driven.  You
-     should be able to discover jini itself and then any of the
-     services in any order.  some services clearly must wait for a
-     join (e.g., the client and the data service must wait for the
-     timestamp service) while others can come and go as they like (if
-     the load balancer is not there then things should run anyway but
-     centralized reporting will not work and index partition moves
-     will not happen).
+   - Startup should be event driven.
 
-   - review jdk (1.6.0_03), sysstat (8.0.3) {version 7 on host{1,2}},
+      - The server startup for bigdata should be more event driven.
+        You should be able to discover jini itself and then any of the
+        services in any order.  some services clearly must wait for a
+        join (e.g., the client and the data service must wait for the
+        timestamp service) while others can come and go as they like
+        (if the load balancer is not there then things should run
+        anyway but centralized reporting will not work and index
+        partition moves will not happen).
+
+      - Done? Modify to have an observable event or callback that
+        assigns the service UUID and that indicates when the resource
+        manager is running and refactor the LDS and DS startup logic
+        to use that to configure the reporting of counters and an
+        optional httpd service (at least for the LDS). The relevant
+        Jini method is ServiceIDNotify().  For the moment I have
+        disabled the httpd for the LDS.
+
+   - Done. review jdk (1.6.0_03), sysstat (8.0.3) {version 7 on
+     host{1,2}, solved using rpm -U to update rather than install},
      /etc/hosts, /etc/fstab{/NAS vs /nas}, jini (not really required
      on all hosts since we are bundling the jars) for consistency.
      also emacs install.
@@ -1589,27 +1463,298 @@ Caused by: java.lang.NullPointerException
    - Run multiple clients as well as multiple servers specifying
      nclients=3 and clientNum={0,1,2}
 
-     *** writing the nohup.out files onto NAS in unfortunate.  Is
-         there a way to specify another location for that file? I
-         don't think so...  Well, if the server description was copied
-         onto the local host for execution then it would ALL BE LOCAL
-
-     *** verify that the older version of sysstat does not cause a
-         problem or remove and replace with the newer. I might need
-         LeeV to look into this on hosts{1,2}.
-
-   - (***) Test performance with local file system reads for U10,
-     U100.  NAS seems to be quite slow in comparison.
-
-   - The byte count needs to be a long, not an int.  with an int it
-     can only use 32bits so the bit split must always favor the offset
-     in that model.
+   - (*) Ala log4j, use a set named property model for property
+     values.  This will let us warn people when the property value is
+     not defined.
    
 LDS U10 13.6k
-
-    - Compare this with 16k tps with autoFlush=false.  Experiment more
-      with buffer sizes, combining writes, etc.
 
 JF host3 U10 7.7k
 
 JF host3 U10 startAll 6.7k
+
+====================
+jrockit:
+
+LDS U10 SIDS=true nthreads=10 bufferCapacity=100000 wrkstn : 6.6k
+
+LDS U10 SIDS=false nthreads=10 bufferCapacity=100000 wrkstn : 7.2k
+
+LDS U10 SIDS=false nthreads=10 bufferCapacity=100000 wrkstn 1G : 7.5k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=100000 wrkstn 1G : 8.4k
+
+LDS U10 SIDS=false nthreads=30 bufferCapacity=100000 wrkstn 1G : 7.8k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 wrkstn 1G : 8.6k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=100000 wrkstn 1G noText : 10.8k, 11.6k, 11.3k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 wrkstn 1G noText : 11.6k, 12.7k
+
+LDS U10 SIDS=false nthreads=30 bufferCapacity=200000 wrkstn 1G noText : 11.8k
+
+LDS U10 SIDS=false nthreads=40 bufferCapacity=200000 wrkstn 1G noText : 11.9k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=300000 wrkstn 1G noText : 12.0k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=400000 wrkstn 1G noText : 12.3k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=500000 wrkstn 1G noText : 12.7k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=300000 wrkstn 1G : 9.1k
+
+LDS U10 SIDS=false nthreads=30 bufferCapacity=1000 wrkstn : 4.5k
+
+jdk 1.6.0_03 -server
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 host3 2G noText : 14.5k, 14.4k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 host3 2G noText localData : 14.6k, 15.0k
+
+LDS U100 SIDS=false nthreads=20 bufferCapacity=200000 host3 2G noText localData : 16.4k
+	 Run saved as bigdata-rdf/host3-U100-LDS-countersfinal.xml (13M stmts, 3M terms)
+
+LDS U100 SIDS=false nthreads=20 bufferCapacity=200000 host2 2G noText localData : 16.2k
+
+LDS U1000 SIDS=false nthreads=20 bufferCapacity=200000 host2 2G noText localData : 11.4k
+    #terms=32,905,188; #stmts=133,613,894; rate=11412; 68G journal.
+    Run saved as: U1000-host2-countersfinal.xml
+
+    - Done. Add moving average w/ and w/o locks.  Perhaps there is a
+      queue but it is before the locks are obtained?
+
+      Done. Also add the commit wait time and commit service time
+      measures.
+
+    - The LockManager could report the queue size and queue waiting
+      time per resource.  This would let us know which resources are
+      the bottlenecks.
+
+    - Done. The LockManager could report the total #of waiting tasks,
+      which is not showing up anywhere right now.
+
+    - (*) Per-procedure/index/isolation counters {#submitted,
+      #completed, task service time (queue waiting times are always
+      shared by a queue but lock waiting times and task service times
+      can differ by task)}.
+
+(**) Note: Compare the performance for LDS against 16k tps with
+     [autoFlush=false] (before sids and before the text indexing).
+     Experiment more with buffer sizes, combining writes, etc.
+
+============================================================
+
+Scale-out runs.
+
+JF host3 U10 startAll 6.7k
+
+JF host{1,2,3} U100, SIDS=false, nthreads=20, nclients=3, bufferCapacity=200000, nasData : 
+
+============================================================
+
+Main issues:
+
+(*) map/reduce processing.
+
+    If the ConcurrentDataLoader was a map/reduce job then I could
+    start the whole thing by running a single master.  I would of
+    course have to have map and reduce services running on the
+    cluster.
+
+(*) Optimize JOINs and start running LUBM query times.
+
+(*) Index and other performance tuning.
+
+    (*) Implement prefix compression algorithm using mg4j.
+
+    (*) Try prefix compression for statement indices to see if I can
+	reduce the (de-)serialization times!
+
+    (-) Replace use of "immutable nodes" throughout and introduce the
+        default prefix compression algorithm in its place.
+
+    (-) Experiment with higher branching factors on the journal
+        indices now that we will overflow periodically.
+
+    (*) Try co-threading the search index writes with the reverse
+	lexicon write, but that should only reduce a single load
+	latency where as overall parallelism should reduce the total
+	load latency.
+
+    (*) Try co-threading the forward index writes for the statements with
+	the reverse index writes for the term identifiers.
+
+(*) Scale-out performance
+
+    - Estimate parameters for the scale-out model.
+
+      Note: Concurrency and throughput SHOULD NOT increase as indices
+      are broken down into index partitions on a single server since
+      we are CPU bound in the unisolated index tasks.  However, an
+      increase SHOULD be observed with or without index partition
+      splits (and with or without overflow) when running on more than
+      one host since we have more CPU resources.
+
+      Find the point intercept for a linear scale-out model using JF
+      with two data services (and hence RMI) on U100 w/o overflow.
+      
+      Find the slope of the linear scale-out using JF where one of
+      data services is located on a second machine, still w/o
+      overflow.
+
+      (Ideally the client will also be distributed but that is not
+      critical to proving the point as the client is faster than a
+      single host can service).  Retest on U1000 (requires use to use
+      host1 or host2 for the additional disk space).
+
+    - What cost is associated with overflow processing?
+
+      Evaluate for:
+
+      (a) EF with one data service;
+
+      (b) for JF with two data services with on one machines; and
+      
+      (c) for JF with two data services on two machines.
+
+      Choose runs where we have the data w/o overflow from above.
+
+    * There is still a problem with multicast which is preventing
+      scale-out runs.
+
+(*) Dynamic index partitioning
+
+    Note: It is best to run EF with one data service to test index
+    partitioning questions and JF to test marshalling, robustness, and
+    index move questions.
+
+    Running JF U100 on host3 right now to get some data on queue
+    behavior with dynamic index partitioning.  Some questions are:
+
+    - Change the default split point and verify build and split
+      behavior on both the workstation and the server using U100 and
+      one data service.
+
+    - Do I need to increase the client timeout for Jini?  It seems
+      that I probably do.  Perhaps double it to 40 seconds?  Or
+      perhaps make the default much longer (1 minute, 5 minutes or
+      infinite) since tasks could be queued up.
+
+    - Are good decisions being made with regard to build and split of
+      index partitions?
+
+    - Are good decisions being made with regard to index partition
+      moves?
+
+    * Configure to hold more indices open per data service.  This
+      should be done in the bigdata.properties files for each data
+      service.
+
+    * Observe the metadata service response time and verify that it
+      does not become a bottleneck since the current implementation is
+      NOT caching.
+
+    * Verify that we use read-committed or read-historical operations
+      whenever possible (e.g., for asynchronous overflow processing,
+      joins, metadata service reads, etc).
+
+    - Should report the #of tasks, action on each index, and the
+      duration of overflow processing for each event, but that event
+      oriented data does not fit well within the counters model.
+
+(*) Load-balancing
+
+    * Watch the load balancer and see how host utilization and service
+      response time change as the run progresses, for different #of
+      client threads, and as index splits occur, and as index moves
+      occur.
+
+    - Try U10000 reading the data from NAS with 2 clients, 10 threads
+      each and 2 servers.  See if scale-out holds as we increase the
+      data size.  The point of comparison is the 1B run that we did on
+      server2 (single host, non-scale-out architecture, non-concurrent
+      load).
+
+    - Delay start of some data services, either on each host or on one
+      of the hosts and then see how the load changes once we start
+      additional data services (this could be expanded into a variety
+      of hardware add and hardware fail tests).
+
+============================================================
+
+***** I appear to have introduced (or uncovered) a bug leading to a
+      corrupt index.  Generally these problems are related to
+      concurrent access to the same unisolated index through a failure
+      of AbstractTask, WriteExecutorService, or Name2Addr.
+
+      This one might have been introduced by recent changes to
+      overflowToDisk() for the temporary raw store (triggered during
+      index builds) or that may be a red herring.  It is definately
+      correlated with client requests which timeout and throw
+      CancelledExceptions.
+
+      Try running with an infinite timeout on the client and see if it
+      is related to failed tasks (perhaps AbstractTask does not
+      correctly discard the write set and force the index to be
+      reloaded?)
+
+      FIXME The problem is not observed when I (a) fixed the assertion
+      about the direct byte buffer owner and (b) changed the client
+      timeout to infinite.  Now I need to figure out which was the
+      cause.  Either way there is a weak spot in the system -- Ok.  It
+      seems that cancellation exceptions do not provoke the index
+      corruption problems, but I am unclear how the temp store
+      finializer exception could cause problems elsewhere?
+
+Caused by: com.bigdata.service.ClientIndexView$ClientException: Execution failed: ntasks=1, nfailed=1, causes=[java.util.concurrent.ExecutionException: java.lang.RuntimeException: unknown node type=-128]
+	at com.bigdata.service.ClientIndexView.runParallel(ClientIndexView.java:1044)
+	at com.bigdata.service.ClientIndexView.runTasks(ClientIndexView.java:969)
+	at com.bigdata.service.ClientIndexView.submit(ClientIndexView.java:920)
+
+
+	Note: There is ALSO a problem with temp store use during index
+	segment build.  Since the builds a single threaded this is not
+	going to be a concurrency issue.  One possibility is that the
+	various disk IO operations need to be surveyed for instances
+	that assume all bytes are written in a single IO.  As I have
+	seen this is not always the case - especially under heavy
+	loads.
+
+ERROR: 279806 pool-1-thread-10    overflowService     com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1553): Update task failed
+java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.nio.BufferOverflowException
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:215)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:85)
+	at com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1539)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run(Thread.java:595)
+Caused by: java.lang.RuntimeException: java.nio.BufferOverflowException
+	at com.bigdata.btree.IndexSegmentBuilder.<init>(IndexSegmentBuilder.java:841)
+	at com.bigdata.resources.IndexManager.buildIndexSegment(IndexManager.java:1026)
+	at com.bigdata.resources.BuildIndexSegmentTask.doTask(BuildIndexSegmentTask.java:90)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1536)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1438)
+	... 5 more
+Caused by: java.nio.BufferOverflowException
+	at java.nio.DirectByteBuffer.put(DirectByteBuffer.java:311)
+	at java.nio.DirectByteBuffer.put(DirectByteBuffer.java:290)
+	at com.bigdata.journal.DiskOnlyStrategy$WriteCache.write(DiskOnlyStrategy.java:384)
+	at com.bigdata.journal.DiskOnlyStrategy.write(DiskOnlyStrategy.java:1700)
+	at com.bigdata.journal.TemporaryRawStore.write(TemporaryRawStore.java:386)
+	at com.bigdata.btree.IndexSegmentBuilder.writeLeaf(IndexSegmentBuilder.java:1135)
+	at com.bigdata.btree.IndexSegmentBuilder.writeNodeOrLeaf(IndexSegmentBuilder.java:1106)
+	at com.bigdata.btree.IndexSegmentBuilder.close(IndexSegmentBuilder.java:893)
+	at com.bigdata.btree.IndexSegmentBuilder.<init>(IndexSegmentBuilder.java:772)
+	... 9 more
+
+--------------------
+
+** Either never retry an error task when the queue is likely to be
+   full or make the retry itself robust.  Otherwise the CDL risks
+   reporting fatal error for a task which could have been run
+   successfully.
+
+--------------------

@@ -257,7 +257,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * {@link IndexSegmentStore#finalize()}, both of which close the store
          * if it is still open.
          * 
-         * @see #DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY
+         * @see #DEFAULT_STORE_CACHE_CAPACITY
          * 
          * @todo define maximum age on the LRU and the delay between sweeps of
          *       the LRU
@@ -369,7 +369,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * a new object. This is easy enough to do since the {@link UUID} of the
      * {@link IndexSegmentStore} is the key in our map!
      * 
-     * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
+     * @see Options#STORE_CACHE_CAPACITY
      * 
      * @todo purges entries that have not been touched in the last N seconds,
      *       where N might be 60.
@@ -577,14 +577,24 @@ abstract public class StoreManager extends ResourceEvents implements
     final long minReleaseAge;
 
     /**
-     * The #of journals that have been opened to date.
+     * The #of {@link ManagedJournal}s that have been (re-)opened to date.
      */
-    final protected AtomicLong journalOpenCount = new AtomicLong();
+    final protected AtomicLong journalReopenCount = new AtomicLong();
 
     /**
-     * The #of index segments that have been opened to date.
+     * The #of {@link IndexSegmentStore}s that have been (re-)opened to date.
      */
-    final protected AtomicLong segmentOpenCount = new AtomicLong();
+    final protected AtomicLong segmentStoreReopenCount = new AtomicLong();
+    
+    /**
+     * The #of {@link ManagedJournal}s that have been deleted to date.
+     */
+    final protected AtomicLong journalDeleteCount = new AtomicLong();
+    
+    /**
+     * The #of {@link IndexSegmentStore}s that have been deleted to date.
+     */
+    final protected AtomicLong segmentStoreDeleteCount = new AtomicLong();
     
     /**
      * An object wrapping the {@link Properties} given to the ctor.
@@ -1515,7 +1525,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * The #of journals on hand.
      */
-    public int getJournalCount() {
+    public int getManagedJournalCount() {
 
         assertOpen();
 
@@ -1526,7 +1536,7 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * The #of index segments on hand.
      */
-    public int getIndexSegmentCount() {
+    public int getManagedIndexSegmentCount() {
 
         assertOpen();
 
@@ -1849,7 +1859,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     ((IndexSegmentStore) store).reopen();
 
                     // re-opening the store.
-                    segmentOpenCount.incrementAndGet();
+                    segmentStoreReopenCount.incrementAndGet();
 
                     // done.
                     return store;
@@ -1933,7 +1943,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 store = journal;
 
                 // opened another journal.
-                journalOpenCount.incrementAndGet();
+                journalReopenCount.incrementAndGet();
 
             } else {
 
@@ -1944,7 +1954,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 store = segStore;
 
                 // opened another index segment store.
-                segmentOpenCount.incrementAndGet();
+                segmentStoreReopenCount.incrementAndGet();
 
             }
 
@@ -2575,6 +2585,16 @@ abstract public class StoreManager extends ResourceEvents implements
         } catch(Throwable t) {
             
             log.error(t.getMessage(), t);
+            
+        }
+
+        if(isJournal) {
+
+            journalDeleteCount.incrementAndGet();
+            
+        } else {
+            
+            segmentStoreDeleteCount.incrementAndGet();
             
         }
 

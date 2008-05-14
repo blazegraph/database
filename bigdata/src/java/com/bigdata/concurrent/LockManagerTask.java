@@ -95,8 +95,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
     }
 
     /**
-     * The amount of the that the task waited to acquire its locks (in
-     * nanoseconds).
+     * The elapsed nanoseconds the task waited to acquire its locks.
      */
     public long getLockLatency() {
         
@@ -191,42 +190,52 @@ public class LockManagerTask<R extends Comparable<R>> implements
      */
     private void acquireLocks() throws Exception {
 
-        for (int i = 0; i < maxLockTries; i++) {
+        lockManager.nwaiting.incrementAndGet();
 
-            if(Thread.interrupted()) {
-                
-                throw new InterruptedException();
-                
+        try {
+
+            for (int i = 0; i < maxLockTries; i++) {
+
+                if (Thread.interrupted()) {
+
+                    throw new InterruptedException();
+
+                }
+
+                try {
+
+                    // Request resource lock(s).
+
+                    lockManager.lock(resource, lockTimeout);
+
+                    return;
+
+                } catch (DeadlockException ex) {
+
+                    // Count deadlocks.
+
+                    lockManager.ndeadlock.incrementAndGet();
+
+                } catch (TimeoutException ex) {
+
+                    // Count timeouts.
+
+                    lockManager.ntimeout.incrementAndGet();
+
+                }
+
+                /*
+                 * Release any locks granted since we did not get all of the
+                 * locks that we were seeking.
+                 */
+
+                lockManager.releaseLocks(true/* waiting */);
+
             }
-            
-            try {
 
-                // Request resource lock(s).
+        } finally {
 
-                lockManager.lock(resource, lockTimeout);
-
-                return;
-
-            } catch (DeadlockException ex) {
-
-                // Count deadlocks.
-
-                lockManager.ndeadlock.incrementAndGet();
-
-            } catch (TimeoutException ex) {
-
-                // Count timeouts.
-
-                lockManager.ntimeout.incrementAndGet();
-
-            }
-
-            /*
-             * Release any locks granted since we did not get all of the
-             * locks that we were seeking.
-             */
-
-            lockManager.releaseLocks(true/*waiting*/);
+            lockManager.nwaiting.decrementAndGet();
 
         }
 
