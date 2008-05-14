@@ -14,6 +14,23 @@ JINI
   http://www.linuxquestions.org/questions/showthread.php?t=370056 for
   a resolution.
 
+- Here are some notes on getting things working on a Fedora Core 6 platform.
+  The symptom was that ifconfig was reporting MULTICAST for the interface 
+  but the jini install was complaining that multicase was not enabled for
+  that interface.
+
+	Here's what I did:
+
+	First, verify that multicast is enabled on eth0 by typing ifconfig and looking for multicast
+
+	if it is not enabled type ifconfig eth0 multicast
+
+	after that add a default route for multicast broadcasts and bind it to eth0
+
+	route add -net 224.0.0.0 netmask 240.0.0.0 dev eth0
+
+	additionally, I disabled the firewall and I disabled SELinux (but I think the firewall was the big culprit here).
+
 - Downloadable code is NOT required for deployments, but MAY be useful
   for the following purposes:
 
