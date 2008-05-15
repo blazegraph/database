@@ -36,6 +36,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.MalformedURLException;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -151,7 +152,7 @@ public class ConcurrentDataLoader {
 
     protected static final Logger log = Logger
             .getLogger(ConcurrentDataLoader.class);
-
+    
     /**
      * True iff the {@link #log} level is INFO or less.
      */
@@ -230,6 +231,15 @@ public class ConcurrentDataLoader {
     final AbstractFederation fed;
     
     final ScheduledFuture loadServiceStatisticsFuture;
+    
+    /**
+     * The amount of delay in milliseconds that will be imposed on the caller's
+     * {@link Thread} when a {@link RejectedExecutionException} is thrown when
+     * attempting to submit a task for execution. A delay is imposed in order to
+     * give the tasks already in the queue time to progress before the caller
+     * can try to (re-)submit a task for execution.
+     */
+    protected final long REJECTED_EXECUTION_DELAY = 250L;
 
     /**
      * Create and run a concurrent data load operation.
@@ -405,6 +415,15 @@ public class ConcurrentDataLoader {
 
                     }
                 });
+                tmp.addCounter("taskCancelCount", new Instrument<Long>() {
+
+                    @Override
+                    protected void sample() {
+
+                        setValue((long) counters.taskCancelCount.get());
+
+                    }
+                });
                 tmp.addCounter("taskFatalCount", new Instrument<Long>() {
 
                     @Override
@@ -438,14 +457,32 @@ public class ConcurrentDataLoader {
 
         if (errorTask != null) {
 
+            if(INFO)
             log.info("Re-submitting task="+errorTask.target);
             
             // re-submit a task that produced an error.
-            new WorkflowTask<ReaderTask, Object>(errorTask).submit();
+            try {
 
-            counters.taskRetryCount.incrementAndGet();
+                new WorkflowTask<ReaderTask, Object>(errorTask).submit();
 
-            return true;
+                counters.taskRetryCount.incrementAndGet();
+
+                return true;
+                
+            } catch(RejectedExecutionException ex) {
+
+                /*
+                 * Ignore. The task will be re-tried again. Eventually the queue
+                 * will be short enough that the task can be submitted for
+                 * execution.
+                 */
+                
+                // pause a bit so that the running tasks can progress.
+                Thread.sleep(REJECTED_EXECUTION_DELAY/*ms*/);
+                
+                return false;
+                
+            }
 
         }
 
@@ -771,7 +808,7 @@ public class ConcurrentDataLoader {
                 
                 // But retry the task every 1/4 second.
                 
-                Thread.sleep(250/*ms*/);
+                Thread.sleep(REJECTED_EXECUTION_DELAY/*ms*/);
                 
             }
 
@@ -802,6 +839,12 @@ public class ConcurrentDataLoader {
         
         protected static final Logger log = Logger
                 .getLogger(WorkflowTask.class);
+
+        /**
+         * True iff the {@link #log} level is WARN or less.
+         */
+        final protected static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+                .toInt();
 
         /**
          * True iff the {@link #log} level is INFO or less.
@@ -1081,18 +1124,29 @@ public class ConcurrentDataLoader {
 
             counters.taskFailCount.incrementAndGet();
 
+            if(t instanceof CancellationException) {
+
+                /*
+                 * An operation submitted by the task was cancelled due to a
+                 * timeout configured for the IBigdataClient's thread pool.
+                 */
+                
+                counters.taskCancelCount.incrementAndGet();
+                
+            }
+            
             if (ntries < maxtries) {
 
-                // note: w/o stack trace since we will retry.
-                log.warn("error: task=" + target + ", cause="+t);
+                if (WARN)
+                    log.warn("error (will retry): task=" + target + ", cause=" + t, t);
 
                 // may block
                 errorQueue.put(this);
 
             } else {
 
-                // note: with stack trace on final error.
-                log.error("failed: task=" + target+", cause="+t, t);
+                // note: always with stack trace on final error.
+                log.error("failed (will not retry): task=" + target+", cause="+t, t);
 
                 counters.taskFatalCount.incrementAndGet();
 
@@ -1117,17 +1171,44 @@ public class ConcurrentDataLoader {
      */
     public static class WorkflowTaskCounters extends TaskCounters {
         
+        /**
+         * The #of tasks for which a {@link RejectedExecutionException} was
+         * thrown when the task was
+         * {@link ExecutorService#submit(java.util.concurrent.Callable) submitted}.
+         * <p>
+         * Note: A task is not considered to be "submitted" until it is accepted
+         * for execution by some service. Therefore a task which is rejected
+         * does NOT cause {@link TaskCounters#taskSubmitCount} to be incremented
+         * and the retry of a rejected task is not counted by
+         * {@link #taskRetryCount}.
+         */
         final public AtomicInteger taskRejectCount = new AtomicInteger(0);
 
+        /**
+         * The #of tasks that have been re-submitted following some error which
+         * caused the task to fail.
+         */
         final public AtomicInteger taskRetryCount = new AtomicInteger(0);
         
+        /**
+         * #of tasks that failed due to a {@link CancellationException} - this is
+         * the exception thrown when the
+         * {@link IBigdataClient.Options#CLIENT_TASK_TIMEOUT} is exceeded for some
+         * operation causing the operation to be cancelled and the task to fail.
+         */
+        final public AtomicLong taskCancelCount = new AtomicLong();
+
+        /**
+         * The #of tasks which have failed and will not be retried as their max
+         * retry count has been reached.
+         */
         final public AtomicInteger taskFatalCount = new AtomicInteger(0);
         
         public String toString() {
          
             return super.toString() + ", #reject=" + taskRejectCount
-                    + ", #retry=" + taskRetryCount + ", #fatal="
-                    + taskFatalCount;
+                    + ", #retry=" + taskRetryCount + ", #cancel="
+                    + taskCancelCount + ", #fatal=" + taskFatalCount;
             
         }
         

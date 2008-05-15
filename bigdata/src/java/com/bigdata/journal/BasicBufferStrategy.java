@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.io.FileChannelUtility;
 
 /**
  * Implements logic to read from and write on a buffer. This is sufficient
@@ -327,7 +328,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
     synchronized public long transferTo(RandomAccessFile out)
             throws IOException {
         
-        long count = nextOffset;
+        final long count = nextOffset;
         
         final FileChannel outChannel = out.getChannel();
         
@@ -341,31 +342,34 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 //        }
         
         /*
-         * use a single nio operation to write all the data onto the output
-         * channel.
+         * Write all the data onto the output channel.
          */
         
-        final long begin = System.currentTimeMillis();
+//        final long begin = System.currentTimeMillis();
         
         // setup the buffer for the operation.
         buffer.limit((int)nextOffset);
         buffer.position(0);
         
-        // write the data : @todo use an explicit position for this write?
-        final long nwritten = outChannel.write(buffer);
-        
-        if( nwritten != count ) {
-            
-            throw new AssertionError("Expected to write " + count
-                    + " bytes but wrote " + nwritten);
-            
-        }
+        FileChannelUtility.writeAll(outChannel, buffer, toPosition);
 
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        log.info("\nTransferred " + count
-                + " bytes from memory to disk at offset=" + toPosition + " in "
-                + elapsed + "ms");
+        outChannel.position(toPosition+count);
+
+//        // write the data : @todo use an explicit position for this write?
+//        final long nwritten = outChannel.write(buffer);
+//        
+//        if( nwritten != count ) {
+//            
+//            throw new AssertionError("Expected to write " + count
+//                    + " bytes but wrote " + nwritten);
+//            
+//        }
+//
+//        final long elapsed = System.currentTimeMillis() - begin;
+//        
+//        log.info("\nTransferred " + count
+//                + " bytes from memory to disk at offset=" + toPosition + " in "
+//                + elapsed + "ms");
 
         return count;
         

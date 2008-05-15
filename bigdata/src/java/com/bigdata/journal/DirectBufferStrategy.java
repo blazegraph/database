@@ -29,6 +29,8 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.io.FileChannelUtility;
+
 /**
  * Direct buffer strategy uses a direct {@link ByteBuffer} as a write through
  * cache and writes through to disk for persistence.
@@ -109,15 +111,16 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              * optimized by Java and the OS.
              */
 
-            final int count = getChannel().write(buffer,
-                    headerSize + offset);
+            FileChannelUtility.writeAll(getChannel(), buffer, headerSize + offset);
             
-            if (count != nbytes) {
-
-                throw new RuntimeException("Expected to write " + nbytes
-                        + " bytes but wrote " + count);
-
-            }
+//            final int count = getChannel().write(buffer, headerSize + offset);
+//            
+//            if (count != nbytes) {
+//
+//                throw new RuntimeException("Expected to write " + nbytes
+//                        + " bytes but wrote " + count);
+//
+//            }
             
         } catch( IOException ex ) {
             

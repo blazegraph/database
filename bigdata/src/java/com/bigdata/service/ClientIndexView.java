@@ -29,7 +29,6 @@ package com.bigdata.service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -960,6 +959,10 @@ public class ClientIndexView implements IClientIndex {
 
             runInCallersThread(tasks);
 
+        } else if(tasks.size()==1) {
+
+            runOne(tasks.get(0));
+            
         } else if (parallel) {
 
             /*
@@ -975,6 +978,41 @@ public class ClientIndexView implements IClientIndex {
              */
 
             runSequence(tasks);
+
+        }
+
+    }
+    
+    /**
+     * Maps a set of {@link DataServiceProcedureTask} tasks across the index
+     * partitions in strict sequence. The tasks are run on the
+     * {@link #getThreadPool()} so that sequential tasks never increase the
+     * total burden placed by the client above the size of that thread pool.
+     * 
+     * @param tasks
+     *            The tasks.
+     */
+    protected void runOne(Callable<Void> task) {
+
+        if (INFO)
+            log.info("Running one task (#active="
+                    + getThreadPool().getActiveCount() + ", queueSize="
+                    + getThreadPool().getQueue().size() + ") : "
+                    + task.toString());
+
+        try {
+
+            final Future<Void> f = getThreadPool().submit(task);
+
+            // await completion of the task.
+            f.get(taskTimeout, TimeUnit.MILLISECONDS);
+
+        } catch (Exception e) {
+
+            if (INFO)
+                log.info("Execution failed: task=" + task, e);
+
+            throw new ClientException("Execution failed: " + task,e);
 
         }
 
@@ -1046,8 +1084,8 @@ public class ClientIndexView implements IClientIndex {
             
         }
 
-        if(INFO)
-        log.info("Ran " + tasks.size() + " tasks in parallel: elapsed="
+        if (INFO)
+            log.info("Ran " + tasks.size() + " tasks in parallel: elapsed="
                 + (System.currentTimeMillis() - begin));
 
     }
@@ -1130,96 +1168,6 @@ public class ClientIndexView implements IClientIndex {
             }
             
         }
-
-    }
-    
-    /**
-     * Exposes a linked list of retry exceptions leading to the failure of an
-     * {@link AbstractDataServiceProcedureTask}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ClientException extends RuntimeException {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 7802533953100817726L;
-        
-        private List<Throwable> causes;
-
-        /**
-         * The list of causes, one per failed attempt.
-         * 
-         * @return
-         * 
-         * @see #getCause()
-         */
-        public List<Throwable> getCauses() {
-
-            if (causes == null)
-                return Collections.EMPTY_LIST;
-
-            return causes;
-            
-        }
-        
-        /**
-         * The final exception thrown which caused the task to fail. Normally
-         * this will indicate that the retry count has been exceeded and
-         * {@link #getCauses()} will report the underlying problem(s) which the
-         * task encountered.
-         * 
-         * @see #getCauses()
-         */
-        public Throwable getCause() {
-            
-            return super.getCause();
-            
-        }
-        
-//        /**
-//         *  
-//         */
-//        public ClientException() {
-//            super();
-//        }
-
-        /**
-         * @param msg
-         * @param cause
-         */
-        public ClientException(String msg, Throwable cause,
-                List<Throwable> causes) {
-
-            super(msg+(causes==null?"":", causes="+causes), cause);
-
-            this.causes = causes;
-
-        }
-
-        /**
-         * @param msg
-         */
-        public ClientException(String msg, List<Throwable> causes) {
-
-            super(msg+(causes==null?"":", causes="+causes));
-
-            this.causes = causes;
-
-        }
-
-//        /**
-//         * @param cause
-//         */
-//        public ClientException(Throwable cause, List<Throwable> causes) {
-//
-//            super((causes==null?"":", causes="+causes),cause);
-//
-//            this.causes = causes;
-//            
-//        }
 
     }
     

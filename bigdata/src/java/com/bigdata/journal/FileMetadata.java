@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;
@@ -430,17 +431,19 @@ public class FileMetadata {
                 FileChannel channel = raf.getChannel();
                 ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
                 ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-                int nread;
-                if ((nread = channel.read(tmp0, OFFSET_ROOT_BLOCK0)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
-                    throw new IOException("Expected to read "
-                            + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
-                            + nread + " bytes");
-                }
-                if ((nread = channel.read(tmp1, OFFSET_ROOT_BLOCK1)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
-                    throw new IOException("Expected to read "
-                            + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
-                            + nread + " bytes");
-                }
+                FileChannelUtility.readAll(channel, tmp0, OFFSET_ROOT_BLOCK0);
+                FileChannelUtility.readAll(channel, tmp1, OFFSET_ROOT_BLOCK1);
+//                int nread;
+//                if ((nread = channel.read(tmp0, OFFSET_ROOT_BLOCK0)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
+//                    throw new IOException("Expected to read "
+//                            + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
+//                            + nread + " bytes");
+//                }
+//                if ((nread = channel.read(tmp1, OFFSET_ROOT_BLOCK1)) != RootBlockView.SIZEOF_ROOT_BLOCK) {
+//                    throw new IOException("Expected to read "
+//                            + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but read "
+//                            + nread + " bytes");
+//                }
                 tmp0.position(0); // resets the position.
                 tmp1.position(0);
                 try {
@@ -496,12 +499,13 @@ public class FileMetadata {
                     buffer.limit((int)nextOffset);
                     buffer.position(0);
                     // Read the file image into the direct buffer.
-                    final int nbytes = raf.getChannel().read(buffer,
-                            headerSize0);
-                    if (nbytes != nextOffset) {
-                        throw new IOException("Expected to read " + nextOffset
-                                + " bytes, but read " + nbytes + " bytes");
-                    }
+                    FileChannelUtility.readAll(raf.getChannel(), buffer, headerSize0);
+//                    final int nbytes = raf.getChannel().read(buffer,
+//                            headerSize0);
+//                    if (nbytes != nextOffset) {
+//                        throw new IOException("Expected to read " + nextOffset
+//                                + " bytes, but read " + nbytes + " bytes");
+//                    }
                     break;
                 }
                 case Mapped: {
@@ -604,18 +608,20 @@ public class FileMetadata {
                 }
                 this.createTime = createTime;
                 this.closeTime = 0L;
-                IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
+                final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                         nextOffset, firstCommitTime, lastCommitTime,
                         commitCounter, commitRecordAddr, commitRecordIndexAddr,
                         uuid, createTime, closeTime, checker);
-                IRootBlockView rootBlock1 = new RootBlockView(false,
+                final IRootBlockView rootBlock1 = new RootBlockView(false,
                         offsetBits, nextOffset, firstCommitTime,
                         lastCommitTime, commitCounter, commitRecordAddr,
                         commitRecordIndexAddr, uuid, createTime, closeTime,
                         checker);
                 FileChannel channel = raf.getChannel();
-                channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
-                channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+                FileChannelUtility.writeAll(channel, rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
+                FileChannelUtility.writeAll(channel, rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+//                channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
+//                channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
                 this.rootBlock = rootBlock0;
                 
                 /*

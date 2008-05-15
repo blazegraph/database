@@ -835,6 +835,7 @@ public class IndexSegmentBuilder {
                 try {
                     out.close();
                 } catch (Throwable t) {
+                    log.error("Ignoring: "+t,t);
                 }
             }
             outFile.delete();

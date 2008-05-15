@@ -30,7 +30,6 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -562,7 +561,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
             while (data.remaining() > 0) {
 
                 // reset the direct buffer used to manage the transfers.
-                writeCache.rewind();
+                writeCache.clear();
 
                 // #of bytes to copy from the heap buffer to the direct buffer.
                 final int nxfer = Math.min(data.remaining(), writeCache
@@ -597,7 +596,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
              * DiskOnlyStrategy begins to use this buffer.
              */
             
-            writeCache.rewind();
+            writeCache.clear();
 
             /*
              * Increment the offset - this is where the next write will be made
@@ -847,15 +846,10 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
                 // the head of the pool must exist.
                 final ByteBuffer b = pool.take();
                 
-                assert b != null;
-                
-                assert b.capacity() == bufferCapacity;
-
                 assertOurBuffer( b );
-                
-                b.rewind();
-                
-                b.limit(bufferCapacity);
+
+                // limit -> capacity; pos-> 0; mark cleared.
+                b.clear();
                 
                 return b;
             
@@ -1018,6 +1012,12 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
             
             assert lock.isHeldByCurrentThread();
                         
+            if (b == null)
+                throw new IllegalArgumentException("null reference");
+
+            if (b.capacity() != bufferCapacity)
+                throw new IllegalArgumentException("wrong capacity");
+
             if (allocated == null) {
 
                 // test is disabled.

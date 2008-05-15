@@ -912,6 +912,15 @@ abstract public class OverflowManager extends IndexManager {
         
         /*
          * Overflow each index by re-defining its view on the new journal.
+         * 
+         * FIXME This whole operation should be validated as a pre-condition to
+         * attempting overflow and if an error arises during overflow then a
+         * compenating action should restore the old journal and delete the new
+         * one so that we continue to run against a known good state. For
+         * example, if an unpartitioned index is encountered then a thrown
+         * exception results in the application running against the new live
+         * journal but its indices have not been propagated correctly onto that
+         * journal!
          */
         int noverflow = 0;
         // #of indices with at least one index entry that were copied.
@@ -977,7 +986,6 @@ abstract public class OverflowManager extends IndexManager {
                     throw new RuntimeException("Not a partitioned index: "
                             + entry.name);
                      
-                    
                 }
                 
                 /*

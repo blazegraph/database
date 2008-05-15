@@ -410,6 +410,17 @@ public class NodeSerializer {
 
         this.recordCompressor = indexMetadata.getRecordCompressor();
 
+        if (recordCompressor != null) {
+            /*
+             * FIXME The record compressor is not thread-safe since it relies on
+             * the [cbuf] field, which is shared across concurrent threads with
+             * read access to the same BTree (write access is single threaded).
+             */
+            throw new UnsupportedOperationException(
+                    "Record compressor is not thread-safe");
+        }
+
+        
         this.useChecksum = indexMetadata.getUseChecksum() && isFullyBuffered;
 
         this.chk = useChecksum ? new ChecksumUtility() : null;

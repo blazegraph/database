@@ -170,7 +170,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * for the {@link AbstractBTree}.
      * <p>
      * Note: This field MUST be marked as [volatile] in order to guarentee
-     * correct semantics for double-checked locking in {@link #reopen()}
+     * correct semantics for double-checked locking in {@link BTree#reopen()}
+     * and {@link IndexSegment#reopen()}.
      * 
      * @see http://en.wikipedia.org/wiki/Double-checked_locking
      */
@@ -2145,6 +2146,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         final ByteBuffer tmp;
         {
+
             final long begin = System.nanoTime();
             
         // /*
@@ -2179,7 +2181,17 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
             final long begin = System.nanoTime();
             
-            node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
+            try {
+
+                node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
+                
+            } catch(Exception ex) {
+                
+                throw new RuntimeException("De-serialization problem: addr="
+                        + store.toString(addr) + " from store="
+                        + store.getFile() + " : " + ex, ex);
+                
+            }
 
             counters.deserializeNanos += System.nanoTime() - begin;
             

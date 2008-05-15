@@ -103,6 +103,9 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         // turn off text indexing.
 //        properties.setProperty(Options.TEXT_INDEX,"false");
 
+        // turn off statement identifiers.
+//        properties.setProperty(Options.STATEMENT_IDENTIFIERS,"false");
+
         // Enable the o/s specific statistics collection for the test run.
 //        properties.setProperty(EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS,"true");
 

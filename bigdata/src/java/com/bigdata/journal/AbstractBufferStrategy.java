@@ -31,6 +31,7 @@ import java.text.NumberFormat;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
@@ -374,106 +375,106 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     /**
      * Helper method used by {@link DiskBackedBufferStrategy} and
      * {@link DiskOnlyStrategy} to implement
-     * {@link IBufferStrategy#transferTo(RandomAccessFile)}
+     * {@link IBufferStrategy#transferTo(RandomAccessFile)} using a
+     * {@link FileChannel} to {@link FileChannel} transfer.
      * 
      * @param src
      *            The source.
      * @param out
      *            The output file.
-     *            
+     * 
      * @return The #of bytes transferred.
      * 
      * @throws IOException
      */
-    protected long transferFromDiskTo(IDiskBasedStrategy src,RandomAccessFile out) throws IOException {
+    static protected long transferFromDiskTo(final IDiskBasedStrategy src,
+            final RandomAccessFile out) throws IOException {
 
-        final long begin = System.currentTimeMillis();
-        
-        // #of bytes to transfer.
+        // We want everything after the file header.
+        final long fromPosition = src.getHeaderSize();
+
+        // #of bytes to transfer (everything in the user extent).
         final long count = src.getNextOffset();
 
-        // the output channel.
-        final FileChannel outChannel = out.getChannel();
+        final FileChannel srcChannel = src.getRandomAccessFile().getChannel();
         
-        // current position on the output channel.
-        final long toPosition = outChannel.position();
+        FileChannelUtility.transferAllFrom(srcChannel, fromPosition, count, out);
         
-//        if(toPosition + count > Integer.MAX_VALUE) {
-//            
-//            throw new IOException("Index segment exceeds int32 bytes.");
-//            
-//        }
+        return count;
 
-        /* 
-         * Transfer data from channel to channel.
-         */
-        
-        final FileChannel tmpChannel = src.getRandomAccessFile().getChannel();
-        
-        /*
-         * Set the fromPosition on source channel. We want everything after the
-         * file header.
-         */
-        tmpChannel.position(src.getHeaderSize());
-
-        /*
-         * Extend the output file. This is required at least for some
-         * circumstances.
-         */
-        out.setLength(toPosition+count);
-                    
-        /*
-         * Transfer the data. It is possible that this will take multiple
-         * writes for at least some implementations.
-         */
-
-        log.warn("fromPosition="+tmpChannel.position()+", toPosition="+toPosition+", count="+count);
-
-        int nwrites = 0; // #of write operations.
-
-        {
-            
-            long n = count;
-            
-            long to = toPosition;
-            
-            while (n > 0) {
-
-                log.warn("to="+toPosition+", remaining="+n+", nwrites="+nwrites);
-                long nxfer = outChannel.transferFrom(tmpChannel, to, n);
-                
-                to += nxfer;
-                
-                n -= nxfer;
-                
-                nwrites++;
-        
-//        // Verify transfer is complete.
-//            if (nxfer != count) {
+//        final long begin = System.currentTimeMillis();
+//        
+//        // the output channel.
+//        final FileChannel outChannel = out.getChannel();
+//        
+//        // current position on the output channel.
+//        final long toPosition = outChannel.position();
 //
-//                throw new IOException("Expected to transfer " + count
-//                        + ", but transferred " + nxfer);
+//        /* 
+//         * Transfer data from channel to channel.
+//         */
+//
+//        /*
+//         * Extend the output file. This is required at least for some
+//         * circumstances.
+//         */
+//        out.setLength(toPosition+count);
+//                    
+//        /*
+//         * Transfer the data. It is possible that this will take multiple
+//         * writes for at least some implementations.
+//         */
+//
+//        if (log.isInfoEnabled())
+//            log.info("fromPosition="+tmpChannel.position()+", toPosition="+toPosition+", count="+count);
+//
+//        int nwrites = 0; // #of write operations.
+//
+//        {
+//            
+//            long n = count;
+//            
+//            long to = toPosition;
+//            
+//            while (n > 0) {
+//
+//                if (log.isInfoEnabled())
+//                    log.info("to=" + toPosition+", remaining="+n+", nwrites="+nwrites);
+//                
+//                long nxfer = outChannel.transferFrom(tmpChannel, to, n);
+//                
+//                to += nxfer;
+//                
+//                n -= nxfer;
+//                
+//                nwrites++;
+//        
+////        // Verify transfer is complete.
+////            if (nxfer != count) {
+////
+////                throw new IOException("Expected to transfer " + count
+////                        + ", but transferred " + nxfer);
+////
+////            }
 //
 //            }
-
-            }
-            
-        }
-        
-        /*
-         * Update the position on the output channel since transferFrom does
-         * NOT do this itself.
-         */
-        outChannel.position(toPosition+count);
-        
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        log.warn("Transferred " + count
-                + " bytes from disk channel to disk channel (offset="
-                + toPosition + ") in " + nwrites + " writes and " + elapsed
-                + "ms");
-
-        return count;
+//            
+//        }
+//        
+//        /*
+//         * Update the position on the output channel since transferFrom does
+//         * NOT do this itself.
+//         */
+//        outChannel.position(toPosition+count);
+//        
+//        final long elapsed = System.currentTimeMillis() - begin;
+//        
+//        log.warn("Transferred " + count
+//                + " bytes from disk channel to disk channel (offset="
+//                + toPosition + ") in " + nwrites + " writes and " + elapsed
+//                + "ms");
+//
+//        return count;
         
     }
 
