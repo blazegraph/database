@@ -1,0 +1,193 @@
+<html>
+<head>
+<title>bigdata(R) starter kit</title>
+</head>
+<body>
+
+<p>
+
+    The starter kit contains some configuration files and scripts that
+    can help you get started running a variety of bigdata
+    configurations, including:<dl>
+	
+    <dt>LDS</dt><dd>Local Data Service.  This configuration provides
+    an embedded immortal database with full concurrency control and
+    monolithic indices.  This option supports only a single data
+    service and NO metadata service (hence monolithic indices).  This
+    is useful for testing and for scenarios where you need all indices
+    to be local.</dd>
+	
+    <dt>EF</dt><dd>Embedded Federation.  This configuration provides
+    an embedded database with full concurrency control and key-range
+    partitioned indices (the scale-out architecture, but running
+    embedded in a single JVM). This is useful for testing or for
+    running on a single server platform.  You can control the #of data
+    services that will be created with a configuration option.</dd>
+	
+    <dt>JF</dt><dd>Jini Federation.  This configuration provides a
+    distributed database with full concurrency control and key-range
+    partitioned indices (the scale-out architecture running on one or
+    more machines).</dd>
+	
+    </dl>
+
+</p>
+
+<p>
+    
+    The following scripts may help you get started.  These scripts
+    <em>MUST</em> be edited for your platform.  Also, many of the
+    scripts assume that you are running a test application (the
+    concurrent data loader for the RDF knowledge base) and rely on
+    data not supplied with the starter kit (a synthetic data set
+    generated using the LUBM benchmark for RDF databases).  Again, you
+    will need to edit for your application needs.
+
+    <dl>
+    
+    <dt>env.sh</dt><dd>Sets up an environment for a Linux host.  You
+    will have to edit this to reflect your own platform.  This sets
+    various environment variables and it MUST be executed using
+    <em>source env.sh</em> so that those variables will be defined in
+    the shell you are running (otherwise they will be local to the
+    temporary shell in which the script is executed).</dd>
+
+    <dt>runLDS.sh</dt><dd>Starts a test class running against a Local
+    Data Service.  The configuration options are specified in the test
+    class and may be overriden using <code>-D</code> parameters on the
+    command line.</dd>
+
+    <dt>runEF.sh</dt><dd>Starts a test class running against a Local
+    Data Service.  The configuration options are specified in the test
+    class and may be overriden using <code>-D</code> parameters on the
+    command line.</dd>
+
+    <dt>counters.sh</dt><dd>A utility to run an httpd server exposing
+    post-mortem performance analysis counters from the load balanced.
+    The data services, the metadata service, and the client all report
+    performance counters to the load balancer and also optionally
+    expose their counters via an embedded real-time httpd service.
+    The load balancer aggregates those data.  Some of the data are
+    used by the load balancer for its decision-making, but all of the
+    aggregated data is made available via an httpd service embedded
+    with the load balancer.  The load balancer also saves snapshots of
+    the aggregated performance counters on a periodic basis and when
+    it is shutdown.  This utility will allow you to navigate those
+    snaphots using a web browser.  This has been designed to make it
+    modestly easy to grad interesting data and stuff it into a
+    worksheet for further analysis, plotting, etc.</dd>
+
+    </dl>
+
+</p>
+
+<p>
+
+    The JF configuration is significantly different from the various
+    embedded configurations.  Once you have Jini installed and running
+    on at least one host in your cluster and have verified that your
+    hosts enabled for multicast, then each bigdata service is started
+    separately.  You can start services on any host in the cluster.
+
+</p>
+
+<p>
+
+    Currently there are some startup dependencies, so make sure that
+    you start the <code>TimestampServer</code> first, followed by the
+    <code>LoadBalancerServer</code>.  With those running you can then
+    start as many <code>DataServer</code>s as you wish.  Also be sure
+    to start ONE <code>MetadataServer</code>.  (The bigdata federation
+    does not support failover services at this time so there can only
+    be one TimestampServer and one MetadataServer.)
+
+<p>
+
+    These scripts should be run from the <code>config</code>
+    directory.
+
+</p>
+
+</p>
+
+<p>
+
+    The following scripts may help you start a Jini-based bigdata
+    federation.  Note that these scripts rely on the files in the
+    config directory (TimestampServer0, LoadBalancerServer0,
+    DataServer0, etc).
+
+</p>
+<p>
+
+    <strong>WARNING: These scripts delete any old start before
+    starting the services!!!</strong>
+
+</p>
+<p>
+
+    <dl>
+
+    <dt>start3.sh (RUN FIRST), start1.sh, start2.sh </dt>
+
+    <dd> These scripts were developed to start bigdata services on a
+    cluster of three Linux machines.  The scripts assume that there is
+    a network file system (/nas) on which the scripts and the config
+    files are located.  Each service is configured to store its
+    persistent data on <code>/var/bigdata</code>.  The load balancer
+    is configured to log the performance counters under
+    <code>/var/log/bigdata</code> on the host on which it is
+    executing.</dd>
+
+    <dt>startAll.sh</dt><dd>Suitable for starting all services when
+    you are running on a single host.</dd>
+
+    <dt>startService.sh</dt><dd>A helper script that starts a single
+    service.</dd>
+
+    <dt>runJini.sh</dt><dd>A script designed to start a bigdata client
+    executing against a bigdata federation that is already
+    running. </dd>
+
+    </dl>
+
+</p>
+
+<p>
+
+    The following files are found in the <code>config</code> directory.
+    
+    <dl>
+
+    <dt>policy.all</dt><dd>A liberal policy that will allow bigdata
+    services to start, connect to Jini services, etc.  This is
+    referenced from the various scripts as
+    <code>../policy.all</code>. More constrained policies can of
+    course be developed.</dd>
+
+    <dt>log4j.properties</dt><dd>A log4j configuration file.  The
+    various scripts reference this configuration resource as
+    <code>file:/nas/config/policy.all</code>.  You will have to edit
+    the URL so that the file can be resolved in your environment.</dd>
+
+    <dt>TimestampServer0</dt><dd>A configuration for a timestamp
+    service.</dd>
+
+    <dt>LoadBalancerServer0</dt><dd>A configuration for a load
+    balancer service.</dd>
+
+    <dt>DataServer{0,1,2,3,4}</dt><dd>Configurations for a set of data
+    services.</dd>
+
+    <dt>MetadataServer0</dt><dd>A configuration for a metadata
+    service.</dd>
+
+    <dt>Client</dt><dd>A client configuration for connecting to the
+    running bigdata federation.</dd>
+
+    </dl>
+
+</p>
+
+</body>
+</html>
