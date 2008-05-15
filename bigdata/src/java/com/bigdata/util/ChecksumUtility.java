@@ -59,7 +59,7 @@ public class ChecksumUtility {
      * 
      * @return The checksum.
      */
-    public int checksum(ByteBuffer buf, int pos, int limit) {
+    public int checksum(final ByteBuffer buf, final int pos, final int limit) {
         
         assert buf != null;
         assert pos >= 0;
@@ -84,7 +84,7 @@ public class ChecksumUtility {
             
             }
                 
-            chk.update(bytes, pos, len);
+            chk.update(bytes, pos + buf.arrayOffset(), len);
             
         } else {
             

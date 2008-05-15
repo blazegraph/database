@@ -426,7 +426,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             final int pos = writeCachePosition;
 
             // view onto the writeCache with its own limit and position.
-            ByteBuffer tmp = buf.asReadOnlyBuffer();
+            final ByteBuffer tmp = buf.asReadOnlyBuffer();
 
             // adjust the view to just the record of interest.
             tmp.limit(pos + nbytes);

@@ -70,9 +70,11 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.ClientException;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -1135,6 +1137,25 @@ public class ConcurrentDataLoader {
                 
             }
             
+            if(InnerCause.isInnerCause(t, ClientException.class)) {
+
+                /*
+                 * Note: The way printStackTrace() behaves it appears to use
+                 * getStackTrace() to format the stack trace for viewing. This
+                 * seems to be custom tailored for the [cause] property for a
+                 * Throwable. However, ClientException can report more than one
+                 * cause from parallel executions of subtasks split out of an
+                 * original request. In order for those cause_s_ to be made
+                 * visible in the stack trace we have to unwrap the thrown
+                 * exception until we get the [ClientException]. ClientException
+                 * knows how to print a stack trace that shows ALL of its
+                 * causes.
+                 */
+                
+                t = InnerCause.getInnerCause(t, ClientException.class);
+                
+            }
+            
             if (ntries < maxtries) {
 
                 if (WARN)
@@ -1425,7 +1446,8 @@ public class ConcurrentDataLoader {
                  * through to the database when that file is processed rather
                  * than being accumulated in a thread-local buffer).
                  */
-                log.info(stats.toString());
+                if (INFO)
+                    log.info(stats.toString());
 
                 return stats;
 

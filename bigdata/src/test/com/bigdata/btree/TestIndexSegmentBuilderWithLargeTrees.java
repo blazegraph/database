@@ -155,14 +155,18 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
      * Branching factors for the source btree that is then used to build an
      * {@link IndexSegment}. This parameter indirectly determines both the #of
      * leaves and the #of entries in the source btree.
-     * 
+     * <p>
      * Note: Regardless of the branching factor in the source btree, the same
-     * {@link IndexSegment} should be build for a given set of entries
+     * {@link IndexSegment} should be built for a given set of entries
      * (key-value pairs) and a given output branching factor for the
      * {@link IndexSegment}. However, input trees of different heights also
      * stress different parts of the algorithm.
      */
-    final int[] branchingFactors = new int[]{3,4,5,10,20};//64};//128};//,512};
+    final int[] branchingFactors = new int[]{
+            3,4,5,
+            32
+            };
+    //64};//128};//,512};
     
     /**
      * A stress test for building {@link IndexSegment}s. A variety of
@@ -184,7 +188,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
             doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m ) );
 
-            // Note: overflows the initial journal extent.
+//            // Note: overflows the initial journal extent.
 //            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m*m ) );
 
         }
@@ -207,14 +211,14 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
             
             int m = branchingFactors[i];
             
-            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m,trace));
-            
-            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m,trace) );
-
-            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m,trace) );
+//            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m,trace));
+//            
+//            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m,trace) );
+//
+//            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m,trace) );
 
             // Note: overflows the initial journal extent.
-//            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m*m,trace) );
+            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m*m,trace) );
 
         }
     
@@ -230,7 +234,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
     public void doBuildIndexSegmentAndCompare(BTree btree) throws IOException {
         
         // branching factors used for the index segment.
-        final int branchingFactors[] = new int[]{3,4,5,10,20,60,100,256,1024,4096,8192};
+        final int branchingFactors[] = new int[] { 257, 512, 4196, 8196};
         
         for( int i=0; i<branchingFactors.length; i++ ) {
         

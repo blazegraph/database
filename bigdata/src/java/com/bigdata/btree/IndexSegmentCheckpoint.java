@@ -25,15 +25,18 @@ package com.bigdata.btree;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RootBlockException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * The checkpoint record for an {@link IndexSegment}.
@@ -57,9 +60,6 @@ import com.bigdata.rawstore.IAddressManager;
  *       partitioned index so that it can be validated after being moved around,
  *       etc. If we do this then it might not be necessary to checksum the
  *       individual records within the {@link IndexSegment}.
- *       <p>
- *       it would also be good to checksum the {@link IndexSegmentCheckpoint}
- *       record.
  */
 public class IndexSegmentCheckpoint {
 
@@ -71,13 +71,14 @@ public class IndexSegmentCheckpoint {
 
     static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
     static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
-    static final int SIZEOF_OFFSET_BITS = Bytes.SIZEOF_BYTE;
+    static final int SIZEOF_OFFSET_BITS = Bytes.SIZEOF_INT;
     static final int SIZEOF_BRANCHING_FACTOR = Bytes.SIZEOF_INT;
     static final int SIZEOF_COUNTS = Bytes.SIZEOF_INT;
     static final int SIZEOF_NBYTES = Bytes.SIZEOF_INT;
     static final int SIZEOF_ADDR = Bytes.SIZEOF_LONG;
     static final int SIZEOF_ERROR_RATE = Bytes.SIZEOF_DOUBLE;
     static final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
+    static final int SIZEOF_CHECKSUM = Bytes.SIZEOF_INT;
 
     /**
      * The #of unused bytes in the checkpoint record format. Note that the
@@ -99,9 +100,11 @@ public class IndexSegmentCheckpoint {
             SIZEOF_OFFSET_BITS + // #of bits used to represent a byte offset.
             SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, #entries
             SIZEOF_NBYTES + // max record length
-            SIZEOF_ADDR * 6 + // leaves, nodes, root, metadata, bloomFilter, blobs
-            Bytes.SIZEOF_LONG + // file size
+            Bytes.SIZEOF_LONG * 6 + // {offset,extent} tuples for the {leaves, nodes, blobs} regions.
+            SIZEOF_ADDR * 3 + // address of the {root node/leaf, indexMetadata, bloomFilter}.
+            Bytes.SIZEOF_LONG + // file size in bytes.
             SIZEOF_UNUSED + // available bytes for future versions.
+            SIZEOF_CHECKSUM+ // the checksum for the proceeding bytes in the checkpoint record.
             Bytes.SIZEOF_LONG // timestamp1
     ;
     
@@ -161,28 +164,64 @@ public class IndexSegmentCheckpoint {
     final public int nentries;
     
     /**
-     * The maximum #of bytes in any node or leaf stored on the index
-     * segment.
-     * 
-     * @todo this appears to be unused now - perhaps it should go away?
+     * The maximum #of bytes in any node or leaf stored on the
+     * {@link IndexSegment}.
+     * <p>
+     * Note: while this appears to be unused now, it is still of interest and
+     * will be retained.
      */
     final public int maxNodeOrLeafLength;
     
-    /**
-     * The address of the contiguous region containing the serialized leaves in
-     * the file.
-     * <p>
-     * Note: The offset component of this address must be equal to {@link #SIZE}
-     * since the leaves are written immediately after the
-     * {@link IndexSegmentCheckpoint} record.
+    /*
+     * begin {offset,size} region extent tuples for the various multi-record
+     * regions defined in the store file. These use a long value for the
+     * byteCount size each region can span many, many records.
      */
-    final public long addrLeaves;
     
     /**
-     * The address of the contiguous region containing the serialized nodes in
+     * The offset of the contiguous region containing the serialized leaves in
+     * the file.
+     * <p>
+     * Note: The offset must be equal to {@link #SIZE} since the leaves are
+     * written immediately after the {@link IndexSegmentCheckpoint} record.
+     */
+    final public long offsetLeaves;
+    
+    /**
+     * The #of bytes in the contiguous region containing the serialized leaves in
+     * the file.
+     */
+    final public long extentLeaves;
+    
+    /**
+     * The offset of the contiguous region containing the serialized nodes in
      * the file or <code>0L</code> iff there are no nodes in the file.
      */
-    final public long addrNodes;
+    final public long offsetNodes;
+    
+    /**
+     * The #of bytes in the contiguous region containing the serialized nodes in
+     * the file or <code>0L</code> iff there are no nodes in the file.
+     */
+    final public long extentNodes;
+    
+    /**
+     * The offset of the optional contiguous region containing the raw records
+     * to be resolved by blob references or <code>0L</code> iff there are no
+     * raw records in this region.
+     */
+    final public long offsetBlobs;
+
+    /**
+     * The #of bytes in the optional contiguous region containing the raw
+     * records to be resolved by blob references or <code>0L</code> iff there
+     * are no raw records in this region.
+     */
+    final public long extentBlobs;
+
+    /*
+     * begin store addresses for individual records.
+     */
     
     /**
      * Address of the root node or leaf in the file.
@@ -200,10 +239,9 @@ public class IndexSegmentCheckpoint {
      */
     final public long addrBloom;
     
-    /**
-     * Address of the optional records to be resolved by blob references.
+    /*
+     * end of store addresses for individual records.
      */
-    final public long addrBlobs;
     
     /**
      * Length of the file in bytes.
@@ -224,7 +262,19 @@ public class IndexSegmentCheckpoint {
      * checkpoint record.
      */
     final public long commitTime;
+    
+    /**
+     * The checksum for the serialized representation of the
+     * {@link IndexSegmentCheckpoint} record. This is computed when the record
+     * is serialized and verified when it is de-serialized.
+     */
+    private int checksum;
 
+    /**
+     * A read-only view of the serialized {@link IndexSegmentCheckpoint} record.
+     */
+    final private ByteBuffer buf;
+    
     /**
      * Reads the {@link IndexSegmentCheckpoint} record for the
      * {@link IndexSegment}. The operation seeks to the start of the file and
@@ -251,10 +301,17 @@ public class IndexSegmentCheckpoint {
             
         }
         
-        // rewind.
-        raf.seek(0L);
+        // allocate buffer for the checkpoint record.
+        ByteBuffer buf = ByteBuffer.allocate(SIZE);
         
-        final int magic = raf.readInt();
+        // read in the serialized checkpoint record.
+        FileChannelUtility.readAll(raf.getChannel(), buf, 0L);
+        
+        // prepare for reading.
+        buf.rewind();
+        
+        // extract the various fields.
+        final int magic = buf.getInt();
 
         if (magic != MAGIC) {
 
@@ -263,7 +320,7 @@ public class IndexSegmentCheckpoint {
 
         }
 
-        final int version = raf.readInt();
+        final int version = buf.getInt();
 
         if (version != VERSION0) {
 
@@ -271,35 +328,38 @@ public class IndexSegmentCheckpoint {
 
         }
 
-        final long timestamp0 = raf.readLong();
+        final long timestamp0 = buf.getLong();
         
-        segmentUUID = new UUID(raf.readLong()/*MSB*/, raf.readLong()/*LSB*/);
+        segmentUUID = new UUID(buf.getLong()/*MSB*/, buf.getLong()/*LSB*/);
 
-        offsetBits = raf.readByte();
+        offsetBits = buf.getInt();
         
-        height = raf.readInt();
+        height = buf.getInt();
         
-        nleaves = raf.readInt();
+        nleaves = buf.getInt();
         
-        nnodes = raf.readInt();
+        nnodes = buf.getInt();
         
-        nentries = raf.readInt();
+        nentries = buf.getInt();
 
-        maxNodeOrLeafLength = raf.readInt();
+        maxNodeOrLeafLength = buf.getInt();
         
-        addrLeaves = raf.readLong();
+        offsetLeaves = buf.getLong();
+        extentLeaves = buf.getLong();
 
-        addrNodes = raf.readLong();
+        offsetNodes = buf.getLong();
+        extentNodes = buf.getLong();
         
-        addrRoot = raf.readLong();
+        offsetBlobs = buf.getLong();
+        extentBlobs = buf.getLong();
+        
+        addrRoot = buf.getLong();
 
-        addrMetadata = raf.readLong();
+        addrMetadata = buf.getLong();
 
-        addrBloom = raf.readLong();
+        addrBloom = buf.getLong();
         
-        addrBlobs = raf.readLong();
-        
-        length = raf.readLong();
+        length = buf.getLong();
         
         if (length != raf.length()) {
 
@@ -308,13 +368,22 @@ public class IndexSegmentCheckpoint {
 
         }
         
-        raf.skipBytes(SIZEOF_UNUSED);
+        buf.position(buf.position() + SIZEOF_UNUSED);
         
-        final long timestamp1 = raf.readLong();
+        // the checksum read from the record.
+        checksum = buf.getInt();
+        
+        // FIXME verify against checksum computed from the record.
+        {
+            
+        }
+        
+        final long timestamp1 = buf.getLong();
         
         if (timestamp0 != timestamp1) {
 
-            throw new RootBlockException("Timestamps differ: "+timestamp0 +" vs "+ timestamp1);
+            throw new RootBlockException("Timestamps differ: " + timestamp0
+                    + " vs " + timestamp1);
             
         }
         
@@ -324,7 +393,12 @@ public class IndexSegmentCheckpoint {
         
         validate();
 
-        log.info(this.toString());
+        // save read-only view of the checkpoint record.
+        buf.rewind();
+        this.buf = buf.asReadOnlyBuffer();
+
+        if (log.isInfoEnabled())
+            log.info(this.toString());
 
     }
 
@@ -334,10 +408,29 @@ public class IndexSegmentCheckpoint {
      * 
      * @todo javadoc.
      */
-    public IndexSegmentCheckpoint(int offsetBits, int height, int nleaves,
-            int nnodes, int nentries, int maxNodeOrLeafLength, long addrLeaves,
-            long addrNodes, long addrRoot, long addrMetadata, long addrBloom,
-            long addrBlobs, long length, UUID segmentUUID, long commitTime) {
+    public IndexSegmentCheckpoint(//
+            //
+            int offsetBits,//
+            // basic checkpoint record.
+            int height, //
+            int nleaves,//
+            int nnodes,//
+            int nentries,//
+            //
+            int maxNodeOrLeafLength,//
+            // region extents
+            long offsetLeaves, long extentLeaves,//
+            long offsetNodes, long extentNodes,// 
+            long offsetBlobs, long extentBlobs,//
+            // simple addresses
+            long addrRoot, //
+            long addrMetadata, //
+            long addrBloom,//
+            // misc.
+            long length,//
+            UUID segmentUUID,//
+            long commitTime//
+    ) {
 
         /*
          * Copy the various fields to initialize the checkpoint record.
@@ -357,18 +450,25 @@ public class IndexSegmentCheckpoint {
 
         this.maxNodeOrLeafLength = maxNodeOrLeafLength;
         
-        this.addrLeaves = addrLeaves;
+        // region extents.
         
-        this.addrNodes = addrNodes;
+        this.offsetLeaves = offsetLeaves;
+        this.extentLeaves = extentLeaves;
         
+        this.offsetNodes = offsetNodes;
+        this.extentNodes = extentNodes;
+
+        this.offsetBlobs = offsetBlobs;
+        this.extentBlobs = extentBlobs;
+
+        // simple addresses
+
         this.addrRoot = addrRoot;
 
         this.addrMetadata = addrMetadata;
 
         this.addrBloom = addrBloom;
 
-        this.addrBlobs = addrBlobs;
-        
         this.length = length;
         
         this.commitTime = commitTime;
@@ -382,7 +482,10 @@ public class IndexSegmentCheckpoint {
         
         validate();
         
-        log.info(this.toString());
+        buf = createView();
+        
+        if (log.isInfoEnabled())
+            log.info(this.toString());
         
     }
 
@@ -425,71 +528,98 @@ public class IndexSegmentCheckpoint {
         // validate addrLeaves
         {
             // assert addrLeaves != 0L;
-            if (addrLeaves == 0L) {
+            if (extentLeaves == 0L) {
 
-                throw new RootBlockException("addrLeaves=" + addrLeaves);
+                throw new RootBlockException("extentLeaves=" + extentLeaves);
 
             }
 
             // leaves start immediately after the checkpoint record.
-            if (am.getOffset(addrLeaves) != SIZE) {
+            if (offsetLeaves != SIZE) {
 
-                throw new RootBlockException("addrLeaves.offset="
-                        + am.getOffset(addrLeaves) + ", but expecting " + SIZE);
+                throw new RootBlockException("offsetLeaves=" + offsetLeaves
+                        + ", but expecting " + SIZE);
 
             }
             
-            if (am.getOffset(addrLeaves) + am.getByteCount(addrLeaves) > length) {
+            if (offsetLeaves + extentLeaves > length) {
+
                 throw new RootBlockException(
-                        "The leaf record(s) extend beyond the end of the file: addrLeaves="
-                                + am.toString(addrLeaves) + ", but length="
-                                + length);
+                        "The leaves region extends beyond the end of the file: leaves={extent="
+                                + extentLeaves + ", offset=" + offsetLeaves
+                                + "}, but length=" + length);
+                
             }
 
         }
 
         if(nnodes == 0) {
+
             /*
              * The root is a leaf. In this case there is only a single root leaf
              * and there are no nodes.
              */
-            if (addrNodes != 0L) {
+            
+            if (offsetNodes != 0L || extentNodes != 0L) {
+            
                 /*
-                 * Since there is are no nodes, addrNodes MUST be ZERO.
+                 * Since there is are no nodes, nodes offset and extent MUST be
+                 * ZERO.
                  */
-                throw new RootBlockException("addrNodes=" + addrNodes
-                        + ", but expecting zero.");
+                
+                throw new RootBlockException("nodes={extent=" + extentNodes
+                        + ", offset=" + offsetNodes + "}, but expecting zero.");
+                
             }
-            if (addrRoot != addrLeaves) {
+
+            if (am.getByteCount(addrRoot) != extentLeaves) {
+
                 /*
-                 * Since there is only a single root leaf, addrRoot MUST equal
-                 * addrLeaves.
+                 * Since there is only a single root leaf, size of the root leaf
+                 * record MUST equal extent of the leaves region.
                  */
+
                 throw new RootBlockException("addrRoot("
                         + am.toString(addrRoot)
-                        + ") is not equal to addrLeaves(" + addrLeaves + ")");
+                        + ") : size is not equal to extentLeaves("
+                        + extentLeaves + ")");
+                
             }
+            
 //            assert am.getOffset(addrRoot) >= am.getOffset(addrLeaves);
 //            assert am.getOffset(addrRoot) < length;
+
         } else {
+        
             /*
              * The root is a node.
              */
-            if(addrNodes==0L) {
+            
+            if (offsetNodes == 0L || extentNodes == 0L) {
+            
                 // the nodes region MUST exist.
-                throw new RootBlockException("addrNodes=" + addrNodes);                
+                
+                throw new RootBlockException("nodes={extent=" + extentNodes
+                        + ", offset=" + offsetNodes + "}");
+                
             }
-            if (am.getOffset(addrNodes) + am.getByteCount(addrNodes) > length) {
+            
+            if (offsetNodes + extentNodes > length) {
+                
                 throw new RootBlockException(
-                        "The node record(s) extend beyond the end of the file: addrNodes="
-                                + am.toString(addrNodes) + ", but length="
-                                + length);
+                        "The nodes region extends beyond the end of the file: nodes={extent="
+                                + extentNodes + ",offset=" + offsetNodes
+                                + "}, but length=" + length);
+                
             }
+
             if (am.getOffset(addrRoot) + am.getByteCount(addrRoot) > length) {
+            
                 throw new RootBlockException(
                         "The root node record extends beyond the end of the file: addrRoot="
                                 + am.toString(addrRoot) + ", but length="
                                 + length);
+                
             }
 
 //            assert am.getOffset(addrNodes) > am.getOffset(addrLeaves);
@@ -524,7 +654,93 @@ public class IndexSegmentCheckpoint {
     }
     
     /**
-     * Write the checkpoint record on the current position of the file.
+     * Returns a new view of the read-only {@link ByteBuffer} containing the
+     * serialized representation of the {@link IndexSegmentCheckpoint} record.
+     */
+    public ByteBuffer asReadOnlyBuffer() {
+        
+        return buf.slice();
+        
+    }
+    
+    /**
+     * Serialize the {@link IndexSegmentCheckpoint} record onto a read-only
+     * {@link ByteBuffer}.
+     * 
+     * @return The read-only {@link ByteBuffer}.
+     */
+    private ByteBuffer createView() {
+
+        final ByteBuffer buf = ByteBuffer.allocate(SIZE);
+        
+        buf.putInt(MAGIC);
+
+        buf.putInt(VERSION0);
+
+        buf.putLong(commitTime);
+        
+        buf.putLong(segmentUUID.getMostSignificantBits());
+
+        buf.putLong(segmentUUID.getLeastSignificantBits());
+
+        buf.putInt(offsetBits);
+                        
+        buf.putInt(height);
+        
+        buf.putInt(nleaves);
+
+        buf.putInt(nnodes);
+        
+        buf.putInt(nentries);
+
+        buf.putInt(maxNodeOrLeafLength);
+        
+        // region extents.
+        
+        buf.putLong(offsetLeaves);
+        buf.putLong(extentLeaves);
+        
+        buf.putLong(offsetNodes);
+        buf.putLong(extentNodes);
+
+        buf.putLong(offsetBlobs);
+        buf.putLong(extentBlobs);
+
+        // simple addresses
+        
+        buf.putLong(addrRoot);
+
+        buf.putLong(addrMetadata);
+        
+        buf.putLong(addrBloom);
+        
+        buf.putLong(length);
+
+        // skip over this many bytes.
+        buf.position(buf.position()+SIZEOF_UNUSED);
+        
+        // Note: this sets the instance field! 
+        checksum = new ChecksumUtility().checksum(buf, 0, SIZE
+                - (SIZEOF_CHECKSUM + SIZEOF_TIMESTAMP));
+        
+        buf.putInt(checksum); // checksum of the proceeding bytes.
+
+        buf.putLong(commitTime);
+
+        assert buf.position() == SIZE : "position=" + buf.position()
+                + " but checkpoint record should be " + SIZE + " bytes";
+
+        assert buf.limit() == SIZE;
+
+        buf.rewind();
+
+        // read-only view.
+        return buf.asReadOnlyBuffer();
+
+    }
+    
+    /**
+     * Write the checkpoint record at the start of the file.
      * 
      * @param raf
      *            The file.
@@ -535,57 +751,74 @@ public class IndexSegmentCheckpoint {
 
 //        raf.seek(0);
 
-        log.info("wrote: pos="+raf.getFilePointer());
+        FileChannelUtility.writeAll(raf.getChannel(), asReadOnlyBuffer(), 0L);
 
-        raf.writeInt(MAGIC);
+        if (log.isInfoEnabled()) {
 
-        raf.writeInt(VERSION0);
+            log.info("wrote checkpoint record: " + this);
+            
+        }
 
-        raf.writeLong(commitTime);
-        
-        raf.writeLong(segmentUUID.getMostSignificantBits());
-
-        raf.writeLong(segmentUUID.getLeastSignificantBits());
-
-        raf.writeByte(offsetBits);
-                        
-        raf.writeInt(height);
-        
-        raf.writeInt(nleaves);
-
-        raf.writeInt(nnodes);
-        
-        raf.writeInt(nentries);
-
-        raf.writeInt(maxNodeOrLeafLength);
-        
-        raf.writeLong(addrLeaves);
-        
-        raf.writeLong(addrNodes);
-
-        raf.writeLong(addrRoot);
-
-        raf.writeLong(addrMetadata);
-        
-        raf.writeLong(addrBloom);
-        
-        raf.writeLong(addrBlobs);
-        
-        raf.writeLong(length);
-
-        /*
-         * skip over this many bytes. Note that skipBytes() does not seem to
-         * really skip over bytes when writing while this approach definately
-         * writes out those bytes and advances the file pointer.  seek() also
-         * works.
-         */
-//        raf.skipBytes(SIZEOF_UNUSED);
-//        raf.write(new byte[SIZEOF_UNUSED]);
-        raf.seek(raf.getFilePointer()+SIZEOF_UNUSED);
-        
-        raf.writeLong(commitTime);
-
-        log.info("wrote: pos="+raf.getFilePointer());
+//        if (log.isInfoEnabled())
+//            log.info("wrote: pos="+raf.getFilePointer());
+//
+//        raf.writeInt(MAGIC);
+//
+//        raf.writeInt(VERSION0);
+//
+//        raf.writeLong(commitTime);
+//        
+//        raf.writeLong(segmentUUID.getMostSignificantBits());
+//
+//        raf.writeLong(segmentUUID.getLeastSignificantBits());
+//
+//        raf.writeByte(offsetBits);
+//                        
+//        raf.writeInt(height);
+//        
+//        raf.writeInt(nleaves);
+//
+//        raf.writeInt(nnodes);
+//        
+//        raf.writeInt(nentries);
+//
+//        raf.writeInt(maxNodeOrLeafLength);
+//        
+//        // region extents.
+//        
+//        raf.writeLong(offsetLeaves);
+//        raf.writeLong(extentLeaves);
+//        
+//        raf.writeLong(offsetNodes);
+//        raf.writeLong(extentNodes);
+//
+//        raf.writeLong(offsetBlobs);
+//        raf.writeLong(extentBlobs);
+//
+//        // simple addresses
+//        
+//        raf.writeLong(addrRoot);
+//
+//        raf.writeLong(addrMetadata);
+//        
+//        raf.writeLong(addrBloom);
+//        
+//        raf.writeLong(length);
+//
+//        /*
+//         * skip over this many bytes. Note that skipBytes() does not seem to
+//         * really skip over bytes when writing while this approach definately
+//         * writes out those bytes and advances the file pointer.  seek() also
+//         * works.
+//         */
+////        raf.skipBytes(SIZEOF_UNUSED);
+////        raf.write(new byte[SIZEOF_UNUSED]);
+//        raf.seek(raf.getFilePointer()+SIZEOF_UNUSED);
+//        
+//        raf.writeLong(commitTime);
+//
+//        if (log.isInfoEnabled())
+//            log.info("wrote: pos="+raf.getFilePointer());
         
     }
     
@@ -605,13 +838,14 @@ public class IndexSegmentCheckpoint {
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);
         sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
-        sb.append(", addrLeaves=" + am.toString(addrLeaves));
-        sb.append(", addrNodes=" + am.toString(addrNodes));
+        sb.append(", leavesRegion={extent=" + extentLeaves+", offset="+offsetLeaves+"}");
+        sb.append(", nodesRegion={extent=" + extentNodes+", offset="+offsetNodes+"}");
+        sb.append(", blobsRegion={extent=" + extentBlobs+", offset="+offsetBlobs+"}");
         sb.append(", addrRoot=" + am.toString(addrRoot));
         sb.append(", addrMetadata=" + am.toString(addrMetadata));
         sb.append(", addrBloom=" + am.toString(addrBloom));
-        sb.append(", addrBlobs=" + am.toString(addrBlobs));
         sb.append(", length=" + length);
+        sb.append(", checksum="+checksum);
         sb.append(", commitTime=" + new Date(commitTime));
 
         return sb.toString();

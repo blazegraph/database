@@ -159,59 +159,58 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
 
         /*
          * Fake a checkpoint record. The only parts of this that we need are the
-         * addresses of the nodes and blobs. Those addresses MUST be formed as
-         * relative to the BASE region of the file. The offsets encoded within
-         * those addresses will be used to decode addresses in the non-BASE
-         * regions of the file.
+         * offset and extent of the node and blob regions. Those offsets are
+         * absolute are absolute offsets into the file. The offsets of those
+         * regions are used to decode addresses in the non-BASE regions of the
+         * file.
          * 
          * Note: the checkpoint ctor has a variety of assertions so that
          * constrains how we can generate this fake checkpoint record.
          */
         final IndexSegmentCheckpoint checkpoint;
-        final long offsetBase = 0L;
+        final long extentLeaves = 216;
+        final long offsetLeaves = IndexSegmentCheckpoint.SIZE; // but base region begins at 0L!
         final long offsetNodes;
         final long offsetBlobs;
-        final int sizeNodes;
-        final int sizeBlobs;
+        final long extentNodes;
+        final long extentBlobs;
+        final long length;
         {
 
             // Used to encode the addresses.
-            WormAddressManager am = new WormAddressManager(offsetBits);
+            final WormAddressManager am = new WormAddressManager(offsetBits);
 
-            final int sizeLeaves = 216;
-            
-            final long offsetLeaves = IndexSegmentCheckpoint.SIZE;
-            
-            final long addrLeaves = am.toAddr(sizeLeaves, IndexSegmentRegion.BASE
-                    .encodeOffset(offsetLeaves));
+//            final long addrLeaves = am.toAddr(sizeLeaves, IndexSegmentRegion.BASE
+//                    .encodeOffset(offsetLeaves));
 
-            sizeNodes = 123;
+            extentNodes = 123;
             
-            offsetNodes = offsetLeaves + sizeLeaves;
+            offsetNodes = offsetLeaves + extentLeaves;
             
-            final long addrNodes = am.toAddr(sizeNodes, IndexSegmentRegion.BASE
+//            final long addrNodes = am.toAddr(extentNodes, IndexSegmentRegion.BASE
+//                    .encodeOffset(offsetNodes));
+
+            // Note: only one node and it is the root node.
+            final long addrRoot = am.toAddr((int)extentNodes, IndexSegmentRegion.BASE
                     .encodeOffset(offsetNodes));
-
-            // Note: only one node and it is the root, so addrRoot==addrNodes
-            final long addrRoot = addrNodes;
             
-            sizeBlobs = Bytes.megabyte32 * 20;
+            extentBlobs = Bytes.megabyte32 * 20;
             
-            offsetBlobs = offsetNodes + sizeNodes;
+            offsetBlobs = offsetNodes + extentNodes;
             
-            final long addrBlobs = am.toAddr(sizeBlobs, IndexSegmentRegion.BASE
-                    .encodeOffset(offsetBlobs));
+//            final long addrBlobs = am.toAddr(extentBlobs, IndexSegmentRegion.BASE
+//                    .encodeOffset(offsetBlobs));
 
             final long addrBloom = 0L;
             
             final int sizeMetadata = 712;
             
-            final long offsetMetadata = offsetBlobs + sizeBlobs;
+            final long offsetMetadata = offsetBlobs + extentBlobs;
 
             final long addrMetadata = am.toAddr(sizeMetadata, IndexSegmentRegion.BASE
                     .encodeOffset(offsetMetadata));
 
-            final long length = offsetMetadata + sizeMetadata; 
+            length = offsetMetadata + sizeMetadata; 
             
             checkpoint = new IndexSegmentCheckpoint(
                 offsetBits,//
@@ -220,12 +219,12 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
                 1, // nnodes
                 29, // nentries
                 128,// maxNodeOrLeafLength`
-                addrLeaves,//
-                addrNodes,//
+                offsetLeaves, extentLeaves,//
+                offsetNodes, extentNodes, //
+                offsetBlobs, extentBlobs, //
                 addrRoot,//
                 addrMetadata,//
                 addrBloom, //
-                addrBlobs,//
                 length,//
                 UUID.randomUUID(),// segmentUUID,
                 System.currentTimeMillis()//commitTime
@@ -238,42 +237,73 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
         /*
          * Used to decode the addresses.
          */
-        IndexSegmentAddressManager am = new IndexSegmentAddressManager(checkpoint);
+        final IndexSegmentAddressManager am = new IndexSegmentAddressManager(checkpoint);
         
-        final int nbytes = 12;
-        final long offset = 44L;
+        {
+         
+            final int nbytes = 12;
+            final long offset = 44L;
+            final long offsetBase = 0L;
+
+            doRoundTripTest(IndexSegmentRegion.BASE, nbytes, offset, offsetBase
+                    + offset, am);
+
+            doRoundTripTest(IndexSegmentRegion.NODE, nbytes, offset,
+                    offsetNodes + offset, am);
+
+            doRoundTripTest(IndexSegmentRegion.BLOB, nbytes, offset,
+                    offsetBlobs + offset, am);
+            
+        }
         
-        doRoundTripTest(IndexSegmentRegion.BASE, nbytes, offset, offsetBase + offset,
-                am);
-
-        doRoundTripTest(IndexSegmentRegion.NODE, nbytes, offset, offsetNodes + offset,
-                am);
-
-        doRoundTripTest(IndexSegmentRegion.BLOB, nbytes, offset, offsetBlobs + offset,
-                am);
-
         /*
          * Now verify that range checks work within each region.
          */
+
+        /*
+         * BASE
+         */
         
         // legal.
-        am.getOffset(am.toAddr(1, offsetNodes));
-        am.getOffset(am.toAddr(sizeNodes-1, offsetNodes));
-        am.getOffset(am.toAddr(sizeNodes, offsetNodes));
+        assertEquals(0L,am.getOffset(am.toAddr(1, IndexSegmentRegion.BASE.encodeOffset(0L))));
+        assertEquals(0L,am.getOffset(am.toAddr((int)(length-1), IndexSegmentRegion.BASE.encodeOffset(0L))));
+        assertEquals(0L,am.getOffset(am.toAddr((int)length, IndexSegmentRegion.BASE.encodeOffset(0L))));
         // illegal.
         try {
-            am.getOffset(am.toAddr(sizeNodes+1, offsetNodes));
+            assertEquals(0L,am.getOffset(am.toAddr((int)(length+1), IndexSegmentRegion.BASE.encodeOffset(0L))));
+            fail("Expecting exception");
         } catch(AssertionError ex) {
             log.info("Ignoring expected exception: "+ex);
         }
 
+        /*
+         * NODES
+         */
+        
         // legal.
-        am.getOffset(am.toAddr(1, offsetBlobs));
-        am.getOffset(am.toAddr(sizeBlobs-1, offsetBlobs));
-        am.getOffset(am.toAddr(sizeBlobs, offsetBlobs));
+        assertEquals(offsetNodes,am.getOffset(am.toAddr(1, IndexSegmentRegion.NODE.encodeOffset(0L))));
+        assertEquals(offsetNodes,am.getOffset(am.toAddr((int)(extentNodes-1), IndexSegmentRegion.NODE.encodeOffset(0L))));
+        assertEquals(offsetNodes,am.getOffset(am.toAddr((int)extentNodes, IndexSegmentRegion.NODE.encodeOffset(0L))));
         // illegal.
         try {
-            am.getOffset(am.toAddr(sizeBlobs+1, offsetBlobs));
+            assertEquals(offsetNodes,am.getOffset(am.toAddr((int)(extentNodes+1), IndexSegmentRegion.NODE.encodeOffset(0L))));
+            fail("Expecting exception");
+        } catch(AssertionError ex) {
+            log.info("Ignoring expected exception: "+ex);
+        }
+        
+        /*
+         * BLOBS
+         */
+
+        // legal.
+        assertEquals(offsetBlobs,am.getOffset(am.toAddr(1, IndexSegmentRegion.BLOB.encodeOffset(0L))));
+        assertEquals(offsetBlobs,am.getOffset(am.toAddr((int)(extentBlobs-1), IndexSegmentRegion.BLOB.encodeOffset(0L))));
+        assertEquals(offsetBlobs,am.getOffset(am.toAddr((int)extentBlobs, IndexSegmentRegion.BLOB.encodeOffset(0L))));
+        // illegal.
+        try {
+            assertEquals(offsetBlobs,am.getOffset(am.toAddr((int)(extentBlobs+1), IndexSegmentRegion.BLOB.encodeOffset(0L))));
+            fail("Expecting exception");
         } catch(AssertionError ex) {
             log.info("Ignoring expected exception: "+ex);
         }

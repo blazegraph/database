@@ -32,6 +32,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -445,11 +446,16 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * @param addrSer
      *            Object that knows how to (de-)serialize the child addresses in
      *            an {@link INodeData}.
+     * @param readOnly
+     *            <code>true</code> IFF it is <em>known</em> that the
+     *            {@link AbstractBTree} is read-only.
+     * @param metadata
+     *            The {@link IndexMetadata} object for this B+Tree.
      */
     protected AbstractBTree(//
             IRawStore store,//
             INodeFactory nodeFactory,//
-            IAddressSerializer addrSer,//
+            boolean readOnly,
             IndexMetadata metadata//
             ) {
 
@@ -457,8 +463,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         Banner.banner();
 
         assert store != null;
-
-        assert addrSer != null;
 
         assert metadata != null;
 
@@ -481,8 +485,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
                 nodeFactory,//
                 branchingFactor,//
                 0, //initialBufferCapacity
-                addrSer, //
                 metadata,//
+                readOnly, // 
                 store.isFullyBuffered()
                 );
 
@@ -2185,11 +2189,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
                 node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
                 
-            } catch(Exception ex) {
+            } catch(Throwable t) {
                 
                 throw new RuntimeException("De-serialization problem: addr="
                         + store.toString(addr) + " from store="
-                        + store.getFile() + " : " + ex, ex);
+                        + store.getFile() + " : cause=" + t
+//                        + ", data=\n" + toString(store, addr, tmp)
+                        , t);
                 
             }
 
@@ -2218,92 +2224,44 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     }
 
 //    /**
-//     * Configuration options.
-//     * <p>
-//     * Note: This class is {@link Serializable} so that an instance of the class
-//     * may be passed to a remote data service in the scale-out architecture in
-//     * order to provision a btree with the desired options.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class Config implements Serializable {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = 1728456753818367361L;
-//
-//        public int branchingFactor;
-//        public int initialBufferCapacity;
-//        public HardReferenceQueue<PO> hardReferenceQueue;
-//        public IAddressSerializer addrSer;
-//        public IValueSerializer valueSer;
-//        public INodeFactory nodeFactory;
-//        public RecordCompressor recordCompressor;
-//        public boolean useChecksum;
-//        public UUID indexUUID;
-//        
-//        /**
-//         * @param branchingFactor
-//         *            The branching factor is the #of children in a node or
-//         *            values in a leaf and must be an integer greater than or
-//         *            equal to three (3). Larger branching factors result in
-//         *            trees with fewer levels. However there is a point of
-//         *            diminishing returns at which the amount of copying
-//         *            performed to move the data around in the nodes and leaves
-//         *            exceeds the performance gain from having fewer levels.
-//         * @param initialBufferCapacity
-//         *            When non-zero, this is the initial buffer capacity used by
-//         *            the {@link NodeSerializer}. When zero the initial buffer
-//         *            capacity will be estimated based on the branching factor,
-//         *            the key serializer, and the value serializer. The initial
-//         *            estimate is not critical and the buffer will be resized by
-//         *            the {@link NodeSerializer} if necessary.
-//         * @param headReferenceQueue
-//         *            The hard reference queue.
-//         * @param addrSer
-//         *            Object that knows how to (de-)serialize the child
-//         *            addresses in an {@link INodeData}.
-//         * @param valueSer
-//         *            Object that knows how to (de-)serialize the values in an
-//         *            {@link ILeafData}.
-//         * @param nodeFactory
-//         *            Object that provides a factory for node and leaf objects.
-//         * @param recordCompressor
-//         *            Object that knows how to (de-)compress serialized nodes
-//         *            and leaves (optional).
-//         * @param useChecksum
-//         *            When true, computes and verifies checksum of serialized
-//         *            nodes and leaves. This option is not recommended for use
-//         *            with a fully buffered store, such as a {@link Journal},
-//         *            since all reads are against memory which is presumably
-//         *            already parity checked.
-//         * @param indexUUID
-//         *            The unique identifier for the index whose data is stored
-//         *            in this B+Tree data structure. When using a scale-out
-//         *            index the same <i>indexUUID</i> MUST be assigned to each
-//         *            mutable and immutable B+Tree having data for any partition
-//         *            of that scale-out index. This makes it possible to work
-//         *            backwards from the B+Tree data structures and identify the
-//         *            index to which they belong.
-//         */
-//        public Config(int branchingFactor,
-//                int initialBufferCapacity,
-//                HardReferenceQueue<PO> hardReferenceQueue,
-//                IAddressSerializer addrSer, IValueSerializer valueSer,
-//                INodeFactory nodeFactory, RecordCompressor recordCompressor,
-//                boolean useChecksum, UUID indexUUID) {
-//        }
-//
-//    }
-
-//    /**
 //     * When <code>true</code> {@link Node}s will hold onto their parents and
 //     * children using {@link SoftReference}s. When <code>false</code> they
 //     * will use {@link WeakReference}s.
 //     */
 //    private final static boolean softReferences = false;
+
+    /**
+     * Dump a raw record from the store.
+     * 
+     * @param store
+     *            The backing store.
+     * @param addr
+     *            The address from which the record was read.
+     * @param buf
+     *            The {@link ByteBuffer} containing the raw record.
+     * 
+     * @deprecated This will go away as soon as I am done debugging something.
+     */
+    private static String toString(IRawStore store, long addr, ByteBuffer b) {
+
+        final int byteCount = store.getByteCount(addr);
+
+        // independent view of the buffer.
+        b = b.asReadOnlyBuffer();
+
+        // setup the view implied by the address and the store API.
+        b.limit(byteCount);
+
+        b.position(0);
+
+        byte[] a = new byte[byteCount];
+
+        // transfer to a byte[].
+        b.get(a);
+
+        return Arrays.toString(a);
+        
+    }
     
     /**
      * Create the reference that will be used by a {@link Node} to refer to its
@@ -2311,7 +2269,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * 
      * @param child
      *            A node.
-     *            
+     * 
      * @return A reference to that node.
      * 
      * @see SoftReference

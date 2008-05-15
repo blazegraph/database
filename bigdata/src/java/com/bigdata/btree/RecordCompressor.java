@@ -49,6 +49,8 @@ import com.bigdata.io.ByteBufferInputStream;
  * the next compression or decompression operation performed by that
  * {@link RecordCompressor}. When used in a single-threaded context this
  * reduces allocation while maximizing the opportunity for bulk transfers.
+ * <p>
+ * This class is NOT thread-safe.
  * 
  * @todo define an interface for a record compressor and write the class of the
  *       compressor used into the {@link IndexSegmentCheckpoint} so that we can

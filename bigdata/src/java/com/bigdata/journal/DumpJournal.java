@@ -32,10 +32,12 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Properties;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -313,20 +315,25 @@ public class DumpJournal {
         
     }
 
-    private static void dumpIndex(BTree btree) {
+    /**
+     * Utility method to dump the keys and values in an {@link AbstractBTree}.
+     * 
+     * @param btree
+     */
+    public static void dumpIndex(AbstractBTree btree) {
 
         // @todo offer the version metadata also if the index supports isolation.
-        ITupleIterator itr = btree.rangeIterator(null, null);
+        final ITupleIterator itr = btree.rangeIterator(null, null);
         
         int i = 0;
         
         while(itr.hasNext()) {
             
-            ITuple tuple = itr.next();
+            final ITuple tuple = itr.next();
 
-            byte[] key = tuple.getKey();
+            final byte[] key = tuple.getKey();
             
-            byte[] val = tuple.getValue();
+            final byte[] val = tuple.getValue();
             
             System.err.println("rec="+i+"\n key="+dumpKey(key)+"\n val="+dumpVal(val));
             
@@ -336,33 +343,28 @@ public class DumpJournal {
         
     }
 
-    private static String dumpKey(Object key) {
+    private static String dumpKey(byte[] key) {
         
-        try {
-
-            byte[] tmp = (byte[]) key;
-
-            return Arrays.toString(tmp);
-            
-        } catch (ClassCastException ex) {
-            
-            return ""+key;
-            
-        }
+        return Arrays.toString(key);
         
     }
     
-    private static String dumpVal(Object key) {
+    private static String dumpVal(byte[] val) {
+        
+        if (val == null)
+            return null;
         
         try {
 
-            byte[] tmp = (byte[]) key;
-
-            return Arrays.toString(tmp);
+            // Attempt simple java de-serialization. 
             
-        } catch (ClassCastException ex) {
+            return SerializerUtil.deserialize(val).toString();
             
-            return ""+key;
+        } catch (Throwable t) {
+            
+            // Not simple java serialization so dump the bytes.
+            
+            return Arrays.toString(val);
             
         }
         

@@ -63,14 +63,18 @@ public class SerializerUtil {
      */
     static final public byte[] serialize(Object obj) {
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         try {
 
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
+            final ObjectOutputStream oos = new ObjectOutputStream(baos);
 
             oos.writeObject(obj);
 
+            oos.flush();
+
+            oos.close();
+            
         } catch (Exception ex) {
 
             throw new RuntimeException(ex);
@@ -113,11 +117,11 @@ public class SerializerUtil {
      */
     static final public Object deserialize(byte[] b, int off, int len) {
 
-        ByteArrayInputStream bais = new ByteArrayInputStream(b, off, len);
+        final ByteArrayInputStream bais = new ByteArrayInputStream(b, off, len);
 
         try {
 
-            ObjectInputStream ois = new ObjectInputStream(bais);
+            final ObjectInputStream ois = new ObjectInputStream(bais);
 
             return ois.readObject();
 
@@ -141,7 +145,7 @@ public class SerializerUtil {
 
         try {
 
-            ObjectInputStream ois = new ObjectInputStream(is);
+            final ObjectInputStream ois = new ObjectInputStream(is);
 
             return ois.readObject();
 
@@ -166,10 +170,6 @@ public class SerializerUtil {
      */
     static final public Object deserialize(ByteBuffer buf) {
 
-        /*
-         * FIXME Try w/ and w/o this. It appears that reading from the backing
-         * array can cause problems but I am not convinced of that yet.
-         */
         if (true && buf.hasArray()) {
 
             int off = buf.arrayOffset();
@@ -184,11 +184,11 @@ public class SerializerUtil {
 
         }
 
-        ByteBufferInputStream bais = new ByteBufferInputStream(buf);
+        final ByteBufferInputStream bais = new ByteBufferInputStream(buf);
 
         try {
 
-            ObjectInputStream ois = new ObjectInputStream(bais);
+            final ObjectInputStream ois = new ObjectInputStream(bais);
 
             return ois.readObject();
 
