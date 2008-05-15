@@ -402,8 +402,12 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 
         super(store, 
                 NodeFactory.INSTANCE, //
-                // FIXME new PackedAddressSerializer(store),
-                AddressSerializer.INSTANCE,
+                /*
+                 * Note: A BTree is not known to be read-only during its ctor.
+                 * It might be marked as read-only afterwards, but we can't be
+                 * sure at this point.
+                 */
+                false, // read-only
                 metadata
                 );
         

@@ -1219,7 +1219,8 @@ public class ClientIndexView implements IClientIndex {
          */
         public String toString() {
             
-            return "Procedure " + proc.getClass().getName() + " : " + split;
+            return "Index=" + ClientIndexView.this.getName() + ", Procedure "
+                    + proc.getClass().getName() + " : " + split;
             
         }
 

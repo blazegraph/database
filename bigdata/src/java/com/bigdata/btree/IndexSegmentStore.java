@@ -41,9 +41,11 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.RootBlockException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IRawStore;
@@ -118,6 +120,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * The metadata record for the index segment.
      */
     private IndexMetadata metadata;
+
+    /**
+     * The optional bloom filter.
+     */
+    private BloomFilter bloomFilter;
     
     protected void assertOpen() {
 
@@ -141,13 +148,39 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
 
     /**
-     * The metadata record for the index segment.
+     * The {@link IndexMetadata} record for the {@link IndexSegment}.
+     * <p>
+     * Note: The {@link IndexMetadata#getBranchingFactor()} for the
+     * {@link IndexSegment} is overriden by the value of the
+     * {@link IndexMetadata#getIndexSegmentBranchingFactor()}.
+     * <p>
+     * Note: The {@link IndexMetadata#getPartitionMetadata()} always reports
+     * that {@link LocalPartitionMetadata#getResources()} is <code>null</code>.
+     * This is because the {@link BTree} on the {@link AbstractJournal} defines
+     * the index partition view and each {@link IndexSegment} generally
+     * participates in MANY views - one per commit point on each
+     * {@link AbstractJournal} where the {@link IndexSegment} is part of an
+     * index partition view.
      */
     public final IndexMetadata getIndexMetadata() {
     
         assertOpen();
         
         return metadata;
+        
+    }
+
+    /**
+     * Return the optional bloom filter.
+     * 
+     * @return The bloom filter -or- <code>null</code> iff the bloom filter
+     *         was not requested when the {@link IndexSegment} was built.
+     */
+    public final BloomFilter getBloomFilter() {
+        
+        assertOpen();
+        
+        return bloomFilter;
         
     }
     
@@ -402,12 +435,38 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                 
             } else {
                 
-                final long nodesByteCount = getByteCount(checkpoint.addrLeaves);
+                final long nodesByteCount = checkpoint.extentNodes;
 
                 final boolean bufferNodes = maxBytesToFullyBufferNodes == 0L
                         || nodesByteCount < maxBytesToFullyBufferNodes;
                 
                 this.buf_nodes = (bufferNodes ? bufferIndexNodes(raf) : null);
+
+            }
+
+            if (checkpoint.addrBloom == 0L) {
+
+                /*
+                 * No bloom filter.
+                 */
+
+                this.bloomFilter = null;
+
+            } else {
+
+                /*
+                 * Read in the optional bloom filter from its addr.
+                 */
+
+                try {
+
+                    this.bloomFilter = readBloomFilter();
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
 
             }
 
@@ -504,7 +563,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
     }
     
-    public File getFile() {
+    final public File getFile() {
         
         return file;
         
@@ -541,7 +600,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                 
             } catch (IOException ex) {
                 
-                log.warn("Problem closing file: " + file, ex);
+                log.error("Problem closing file: " + file, ex);
+                
+                // ignore exception.
                 
             }
 
@@ -555,6 +616,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         metadata = null;
 
+        bloomFilter = null;
+        
         open = false;
 
     }
@@ -581,19 +644,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
     }
 
-    public long write(ByteBuffer data) {
+    final public long write(ByteBuffer data) {
 
         throw new UnsupportedOperationException();
 
     }
 
-    public void force(boolean metadata) {
+    final public void force(boolean metadata) {
         
         throw new UnsupportedOperationException();
         
     }
     
-    public long size() {
+    final public long size() {
 
         assertOpen();
         
@@ -604,6 +667,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     /**
      * @todo report some interesting stats, but most are on the
      *       {@link IndexSegment} itself.
+     * 
+     * @todo report the #of reads and whether or not the nodes are buffered.
+     * 
+     * FIXME report {@link Counters} for the {@link IndexSegment} here (#of
+     * nodes read, leaves read, de-serialization times, etc). Some additional
+     * counters probably need to be collected (Bloom filter tests, etc).
      */
     synchronized public CounterSet getCounters() {
 
@@ -702,16 +771,23 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     public ByteBuffer read(long addr) {
 
         assertOpen();
-        
+
         final long offset = addressManager.getOffset(addr);
 
         final int length = addressManager.getByteCount(addr);
         
-        final long offsetNodes = addressManager.getOffset(checkpoint.addrNodes);
+        final long offsetNodes = checkpoint.offsetNodes;
 
-        ByteBuffer dst;
+        final ByteBuffer dst;
 
-        if (offset >= offsetNodes && buf_nodes != null) {
+        /*
+         * True IFF the starting address lies entirely within the region
+         * dedicated to the B+Tree nodes.
+         */
+        final boolean isNodeAddr = offset >= offsetNodes
+                && (offset + length) <= (offsetNodes + checkpoint.extentNodes);
+        
+        if (isNodeAddr && buf_nodes != null) {
 
             /*
              * the data are buffered. create a slice onto the read-only
@@ -725,8 +801,20 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // correct the offset so that it is relative to the buffer.
             final long off = offset - offsetNodes;
 
-            // create a view so that concurrent reads do not modify the buffer state.
-            final ByteBuffer tmp = buf_nodes.asReadOnlyBuffer();
+            /*
+             * Create a view so that concurrent reads do not modify the buffer
+             * state.
+             * 
+             * Note: This is synchronized on [this] for paranoia. As long as the
+             * state of [buf_nodes] (its position and limit) can not be changed
+             * concurrently this operation should not need to be synchronized.
+             */
+            final ByteBuffer tmp;
+            synchronized(this) {
+                
+                tmp = buf_nodes.asReadOnlyBuffer();
+                
+            }
 
             // set the limit on the buffer to the end of the record.
             tmp.limit((int)(off + length));
@@ -741,17 +829,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
             /*
              * The data need to be read from the file.
-             * 
-             * @todo This might need to use a static direct buffer pool to avoid
-             * leaking temporary direct buffers.
              */
 
-            // Allocate buffer.
+            // Allocate buffer: limit = capacity; pos = 0.
             dst = ByteBuffer.allocate(length);
-
-            dst.limit(length);
-
-            dst.position(0);
 
             try {
 
@@ -781,15 +862,23 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     private ByteBuffer bufferIndexNodes(RandomAccessFile raf)
             throws IOException {
 
-        if(checkpoint.addrNodes == 0L) {
+        if(checkpoint.offsetNodes == 0L) {
             
             throw new IllegalStateException("No nodes.");
             
         }
-        
-        final long offset = addressManager.getOffset(checkpoint.addrNodes);
 
-        final int nbytes = addressManager.getByteCount(checkpoint.addrLeaves);
+        if(checkpoint.extentNodes > Integer.MAX_VALUE) {
+            
+            throw new IllegalStateException(
+                    "Nodes region exceeds int32: extent="
+                            + checkpoint.extentNodes);
+            
+        }
+
+        final long offset = checkpoint.offsetNodes;
+
+        final int nbytes = (int) checkpoint.extentNodes;
 
         if (log.isInfoEnabled())
             log.info("Buffering nodes: #nodes=" + checkpoint.nnodes
@@ -826,7 +915,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * @return The bloom filter -or- <code>null</code> if the bloom filter was
      *         not constructed when the {@link IndexSegment} was built.
      */
-    protected BloomFilter readBloomFilter() throws IOException {
+    private BloomFilter readBloomFilter() throws IOException {
 
         final long addr = checkpoint.addrBloom;
         

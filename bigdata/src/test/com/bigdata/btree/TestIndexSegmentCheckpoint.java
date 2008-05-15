@@ -85,19 +85,21 @@ public class TestIndexSegmentCheckpoint extends TestCase {
          * constrains how we can generate this fake checkpoint record.
          */
         final IndexSegmentCheckpoint checkpoint;
+        final long extentLeaves = 216;
+        final long offsetLeaves = IndexSegmentCheckpoint.SIZE;
         final long offsetNodes;
         final long offsetBlobs;
-        final int sizeNodes;
-        final int sizeBlobs;
+        final long extentNodes;
+        final long extentBlobs;
         final int height = 1;
         final int nleaves = 5;
         final int nnodes = 1;
         final int nentries = 29;
         final int maxNodeOrLeafLength = 128; // arbitrary non-zero value.
-        final long addrLeaves;
-        final long addrNodes;
+//        final long addrLeaves;
+//        final long addrNodes;
         final long addrRoot;
-        final long addrBlobs;
+//        final long addrBlobs;
         final long addrBloom;
         final long addrMetadata;
         final long length;
@@ -108,35 +110,32 @@ public class TestIndexSegmentCheckpoint extends TestCase {
             // Used to encode the addresses.
             WormAddressManager am = new WormAddressManager(offsetBits);
 
-            final int sizeLeaves = 216;
-            
-            final long offsetLeaves = IndexSegmentCheckpoint.SIZE;
-            
-            addrLeaves = am.toAddr(sizeLeaves, IndexSegmentRegion.BASE
-                    .encodeOffset(offsetLeaves));
+//            addrLeaves = am.toAddr(extentLeaves, IndexSegmentRegion.BASE
+//                    .encodeOffset(offsetLeaves));
 
-            sizeNodes = 123;
+            extentNodes = 123;
             
-            offsetNodes = offsetLeaves + sizeLeaves;
+            offsetNodes = offsetLeaves + extentLeaves;
             
-            addrNodes = am.toAddr(sizeNodes, IndexSegmentRegion.BASE
-                    .encodeOffset(offsetNodes));
+//            addrNodes = am.toAddr(extentNodes, IndexSegmentRegion.BASE
+//                    .encodeOffset(offsetNodes));
 
             // Note: only one node and it is the root, so addrRoot==addrNodes
-            addrRoot = addrNodes;
+            addrRoot = am.toAddr((int)extentNodes, IndexSegmentRegion.BASE
+                    .encodeOffset(offsetNodes));
             
-            sizeBlobs = Bytes.megabyte32 * 20;
+            extentBlobs = Bytes.megabyte32 * 20;
             
-            offsetBlobs = offsetNodes + sizeNodes;
+            offsetBlobs = offsetNodes + extentNodes;
             
-            addrBlobs = am.toAddr(sizeBlobs, IndexSegmentRegion.BASE
-                    .encodeOffset(offsetBlobs));
+//            addrBlobs = am.toAddr(extentBlobs, IndexSegmentRegion.BASE
+//                    .encodeOffset(offsetBlobs));
 
             addrBloom = 0L;
             
             final int sizeMetadata = 712;
             
-            final long offsetMetadata = offsetBlobs + sizeBlobs;
+            final long offsetMetadata = offsetBlobs + extentBlobs;
 
             addrMetadata = am.toAddr(sizeMetadata, IndexSegmentRegion.BASE
                     .encodeOffset(offsetMetadata));
@@ -150,12 +149,12 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 nnodes,//
                 nentries,//
                 maxNodeOrLeafLength,//
-                addrLeaves,//
-                addrNodes,//
+                offsetLeaves,extentLeaves,//
+                offsetNodes,extentNodes,//
+                offsetBlobs,extentBlobs,//
                 addrRoot,//
                 addrMetadata,//
                 addrBloom, //
-                addrBlobs,//
                 length,//
                 segmentUUID,//
                 commitTime//
@@ -165,10 +164,11 @@ public class TestIndexSegmentCheckpoint extends TestCase {
             
         }
         
-        IndexSegmentCheckpoint expected = new IndexSegmentCheckpoint(
+        final IndexSegmentCheckpoint expected = new IndexSegmentCheckpoint(
                 offsetBits, height, nleaves, nnodes, nentries,
-                maxNodeOrLeafLength, addrLeaves, addrNodes, addrRoot,
-                addrMetadata, addrBloom, addrBlobs, length, segmentUUID,
+                maxNodeOrLeafLength, offsetLeaves, extentLeaves, offsetNodes,
+                extentNodes, offsetBlobs, extentBlobs, addrRoot, addrMetadata,
+                addrBloom, length, segmentUUID,
                 commitTime);
         
         System.err.println("Expected: "+expected);
@@ -184,7 +184,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
             // the checkpoint record (starting at 0L in the file).
             expected.write(raf);
         
-            // extend to ful size.
+            // extend to full size.
             raf.getChannel().truncate(length);
             
             // seek near the end.
@@ -204,7 +204,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
 //            raf = new RandomAccessFile(tmp,"r");
             
             // read back from the file.
-            IndexSegmentCheckpoint actual = new IndexSegmentCheckpoint(raf);
+            final IndexSegmentCheckpoint actual = new IndexSegmentCheckpoint(raf);
 
             System.err.println("Actual: "+actual);
 
@@ -220,17 +220,20 @@ public class TestIndexSegmentCheckpoint extends TestCase {
 
             assertEquals("maxNodeOrLeafLength",maxNodeOrLeafLength,actual.maxNodeOrLeafLength);
             
-            assertEquals("addrLeaves",addrLeaves,actual.addrLeaves);
+            assertEquals("offsetLeaves",offsetLeaves,actual.offsetLeaves);
+            assertEquals("extentLeaves",extentLeaves,actual.extentLeaves);
 
-            assertEquals("addrNodes",addrNodes,actual.addrNodes);
+            assertEquals("offsetNodes",offsetNodes,actual.offsetNodes);
+            assertEquals("extentNodes",extentNodes,actual.extentNodes);
+
+            assertEquals("offsetBlobs",offsetBlobs,actual.offsetBlobs);
+            assertEquals("extentBlobs",extentBlobs,actual.extentBlobs);
 
             assertEquals("addrRoot",addrRoot,actual.addrRoot);
 
             assertEquals("addrMetadata",addrMetadata,actual.addrMetadata);
 
             assertEquals("addrBloom",addrBloom,actual.addrBloom);
-
-            assertEquals("addrBlobs",addrBlobs,actual.addrBlobs);
 
             assertEquals("length",length,actual.length);
 

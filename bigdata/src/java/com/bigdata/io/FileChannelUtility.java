@@ -35,6 +35,8 @@ import java.nio.channels.FileChannel;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.TemporaryRawStore;
+
 /**
  * A helper class for operations on {@link FileChannel}s.
  * 
@@ -74,6 +76,10 @@ public class FileChannelUtility {
      *             if <i>pos</i> is negative.
      * @throws IllegalArgumentException
      *             if <i>dst</i> does not have any bytes remaining.
+     * 
+     * @todo This might need to use a static direct buffer pool to avoid leaking
+     *       temporary direct buffers since Java may attempt to allocate a
+     *       "temporary" direct buffer if [dst] is not already a direct buffer.
      */
     static public int readAll(final FileChannel channel, final ByteBuffer dst,
             final long pos) throws IOException {
@@ -86,8 +92,8 @@ public class FileChannelUtility {
             throw new IllegalArgumentException();
 
         final int nbytes = dst.remaining();
-        
-        if (nbytes==0)
+
+        if (nbytes == 0)
             throw new IllegalArgumentException();
 
         /*
@@ -134,6 +140,13 @@ public class FileChannelUtility {
      * modified this code to use a loop to ensure that all bytes get written.
      * 
      * @return The #of disk write operations that were required.
+     * 
+     * @todo This might need to use a static direct buffer pool to avoid leaking
+     *       temporary direct buffers since Java probably will attempt to
+     *       allocate a "temporary" direct buffer if [data] is not already a
+     *       direct buffer. There is logic in {@link TemporaryRawStore} for
+     *       handling the overflow from a heap buffer onto the disk which
+     *       already does this.
      */
     static public int writeAll(final FileChannel channel, final ByteBuffer data,
             final long pos) throws IOException {

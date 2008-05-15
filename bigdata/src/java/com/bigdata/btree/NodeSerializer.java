@@ -38,12 +38,13 @@ import java.io.InputStream;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.Set;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.ByteBufferOutputStream;
 import com.bigdata.io.DataOutputBuffer;
@@ -59,11 +60,10 @@ import com.bigdata.util.ChecksumUtility;
  * bytes use the same format so that you can tell by inspection whether a buffer
  * contains a leaf or a non-leaf node. The header of the record uses a fixed
  * length format so that some fields can be tested without full
- * de-serialization, e.g., the checksum, whether the record contains a leaf vs a
- * node, etc. This fixed record also makes it possible to update some fields in
- * the header once the entire record has been serialized, including the
- * checksum, the #of bytes in the serialized record, and the prior/next
- * addresses for leaves.
+ * de-serialization, especially whether the record contains a leaf vs a node.
+ * This fixed record also makes it possible to update some fields in the header
+ * once the entire record has been serialized, including the checksum, the #of
+ * bytes in the serialized record, and the prior/next addresses for leaves.
  * </p>
  * <p>
  * The methods defined by this class all work with {@link ByteBuffer}s. On
@@ -71,20 +71,39 @@ import com.bigdata.util.ChecksumUtility;
  * After a read, the buffer will be positioned to the first byte after the data
  * read. If there is insufficient data available in the buffer then an
  * {@link BufferUnderflowException} will be thrown. On write, the data will be
- * written starting at the current buffer position. After a write the position
- * will be updated to the first byte after the data written. If there is not
- * enough space remaining in the buffer then a {@link BufferOverflowException}
- * will be thrown.
+ * written on an internal buffer whose size is automatically extended. The write
+ * buffer is reused for each write and quickly achieves a maximum size for any
+ * given {@link BTree}.
  * </p>
  * <p>
- * The (de-)serialization interfaces for the values {@link IDataSerializer}
- * hides the use of {@link ByteBuffer}s from the application. The use of
- * compression or packing techniques within the implementations of this
- * interface is encouraged.
+ * The {@link IDataSerializer} for keys and values hides the use of
+ * {@link ByteBuffer}s from the application. The use of compression or packing
+ * techniques within the implementations of this interface is encouraged.
+ * </p>
+ * <p>
+ * Note: while the {@link NodeSerializer} is NOT thread-safe for writers, it is
+ * thread-safe for readers. This design mirrors the concurrency capabilities of
+ * the {@link AbstractBTree}.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo it would be nice to add an object to the {@link IndexMetadata} and this
+ *       class that know how to convert an Object into a byte[] value and a
+ *       byte[] value into an Object. This would let us hide much of the
+ *       complexity of managing byte[]s from applications that are not
+ *       interested in that sort of thing.
+ * 
+ * @todo it would be nice to add an object to the {@link IndexMetadata} and this
+ *       class that know how to convert an Object into a key (keys can not be
+ *       easily reversed for most indices).
+ * 
+ * @todo it would be nice to have {@link Set} and {@link Map} implementations
+ *       wrapping an {@link AbstractBTree} (or an {@link IIndex}). These might
+ *       be written using objects such as described above for converting
+ *       application objects to unsigned byte[] keys and application objects
+ *       to/from byte[] values.
  * 
  * @todo modify deserialization to use a fast DataInput wrapping a byte[]?
  * 
@@ -95,31 +114,16 @@ import com.bigdata.util.ChecksumUtility;
  *       the buffers may be used by multiple concurrent readers (the bloom
  *       filter is another place where concurrency is limited for readers)
  * 
- * @todo try using an allocation pools for node and leaf objects together with
- *       keys[] and vals[]. We can know when the references are cleared, but at
- *       that point we no longer have the reference so we can not reuse the
- *       large arrays (keys[] and vals[]). It may not make much sense to reuse
- *       vals[] since it always holds Objects. Unless those objects are mutable
- *       we have to clear the array contents so that the values can be GCd. The
- *       same is true when the keys[] contains Objects. The case where reuse
- *       makes the most sense is when it is a primitive data type [] with a
- *       modestly large capacity.<br>
- *       The only way that I can see to manage this is to explicitly deallocate
- *       the leaf/node. This can either be done immediately when it falls off of
- *       the hard reference queue and is written onto the store or we could move
- *       the reference to a secondary hard reference queue for retention of
- *       immutable nodes and leaves. This shoulds be examined in conjunction
- *       with the examination of breaking the hard reference queue into one
- *       queue for nodes and one for leaves.
- * 
  * FIXME add support for serializing the prior/next references when known. we do
  * checksums which makes it trickier to touch up those references after the fact
  * and the next reference is not knowable for the index segments until we have
  * determined the serialized size of the current leaf, which makes that all a
  * bit tricky.
  * 
- * @todo make the checksum optional or do not use when using the record
- *       compressor?
+ * @todo both the checksum and the record compressor should be store level
+ *       options. the {@link IDataSerializer} is used to provide index specific
+ *       compression. The store level record compressor should provide fast
+ *       generic compression.
  * 
  * @see IIndex
  * @see INodeData
@@ -132,62 +136,58 @@ public class NodeSerializer {
     /**
      * An object that knows how to constructor nodes and leaves.
      */
-    protected final INodeFactory nodeFactory;
+    private final INodeFactory nodeFactory;
     
     /**
      * The declared maximum branching factor.
      */
-    protected final int branchingFactor;
+    private final int branchingFactor;
     
     /**
-     * An object that knows how to (de-)serialize child addresses.
+     * When <code>true</code> the {@link NodeSerializer} instance will refuse
+     * to serialize nodes or leaves (this keeps us from allocating the
+     * {@link #_writeBuffer}).
      */
-    protected final IAddressSerializer addrSerializer;
+    private final boolean readOnly;
+    
+    /**
+     * An object that knows how to (de-)serialize child addresses. an
+     * {@link INodeData}.
+     */
+    private final IAddressSerializer addrSerializer;
 
     /**
      * An object that knows how to (de-)serialize keys in a {@link Node}.
      */
-    protected final IDataSerializer nodeKeySerializer;
+    private final IDataSerializer nodeKeySerializer;
 
     /**
      * An object that knows how to (de-)serialize keys in a {@link Leaf}.
      */
-    protected final IDataSerializer leafKeySerializer;
+    private final IDataSerializer leafKeySerializer;
 
     /**
      * An object that knows how to (de-)serialize the values on leaves.
      */
-    protected final IDataSerializer valueSerializer;
+    private final IDataSerializer valueSerializer;
     
     /**
-     * Used to serialize and de-serialize the nodes and leaves of the tree. This
-     * is pre-allocated based on the estimated maximum size of a node or leaf
-     * and grows as necessary when it overflows. The same buffer instance is
-     * used to serialize all nodes and leaves of the tree.
+     * Used to serialize the nodes and leaves of the tree. This is pre-allocated
+     * based on the estimated maximum size of a node or leaf and grows as
+     * necessary when it overflows. The same buffer instance is used to
+     * serialize all nodes and leaves of the tree.
      * <p>
      * Note: this buffer is discarded by {@link #close()} when the btree is
      * {@link AbstractBTree#close() closed} and then reallocated on demand.
+     * <p>
+     * Note: It is important that this field NOT be used for a read-only
+     * {@link BTree} since only mutable {@link BTree}s are single threaded -
+     * concurrent readers are allowed for read-only btrees.
      * 
-     * @see #alloc(int)
+     * @see #allocWriteBuffer()
      * @see #close()
      */
-    protected DataOutputBuffer _buf;
-    
-//    /**
-//     * Used to serialize and de-serialize the nodes and leaves of the tree. This
-//     * wraps {@link #_buf} and exposes an interface for writing bit streams and
-//     * a wide variety of useful codings for int and long values. The stream is
-//     * reset before each node or leaf is written, which causes the underlying
-//     * {@link DataOutputBuffer} to be reset as well.
-//     * <p>
-//     * Note: this buffer is discarded by {@link #close()} when the btree is
-//     * {@link AbstractBTree#close() closed} and then reallocated on demand.
-//     * 
-//     * @see #_buf
-//     * @see #alloc(int)
-//     * @see #close()
-//     */
-//    protected MyOutputBitStream _os;
+    private DataOutputBuffer _writeBuffer;
     
     /**
      * Used to (de-)compress serialized records (optional).
@@ -362,12 +362,13 @@ public class NodeSerializer {
      *            When zero (0), the initial capacity is defaulted to
      *            {@link #DEFAULT_BUFFER_CAPACITY}.
      * 
-     * @param addrSerializer
-     *            An object that knows how to (de-)serialize the child addresses
-     *            on an {@link INodeData}.
-     * 
      * @param indexMetadata
      *            The {@link IndexMetadata} record for the index.
+     * 
+     * @param readOnly
+     *            <code>true</code> IFF the caller is asserting that they WILL
+     *            NOT attempt to serialize any nodes or leaves using this
+     *            {@link NodeSerializer} instance.
      * 
      * @param isFullyBuffered
      *            Checksums are disabled for stores that are fully buffered
@@ -377,14 +378,15 @@ public class NodeSerializer {
      *            makes that extremely unlikely and one has never been observed.
      * 
      * @todo change recordCompressor to an interface.
-     * 
-     * FIXME the {@link IAddressSerializer} can be part of the
-     * {@link IndexMetadata} since we no longer customize it for the
-     * {@link IndexSegment}.
      */
-    public NodeSerializer(INodeFactory nodeFactory, int branchingFactor,
-            int initialBufferCapacity, IAddressSerializer addrSerializer,
-            IndexMetadata indexMetadata, boolean isFullyBuffered) {
+    public NodeSerializer(//
+            INodeFactory nodeFactory,//
+            int branchingFactor,
+            int initialBufferCapacity, //
+            IndexMetadata indexMetadata,//
+            final boolean readOnly,//
+            boolean isFullyBuffered
+            ) {
 
         assert nodeFactory != null;
 
@@ -392,16 +394,19 @@ public class NodeSerializer {
 
         assert initialBufferCapacity >= 0;
 
-        assert addrSerializer != null;
-
         assert indexMetadata != null;
 
         this.nodeFactory = nodeFactory;
 
         this.branchingFactor = branchingFactor;
 
-        this.addrSerializer = addrSerializer;
+        /*
+         * FIXME use packed address serializer (or nibble-based one).
+         */
+        this.addrSerializer = AddressSerializer.INSTANCE;
 
+        this.readOnly = readOnly;
+        
         this.nodeKeySerializer = indexMetadata.getNodeKeySerializer();
 
         this.leafKeySerializer = indexMetadata.getLeafKeySerializer();
@@ -409,6 +414,42 @@ public class NodeSerializer {
         this.valueSerializer = indexMetadata.getValueSerializer();
 
         this.recordCompressor = indexMetadata.getRecordCompressor();
+        
+        this.useChecksum = indexMetadata.getUseChecksum() && isFullyBuffered;
+
+        this.chk = useChecksum ? new ChecksumUtility() : null;
+
+        if (readOnly) {
+
+            this.initialBufferCapacity = 0;
+            
+            this._writeBuffer = null;
+            
+        } else {
+            
+            if (initialBufferCapacity == 0) {
+
+                initialBufferCapacity = DEFAULT_BUFFER_CAPACITY_PER_ENTRY
+                        * branchingFactor;
+
+            }
+
+            this.initialBufferCapacity = initialBufferCapacity;
+
+            // set _buf and _os.
+            allocWriteBuffer();
+
+        }
+
+        /*
+         * Allocate compression buffer iff a compression algorithm is used.
+         * 
+         * FIXME The capacity of this buffer is a SWAG. If it is too small then
+         * an EOFException will be thrown. This needs to be modified start with
+         * a smaller buffer and grow as required. An alternative would be to
+         * re-allocate this whenever _buf is resize since the compressed data
+         * should never be larger than the original data.
+         */
 
         if (recordCompressor != null) {
             /*
@@ -419,37 +460,6 @@ public class NodeSerializer {
             throw new UnsupportedOperationException(
                     "Record compressor is not thread-safe");
         }
-
-        
-        this.useChecksum = indexMetadata.getUseChecksum() && isFullyBuffered;
-
-        this.chk = useChecksum ? new ChecksumUtility() : null;
-
-        if (initialBufferCapacity == 0) {
-
-            initialBufferCapacity = DEFAULT_BUFFER_CAPACITY_PER_ENTRY
-                    * branchingFactor;
-
-        }
-
-        this.initialBufferCapacity = initialBufferCapacity;
-
-        // set _buf and _os.
-        alloc(initialBufferCapacity);
-
-        /*
-         * Allocate compression buffer iff a compression algorithm is used.
-         * 
-         * FIXME The capacity of this buffer is a SWAG. If it is too small then
-         * an EOFException will be thrown. This needs to be modified start with
-         * a smaller buffer and grow as required. An alternative would be to
-         * re-allocate this whenever _buf is resize since the compressed data
-         * should never be larger than the original data.
-         * 
-         * @todo consider discarding [buf] and [cbuf] if the node serializer
-         * becomes inactive in order to minimize memory use. they can be
-         * reallocated as necesssary.
-         */
 
         cbuf = recordCompressor != null //
         ? ByteBuffer.allocate(Bytes.megabyte32) //
@@ -470,129 +480,37 @@ public class NodeSerializer {
      */
     public void close() {
 
-        _buf = null;
-
-        //        _os = null;
+        _writeBuffer = null;
 
         cbuf = null;
 
     }
 
     /**
-     * Allocates {@link #_buf} with the specified initial capacity and sets up
-     * {@link #_os} to wrap {@link #_buf}.
+     * Allocates {@link #_writeBuffer} with {@link #initialBufferCapacity}.
      * 
-     * @param initialCapacity
-     *            The initial buffer capacity.
+     * @throws UnsupportedOperationException
+     *             if the {@link NodeSerializer} does not permit writes.
      */
-    private void alloc(int initialCapacity) {
+    private void allocWriteBuffer() {
 
-        //        return (true || capacity < Bytes.kilobyte32 * 8 )? ByteBuffer
-        //                .allocate(capacity) : ByteBuffer
-        //                .allocateDirect(capacity);
+        if (readOnly) {
 
-        /*
-         * Note: this always allocates a buffer wrapping a Java <code>byte[]</code>
-         * NOT a direct {@link ByteBuffer}. There is a substantial performance
-         * gain when you are doing a lot of get/put byte operations to use a
-         * wrapped, rather than direct, {@link ByteBuffer} (this was observed
-         * using the Sun JDK 1.5.07 with the -server mode).
-         * 
-         * @todo verify that this is true when using the Transient vs Direct
-         * buffer modes and how it interacts with whether the Journal's buffer
-         * is transient or direct.
-         */
+            throw new UnsupportedOperationException("read-only");
+            
+        }
 
-        //        return ByteBuffer.allocate(capacity);
-        assert _buf == null;
+        assert _writeBuffer == null;
 
-        //        assert _os == null;
-
-        _buf = new DataOutputBuffer(initialCapacity);
-
-        //        _os = new MyOutputBitStream(_buf);
+        _writeBuffer = new DataOutputBuffer(initialBufferCapacity);
 
     }
 
-    //    /**
-    //     * An {@link OutputBitStream} wrapping a {@link DataOutputBuffer}. An
-    //     * instance of this class is maintained by the {@link NodeSerializer} to
-    //     * write the nodes and leaves of a given {@link BTree}. That instance is
-    //     * rewound before each node or leaf is serialized. This allows us to reuse
-    //     * the same internal buffer and the same backing {@link DataOutputStream}
-    //     * for each node or leaf written.
-    //     * <p>
-    //     * Note: The caller can readily access the underlying
-    //     * {@link DataOutputBuffer} in order to perform random or sequential data
-    //     * type or byte oriented writes but you MUST first {@link #flush()} the
-    //     * {@link OutputBitStream} in order to byte align the bit stream and force
-    //     * the data in the internal buffer to the backing {@link DataOutputBuffer}.
-    //     * <p>
-    //     * Note: The {@link OutputBitStream} maintains an internal buffer for
-    //     * efficiency. The contents of that buffer are copied en-mass onto the
-    //     * backing {@link DataOutputBuffer} by {@link #flush()}, when the stream is
-    //     * repositioned, and when it is closed. There should be very little overhead
-    //     * incurred by these byte[] copies.
-    //     * <p>
-    //     * 
-    //     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-    //     * @version $Id$
-    //     */
-    //    public static class MyOutputBitStream extends OutputBitStream {
-    //
-    //        /**
-    //         * Return the underlying {@link OutputStream} - {@link #flush()} before
-    //         * writing on the returned stream!
-    //         */
-    //        public OutputStream getOutputStream() {
-    //            
-    //            return os;
-    //            
-    //        }
-    //        
-    //        /**
-    //         * Return the underlying {@link DataOutputBuffer} - {@link #flush()}
-    //         * before writing on the returned stream!
-    //         * 
-    //         * @throws ClassCastException
-    //         *             if the backing {@link OutputStream} is not a
-    //         *             {@link DataOutputBuffer}.
-    //         */
-    //        public DataOutputBuffer getDataOutputBuffer() {
-    //            
-    //            return (DataOutputBuffer)os;
-    //            
-    //        }
-    //        
-    ////        /**
-    ////         * @param arg0
-    ////         */
-    ////        public MyOutputBitStream(byte[] arg0) {
-    ////            super(arg0);
-    ////        }
-    //
-    //        /**
-    //         * @param os
-    //         * @param bufSize
-    //         */
-    //        public MyOutputBitStream(OutputStream os, int bufSize) {
-    //            super(os, bufSize);
-    //        }
-    //
-    //        /**
-    //         * @param os
-    //         */
-    //        public MyOutputBitStream(OutputStream os) {
-    //            super(os);
-    //        }
-    //
-    //    }
-
     /**
-     * De-serialize a node or leaf. This method is used when the caller does not
-     * know a-priori whether the reference is to a node or leaf. The decision is
-     * made based on inspection of the {@link #OFFSET_NODE_TYPE} byte in the
-     * supplied buffer.
+     * De-serialize a node or leaf (thread-safe). This method is used when the
+     * caller does not know a-priori whether the reference is to a node or leaf.
+     * The decision is made based on inspection of the {@link #OFFSET_NODE_TYPE}
+     * byte in the supplied buffer.
      * 
      * @param btree
      *            The btree.
@@ -619,13 +537,11 @@ public class NodeSerializer {
          * node or a leaf.
          */
 
-        ByteBuffer tmp = buf;
-
-        assert tmp.position() == 0;
+        assert buf.position() == 0;
 
         buf = decompress(buf);
 
-        assert tmp.position() == 0;
+        assert buf.position() == 0;
 
         final IAbstractNodeData ret;
 
@@ -635,7 +551,7 @@ public class NodeSerializer {
 
         case TYPE_NODE: {
 
-            assert tmp.position() == 0;
+            assert buf.position() == 0;
 
             // deserialize (already decompressed)
             ret = getNode(btree, addr, buf, true);
@@ -656,7 +572,7 @@ public class NodeSerializer {
         case TYPE_LEAF:
         case TYPE_LINKED_LEAF: {
 
-            assert tmp.position() == 0;
+            assert buf.position() == 0;
 
             // deserialize (already decompressed)
             ret = getLeaf(btree, addr, buf, true);
@@ -681,15 +597,18 @@ public class NodeSerializer {
     }
 
     /**
-     * Serialize a node or leaf.
+     * Serialize a node or leaf onto an internal buffer and return that buffer
+     * (NOT thread-safe). The operation writes on an internal buffer which is
+     * automatically extended as required.
      * 
      * @param node
      *            The node or leaf.
      * 
-     * @return The serialized record.
-     * 
-     * @exception BufferOverflowException
-     *                if there is not enough space remaining in the buffer.
+     * @return The buffer containing the serialized representation of the node
+     *         or leaf in a <em>shared buffer</em>. The contents of this
+     *         buffer may be overwritten by the next node or leaf serialized the
+     *         same instance of this class. The position will be zero and the
+     *         limit will be the #of bytes in the serialized representation.
      */
     public ByteBuffer putNodeOrLeaf(IAbstractNodeData node) {
 
@@ -706,29 +625,32 @@ public class NodeSerializer {
     }
 
     /**
-     * Serialize a node onto an internal buffer and returns that buffer. If the
-     * operation would overflow then the buffer is extended and the operation is
-     * retried.
+     * Serialize a node onto an internal buffer and returns that buffer (NOT
+     * thread-safe). The operation writes on an internal buffer which is
+     * automatically extended as required.
      * 
      * @param node
      *            The node.
      * 
-     * @return the buffer containing the serialized node. the position will be
-     *         zero and the limit will be the #of bytes in the serialized node.
+     * @return The buffer containing the serialized representation of the node
+     *         in a <em>shared buffer</em>. The contents of this buffer may
+     *         be overwritten by the next node or leaf serialized the same
+     *         instance of this class. The position will be zero and the limit
+     *         will be the #of bytes in the serialized representation.
      */
     public ByteBuffer putNode(INodeData node) {
 
-        if (_buf == null) {
+        if (_writeBuffer == null) {
 
             // the buffer was released so we reallocate it.
-            alloc(initialBufferCapacity);
+            allocWriteBuffer();
 
         }
 
         try {
 
             // prepare buffer for reuse.
-            _buf.reset();
+            _writeBuffer.reset();
             //            _os.position(0L); 
 
             return putNode2(node);
@@ -737,17 +659,13 @@ public class NodeSerializer {
 
             throw new RuntimeException(ex); // exception is not expected.
 
-        } catch (BufferOverflowException ex) {
-
-            throw ex; // exception is not expected.
-
         }
 
     }
 
     private ByteBuffer putNode2(INodeData node) throws IOException {
 
-        assert _buf != null;
+        assert _writeBuffer != null;
         assert node != null;
 
         final int branchingFactor = node.getBranchingFactor();
@@ -761,19 +679,19 @@ public class NodeSerializer {
          * fixed length node header.
          */
 
-        final int pos0 = _buf.pos();
+        final int pos0 = _writeBuffer.pos();
 
         // checksum
-        _buf.writeInt(0); // will overwrite below with the checksum.
+        _writeBuffer.writeInt(0); // will overwrite below with the checksum.
 
         // #bytes
-        _buf.writeInt(0); // will overwrite below with the actual value.
+        _writeBuffer.writeInt(0); // will overwrite below with the actual value.
 
         // nodeType
-        _buf.writeByte(TYPE_NODE); // this is a non-leaf node.
+        _writeBuffer.writeByte(TYPE_NODE); // this is a non-leaf node.
 
         // version
-        _buf.writeShort(VERSION0);
+        _writeBuffer.writeShort(VERSION0);
 
         //        /*
         //         * Setup output stream over the buffer.
@@ -789,23 +707,23 @@ public class NodeSerializer {
         try {
 
             // branching factor.
-            _buf.packLong(branchingFactor);
+            _writeBuffer.packLong(branchingFactor);
 
             // #of spanned entries.
-            _buf.packLong(nentries);
+            _writeBuffer.packLong(nentries);
 
             //            // #of keys
             //            LongPacker.packLong(os, nkeys);
 
             // keys
-            nodeKeySerializer.write(_buf, keys);
+            nodeKeySerializer.write(_writeBuffer, keys);
 //            KeyBufferSerializer.INSTANCE.putKeys(_buf, keys);
 
             // addresses.
-            addrSerializer.putChildAddresses(_buf, childAddr, nkeys + 1);
+            addrSerializer.putChildAddresses(_writeBuffer, childAddr, nkeys + 1);
 
             // #of entries spanned per child.
-            putChildEntryCounts(_buf, childEntryCounts, nkeys + 1);
+            putChildEntryCounts(_writeBuffer, childEntryCounts, nkeys + 1);
 
             //            // Done using the DataOutputStream so flush to the ByteBuffer.
             //            os.flush();
@@ -840,10 +758,10 @@ public class NodeSerializer {
         }
 
         // #of bytes actually written.
-        final int nbytes = _buf.pos() - pos0;
+        final int nbytes = _writeBuffer.pos() - pos0;
         assert nbytes > SIZEOF_NODE_HEADER;
 
-        ByteBuffer buf2 = ByteBuffer.wrap(_buf.array(), 0, nbytes);
+        ByteBuffer buf2 = ByteBuffer.wrap(_writeBuffer.array(), 0, nbytes);
 
         // patch #of bytes written on the record format.
         buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);
@@ -1053,28 +971,32 @@ public class NodeSerializer {
     }
     
     /**
-     * Serialize a leaf node onto a buffer. If the operation would overflow then
-     * the buffer is extended and the operation is retried.
+     * Serialize a leaf onto an internal buffer and returns that buffer (NOT
+     * thread-safe). The operation writes on an internal buffer which is
+     * automatically extended as required.
      * 
      * @param leaf
      *            The leaf node.
      * 
-     * @return the buffer containing the serialized leaf. the position will be
-     *         zero and the limit will be the #of bytes in the serialized leaf.
+     * @return The buffer containing the serialized representation of the leaf
+     *         in a <em>shared buffer</em>. The contents of this buffer may
+     *         be overwritten by the next node or leaf serialized the same
+     *         instance of this class. The position will be zero and the limit
+     *         will be the #of bytes in the serialized representation.
      */
     public ByteBuffer putLeaf(ILeafData leaf) {
 
-        if( _buf == null ) {
+        if( _writeBuffer == null ) {
             
             // the buffer was released so we reallocate it.
-            alloc(initialBufferCapacity);
+            allocWriteBuffer();
             
         }
 
         try {
 
             // prepare buffer for reuse.
-            _buf.reset();
+            _writeBuffer.reset();
 //            _os.position(0L);
 
             return putLeaf2(leaf);
@@ -1083,17 +1005,13 @@ public class NodeSerializer {
 
             throw new RuntimeException(ex); // exception is not expected.
 
-        } catch (BufferOverflowException ex) {
-
-            throw ex; // exception is not expected.
-
         }
         
     }
      
     private ByteBuffer putLeaf2(ILeafData leaf) throws IOException {
 
-        assert _buf != null;
+        assert _writeBuffer != null;
         assert leaf != null;
         
         final int nkeys = leaf.getKeyCount();
@@ -1104,19 +1022,19 @@ public class NodeSerializer {
         /*
          * common data.
          */
-        final int pos0 = _buf.pos();
+        final int pos0 = _writeBuffer.pos();
 
         // checksum
-        _buf.writeInt(0); // will overwrite below with the checksum.
+        _writeBuffer.writeInt(0); // will overwrite below with the checksum.
         
         // nbytes
-        _buf.writeInt(0); // will overwrite below with the actual value.
+        _writeBuffer.writeInt(0); // will overwrite below with the actual value.
         
         // nodeType
-        _buf.writeByte(TYPE_LEAF); // this is a leaf node.
+        _writeBuffer.writeByte(TYPE_LEAF); // this is a leaf node.
 
         // version
-        _buf.writeShort(VERSION0);
+        _writeBuffer.writeShort(VERSION0);
         
         /*
          * Setup output stream over the buffer.
@@ -1131,30 +1049,30 @@ public class NodeSerializer {
         try {
             
             // branching factor.
-            _buf.packLong( branchingFactor);
+            _writeBuffer.packLong( branchingFactor);
 
 //            // #of keys
 //            _buf.packLong(nkeys);
 
             // keys.
-            leafKeySerializer.write(_buf, keys);
+            leafKeySerializer.write(_writeBuffer, keys);
 //            KeyBufferSerializer.INSTANCE.putKeys(_buf, keys);
             
             // values.
 //            // values [branchingFactor + 1]
 //            valueSerializer.write(_buf,0/* fromIndex */,nkeys/* toIndex */, vals,vals.length/* deserializedSize */);
 //            ByteArrayValueSerializer.INSTANCE.putValues(_buf, vals, nkeys);
-            valueSerializer.write(_buf, new RandomAccessByteArray(0, nkeys, vals));
+            valueSerializer.write(_writeBuffer, new RandomAccessByteArray(0, nkeys, vals));
 
             if(leaf.hasDeleteMarkers()) {
                 
-                putDeleteMarkers(_buf, leaf);
+                putDeleteMarkers(_writeBuffer, leaf);
                 
             }
             
             if(leaf.hasVersionTimestamps()) {
                 
-                putVersionTimestamps(_buf, leaf);
+                putVersionTimestamps(_writeBuffer, leaf);
                 
             }
             
@@ -1190,15 +1108,15 @@ public class NodeSerializer {
         }
 
         // #of bytes actually written.
-        final int nbytes = _buf.pos() - pos0;
+        final int nbytes = _writeBuffer.pos() - pos0;
         assert nbytes > SIZEOF_LEAF_HEADER;
 
-        ByteBuffer buf2 = ByteBuffer.wrap(_buf.array(),0,nbytes);
+        ByteBuffer buf2 = ByteBuffer.wrap(_writeBuffer.array(),0,nbytes);
         
         // patch #of bytes written on the record format.
         buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);
 
-        // compute checksum FIXME This will be much faster on the raw {byte[],off,len}
+        // compute checksum
         final int checksum = (useChecksum ? chk.checksum(buf2, pos0
                 + SIZEOF_CHECKSUM, pos0 + nbytes) : 0);
         // System.err.println("computed leaf checksum: "+checksum);
@@ -1346,11 +1264,6 @@ public class NodeSerializer {
                 RandomAccessByteArray raba = new RandomAccessByteArray(0, 0,
                         values);
                 valueSerializer.read(is, raba);
-                if (!(valueSerializer instanceof NoDataSerializer)) { // FIXME remove paranoia test.
-                    final int nread = raba.getKeyCount();
-                    assert nkeys == nread : "nkeys=" + nkeys
-                            + ", but read " + nread + " values.";
-                }
             }
             
             // delete markers.

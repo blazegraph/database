@@ -194,7 +194,8 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
             /*
              * Note: The data MUST be copied within the synchronized() block
              * since otherwise overflow() could cause the buffer reference to be
-             * invalidated.
+             * invalidated. (Likewise, we do not "own" the limit and position on
+             * the [buffer] unless everyone is synchronized.)
              */
             
             buffer.limit((int) offset + nbytes);
@@ -245,8 +246,10 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
              * construct a consistent view with concurrent writers. If you do
              * not synchronize then an IllegalArgumentException can get tossed
              * out of here. The problem is that the operation is not atomic
-             * without synchronization. This problem was revealed by the
-             * AbstractMRMWTestCase, but it does not show up on every run.
+             * without synchronization (concurrent operations can modify the
+             * limit and position rendering the result inconsistent). This
+             * problem was revealed by the AbstractMRMWTestCase, but it does not
+             * show up on every run.
              */
             view = buffer.asReadOnlyBuffer();
         }

@@ -183,6 +183,11 @@ public class IndexSegmentPlan {
      *            The branching factor.
      * @param nleaves
      *            The #of leaves that must be addressable by the tree.
+     * 
+     * @throws UnsupportedOperationException
+     *             if it is not possible to build a B+Tree with that branching
+     *             factor and that many leaves without exceeding <i>maxHeight</i>
+     *             (statically configured to <code>10</code>).
      */
     public static int getMinimumHeight(int m, int nleaves) {
         
@@ -214,8 +219,9 @@ public class IndexSegmentPlan {
         }
         
         throw new UnsupportedOperationException(
-                "Can not build a tree for that many leaves: m=" + m
-                        + ", nleaves=" + nleaves + ", maxHeight=" + maxHeight);
+                "Can not build tree with height less than " + maxHeight
+                        + " given branchingFactor=" + m + ",  nleaves="
+                        + nleaves);
     }
 
     /**

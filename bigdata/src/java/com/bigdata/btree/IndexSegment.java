@@ -25,8 +25,6 @@ package com.bigdata.btree;
 
 import it.unimi.dsi.mg4j.util.BloomFilter;
 
-import java.io.IOException;
-
 import com.bigdata.resources.ResourceManager;
 
 /**
@@ -125,8 +123,7 @@ public class IndexSegment extends AbstractBTree {
 
         super(fileStore,
                 ImmutableNodeFactory.INSTANCE,
-                // FIXME use packed address serializer.
-                AddressSerializer.INSTANCE,
+                true, // always read-only
                 fileStore.getIndexMetadata()
                 );
 
@@ -188,6 +185,9 @@ public class IndexSegment extends AbstractBTree {
                     // reopen the file.
                     fileStore.reopen();
 
+                    // save reference to the optional bloom filter.
+                    this.bloomFilter = fileStore.getBloomFilter();
+                    
                     _open();
 
                 }
@@ -206,32 +206,6 @@ public class IndexSegment extends AbstractBTree {
 
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.getCheckpoint().addrRoot);
-
-        if (fileStore.getCheckpoint().addrBloom == 0L) {
-
-            /*
-             * No bloom filter.
-             */
-
-            this.bloomFilter = null;
-
-        } else {
-
-            /*
-             * Read in the optional bloom filter from its addr.
-             */
-
-            try {
-
-                this.bloomFilter = fileStore.readBloomFilter();
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-        }
 
         // report on the event.
         ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
@@ -297,24 +271,6 @@ public class IndexSegment extends AbstractBTree {
         
     }
     
-//    /**
-//     * Operation is disallowed.
-//     */
-//    public Tuple insert(byte[] key, byte[] value, boolean delete, long timestamp, Tuple tuple) {
-//
-//        throw new UnsupportedOperationException(MSG_READ_ONLY);
-//
-//    }
-
-//    /**
-//     * Operation is disallowed.
-//     */
-//    public Tuple remove(byte[] key, Tuple tuple) {
-//
-//        throw new UnsupportedOperationException(MSG_READ_ONLY);
-//
-//    }
-
     /**
      * Applies the optional bloom filter if it exists. If the bloom filter
      * reports true, then verifies that the key does in fact exist in the index.

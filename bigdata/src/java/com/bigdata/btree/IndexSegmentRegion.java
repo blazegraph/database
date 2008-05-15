@@ -15,14 +15,25 @@ public enum IndexSegmentRegion {
 
     /**
      * Offset is relative to the start of the backing file.
+     * <p>
+     * Note: The {@link #BASE} region runs from the start of the file until the
+     * end of the file and thus overlaps both the {@link #NODE} and
+     * {@link #BLOB} regions. <em>Any</em> address may be expressed within the
+     * {@link #BASE} region.
+     * <p>
+     * Note: The leaves are not really their own region, but rather are found
+     * within the {@link #BASE} region starting at [leavesOffset] and running
+     * for [leavesExtent] bytes.
      */
     BASE(0x00),
     /**
-     * Offset is relative to the start of the node region.
+     * Offset is relative to the start of the node region.  This region contains
+     * only the nodes.
      */
     NODE(0x01),
     /**
-     * Offset is relative to the start of the blob region.
+     * Offset is relative to the start of the blob region. This region contains
+     * only raw records used for blob references.
      */
     BLOB(0x02);
     
