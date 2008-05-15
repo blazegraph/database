@@ -12,6 +12,9 @@
         <fileset dir="${bigdata.rdf.dir}/lib">
             <include name="**/*.jar"/>
         </fileset>
+        <fileset dir="${bigdata.sails.dir}/lib">
+            <include name="**/*.jar"/>
+        </fileset>
     </path>
 
     <path id="runtime.classpath">
@@ -38,6 +41,8 @@
             <src path="${bigdata.jini.dir}/src/test"/>
             <src path="${bigdata.rdf.dir}/src/java"/>
             <src path="${bigdata.rdf.dir}/src/test"/>
+            <src path="${bigdata.sails.dir}/src/java"/>
+            <src path="${bigdata.sails.dir}/src/test"/>
         </javac>
     	<!-- copy resources. -->
         <copy toDir="${build.dir}/classes">
@@ -48,6 +53,9 @@
                 <exclude name="**/*.java"/>
             </fileset>
             <fileset dir="${bigdata.rdf.dir}/src/java">
+                <exclude name="**/*.java"/>
+            </fileset>
+            <fileset dir="${bigdata.sails.dir}/src/java">
                 <exclude name="**/*.java"/>
             </fileset>
         </copy>
