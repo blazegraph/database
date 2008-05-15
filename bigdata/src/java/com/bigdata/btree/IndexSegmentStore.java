@@ -39,8 +39,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.RootBlockException;
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
@@ -192,7 +194,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          * FIXME The JVM will allocate a temporary direct buffer when reading in
          * a large chunk from the store and then have problems releasing it.
          * I've disabled buffering of nodes by default for now to avoid this
-         * memory leak.
+         * memory leak. This could be addressed using the static pool currently
+         * allocated within {@link TemporaryRawStore}.
          */
         //String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = ""+Bytes.megabyte*10;
         String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = "1";
@@ -204,7 +207,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     private static Properties getDefaultProperties(File file) {
 
-        if(file==null)
+        if (file == null)
             throw new IllegalArgumentException();
 
         Properties p = new Properties();
@@ -309,10 +312,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                     .getName(), metadata.getPartitionMetadata()
                     .getPartitionId());
 
-            log.info("Closing index segment store: " + name + ", file="
-                    + getFile());
+            if (log.isInfoEnabled())
+                log.info("Closing index segment store: " + name + ", file="
+                        + getFile());
             
-            close();
+            _close();
             
         }
         
@@ -375,7 +379,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // read the checkpoint record from the file.
             this.checkpoint = new IndexSegmentCheckpoint(raf);
 
-            log.info(checkpoint.toString());
+            if (log.isInfoEnabled())
+                log.info(checkpoint.toString());
 
             // handles transparent decoding of offsets within regions.
             this.addressManager = new IndexSegmentAddressManager(checkpoint);
@@ -385,10 +390,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
             /*
              * Read the index nodes from the file into a buffer. If there are no
-             * index nodes then we skip this step. Note that we always read in
-             * the root, so if the index is just a root leaf then the root will
-             * be a deserialized object and the file will not be buffered in
-             * memory.
+             * index nodes (that is if everything fits in the root leaf of the
+             * index) then we skip this step.
+             * 
+             * Note: We always read in the root in IndexSegment#_open() and hold
+             * a hard reference to the root while the IndexSegment is open.
              */
             if(checkpoint.nnodes == 0) {
                 
@@ -601,16 +607,16 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     synchronized public CounterSet getCounters() {
 
-        if(root==null) {
+        if(counterSet==null) {
         
-            root = new CounterSet();
+            counterSet = new CounterSet();
             
-            root.addCounter("file", new OneShotInstrument<String>(file
+            counterSet.addCounter("file", new OneShotInstrument<String>(file
                     .toString()));
 
             // checkpoint
             {
-                final CounterSet tmp = root.makePath("checkpoint");
+                final CounterSet tmp = counterSet.makePath("checkpoint");
                 
                 tmp.addCounter("segment UUID", new Instrument<String>() {
                     protected void sample() {
@@ -654,7 +660,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // metadata
             {
                 
-                final CounterSet tmp = root.makePath("metadata");
+                final CounterSet tmp = counterSet.makePath("metadata");
                 
                 tmp.addCounter("name", new Instrument<String>() {
                     protected void sample() {
@@ -678,10 +684,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
         
-        return root;
+        return counterSet;
         
     }
-    private CounterSet root;
+    private CounterSet counterSet;
 
     /**
      * Read a record from the {@link IndexSegmentStore}. If the request is in
@@ -714,28 +720,34 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * limit() will be the #of bytes in the compressed record.
              */
 
-            // correct the offset so that it is relative to the buffer.
-            long off = offset - offsetNodes;
-
             // System.err.println("offset="+offset+", length="+length);
+            
+            // correct the offset so that it is relative to the buffer.
+            final long off = offset - offsetNodes;
+
+            // create a view so that concurrent reads do not modify the buffer state.
+            final ByteBuffer tmp = buf_nodes.asReadOnlyBuffer();
 
             // set the limit on the buffer to the end of the record.
-            buf_nodes.limit((int)(off + length));
+            tmp.limit((int)(off + length));
 
             // set the position on the buffer to the start of the record.
-            buf_nodes.position((int)off);
+            tmp.position((int)off);
 
-            // create a slice of that view.
-            dst = buf_nodes.slice();
+            // create a slice of that view showing only the desired record.
+            dst = tmp.slice();
 
         } else {
 
+            /*
+             * The data need to be read from the file.
+             * 
+             * @todo This might need to use a static direct buffer pool to avoid
+             * leaking temporary direct buffers.
+             */
+
             // Allocate buffer.
             dst = ByteBuffer.allocate(length);
-
-            /*
-             * the data need to be read from the file.
-             */
 
             dst.limit(length);
 
@@ -744,7 +756,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             try {
 
                 // read into [dst] - does not modify the channel's position().
-                raf.getChannel().read(dst, offset);
+                FileChannelUtility.readAll(raf.getChannel(), dst, offset);
+//                raf.getChannel().read(dst, offset);
 
             } catch (IOException ex) {
 
@@ -765,7 +778,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * 
      * @return A read-only view of a buffer containing the index nodes.
      */
-    protected ByteBuffer bufferIndexNodes(RandomAccessFile raf)
+    private ByteBuffer bufferIndexNodes(RandomAccessFile raf)
             throws IOException {
 
         if(checkpoint.addrNodes == 0L) {
@@ -778,8 +791,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         final int nbytes = addressManager.getByteCount(checkpoint.addrLeaves);
 
-        log.info("Buffering nodes: #nodes=" + checkpoint.nnodes + ", #bytes="
-                + nbytes + ", file=" + file);
+        if (log.isInfoEnabled())
+            log.info("Buffering nodes: #nodes=" + checkpoint.nnodes
+                    + ", #bytes=" + nbytes + ", file=" + file);
         
         /*
          * Note: The direct buffer imposes a higher burden on the JVM and all
@@ -790,12 +804,17 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          * FIXME This would be true except that the JVM will allocate a
          * temporary direct buffer and then have problems releasing it. I've
          * disabled buffering of nodes by default for now to avoid this memory
-         * leak.
+         * leak. This could be fixed using a static direct buffer pool and then
+         * either reading the data into a buffer from that pool and releasing
+         * the buffer when the index store is closed -or- using the direct
+         * buffer just to copy the data from the store and then releasing it
+         * immediately back to the pool.
          */
 //        ByteBuffer buf = ByteBuffer.allocateDirect(nbytes);
-        ByteBuffer buf = ByteBuffer.allocate(nbytes);
+        final ByteBuffer buf = ByteBuffer.allocate(nbytes);
 
-        raf.getChannel().read(buf, offset);
+        FileChannelUtility.readAll(raf.getChannel(), buf, offset);
+//        raf.getChannel().read(buf, offset);
 
         return buf.asReadOnlyBuffer();
 
@@ -817,13 +836,14 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
         
-        log.info("reading bloom filter: "+addressManager.toString(addr));
+        if (log.isInfoEnabled())
+            log.info("reading bloom filter: "+addressManager.toString(addr));
         
         final long off = addressManager.getOffset(addr);
         
         final int len = addressManager.getByteCount(addr);
         
-        ByteBuffer buf = ByteBuffer.allocate(len);
+        final ByteBuffer buf = ByteBuffer.allocate(len);
 
         buf.limit(len);
 
@@ -832,9 +852,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         try {
 
             // read into [dst] - does not modify the channel's position().
-            final int nread = raf.getChannel().read(buf, off);
-            
-            assert nread == len;
+            FileChannelUtility.readAll(raf.getChannel(), buf, off);
+//            final int nread = raf.getChannel().read(buf, off);
+//            
+//            assert nread == len;
             
             buf.flip(); // Flip buffer for reading.
             
@@ -847,11 +868,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         assert buf.position() == 0;
         assert buf.limit() == len;
 
-        BloomFilter bloomFilter = (BloomFilter) SerializerUtil.deserialize(buf);
+        final BloomFilter bloomFilter = (BloomFilter) SerializerUtil.deserialize(buf);
 
-        log.info("Read bloom filter: minKeys=" + bloomFilter.size()
-                + ", entryCount=" + checkpoint.nentries + ", bytesOnDisk="
-                + len + ", errorRate=" + metadata.getErrorRate());
+        if (log.isInfoEnabled())
+            log.info("Read bloom filter: minKeys=" + bloomFilter.size()
+                    + ", entryCount=" + checkpoint.nentries + ", bytesOnDisk="
+                    + len + ", errorRate=" + metadata.getErrorRate());
 
         return bloomFilter;
 
@@ -860,19 +882,20 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     /**
      * Reads the {@link IndexMetadata} record directly from the file.
      */
-    protected IndexMetadata readMetadata() throws IOException {
+    private IndexMetadata readMetadata() throws IOException {
 
         final long addr = checkpoint.addrMetadata;
         
         assert addr != 0L;
         
-        log.info("reading extension metadata record: "+addressManager.toString(addr));
+        if (log.isInfoEnabled())
+            log.info("reading metadata: "+addressManager.toString(addr));
         
         final long off = addressManager.getOffset(addr);
         
         final int len = addressManager.getByteCount(addr);
         
-        ByteBuffer buf = ByteBuffer.allocate(len);
+        final ByteBuffer buf = ByteBuffer.allocate(len);
 
         buf.limit(len);
 
@@ -881,9 +904,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         try {
 
             // read into [dst] - does not modify the channel's position().
-            final int nread = raf.getChannel().read(buf, off);
+            FileChannelUtility.readAll(raf.getChannel(), buf, off);
             
-            assert nread == len;
+//            final int nread = raf.getChannel().read(buf, off);
+//            
+//            assert nread == len;
             
             buf.flip(); // Flip buffer for reading.
             
@@ -896,12 +921,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         assert buf.position() == 0;
         assert buf.limit() == len;
 
-        final IndexMetadata extensionMetadata = (IndexMetadata) SerializerUtil
+        final IndexMetadata md = (IndexMetadata) SerializerUtil
                 .deserialize(buf);
 
-        log.info("Read extension metadata: " + extensionMetadata);
+        if (log.isInfoEnabled())
+            log.info("Read metadata: " + md);
 
-        return extensionMetadata;
+        return md;
 
     }
 

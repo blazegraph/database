@@ -195,9 +195,14 @@ public interface IBigdataClient {
         /**
          * The #of threads in the client thread pool -or- ZERO (0) if the size
          * of the thread pool is not fixed (default is <code>0</code>). The
-         * thread pool is used to parallelize all requests issued by the client
-         * and optionally to limit the maximum parallelism of the client with
-         * respect to requests made of the connected federation.
+         * thread pool is used to parallelize requests issued by the client.
+         * <p>
+         * Note: It is possible for the client to deadlock if the size of the
+         * thread pool is limited. At least some sources of deadlock have been
+         * eliminated (retries after a {@link StaleLocatorException} are now run
+         * in the caller's thread) but as of <code>5/14/08</code> it is clear
+         * that there is at least one source of deadlock remaining so the
+         * default value of <code>0</code> is advised.
          */
         String CLIENT_THREAD_POOL_SIZE = "client.threadPoolSize";
 
@@ -247,7 +252,8 @@ public interface IBigdataClient {
          * 
          * @see #CLIENT_TASK_TIMEOUT
          */
-        String DEFAULT_CLIENT_TASK_TIMEOUT = ""+20*1000L;
+        String DEFAULT_CLIENT_TASK_TIMEOUT = ""+Long.MAX_VALUE;
+//        String DEFAULT_CLIENT_TASK_TIMEOUT = ""+20*1000L;
         
         /**
          * The default capacity used when a client issues a range query request

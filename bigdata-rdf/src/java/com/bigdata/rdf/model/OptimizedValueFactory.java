@@ -1693,6 +1693,9 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public int compare(_Statement stmt1, _Statement stmt2) {
 
+            if (stmt1 == stmt2)
+                return 0;
+            
             /*
              * Note: logic avoids possible overflow of [long] by not computing the
              * difference between two longs.
@@ -1731,6 +1734,9 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public int compare(_Statement stmt1, _Statement stmt2) {
 
+            if (stmt1 == stmt2)
+                return 0;
+            
             /*
              * Note: logic avoids possible overflow of [long] by not computing the
              * difference between two longs.
@@ -1769,6 +1775,9 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public int compare(_Statement stmt1, _Statement stmt2) {
 
+            if (stmt1 == stmt2)
+                return 0;
+            
             /*
              * Note: logic avoids possible overflow of [long] by not computing the
              * difference between two longs.

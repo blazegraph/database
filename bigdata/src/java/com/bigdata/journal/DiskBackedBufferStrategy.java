@@ -29,6 +29,8 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import com.bigdata.io.FileChannelUtility;
+
 /**
  * Abstract base class for implementations that use a direct buffer as a write
  * through cache to an image on the disk. This covers both the
@@ -170,23 +172,29 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
    
     public void writeRootBlock(IRootBlockView rootBlock,ForceEnum forceOnCommit) {
 
-        if( rootBlock == null ) throw new IllegalArgumentException();
+        if (rootBlock == null)
+            throw new IllegalArgumentException();
 
         try {
 
-            FileChannel channel = getChannel();
+            final ByteBuffer data = rootBlock.asReadOnlyBuffer();
+            
+            final long pos = rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
+                    : FileMetadata.OFFSET_ROOT_BLOCK1;
+            
+            FileChannelUtility.writeAll(getChannel(), data, pos);
 
-            final int count = channel.write(rootBlock.asReadOnlyBuffer(),
-                    rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
-                            : FileMetadata.OFFSET_ROOT_BLOCK1);
-
-            if(count != RootBlockView.SIZEOF_ROOT_BLOCK) {
-                
-                throw new IOException("Expecting to write "
-                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but wrote"
-                        + count + " bytes.");
-                
-            }
+//            final int count = getChannel().write(rootBlock.asReadOnlyBuffer(),
+//                    rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
+//                            : FileMetadata.OFFSET_ROOT_BLOCK1);
+//
+//            if(count != RootBlockView.SIZEOF_ROOT_BLOCK) {
+//                
+//                throw new IOException("Expecting to write "
+//                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but wrote"
+//                        + count + " bytes.");
+//                
+//            }
 
             if( forceOnCommit != ForceEnum.No ) {
 

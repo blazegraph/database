@@ -500,25 +500,27 @@ abstract public class LoadBalancerService extends AbstractService
          */
         String LOG_DELAY = "log.delay";
         
-        String DEFAULT_LOG_DELAY = ""+1000*60*60;
+        String DEFAULT_LOG_DELAY = "" + 1000 * 60 * 60;
 
         /**
          * The maximum #of distinct log files to retain (default is one week
          * based on a {@link #LOG_DELAY} equivilant to one hour).
          */
         String LOG_MAX_FILES = "log.maxFiles";
-        
-        String DEFAULT_LOG_MAX_FILES = ""+24*7;
-        
+
+        String DEFAULT_LOG_MAX_FILES = "" + 24 * 7;
+
     }
 
     /**
      * 
-     * @param properties See {@link Options}
+     * @param properties
+     *            See {@link Options}
      */
     public LoadBalancerService(Properties properties) {
-        
-        if(properties==null) throw new IllegalArgumentException();
+
+        if (properties == null)
+            throw new IllegalArgumentException();
         
         this.properties = (Properties) properties.clone();
 
@@ -811,7 +813,7 @@ abstract public class LoadBalancerService extends AbstractService
                 
             } catch (Throwable t) {
 
-                log.warn("Problem in update task?", t);
+                log.error("Problem in update task?", t);
 
             } finally {
                 

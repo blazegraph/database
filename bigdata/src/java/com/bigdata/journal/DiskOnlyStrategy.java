@@ -44,6 +44,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager.ManagedJournal;
@@ -1458,9 +1459,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             // the offset into the disk file.
             final long pos = offset + headerSize;
 
-            for(int ntries=0; ntries<3; ntries++) {
+            for (int ntries = 0; ntries < 3; ntries++) {
 
-                if(ntries>0) {
+                if (ntries > 0) {
 
                     /*
                      * Note: clear if we are retrying since the buffer may have
@@ -1473,15 +1474,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
                 try {
 
-                    // copy the data into the buffer.
-                    final int nread = getChannel().read(dst, pos);
-
-                    if (nread != nbytes) {
-
-                        throw new RuntimeException("Expected to read " + nbytes
-                                + " bytes but read " + nread);
-
-                    }
+                    counters.ndiskRead += FileChannelUtility.readAll(
+                            getChannel(), dst, pos);
 
                 } catch (ClosedByInterruptException ex) {
                     
@@ -1533,7 +1527,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             counters.nreads++;
             counters.bytesRead+=nbytes;
             counters.bytesReadFromDisk+=nbytes;
-            counters.ndiskRead++;
             counters.elapsedReadNanos+=(System.nanoTime()-begin);
             counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
 
@@ -1770,7 +1763,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         final long begin = System.nanoTime();
         
-        final int nbytes = data.limit();
+        final int nbytes = data.remaining();
         
         /* 
          * The position in the file at which the record will be written
@@ -1794,62 +1787,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         try {
 
             /*
-             * Write the data onto the channel.
-             * 
-             * Note: writes bytes from position to limit on the channel at pos.
-             * 
-             * Note: I have seen count != remaining() for a single invocation of
-             * FileChannel#write(). This occured 5 hours into a run with the
-             * write cache disabled (so lots of small record writes). All of a
-             * sudden, several writes wound up reporting too few bytes written -
-             * this persisted until the end of the run (Fedora core 6 with Sun
-             * JDK 1.6.0_03). I have since modified this code to use a loop to
-             * ensure that all bytes get written.
-             * 
-             * FIXME Propagate this change to all places where we use
-             * FileChannel#write().
+             * Write bytes in [data] from position to limit onto the channel.
              */
 
-            int count = 0;
-            int nwrites = 0;
-
-            while (data.remaining() > 0) {
-
-                count += getChannel().write(data, pos);
-                
-                nwrites++;
-
-                counters.ndiskWrite++;
-
-                if (nwrites == 100) {
-
-                    log.warn("writing on channel: remaining="
-                            + data.remaining() + ", nwrites=" + nwrites
-                            + ", written=" + count);
-
-                } else if (nwrites == 1000) {
-
-                    log.error("writing on channel: remaining="
-                            + data.remaining() + ", nwrites=" + nwrites
-                            + ", written=" + count);
-
-                }
-                if (nwrites > 10000) {
-
-                    throw new RuntimeException("writing on channel: remaining="
-                            + data.remaining() + ", nwrites=" + nwrites
-                            + ", written=" + count);
-
-                }
-
-            }
-
-            if (count != nbytes) {
-
-                throw new RuntimeException("Expecting to write " + nbytes
-                        + " bytes, but wrote " + count + " bytes in " + nwrites);
-
-            }
+            counters.ndiskWrite += FileChannelUtility.writeAll(getChannel(),
+                    data, pos);
 
         } catch (IOException ex) {
 
@@ -1859,9 +1801,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         // update the next offset at which data will be written on the disk.
         writeCacheOffset += nbytes;
-                
-        counters.bytesWrittenOnDisk+=nbytes;
-        counters.elapsedDiskWriteNanos+=(System.nanoTime()-begin);
+
+        counters.bytesWrittenOnDisk += nbytes;
+        counters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
 
     }
     
@@ -1871,20 +1813,24 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             throw new IllegalArgumentException();
         
         try {
-
-            FileChannel channel = getChannel();
-
-            final int count = channel.write(rootBlock.asReadOnlyBuffer(),
-                    rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
-                            : FileMetadata.OFFSET_ROOT_BLOCK1);
             
-            if(count != RootBlockView.SIZEOF_ROOT_BLOCK) {
-                
-                throw new IOException("Expecting to write "
-                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but wrote"
-                        + count + " bytes.");
-                
-            }
+            final ByteBuffer data = rootBlock.asReadOnlyBuffer();
+            
+            final long pos = rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
+                    : FileMetadata.OFFSET_ROOT_BLOCK1;
+            
+            FileChannelUtility.writeAll(getChannel(), data, pos);
+            
+//            // FIXME write in loop until count == SIZEOF_ROOT_BLOCK
+//            final int count = getChannel().write(data, pos);
+//            
+//            if(count != RootBlockView.SIZEOF_ROOT_BLOCK) {
+//                
+//                throw new IOException("Expecting to write "
+//                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but wrote"
+//                        + count + " bytes.");
+//                
+//            }
 
             if (forceOnCommit != ForceEnum.No) {
 

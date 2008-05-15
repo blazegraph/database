@@ -364,6 +364,13 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
            SPO index.
 
     - BTree
+
+     - The RecordCompressor as utilized by the NodeSerializer is NOT
+       thread-safe as it relies on a single cbuf field.  Either the
+       static buffer pool (if direct buffers are performant for this),
+       a heap buffer pool, dynamic heap allocations for
+       (de-)compression, or a serialized access to an instance per
+       NodeSerializer instance (and hence per BTree instance).
 			
      - Support copy in/out of keys and vals in lookup(), insert(),
        remove(), and rangeIterator so that we can (a) be more
@@ -453,6 +460,38 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
       - Provide for registration of a global index within a
         transaction, but the transaction will fail if the index
         already exists when it commits.
+
+      - For full transactions, explore a synchronous overflow variant
+        from a managed journal hosting named indices (as isolated by
+        the tx) backed by a transient buffer to a managed journal
+        backed by a disk buffer that would let us keep full
+        concurrency.  The overflow should be a buffer -> disk transfer
+        and then the disk file should be allowed to grow without
+        bounds (or to the resource limit of the tx).  Asynchronous
+        overflow processing for transaction journals would add a layer
+        of complexity throughout as the MDI would need to be
+        instantiated on a per-tx basis.
+
+	The WriteExecutorService for the transaction would identify
+	and support synchronous overflow exactly as it does now for
+	unisolated journals.
+
+     - Raw temporary stores such as are used by the index manager must
+       be handled differently since (a) there are no indices in use;
+       and (b) the use is always single threaded (no write executor
+       service).  This case requires a direct buffer to disk transfer,
+       but the API can be declare an assumption that the caller is
+       single threaded and the writer can simply block during that
+       transfer.
+
+     * Some of the buffer strategy implementations appear to assume
+       that by synchronizing one method, such as truncate() or
+       transferTo(), that concurrent writers are automatically
+       synchronized for those operations.  This is NOT true unless the
+       write() method is also synchronized, and it is not for at least
+       the DirectBufferStrategy.  This could show up as a concurrency
+       problem with the indices when the store is used in a mode that
+       is in fact concurrent and an overflow is triggered.
 
 Short term tasks:
 
@@ -994,14 +1033,19 @@ Short term tasks:
    - Consider thread pool size defaults, especially for the temporary
      stores such as the temp triple store.  What is a good policy?
 
-   - Provide option to pass in a write cache buffer for a temporary
-     store and use that buffer as the in-memory store before it
-     overflows onto the disk.
+   - Done.  Either never retry an error task when the queue is likely
+     to be full or make the retry itself robust.  Otherwise the CDL
+     risks reporting fatal error for a task which could have been run
+     successfully.
+
+   - Done (uses a static pool). Provide option to pass in a write
+     cache buffer for a temporary store and use that buffer as the
+     in-memory store before it overflows onto the disk.
 
    - *** Batch API for extractor, allowing runs directly against the
-     KB.  Form a single prefix-scan query from a sort of all simple
-     terms in the document and then piece together the phrases from
-     the result.
+         KB.  Form a single prefix-scan query from a sort of all
+         simple terms in the document and then piece together the
+         phrases from the result.
 
    - Consider dropping the BasicRioLoader, PresortRioLoader, etc.  All
      of the benefit is in the use of the StatementBuffer.  These
@@ -1174,9 +1218,17 @@ Short term tasks:
        we are doing commits whose size fits within a single write
        cache (10M by default).
 
-     - Use a pool of direct buffers for the data service and handle
-       all block io/out requests with that pool.  this will help about
-       OOM problems with "temporary" direct byte buffers.
+     - Use a pool of direct buffers (the same pool that is used for
+       the TemporaryRawStore) for the data service and handle all
+       block io/out requests with that pool.  this will help about OOM
+       problems with "temporary" direct byte buffers.
+
+     *** It is possible that we will need to use the TemporaryRawStore
+       static buffer pool for all reads from the store (or writes that
+       are not via a write cache backed by a direct buffer) since
+       otherwise Java could allocate for us, and then fail to
+       correctly release, a "temporary" direct buffer. This would
+       impose ReentrantLock on all reads....
 
    - write performance test drivers and run on cluster.
 
@@ -1228,54 +1280,6 @@ Short term tasks:
           IndexSegment so that partial index segment writes can be
           recognized.
  
-	  ============================================================
-
-	- Results:
-
-	  Note: writing on local disk but reading the classpath and
-          data from NAS.
-
-	  **** Try with overflow processing enabled.
-
-	  **** (Set true by default on 5/7/08) Try w/ autoFlush==true
-               so that each document is parsed and written in a single
-               pass.  Also try w/ different combinations of the
-               statement buffer size and the #of threads in the
-               client.
-
-	  **** Measure the effect of the WriteCache on U100 and U1000.
-               Measure again with the onboard disk cache disabled.
-
-	  http://192.168.20.28:8080/
-
-	- U10, host3, LDS, 20 threads: 11517 tps <== verify again
-
-	- U10, host3, LDS, 10 threads: 16837/16389/16942 tps.
-
-	- U100, host3, LDS, 10 threads, writeCache: 15490 tps.
-
-	- U1000, host3, LDS, 10 threads, writeCache: _____  tps; no
-          problems until it runs out of disk space.
-	
-	- U10, host3, Jini, 20 threads: fails to progress.  (*) Why is
-          the system so sensitive to the #of client threads?
-
-	- U10, host3, Jini, 10 threads: 9692/9611/9406 tps
-
-	- U100, host3, Jini, 10 threads: 11693 tps - saved copy of the
-          log output.
-
-	- U1000, host3, Jini, 10 threads, writeCache, no overflow:
-          ______ tps. (Should run until its out of disk now that the
-          write cache memory leak is fixed.  A run without the write
-          cache progressed fine until it ran out of disk after 6 hours
-          (U1000-host3-disk-full).  At that point it had loaded 17349
-          out of ~20000 files and consumed ~59G.)
-
-	  ----------------- overflow enabled --------------
-
-	- U10, host3, Jini, 10 threads: ______ tps.
-
 ============================================================
 
 	Looks like virtuoso is running a clustered triple store!
@@ -1289,16 +1293,6 @@ Short term tasks:
 	http://docs.openlinksw.com/virtuoso/clusterprogrammingsqlexmod.html
 
 ============================================================
-
-host3
-
-LDS 12.8k on U10
-
-JDS 10.3k on U10 (2 data services)
-
-JDS 13.6k on U100 (2 data services; w/o overflow)
-
-JDS 13.6k on U100 (2 data services; w/ overflow -- redo and do U1000)
 
     - Done. (There was a fence post when the releaseTime was less than
       the first commit time for any journal.) Saw "no data for release
@@ -1545,24 +1539,41 @@ LDS U1000 SIDS=false nthreads=20 bufferCapacity=200000 host2 2G noText localData
 
 ============================================================
 
-Scale-out runs.
-
-JF host3 U10 startAll 6.7k
-
-JF host{1,2,3} U100, SIDS=false, nthreads=20, nclients=3, bufferCapacity=200000, nasData : 
+Main issues:
 
 ============================================================
 
-Main issues:
-
 (*) map/reduce processing.
 
-    If the ConcurrentDataLoader was a map/reduce job then I could
-    start the whole thing by running a single master.  I would of
-    course have to have map and reduce services running on the
-    cluster.
+    (-) If the ConcurrentDataLoader was a map/reduce job then I could
+        start the whole thing by running a single master.  I would of
+        course have to have map and reduce services running on the
+        cluster.
 
-(*) Optimize JOINs and start running LUBM query times.
+    (-) ...
+
+============================================================
+
+(*) Optimize JOINs
+
+    (-) LDS optimization (all indices are local, use read-committed
+        view).
+
+    (-) Scale-out optimization (essentially unrolling the loops).
+
+    (-) Integrate optimized JOINs with Sesame 2.
+
+    (-) Generalize the JOIN paradigm so that it can be used for things
+        other than RDF.
+
+    (-) Original LUBM benchmark.
+
+    (-) Modified LUBM benchmark.
+
+	Can this be modified to generate the data dynamically for
+	distributed clients?
+
+============================================================
 
 (*) Index and other performance tuning.
 
@@ -1585,6 +1596,8 @@ Main issues:
     (*) Try co-threading the forward index writes for the statements with
 	the reverse index writes for the term identifiers.
 
+============================================================
+
 (*) Scale-out performance
 
     - Estimate parameters for the scale-out model.
@@ -1596,17 +1609,85 @@ Main issues:
       splits (and with or without overflow) when running on more than
       one host since we have more CPU resources.
 
-      Find the point intercept for a linear scale-out model using JF
-      with two data services (and hence RMI) on U100 w/o overflow.
+      Find the LDS baseline for U100.
+
+      Find the EF baseline w/ one data service and no overflow for
+      U100.
+
+      Find the EF baseline w/ two data services and no overflow for
+      U100.      
+
+      Find the intercept for a linear scale-out model using JF with
+      two data services (and hence RMI) on U100 w/o overflow.
       
       Find the slope of the linear scale-out using JF where one of
       data services is located on a second machine, still w/o
       overflow.
 
-      (Ideally the client will also be distributed but that is not
-      critical to proving the point as the client is faster than a
-      single host can service).  Retest on U1000 (requires use to use
-      host1 or host2 for the additional disk space).
+        **** There is still a problem with multicast which is
+             preventing scale-out runs.
+
+      Note: Ideally the client will also be distributed but that is
+      not critical to proving the point as the client is faster than a
+      single host can service.
+
+
+All runs:
+
+    -DtextIndex=true -DstatementIdentifiers=true -Xmx=2G -Dnthreads=20
+    -DbufferCapacity=200000
+
+    Note: EF runs use -DoverflowEnabled=false
+
+    Note: JF runs configure overflowEnabled=false in
+    bigdata.properties for DataService4 on host3.
+
+LDS-U100-host3-noText-noSids : 16784 (798910 ms (13m)) 13M stmts.
+
+LDS-U100-host3 : 16783
+
+EF-U100-host3-1DS-noOverflow: 12877
+
+EF-U100-host3-2DS-noOverflow: 11332
+
+JF-U100-host3-1DS-noOverflow: 8528
+
+JF-U100-host3-2DS-noOverflow: 
+
+JF-U100-host23-2DS-noOverflow: 
+
+	*** Why does EF run so much slower than LDS?  Is the overhead
+            the MDI?  The cost of setup for the client index
+            operations (ClientIndexView vs DataServiceIndex)?
+            Removing the existing journal files (try the EF runs with
+            the [test] directory pre-deleted)?
+
+      Retest all of the above on U1000 (requires use to use host1 or
+      host2 for the additional disk space).
+
+LDS-U1000-host2
+EF-U1000-host2-1DS-noOverflow
+EF-U1000-host2-2DS-noOverflow
+JF-U1000-host2-2DS-noOverflow
+JF-U1000-host12-2DS-noOverflow
+
+============================================================
+
+(*) Dynamic index partitioning
+
+    ****** I am seeing assertion errors on host3 when overflow is
+           enabled for EF-U100-host3-2DS.  I think that these are
+           probably related to the assumption that a read or write is
+           complete in one operation rather than looping until count
+           == nbytes.
+
+	   FIXME In tracking this down note that the maximumExtent is
+	   set at 5M and that the #of data services was 1 on host3 but
+	   I have replicated it with 2 data services on the
+	   workstation.
+
+	   I am currently trying to get at the list of actual cases
+	   thrown back from the parallel tasks.
 
     - What cost is associated with overflow processing?
 
@@ -1614,16 +1695,23 @@ Main issues:
 
       (a) EF with one data service;
 
-      (b) for JF with two data services with on one machines; and
+EF-U100-host3-1DS: running
+
+      (b) for JF with one data services with on one machine; 
+
+JF-U100-host3-2DS:
+
+      (c) for JF with two data services with on one machine; and
+
+JF-U100-host3-2DS:
       
-      (c) for JF with two data services on two machines.
+      (d) for JF with two data services on two machines.
+
+JF-U100-host23-2DS:
 
       Choose runs where we have the data w/o overflow from above.
 
-    * There is still a problem with multicast which is preventing
-      scale-out runs.
-
-(*) Dynamic index partitioning
+    --------------------
 
     Note: It is best to run EF with one data service to test index
     partitioning questions and JF to test marshalling, robustness, and
@@ -1683,78 +1771,43 @@ Main issues:
 
 ============================================================
 
-***** I appear to have introduced (or uncovered) a bug leading to a
-      corrupt index.  Generally these problems are related to
-      concurrent access to the same unisolated index through a failure
-      of AbstractTask, WriteExecutorService, or Name2Addr.
+- Add counters to the client index view showing the times for each
+  operation and also showing the times for querying the metadata index
+  to split an key[] operation or map a key-range operation.  This will
+  be help identify if/when the MDI is a bottleneck for the client.
 
-      This one might have been introduced by recent changes to
-      overflowToDisk() for the temporary raw store (triggered during
-      index builds) or that may be a red herring.  It is definately
-      correlated with client requests which timeout and throw
-      CancelledExceptions.
+- Done. Verify [limit := capacity; pos := 0] before each xfer for temp
+  to disk.
 
-      Try running with an infinite timeout on the client and see if it
-      is related to failed tasks (perhaps AbstractTask does not
-      correctly discard the write set and force the index to be
-      reloaded?)
+- Survey and verify all file channel IO using loops in case more than
+  one op is required for the transfer (as has been shown to be the
+  case sometimes under heavy loads).
 
-      FIXME The problem is not observed when I (a) fixed the assertion
-      about the direct byte buffer owner and (b) changed the client
-      timeout to infinite.  Now I need to figure out which was the
-      cause.  Either way there is a weak spot in the system -- Ok.  It
-      seems that cancellation exceptions do not provoke the index
-      corruption problems, but I am unclear how the temp store
-      finializer exception could cause problems elsewhere?
+  - Done. DiskOnlyStrategy#read(long)
 
-Caused by: com.bigdata.service.ClientIndexView$ClientException: Execution failed: ntasks=1, nfailed=1, causes=[java.util.concurrent.ExecutionException: java.lang.RuntimeException: unknown node type=-128]
-	at com.bigdata.service.ClientIndexView.runParallel(ClientIndexView.java:1044)
-	at com.bigdata.service.ClientIndexView.runTasks(ClientIndexView.java:969)
-	at com.bigdata.service.ClientIndexView.submit(ClientIndexView.java:920)
+  - Done. DiskOnlyStrategy#writeRootBlock()
 
+  - Done. DirectByteBuffer#write(...)
 
-	Note: There is ALSO a problem with temp store use during index
-	segment build.  Since the builds a single threaded this is not
-	going to be a concurrency issue.  One possibility is that the
-	various disk IO operations need to be surveyed for instances
-	that assume all bytes are written in a single IO.  As I have
-	seen this is not always the case - especially under heavy
-	loads.
+  - Done. DiskBackedBufferStrategy#writeRootBlock() (same as for DiskOnly version)
 
-ERROR: 279806 pool-1-thread-10    overflowService     com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1553): Update task failed
-java.util.concurrent.ExecutionException: java.lang.RuntimeException: java.nio.BufferOverflowException
-	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:215)
-	at java.util.concurrent.FutureTask.get(FutureTask.java:85)
-	at com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1539)
-	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
-	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
-	at java.lang.Thread.run(Thread.java:595)
-Caused by: java.lang.RuntimeException: java.nio.BufferOverflowException
-	at com.bigdata.btree.IndexSegmentBuilder.<init>(IndexSegmentBuilder.java:841)
-	at com.bigdata.resources.IndexManager.buildIndexSegment(IndexManager.java:1026)
-	at com.bigdata.resources.BuildIndexSegmentTask.doTask(BuildIndexSegmentTask.java:90)
-	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1536)
-	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1438)
-	... 5 more
-Caused by: java.nio.BufferOverflowException
-	at java.nio.DirectByteBuffer.put(DirectByteBuffer.java:311)
-	at java.nio.DirectByteBuffer.put(DirectByteBuffer.java:290)
-	at com.bigdata.journal.DiskOnlyStrategy$WriteCache.write(DiskOnlyStrategy.java:384)
-	at com.bigdata.journal.DiskOnlyStrategy.write(DiskOnlyStrategy.java:1700)
-	at com.bigdata.journal.TemporaryRawStore.write(TemporaryRawStore.java:386)
-	at com.bigdata.btree.IndexSegmentBuilder.writeLeaf(IndexSegmentBuilder.java:1135)
-	at com.bigdata.btree.IndexSegmentBuilder.writeNodeOrLeaf(IndexSegmentBuilder.java:1106)
-	at com.bigdata.btree.IndexSegmentBuilder.close(IndexSegmentBuilder.java:893)
-	at com.bigdata.btree.IndexSegmentBuilder.<init>(IndexSegmentBuilder.java:772)
-	... 9 more
+  - FileMetadata#<init>
 
---------------------
+     - Done. writing both root blocks.
+     
+     - Done. reading both root blocks.
 
-** Either never retry an error task when the queue is likely to be
-   full or make the retry itself robust.  Otherwise the CDL risks
-   reporting fatal error for a task which could have been run
-   successfully.
+     - Done. reading a fully buffered store into memory.
 
---------------------
+  - IndexSegmentStore
+
+     - Done. fully buffering the node region.
+
+     - Done. read(long)
+
+     - Done. readBloomFilter()
+
+     - Done. readMetadata()
+
+  - Done. BasicBufferStrategy#transferTo(RAF) - should be per
+    AbstractBufferStrategy#transferTo(...)

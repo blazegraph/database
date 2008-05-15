@@ -169,6 +169,18 @@ public class IndexSegment extends AbstractBTree {
 
         if (root == null) {
 
+            /*
+             * reload the root node.
+             * 
+             * Note: This is synchronized to avoid race conditions when
+             * re-opening the index from the backing store.
+             * 
+             * Note: [root] MUST be marked as [volatile] to guarentee correct
+             * semantics.
+             * 
+             * See http://en.wikipedia.org/wiki/Double-checked_locking
+             */
+            
             synchronized (this) {
 
                 if (root == null) {
@@ -276,8 +288,8 @@ public class IndexSegment extends AbstractBTree {
      */
 
     /**
-     * Operation is disallowed - the counter is always stored in the mutable
-     * btree.
+     * Operation is disallowed - the counter is only stored in the mutable
+     * {@link BTree}.
      */
     final public ICounter getCounter() {
         

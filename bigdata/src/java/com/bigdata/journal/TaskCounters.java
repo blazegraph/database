@@ -30,21 +30,21 @@ import com.bigdata.service.IDataService;
 public class TaskCounters {
 
     /** #of tasks that have been submitted. */
-    public AtomicLong taskSubmitCount = new AtomicLong();
+    final public AtomicLong taskSubmitCount = new AtomicLong();
     
     /** #of tasks that have been completed. */
-    public AtomicLong taskCompleteCount = new AtomicLong();
+    final public AtomicLong taskCompleteCount = new AtomicLong();
 
     /** #of tasks that failed. */
-    public AtomicLong taskFailCount = new AtomicLong();
+    final public AtomicLong taskFailCount = new AtomicLong();
 
     /** #of tasks that succeeded. */
-    public AtomicLong taskSuccessCount = new AtomicLong();
+    final public AtomicLong taskSuccessCount = new AtomicLong();
 
     /**
      * Cumulative elapsed time waiting on the queue pending service.
      */
-    public AtomicLong queueWaitingTime = new AtomicLong();
+    final public AtomicLong queueWaitingTime = new AtomicLong();
     
     /**
      * Cumulative elapsed time consumed by tasks while waiting for an resource
@@ -55,7 +55,7 @@ public class TaskCounters {
      * measuring the times on the {@link IDataService} rather than the client's
      * thread pool.
      */
-    public AtomicLong lockWaitingTime = new AtomicLong();
+    final public AtomicLong lockWaitingTime = new AtomicLong();
 
     /**
      * Cumulative elapsed time consumed by tasks while assigned to a worker
@@ -65,25 +65,25 @@ public class TaskCounters {
      * time MAY exceed the actual elapsed time during which those tasks were
      * executed.
      */
-    public AtomicLong serviceNanoTime = new AtomicLong();
+    final public AtomicLong serviceNanoTime = new AtomicLong();
 
     /**
      * Cumulative elapsed time consumed by tasks from when they are submitted
      * until they are complete.
      */
-    public AtomicLong queuingNanoTime = new AtomicLong();
+    final public AtomicLong queuingNanoTime = new AtomicLong();
     
     /**
      * Cumulative elapsed time consumed by tasks awaiting group commit (iff the
      * task is run on the {@link WriteExecutorService}).
      */
-    public AtomicLong commitWaitingTime = new AtomicLong();
+    final public AtomicLong commitWaitingTime = new AtomicLong();
     
     /**
      * Cumulative elapsed time servicing group commit (iff the task is run on
      * the {@link WriteExecutorService}).
      */
-    public AtomicLong commitServiceTime = new AtomicLong();
+    final public AtomicLong commitServiceTime = new AtomicLong();
     
     /** Ctor */
     public TaskCounters() {
