@@ -8,13 +8,17 @@
 
 The journal is an append-only persistence capable data structure
 supporting atomic commit, named indices, and transactions. Writes are
-logically appended to the journal to minimize disk head movement.  An
-individual journal will scale up to 4 terabytes and allows records up
-to 4 megabytes in length.  The journal supports the concept of
-"overflow", which is triggered when the journal exceeds a threshold
-extent.  An implementation that handles overflow will expunge B+Trees
-from the journal onto read-optimized index segments, thereby creating
-a database of range partitioned indices.
+logically appended to the journal to minimize disk head movement.  The
+addressing scheme of the journal is configurable.  The scale-up default
+allows individual journal that address up to 4 terabytes and allows records
+up to 4 megabytes in length.  The scale-out default allows records of up
+to 64 megabytes in length, but the maximum file size is smaller.  See the
+{@link com.bigdata.rawstore.WormAddressManager} for details.  The journal
+supports the concept of "overflow", which is triggered when the journal
+exceeds a threshold extent.  An implementation that handles overflow will
+expunge B+Trees from the journal onto read-optimized index segments, thereby
+creating a database of range partitioned indices.  See the {@link com.bigdata.resources.ResourceManager}
+for overflow handling, which is part of the basic {@link com.bigdata.service.DataService}.
 
 </p>
 
@@ -24,12 +28,12 @@ The journal may be used as a Write Once Read Many (WORM) store. An
 index is maintained over the historical commit points for the store,
 so a journal may also be used as an immortal store in which all
 historical consistent states may be accessed.  A read-write
-architecture may be realized by limiting the journal to a few
-gigabytes in length.  Both incrementally and when the journal
-overflows, key ranges of indices are expunged from the journal onto
-read-only index segments.  When used in this manner, a consistent read
-on an index partition requires a fused view of the data on the journal
-and the data in the active index segments.
+architecture may be realized by limiting the journal to 100s of megabytes
+in length.  Both incrementally and when the journal overflows, key ranges
+of indices are expunged from the journal onto read-only index segments.  When
+used in this manner, a consistent read on an index partition requires a fused
+view of the data on the journal and the data in the active index segments.
+Again, see {@link com.bigdata.resources.ResourceManager} for details.
 
 </p>
 
@@ -50,29 +54,27 @@ into the JVM memory pool) and can cause contention for system RAM.
 <p>
 
 The journal relies on the {@link com.bigdata.btree.BTree} to provide a
-persistent mapping from keys to values, including for the special
-cases of object identifiers and variable length byte[] keys. When used
-as an object store, the B+Tree naturally clusters serialized objects
-within the leaves of the B+Tree based on their object identifier and
-provides IO efficiencies. (From the perspective of the journal, an
-object is a byte[] or byte stream.)  If the database generalizes the
-concept of an object identifier to a variable length byte[], then the
-application can take control over the clustering behavior by simply
-choosing how to code a primary key for their objects.
+persistent mapping from keys to values. When used as an object store,
+the B+Tree naturally clusters serialized objects within the leaves of
+the B+Tree based on their object identifier and provides IO efficiencies.
+(From the perspective of the journal, an object is a byte[] or byte stream.)
+If the database generalizes the concept of an object identifier to a variable
+length byte[], then the application can take control over the clustering
+behavior by simply choosing how to code a primary key for their objects.
 
 </p>
 
 <p>
 
-When using journals with an overflow limit of a few 100MB, a single
-large object would cause the journal to overflow.  In such cases
-applications may be better off writing very large objects (or streams)
-into the file system and then managing their metadata within the
-journal.  E.g., to have the blob reference an entry in the file
-system.  An alternative is to provision parts of a distributed
-database for larger records and larger extents or to distribute the
-chunks of the large object across multiple data services using a hash
-function.
+When using journals with an overflow limit of a few 100MB, a few large
+records would cause the journal to overflow.  In such cases the journal
+may be configured to have a larger maximum extent and therefore defer
+overflow.  The scale-out file system is an example of such an application
+and records of (up to) 64M by default.  The index for the file system only
+stores a reference to the raw record on the journal.  During overflow 
+processing, the record is replicated onto an index segment and the index
+entry in the index segment is modified during the build so that it has a
+reference to the replicated record.
 
 </p>
 

@@ -65,9 +65,10 @@
         <mkdir dir="${build.docs}/api"/>
         <javadoc destdir="${build.docs}/api" 
         	defaultexcludes="yes"
-        	           author="true"
-        	           version="true"
-        	           use="true"
+        	         author="true"
+        	        version="true"
+        	            use="true"
+        		   overview="../bigdata/overview.html"
 				windowtitle="bigdata (TM)"
                classpathref="build.classpath">
             <packageset dir="${bigdata.dir}/src/java"/>

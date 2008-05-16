@@ -5,8 +5,9 @@
 <body>
 
 <p>
-A scalable B+-Tree with copy-on-write semantics mapping variable
-length unsigned byte[] keys to arbitrary objects.
+The {@link com.bigdata.btree.BTree} is a scalable B+-Tree with copy-on-write
+semantics mapping variable length unsigned byte[] keys to variable length byte[]
+values (null values are allowed) designed for read-write operations. 
 </p>
 
 <p>
@@ -15,31 +16,31 @@ variable length keys and values and does not directly constrain the
 serialized size of a node or leaf.  The branching factor is determined
 when the B+Tree is created.  Bulk index builds are supported from a
 variety of sources, including a merge of mutable and immutable
-B+-Trees.  Bulk index builds result in immutable {@link IndexSegment}s
+B+-Trees.  Bulk index builds result in immutable {@link com.bigdata.btree.IndexSegment}s
 which may have a branching distinct from that of their source
 B+Tree(s).
 </p>
+
 <p>
 Nodes (and leaves) are either dirty or immutable and persistent.  If
 the node is dirty, then it is always mutable.  If a node is clean,
 then it is always immutable and persistent.  An attempt to write on a
-clean node forces copy on write of the node and its ancenstors up to
+clean node forces copy-on-write of the node and its ancenstors up to
 the root of the tree.  In any case where the node has already been
 copied and is dirty, the mutable node is always used.  Therefore
 mutations never overwrite the historical state of the B+-Tree and
 always produce a new well-formed tree.  The root of the new tree is
-recorded in the root block of the store during a commit, at which
-point there is an atomic change in the addressable objects when
-restarting from that root block (this is handled by the {@link
-com.bigdata.Journal}.
+accessible from root block of the store after a commit (this is handled
+by the {@link com.bigdata.journal.AbstractJournal}.
 </p>
 
 <p>
 A "reference" for a child node is always an int64 value
 encoding an address in a {@link com.bigdata.rawstore.IRawStore}.
-Those slots are read and written as ByteBuffers.  The {@link com.bigdata.btree.NodeSerializer} knows how to access and interpret the contents of a
-ByteBuffer as an index node with a given branching factor and provides
-for extensible serialization semantics for leaves and values.
+Those slots are read and written as {@link java.nio.ByteBuffer}s.  The
+{@link com.bigdata.btree.NodeSerializer} knows how to access and interpret the
+contents of a {@link java.nio.ByteBuffer} as an index node with a given branching
+factor and provides extensible serialization semantics for leaves and values.
 </p>
 
 </body>

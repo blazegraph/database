@@ -1,15 +1,18 @@
 <html>
 <head>
-<title>Content Repository</title>
+<title>Content Repository / Distributed File System</title>
 </head>
 <body>
 
 <p>
 
-	This package provides a scale-out content repository suitable as the backend
-	for a REST-ful service using the bigdata architecture.  Content is arbitrary
-	byte[]s.  Basic and extensible metadata may be stored for any given item of
-	content.
+	This package provides a scale-out content repository (aka distributed file
+	system) suitable as the backend for a REST-ful service using the bigdata
+	architecture.  Content is arbitrary byte[]s broken down into chunks of up to
+	64M each.  Basic and extensible metadata may be stored for any given item of
+	content.  Atomic operations on chunks are provided for reading, writing,
+	deleting, etc.  The architecture is designed for interoperation with map /
+	reduce style processing.
 
 </p>
 

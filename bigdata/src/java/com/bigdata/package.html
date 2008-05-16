@@ -71,14 +71,14 @@ creating weak reference object caches.</dd>
 
 <dt>{@link com.bigdata.util}</dt><dd>A set of utility classes.</dd>
 
-<dt>{@link com.bigdata.irawstore}</dt><dd>A set of interfaces and
+<dt>{@link com.bigdata.rawstore}</dt><dd>A set of interfaces and
 utility classes defining the low-level protocol for operations on a
 persistence store.  Operations at this level are expressed in terms of
 byte[] records and an "address" combining both the <code>offset</code>
 at which the a record was written and the <code>length</code> of the
 record.</dd>
 
-<dt>{@link com.bigdata.btree></dt><dd>This package provides both a
+<dt>{@link com.bigdata.btree}</dt><dd>This package provides both a
 implementation of both a mutable B+Tree and a read-only B+Tree.  The
 mutable {@link com.bigdata.btree.BTree} supports variable length
 byte[] keys, a copy-on-write strategy for nodes and leaves which is
@@ -87,7 +87,7 @@ both insert and delete operations.  a B+Tree may be exported into a
 read-only {@link com.bigdata.btree.IndexSegment} using an efficient
 bulk index build utility.</dd>
 
-<dt>{@link com.bigdata.isolation}</dt>This package provides
+<dt>{@link com.bigdata.isolation}</dt><dd>This package provides
 specialized B+Tree classes designed to support transactional
 isolation. This builds on the features of the base B+Tree package,
 which already supports copy-on-write semantics, and on the Journal
@@ -98,7 +98,7 @@ com.bigdata.isolation.IValue} objects wrapping application data
 values. Each {@link com.bigdata.isolation.IValue} encapsulates a
 version counter, which is used to detect write-write conflicts, and a
 deleted flag, which is used to mark keys that have been deleted until
-a full compacting merge can be performed.<dd>
+a full compacting merge can be performed.</dd>
 
 <dt>{@link com.bigdata.sparse}<dt><dd>This package provides a sparse
 row store data model similar to Google's bigtable or the HBase
@@ -116,15 +116,10 @@ Typically, multiple indices are mapped onto the same journal in order
 to minimize the #of distinct disk files and disk seeks on a server
 platform.</dd>
 
-<dt>{@link com.bigdata.scaleup}<dt><dd>This package contains some
-implementations for a scale-up solution but will probably disappear
-soon.</dd>
-
-<dt>{@link com.bigdata.services}</dt><dd>This package realizes the
+<dt>{@link com.bigdata.service}</dt><dd>This package realizes the
 services for a distributed scale-out database.  The basic components
 of the scale-out architecture are the {@link
-com.bigdata.IDataService}, {@link com.bigdata.IMetadataService}, and
-an {@link com.bigdata.ITransactionService}.</dd>
+com.bigdata.service.IDataService} and {@link com.bigdata.service.IMetadataService}.</dd>
 
 </dl>
 
