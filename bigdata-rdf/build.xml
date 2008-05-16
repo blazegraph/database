@@ -75,7 +75,7 @@
             <packageset dir="${bigdata.jini.dir}/src/java"/>
             <packageset dir="${bigdata.rdf.dir}/src/java"/>
             <packageset dir="${bigdata.sails.dir}/src/java"/>
-			<doctitle><![CDATA[<h1>bigdata&tm;</h1>]]></doctitle>
+			<doctitle><![CDATA[<h1>bigdata&trade;</h1>]]></doctitle>
 	    	<bottom><![CDATA[<i>Copyright &#169; 2006-2008 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
     		<tag name="todo" scope="all" description="TODO:"/>
     		<!--tag name="FIXME" scope="all" description="FIXME:"/-->
