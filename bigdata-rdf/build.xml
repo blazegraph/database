@@ -61,6 +61,28 @@
         </copy>
     </target>
 
+	<target name="javadoc" depends="prepare">
+        <mkdir dir="${build.docs}/api"/>
+        <javadoc destdir="${build.docs}/api" 
+        	defaultexcludes="yes"
+        	           author="true"
+        	           version="true"
+        	           use="true"
+				windowtitle="bigdata (TM)"
+               classpathref="build.classpath">
+            <packageset dir="${bigdata.dir}/src/java"/>
+            <packageset dir="${bigdata.jini.dir}/src/java"/>
+            <packageset dir="${bigdata.rdf.dir}/src/java"/>
+            <packageset dir="${bigdata.sails.dir}/src/java"/>
+			<doctitle><![CDATA[<h1>bigdata&tm;</h1>]]></doctitle>
+	    	<bottom><![CDATA[<i>Copyright &#169; 2006-2008 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+    		<tag name="todo" scope="all" description="TODO:"/>
+    		<!--tag name="FIXME" scope="all" description="FIXME:"/-->
+		    <link href="http://java.sun.com/j2se/1.5.0/docs/api/"/>
+		    <link href="http://openrdf.org/doc/sesame/api/"/>
+        </javadoc>
+    </target>
+
     <target name="jar" depends="compile">
         <jar destfile="${jar.name}">
             <fileset dir="${build.dir}"/>
