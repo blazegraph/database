@@ -21,7 +21,7 @@ against a historical committed state of the store (the ground state,
 which is typically the last committed state of the store at the time
 that the transaction begins) while writes are isolated (they are not
 visible outside of the transaction). The basic mechanism for isolation
-is an {@link IIndex} that reads through to a read-only btree loaded
+is an {@link com.bigdata.btree.IIndex} that reads through to a read-only btree loaded
 from a historical metadata record while writes go into the isolated
 btree (the write set of the transaction). The isolated btree is used
 by the transaction and never by another transaction.
@@ -53,8 +53,8 @@ If a transaction is reading from or writing on more than one btree,
 then it must validate the write set for each btree during its
 validation stage and merge down the write set for each btree during
 its merge stage. Once this merge process is complete, the btree is
-flushed to the backing store which results in a new metadata
-record. The mapping from btree identifier to btree metadata record is
+flushed to the backing store which results in a new checkpoint
+record. The mapping from the btree name to checkpoint record is
 then updated on the backing store. Finally, an atomic commit is then
 performed on the backing store. At this point the transaction has
 successfully completed.
