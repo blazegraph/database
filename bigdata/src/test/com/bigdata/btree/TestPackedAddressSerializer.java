@@ -49,7 +49,7 @@ public class TestPackedAddressSerializer extends AbstractAddressSerializerTestCa
     
     public void setUp() {
         
-        ser = new PackedAddressSerializer(store);
+        ser = PackedAddressSerializer.INSTANCE;
         
     }
     

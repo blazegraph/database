@@ -31,7 +31,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-
 /**
  * Aggregates test suites in increasing dependency order.
  * 
@@ -62,6 +61,12 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("IO");
 
+        // test suite for the direct buffer pool.
+        suite.addTestSuite(TestDirectBufferPool.class);
+        
+        // test suite for FileChannel IO utility class.
+        suite.addTestSuite(TestFileChannelUtility.class);
+        
         // test suite for locating journal files.
         suite.addTestSuite(TestNameAndExtensionFilter.class);
 

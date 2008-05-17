@@ -36,6 +36,17 @@ import com.bigdata.rawstore.WormAddressManager;
 public class IndexSegmentAddressManager extends WormAddressManager {
 
     /**
+     * The offset within the file of the start of the leaves region. All leaves
+     * are written densely on the file beginning at this offset.
+     */
+    protected final long offsetLeaves;
+    
+    /**
+     * #of bytes in the leaves region.
+     */
+    protected final long extentLeaves;
+
+    /**
      * The offset within the file of the start of the node region. All nodes
      * are written densely on the file beginning at this offset. The child
      * addresses for a node are relative to this offset and are
@@ -73,11 +84,9 @@ public class IndexSegmentAddressManager extends WormAddressManager {
 
         super(checkpoint.offsetBits);
 
-        /*
-         * Note: we have to bootstrap these fields without relying on our
-         * own getOffset(...) implementation since it has a dependency on
-         * the correct initialization of these fields.
-         */
+        this.offsetLeaves = checkpoint.offsetLeaves;
+        
+        this.extentLeaves = checkpoint.extentLeaves;
         
         this.offsetNodes = checkpoint.offsetNodes;
 
@@ -133,6 +142,9 @@ public class IndexSegmentAddressManager extends WormAddressManager {
         // the region.
         final IndexSegmentRegion region = IndexSegmentRegion.decodeRegion(encodedOffset);
         
+        // #of bytes in the addressed record.
+        final int nbytes = getByteCount(addr);
+        
         // the decoded offset (relative to the region).
         final long decodedOffset = IndexSegmentRegion.decodeOffset(encodedOffset);
         
@@ -141,19 +153,13 @@ public class IndexSegmentAddressManager extends WormAddressManager {
         switch (region) {
         
         case BASE:
-            
+
             offset = decodedOffset; // + 0L (offsetBase);
-            
+
             // range check address.
-            assert (decodedOffset + getByteCount(addr)) <= maxOffset : "Region="
-                    + region
-                    + ", addr="
-                    + toString(addr)
-                    + ", offset="
-                    + offset
-                    + ", byteCount="
-                    + getByteCount(addr)
-                    + ", maxOffset=" + maxOffset;
+            assert (decodedOffset + nbytes) <= maxOffset : "Region=" + region
+                    + ", addr=" + toString(addr) + ", offset=" + offset
+                    + ", byteCount=" + nbytes + ", maxOffset=" + maxOffset;
 
             break;
 
@@ -163,38 +169,27 @@ public class IndexSegmentAddressManager extends WormAddressManager {
             offset = decodedOffset + offsetNodes;
 
             // range check address.
-            assert (decodedOffset + getByteCount(addr)) <= extentNodes : "Region="
-                    + region
-                    + ", addr="
-                    + toString(addr)
-                    + ", offset="
-                    + offset
-                    + ", byteCount="
-                    + getByteCount(addr)
-                    + ", sizeNodes=" + extentNodes;
+            assert (decodedOffset + nbytes) <= extentNodes : "Region=" + region
+                    + ", addr=" + toString(addr) + ", offset=" + offset
+                    + ", byteCount=" + nbytes + ", sizeNodes=" + extentNodes;
 
             break;
-            
+
         case BLOB:
 
             // adjust offset.
             offset = decodedOffset + offsetBlobs;
-            
+
             // range check address.
-            assert (decodedOffset + getByteCount(addr)) <= extentBlobs : "Region="
-                    + region
-                    + ", addr="
-                    + toString(addr)
-                    + ", offset="
-                    + offset
-                    + ", byteCount="
-                    + getByteCount(addr)
-                    + ", sizeBlobs=" + extentBlobs;
+            assert (decodedOffset + nbytes) <= extentBlobs : "Region=" + region
+                    + ", addr=" + toString(addr) + ", offset=" + offset
+                    + ", byteCount=" + nbytes + ", sizeBlobs=" + extentBlobs;
             
             break;
             
         default:
-            throw new AssertionError();
+            
+            throw new IllegalArgumentException("Could not decode: addr=" + addr);
         
         }
         
@@ -220,4 +215,42 @@ public class IndexSegmentAddressManager extends WormAddressManager {
 
     }
 
+    /**
+     * Return <code>true</code> IFF the starting address lies entirely within
+     * the region dedicated to the B+Tree nodes.
+     */
+    public boolean isNodeAddr(long addr) {
+       
+        // abs. offset of the record in the file.
+        final long offset = getOffset(addr);
+
+        // length of the record.
+        final int length = getByteCount(addr);
+
+        final boolean isNodeAddr = offset >= offsetNodes
+                && (offset + length) <= (offsetNodes + extentNodes);
+
+        return isNodeAddr;
+
+    }
+    
+    /**
+     * Return <code>true</code> IFF the starting address lies entirely within
+     * the region dedicated to the B+Tree leaves.
+     */
+    public boolean isLeafAddr(long addr) {
+       
+        // abs. offset of the record in the file.
+        final long offset = getOffset(addr);
+
+        // length of the record.
+        final int length = getByteCount(addr);
+
+        final boolean isNodeAddr = offset >= offsetLeaves
+                && (offset + length) <= (offsetLeaves + extentLeaves);
+
+        return isNodeAddr;
+
+    }
+    
 }

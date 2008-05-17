@@ -61,7 +61,7 @@ public class FileChannelUtility {
      * 
      * @param channel
      *            The source {@link FileChannel}.
-     * @param dst
+     * @param src
      *            A {@link ByteBuffer} into which the data will be read.
      * @param pos
      *            The offset from which the data will be read.
@@ -81,21 +81,27 @@ public class FileChannelUtility {
      *       temporary direct buffers since Java may attempt to allocate a
      *       "temporary" direct buffer if [dst] is not already a direct buffer.
      */
-    static public int readAll(final FileChannel channel, final ByteBuffer dst,
+    static public int readAll(final FileChannel channel, final ByteBuffer src,
             final long pos) throws IOException {
 
         if (channel == null)
             throw new IllegalArgumentException();
-        if (dst == null)
+        if (src == null)
             throw new IllegalArgumentException();
         if (pos < 0)
             throw new IllegalArgumentException();
 
-        final int nbytes = dst.remaining();
+        final int nbytes = src.remaining();
 
         if (nbytes == 0)
             throw new IllegalArgumentException();
 
+        if (log.isDebugEnabled()) {
+
+            log.debug("pos=" + pos + ", #bytes=" + nbytes);
+            
+        }
+        
         /*
          * Read in loop until nbytes == nread
          */
@@ -104,16 +110,14 @@ public class FileChannelUtility {
 
         int count = 0; // #of bytes read.
 
-        long p = pos; // offset into the disk file.
-
         while (count < nbytes) {
 
             // copy the data into the buffer
-            final int nread = channel.read(dst, p);
-
-            p += nread; // increment file offset.
+            final int nread = channel.read(src, pos + count);
 
             count += nread; // #bytes read so far.
+            
+            nreads++;
 
         }
 
@@ -124,13 +128,21 @@ public class FileChannelUtility {
 
         }
 
+        if (log.isInfoEnabled()) {
+
+            log.info("read " + nbytes + " bytes from offset=" + pos + " in "
+                    + nreads + " IOs");
+            
+        }
+        
         return nreads;
         
     }
 
     /**
      * Write bytes in <i>data</i> from the position to the limit on the channel
-     * starting at <i>pos</i>
+     * starting at <i>pos</i>. The position of the buffer will be advanced to
+     * the limit. The position of the channel is not changed by this method.
      * <p>
      * Note: I have seen count != remaining() for a single invocation of
      * FileChannel#write(). This occured 5 hours into a run with the write cache
@@ -158,8 +170,10 @@ public class FileChannelUtility {
 
         while (data.remaining() > 0) {
 
-            count += channel.write(data, pos);
+            final int nwritten = channel.write(data, pos + count);
 
+            count += nwritten;
+            
             nwrites++;
 
             if (nwrites == 100) {
@@ -172,8 +186,7 @@ public class FileChannelUtility {
                 log.error("writing on channel: remaining=" + data.remaining()
                         + ", nwrites=" + nwrites + ", written=" + count);
 
-            }
-            if (nwrites > 10000) {
+            } else if (nwrites > 10000) {
 
                 throw new RuntimeException("writing on channel: remaining="
                         + data.remaining() + ", nwrites=" + nwrites
@@ -191,7 +204,7 @@ public class FileChannelUtility {
         }
 
         return nwrites;
-        
+
     }
 
     /**
@@ -199,9 +212,13 @@ public class FileChannelUtility {
      * bytes from the <i>sourceChannel</i> starting at the <i>fromPosition</i>
      * onto the <i>out</i> file starting at its current position. The position
      * on the <i>sourceChannel</i> is updated by this method and will be the
-     * positioned after the last byte transferred. The position on the <i>out</i>
-     * file is updated by this method and will be positioned after the last byte
-     * written.
+     * positioned after the last byte transferred (this is done by
+     * {@link FileChannel#transferFrom(java.nio.channels.ReadableByteChannel, long, long)}
+     * so we have no choice about that). The position on the <i>out</i> file is
+     * updated by this method and will be located after the last byte
+     * transferred (this is done since we may have to extend the output file in
+     * which case its position will have been changed anyway so this makes the
+     * API more uniform).
      * 
      * @param sourceChannel
      *            The source {@link FileChannel}.
@@ -211,29 +228,32 @@ public class FileChannelUtility {
      *            The #of bytes to transfer.
      * @param out
      *            The output file.
+     * @param toPosition
+     *            The data will be transferred onto the output channel starting
+     *            at this position.
      * 
      * @return #of IO operations required to effect the transfer.
      * 
      * @throws IOException
      */
-     static public int transferAllFrom(final FileChannel sourceChannel,
+     static public int transferAll(final FileChannel sourceChannel,
             final long fromPosition, final long count,
-            final RandomAccessFile out) throws IOException {
+            final RandomAccessFile out, final long toPosition) throws IOException {
 
         final long begin = System.currentTimeMillis();
 
         // the output channel.
         final FileChannel outChannel = out.getChannel();
         
-        // current position on the output channel.
-        final long toPosition = outChannel.position();
-
         // Set the fromPosition on source channel.
         sourceChannel.position(fromPosition);
 
         /*
-         * Extend the output file. This is required at least for some
-         * circumstances.
+         * Extend the output file.
+         * 
+         * Note: This is required at least for some circumstances.
+         * 
+         * Note:This can also have a side-effect on the file position.
          */
         out.setLength(toPosition + count);
 
@@ -243,30 +263,33 @@ public class FileChannelUtility {
          */
 
         if (log.isInfoEnabled())
-            log.info("fromPosition=" + sourceChannel.position()
-                    + ", toPosition=" + toPosition + ", count=" + count);
+            log.info("fromPosition=" + fromPosition + ", count=" + count
+                    + ", toPosition=" + toPosition);
 
         int nwrites = 0; // #of write operations.
 
         long n = count;
-
+        
         {
-
+            
             long to = toPosition;
 
             while (n > 0) {
 
-                if (log.isInfoEnabled())
-                    log.info("to=" + toPosition + ", remaining=" + n
-                            + ", nwrites=" + nwrites);
+                final long nbytes = outChannel.transferFrom(sourceChannel, to, n);
 
-                long nxfer = outChannel.transferFrom(sourceChannel, to, n);
+                to += nbytes;
 
-                to += nxfer;
-
-                n -= nxfer;
+                n -= nbytes;
 
                 nwrites++;
+
+                if (n != 0 && log.isDebugEnabled()) {
+
+                    log.debug("to=" + toPosition + ", remaining=" + n
+                            + ", nwrites=" + nwrites);
+                    
+                }
 
             }
 
@@ -288,10 +311,11 @@ public class FileChannelUtility {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        log.warn("Transferred " + count
-                + " bytes from disk channel to disk channel (offset="
-                + toPosition + ") in " + nwrites + " writes and " + elapsed
-                + "ms");
+        if (log.isInfoEnabled())
+            log.info("Transferred " + count
+                    + " bytes from disk channel at offset " + fromPosition
+                    + " to disk channel at offset=" + toPosition + " in "
+                    + nwrites + " writes and " + elapsed + "ms");
 
         return nwrites;
 

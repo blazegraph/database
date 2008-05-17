@@ -193,6 +193,10 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
             // Note: only one node and it is the root node.
             final long addrRoot = am.toAddr((int)extentNodes, IndexSegmentRegion.BASE
                     .encodeOffset(offsetNodes));
+
+            final long addrFirstLeaf = addrRoot;
+            
+            final long addrLastLeaf = addrRoot;
             
             extentBlobs = Bytes.megabyte32 * 20;
             
@@ -225,6 +229,8 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
                 addrRoot,//
                 addrMetadata,//
                 addrBloom, //
+                addrFirstLeaf,//
+                addrLastLeaf,//
                 length,//
                 UUID.randomUUID(),// segmentUUID,
                 System.currentTimeMillis()//commitTime

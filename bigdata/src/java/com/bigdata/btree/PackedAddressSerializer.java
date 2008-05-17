@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.DataInput;
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IAddressManager;
@@ -41,23 +44,21 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PackedAddressSerializer implements IAddressSerializer {
+public class PackedAddressSerializer implements IAddressSerializer, Externalizable {
 
     /**
-     * Required to (de-)serialize addresses,
+     * 
      */
-    protected final IRawStore store;
+    private static final long serialVersionUID = 7533128830948670801L;
     
-    PackedAddressSerializer(IRawStore store) {
-        
-        if(store==null) throw new IllegalArgumentException();
-        
-        this.store = store;
+    public static final IAddressSerializer INSTANCE = new PackedAddressSerializer();
+
+    public PackedAddressSerializer() {
         
     }
     
-    public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
-            int nchildren) throws IOException {
+    public void putChildAddresses(IAddressManager addressManager, DataOutputBuffer os,
+            long[] childAddr, int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {
 
@@ -73,18 +74,18 @@ public class PackedAddressSerializer implements IAddressSerializer {
 
             }
 
-            store.packAddr(os, addr);
+            addressManager.packAddr(os, addr);
 
         }
 
     }
 
-    public void getChildAddresses(DataInput is, long[] childAddr,
-            int nchildren) throws IOException {
+    public void getChildAddresses(IAddressManager addressManager, DataInput is,
+            long[] childAddr, int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {
 
-            final long addr = store.unpackAddr(is);
+            final long addr = addressManager.unpackAddr(is);
 
             if (addr == 0L) {
 
@@ -96,6 +97,19 @@ public class PackedAddressSerializer implements IAddressSerializer {
             childAddr[i] = addr;
 
         }
+
+    }
+
+
+    public void readExternal(ObjectInput arg0) throws IOException, ClassNotFoundException {
+
+        // NOP (no state)
+        
+    }
+
+    public void writeExternal(ObjectOutput arg0) throws IOException {
+
+        // NOP (no state)
 
     }
 

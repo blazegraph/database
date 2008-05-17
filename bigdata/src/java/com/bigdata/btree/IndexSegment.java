@@ -185,9 +185,6 @@ public class IndexSegment extends AbstractBTree {
                     // reopen the file.
                     fileStore.reopen();
 
-                    // save reference to the optional bloom filter.
-                    this.bloomFilter = fileStore.getBloomFilter();
-                    
                     _open();
 
                 }
@@ -207,6 +204,9 @@ public class IndexSegment extends AbstractBTree {
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.getCheckpoint().addrRoot);
 
+        // save reference to the optional bloom filter.
+        this.bloomFilter = fileStore.getBloomFilter();
+        
         // report on the event.
         ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
                 .toString(), fileStore.size());
@@ -342,11 +342,12 @@ public class IndexSegment extends AbstractBTree {
 
         public ILeafData allocLeaf(IIndex btree, long addr,
                 int branchingFactor, IKeyBuffer keys, byte[][] values,
-                long[] versionTimestamps, boolean[] deleteMarkers) {
+                long[] versionTimestamps, boolean[] deleteMarkers,
+                long priorAddr, long nextAddr) {
 
             return new ImmutableLeaf((AbstractBTree) btree, addr,
                     branchingFactor, keys, values, versionTimestamps,
-                    deleteMarkers);
+                    deleteMarkers, priorAddr, nextAddr);
 
         }
 
@@ -419,6 +420,18 @@ public class IndexSegment extends AbstractBTree {
         public static class ImmutableLeaf extends Leaf {
 
             /**
+             * The address of the previous leaf in key order if known, 0L if it
+             * known that this is the first leaf, and -1L otherwise.
+             */
+            public final long priorAddr;
+
+            /**
+             * The address of the next leaf in key order if known, 0L if it
+             * known that this is the first leaf, and -1L otherwise.
+             */
+            public final long nextAddr;
+            
+            /**
              * @param btree
              * @param addr
              * @param branchingFactor
@@ -427,11 +440,16 @@ public class IndexSegment extends AbstractBTree {
              */
             protected ImmutableLeaf(AbstractBTree btree, long addr,
                     int branchingFactor, IKeyBuffer keys, byte[][] values,
-                    long[] versionTimestamps, boolean[] deleteMarkers) {
+                    long[] versionTimestamps, boolean[] deleteMarkers,
+                    long priorAddr, long nextAddr) {
 
                 super(btree, addr, branchingFactor, keys, values,
                         versionTimestamps, deleteMarkers);
 
+                this.priorAddr = priorAddr;
+                
+                this.nextAddr = nextAddr;
+                
             }
 
             public void delete() {

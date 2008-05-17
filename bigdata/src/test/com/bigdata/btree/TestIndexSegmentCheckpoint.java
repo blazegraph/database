@@ -102,6 +102,8 @@ public class TestIndexSegmentCheckpoint extends TestCase {
 //        final long addrBlobs;
         final long addrBloom;
         final long addrMetadata;
+        final long addrFirstLeaf;
+        final long addrLastLeaf;
         final long length;
         final UUID segmentUUID = UUID.randomUUID();
         final long commitTime = System.currentTimeMillis();
@@ -124,6 +126,10 @@ public class TestIndexSegmentCheckpoint extends TestCase {
             addrRoot = am.toAddr((int)extentNodes, IndexSegmentRegion.BASE
                     .encodeOffset(offsetNodes));
             
+            addrFirstLeaf = addrRoot;
+            
+            addrLastLeaf = addrRoot;
+
             extentBlobs = Bytes.megabyte32 * 20;
             
             offsetBlobs = offsetNodes + extentNodes;
@@ -155,6 +161,8 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 addrRoot,//
                 addrMetadata,//
                 addrBloom, //
+                addrFirstLeaf,//
+                addrLastLeaf,//
                 length,//
                 segmentUUID,//
                 commitTime//
@@ -168,7 +176,7 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 offsetBits, height, nleaves, nnodes, nentries,
                 maxNodeOrLeafLength, offsetLeaves, extentLeaves, offsetNodes,
                 extentNodes, offsetBlobs, extentBlobs, addrRoot, addrMetadata,
-                addrBloom, length, segmentUUID,
+                addrBloom, addrFirstLeaf, addrLastLeaf, length, segmentUUID,
                 commitTime);
         
         System.err.println("Expected: "+expected);

@@ -1325,9 +1325,11 @@ public class Leaf extends AbstractNode implements ILeafData {
                     + ", minKeys=" + minKeys + ", maxKeys=" + maxKeys
                     + ", branchingFactor=" + branchingFactor);
             
+            // Note: key format is dumped by its object.
             out.println(indent(height) + "  keys=" + keys);
         
-            out.println(indent(height) + "  vals=" + Arrays.toString(values));
+            // Note: signed byte[]s.
+            out.println(indent(height) + "  vals=" + toString(values));
             
             if(deleteMarkers!=null) {
                 
@@ -1345,6 +1347,41 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         return ok;
 
+    }
+
+    /**
+     * Formats the data into a {@link String}.
+     * 
+     * @param data
+     *            An array of <em>signed</em> byte arrays.
+     */
+    static private String toString(byte[][] data) {
+       
+        StringBuilder sb = new StringBuilder();
+        
+        final int n = data.length;
+        
+        sb.append("data(n=" + n + ")={");
+
+        for (int i = 0; i < n; i++) {
+
+            final byte[] a = data[i];
+            
+            sb.append("\n");
+
+            sb.append("data[" + i + "]=");
+
+            sb.append(Arrays.toString(a));
+
+            if (i + 1 < n)
+                sb.append(",");
+            
+        }
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
     }
 
 }
