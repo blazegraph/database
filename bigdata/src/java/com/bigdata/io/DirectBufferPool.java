@@ -1,4 +1,4 @@
-package com.bigdata.journal;
+package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -9,27 +9,31 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.TransientBufferStrategy;
 import com.bigdata.rawstore.Bytes;
 
 /**
  * An instance of this class manages a JVM-wide pool of direct (aka native)
- * {@link ByteBuffer}s. Methods are provided to acquire a
- * {@link ByteBuffer} from the pool and to release a {@link ByteBuffer} back
- * to the pool.
+ * {@link ByteBuffer}s. Methods are provided to acquire a {@link ByteBuffer}
+ * from the pool and to release a {@link ByteBuffer} back to the pool.
  * <p>
  * Note: There is a bug in the release of large temporary direct
- * {@link ByteBuffer}s which motivates this class. For regular journals
- * that overflow, the write cache is allocated once and handed off from
- * journal to journal. However, there is no such opportunity for temporary
- * stores. Unfortunately it is NOT an option to simply disable the write
- * cache for temporary stores since NIO will allocate (and fail to release)
- * an "temporary" direct buffer for the operation which transfers the data
- * from the {@link TransientBufferStrategy} to disk. Therefore the data is
- * copied into a temporary buffer allocated from this pool and then the
- * buffer is either handed off to the {@link DiskOnlyStrategy} for use as
- * its write cache (in which case the {@link TemporaryRawStore} holds a
- * reference to the buffer and releases it back to those pool when it is
- * finalized) or the buffer is immediately released back to this pool.
+ * {@link ByteBuffer}s which motivates this class. For regular journals that
+ * overflow, the write cache is allocated once and handed off from journal to
+ * journal. However, there is no such opportunity for temporary stores.
+ * Unfortunately it is NOT an option to simply disable the write cache for
+ * temporary stores since NIO will allocate (and fail to release) an "temporary"
+ * direct buffer for the operation which transfers the data from the
+ * {@link TransientBufferStrategy} to disk. Therefore the data is copied into a
+ * temporary buffer allocated from this pool and then the buffer is either
+ * handed off to the {@link DiskOnlyStrategy} for use as its write cache (in
+ * which case the {@link TemporaryRawStore} holds a reference to the buffer and
+ * releases it back to those pool when it is finalized) or the buffer is
+ * immediately released back to this pool.
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
  * 
@@ -37,6 +41,9 @@ import com.bigdata.rawstore.Bytes;
  * @version $Id$
  */
 public class DirectBufferPool {
+
+    protected static final Logger log = Logger
+            .getLogger(DirectBufferPool.class);
 
     /**
      * Note: This is NOT a weak reference colletion since the JVM will leak
@@ -226,7 +233,7 @@ public class DirectBufferPool {
     public ByteBuffer acquire(long timeout, TimeUnit unit)
             throws InterruptedException, TimeoutException {
 
-        TemporaryRawStore.log.info("");
+        log.info("");
 
         lock.lock();
 
@@ -274,7 +281,7 @@ public class DirectBufferPool {
     public void release(final ByteBuffer b, long timeout, TimeUnit units)
             throws InterruptedException {
 
-        TemporaryRawStore.log.info("");
+        log.info("");
 
         if (b == null)
             throw new IllegalArgumentException();
@@ -327,7 +334,7 @@ public class DirectBufferPool {
 
         assert lock.isHeldByCurrentThread();
 
-        TemporaryRawStore.log.info("");
+        log.info("");
 
         try {
 
@@ -337,8 +344,7 @@ public class DirectBufferPool {
                  * Wait for a free buffer since the pool is at its capacity.
                  */
 
-                TemporaryRawStore.log
-                        .warn("Pool is at capacity - waiting for a free buffer");
+                log.warn("Pool is at capacity - waiting for a free buffer");
 
                 awaitFreeBuffer(timeout, unit);
 
@@ -369,9 +375,8 @@ public class DirectBufferPool {
 
         } catch (OutOfMemoryError err) {
 
-            TemporaryRawStore.log.error(
-                    "Not enough native memory - will await a free buffer: "
-                            + err, err);
+            log.error("Not enough native memory - will await a free buffer: "
+                    + err, err);
 
             awaitFreeBuffer(timeout, unit);
 

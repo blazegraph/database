@@ -396,9 +396,23 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         // #of bytes to transfer (everything in the user extent).
         final long count = src.getNextOffset();
 
+        // the source channel.
         final FileChannel srcChannel = src.getRandomAccessFile().getChannel();
         
-        FileChannelUtility.transferAllFrom(srcChannel, fromPosition, count, out);
+        // the output channel.
+        final FileChannel outChannel = out.getChannel();
+        
+        // the current file position on the output channel.
+        final long outPosition = outChannel.position();
+        
+        /*
+         * Transfer the user extent from the source channel onto the output
+         * channel starting at its current file position.
+         * 
+         * Note: this has a side-effect on the position for both the source and
+         * output channels.
+         */
+        FileChannelUtility.transferAll(srcChannel, fromPosition, count, out, outPosition);
         
         return count;
 

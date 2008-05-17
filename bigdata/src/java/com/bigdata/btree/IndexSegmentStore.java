@@ -137,6 +137,21 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
     
     /**
+     * Used to correct decode region-based addresses. The
+     * {@link IndexSegmentBuilder} encodes region-based addresses using
+     * {@link IndexSegmentRegion}. Those addresses are then transparently
+     * decoded by this class. The {@link IndexSegment} itself knows nothing
+     * about this entire slight of hand.
+     */
+    protected final IndexSegmentAddressManager getAddressManager() {
+        
+        assertOpen();
+        
+        return addressManager;
+        
+    }
+    
+    /**
      * A read-only view of the checkpoint record for the index segment.
      */
     public final IndexSegmentCheckpoint getCheckpoint() {
@@ -434,11 +449,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                 this.buf_nodes = null;
                 
             } else {
-                
-                final long nodesByteCount = checkpoint.extentNodes;
 
-                final boolean bufferNodes = maxBytesToFullyBufferNodes == 0L
-                        || nodesByteCount < maxBytesToFullyBufferNodes;
+                final boolean bufferNodes = (maxBytesToFullyBufferNodes == 0L)
+                        || (checkpoint.extentNodes < maxBytesToFullyBufferNodes);
                 
                 this.buf_nodes = (bufferNodes ? bufferIndexNodes(raf) : null);
 
@@ -771,39 +784,33 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     public ByteBuffer read(long addr) {
 
         assertOpen();
-
-        final long offset = addressManager.getOffset(addr);
-
-        final int length = addressManager.getByteCount(addr);
         
-        final long offsetNodes = checkpoint.offsetNodes;
-
-        final ByteBuffer dst;
-
         /*
          * True IFF the starting address lies entirely within the region
          * dedicated to the B+Tree nodes.
          */
-        final boolean isNodeAddr = offset >= offsetNodes
-                && (offset + length) <= (offsetNodes + checkpoint.extentNodes);
+        final boolean isNodeAddr = addressManager.isNodeAddr(addr);
         
+        if (log.isDebugEnabled()) {
+
+            log.debug("addr=" + addr + "(" + addressManager.toString(addr)
+                    + "), isNodeAddr="+isNodeAddr);
+            
+        }
+        
+        // abs. offset of the record in the file.
+        final long offset = addressManager.getOffset(addr);
+
+        // length of the record.
+        final int length = addressManager.getByteCount(addr);
+
+        final ByteBuffer dst;
+
         if (isNodeAddr && buf_nodes != null) {
 
             /*
-             * the data are buffered. create a slice onto the read-only
-             * buffer that reveals only those bytes that contain the desired
-             * node. the position() of the slice will be zero(0) and the
-             * limit() will be the #of bytes in the compressed record.
-             */
-
-            // System.err.println("offset="+offset+", length="+length);
-            
-            // correct the offset so that it is relative to the buffer.
-            final long off = offset - offsetNodes;
-
-            /*
-             * Create a view so that concurrent reads do not modify the buffer
-             * state.
+             * The [addr] addresses a node and the data are buffered. Create a
+             * view so that concurrent reads do not modify the buffer state.
              * 
              * Note: This is synchronized on [this] for paranoia. As long as the
              * state of [buf_nodes] (its position and limit) can not be changed
@@ -816,13 +823,20 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                 
             }
 
+            // correct the offset so that it is relative to the buffer.
+            final long off = offset - checkpoint.offsetNodes;
+
             // set the limit on the buffer to the end of the record.
             tmp.limit((int)(off + length));
 
             // set the position on the buffer to the start of the record.
             tmp.position((int)off);
 
-            // create a slice of that view showing only the desired record.
+            /*
+             * Create a slice of that view showing only the desired record. The
+             * position() of the slice will be zero(0) and the limit() will be
+             * the #of bytes in the record.
+             */
             dst = tmp.slice();
 
         } else {
@@ -861,6 +875,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     private ByteBuffer bufferIndexNodes(RandomAccessFile raf)
             throws IOException {
+
+        if(checkpoint.nnodes == 0) {
+        
+            throw new IllegalStateException("No nodes.");
+            
+        }
 
         if(checkpoint.offsetNodes == 0L) {
             

@@ -1255,10 +1255,19 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 
         public ILeafData allocLeaf(IIndex btree, long addr,
                 int branchingFactor, IKeyBuffer keys, byte[][] values,
-                long[] versionTimestamp, boolean[] deleteMarkers) {
+                long[] versionTimestamp, boolean[] deleteMarkers,
+                long priorAddr, long nextAddr) {
 
-            return new Leaf((BTree) btree, addr, branchingFactor, keys, values,
+            Leaf leaf = new Leaf((BTree) btree, addr, branchingFactor, keys, values,
                     versionTimestamp, deleteMarkers);
+            
+            /*
+             * FIXME The prior/next leaf addr information is generally not
+             * available for mutable BTree, but it is also not being preserved
+             * here when a leaf is de-serialized.
+             */
+            
+            return leaf;
 
         }
 

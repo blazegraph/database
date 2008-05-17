@@ -32,14 +32,12 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.zip.Deflater;
 
 import org.apache.log4j.Level;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.util.ChecksumError;
 
 /**
  * Test case for {@link NodeSerializer}.
@@ -63,31 +61,13 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
     }
     
     /**
-     * Overrides to use the {@link SimpleEntry.Serializer}.
-     */
-    public BTree getBTree(int branchingFactor) {
-        
-        return getBTree(branchingFactor,false);
-        
-    }
-    
-    /**
-     * Overrides to use the {@link SimpleEntry.Serializer}.
+     * Sets up a btree for our tests.
      * 
      * @param branchingFactor
      * 
-     * @param useCompression
-     *            when true, uses a {@link RecordCompressor}.
-     * 
      * @return
      */
-    public BTree getBTree(int branchingFactor,boolean useCompression) {
-        
-//        IRawStore store = new SimpleMemoryRawStore();
-//
-//        final int leafQueueCapacity = 10000;
-//        
-//        final int nscan = 10;
+    public BTree getBTree(int branchingFactor) {
         
         /*
          * Setup the B+Tree directly so that we can override the hard reference
@@ -107,12 +87,6 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
             metadata.setDeleteMarkers(r.nextBoolean());
 
             metadata.setVersionTimestamps(r.nextBoolean());
-            
-            if(useCompression) {
-                
-                metadata.setRecordCompressor(new RecordCompressor(Deflater.BEST_SPEED));
-                
-            }
             
             metadata.write(store);
             
@@ -137,17 +111,6 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
             
         }
 
-//        BTree btree = new BTree(store,//
-//                branchingFactor, //
-//                UUID.randomUUID(),//
-//                r.nextBoolean(),// isolatable
-//                null,// conflictResolver
-//                new HardReferenceQueue<PO>(new NoEvictionListener(),
-//                        leafQueueCapacity, nscan),//
-//                KeyBufferSerializer.INSTANCE,//
-//                ByteArrayValueSerializer.INSTANCE,//
-//                useCompression ? new RecordCompressor() : null);
-
         return btree;
         
     }
@@ -159,28 +122,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
         final int branchingFactor = 8;
         
-        BTree ndx = getBTree(branchingFactor,false);
-        
-        // Create test node.
-        final Leaf expected = getRandomLeaf(ndx);
-        
-//        expected.dump(System.err);
-        
-//        final Leaf actual = (Leaf)
-        doRoundTripTest( true, ndx, expected );
-
-//        actual.dump(System.err);
-        
-    }
-
-    /**
-     * Test of leaf serialization.
-     */
-    public void test_leaf_serialization_compressed01() {
-        
-        final int branchingFactor = 8;
-        
-        BTree ndx = getBTree(branchingFactor,true);
+        BTree ndx = getBTree(branchingFactor);
         
         // Create test node.
         final Leaf expected = getRandomLeaf(ndx);
@@ -279,28 +221,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
         final int branchingFactor = 8;
 
-        BTree ndx = getBTree(branchingFactor,false);
-
-        // Create test node.
-        final Node expected = getRandomNode(ndx);
-
-//        expected.dump(System.err);
-
-//        final Node actual = (Node)
-        doRoundTripTest( true, ndx, expected);
-
-//        actual.dump(System.err);
-
-    }
-    
-    /**
-     * Test of node serialization.
-     */
-    public void test_node_serialization_compressed01() {
-        
-        final int branchingFactor = 8;
-
-        BTree ndx = getBTree(branchingFactor,true);
+        BTree ndx = getBTree(branchingFactor);
 
         // Create test node.
         final Node expected = getRandomNode(ndx);
@@ -382,84 +303,6 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         // compare buffers - they should have images of the same node.
         assertEquals(buf.array(),buf2.array());
 
-        /*
-         * Overwrite the checksum to test for correct reporting of checksum
-         * failure.
-         * 
-         * @todo the checksum mechanism works well when we are not using a
-         * compression technique. depending on the compression technique, a
-         * change in the compressed data may trigger a failure of the
-         * decompression algorithm. in such cases we never get the decompressed
-         * record and there for the checksum is not even computed.
-         */
-
-        if(nodeSer.useChecksum && nodeSer.recordCompressor==null ) {
-            
-        final int checksum = buf.getInt(NodeSerializer.OFFSET_CHECKSUM);
-        
-        int randomChecksum;
-        
-        do {
-            
-            randomChecksum = r.nextInt();
-            
-        } while( randomChecksum == checksum );
-        
-        buf.putInt(NodeSerializer.OFFSET_CHECKSUM, randomChecksum);
-
-        assert buf.position() == 0;
-//        buf.flip(); // prepare for re-reading.
-        
-        try {
-        
-            nodeSer.getNodeOrLeaf(ndx, expected.getIdentity(), buf);
-            
-            fail("Expecting: "+ChecksumError.class);
-            
-        } catch( ChecksumError ex ) {
-            
-            if( verbose) 
-                System.err.println("Ignoring expected exception: "+ex);
-            
-        }
-
-        /*
-         * Override a byte in the serialized record to test for a correctly
-         * reported checksum error.
-         * 
-         * Note: i am not overwritting the node type byte since that causes
-         * a different exception (unknown node type) before we get as far as
-         * the checksum test.
-         */
-
-        final byte b = buf2.get(NodeSerializer.OFFSET_VERSION);
-        
-        byte randomByte;
-        
-        do {
-            
-            randomByte= (byte) r.nextInt(255);
-            
-        } while( randomByte == b );
-        
-        buf2.put(NodeSerializer.OFFSET_VERSION, randomByte );
-        
-//        buf2.flip(); // prepare for re-reading.
-        
-        try {
-        
-            nodeSer.getNodeOrLeaf(ndx,expected.getIdentity(),buf2);
-            
-            fail("Expecting: "+ChecksumError.class);
-            
-        } catch( ChecksumError ex ) {
-            
-            if( verbose )
-                System.err.println("Ignoring expected exception: "+ex);
-            
-        }
-        }
-        
         return actual;
         
     }
@@ -526,7 +369,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
             // Choose the branching factor randomly.
             final int branchingFactor = branchingFactors[r.nextInt(branchingFactors.length)];
 
-            BTree ndx = getBTree(branchingFactor,r.nextBoolean());
+            BTree ndx = getBTree(branchingFactor);
 
             System.err.println("Trial " + trial + " of " + ntrials
                     + " : testing " + nnodes
@@ -539,12 +382,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
                 doRoundTripTest( false, ndx, expected);
                 
             }
-
-//            // Show the counters.
-//            System.err
-//                    .println(((KeyBufferSerializer) ndx.getNodeSerializer().keySerializer).counters
-//                            .toString());
-            
+   
         }
         
     }
@@ -578,61 +416,6 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         return ((long) offset) << 32 | nbytes;
         
     }
-
-//    /**
-//     * Generates a random array of keys.
-//     * 
-//     * @param maxKeys
-//     *            The #of key positions to allocate.  This is based on the
-//     *            branching factor and whether the keys are for a node or a
-//     *            leaf.
-//     *            
-//     * @param nkeys
-//     *            The #of keys position to populate.
-//     */
-//    protected byte[][] getRandomKeys(int maxKeys, int nkeys) {
-//
-//        assert nkeys < maxKeys;
-//        
-//        byte[][] keys = new byte[maxKeys][];
-//
-//        // used to detect duplicate keys.
-//        Set<byte[]> set = new TreeSet<byte[]>(
-//                BytesUtil.UnsignedByteArrayComparator.INSTANCE);
-//        
-//        int n = 0;
-//        
-//        while( n < nkeys ) {
-//            
-//            // length of this key in bytes.
-//            int len = r.nextInt(10)+1;
-//            
-//            byte[] key = new byte[len];
-//            
-//            r.nextBytes(key);
-//            
-//            if( set.add(key) ) {
-//                
-//                keys[n++] = key;
-//                     
-//            }
-//            
-//        }
-//        
-//        assert set.size() == nkeys;
-//        
-//        /*
-//         * sort those random keys.
-//         */
-//        Arrays.sort(keys,BytesUtil.UnsignedByteArrayComparator.INSTANCE);
-//
-//        /*
-//         * return the sorted keys to the caller.
-//         */
-//        
-//        return keys;
-//        
-//    }
     
     /**
      * Generate a set of N random distinct byte[] keys in sorted order using an

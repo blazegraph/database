@@ -61,9 +61,12 @@ public enum IndexSegmentRegion {
     final static private long MASK = 0x03;
     
     /**
-     * Encode an offset within a region. The address is left shifted by one
+     * Encode an offset within a region. The address is left shifted by
      * {@link #NBITS} and the low bits are set to indicate the region that
      * identifies the base for the offset.
+     * <p>
+     * Note: This effectively reduces the maximum usable offset for the
+     * {@link IndexSegmentStore} by {@link #NBITS}
      * 
      * @param offset
      *            The offset of the allocation.

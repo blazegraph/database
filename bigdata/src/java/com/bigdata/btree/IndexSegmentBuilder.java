@@ -48,6 +48,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -93,7 +94,9 @@ import com.bigdata.rawstore.WormAddressManager;
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
  * 
- * FIXME support efficient prior/next leaf scans.
+ * FIXME support efficient prior/next leaf scans (nextAddr and modify the itr to
+ * use priorLeaf() and nextLeaf() methods for the scan). See
+ * {@link DumpIndexStore}.
  * 
  * FIXME use the shortest separator key.
  * 
@@ -121,13 +124,6 @@ public class IndexSegmentBuilder {
      */
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
-
-//    /**
-//     * The default error rate for a bloom filter.
-//     * 
-//     * @todo the error rate is only zero or non-zero at this time.
-//     */
-//    final public static double DEFAULT_ERROR_RATE = 1/128d;
     
     /**
      * The file mode used to open the file on which the {@link IndexSegment} is
@@ -189,9 +185,10 @@ public class IndexSegmentBuilder {
     final NodeSerializer nodeSer;
 
     /**
-     * Address managed used to form addresses for the generated file.  Addresses
-     * are formed from a byteCount and an <em>encoded</em> offset comprised of
-     * a relative offset into a known region and the region identifier.
+     * The {@link IAddressManager} used to form addresses for the generated
+     * file. Addresses are formed from a byteCount and an <em>encoded</em>
+     * offset comprised of a relative offset into a known region and the region
+     * identifier.
      * 
      * @see IndexSegmentRegion
      * @see IndexSegmentAddressManager
@@ -202,6 +199,18 @@ public class IndexSegmentBuilder {
      * The bloom filter iff we build one (errorRate != 0.0).
      */
     final BloomFilter bloomFilter;
+    
+    /**
+     * The address of the first leaf written on the file (there is always at
+     * least one, even if it is the root leaf).
+     */
+    long addrFirstLeaf = 0L;
+
+    /**
+     * The address of the last leaf written on the file (there is always at
+     * least one, even if it is the root leaf).
+     */
+    long addrLastLeaf = 0L;
     
     /**
      * The offset in the output file of the last leaf written onto that file.
@@ -266,22 +275,6 @@ public class IndexSegmentBuilder {
      * The plan for building the B+-Tree.
      */
     final public IndexSegmentPlan plan;
-   
-//    /**
-//     * The address at which each leaf is written on the file.  This information
-//     * is stored in the {@link IndexSegmentExtensionMetadata} and may be used to
-//     * perform fast forward or reverse leaf scans by first looking up the leaf
-//     * address based on its ordinal position within the file and then scanning
-//     * forward or backward through the addresses in this array.  The array is
-//     * buffered when the {@link IndexSegment} is loaded.
-//     *
-//     * @todo We need to be able to extend the leaf data structure for this
-//     * purpose.  We could write the addr of the prior leaf on the leaf, but
-//     * not of the next leaf.  For that we need to ordinal position of the leaf.
-//     * 
-//     * @see ... 
-//     */
-//    final long[] leaveAddrs;
     
     /**
      * The process runtime in milliseconds.
@@ -540,12 +533,26 @@ public class IndexSegmentBuilder {
              * Used to serialize the nodes and leaves for the output tree.
              */
             nodeSer = new NodeSerializer(//
-                    NOPNodeFactory.INSTANCE,
-                    plan.m,
-                    0, /*initialBufferCapacity - will be estimated. */
+                    /*
+                     * Note: it does not seem like there should be any
+                     * interaction between various IAddressSerializer strategies
+                     * and the manner in which we encode the region (BASE, NODE,
+                     * or BLOB) into the offset of addresses for the index
+                     * segment store. The offset is effectively left-shifted by
+                     * two bits to encode the region, there by reducing the
+                     * maximum possible byte offset within any region (including
+                     * BASE). However, that should not pose problems for any
+                     * IAddressSerializer strategy as long as the accept any
+                     * legal [byteCount] and [offset] - it is just that our
+                     * offsets are essentially 4x larger than they would be
+                     * otherwise.
+                     */
+                    addressManager,//
+                    NOPNodeFactory.INSTANCE,//
+                    plan.m,//
+                    0, // initialBufferCapacity - will be estimated.
                     metadata, //
-                    false, // NOT read-only (we are using it for writing).
-                    false // isFullyBuffered
+                    false // NOT read-only (we are using it for writing).
                     );
 
             elapsed_setup = System.currentTimeMillis() - begin_setup;
@@ -1114,35 +1121,34 @@ public class IndexSegmentBuilder {
      * 
      * @return The address that may be used to read the leaf from the file
      *         backing the {@link IndexSegmentStore}.
-     * 
-     * @todo write prior; compute next from offset+size during IndexSegment
-     *       scans. Basically, we can only record one of the references in the
-     *       leaf data structure since we do not know its size until it has been
-     *       compressed, at which point we can no longer set the size field on
-     *       the record. However, we do know that offset of the next leaf simply
-     *       from the reference of the current leaf, which encodes {offset,size}
-     *       (assuming that there is another leaf and that this is not the last
-     *       leaf to be written). The other way is to write out the next
-     *       reference on the leaf after it has been compressed. Review
-     *       {@link NodeSerializer} with regard to this issue again.
      */
     protected long writeLeaf(final SimpleLeafData leaf)
         throws IOException
     {
        
-        final long addr1;
-        {
-            
-            // serialize the leaf.
-            final ByteBuffer buf = nodeSer.putLeaf(leaf);
+        // serialize the leaf.
+        final ByteBuffer buf = nodeSer.putLeaf(leaf);
 
-            // write leaf on file, returning its address.
-            addr1 = leafBuffer.write(buf);
-            
-            assert addressManager.getByteCount(addr1) == buf.limit();
-            
-        }
+        /*
+         * FIXME At this point we already know the address of the previous leaf
+         * [addrLastLeaf] and we use nodeSer.updateLeaf(...) to set it on the
+         * record. However, we MUST be a little bit trickier to get the address
+         * of the _next_ leaf into the record. Basically, we have to defer
+         * writing a leaf (we already know how large it is) until we have the
+         * next leaf serialized. The we patch the prior leaf and write it out.
+         */
+        nodeSer.updateLeaf(buf, addrLastLeaf, -1L/* UNKNOWN */);
+        
+        /*
+         * Write leaf on file, returning its address.
+         * 
+         * Note: We will encode this address before it is allowed out of this
+         * method! The encoded address will be relative to the BASE region.
+         */
+        final long addr1 = leafBuffer.write(buf);
 
+        assert addressManager.getByteCount(addr1) == buf.limit();
+            
         final int nbytes = addressManager.getByteCount(addr1);
 
         /*
@@ -1179,6 +1185,16 @@ public class IndexSegmentBuilder {
          */
         final long addr = addressManager.toAddr(nbytes, IndexSegmentRegion.BASE
                 .encodeOffset(offset));
+        
+        if (nleavesWritten == 1) {
+            
+            // update only for the first leaf that we write.
+            addrFirstLeaf = addr;
+            
+        }
+        
+        // always update for each leaf that we write.
+        addrLastLeaf = addr;
         
         return addr;
         
@@ -1463,7 +1479,8 @@ public class IndexSegmentBuilder {
                     nnodesWritten, plan.nentries, maxNodeOrLeafLength,
                     offsetLeaves, extentLeaves, offsetNodes, extentNodes,
                     offsetBlobs, extentBlobs, addrRoot, addrMetadata,
-                    addrBloom, out.length(), segmentUUID, commitTime);
+                    addrBloom, addrFirstLeaf, addrLastLeaf, out.length(),
+                    segmentUUID, commitTime);
 
             md.write(out);
             
@@ -1873,7 +1890,8 @@ public class IndexSegmentBuilder {
 
         public ILeafData allocLeaf(IIndex btree, long addr,
                 int branchingFactor, IKeyBuffer keys, byte[][] values,
-                long[] versionTimestamps, boolean[] deleteMarkers) {
+                long[] versionTimestamps, boolean[] deleteMarkers,
+                long priorAddr, long nextAddr) {
             
             throw new UnsupportedOperationException();
             

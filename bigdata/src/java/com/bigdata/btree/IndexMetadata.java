@@ -30,6 +30,8 @@ import java.io.ObjectOutput;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -190,6 +192,22 @@ import com.bigdata.sparse.SparseRowStore;
  *       serializers, etc. while the existing objects will still have their old
  *       key/val serializers and therefore can still be read.
  * 
+ * @todo it would be nice to add an object to the {@link IndexMetadata} and this
+ *       class that know how to convert an Object into a byte[] value and a
+ *       byte[] value into an Object. This would let us hide much of the
+ *       complexity of managing byte[]s from applications that are not
+ *       interested in that sort of thing.
+ * 
+ * @todo it would be nice to add an object to the {@link IndexMetadata} and this
+ *       class that know how to convert an Object into a key (keys can not be
+ *       easily reversed for most indices).
+ * 
+ * @todo it would be nice to have {@link Set} and {@link Map} implementations
+ *       wrapping an {@link AbstractBTree} (or an {@link IIndex}). These might
+ *       be written using objects such as described above for converting
+ *       application objects to unsigned byte[] keys and application objects
+ *       to/from byte[] values.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -221,9 +239,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     }
 
     /*
-     * @todo consider allowing distinct values for the branching factor, the
-     * class name, and possibly some other properties (record compression,
-     * checksum) for the index segments vs the mutable btrees.
+     * @todo consider allowing distinct values for the branching factor (already
+     * done), the class name, and possibly some other properties (record
+     * compression, checksum) for the index segments vs the mutable btrees.
      */
 
     private UUID indexUUID;
@@ -233,13 +251,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private LocalPartitionMetadata pmd;
     private String className;
     private String checkpointClassName;
+    private IAddressSerializer addrSer;
     private IDataSerializer nodeKeySer;
     private IDataSerializer leafKeySer;
     private IDataSerializer valSer;
     private IConflictResolver conflictResolver;
-    private RecordCompressor recordCompressor;
-    // @todo store booleans as bit flags.
-    private boolean useChecksum;
+//    private RecordCompressor recordCompressor;
+//    private boolean useChecksum;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
     private double errorRate;
@@ -339,9 +357,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     public final String getCheckpointClassName() {return checkpointClassName;}
 
     public final void setCheckpointClassName(String className) {
+        
+        if (className == null)
+            throw new IllegalArgumentException();
+
         this.checkpointClassName = className;
+        
     }
 
+    /**
+     * Object used to (de-)serialize the addresses of the children of a node.
+     */
+    public final IAddressSerializer getAddressSerializer() {return addrSer;}
+    
     /**
      * Object used to (de-)serialize the keys in a node.
      * <p>
@@ -381,30 +409,38 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      */
     public final IConflictResolver getConflictResolver() {return conflictResolver;}
     
-    /**
-     * Object that knows how to (de-)compress serialized nodes and leaves
-     * (optional).
-     * 
-     * @todo change record compressor to an interface.
-     */
-    public final RecordCompressor getRecordCompressor() {return recordCompressor;}
-
-    /**
-     * When <code>true</code>, checksums will be generated for serialized
-     * nodes and leaves and verified on read. Checksums provide a check for
-     * corrupt media and make the database more robust at the expense of some
-     * added cost to compute a validate the checksums.
-     * <p>
-     * Computing the checksum is ~ 40% of the cost of (de-)serialization.
-     * <p>
-     * When the backing store is fully buffered (it is entirely in RAM) then
-     * checksums are automatically disabled.
-     */
-    public final boolean getUseChecksum() {return useChecksum;}
-    
-    public void setUseChecksum(boolean useChecksum) {
-        this.useChecksum = useChecksum;
-    }
+//    /**
+//     * Object that knows how to (de-)compress serialized nodes and leaves
+//     * (optional).
+//     * 
+//     * @deprecated See {@link #setRecordCompressor(RecordCompressor)}
+//     */
+//    public final RecordCompressor getRecordCompressor() {return recordCompressor;}
+//
+//    /**
+//     * When <code>true</code>, checksums will be generated for serialized
+//     * nodes and leaves and verified on read. Checksums provide a check for
+//     * corrupt media and make the database more robust at the expense of some
+//     * added cost to compute a validate the checksums.
+//     * <p>
+//     * Computing the checksum is ~ 40% of the cost of (de-)serialization.
+//     * <p>
+//     * When the backing store is fully buffered (it is entirely in RAM) then
+//     * checksums are automatically disabled.
+//     * 
+//     * @deprecated See {@link #setUseChecksum(boolean)}
+//     */
+//    public final boolean getUseChecksum() {return useChecksum;}
+//    
+//    /**
+//     * 
+//     * @deprecated This will be refactored as a store-level option. See
+//     *             {@link #setRecordCompressor(RecordCompressor)} for more
+//     *             musing on this.
+//     */
+//    public void setUseChecksum(boolean useChecksum) {
+//        this.useChecksum = useChecksum;
+//    }
 
     /**
      * When <code>true</code> the index will write a delete marker when an
@@ -418,7 +454,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     public final boolean getDeleteMarkers() {return deleteMarkers;}
     
     public final void setDeleteMarkers(boolean deleteMarkers) {
+
         this.deleteMarkers = deleteMarkers;
+        
     }
 
     /**
@@ -429,7 +467,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     public final boolean getVersionTimestamps() {return versionTimestamps;}
     
     public final void setVersionTimestamps(boolean versionTimestamps) {
+        
         this.versionTimestamps = versionTimestamps;
+        
     }
 
     /**
@@ -443,51 +483,119 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     }
 
     public void setIsolatable(boolean isolatable) {
+
         setDeleteMarkers(isolatable);
+        
         setVersionTimestamps(isolatable);
+        
     }
 
     public void setPartitionMetadata(LocalPartitionMetadata pmd) {
         this.pmd = pmd;
     }
 
+    public void setAddressSerializer(IAddressSerializer addrSer) {
+        
+        if (addrSer == null)
+            throw new IllegalArgumentException();
+        
+        this.addrSer = addrSer;
+        
+    }
+
     public void setNodeKeySerializer(IDataSerializer nodeKeySer) {
+        
+        if (nodeKeySer == null)
+            throw new IllegalArgumentException();
+        
         this.nodeKeySer = nodeKeySer;
+        
     }
 
     public void setLeafKeySerializer(IDataSerializer leafKeySer) {
+
+        if (leafKeySer == null)
+            throw new IllegalArgumentException();
+
         this.leafKeySer = leafKeySer;
+        
     }
 
     public void setValueSerializer(IDataSerializer valueSer) {
+        
+        if (valSer == null)
+            throw new IllegalArgumentException();
+
         this.valSer = valueSer;
+        
     }
 
+    /**
+     * The branching factor MAY NOT be changed once an {@link AbstractBTree}
+     * object has been created.
+     * 
+     * @param branchingFactor
+     */
     public void setBranchingFactor(int branchingFactor) {
+        
         if(branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+            
             throw new IllegalArgumentException();
+            
         }
+        
         this.branchingFactor = branchingFactor;
+        
     }
 
     public void setIndexSegmentBranchingFactor(int branchingFactor) {
+
         if(branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+            
             throw new IllegalArgumentException();
+            
         }
+        
         this.indexSegmentBranchingFactor = branchingFactor;
+        
     }
 
     public void setClassName(String className) {
+
+        if (className == null)
+            throw new IllegalArgumentException();
+
         this.className = className;
+        
     }
 
     public void setConflictResolver(IConflictResolver conflictResolver) {
+
         this.conflictResolver = conflictResolver;
+        
     }
 
-    public void setRecordCompressor(RecordCompressor recordCompressor) {
-        this.recordCompressor = recordCompressor;
-    }
+//    /**
+//     * 
+//     * @deprecated Use {@link IDataSerializer} to provide custom compression or
+//     *             the keys or values in a btree node via
+//     *             {@link #setNodeKeySerializer(IDataSerializer)},
+//     *             {@link #setLeafKeySerializer(IDataSerializer)}, and
+//     *             {@link #setValueSerializer(IDataSerializer)}.
+//     *             <p>
+//     *             An option is contemplated to provide optional record level
+//     *             compression and optional record level checksums for the store
+//     *             which would replace the use of this record compressor. This
+//     *             would of course break binary compatibilty.
+//     *             <p>
+//     *             The {@link SparseRowStore} already benefits from leading key
+//     *             compression. A value compression for the
+//     *             {@link SparseRowStore} might look for common strings
+//     *             (dictionary based compression).
+//     */
+//    public void setRecordCompressor(RecordCompressor recordCompressor) {
+//        this.recordCompressor = recordCompressor;
+//    }
 
     /**
      * A value in [0:1] that is interpreted as an allowable false positive error
@@ -507,7 +615,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     }
     
     public void setErrorRate(double errorRate) {
+
+        if (errorRate < 0d || errorRate > 1d)
+            throw new IllegalArgumentException();
+        
         this.errorRate = errorRate;
+        
     }
     
     /**
@@ -515,11 +628,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * each index entry as it is copied into an {@link IndexSegment}.
      */
     public IOverflowHandler getOverflowHandler() {
+        
         return overflowHandler;
+        
     }
 
     public void setOverflowHandler(IOverflowHandler overflowHandler) {
+        
         this.overflowHandler = overflowHandler;
+        
     }
 
     /**
@@ -606,6 +723,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         this.checkpointClassName = Checkpoint.class.getName();
         
+        /*
+         * FIXME Experiment with performance using a packed address serializer
+         * (or a nibble-based one). This effects how we serialize the child
+         * addresses for a Node. (PackedAddressSerialized appears to be broken
+         * - see the NodeSerialier test suite).
+         */
+        this.addrSer = AddressSerializer.INSTANCE;
+        
         this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
         
         this.leafKeySer = SimplePrefixSerializer.INSTANCE;
@@ -614,9 +739,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         this.conflictResolver = null;
         
-        this.recordCompressor = null;
-        
-        this.useChecksum = false;
+//        this.recordCompressor = null;
+//        
+//        this.useChecksum = false;
     
         this.deleteMarkers = false;
         
@@ -723,16 +848,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         sb.append(", pmd=" + pmd);
         sb.append(", class=" + className);
         sb.append(", checkpointClass=" + checkpointClassName);
+        sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
         sb.append(", leafKeySerializer=" + leafKeySer.getClass().getName());
         sb.append(", valueSerializer=" + valSer.getClass().getName());
         sb.append(", conflictResolver="
                 + (conflictResolver == null ? "N/A" : conflictResolver
                         .getClass().getName()));
-        sb.append(", recordCompressor="
-                + (recordCompressor == null ? "N/A" : recordCompressor
-                        .getClass().getName()));
-        sb.append(", useChecksum=" + useChecksum);
         sb.append(", deleteMarkers=" + deleteMarkers);
         sb.append(", versionTimestamps=" + versionTimestamps);
         sb.append(", isolatable=" + isIsolatable());
@@ -785,6 +907,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         checkpointClassName = in.readUTF();
         
+        addrSer = (IAddressSerializer)in.readObject();
+        
         nodeKeySer = (IDataSerializer)in.readObject();
 
         leafKeySer = (IDataSerializer)in.readObject();
@@ -793,9 +917,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         conflictResolver = (IConflictResolver)in.readObject();
         
-        recordCompressor = (RecordCompressor)in.readObject();
-        
-        useChecksum = in.readBoolean();
+//        recordCompressor = (RecordCompressor)in.readObject();
+//        
+//        useChecksum = in.readBoolean();
         
         deleteMarkers = in.readBoolean();
         
@@ -839,6 +963,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         out.writeUTF(checkpointClassName);
         
+        out.writeObject(addrSer);
+        
         out.writeObject(nodeKeySer);
 
         out.writeObject(leafKeySer);
@@ -847,9 +973,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         out.writeObject(conflictResolver);
 
-        out.writeObject(recordCompressor);
-        
-        out.writeBoolean(useChecksum);
+//        out.writeObject(recordCompressor);
+//        
+//        out.writeBoolean(useChecksum);
 
         out.writeBoolean(deleteMarkers);
         

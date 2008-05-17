@@ -123,7 +123,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     /**
      * Log for {@link BTree#dump(PrintStream)} and friends.
      */
-    protected static final Logger dumpLog = Logger.getLogger(BTree.class
+    public static final Logger dumpLog = Logger.getLogger(BTree.class
             .getName()
             + "#dump");
 
@@ -482,12 +482,12 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         this.readRetentionQueue = newReadRetentionQueue();
 
         this.nodeSer = new NodeSerializer(//
+                store, // addressManager
                 nodeFactory,//
                 branchingFactor,//
                 0, //initialBufferCapacity
                 metadata,//
-                readOnly, // 
-                store.isFullyBuffered()
+                readOnly
                 );
 
     }

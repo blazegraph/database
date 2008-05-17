@@ -77,11 +77,23 @@ public interface INodeFactory {
      * @param deleteMarkers
      *            An array of the delete markers (iff the version metadata is
      *            being maintained).
+     * @param priorAddr
+     *            The address of the previous leaf in key order, <code>0L</code>
+     *            if it is known that there is no previous leaf, and
+     *            <code>-1L</code> if either: (a) it was not known whether
+     *            there is a previous leaf; or (b) it was known that there was a
+     *            previous leaf but the address of that leaf was not known.
+     * @param nextAddr
+     *            The address of the next leaf in key order, <code>0L</code>
+     *            if it is known that there is no next leaf, and
+     *            <code>-1L</code> if either: (a) it was not known whether
+     *            there is a next leaf; or (b) it was known that there was a
+     *            next leaf but the address of that leaf was not known.
      * 
      * @return A leaf initialized from those data.
      */
     public ILeafData allocLeaf(IIndex btree, long addr, int branchingFactor,
             IKeyBuffer keys, byte[][] values, long[] versionTimestamps,
-            boolean[] deleteMarkers);
+            boolean[] deleteMarkers, long priorAddr, long nextAddr);
 
 }

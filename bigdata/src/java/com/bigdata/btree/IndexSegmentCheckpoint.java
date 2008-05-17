@@ -55,11 +55,6 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo the checksum of the index segment file should be stored in the
- *       partitioned index so that it can be validated after being moved around,
- *       etc. If we do this then it might not be necessary to checksum the
- *       individual records within the {@link IndexSegment}.
  */
 public class IndexSegmentCheckpoint {
 
@@ -101,7 +96,7 @@ public class IndexSegmentCheckpoint {
             SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, #entries
             SIZEOF_NBYTES + // max record length
             Bytes.SIZEOF_LONG * 6 + // {offset,extent} tuples for the {leaves, nodes, blobs} regions.
-            SIZEOF_ADDR * 3 + // address of the {root node/leaf, indexMetadata, bloomFilter}.
+            SIZEOF_ADDR * 5 + // address of the {root node/leaf, indexMetadata, bloomFilter, {first,last}Leaf}.
             Bytes.SIZEOF_LONG + // file size in bytes.
             SIZEOF_UNUSED + // available bytes for future versions.
             SIZEOF_CHECKSUM+ // the checksum for the proceeding bytes in the checkpoint record.
@@ -220,7 +215,7 @@ public class IndexSegmentCheckpoint {
     final public long extentBlobs;
 
     /*
-     * begin store addresses for individual records.
+     * begin: addresses for individual records.
      */
     
     /**
@@ -238,9 +233,19 @@ public class IndexSegmentCheckpoint {
      * was constructed.
      */
     final public long addrBloom;
+
+    /**
+     * Address of the first leaf in the file.
+     */
+    final public long addrFirstLeaf;
+
+    /**
+     * Address of the last leaf in the file.
+     */
+    final public long addrLastLeaf;
     
     /*
-     * end of store addresses for individual records.
+     * end: addresses for individual records.
      */
     
     /**
@@ -344,6 +349,8 @@ public class IndexSegmentCheckpoint {
 
         maxNodeOrLeafLength = buf.getInt();
         
+        // regions.
+        
         offsetLeaves = buf.getLong();
         extentLeaves = buf.getLong();
 
@@ -353,32 +360,51 @@ public class IndexSegmentCheckpoint {
         offsetBlobs = buf.getLong();
         extentBlobs = buf.getLong();
         
+        // simple addresses.
+        
         addrRoot = buf.getLong();
 
         addrMetadata = buf.getLong();
 
         addrBloom = buf.getLong();
         
-        length = buf.getLong();
+        addrFirstLeaf = buf.getLong();
+
+        addrLastLeaf = buf.getLong();
         
-        if (length != raf.length()) {
-
-            throw new RootBlockException("Length differs: actual="
-                    + raf.length() + ", expected=" + length);
-
-        }
+        // other data.
+        
+        length = buf.getLong();
         
         buf.position(buf.position() + SIZEOF_UNUSED);
         
-        // the checksum read from the record.
+        // Note: this sets the instance field to the checksum read from the record!
         checksum = buf.getInt();
         
-        // FIXME verify against checksum computed from the record.
-        {
-            
-        }
-        
         final long timestamp1 = buf.getLong();
+        
+        this.commitTime = timestamp0;
+        
+        /*
+         * Now do the validation steps.
+         * 
+         * Start with the checksum.
+         * 
+         * Then the timestamps.
+         * 
+         * Then the file length, etc.
+         */
+        
+        // compute the checksum of the record.
+        final int checksum = new ChecksumUtility().checksum(buf, 0, SIZE
+                - (SIZEOF_CHECKSUM + SIZEOF_TIMESTAMP));
+            
+        if (checksum != this.checksum) {
+            
+            throw new RootBlockException("Bad checksum: expected="
+                    + this.checksum + ", but actual=" + checksum);
+                
+        }
         
         if (timestamp0 != timestamp1) {
 
@@ -387,10 +413,16 @@ public class IndexSegmentCheckpoint {
             
         }
         
-        this.commitTime = timestamp0;
+        if (length != raf.length()) {
+
+            throw new RootBlockException("Length differs: actual="
+                    + raf.length() + ", expected=" + length);
+
+        }
         
         am = new IndexSegmentAddressManager(this); 
-        
+
+        // more validation.
         validate();
 
         // save read-only view of the checkpoint record.
@@ -426,12 +458,14 @@ public class IndexSegmentCheckpoint {
             long addrRoot, //
             long addrMetadata, //
             long addrBloom,//
+            long addrFirstLeaf,//
+            long addrLastLeaf,//
             // misc.
             long length,//
             UUID segmentUUID,//
             long commitTime//
     ) {
-
+        
         /*
          * Copy the various fields to initialize the checkpoint record.
          */
@@ -469,6 +503,12 @@ public class IndexSegmentCheckpoint {
 
         this.addrBloom = addrBloom;
 
+        this.addrFirstLeaf = addrFirstLeaf;
+        
+        this.addrLastLeaf = addrLastLeaf;
+        
+        // other data
+        
         this.length = length;
         
         this.commitTime = commitTime;
@@ -491,8 +531,6 @@ public class IndexSegmentCheckpoint {
 
     /**
      * Test validity of the {@link IndexSegmentCheckpoint} record.
-     * 
-     * @todo this uses asserts which may be disabled.
      */
     public void validate() {
         
@@ -550,6 +588,12 @@ public class IndexSegmentCheckpoint {
                                 + "}, but length=" + length);
                 
             }
+
+            if (addrFirstLeaf == 0L)
+                throw new RootBlockException("No address for the first leaf?");
+
+            if (addrLastLeaf == 0L)
+                throw new RootBlockException("No address for the first leaf?");
 
         }
 
@@ -629,8 +673,8 @@ public class IndexSegmentCheckpoint {
         }
 
         /*
-         * @todo validate the blob, bloom, and metadata addresses as well and
-         * the total length of the file.
+         * @todo validate the blob, bloom, and metadata addresses and the
+         * first/last leaf addresses as well and the total length of the file.
          */
         
 //        if( addrBloom == 0L ) assert errorRate == 0.;
@@ -714,6 +758,12 @@ public class IndexSegmentCheckpoint {
         
         buf.putLong(addrBloom);
         
+        buf.putLong(addrFirstLeaf);
+
+        buf.putLong(addrLastLeaf);
+        
+        // other data.
+        
         buf.putLong(length);
 
         // skip over this many bytes.
@@ -749,8 +799,6 @@ public class IndexSegmentCheckpoint {
      */
     public void write(RandomAccessFile raf) throws IOException {
 
-//        raf.seek(0);
-
         FileChannelUtility.writeAll(raf.getChannel(), asReadOnlyBuffer(), 0L);
 
         if (log.isInfoEnabled()) {
@@ -759,67 +807,6 @@ public class IndexSegmentCheckpoint {
             
         }
 
-//        if (log.isInfoEnabled())
-//            log.info("wrote: pos="+raf.getFilePointer());
-//
-//        raf.writeInt(MAGIC);
-//
-//        raf.writeInt(VERSION0);
-//
-//        raf.writeLong(commitTime);
-//        
-//        raf.writeLong(segmentUUID.getMostSignificantBits());
-//
-//        raf.writeLong(segmentUUID.getLeastSignificantBits());
-//
-//        raf.writeByte(offsetBits);
-//                        
-//        raf.writeInt(height);
-//        
-//        raf.writeInt(nleaves);
-//
-//        raf.writeInt(nnodes);
-//        
-//        raf.writeInt(nentries);
-//
-//        raf.writeInt(maxNodeOrLeafLength);
-//        
-//        // region extents.
-//        
-//        raf.writeLong(offsetLeaves);
-//        raf.writeLong(extentLeaves);
-//        
-//        raf.writeLong(offsetNodes);
-//        raf.writeLong(extentNodes);
-//
-//        raf.writeLong(offsetBlobs);
-//        raf.writeLong(extentBlobs);
-//
-//        // simple addresses
-//        
-//        raf.writeLong(addrRoot);
-//
-//        raf.writeLong(addrMetadata);
-//        
-//        raf.writeLong(addrBloom);
-//        
-//        raf.writeLong(length);
-//
-//        /*
-//         * skip over this many bytes. Note that skipBytes() does not seem to
-//         * really skip over bytes when writing while this approach definately
-//         * writes out those bytes and advances the file pointer.  seek() also
-//         * works.
-//         */
-////        raf.skipBytes(SIZEOF_UNUSED);
-////        raf.write(new byte[SIZEOF_UNUSED]);
-//        raf.seek(raf.getFilePointer()+SIZEOF_UNUSED);
-//        
-//        raf.writeLong(commitTime);
-//
-//        if (log.isInfoEnabled())
-//            log.info("wrote: pos="+raf.getFilePointer());
-        
     }
     
     /**
@@ -844,6 +831,8 @@ public class IndexSegmentCheckpoint {
         sb.append(", addrRoot=" + am.toString(addrRoot));
         sb.append(", addrMetadata=" + am.toString(addrMetadata));
         sb.append(", addrBloom=" + am.toString(addrBloom));
+        sb.append(", addrFirstLeaf=" + am.toString(addrFirstLeaf));
+        sb.append(", addrLastLeaf=" + am.toString(addrLastLeaf));
         sb.append(", length=" + length);
         sb.append(", checksum="+checksum);
         sb.append(", commitTime=" + new Date(commitTime));

@@ -2417,8 +2417,14 @@ public class Node extends AbstractNode implements INodeData {
         } else {
             /*
              * Note: there is a difference between having a parent reference and
-             * having the parent be reachable. However, we actually want to
-             * maintain both -- a parent MUST always be reachable.
+             * having the parent be stronly reachable. However, we actually want
+             * to maintain both -- a parent MUST always be strongly reachable
+             * ... UNLESS you are doing a fast forward or reverse leaf scan
+             * since the node hierarchy is not being traversed in that case.
+             * 
+             * @todo Should we keep leaves using a fast forward or reverse scan
+             * out of the hard reference cache since their parents are not
+             * strongly reachable?
              */
             if (parent == null) {
                 out

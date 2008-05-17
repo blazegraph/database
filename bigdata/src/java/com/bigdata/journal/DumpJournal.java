@@ -34,6 +34,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -343,12 +344,29 @@ public class DumpJournal {
         
     }
 
+    /**
+     * Format key as unsigned byte[].
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return
+     */
     private static String dumpKey(byte[] key) {
         
-        return Arrays.toString(key);
+        return BytesUtil.toString(key);
         
     }
     
+    /**
+     * Formats value as object if using default java serialization and
+     * otherwised as a signed byte[].
+     * 
+     * @param val
+     *            The value.
+     *            
+     * @return
+     */
     private static String dumpVal(byte[] val) {
         
         if (val == null)

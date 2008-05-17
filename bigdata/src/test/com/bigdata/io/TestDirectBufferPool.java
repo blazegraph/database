@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,27 +20,41 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Nov 5, 2006
+ * Created on May 16, 2008
  */
 
-package com.bigdata.util;
+package com.bigdata.io;
+
+import junit.framework.TestCase;
 
 /**
- * Exception thrown when the checksum field does not match the checksum computed
- * for the data being read. This is a serious error and indicates bad logic
- * and/or corrupt data.
+ * Test suite for {@link DirectBufferPool}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ChecksumError extends RuntimeException {
-    
-    private static final long serialVersionUID = -9067118459184074756L;
+public class TestDirectBufferPool extends TestCase {
 
-    public ChecksumError(String msg) {
-        super( msg );
+    /**
+     * 
+     */
+    public TestDirectBufferPool() {
+    }
+
+    /**
+     * @param arg0
+     */
+    public TestDirectBufferPool(String arg0) {
+        super(arg0);
+    }
+
+    public void test_nothing() {
+        
+        fail("No tests written yet.");
+        
     }
     
 }

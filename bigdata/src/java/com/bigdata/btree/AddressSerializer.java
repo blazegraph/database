@@ -28,9 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.DataInput;
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Serializes each address as a long integer and does not attempt to pack or
@@ -39,13 +44,19 @@ import com.bigdata.io.DataOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AddressSerializer implements IAddressSerializer {
+public class AddressSerializer implements IAddressSerializer, Externalizable {
+
+    private static final long serialVersionUID = -1434032311796654357L;
 
     public static final IAddressSerializer INSTANCE = new AddressSerializer();
-    
-    private AddressSerializer() {}
 
-    public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
+    /**
+     * De-serialization ctor.
+     */
+    public AddressSerializer() {
+    }
+
+    public void putChildAddresses(IAddressManager addressManager, DataOutputBuffer os, long[] childAddr,
             int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {
@@ -68,7 +79,7 @@ public class AddressSerializer implements IAddressSerializer {
 
     }
 
-    public void getChildAddresses(DataInput is, long[] childAddr,
+    public void getChildAddresses(IAddressManager addressManager,DataInput is, long[] childAddr,
             int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {
@@ -85,6 +96,18 @@ public class AddressSerializer implements IAddressSerializer {
             childAddr[i] = addr;
 
         }
+
+    }
+
+    public void readExternal(ObjectInput arg0) throws IOException, ClassNotFoundException {
+
+        // NOP (no state)
+        
+    }
+
+    public void writeExternal(ObjectOutput arg0) throws IOException {
+
+        // NOP (no state)
 
     }
 
