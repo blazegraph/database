@@ -956,10 +956,10 @@ abstract public class IndexManager extends StoreManager {
      * @return A {@link BuildResult} identifying the new {@link IndexSegment}
      *         and the source index.
      * 
-     * @throws IOException
+     * @throws Exception
      */
     public BuildResult buildIndexSegment(String name, IIndex src, File outFile,
-            long createTime, byte[] fromKey, byte[] toKey) throws IOException {
+            long createTime, byte[] fromKey, byte[] toKey) throws Exception {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -1022,7 +1022,7 @@ abstract public class IndexManager extends StoreManager {
                  .rangeIterator(fromKey, toKey, 0/* capacity */,
                          IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
          
-         // Build index segment.
+         // Setup the index segment build operation.
          final IndexSegmentBuilder builder = new IndexSegmentBuilder(//
                  outFile, //
                  getTmpDir(), //
@@ -1032,6 +1032,9 @@ abstract public class IndexManager extends StoreManager {
                  indexMetadata,//
                  createTime//
          );
+         
+         // build the index segment.
+         builder.call();
 
          // report event
          notifyIndexSegmentBuildEvent(builder);

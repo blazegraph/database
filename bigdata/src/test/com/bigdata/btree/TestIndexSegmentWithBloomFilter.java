@@ -155,7 +155,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * factors. For each {@link IndexSegment}, we then compare it against its
      * source {@link BTree} for the same total ordering.
      */
-    public void test_randomDenseKeys() throws IOException {
+    public void test_randomDenseKeys() throws Exception {
 
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -184,7 +184,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * factors. For each {@link IndexSegment}, we then compare it against its
      * source {@link BTree} for the same total ordering.
      */
-    public void test_randomSparseKeys() throws IOException {
+    public void test_randomSparseKeys() throws Exception {
 
         int trace = 0;
         
@@ -211,7 +211,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * 
      * @throws IOException
      */
-    public void test_rootLeaf() throws IOException {
+    public void test_rootLeaf() throws Exception {
 
         final int m = 3; // for input and output trees.
         
@@ -247,6 +247,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
                 tmpDir, btree.getEntryCount(), btree.entryIterator(), m, btree
                         .getIndexMetadata(), commitTime);
+        
+        builder2.call();
         
 //        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
 //                tmpDir, btree, m, 1/64.);
@@ -315,7 +317,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * 
      * @param btree The source btree.
      */
-    public void doBuildIndexSegmentAndCompare(BTree btree) throws IOException {
+    public void doBuildIndexSegmentAndCompare(BTree btree) throws Exception {
         
         // branching factors used for the index segment.
         final int branchingFactors[] = new int[]{3,4,5,10,20,60,100,256,1024,4096,8192};
@@ -354,7 +356,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 metadata.setErrorRate(0.0);
 
                 new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                        btree.entryIterator(), m, metadata, commitTime);
+                        btree.entryIterator(), m, metadata, commitTime).call();
                 
 //              new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
                 
@@ -374,6 +376,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 builder2 = new IndexSegmentBuilder(outFile2, tmpDir, btree
                         .getEntryCount(), btree.entryIterator(), m, metadata,
                         commitTime);
+                
+                builder2.call();
             
 //            IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
 //                    tmpDir, btree, m, 1/64.);

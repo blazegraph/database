@@ -176,7 +176,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
      * factors. For each {@link IndexSegment}, we then compare it against its
      * source {@link BTree} for the same total ordering.
      */
-    public void test_randomDenseKeys() throws IOException {
+    public void test_randomDenseKeys() throws Exception {
 
         for(int i=0; i<branchingFactors.length; i++) {
             
@@ -203,7 +203,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
      * factors. For each {@link IndexSegment}, we then compare it against its
      * source {@link BTree} for the same total ordering.
      */
-    public void test_randomSparseKeys() throws IOException {
+    public void test_randomSparseKeys() throws Exception {
 
         int trace = 0;
         
@@ -231,7 +231,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
      * 
      * @param btree The source btree.
      */
-    public void doBuildIndexSegmentAndCompare(BTree btree) throws IOException {
+    public void doBuildIndexSegmentAndCompare(BTree btree) throws Exception {
         
         // branching factors used for the index segment.
         final int branchingFactors[] = new int[] { 257, 512, 4196, 8196};
@@ -258,7 +258,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
             final long commitTime = System.currentTimeMillis();
             
             new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                    btree.entryIterator(), m, btree.getIndexMetadata(), commitTime);
+                    btree.entryIterator(), m, btree.getIndexMetadata(), commitTime).call();
             
 //            new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
 

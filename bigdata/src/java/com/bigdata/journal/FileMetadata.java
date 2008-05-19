@@ -277,8 +277,7 @@ public class FileMetadata {
             long initialExtent, long maximumExtent, boolean create,
             boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
             ForceEnum forceWrites, int offsetBits, int readCacheCapacity,
-            int readCacheMaxRecordSize,
-            ByteBuffer writeCache,
+            int readCacheMaxRecordSize, ByteBuffer writeCache,
             boolean validateChecksum, final long createTime,
             ChecksumUtility checker) throws RuntimeException {
 

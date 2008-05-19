@@ -248,8 +248,8 @@ public class ResourceEvents {
             String filename = builder.outFile.toString();
             int nentries = builder.plan.nentries;
             long elapsed = builder.elapsed;
-            long commitTime = builder.checkpoint.commitTime;
-            long nbytes = builder.checkpoint.length;
+            long commitTime = builder.getCheckpoint().commitTime;
+            long nbytes = builder.getCheckpoint().length;
             
             // data rate in MB/sec.
             float mbPerSec = builder.mbPerSec;

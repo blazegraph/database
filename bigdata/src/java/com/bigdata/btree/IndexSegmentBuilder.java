@@ -38,6 +38,7 @@ import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -105,7 +106,7 @@ import com.bigdata.rawstore.WormAddressManager;
  * @see IndexSegmentCheckpoint
  * @see IndexSegmentMerger
  */
-public class IndexSegmentBuilder {
+public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     
     /**
      * Logger.
@@ -138,11 +139,98 @@ public class IndexSegmentBuilder {
     public final File outFile;
     
     /**
+     * The value specified to the ctor.
+     */
+    final public int entryCount;
+    
+    /**
+     * The iterator specified to the ctor. This is the source for the keys and
+     * values that will be written onto the generated {@link IndexSegment}.
+     */
+    final private ITupleIterator entryIterator;
+    
+    /**
+     * The commit time associated with the view from which the
+     * {@link IndexSegment} is being generated (from the ctor). This value is
+     * written into {@link IndexSegmentCheckpoint#commitTime}.
+     */
+    final public long commitTime;
+    
+    /**
+     * A copy of the metadata object provided to the ctor. This object is
+     * further modified before being written on the
+     * {@link IndexSegmentStore}.
+     */
+    final public IndexMetadata metadata;
+    
+    /**
+     * <code>true</code> iff the source index is isolatable (supports both
+     * deletion markers and version timestamps).
+     */
+    final boolean isolatable;
+    
+    /**
+     * The unique identifier for the generated {@link IndexSegment} resource.
+     */
+    final public UUID segmentUUID;
+
+    /**
+     * Used to serialize the nodes and leaves of the output tree.
+     */
+    final private NodeSerializer nodeSer;
+
+    /**
+     * Note: The offset bits on the {@link IndexSegmentFileStore} does NOT
+     * have to agree with the offset bits on the source store. However, it
+     * must be large enough to handle the large branching factors typically
+     * associated with an {@link IndexSegment} vs a {@link BTree}. Further,
+     * if blobs are to be copied into the index segment then it generally
+     * must be large enough for those blobs (up to 64M per record).
+     * <p>
+     * Note: The same #of offset bits MUST be used by the temporary stores
+     * that we use to buffer nodes, leaves, and blobs as are used by the
+     * generated index segment!
+     */
+    final int offsetBits = WormAddressManager.SCALE_OUT_OFFSET_BITS;
+    
+    /**
+     * The {@link IAddressManager} used to form addresses for the generated
+     * file. Addresses are formed from a byteCount and an <em>encoded</em>
+     * offset comprised of a relative offset into a known region and the region
+     * identifier.
+     * 
+     * @see IndexSegmentRegion
+     * @see IndexSegmentAddressManager
+     */
+    final private WormAddressManager addressManager;
+
+    /**
+     * The bloom filter iff we build one (errorRate != 0.0).
+     */
+    final BloomFilter bloomFilter;
+    
+    /**
      * The file on which the {@link IndexSegment} is written. The file is closed
      * regardless of the outcome of the operation.
      */
     protected RandomAccessFile out = null;
-
+    
+    /**
+     * The {@link IndexSegmentCheckpoint} record written on the
+     * {@link IndexSegmentStore}.
+     */
+    private IndexSegmentCheckpoint checkpoint;
+    
+    /**
+     * The {@link IndexSegmentCheckpoint} record written on the
+     * {@link IndexSegmentStore}.
+     */
+    public IndexSegmentCheckpoint getCheckpoint() {
+        
+        return checkpoint;
+        
+    }
+    
     /**
      * The buffer used to hold leaves so that they can be evicted en mass onto
      * a region of the {@link #outFile}.
@@ -160,45 +248,6 @@ public class IndexSegmentBuilder {
      * order to use this buffer the {@link IndexMetadata} MUST specify an  
      */
     protected TemporaryRawStore blobBuffer;
-    
-    /**
-     * The unique identifier for the generated {@link IndexSegment} resource.
-     */
-    final public UUID segmentUUID;
-
-    /**
-     * A copy of the metadata object provided to the ctor. This object is
-     * further modified before being written on the
-     * {@link IndexSegmentStore}.
-     */
-    final public IndexMetadata metadata;
-    
-    /**
-     * The {@link IndexSegmentCheckpoint} record written on the
-     * {@link IndexSegmentStore}.
-     */
-    final public IndexSegmentCheckpoint checkpoint;
-    
-    /**
-     * Used to serialize the nodes and leaves of the output tree.
-     */
-    final NodeSerializer nodeSer;
-
-    /**
-     * The {@link IAddressManager} used to form addresses for the generated
-     * file. Addresses are formed from a byteCount and an <em>encoded</em>
-     * offset comprised of a relative offset into a known region and the region
-     * identifier.
-     * 
-     * @see IndexSegmentRegion
-     * @see IndexSegmentAddressManager
-     */
-    final WormAddressManager addressManager;
-
-    /**
-     * The bloom filter iff we build one (errorRate != 0.0).
-     */
-    final BloomFilter bloomFilter;
     
     /**
      * The address of the first leaf written on the file (there is always at
@@ -277,11 +326,6 @@ public class IndexSegmentBuilder {
     final public IndexSegmentPlan plan;
     
     /**
-     * The process runtime in milliseconds.
-     */
-    public final long elapsed;
-    
-    /**
      * The time to setup the index build, including the generation of the index
      * plan and the initialization of some helper objects.
      */
@@ -291,23 +335,28 @@ public class IndexSegmentBuilder {
      * The time to write the nodes and leaves into their respective buffers, not
      * including the time to transfer those buffered onto the output file.
      */
-    public final long elapsed_build;
+    public long elapsed_build;
     
     /**
      * The time to write the nodes and leaves from their respective buffers
      * onto the output file and synch and close that output file.
      */
-    public final long elapsed_write;
+    public long elapsed_write;
+    
+    /**
+     * The process runtime in milliseconds.
+     */
+    public long elapsed;
     
     /**
      * The data throughput rate in megabytes per second.
      */
-    public final float mbPerSec;
+    public float mbPerSec;
         
     /**
      * <p>
-     * Designated constructor builds an index segment for some caller defined
-     * read-only view.
+     * Designated constructor sets up a build of an {@link IndexSegment} for
+     * some caller defined read-only view.
      * </p>
      * <p>
      * Note: The caller must determine whether or not deleted index entries are
@@ -316,7 +365,7 @@ public class IndexSegmentBuilder {
      * difficult. However, if a compacting merge is desired (that is, if you are
      * trying to generate a view containing only the non-deleted entries) then
      * you MUST explicitly count the #of entries that will be visited by the
-     * iterator, e.g., it will require to passes over the iterator to setup the
+     * iterator, e.g., it will require two passes over the iterator to setup the
      * index build operation.
      * </p>
      * <p>
@@ -380,9 +429,15 @@ public class IndexSegmentBuilder {
         assert entryIterator != null;
         assert commitTime > 0L;
 
+        final long begin_setup = System.currentTimeMillis();
+
         // the UUID assigned to this index segment file.
         this.segmentUUID = UUID.randomUUID();
 
+        this.entryCount = entryCount;
+        
+        this.entryIterator = entryIterator;
+        
         /*
          * Make a copy of the caller's metadata.
          * 
@@ -419,6 +474,12 @@ public class IndexSegmentBuilder {
             
         }
         
+        // true iff the source index is isolatable.
+        this.isolatable = metadata.isIsolatable();
+
+        //
+        this.commitTime = commitTime;
+        
         /*
          * Override the branching factor on the index segment.
          * 
@@ -439,33 +500,12 @@ public class IndexSegmentBuilder {
          */
         this.metadata.setClassName(IndexSegment.class.getName());
 
-        /*
-         * Note: The offset bits on the {@link IndexSegmentFileStore} does NOT
-         * have to agree with the offset bits on the source store. However, it
-         * must be large enough to handle the large branching factors typically
-         * associated with an {@link IndexSegment} vs a {@link BTree}. Further,
-         * if blobs are to be copied into the index segment then it generally
-         * must be large enough for those blobs (up to 64M per record).
-         * 
-         * Note: The same #of offset bits MUST be used by the temporary stores
-         * that we use to buffer nodes, leaves, and blobs as are used by the
-         * generated index segment!
-         */
-
-        final int offsetBits = WormAddressManager.SCALE_OUT_OFFSET_BITS;
-        
         this.addressManager = new WormAddressManager(offsetBits);
-        
-        final boolean isolatable = metadata.isIsolatable();
-        
-        final long begin = System.currentTimeMillis();
         
         /*
          * Create the index plan and do misc setup.
          */
         {
-
-            final long begin_setup = System.currentTimeMillis();
 
             // Create a plan for generating the output tree.
             plan = new IndexSegmentPlan(m, entryCount);
@@ -555,17 +595,25 @@ public class IndexSegmentBuilder {
                     false // NOT read-only (we are using it for writing).
                     );
 
-            elapsed_setup = System.currentTimeMillis() - begin_setup;
-            
         }
     
+        this.outFile = outFile;
+        
+        elapsed_setup = System.currentTimeMillis() - begin_setup;
+        
+    }
+    
+    /**
+     * Build the {@link IndexSegment} given the parameters specified to
+     * the ctor.
+     */
+    public IndexSegmentCheckpoint call() throws Exception {
+
         /*
          * Setup for IO.
          */
 
         long begin_build = System.currentTimeMillis();
-        
-        this.outFile = outFile;
         
         if (outFile.exists() && outFile.length() != 0L) {
             throw new IllegalArgumentException("File exists and is not empty: "
@@ -806,23 +854,25 @@ public class IndexSegmentBuilder {
              * log run time.
              */
             
-            elapsed = System.currentTimeMillis() - begin;
+            elapsed = (System.currentTimeMillis() - begin_build) + elapsed_setup;
 
             // data rate in MB/sec.
             mbPerSec = (elapsed == 0 ? 0 : checkpoint.length / Bytes.megabyte32
                     / (elapsed / 1000f));
             
-            NumberFormat cf = NumberFormat.getNumberInstance();
+            if(log.isInfoEnabled()) {
             
-            cf.setGroupingUsed(true);
-            
-            NumberFormat fpf = NumberFormat.getNumberInstance();
-            
-            fpf.setGroupingUsed(false);
-            
-            fpf.setMaximumFractionDigits(2);
+                final NumberFormat cf = NumberFormat.getNumberInstance();
+                
+                cf.setGroupingUsed(true);
+                
+                final NumberFormat fpf = NumberFormat.getNumberInstance();
+                
+                fpf.setGroupingUsed(false);
+                
+                fpf.setMaximumFractionDigits(2);
 
-            log.info("finished: total=" + elapsed + "ms := setup("
+                log.info("finished: total=" + elapsed + "ms := setup("
                     + elapsed_setup + "ms) + build(" + elapsed_build
                     + "ms) +  write(" + elapsed_write + "ms); nentries="
                     + plan.nentries + ", branchingFactor=" + plan.m + ", nnodes="
@@ -830,25 +880,31 @@ public class IndexSegmentBuilder {
                     fpf.format(((double) checkpoint.length / Bytes.megabyte32))
                     + "MB"+", rate="+fpf.format(mbPerSec)+"MB/sec");
 
+            }
+            
+            return checkpoint;
+            
+        } catch (Exception ex) {
+            
+            /*
+             * Note: The output file is deleted if the build fails.
+             */
+            deleteOutputFile();
+            
+            // Re-throw exception
+            throw ex;
+            
         } catch (Throwable ex) {
 
             /*
-             * make sure that the output file is deleted unless it was
-             * successfully processed.
+             * Note: The output file is deleted if the build fails.
              */
-            if (out != null && out.getChannel().isOpen()) {
-                try {
-                    out.close();
-                } catch (Throwable t) {
-                    log.error("Ignoring: "+t,t);
-                }
-            }
-            outFile.delete();
+            deleteOutputFile();
+
+            // Masquerade exception.
             throw new RuntimeException(ex);
 
-        }
-        
-        finally {
+        } finally {
 
             /*
              * make sure that the temporary file gets deleted regardless.
@@ -857,6 +913,7 @@ public class IndexSegmentBuilder {
                 try {
                     leafBuffer.close(); // also deletes the file if any.
                 } catch (Throwable t) {
+                    log.warn(t,t);
                 }
             }
             
@@ -867,6 +924,7 @@ public class IndexSegmentBuilder {
                 try {
                     nodeBuffer.close(); // also deletes the file if any.
                 } catch (Throwable t) {
+                    log.warn(t,t);
                 }
             }
             
@@ -875,13 +933,40 @@ public class IndexSegmentBuilder {
     }
 
     /**
-     * Flush a node or leaf that has been closed (no more data will be added).
+     * Used to make sure that the output file is deleted unless it was
+     * successfully processed.
+     */
+    private void deleteOutputFile() {
+    
+        if (out != null && out.getChannel().isOpen()) {
+            
+            try {
+            
+                out.close();
+                
+            } catch (Throwable t) {
+             
+                log.error("Ignoring: " + t, t);
+                
+        
+            }
+        
+        }
+
+        outFile.delete();
+        
+    }
+    
+    /**
      * <p>
-     * When a node or leaf is flushed we write it out to obtain its address and
-     * set that address on its direct parent using
-     * {@link #addChild(com.bigdata.btree.IndexSegmentBuilder.SimpleNodeData, long)}.
-     * This also updates the per-child counters of the #of entries spanned by a
-     * node.
+     * Flush a node or leaf that has been closed (no more data will be added).
+     * </p>
+     * <p>
+     * Note: When a node or leaf is flushed we write it out to obtain its
+     * address and set that address on its direct parent using
+     * {@link #addChild(SimpleNodeData, long)}. This also updates the per-child
+     * counters of the #of entries spanned by a node.
+     * </p>
      */
     protected void flush(AbstractSimpleNodeData node) throws IOException {
 

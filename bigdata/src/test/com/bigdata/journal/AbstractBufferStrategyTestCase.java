@@ -118,6 +118,8 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         
         Journal store = (Journal) getStore();
         
+        try {
+        
         AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
                 .getBufferStrategy();
 
@@ -161,8 +163,12 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
             assertEquals(nextOffset,bufferStrategy.getNextOffset());
 
         }
-        
-        store.closeAndDelete();
+
+        } finally {
+
+            store.closeAndDelete();
+            
+        }
         
     }
 
@@ -173,6 +179,8 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
     public void test_writeNoExtend() {
 
         Journal store = (Journal) getStore();
+
+        try {
         
         AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
                 .getBufferStrategy();
@@ -197,7 +205,11 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         // no change in user extent.
         assertEquals("userExtent",userExtent, bufferStrategy.getUserExtent());
 
+        } finally {
+        
         store.closeAndDelete();
+        
+        }
 
     }
     
@@ -273,6 +285,8 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
     public void test_writeWithExtend() {
 
         Journal store = (Journal) getStore();
+
+        try {
         
         AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
                 .getBufferStrategy();
@@ -341,7 +355,11 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         // verify data written after we overflowed the buffer.
         assertEquals(b2, bufferStrategy.read(addr2));
     
+        } finally {
+        
         store.closeAndDelete();
+        
+        }
 
     }
     
