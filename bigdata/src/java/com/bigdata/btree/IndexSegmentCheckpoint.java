@@ -703,7 +703,7 @@ public class IndexSegmentCheckpoint {
      */
     public ByteBuffer asReadOnlyBuffer() {
         
-        return buf.slice();
+        return buf.asReadOnlyBuffer(); // Note: a _new_ view.
         
     }
     

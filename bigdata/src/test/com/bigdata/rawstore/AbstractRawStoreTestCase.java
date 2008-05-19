@@ -356,6 +356,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         assertEquals(0,actual.position());
         assertEquals(expected.length,actual.limit());
+        assertEquals(actual.limit(),actual.capacity());
         
         store.closeAndDelete();
 

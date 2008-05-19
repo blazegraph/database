@@ -131,14 +131,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
     /**
      * Test ability to build an index segment from a {@link BTree}.
      */
-    public void test_buildOrder3() throws IOException {
+    public void test_buildOrder3() throws Exception {
 
         final BTree btree = getProblem1();
 
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime);
+                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime).call();
 
          /*
           * Verify can load the index file and that the metadata
@@ -213,14 +213,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      * 
      * @throws IOException
      */
-    public void test_buildOrder9() throws IOException {
+    public void test_buildOrder9() throws Exception {
         
         final BTree btree = getProblem1();
         
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .entryIterator(), 9/* m */, btree.getIndexMetadata(), commitTime);
+                .entryIterator(), 9/* m */, btree.getIndexMetadata(), commitTime).call();
 
 //        new IndexSegmentBuilder(outFile,tmpDir,btree,9,0.);
 
@@ -273,14 +273,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      * 
      * @throws IOException
      */
-    public void test_buildOrder10() throws IOException {
+    public void test_buildOrder10() throws Exception {
         
         final BTree btree = getProblem1();
 
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .entryIterator(), 10/* m */, btree.getIndexMetadata(), commitTime);
+                .entryIterator(), 10/* m */, btree.getIndexMetadata(), commitTime).call();
 
 //        new IndexSegmentBuilder(outFile, tmpDir, btree, 10, 0.);
 
@@ -352,7 +352,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      * 
      * @throws IOException
      */
-    public void test_problem2_buildOrder3() throws IOException {
+    public void test_problem2_buildOrder3() throws Exception {
         
         final BTree btree = getProblem2();
         
@@ -361,7 +361,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime);
+                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime).call();
         
 //        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
@@ -446,7 +446,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      * 
      * @throws IOException
      */
-    public void test_problem3_buildOrder3() throws IOException {
+    public void test_problem3_buildOrder3() throws Exception {
 
         final BTree btree = getProblem3();
 
@@ -455,7 +455,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         final long commitTime = System.currentTimeMillis();
         
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime);
+                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime).call();
 
 //        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 

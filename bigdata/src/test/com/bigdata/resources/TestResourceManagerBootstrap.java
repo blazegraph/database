@@ -343,7 +343,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
      * 
      * @throws IOException
      */
-    public void test_restartWithIndexSegments() throws IOException {
+    public void test_restartWithIndexSegments() throws Exception {
         
         // create the data directory.
         assertTrue(dataDir.mkdirs());
@@ -404,6 +404,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                             outFile, tmpDir, ndx.getEntryCount(), ndx
                                     .entryIterator(), branchingFactor, ndx
                                     .getIndexMetadata(), commitTime);
+                    
+                    builder.call();
 
                     segmentUUIDs[i] = builder.segmentUUID;
                     
@@ -487,7 +489,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
      * 
      * @throws IOException
      */
-    public void test_openIndexPartition() throws IOException {
+    public void test_openIndexPartition() throws Exception {
         
         // create the data directory.
         assertTrue(dataDir.mkdirs());
@@ -573,6 +575,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                             outFile, tmpDir, (int) ndx.rangeCount(null, null), ndx
                                     .rangeIterator(null, null),
                             branchingFactor, ndx.getIndexMetadata(), commitTime);
+                    
+                    builder.call();
 
                     // assigned UUID for the index segment resource.
                     segmentUUID = builder.segmentUUID;

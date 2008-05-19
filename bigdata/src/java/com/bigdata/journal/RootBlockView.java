@@ -396,13 +396,12 @@ public class RootBlockView implements IRootBlockView {
 
     public ByteBuffer asReadOnlyBuffer() {
 
-        return buf.slice();
+        return buf.asReadOnlyBuffer(); // Note: a new view onto the same data.
         
     }
     
     /**
-     * Create a new read-only view of the region of the supplied buffer from its
-     * current position to its current limit.
+     * Create a new read-only view from the supplied buffer.
      * 
      * @param rootBlock0
      *            There are two root blocks and they are written in an
@@ -412,9 +411,7 @@ public class RootBlockView implements IRootBlockView {
      *            a transient field on the view that indicates which root block
      *            it represents.
      * @param buf
-     *            The buffer. If the buffer is modified in this region, those
-     *            changes will be immediately reflected in the methods on the
-     *            created {@link RootBlockView} object.
+     *            The buffer.
      * @param checker
      *            An object used to compute the checksum of the root block
      *            (optional, when <code>null</code> the checksum stored in the
@@ -437,8 +434,13 @@ public class RootBlockView implements IRootBlockView {
                     + " remaining, acutal=" + buf.remaining());
             
         }
-        
-        this.buf = buf.slice().asReadOnlyBuffer();
+
+        /*
+         * @todo If the buffer is modified, those changes will be immediately
+         * reflected in the various methods. It probably is safer to clone the
+         * buffer and then save a reference to the clone.
+         */
+        this.buf = buf.asReadOnlyBuffer();
         
         this.rootBlock0 = rootBlock0;
 

@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
@@ -357,7 +358,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             buf.flip();
 
             // write the data on the disk file.
-            writeOnDisk(buf, writeCacheOffset);
+            writeOnDisk(buf, writeCacheOffset, true/*append*/);
 
             // position := 0; limit := capacity.
             buf.clear();
@@ -398,13 +399,18 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          *            The length of the record (decoded from the address by the
          *            caller).
          * 
-         * @return A view onto the record in the write cache buffer -or-
-         *         <code>null</code> iff the record does not lie within this
-         *         {@link WriteCache}.
+         * @return A read-write view onto the record in the write cache buffer
+         *         -or- <code>null</code> iff the record does not lie within
+         *         this {@link WriteCache}.
          *         <p>
          *         Note: The caller MUST copy the data from the view since
          *         concurrent operations may result in the write cache being
          *         flushed and the view overwritten with new data.
+         *         <p>
+         *         Note: A read-write view is returned in order to support
+         *         {@link DiskOnlyStrategy#update(long, int, ByteBuffer)}
+         *         for those cases when the record to be updated in still in
+         *         the {@link WriteCache}.
          */
         ByteBuffer read(long addr,int nbytes) {
                 
@@ -425,16 +431,18 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             // the start of the record in writeCache.
             final int pos = writeCachePosition;
 
-            // view onto the writeCache with its own limit and position.
-            final ByteBuffer tmp = buf.asReadOnlyBuffer();
+            // create a view with same offset, limit and position.
+            final ByteBuffer tmp = buf.duplicate();
 
             // adjust the view to just the record of interest.
             tmp.limit(pos + nbytes);
-            
             tmp.position(pos);
             
-            // return the view.
-            return tmp;
+            /*
+             * Return a slice using that view - this restrict the caller to only
+             * those bytes exposed by the slice.
+             */
+            return tmp.slice();
 
         }
         
@@ -1477,6 +1485,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     counters.ndiskRead += FileChannelUtility.readAll(
                             getChannel(), dst, pos);
 
+                    // successful read - exit the loop.
+                    break;
+
                 } catch (ClosedByInterruptException ex) {
                     
                     /*
@@ -1625,6 +1636,237 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         return true;
         
     }
+
+    /**
+     * Allocate a record without writing it on the store
+     * <p>
+     * Note: The contents of the record having that address are <i>undefined</i>
+     * unless until data is written onto the record using
+     * {@link #update(long, int, ByteBuffer)} and only those bytes actually
+     * written will be defined.
+     * 
+     * @param nbytes
+     *            The #of bytes in the record.
+     * 
+     * @return The address of the record.
+     */
+    public long allocate(final int nbytes) {
+        
+        if (isReadOnly())
+            throw new IllegalStateException(ERR_READ_ONLY);
+        
+        if (nbytes <= 0)
+            throw new IllegalArgumentException("Bad record size");
+        
+        final long addr; // address in the store.
+        
+        synchronized(this) {
+            
+            /*
+             * The offset at which the record will be written on the disk file
+             * (not adjusted for the root blocks).
+             */
+            final long offset = nextOffset;
+
+            /*
+             * Make sure that the allocated region of the file exists.
+             */
+            overflow(offset, nbytes);
+            
+            /* 
+             * Formulate the address that can be used to recover that record.
+             */
+            addr = toAddr(nbytes, offset);
+            
+            /*
+             * Increment the offset of the next address to be assigned by the
+             * #of bytes in the record.
+             */
+            nextOffset += nbytes;
+        
+        }
+
+        return addr;
+        
+    }
+    
+    /**
+     * Updates a region of a record. The record may have been written or simply
+     * allocated. The bytes in <i>data</i> from the
+     * {@link ByteBuffer#position()} to the {@link ByteBuffer#limit()} will be
+     * written starting at <i>off</i> bytes into the record identified by the
+     * <i>addr</i>. The state of other bytes in the record are unchanged. If
+     * their state was undefined (e.g., the record was {@link #allocate(int)}'d
+     * but not written) then their state will remain undefined.
+     * 
+     * @param addr
+     *            The address of an existing record.
+     * @param off
+     *            The offset into that record at which the data will be written.
+     * @param data
+     *            The data to be written.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>addr</i> was not assigned by this store (at least for
+     *             those cases where this can be detected).
+     * @throws IllegalArgumentException
+     *             if <i>off</i> is negative.
+     * @throws IllegalArgumentException
+     *             if <i>data</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if there are no bytes to be written in <i>data</i>.
+     * @throws IllegalArgumentException
+     *             if <i>off</i> plus the #of bytes to be written in <i>data</i>
+     *             exceeds the size of the record identified by <i>addr</i>.
+     * @throws IllegalStateException
+     *             if the store is read-only.
+     * 
+     * @todo this can be used to perform incremental writes for the block API.
+     *       The client requests a blob reference of a given size. The data
+     *       service allocates the space for that block on the raw store,
+     *       obtaining its addr, and encapsulates this as a "blob" for the
+     *       client. The client writes on the blob and the data service collects
+     *       bytes to be written in a buffer. When the buffer overflows, the
+     *       data services flushes it in an incremental write to the backing
+     *       store using this method.
+     * 
+     * @todo the other use case for this is the {@link IndexSegmentBuilder}
+     *       which needs to be able to allocate the block (obtaining its
+     *       address) before it writes the block, so either a "write-update" or
+     *       an "alloc-update". this is required in order to get the prior/next
+     *       leaf references into place in the generated store file.
+     */
+    public void update(final long addr, final int off, final ByteBuffer data) {
+
+        if (addr == 0L)
+            throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
+
+        if (off < 0)
+            throw new IllegalArgumentException("Offset is negative");
+        
+        if (data == null)
+            throw new IllegalArgumentException(ERR_BUFFER_NULL);
+
+        if (isReadOnly())
+            throw new IllegalStateException(ERR_READ_ONLY);
+        
+        // The offset of the record in the store (not adjusted for the root blocks).
+        final long addrOffset = getOffset(addr);
+
+        // The size of the record (NOT the #of bytes to be written).
+        final int addrByteCount = getByteCount(addr);
+        
+        if (addrOffset + addrByteCount > nextOffset) {
+
+            throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
+
+        }
+
+        // #of bytes to be updated on the pre-existing record.
+        final int nbytes = data.remaining();
+        
+        if (nbytes == 0)
+            throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
+        
+        if (off + nbytes > addrByteCount) {
+
+            throw new IllegalArgumentException("Would overrun record");
+
+        }
+        
+        final long begin = System.nanoTime();
+        
+        synchronized(this) {
+
+            try {
+
+                if (writeCache != null) {
+
+                    /*
+                     * Check the writeCache. If the record is found in the write
+                     * cache then we just update the slice of the record
+                     * corresponding to the caller's request. This is a common
+                     * use case and results in no IO.
+                     */
+
+                    final long beginCache = System.nanoTime();
+
+                    try {
+
+                        final ByteBuffer view = writeCache.read(addr,addrByteCount);
+
+                        if (view != null) {
+
+                            // adjust the limit on the record in the write
+                            // cache.
+                            view.limit(off + nbytes);
+
+                            // adjust the position on the record in the write
+                            // cache.
+                            view.position(off);
+
+                            // copy the caller's data onto the record in the
+                            // write
+                            // cache.
+                            view.put(data);
+
+                            // count this as a cache write.
+                            counters.ncacheWrite++;
+
+                            // Done.
+                            return;
+
+                        }
+
+                    } finally {
+
+                        // track the write cache time.
+                        counters.elapsedCacheWriteNanos += (System.nanoTime() - beginCache);
+
+                    }
+
+                }
+
+                /*
+                 * Either the writeCache is disabled or the record was not found
+                 * in the write cache so just write the record directly on the
+                 * disk.
+                 * 
+                 * Note: for this case we might be able to move the write
+                 * outside of the synchronized() block IFF we also cloned the
+                 * data (since the caller is allowed to modify the buffer as
+                 * soon as write() returns).
+                 * 
+                 * Note: We MUST NOT update the writeCacheOffset since we are
+                 * probably writing behind the end of the file (this is contrary
+                 * to a normal write write is an append at the end of the file).
+                 */
+
+                writeOnDisk(data, addrOffset + off/* adjustedOffset */, false/* append */);
+
+            } finally {
+
+                /*
+                 * Update counters while we are synchronized. If done outside of
+                 * the synchronization block then we need to use AtomicLongs
+                 * rather than primitive longs.
+                 */
+
+                counters.nwrites++;
+                counters.bytesWritten += nbytes;
+                counters.elapsedWriteNanos += (System.nanoTime() - begin);
+
+                if(nbytes > counters.maxWriteSize) {
+                    
+                    counters.maxWriteSize = nbytes;
+                    
+                }
+                
+            }
+            
+        } // synchronized
+        
+    }
     
     public long write(final ByteBuffer data) {
 
@@ -1644,22 +1886,18 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         final long addr; // address in the store.
         synchronized(this) {
-            
-            if(nbytes > counters.maxWriteSize) {
-                
-                counters.maxWriteSize = nbytes;
-                
-            }
+
+            /*
+             * Allocate address for a new record with [nbytes] of data.
+             */
+            addr = allocate(nbytes);
             
             /*
              * The offset at which the record will be written on the disk file
              * (not adjusted for the root blocks).
              */
-            final long offset = nextOffset;
+            final long offset = getOffset(addr);
             
-            // formulate the address that can be used to recover that record.
-            addr = toAddr(nbytes, offset);
-
             if (writeCache != null) {
 
                 /*
@@ -1680,7 +1918,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
                 if (nbytes > writeCache.capacity()) {
 
-                    writeOnDisk(data,nextOffset);
+                    writeOnDisk(data, offset, true/*append*/);
 
                 } else {
 
@@ -1715,17 +1953,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                  * at will.
                  */
                 
-                writeOnDisk(data,nextOffset);
+                writeOnDisk(data,offset, true/*append*/);
 
             }
-            
-            /*
-             * Whether we wrote the record on the cache or on the disk, we now
-             * increment the offset of the next address to be assigned by the
-             * #of bytes in the record.
-             */
-            
-            nextOffset += nbytes;
 
             /*
              * Update counters while we are synchronized. If done outside of the
@@ -1737,6 +1967,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             counters.bytesWritten+=nbytes;
             counters.elapsedWriteNanos+=(System.nanoTime() - begin);
 
+            if(nbytes > counters.maxWriteSize) {
+                
+                counters.maxWriteSize = nbytes;
+                
+            }
+
         } // synchronized
         
         return addr;
@@ -1744,9 +1980,45 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     }
 
     /**
+     * Make sure that the file is large enough to accept a write of <i>nbytes</i>
+     * starting at <i>offset</i> bytes into the file.
+     * <p>
+     * Note: The caller MUST be synchronized on <i>this</i>.
+     * 
+     * @param offset
+     *            The offset into the file (NOT adjusted for the root blocks).
+     * @param nbytes
+     *            The #of bytes to be written at that offset.
+     */
+    private void overflow(final long offset, final int nbytes) {
+
+        final long needed = (offset + nbytes) - userExtent;
+
+        if (needed > 0) {
+            
+            if (!overflow(needed)) {
+
+                throw new OverflowException();
+
+            }
+
+        }
+
+    }
+    
+    /**
      * Write the data on the disk (synchronous).
      * <p>
-     * Note: This updates {@link #writeCacheOffset} as well.
+     * Note: The caller MUST be synchronized on <i>this</i>.
+     * <p>
+     * Note: This updates {@link #writeCacheOffset} as well (but only if the
+     * write is an append).
+     * <p>
+     * Note: It is possible for {@link #update(long, int, ByteBuffer)} to force
+     * a non-append write that is beyond the {@link #writeCacheOffset}. This
+     * will occur if the record that is being updated is too large for the
+     * {@link #writeCache} while there are also records buffered by this write
+     * cache.
      * 
      * @param data
      *            The data. The bytes from the current
@@ -1758,31 +2030,25 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      *            the data are copied onto the disk).
      * @param offset
      *            The offset in the file at which the data will be written.
+     * @param append
+     *            <code>true</code> iff the write is an append (most record
+     *            writes are appends).
      */
-    void writeOnDisk(final ByteBuffer data, final long offset) {
+    void writeOnDisk(final ByteBuffer data, final long offset, final boolean append) {
 
         final long begin = System.nanoTime();
         
         final int nbytes = data.remaining();
-        
+
+        // make sure that the file is large enough.
+        overflow(offset, nbytes);
+
         /* 
          * The position in the file at which the record will be written
          * (this is adjusted for the root blocks).
          */
 
         final long pos = offset + headerSize;
-
-        final long needed = (offset + nbytes) - userExtent;
-
-        if (needed > 0) {
-
-            if (!overflow(needed)) {
-
-                throw new OverflowException();
-
-            }
-
-        }
 
         try {
 
@@ -1800,7 +2066,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
 
         // update the next offset at which data will be written on the disk.
-        writeCacheOffset += nbytes;
+        if(append) {
+            
+            writeCacheOffset += nbytes;
+            
+        }
 
         counters.bytesWrittenOnDisk += nbytes;
         counters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
@@ -1820,17 +2090,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     : FileMetadata.OFFSET_ROOT_BLOCK1;
             
             FileChannelUtility.writeAll(getChannel(), data, pos);
-            
-//            // FIXME write in loop until count == SIZEOF_ROOT_BLOCK
-//            final int count = getChannel().write(data, pos);
-//            
-//            if(count != RootBlockView.SIZEOF_ROOT_BLOCK) {
-//                
-//                throw new IOException("Expecting to write "
-//                        + RootBlockView.SIZEOF_ROOT_BLOCK + " bytes, but wrote"
-//                        + count + " bytes.");
-//                
-//            }
 
             if (forceOnCommit != ForceEnum.No) {
 
@@ -1846,7 +2105,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
-        log.debug("wrote root block: "+rootBlock);
+        if (log.isDebugEnabled())
+            log.debug("wrote root block: "+rootBlock);
         
         counters.nwriteRootBlock++;
         
@@ -1890,7 +2150,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
             log.warn("Disk file: newLength="+cf.format(newExtent));
             
-            log.info(getCounters().toString());
+            if(log.isInfoEnabled())
+                log.info(getCounters().toString());
             
         } catch(IOException ex) {
             
@@ -1927,4 +2188,29 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
+    /**
+     * Subclass that uses lazy creation of the file on the disk, disables
+     * forcing of writes and force on commit, and marks the file (when created)
+     * as "temporary". This will let us write in memory until the write cache
+     * overflows and then it will start putting down the data on the disk. This
+     * has all of the advantages of the current approach (low latency on
+     * startup), plus we get MRMW for the temp store. Maybe add a
+     * TemporaryStoreFactory class to encapsulate this approach.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TempStore extends DiskOnlyStrategy {
+
+        /**
+         * @param maximumExtent
+         * @param fileMetadata
+         */
+        TempStore(long maximumExtent, FileMetadata fileMetadata) {
+            super(maximumExtent, fileMetadata);
+            // TODO Auto-generated constructor stub
+        }
+        
+    }
+    
 }

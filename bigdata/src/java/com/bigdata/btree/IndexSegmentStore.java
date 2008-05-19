@@ -836,6 +836,10 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * Create a slice of that view showing only the desired record. The
              * position() of the slice will be zero(0) and the limit() will be
              * the #of bytes in the record.
+             * 
+             * Note: slice restricts the view available to the caller to the
+             * view that was setup on the buffer at the moment that the slice
+             * was obtained.
              */
             dst = tmp.slice();
 

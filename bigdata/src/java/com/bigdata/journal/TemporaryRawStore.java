@@ -66,7 +66,8 @@ import com.bigdata.util.ChecksumUtility;
  * commit, and mark the file as "temporary". This will let us write in memory
  * until the write cache overflows and then it will start putting down the data
  * on the disk. This has all of the advantages of the current approach (low
- * latency on startup), plus we get MRMW for the temp store.
+ * latency on startup), plus we get MRMW for the temp store.  Maybe add a TemporaryStoreFactory
+ * class to encapsulate this approach.
  */
 public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore, IMROW {
 
