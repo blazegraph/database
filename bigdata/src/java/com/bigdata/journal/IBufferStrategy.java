@@ -72,9 +72,7 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      * Note: This is <em>normally</em> zero (0L), which basically means that
      * the maximum extent is ignored by the {@link IBufferStrategy} but
      * respected by the {@link AbstractJournal}, resulting in a <i>soft limit</i>
-     * on journal overflow. The primary reason to limit the buffer size is when
-     * an in-memory buffer will be converted to a disk-based buffer -- see
-     * {@link TemporaryRawStore} for an example.
+     * on journal overflow.
      * 
      * @return The maximum extent permitted for the buffer -or- <code>0L</code>
      *         iff no limit is imposed.

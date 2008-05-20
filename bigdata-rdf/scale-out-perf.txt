@@ -330,6 +330,97 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 
 ============================================================
 
+Notes on store level record checksums and record compression.
+
+1. many record compression schemes will fail if the data are corrupt,
+   but logically you compress first and then checksum the record.
+
+   compression is often a technique using a stream of blocks.
+
+   checksum is a streaming technique.
+
+   // IRawStore#write()
+   write(ByteBuffer b) : addr
+
+   // AbstractJournal#write()
+
+   if(compress) {
+
+      b = compress(b)
+
+   }
+
+   int chksum;
+   if(useChecksum) {
+
+      bytesRequired = b.remaining() + 4;
+
+      chmsum = computeChecksum( b );
+
+   } else bytesRequired = b.remaining();
+
+   bufferStrategy.write(b,chksum,useChecksum)
+
+   Note: buffer strategy write() probably needs to have the checksum
+   value pass along in addition to the record to avoid re-allocation
+   of the ByteBuffer just to tack on the additional 4 bytes.  We could
+   either always write those additional 4 bytes or optionally write
+   them if checksums are enabled.
+
+2. the root block needs to hold the critical data indicating whether
+   or not checksums in use and what record compression technique, if
+   any, to apply.  We need this on hand before we can either read or
+   write a record on the store.
+
+3. we need 4 bytes (int32) for the checksum.  this should be at the
+   end of the record, so the size in the store is extended by 4 bytes
+   and the address for the record on the store is adjusted to also
+   include those 4 bytes.  However, when you read from the store it
+   will give you a slice WITHOUT those four bytes.  Further, if it is
+   using compression then it will decompress the slice, resulting in a
+   new slice that can be much larger than the record on the store
+   whose size is encoded within the address.  This will probably break
+   a variety of asserts that assume that the returned ByteBuffer will
+   be exactly the size of the byte count encoded in the address.
+
+4. Compression should run on the byte[] not on the slower ByteBuffer.
+   Serialization generally writes on a byte[], but sometimes that is
+   wrapped up as a ByteBuffer - and it can even be a slice() onto a
+   larger array (NodeSerializer does this since it returns a view onto
+   an internal buffer).
+
+    /**
+     * The {@link Adler32} checksum. This is an int32 value, even through the
+     * {@link Checksum} API returns an int64 (aka long integer) value. The
+     * actual checksum is in the lower 32 bit.
+     */
+    static final int SIZEOF_CHECKSUM = Bytes.SIZEOF_INT;
+
+    /**
+     * Offset of the int32 value that is the {@link Adler32} checksum of the
+     * serialized node or leaf. The checksum is computed for all bytes exclusing
+     * the first 4 bytes, on which the value of the computed checksum is
+     * written.
+     */
+    static final int OFFSET_CHECKSUM = 0;
+
+    /**
+     * When <code>true</code>, checksums will be generated for serialized
+     * nodes and leaves and verified on read. Checksums provide a check for
+     * corrupt media and make the database more robust at the expense of some
+     * added cost to compute a validate the checksums.
+     * <p>
+     * Computing the checksum is ~ 40% of the cost of (de-)serialization.
+     * <p>
+     * When the backing store is fully buffered (it is entirely in RAM) then
+     * checksums are automatically disabled.
+     * 
+     * @deprecated See {@link #setUseChecksum(boolean)}
+     */
+    public final boolean getUseChecksum() {return useChecksum;}
+
+============================================================
+
     - Tune indices
 
       - The ids index should benefit from value compression since the
@@ -1314,10 +1405,6 @@ Short term tasks:
       Jini client is not reporting counters on either machine.  The
       problem is the client configuration.
 
-    - * Review the LBS host and service scores.  Can they predict host
-        and service load well enough to move index partitions around
-        without the host-based physical disk counters under linux?
-
     - Done. Dynamically refresh the httpd view for the data service to
       make the counter set for the index manager live.
 
@@ -1624,8 +1711,9 @@ Main issues:
       data services is located on a second machine, still w/o
       overflow.
 
-        **** There is still a problem with multicast which is
-             preventing scale-out runs.
+      Done. (Multicase configuration issue was resolved.)  There is
+      still a problem with multicast which is preventing scale-out
+      runs.
 
       Note: Ideally the client will also be distributed but that is
       not critical to proving the point as the client is faster than a
@@ -1758,11 +1846,15 @@ JF-U100-host23-2DS:
       client threads, and as index splits occur, and as index moves
       occur.
 
+    * Review the LBS host and service scores.  Can they predict host
+      and service load well enough to move index partitions around
+      without the host-based physical disk counters under linux?
+
     - Try U10000 reading the data from NAS with 2 clients, 10 threads
-      each and 2 servers.  See if scale-out holds as we increase the
-      data size.  The point of comparison is the 1B run that we did on
-      server2 (single host, non-scale-out architecture, non-concurrent
-      load).
+      each and 2 or 3 servers.  See if scale-out holds as we increase
+      the data size.  The point of comparison is the 1B run that we
+      did on server2 (single host, non-scale-out architecture,
+      non-concurrent load).
 
     - Delay start of some data services, either on each host or on one
       of the hosts and then see how the load changes once we start
@@ -1811,3 +1903,82 @@ JF-U100-host23-2DS:
 
   - Done. BasicBufferStrategy#transferTo(RAF) - should be per
     AbstractBufferStrategy#transferTo(...)
+
+  - IndexSegment
+
+    - Done. The addrLeaves and addrNodes can not be expressed as a
+      single long since they are regions spanning many records and a
+      long would limit their byteCount to whatever was allowed by the
+      offsetBits.
+
+    - Done. The logic to buffer the nodes was actually examining the
+      extent of the leaves.
+
+    - Done. Added checksum to the index segment store checkpoint
+      record.
+
+    - Done (the problem was failing to flush the write cache to the
+      disk before initiating the channel to channel transfer - since
+      the data were not on the channel they naturally were not being
+      transferred.)  Stress test of U100 and very large runs of
+      TestIndexSegmentBuilderWithLargeTrees (m=32, nentries=m**4)
+      cause corrupt leaves in an index segment build.
+
+- Done. try w/ smaller extent via offsetBits (does not seem to clearly
+  trigger it earlier, but it still triggers the problem).
+
+- Done. write tests of transferTo.  I did find a bug in writeAll(),
+  but that was not the problem (it was writing each pass at the same
+  offset in the file when a write required multiple IOs).
+
+- **** Modify IndexSegmentBuilder to support fast forward scan, at
+  least in the data and in DumpIndexStore.
+
+- Done. Modify IndexSegmentBuilder to support fast reverse scan, at
+  least in the data and in DumpIndexStore.
+
+- **** Modify IndexSegment to use fast forward and fast reverse scans.
+  I need to override or replace the iterator to do this.  It should
+  use a priorLeaf/nextLeaf method in order for this to be easy to do.
+  
+  Ah. There is a protected [AbstractBTree#leafIterator()] method, but
+  it is not being used.  Perhaps this could be modified to accept a
+  fromKey and toKey and then used to allow replacement of the
+  striterator-based postOrderNodeIterator().
+
+- Done. IndexSegmentBuilder should be refactored to implement
+  Runnable/Callable.  The ctor can do the setup and the index build
+  will run in run()/call().  The return can be a status code for the
+  operation or statistics on the operation.  Throw an exception for an
+  error.
+
+- Done. Refactor to create a Temporary BufferMode.
+
+- Done. Refactor DiskOnlyStrategy to permit lazy creation of the
+  backing file.
+
+- Done. Refactor of TemporaryRawStore to use DiskOnlyStrategy with
+  lazy creation of the backing file.
+
+* Test suite for Temporary mode journals.
+
+- Static config via System#getProperties() for the direct buffer pool
+
+- Commit.
+
+- Scale-out runs now that I've fixed the index segment build problem.
+ 
+FIXME Apply {@link DiskOnlyStrategy#allocate(int)} and {@link
+      DiskOnlyStrategy#update(long, int, ByteBuffer)} and the new
+      temporary "store" facility (w/ factory) to the {@link
+      IndexSegmentBuilder}.
+      
+      Note: I need to create an interface extending IRawStore, put
+      those methods on that interface, and then declare that interface
+      on TemporaryRawStore in order to be able to access these
+      methods.
+
+- Done. Found a bug in DiskOnlyStrategy where it was always reading a
+  record three times....  Probably there was little performance impact
+  since the read would have come from the OS cache after the first
+  time, but still....

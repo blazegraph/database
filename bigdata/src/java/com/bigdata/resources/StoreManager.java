@@ -79,9 +79,7 @@ import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
@@ -321,12 +319,7 @@ abstract public class StoreManager extends ResourceEvents implements
      *       {@link #segmentIndex} onto a new tmpStore (or just rebuilding
      *       them from the {@link #dataDir}).
      */
-    private final IRawStore tmpStore = new TemporaryRawStore(
-            WormAddressManager.SCALE_UP_OFFSET_BITS,//
-            10 * Bytes.kilobyte, // initial in memory extent
-            100 * Bytes.megabyte, // maximum in memory extent
-            false // useDirectBuffers
-    );
+    private final IRawStore tmpStore = new TemporaryRawStore();
 
     /**
      * A map over the journal histories. The map is transient and is

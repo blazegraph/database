@@ -218,7 +218,9 @@ public class FileMetadata {
      *            The maximum extent of the journal before it will
      *            {@link Journal#overflow()}.
      * @param create
-     *            When true, the file is created if it does not exist.
+     *            When true, the file is created if it does not exist (this is
+     *            ignored for {@link BufferMode#Temporary} files since they are
+     *            created lazily if at all).
      * @param isEmptyFile
      *            This flag must be set when the temporary file mechanism is
      *            used to create a new temporary file otherwise an empty file is
@@ -264,9 +266,9 @@ public class FileMetadata {
      *            The create time to be assigned to the root block iff a new
      *            file is created.
      * @param validateChecksum
-     *            When true, the checksum stored in the root blocks of an
-     *            existing file will be validated when the file is opened. See
-     *            {@link Options}
+     *            When <code>true</code>, the checksum stored in the root
+     *            blocks of an existing file will be validated when the file is
+     *            opened. See {@link Options#VALIDATE_CHECKSUM}.
      * @param checker
      *            The object used to compute the checksum of the root blocks.
      * @throws RuntimeException
@@ -328,9 +330,19 @@ public class FileMetadata {
         
         this.exists = !isEmptyFile && file.exists();
         
+        // true for a temporary file
+        final boolean temporary = bufferMode.equals(BufferMode.Temporary);
+
+        if(temporary) {
+            
+            // override for temporary files.
+            deleteOnExit = true;
+            
+        }
+        
         this.file = file;
         
-        if (exists) {
+        if (exists && !temporary) {
 
             log.info("Opening existing file: "
                     + file.getAbsoluteFile());
@@ -360,14 +372,14 @@ public class FileMetadata {
         try {
             
             /*
-             * Open/create the file.
+             * Open/create the file (temporary files are not opened/created eagerly).
              */
-            this.raf = openFile(file, fileMode, bufferMode); 
+            this.raf = temporary ? null : openFile(file, fileMode, bufferMode); 
                 
-            if (exists) {
+            if (exists && !temporary) {
     
                 /*
-                 * The file already exists.
+                 * The file already exists (but not for temporary files).
                  */
     
                 this.extent = raf.length();
@@ -543,8 +555,12 @@ public class FileMetadata {
                  * Create a new journal.
                  */
     
-                // Mark the file for deletion on exit.
-                if(deleteOnExit) file.deleteOnExit();
+                if (deleteOnExit) {
+                    
+                    // Mark the file for deletion on exit.
+                    file.deleteOnExit();
+                    
+                }
                 
                 /*
                  * Set the initial extent.
@@ -558,7 +574,8 @@ public class FileMetadata {
     
                 this.userExtent = extent - headerSize0;
                 
-                if( bufferMode != BufferMode.Disk ) {
+                if (bufferMode != BufferMode.Disk
+                        && bufferMode != BufferMode.Temporary ) {
     
                     /*
                      * Verify that we can address this many bytes with this
@@ -570,32 +587,41 @@ public class FileMetadata {
                     AbstractBufferStrategy.assertNonDiskExtent(userExtent);
                     
                 }
-    
-                /* 
-                 * Extend the file.  We do this eagerly in an attempt to convince
-                 * the OS to place the data into a contiguous region on the disk.
-                 */
-                raf.setLength(extent);
-    
-                /*
-                 * Write the MAGIC and version on the file.
-                 */
-                raf.seek(0);
-                raf.writeInt(magic = MAGIC);
-                raf.writeInt(version = VERSION1);
-    
-                /*
-                 * Generate the root blocks. They are for all practical purposes
-                 * identical (in fact, their timestamps will be distict). The root
-                 * block are then written into their locations in the file.
-                 */
-                
+
                 /*
                  * The offset at which the first record will be written. This is
                  * zero(0) since the buffer offset (0) is the first byte after the
                  * root blocks.
                  */
                 nextOffset = 0;
+
+                magic = MAGIC;
+
+                version = VERSION1;
+                
+                if (!temporary) {
+                
+                    /*
+                     * Extend the file. We do this eagerly in an attempt to
+                     * convince the OS to place the data into a contiguous
+                     * region on the disk.
+                     */
+                    raf.setLength(extent);
+
+                    /*
+                     * Write the MAGIC and version on the file.
+                     */
+                    raf.seek(0);
+                    raf.writeInt(MAGIC);
+                    raf.writeInt(VERSION1);
+                
+                }
+
+                /*
+                 * Generate the root blocks. They are for all practical purposes
+                 * identical (in fact, their timestamps will be distict). The root
+                 * block are then written into their locations in the file.
+                 */
                 final long commitCounter = 0L;
                 final long firstCommitTime = 0L;
                 final long lastCommitTime = 0L;
@@ -616,20 +642,26 @@ public class FileMetadata {
                         lastCommitTime, commitCounter, commitRecordAddr,
                         commitRecordIndexAddr, uuid, createTime, closeTime,
                         checker);
-                FileChannel channel = raf.getChannel();
-                FileChannelUtility.writeAll(channel, rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
-                FileChannelUtility.writeAll(channel, rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
-//                channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
-//                channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+                
+                if(!temporary) {
+                
+                    FileChannel channel = raf.getChannel();
+                    
+                    FileChannelUtility.writeAll(channel, rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
+                    
+                    FileChannelUtility.writeAll(channel, rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+                    
+                    /*
+                     * Force the changes to disk. We also force the file metadata to
+                     * disk since we just changed the file size and we do not want to
+                     * loose track of that.
+                     */
+                    channel.force(true);
+        
+                }
+
                 this.rootBlock = rootBlock0;
                 
-                /*
-                 * Force the changes to disk. We also force the file metadata to
-                 * disk since we just changed the file size and we do not want to
-                 * loose track of that.
-                 */
-                channel.force(true);
-    
                 switch (bufferMode) {
                 case Direct:
                     /*
@@ -653,6 +685,9 @@ public class FileMetadata {
                             headerSize0, userExtent);
                     break;
                 case Disk:
+                    buffer = null;
+                    break;
+                case Temporary:
                     buffer = null;
                     break;
                 default:

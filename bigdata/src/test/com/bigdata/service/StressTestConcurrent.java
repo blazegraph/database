@@ -371,9 +371,7 @@ public class StressTestConcurrent extends
                      */
                     
                     groundTruthStore[i] = new TemporaryRawStore(
-                            WormAddressManager.SCALE_UP_OFFSET_BITS,
-                            Bytes.megabyte * 5/*min*/,
-                            Bytes.megabyte * 5/*max*/, false/*useDirectBuffers*/);
+                            WormAddressManager.SCALE_UP_OFFSET_BITS);
 
                     IndexMetadata md = indexMetadata.clone();
                     

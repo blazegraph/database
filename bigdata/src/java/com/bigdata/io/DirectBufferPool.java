@@ -137,6 +137,8 @@ public class DirectBufferPool {
      * <p>
      * Note: {@link #acquire()} requests will block once the pool capacity has
      * been reached until a buffer is {@link #release(ByteBuffer)}ed.
+     * 
+     * FIXME static config on {@link System#getProperties()}
      */
     public final static DirectBufferPool INSTANCE = new DirectBufferPool(//
             
@@ -144,9 +146,8 @@ public class DirectBufferPool {
              * This configuration will never block but is not bounded in how
              * many buffers it will allocate.
              */
-            
-//            Integer.MAX_VALUE, //poolCapacity
-//            Bytes.megabyte32 // bufferCapacity
+            Integer.MAX_VALUE, //poolCapacity
+            Bytes.megabyte32 // bufferCapacity
             
             /*
              * This configuration will block if there is a concurrent demand for
@@ -160,8 +161,8 @@ public class DirectBufferPool {
              * is capped at [poolCapacity * bufferCapacity] bytes, which is
              * again a reasonable value.
              */
-            100, // poolCapacity
-            1 * Bytes.megabyte32 // bufferCapacity
+//            100, // poolCapacity
+//            1 * Bytes.megabyte32 // bufferCapacity
             
             /*
              * This configuration may be useful for stress testing.

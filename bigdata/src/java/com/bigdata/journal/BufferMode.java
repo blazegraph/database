@@ -30,7 +30,7 @@ import java.nio.ByteBuffer;
  * The buffer mode in which the journal is opened.
  * </p>
  * <p>
- * This {@link #Direct} and {@link #Mapped} options may not be used for files
+ * The {@link #Direct} and {@link #Mapped} options may not be used for files
  * exceeding {@link Integer#MAX_VALUE} bytes in length since a
  * {@link ByteBuffer} is indexed with an <code>int</code> (the pragmatic limit
  * is much lower since a JVM does not have access to more than 2G of RAM).
@@ -49,7 +49,7 @@ public enum BufferMode {
      * etc.
      * </p>
      */
-    Transient("Transient",false/*stable*/),
+    Transient(false/*stable*/),
     
     /**
      * <p>
@@ -67,7 +67,7 @@ public enum BufferMode {
      * allows the journal to optimize IO operations.
      * </p>
      */
-    Direct("Direct",true/*stable*/),
+    Direct(true/*stable*/),
     
     /**
      * <p>
@@ -86,7 +86,7 @@ public enum BufferMode {
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      */
-    Mapped("Mapped",true/*stable*/),
+    Mapped(true/*stable*/),
     
     /**
      * <p>
@@ -98,14 +98,21 @@ public enum BufferMode {
      * grow and the journal is NOT optimized for random reads (poor locality).
      * </p>
      */
-    Disk("Disk",true/*stable*/);
+    Disk(true/*stable*/),
     
-    private final String name;
+    /**
+     * <p>
+     * A variant on the {@link #Disk} mode that is not restart-safe. This mode
+     * is useful for all manners of temporary data with full concurrency control
+     * and scales-up to very large temporary files. The backing file (if any) is
+     * always destroyed when the store is closed.
+     * </p>
+     */
+    Temporary(false/*stable*/);
+    
     private final boolean stable;
     
-    private BufferMode(String name, boolean stable) {
-
-        this.name = name;
+    private BufferMode(boolean stable) {
         
         this.stable = stable;
         
@@ -119,30 +126,6 @@ public enum BufferMode {
        
         return stable;
         
-    }
-    
-    public String toString() {
-        
-        return name;
-        
-    }
-
-    /**
-     * Parse a string whose contents must be "Transient", "Direct", "Mapped", or
-     * "Disk".
-     * 
-     * @param s
-     *            The string.
-     * 
-     * @return The named {@link BufferMode}.
-     */
-    public static BufferMode parse(String s) {
-        if( s == null ) throw new IllegalArgumentException();
-        if( s.equals(Transient.name)) return Transient;
-        if( s.equals(Direct.name)) return Direct;
-        if( s.equals(Mapped.name)) return Mapped;
-        if( s.equals(Disk.name)) return Disk;
-        throw new IllegalArgumentException();
     }
     
 }

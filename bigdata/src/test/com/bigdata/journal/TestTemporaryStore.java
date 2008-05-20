@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
@@ -37,10 +36,11 @@ import junit.framework.Test;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Test suite for {@link TemporaryStore} (temporary store with named indices).
+ * 
+ * @todo add test to verify read back after we overflow the initial write cache.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -106,10 +106,8 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo While the transient store uses root blocks there is no means
-     *       currently defined to re-open a journal based on a transient store
-     *       and hence it is not possible to extend
-     *       {@link AbstractRestartSafeTestCase}.
+     * Note: You can not re-open a transient store, hence it is not possible to
+     * extend {@link AbstractRestartSafeTestCase}.
      */
     public static class TestRawStore extends AbstractRawStoreTestCase {
         
@@ -145,21 +143,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
 
         protected IRawStore getStore() {
 
-            /*
-             * Note: The TemporaryRawStore transitions from a transient store
-             * (fully buffered, so interrupts can not cause the channel to be
-             * closed) to a disk-only store (already knows how to handle
-             * interrupts).
-             * 
-             * The only place where interrupts could be a problem is during a
-             * transition from transient to disk-only.
-             */
-            return new TemporaryRawStore(
-                    WormAddressManager.SCALE_UP_OFFSET_BITS,
-                    0, // DEFAULT_INITIAL_IN_MEMORY_EXTENT,
-                    0, //DEFAULT_MAXIMUM_IN_MEMORY_EXTENT
-                    false // use direct buffers.
-                    );
+            return new TemporaryRawStore();
             
         }
         
@@ -237,6 +221,8 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
         
         final long needed = Bytes.kilobyte32;
 
+        bufferStrategy.force(true);
+        
         assertTrue("overflow()", bufferStrategy.overflow(needed));
 
         assertTrue("extent", extent + needed <= bufferStrategy.getExtent());
@@ -431,173 +417,163 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
 
     }
     
-    /**
-     * Test that the store transparently overflows onto disk when the maximum
-     * in-memory limit has been exceeded. The test also makes sure that the
-     * existing data is recoverable and that the new data is also recoverable
-     * (when the buffer is extended it is typically copied while the length of a
-     * file is simply changed).  Finally, the test makes sure that the temporary
-     * file is deleted when the store is closed.
-     */
-    public void test_overflowToDisk() {
-        
-        Random r = new Random();
-
-        /*
-         * Note: We use a small store for this test to minimize the resource
-         * requirements. This should have no impact on the ability to test
-         * correctness.
-         */
-        TemporaryRawStore store = new TemporaryRawStore(
-                WormAddressManager.SCALE_UP_OFFSET_BITS, Bytes.kilobyte * 10,
-                Bytes.kilobyte * 100, false);
-        
-        // verify that we are using an in-memory buffer.
-        assertTrue(store.getBufferStrategy() instanceof TransientBufferStrategy); 
-        
-        {
-
-            AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
-                    .getBufferStrategy();
-
-            final long userExtent = bufferStrategy.getUserExtent();
-
-            final long extent = bufferStrategy.getExtent();
-
-            final long initialExtent = bufferStrategy.getInitialExtent();
-
-            final long nextOffset = bufferStrategy.getNextOffset();
-
-            // will be zero for a transient buffer.
-            assertEquals("nextOffset",0,nextOffset);
-            
-            // check the initial extent.
-            assertEquals("extent", store.initialInMemoryExtent, extent);
-
-            // will be the same for a transient buffer.
-            assertEquals("initialExtent", store.initialInMemoryExtent, initialExtent );
-
-            // will be the same for a transient buffer.
-            assertEquals("userExtent", store.initialInMemoryExtent, userExtent );
-
-            /*
-             * pre-extend the transient buffer to its maximum capacity.
-             */
-            bufferStrategy.truncate(store.maximumInMemoryExtent);
-
-            // verify that we are using an in-memory buffer.
-            assertTrue(store.getBufferStrategy() instanceof TransientBufferStrategy);
-
-            /*
-             * for the transient store, this gives us exactly that many bytes in
-             * both the user extent and the overall extent (there is no reserved
-             * header).
-             */
-            assertEquals("extent", store.maximumInMemoryExtent, bufferStrategy
-                    .getExtent());
-            assertEquals("userExtent", store.maximumInMemoryExtent,
-                    bufferStrategy.getUserExtent());
-
-        }
-
-        final byte[] b;
-        
-        final long addr;
-        
-        {
-            
-            final long extent = store.getBufferStrategy().getExtent();
-
-            final long userExtent = store.getBufferStrategy().getUserExtent();
-
-            /*
-             * now write random bytes that exactly fill the remaining space and
-             * verify that write.
-             */
-            long remaining = userExtent
-                    - store.getBufferStrategy().getNextOffset();
-
-//            assertTrue(remaining < Integer.MAX_VALUE);
+//    /**
+//     * Test that the store transparently overflows onto disk when the maximum
+//     * in-memory limit has been exceeded. The test also makes sure that the
+//     * existing data is recoverable and that the new data is also recoverable
+//     * (when the buffer is extended it is typically copied while the length of a
+//     * file is simply changed).  Finally, the test makes sure that the temporary
+//     * file is deleted when the store is closed.
+//     */
+//    public void test_overflowToDisk() {
+//        
+//        Random r = new Random();
 //
-//            b = new byte[(int) remaining];
+//        TemporaryRawStore store = new TemporaryRawStore();
+//        
+//        {
 //
-//            r.nextBytes(b);
+//            AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
+//                    .getBufferStrategy();
 //
-//            ByteBuffer tmp = ByteBuffer.wrap(b);
+//            final long userExtent = bufferStrategy.getUserExtent();
 //
-//            addr = store.write(tmp);
-            
-            addr = writeRandomData(store, remaining);
-
-            // verify that we are using an in-memory buffer.
-            assertTrue(store.getBufferStrategy() instanceof TransientBufferStrategy);
-
-            // no change in extent.
-            assertEquals("extent", extent, store.getBufferStrategy()
-                    .getExtent());
-
-            // no change in user extent.
-            assertEquals("userExtent", userExtent, store.getBufferStrategy()
-                    .getUserExtent());
-
-            // read back the data.
-            ByteBuffer tmp = store.read(addr);
-            
-            b = new byte[tmp.remaining()];
-            
-            tmp.get(b);
-
-        }
-
-        /*
-         * Now write some more random bytes forcing an extension of the buffer.
-         * 
-         * Note that this will cause the buffer to overflow and convert to a
-         * disk-based buffer.
-         * 
-         * We verify both the original write on the buffer and the new write.
-         * this helps to ensure that data was copied correctly into the extended
-         * buffer.
-         */
-        
-        final byte[] b2 = new byte[Bytes.kilobyte32];
-        
-        r.nextBytes(b2);
-        
-        ByteBuffer tmp2 = ByteBuffer.wrap(b2);
-        
-        final long addr2 = store.write(tmp2);
-        
-        // verify that we are using an disk-based store.
-        assertTrue(store.getBufferStrategy() instanceof DiskOnlyStrategy); 
-        
-        // verify extension of store.
-        assertTrue("extent", store.maximumInMemoryExtent + b2.length <= store
-                .getBufferStrategy().getExtent());
-
-        // verify extension of store.
-        assertTrue("userExtent",
-                store.maximumInMemoryExtent + b2.length <= store
-                        .getBufferStrategy().getUserExtent());
-
-        // verify data written before we overflowed the buffer.
-        assertEquals(b, store.read(addr));
-
-        // verify data written after we overflowed the buffer.
-        assertEquals(b2, store.read(addr2));
-    
-        // the name of the on-disk file.
-        File file = ((DiskOnlyStrategy)store.getBufferStrategy()).getFile();
-        
-        // verify that it exists.
-        assertTrue(file.exists());
-        
-        // close the store.
-        store.close();
-
-        // verify that the file is gone.
-        assertFalse(file.exists());
-
-    }
+//            final long extent = bufferStrategy.getExtent();
+//
+//            final long initialExtent = bufferStrategy.getInitialExtent();
+//
+//            final long nextOffset = bufferStrategy.getNextOffset();
+//
+//            // will be zero for a transient buffer.
+//            assertEquals("nextOffset",0,nextOffset);
+//            
+//            // check the initial extent.
+//            assertEquals("extent", store.initialInMemoryExtent, extent);
+//
+//            // will be the same for a transient buffer.
+//            assertEquals("initialExtent", store.initialInMemoryExtent, initialExtent );
+//
+//            // will be the same for a transient buffer.
+//            assertEquals("userExtent", store.initialInMemoryExtent, userExtent );
+//
+//            /*
+//             * pre-extend the transient buffer to its maximum capacity.
+//             */
+//            bufferStrategy.truncate(store.maximumInMemoryExtent);
+//
+//            // verify that we are using an in-memory buffer.
+//            assertTrue(store.getBufferStrategy() instanceof TransientBufferStrategy);
+//
+//            /*
+//             * for the transient store, this gives us exactly that many bytes in
+//             * both the user extent and the overall extent (there is no reserved
+//             * header).
+//             */
+//            assertEquals("extent", store.maximumInMemoryExtent, bufferStrategy
+//                    .getExtent());
+//            assertEquals("userExtent", store.maximumInMemoryExtent,
+//                    bufferStrategy.getUserExtent());
+//
+//        }
+//
+//        final byte[] b;
+//        
+//        final long addr;
+//        
+//        {
+//            
+//            final long extent = store.getBufferStrategy().getExtent();
+//
+//            final long userExtent = store.getBufferStrategy().getUserExtent();
+//
+//            /*
+//             * now write random bytes that exactly fill the remaining space and
+//             * verify that write.
+//             */
+//            long remaining = userExtent
+//                    - store.getBufferStrategy().getNextOffset();
+//
+////            assertTrue(remaining < Integer.MAX_VALUE);
+////
+////            b = new byte[(int) remaining];
+////
+////            r.nextBytes(b);
+////
+////            ByteBuffer tmp = ByteBuffer.wrap(b);
+////
+////            addr = store.write(tmp);
+//            
+//            addr = writeRandomData(store, remaining);
+//
+//            // verify that we are using an in-memory buffer.
+//            assertTrue(store.getBufferStrategy() instanceof TransientBufferStrategy);
+//
+//            // no change in extent.
+//            assertEquals("extent", extent, store.getBufferStrategy()
+//                    .getExtent());
+//
+//            // no change in user extent.
+//            assertEquals("userExtent", userExtent, store.getBufferStrategy()
+//                    .getUserExtent());
+//
+//            // read back the data.
+//            ByteBuffer tmp = store.read(addr);
+//            
+//            b = new byte[tmp.remaining()];
+//            
+//            tmp.get(b);
+//
+//        }
+//
+//        /*
+//         * Now write some more random bytes forcing an extension of the buffer.
+//         * 
+//         * Note that this will cause the buffer to overflow and convert to a
+//         * disk-based buffer.
+//         * 
+//         * We verify both the original write on the buffer and the new write.
+//         * this helps to ensure that data was copied correctly into the extended
+//         * buffer.
+//         */
+//        
+//        final byte[] b2 = new byte[Bytes.kilobyte32];
+//        
+//        r.nextBytes(b2);
+//        
+//        ByteBuffer tmp2 = ByteBuffer.wrap(b2);
+//        
+//        final long addr2 = store.write(tmp2);
+//        
+//        // verify that we are using an disk-based store.
+//        assertTrue(store.getBufferStrategy() instanceof DiskOnlyStrategy); 
+//        
+//        // verify extension of store.
+//        assertTrue("extent", store.maximumInMemoryExtent + b2.length <= store
+//                .getBufferStrategy().getExtent());
+//
+//        // verify extension of store.
+//        assertTrue("userExtent",
+//                store.maximumInMemoryExtent + b2.length <= store
+//                        .getBufferStrategy().getUserExtent());
+//
+//        // verify data written before we overflowed the buffer.
+//        assertEquals(b, store.read(addr));
+//
+//        // verify data written after we overflowed the buffer.
+//        assertEquals(b2, store.read(addr2));
+//    
+//        // the name of the on-disk file.
+//        File file = ((DiskOnlyStrategy)store.getBufferStrategy()).getFile();
+//        
+//        // verify that it exists.
+//        assertTrue(file.exists());
+//        
+//        // close the store.
+//        store.close();
+//
+//        // verify that the file is gone.
+//        assertFalse(file.exists());
+//
+//    }
     
 }

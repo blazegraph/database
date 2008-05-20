@@ -36,6 +36,17 @@ import com.bigdata.rawstore.WormAddressManager;
 /**
  * A temporary store that supports named indices.
  * 
+ * @todo Consider a re-write a wrapper for creating a
+ *       {@link BufferMode#Temporary} {@link Journal}.
+ *       <p>
+ *       This has the advantage of full concurrency support, group commit, and
+ *       low-latency startup (since the file is not created until the store
+ *       attempts to write through to the disk).
+ *       <p>
+ *       However, the current approach is lighter weight precisely because it
+ *       does not provide the thread-pool for concurrency control, so maybe it
+ *       is useful to keep both approaches.
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -56,11 +67,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      */
     public TemporaryStore() {
 
-        this(WormAddressManager.SCALE_UP_OFFSET_BITS,
-                DEFAULT_INITIAL_IN_MEMORY_EXTENT,
-                DEFAULT_MAXIMUM_IN_MEMORY_EXTENT,
-                false // useDirectBuffers (NO!)
-        );
+        this(WormAddressManager.SCALE_UP_OFFSET_BITS);
         
     }
 
@@ -69,15 +76,10 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      *            This determines the capacity of the store file and the maximum
      *            length of a record.  The value is passed through to
      *            {@link WormAddressManager#WormAddressManager(int)}.
-     * @param initialInMemoryExtent
-     * @param maximumInMemoryExtent
-     * @param useDirectBuffers
      */
-    public TemporaryStore(int offsetBits, long initialInMemoryExtent,
-            long maximumInMemoryExtent, boolean useDirectBuffers) {
+    public TemporaryStore(int offsetBits) {
 
-        super(offsetBits, initialInMemoryExtent, maximumInMemoryExtent,
-                useDirectBuffers);
+        super(0L/* maximumExtent */, offsetBits, getTempFile());
 
         setupName2AddrBTree();
 
@@ -105,19 +107,6 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         name2Addr.setupCache(liveIndexCacheCapacity);
         
     }
-
-//    /**
-//     * @deprecated This is only used by the test suites.
-//     */
-//    public BTree registerIndex(String name) {
-//
-//        IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
-//        
-//        BTree btree = BTree.create(this, metadata);
-//
-//        return registerIndex(name, btree);
-//        
-//    }
 
     public void registerIndex(IndexMetadata metadata) {
         

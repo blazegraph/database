@@ -35,9 +35,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Exchanger;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.cache.LRUCache;
@@ -49,7 +47,6 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager.ManagedJournal;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Disk-based journal strategy.
@@ -57,6 +54,15 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * Writes are buffered in a write cache. The cache is flushed when it would
  * overflow. As a result only large sequential writes are performed on the
  * store. Reads read through the write cache for consistency.
+ * <p>
+ * Note: This is used to realize both the {@link BufferMode#Disk} and the
+ * {@link BufferMode#Temporary} {@link BufferMode}s. When configured for the
+ * {@link BufferMode#Temporary} mode: the root blocks will not be written onto
+ * the disk, writes will not be forced, and the backing file will be created the
+ * first time the {@link DiskOnlyStrategy} attempts to write through to the
+ * disk. For many scenarios, the backing file will never be created unless the
+ * write cache overflows. This provides very low latency on start-up, the same
+ * MRMW capability, and allows very large temporary stores.
  * 
  * FIXME Examine behavior when write caching is enabled/disabled for the OS.
  * This has a profound impact. Asynchronous writes of multiple buffers, and the
@@ -121,13 +127,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       Async cache writes are also useful if the disk cache is turned off and
  *       could gain importance in offering tighter control over IO guarentees.
  * 
- * FIXME Add lazy creation of the backing file so that we can use the
- * {@link DiskOnlyStrategy} for temporary stores as well. The backing file will
- * never be created unless the write cache overflows. Since we write the root
- * blocks when we create the file, we have to be careful and make sure that the
- * store is initialized properly. Note that this will also mean that the temp
- * store can support commits, which it does not really need to do.
- * 
  * @todo test verifying that large records are written directly and that the
  *       write cache is properly flush beforehand.
  * 
@@ -148,11 +147,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       we do not need to allocate a separate writeCache. However, we will
  *       still need to track the {@link #writeCacheOffset} and maintain a
  *       {@link #writeCacheIndex}.
- *       
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @see BufferMode#Disk
+ * @see BufferMode#Temporary
  */
 public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         IDiskBasedStrategy {
@@ -166,6 +166,23 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * The mode used to open that file.
      */
     private final String fileMode;
+
+    /**
+     * <code>true</code> iff configured as a {@link BufferMode#Temporary} store.
+     */
+    private final boolean temporaryStore;
+
+    /**
+     * The backing file for a {@link BufferMode#Temporary} store is not opened
+     * until the {@link #writeCache} is flushed to disk for the first time. In
+     * these scenarios this field will be <code>false</code> until the
+     * {@link #writeCache} is flushed and <code>true</code> thereafter. For
+     * {@link BufferMode#Disk}, this field is initially <code>true</code>.
+     * <p>
+     * The value of this field determines the behavior of
+     * {@link #reopenChannel()}.
+     */
+    private boolean fileOpened;
     
     /**
      * The IO interface for the file - <strong>use
@@ -476,16 +493,31 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
+    /**
+     * Note: This MAY be <code>null</code>. If {@link BufferMode#Temporary}
+     * is used then it WILL be <code>null</code> until the {@link #writeCache}
+     * is flushed to disk for the first time.
+     */
     final public RandomAccessFile getRandomAccessFile() {
 
         return raf;
-        
+
     }
 
+    /**
+     * Note: This MAY be <code>null</code>. If {@link BufferMode#Temporary}
+     * is used then it WILL be <code>null</code> until the {@link #writeCache}
+     * is flushed to disk for the first time.
+     */
     final public FileChannel getChannel() {
-        
-        return getRandomAccessFile().getChannel();
-        
+
+        final RandomAccessFile raf = getRandomAccessFile();
+
+        if (raf == null)
+            return null;
+
+        return raf.getChannel();
+
     }
 
     /**
@@ -1075,13 +1107,25 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     DiskOnlyStrategy(long maximumExtent, FileMetadata fileMetadata) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
-                fileMetadata.nextOffset, BufferMode.Disk, fileMetadata.readOnly);
+                fileMetadata.nextOffset, fileMetadata.bufferMode,
+                fileMetadata.readOnly);
 
         this.file = fileMetadata.file;
 
         this.fileMode = fileMetadata.fileMode;
         
+        this.temporaryStore = (fileMetadata.bufferMode==BufferMode.Temporary);
+        
         this.raf = fileMetadata.raf;
+        
+        this.fileOpened = raf != null;
+        
+        if (!temporaryStore && !fileOpened) {
+            
+            throw new RuntimeException(
+                    "File not open and not a temporary store");
+            
+        }
 
         this.extent = fileMetadata.extent;
 
@@ -1111,19 +1155,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             writeCache = new WriteCache( fileMetadata.writeCache );
             
-            /*
-             * Start a thread that will be used to asynchronously drive data in
-             * the write cache to the disk.
-             */
-
-            if(false) {
-                
-                writeService = Executors
-                        .newSingleThreadExecutor(DaemonThreadFactory
-                                .defaultThreadFactory());
-                
-            }
-
         } else {
             
             writeCache = null;
@@ -1150,46 +1181,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
         
     }
-    private ExecutorService writeService = null;
-
-//    /**
-//     * Writes all data in the {@link WriteCache} onto the disk file.
-//     * 
-//     * FIXME In order to be able to asynchronously drive data in the write cache
-//     * to the disk we need to track the offset of the 1st byte in {@link #buf}
-//     * that has not been written onto the disk.
-//     * {@link DiskOnlyStrategy#force(boolean)} will have to be modified so that
-//     * it awaits the current task writing out data (if any) and then
-//     * synchronously writes out the remaining data itself.
-//     * <P>
-//     * We can submit a new task each time a record is written, but we do not
-//     * want to have more than one task on the queue. Alternatively, just make
-//     * the thread runnable and coordinate with a {@link Lock} and
-//     * {@link Condition}s.
-//     * 
-//     * in order to handle the end of the buffer gracefully we might have to just
-//     * and the application a new one when the current one is full. we can then
-//     * trigger a write once the buffer is at least X% (or #M) and if the next
-//     * record would cause an overflow in anycase. the write can be a partial
-//     * write of the buffer or not.
-//     * 
-//     * using multiple buffers means that we have to search the chain of buffers
-//     * still holding data as our write cache. if we make the buffer change over
-//     * point synchronous then this will only be a single buffer. else a chain.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    private class Task implements Runnable {
-//
-//        public void run() {
-//
-//            throw new UnsupportedOperationException();
-//            
-//        }
-//        
-//    }
-    
+   
     final public boolean isStable() {
         
         return true;
@@ -1208,6 +1200,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     public void force(boolean metadata) {
 
+        assertOpen();
+        
         synchronized(this) {
 
             // flush all pending writes to disk.
@@ -1217,8 +1211,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         try {
 
-            // sync the disk.
-            getChannel().force(metadata);
+            if(!temporaryStore) {
+
+                // sync the disk.
+                getChannel().force(metadata);
+                
+            }
 
         } catch (IOException ex) {
 
@@ -1242,30 +1240,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         super.close();
 
-        if (writeService != null) {
-            
-            /*
-             * Shutdown the write service.
-             */
-            
-            writeService.shutdownNow();
-            
-            try {
-            
-                if (!writeService.awaitTermination(2, TimeUnit.SECONDS)) {
-                
-                    log.warn("Timeout awaiting termination");
-                    
-                }
-                
-            } catch (InterruptedException ex) {
-                
-                log.warn("Interrupted awaiting termination: " + ex, ex);
-                
-            }
-            
-        }
-        
         // Release the write cache.
         writeCache = null;
         
@@ -1281,8 +1255,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         try {
 
-            raf.close();
+            if (raf != null) {
 
+                raf.close();
+                
+            }
+            
         } catch (IOException ex) {
 
             throw new RuntimeException(ex);
@@ -1619,6 +1597,23 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
         }
 
+        if(temporaryStore && !fileOpened) {
+
+            /*
+             * The backing file has not been opened.
+             * 
+             * Note: Without this case this method would create the backing
+             * store for a Temporary store if anyone happened to invoke it. In
+             * fact, this method will never get invoked for a Temporary store
+             * without a backing store since the reads never read against the
+             * channel because it does not exist. So, really, this is just here
+             * to be paranoid.
+             */
+            
+            return false;
+        
+        }
+        
         try {
 
             raf = FileMetadata.openFile(file, fileMode, bufferMode);
@@ -2007,6 +2002,36 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     }
     
     /**
+     * Create/open the backing file for a {@link BufferMode#Temporary} store iff
+     * it has not been created/opened.
+     */
+    final private void createBackingFile() {
+        
+        if (!fileOpened && temporaryStore) {
+            
+            try {
+                
+                // open the file for the first time (create).
+                raf = FileMetadata.openFile(file, fileMode, bufferMode);
+                
+                // note that it has been opened.
+                fileOpened = true;
+
+//                if(log.isInfoEnabled())
+                log.warn("Opened backing file for temporary store: "+file);
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException("Could not open temp file: file="
+                        + file, e);
+                
+            }
+            
+        }
+
+    }
+    
+    /**
      * Write the data on the disk (synchronous).
      * <p>
      * Note: The caller MUST be synchronized on <i>this</i>.
@@ -2037,6 +2062,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     void writeOnDisk(final ByteBuffer data, final long offset, final boolean append) {
 
         final long begin = System.nanoTime();
+
+        createBackingFile();
         
         final int nbytes = data.remaining();
 
@@ -2079,6 +2106,21 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     
     public void writeRootBlock(IRootBlockView rootBlock,ForceEnum forceOnCommit) {
 
+        if(temporaryStore) {
+            
+            /*
+             * Note: There are NO ROOT BLOCKS for a temporary store. Root blocks
+             * are only useful for stores that can be re-opened, and you can not
+             * re-open a temporary store - the backing file is always deleted
+             * when the store is closed. The AbstractJournal still formats the
+             * root blocks and retains a reference to the current root block,
+             * but it is NOT written onto the file.
+             */
+            
+            return;
+            
+        }
+        
         if (rootBlock == null)
             throw new IllegalArgumentException();
         
@@ -2129,13 +2171,20 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
         }
         
+        /*
+         * Note: This handles the case for a Temporary store where the write
+         * cache is the same size as the initial extent and everything written
+         * so far has been absorbed by the write cache.
+         */
+        createBackingFile();
+        
         try {
 
             // extend the file.
             getRandomAccessFile().setLength(newExtent);
             
             /*
-             * since we just changed the file length we force the data to disk
+             * Since we just changed the file length we force the data to disk
              * and update the file metadata. this is a relatively expensive
              * operation but we want to make sure that we do not loose track of
              * a change in the length of the file.
@@ -2144,7 +2193,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * that the next force() also forced the metadata to disk.
              */
             
-            force(true);
+            if (!temporaryStore) {
+
+                force(true);
+                
+            }
 
             counters.ntruncate++;
             
@@ -2168,6 +2221,17 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     synchronized public long transferTo(RandomAccessFile out)
             throws IOException {
         
+        /*
+         * Note: Force the write cache to the disk so that all the data we want
+         * to transfer from channel to channel are actually on the source
+         * channel!
+         * 
+         * Note: This also handles the case for a Temporary store where the
+         * backing file has not even been created yet.
+         */
+        
+        flushWriteCache();
+        
         return super.transferFromDiskTo(this, out);
         
     }
@@ -2185,31 +2249,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         // discard the write cache.
         writeCache = null;
-        
-    }
-
-    /**
-     * Subclass that uses lazy creation of the file on the disk, disables
-     * forcing of writes and force on commit, and marks the file (when created)
-     * as "temporary". This will let us write in memory until the write cache
-     * overflows and then it will start putting down the data on the disk. This
-     * has all of the advantages of the current approach (low latency on
-     * startup), plus we get MRMW for the temp store. Maybe add a
-     * TemporaryStoreFactory class to encapsulate this approach.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class TempStore extends DiskOnlyStrategy {
-
-        /**
-         * @param maximumExtent
-         * @param fileMetadata
-         */
-        TempStore(long maximumExtent, FileMetadata fileMetadata) {
-            super(maximumExtent, fileMetadata);
-            // TODO Auto-generated constructor stub
-        }
         
     }
     
