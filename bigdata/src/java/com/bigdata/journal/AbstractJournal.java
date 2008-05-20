@@ -508,7 +508,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public static ByteBuffer getWriteCache(Properties properties) {
 
-        final BufferMode bufferMode = BufferMode.parse(properties.getProperty(
+        final BufferMode bufferMode = BufferMode.valueOf(properties.getProperty(
                 Options.BUFFER_MODE, "" + Options.DEFAULT_BUFFER_MODE));
 
         final boolean readOnly = Boolean.parseBoolean(properties.getProperty(
@@ -610,7 +610,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          * Note: very large journals MUST use the disk-based mode.
          */
 
-        final BufferMode bufferMode = BufferMode.parse(properties.getProperty(
+        final BufferMode bufferMode = BufferMode.valueOf(properties.getProperty(
                 Options.BUFFER_MODE, "" + Options.DEFAULT_BUFFER_MODE));
 
         log.info(Options.BUFFER_MODE + "=" + bufferMode);
@@ -1056,6 +1056,31 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
             break;
 
+        }
+        
+        case Temporary: { 
+            
+            /*
+             * Setup the buffer strategy.
+             * 
+             * FIXME Add test suite for this buffer mode. It should support MRMW
+             * but is not restart-safe.
+             */
+
+            fileMetadata = new FileMetadata(file, BufferMode.Temporary,
+                    useDirectBuffers, initialExtent, maximumExtent,
+                    true/* create */, isEmptyFile, true/* deleteOnExit */,
+                    false/* readOnly */, ForceEnum.No/* forceWrites */,
+                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
+                    writeCache, false/* validateChecksum */, createTime, null/* checker */);
+
+            _bufferStrategy = new DiskOnlyStrategy(
+                    0L/* soft limit for maximumExtent */, fileMetadata);
+
+            this._rootBlock = fileMetadata.rootBlock;
+            
+            break;
+            
         }
 
         default:

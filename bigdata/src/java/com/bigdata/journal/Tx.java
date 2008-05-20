@@ -37,7 +37,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IsolatedFusedView;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 
@@ -191,6 +190,21 @@ public class Tx extends AbstractTx implements ITx {
 
     }
 
+    /**
+     * @todo This might need to be a full {@link Journal} using
+     *       {@link BufferMode#Temporary} in order to have concurrency control
+     *       for the isolated named indices. This would let us leverage the
+     *       existing {@link WriteExecutorService} for handling concurrent
+     *       operations within a transaction on the same named _isolated_
+     *       resource. There are a lot of issues here, including the level of
+     *       concurrency expected for transactions. Also, note that the write
+     *       set of the tx is not restart safe, we never force writes to disk,
+     *       etc. Those are good fits for the {@link BufferMode#Temporary}
+     *       {@link BufferMode}.  However, it might be nice to do without having
+     *       a {@link WriteExecutorService} per transaction, e.g., by placing
+     *       the named indices for a transaction within a namespace for that
+     *       tx. 
+     */
     private IRawStore getTemporaryStore() {
 
         assert lock.isHeldByCurrentThread();
@@ -200,12 +214,7 @@ public class Tx extends AbstractTx implements ITx {
             final int offsetBits = resourceManager.getLiveJournal()
                     .getOffsetBits();
             
-            tmpStore = readOnly ? null : new TemporaryRawStore(//
-                    offsetBits, //
-                    Bytes.megabyte * 1, // initial in-memory size
-                    Bytes.megabyte * 10, // maximum in-memory size.
-                    false // do NOT use direct buffers.
-                    );
+            tmpStore = readOnly ? null : new TemporaryRawStore(offsetBits);
 
         }
 

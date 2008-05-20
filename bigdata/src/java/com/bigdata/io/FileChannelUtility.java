@@ -220,6 +220,11 @@ public class FileChannelUtility {
      * which case its position will have been changed anyway so this makes the
      * API more uniform).
      * 
+     * @issue There is a known bug with large transfers under Windows. See <a
+     *        href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=332d29312f820116d80442f33fb87?bug_id=6431344">
+     *        FileChannel.transferTo() doesn't work if address space runs out
+     *        </a>
+     * 
      * @param sourceChannel
      *            The source {@link FileChannel}.
      * @param fromPosition

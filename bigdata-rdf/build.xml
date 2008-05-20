@@ -78,6 +78,7 @@
 			<doctitle><![CDATA[<h1>bigdata&trade;</h1>]]></doctitle>
 	    	<bottom><![CDATA[<i>Copyright &#169; 2006-2008 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
     		<tag name="todo" scope="all" description="TODO:"/>
+    		<tag name="issue" scope="all" description="ISSUE:"/>
     		<!--tag name="FIXME" scope="all" description="FIXME:"/-->
 		    <link href="http://java.sun.com/j2se/1.5.0/docs/api/"/>
 		    <link href="http://openrdf.org/doc/sesame/api/"/>

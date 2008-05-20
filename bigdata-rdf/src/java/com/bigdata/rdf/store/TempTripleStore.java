@@ -29,11 +29,10 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
-import org.openrdf.model.vocabulary.RDF;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -51,6 +50,11 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * then use a {@link LocalTripleStore} and specify
  * {@link com.bigdata.journal.Options#BUFFER_MODE} as
  * {@link BufferMode#Transient}.
+ * 
+ * FIXME examine use of {@link TemporaryStore} vs a {@link Journal} with
+ * {@link BufferMode#Temporary}. The latter provides full concurrency control
+ * and group commit while the former presumably has less startup costs because
+ * it does not have the thread pools for concurrency control.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

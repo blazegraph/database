@@ -73,9 +73,6 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         // Use the disk-backed store.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-        // FIXME remove this - I am trying to trigger a problem earlier.
-        properties.setProperty(Options.OFFSET_BITS, "50"); // 42 is scale-out, 38 is scale-up.
-        
         // name data directory for the unit test.
         properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
 
