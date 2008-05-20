@@ -370,13 +370,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
     
     /**
-     * Re-open a closed store. This operation should succeed if the backing file
-     * is still accessible.
+     * Re-open a (possibly closed) store. This operation should succeed if the
+     * backing file is still accessible.
      * <p>
      * Note: If an exception is thrown then the backing file will be closed.
      * 
-     * @throws IllegalStateException
-     *             if the store is already open.
      * @throws RootBlockException
      *             if the root block is invalid.
      * @throws RuntimeException
@@ -494,13 +492,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
     }
     
-    public boolean isOpen() {
+    final public boolean isOpen() {
         
         return open;
         
     }
    
-    public boolean isReadOnly() {
+    final public boolean isReadOnly() {
 
         assertOpen();
 
@@ -508,7 +506,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
     }
     
-    public boolean isStable() {
+    final public boolean isStable() {
         
         return true;
         
@@ -518,7 +516,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * Return <code>false</code> since the leaves are not fully buffered even
      * if the nodes are fully buffered.
      */
-    public boolean isFullyBuffered() {
+    final public boolean isFullyBuffered() {
         
         return false;
         

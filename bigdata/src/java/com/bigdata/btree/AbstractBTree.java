@@ -55,9 +55,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.Split;
 
-import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.Striterator;
-
 /**
  * <p>
  * Base class for mutable and immutable B+-Tree implementations.
@@ -2178,6 +2175,14 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
             counters.bytesRead += bytesRead;
             
+        }
+
+        if (Thread.currentThread().isInterrupted()) {
+
+            final InterruptedException cause = new InterruptedException();
+
+            throw new RuntimeException("Interrupted", cause);
+
         }
 
         /* 
