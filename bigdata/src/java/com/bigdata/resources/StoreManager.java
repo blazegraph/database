@@ -1409,9 +1409,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     .getAbsolutePath());
 
             // Note: disables buffering nodes during the scan.
-            p.setProperty(
-                    IndexSegmentStore.Options.MAX_BYTES_TO_FULLY_BUFFER_NODES,
-                    "1");
+            p.setProperty(IndexSegmentStore.Options.BUFFER_NODES, "false");
 
             /*
              * Attempt to open the index segment.

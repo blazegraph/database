@@ -82,12 +82,19 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         /*
          * setup overflow conditions - can be easily modified to trigger
          * overflow early or late or to disable overflow all together.
+         * 
+         * Note: Running with 5M initial and maximum extent is something of a
+         * stress test.  Under Windows it will eventually trigger a JVM bug
+         * dealing with large channel to channel transfers during an index
+         * segment build, but it should otherwise run correctly.
          */
 //      properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
-        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
-        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
-//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*100);
-//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*100);
+//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*5);
+//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*5);
+//      properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*100);
+//      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*100);
+        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*200);
+        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*200);
 //      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
 //        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
         

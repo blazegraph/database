@@ -42,7 +42,7 @@ import com.bigdata.mdi.AbstractResourceMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IMRMW;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;
 
@@ -58,7 +58,7 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore, IMRMW {
+public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateStore, IMRMW {
 
     protected static final Logger log = Logger.getLogger(TemporaryRawStore.class);
 
@@ -412,6 +412,18 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
                 
     }
 
+    final public long allocate(int nbytes) {
+
+        return buf.allocate(nbytes);
+        
+    }
+
+    final public void update(long addr, int off, ByteBuffer data) {
+
+        buf.update(addr, off, data);
+        
+    }
+
     /**
      * The maximum length of a record that may be written on the store.
      */
@@ -427,5 +439,4 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         return buf.getCounters();
         
     }
-
 }

@@ -45,14 +45,16 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DumpIndexStore {
+public class DumpIndexSegment {
 
-    protected static Logger log = Logger.getLogger(DumpIndexStore.class);
+    protected static Logger log = Logger.getLogger(DumpIndexSegment.class);
     
     public static void usage() {
      
-        System.err.println("usage: " + DumpIndexStore.class.getSimpleName()
+        System.err.println("usage: " + DumpIndexSegment.class.getSimpleName()
                 + "[options] " + " file(s)");
+        
+        // @todo declare the options that the class understands.
         
 //        System.err.println("options:");
 //
@@ -70,82 +72,124 @@ public class DumpIndexStore {
             
         }
 
-        for (String fileStr : args) {
+        for (int i = 0; i < args.length; i++) {
 
-            File file = new File(fileStr);
+            final String arg = args[i];
 
-            if (!file.exists()) {
+            if (arg.startsWith("-")) {
 
-                System.err.println("No such file: " + fileStr);
+                if( arg.equals("-d")) {
+                    
+                    final Level level = Level.toLevel(args[++i]);
+                    
+                    System.out.println("Setting log level: "+level);
+                    
+                    // turn up the dumpLog level so that we can see the output.
+                    BTree.dumpLog.setLevel(level);
+                    
+                } else {
+                    
+                    System.err.println("Unknown option: "+arg);
+                    
+                    System.exit( 1 );
+                    
+                }
+                
+            } else {
 
-                System.exit(1);
+                final File file = new File(arg);
+
+                if (!file.exists()) {
+
+                    System.err.println("No such file: " + file);
+
+                    continue;
+                    
+                }
+
+                dumpIndexSegment(file);
 
             }
 
-            Properties properties = new Properties();
-
-            properties.setProperty(IndexSegmentStore.Options.SEGMENT_FILE,
-                    fileStr);
-
-            IndexSegmentStore store = new IndexSegmentStore(properties);
-
-            // dump the checkpoint record, index metadata record, etc.
-            dump(store);
-            
-            AbstractNode root = store.loadIndexSegment().getRoot(); 
-            
-            // turn up the dumpLog level so that we can see the output.
-            BTree.dumpLog.setLevel(Level.DEBUG);
-
-            if(root instanceof Node) {
-
-                writeBanner("dump nodes");
-
-                // dump the nodes (not the leaves).
-                dumpNodes(store,(Node)root);
-                
-            }
-            
-            // dump the leaves using a fast reverse scan. @todo command line option
-            if(false) {
-
-                writeBanner("dump leaves using fast reverse scan");
-
-                dumpLeavesReverseScan(store);
-                
-            }
-
-            // dump the leaves using a fast forward scan. @todo command line option
-            if(false) {
-
-                writeBanner("dump leaves using fast forward scan");
-
-                dumpLeavesForwardScan(store);
-                
-            }
-        
-            // dump the index contents : @todo command line option.
-            if(true) {
-                
-                writeBanner("dump keys and values using iterator");
-
-                DumpJournal.dumpIndex(store.loadIndexSegment());
-                
-            }
-            
         }
 
     }
 
-    static void dump(IndexSegmentStore store) {
+    static void dumpIndexSegment(File file) {
 
-        System.err.println("file        : " + store.getFile());
+        /*
+         * Note: These options also require you to turn up the logging level in
+         * order to see the output. However, when true they will apply a variety
+         * of validation tests to the nodes and leaves regardless of whether
+         * their state is written onto the console.
+         */
+        boolean dumpNodeState = true; // @todo command line option
+        boolean dumpLeafState = true;// @todo command line option
 
-        System.err.println("checkpoint  : " + store.getCheckpoint().toString());
+        Properties properties = new Properties();
 
-        System.err.println("metadata    : " + store.getIndexMetadata().toString());
+        properties.setProperty(IndexSegmentStore.Options.SEGMENT_FILE,
+                file.getPath());
+
+        IndexSegmentStore store = new IndexSegmentStore(properties);
+
+        // dump the checkpoint record, index metadata record, etc.
+        dumpHeaders(store);
+
+        AbstractNode root = store.loadIndexSegment().getRoot();
+
+        // dump the node state.
+        if (root instanceof Node) {
+
+            writeBanner("dump nodes");
+
+            // dump the nodes (not the leaves).
+            dumpNodes(store, (Node) root, dumpNodeState);
+
+        }
+
+        // dump the leaves using a fast reverse scan.
+        boolean fastReverseScan = true;// @todo command line option
+        if (fastReverseScan) {
+
+            writeBanner("dump leaves using fast reverse scan");
+
+            dumpLeavesReverseScan(store, dumpLeafState);
+
+        }
+
+        // dump the leaves using a fast forward scan.
+        boolean fastForwardScan = true;// @todo command line option
+        if (fastForwardScan) {
+
+            writeBanner("dump leaves using fast forward scan");
+
+            dumpLeavesForwardScan(store, dumpLeafState);
+
+        }
+
+        // dump the index contents
+        boolean entryScan = true;// @todo command line option.
+        boolean showTuples = false;// @todo command line option.
+        if (entryScan) {
+
+            writeBanner("dump keys and values using iterator");
+
+            DumpJournal.dumpIndex(store.loadIndexSegment(),showTuples);
+
+        }
+
+    }
+
+    static void dumpHeaders(IndexSegmentStore store) {
+
+        System.out.println("file        : " + store.getFile());
+
+        System.out.println("checkpoint  : " + store.getCheckpoint().toString());
+
+        System.out.println("metadata    : " + store.getIndexMetadata().toString());
         
-        System.err.println("bloomFilter : "
+        System.out.println("bloomFilter : "
                 + (store.getCheckpoint().addrBloom != IRawStore.NULL ? store
                         .getBloomFilter().toString() : "N/A"));
         
@@ -158,9 +202,10 @@ public class DumpIndexStore {
      * 
      * @param node
      */
-    static void dumpNodes(IndexSegmentStore store, Node node) {
+    static void dumpNodes(IndexSegmentStore store, Node node, boolean dumpNodeState) {
 
-        node.dump(System.err);
+        if(dumpNodeState)
+            node.dump(System.out);
         
         for (int i = 0; i <= node.nkeys; i++) {
 
@@ -186,7 +231,7 @@ public class DumpIndexStore {
                 }
 
                 // recursive dump
-                dumpNodes(store, child);
+                dumpNodes(store, child, dumpNodeState);
 
             }
             
@@ -257,18 +302,24 @@ public class DumpIndexStore {
     /**
      * Dump leaves by direct record scan from first leaf offset until end of
      * leaves region.
-     * 
-     * FIXME refactor for fast forward/reverse scan in {@link IndexSegment}.
+     * <p>
+     * Note: While this could be rewritten for cleaner code to use
+     * {@link IndexSegment#leafIterator(boolean)} but it would make it harder to
+     * spot problems in the data.
      * 
      * @param store
      */
-    static void dumpLeavesReverseScan(IndexSegmentStore store) {
+    static void dumpLeavesReverseScan(IndexSegmentStore store,boolean dumpLeafState) {
+        
+        final long begin = System.currentTimeMillis();
         
         final AbstractBTree btree = store.loadIndexSegment(); 
         
         // first the address of the first leaf in a right-to-left scan (always defined).
         long addr = store.getCheckpoint().addrLastLeaf;
         
+        System.out.println("lastLeafAddr="+store.toString(addr));
+
         {
             
             final long addr2 = getLastLeafAddr(store,
@@ -299,8 +350,7 @@ public class DumpIndexStore {
                 log.error("Not a leaf address: "+store.toString(addr)+" : aborting scan");
 
                 // abort scan.
-                
-                return;
+                break;
                 
             }
 
@@ -310,7 +360,7 @@ public class DumpIndexStore {
             // note: does NOT set the parent reference on the Leaf!
             Leaf leaf = (Leaf) btree.nodeSer.getLeaf(btree, addr, data);
 
-            leaf.dump(System.err);
+            if(dumpLeafState) leaf.dump(System.out);
             
             nscanned++;
             
@@ -322,7 +372,7 @@ public class DumpIndexStore {
                                 + addr+" ("+store.toString(addr)+")");
                 
                 // abort scan.
-                return;
+                break;
 
             }
             
@@ -337,8 +387,8 @@ public class DumpIndexStore {
                     
                 }
                 
-                // Done.
-                return;
+                // Done (normal completion).
+                break;
                 
             }
             
@@ -347,24 +397,32 @@ public class DumpIndexStore {
             
         }
 
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        System.out.println("Visited "+nscanned+" leaves using fast reverse scan in "+elapsed+" ms");
+        
     }
 
     /**
      * Dump leaves by direct record scan from first leaf offset until end of
      * leaves region.
-     * 
-     * FIXME refactor for fast forward/reverse scan in {@link IndexSegment}.
+     * <p>
+     * Note: While this could be rewritten for cleaner code to use
+     * {@link IndexSegment#leafIterator(boolean)} but it would make it harder to
+     * spot problems in the data.
      * 
      * @param store
      */
-    static void dumpLeavesForwardScan(IndexSegmentStore store) {
+    static void dumpLeavesForwardScan(IndexSegmentStore store,boolean dumpLeafState) {
+        
+        final long begin = System.currentTimeMillis();
         
         final AbstractBTree btree = store.loadIndexSegment(); 
 
         // first the address of the first leaf in a left-to-right scan (always defined).
         long addr = store.getCheckpoint().addrFirstLeaf;
         
-        { // @todo same test for the reverse scan.
+        {
             
             final long addr2 = getFirstLeafAddr(store,
                     store.getCheckpoint().addrRoot);
@@ -385,7 +443,7 @@ public class DumpIndexStore {
             
         }
         
-        System.err.println("firstLeafAddr="+store.toString(addr));
+        System.out.println("firstLeafAddr="+store.toString(addr));
 
         int nscanned = 0;
         
@@ -396,8 +454,7 @@ public class DumpIndexStore {
                 log.error("Not a leaf address: "+store.toString(addr)+" : aborting scan");
 
                 // abort scan.
-                
-                return;
+                break;
                 
             }
             
@@ -407,7 +464,7 @@ public class DumpIndexStore {
             // note: does NOT set the parent reference on the Leaf!
             Leaf leaf = (Leaf) btree.nodeSer.getLeaf(btree, addr, data);
 
-            leaf.dump(System.err);
+            if(dumpLeafState) leaf.dump(System.out);
             
             nscanned++;
             
@@ -419,7 +476,7 @@ public class DumpIndexStore {
                         + addr+" ("+store.toString(addr)+")");
                 
                 // abort scan.
-                return;
+                break;
 
             }
             
@@ -434,14 +491,19 @@ public class DumpIndexStore {
                     
                 }
 
-                // Done.
-                return;
+                // Done (normal completion).
+                break;
                 
             }
             
             addr = nextAddr;
                         
         }
+
+
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        System.out.println("Visited "+nscanned+" leaves using fast forward scan in "+elapsed+" ms");
 
     }
 

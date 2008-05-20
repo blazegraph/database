@@ -33,17 +33,18 @@ import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.RootBlockException;
-import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
@@ -94,15 +95,20 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     private IndexSegmentAddressManager addressManager;
     
     /**
-     * See {@link Options#MAX_BYTES_TO_FULLY_BUFFER_NODES}.
+     * See {@link Options#BUFFER_NODES}.
      */
-    private final long maxBytesToFullyBufferNodes;
+    private final boolean bufferNodes;
     
     /**
-     * A buffer containing the disk image of the nodes in the
-     * {@link IndexSegment}. While some nodes will be held in memory by the
-     * hard reference queue the use of this buffer means that reading a node
-     * that has fallen off of the queue does not require any IOs.
+     * An optional <strong>direct</strong> {@link ByteBuffer} containing a disk
+     * image of the nodes in the {@link IndexSegment}.
+     * <p>
+     * Note: This buffer is acquired from the {@link DirectBufferPool} and MUST
+     * be released back to that pool.
+     * <p>
+     * Note: While some nodes will be held in memory by the hard reference queue
+     * the use of this buffer means that reading a node that has fallen off of
+     * the queue does not require any IO.
      */
     private ByteBuffer buf_nodes;
     
@@ -218,35 +224,25 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         String SEGMENT_FILE = "segmentFile";
         
         /**
-         * <code> maxBytesToFullyBufferedNodes</code> - the maximum #of bytes
-         * in the node region for which the {@link IndexSegmentStore} will fully
-         * buffer (default <code>10485760</code> bytes (10M)). This may be set
-         * to a small value, e.g., <code>1L</code>, to disable buffering.
-         * When ZERO (<code>0L</code>) the nodes will be fully buffered
-         * regardless of the memory requirements. Nodes are buffered when the
-         * {@link IndexSegmentStore} is (re-)opened.
+         * <code>bufferNodes</code> - when <code>true</code> an attempt will
+         * be made to fully buffer the index nodes (but not the leaves) using a
+         * buffer allocated from the {@link DirectBufferPool} (default
+         * {@value #DEFAULT_BUFFER_NODES}).
          * <p>
-         * The nodes in the {@link IndexSegment} are serialized in a contiguous
-         * region by the {@link IndexSegmentBuilder}. That region may be fully
-         * buffered, in which case queries against the {@link IndexSegment} will
-         * incur NO disk hits for the nodes and only one disk hit per visited
-         * leaf.
+         * Note: The nodes in the {@link IndexSegment} are serialized in a
+         * contiguous region by the {@link IndexSegmentBuilder}. That region
+         * may be fully buffered, in which case queries against the
+         * {@link IndexSegment} will incur NO disk hits for the nodes and only
+         * one disk hit per visited leaf.
          * 
-         * @see #DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES
+         * @see #DEFAULT_BUFFER_NODES
          */
-        String MAX_BYTES_TO_FULLY_BUFFER_NODES = "maxBytesToFullyBufferNodes";
+        String BUFFER_NODES = "bufferNodes";
         
         /**
-         * @see #MAX_BYTES_TO_FULLY_BUFFER_NODES
-         * 
-         * FIXME The JVM will allocate a temporary direct buffer when reading in
-         * a large chunk from the store and then have problems releasing it.
-         * I've disabled buffering of nodes by default for now to avoid this
-         * memory leak. This could be addressed using the static pool currently
-         * allocated within {@link TemporaryRawStore}.
+         * @see #BUFFER_NODES
          */
-        //String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = ""+Bytes.megabyte*10;
-        String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = "1";
+        String DEFAULT_BUFFER_NODES = "true";
         
     }
     
@@ -267,12 +263,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
     
     /**
-     * Open a read-only store containing an {@link IndexSegment}.
+     * Open a read-only store containing an {@link IndexSegment} using the
+     * default properties.
      * 
      * @param file
      *            The name of the store file.
-     * 
-     * @deprecated by {@link IndexSegmentStore#IndexSegmentStore(Properties)}
      */
     public IndexSegmentStore(File file) {
 
@@ -320,25 +315,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
         
-        // maxBytesToFullyBufferNodes
-        
         {
             
-            maxBytesToFullyBufferNodes = Long.parseLong(properties.getProperty(
-                    Options.MAX_BYTES_TO_FULLY_BUFFER_NODES,
-                    Options.DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES));
+            bufferNodes = Boolean.parseBoolean(properties.getProperty(
+                    Options.BUFFER_NODES, Options.DEFAULT_BUFFER_NODES));
 
-            log.info(Options.MAX_BYTES_TO_FULLY_BUFFER_NODES + "="
-                    + maxBytesToFullyBufferNodes);
-            
-            if (maxBytesToFullyBufferNodes < 0L) {
-
-                throw new RuntimeException(
-                        Options.MAX_BYTES_TO_FULLY_BUFFER_NODES
-                                + " must be non-negative");
-                
-            }
-            
+            log.info(Options.BUFFER_NODES + "=" + bufferNodes);
+        
         }
         
         reopen();
@@ -444,42 +427,16 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * Note: We always read in the root in IndexSegment#_open() and hold
              * a hard reference to the root while the IndexSegment is open.
              */
-            if(checkpoint.nnodes == 0) {
-                
-                this.buf_nodes = null;
-                
-            } else {
+            if (checkpoint.nnodes > 0 && bufferNodes) {
 
-                final boolean bufferNodes = (maxBytesToFullyBufferNodes == 0L)
-                        || (checkpoint.extentNodes < maxBytesToFullyBufferNodes);
-                
-                this.buf_nodes = (bufferNodes ? bufferIndexNodes(raf) : null);
+                bufferIndexNodes();
 
             }
 
-            if (checkpoint.addrBloom == 0L) {
+            if (checkpoint.addrBloom != 0L) {
 
-                /*
-                 * No bloom filter.
-                 */
-
-                this.bloomFilter = null;
-
-            } else {
-
-                /*
-                 * Read in the optional bloom filter from its addr.
-                 */
-
-                try {
-
-                    this.bloomFilter = readBloomFilter();
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
+                // Read in the optional bloom filter from its addr.
+                this.bloomFilter = readBloomFilter();
 
             }
 
@@ -489,12 +446,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              */
             this.open = true;
 
-        } catch (IOException ex) {
+        } catch (Throwable t) {
 
             // clean up.
             _close();
 
-            throw new RuntimeException(ex);
+            // re-throw the exception.
+            throw new RuntimeException(t);
 
         }
 
@@ -568,11 +526,16 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     
     /**
      * Return <code>true</code> if the nodes of the {@link IndexSegment} are
-     * fully buffered in memory.
+     * fully buffered in memory. The result is consistent as of the time that
+     * this method examines the state of the {@link IndexSegmentStore}.
      */
     public boolean isNodesFullyBuffered() {
         
-        return isOpen() && buf_nodes != null;
+        synchronized(this) {
+
+            return isOpen() && buf_nodes != null;
+            
+        }
         
     }
     
@@ -623,7 +586,26 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         }
 
-        buf_nodes = null;
+        if (buf_nodes != null) {
+
+            try {
+
+                // release the buffer back to the pool.
+                DirectBufferPool.INSTANCE.release(buf_nodes);
+
+            } catch(Throwable t) {
+                
+                // log error but continue anyway.
+                log.error(t,t);
+                
+            } finally {
+
+                // clear reference since buffer was released.
+                buf_nodes = null;
+                
+            }
+            
+        }
 
         checkpoint = null;
 
@@ -678,10 +660,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
 
     /**
-     * @todo report some interesting stats, but most are on the
-     *       {@link IndexSegment} itself.
-     * 
-     * @todo report the #of reads and whether or not the nodes are buffered.
+     * @todo report the #of (re-)opens.
      * 
      * FIXME report {@link Counters} for the {@link IndexSegment} here (#of
      * nodes read, leaves read, de-serialization times, etc). Some additional
@@ -719,6 +698,24 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                     }
                 });
 
+                tmp.addCounter("#nodes", new Instrument<Integer>() {
+                    protected void sample() {
+                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
+                        if (checkpoint != null) {
+                            setValue(checkpoint.nnodes);
+                        }
+                    }
+                });
+
+                tmp.addCounter("#leaves", new Instrument<Integer>() {
+                    protected void sample() {
+                        final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
+                        if (checkpoint != null) {
+                            setValue(checkpoint.nleaves);
+                        }
+                    }
+                });
+
                 tmp.addCounter("entries", new Instrument<Integer>() {
                     protected void sample() {
                         final IndexSegmentCheckpoint checkpoint = IndexSegmentStore.this.checkpoint;
@@ -734,6 +731,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                         if (checkpoint != null) {
                             setValue(checkpoint.height);
                         }
+                    }
+                });
+
+                tmp.addCounter("nodesBuffered", new Instrument<Boolean>() {
+                    protected void sample() {
+                        setValue(buf_nodes != null);
                     }
                 });
 
@@ -856,7 +859,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
                 // read into [dst] - does not modify the channel's position().
                 FileChannelUtility.readAll(raf.getChannel(), dst, offset);
-//                raf.getChannel().read(dst, offset);
 
             } catch (IOException ex) {
 
@@ -864,7 +866,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
             }
 
-            dst.flip(); // Flip buffer for reading.
+            // Flip buffer for reading.
+            dst.flip();
 
         }
 
@@ -873,13 +876,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
 
     /**
-     * Reads the index nodes into a buffer.
-     * 
-     * @return A read-only view of a buffer containing the index nodes.
+     * Attempts to read the index nodes into {@link #buf_nodes}.
+     * <p>
+     * Note: If the nodes could not be buffered then reads against the nodes
+     * will read through to the backing file.
      */
-    private ByteBuffer bufferIndexNodes(RandomAccessFile raf)
-            throws IOException {
+    private void bufferIndexNodes() throws IOException {
 
+        if (buf_nodes != null) {
+
+            throw new IllegalStateException("Node buffer already allocated");
+            
+        }
+        
         if(checkpoint.nnodes == 0) {
         
             throw new IllegalStateException("No nodes.");
@@ -892,44 +901,85 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
 
-        if(checkpoint.extentNodes > Integer.MAX_VALUE) {
+        if(checkpoint.extentNodes > DirectBufferPool.INSTANCE.getBufferCapacity()) {
             
-            throw new IllegalStateException(
-                    "Nodes region exceeds int32: extent="
-                            + checkpoint.extentNodes);
+            /*
+             * The buffer would be too small to contain the nodes.
+             */
+            
+            log.warn("Node extent exceeds buffer capacity: extent="
+                    + checkpoint.extentNodes + ", bufferCapacity="
+                    + DirectBufferPool.INSTANCE.getBufferCapacity());
+            
+            return;
             
         }
 
-        final long offset = checkpoint.offsetNodes;
-
-        final int nbytes = (int) checkpoint.extentNodes;
-
-        if (log.isInfoEnabled())
-            log.info("Buffering nodes: #nodes=" + checkpoint.nnodes
-                    + ", #bytes=" + nbytes + ", file=" + file);
-        
         /*
-         * Note: The direct buffer imposes a higher burden on the JVM and all
-         * operations after we read the data from the disk should be faster with
-         * a heap buffer, so my expectation is that a heap buffer is the correct
-         * choice here.
-         * 
-         * FIXME This would be true except that the JVM will allocate a
-         * temporary direct buffer and then have problems releasing it. I've
-         * disabled buffering of nodes by default for now to avoid this memory
-         * leak. This could be fixed using a static direct buffer pool and then
-         * either reading the data into a buffer from that pool and releasing
-         * the buffer when the index store is closed -or- using the direct
-         * buffer just to copy the data from the store and then releasing it
-         * immediately back to the pool.
+         * This code is designed to be robust. If anything goes wrong then we
+         * make certain that the direct buffer is released back to the pool, log
+         * any errors, and return to the caller. While the nodes will not be
+         * buffered if there is an error throw in this section, if the backing
+         * file is Ok then they can still be read directly from the backing
+         * file.
          */
-//        ByteBuffer buf = ByteBuffer.allocateDirect(nbytes);
-        final ByteBuffer buf = ByteBuffer.allocate(nbytes);
+        try {
 
-        FileChannelUtility.readAll(raf.getChannel(), buf, offset);
-//        raf.getChannel().read(buf, offset);
+            /*
+             * Attempt to allocate a buffer to hold the disk image of the nodes.
+             */
+            
+            buf_nodes = DirectBufferPool.INSTANCE.acquire(100/* ms */,
+                    TimeUnit.MILLISECONDS);
+            
+            if (log.isInfoEnabled())
+                log.info("Buffering nodes: #nodes=" + checkpoint.nnodes
+                        + ", #bytes=" + checkpoint.extentNodes + ", file=" + file);
 
-        return buf.asReadOnlyBuffer();
+            // #of bytes to read.
+            buf_nodes.limit((int)checkpoint.extentNodes);
+            
+            // attempt to read the nodes into the buffer.
+            FileChannelUtility.readAll(raf.getChannel(), buf_nodes,
+                    checkpoint.offsetNodes);
+            
+            buf_nodes.flip();
+            
+        } catch (Throwable t1) {
+
+            /*
+             * If we could not obtain a buffer without blocking, or if there was
+             * ANY problem reading the data into the buffer, then release the
+             * buffer and return. The nodes will not be buffered, but if the
+             * file is Ok then the index will simply read through to the disk
+             * for the nodes.
+             */
+
+            if (buf_nodes != null) {
+
+                try {
+                
+                    // release buffer back to the pool.
+                    DirectBufferPool.INSTANCE.release(buf_nodes);
+                    
+                } catch (Throwable t) {
+                    
+                    // log error and continue.
+                    log.error(t, t);
+                    
+                } finally {
+                    
+                    // make sure the reference is cleared.
+                    buf_nodes = null;
+                    
+                }
+                
+            }
+            
+            // log error and continue.
+            log.error(t1,t1);
+
+        }
 
     }
 

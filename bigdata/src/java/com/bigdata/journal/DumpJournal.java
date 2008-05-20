@@ -104,6 +104,8 @@ public class DumpJournal {
         
         boolean dumpIndices = false;
         
+        boolean showTuples = false;
+        
         for(; i<args.length; i++) {
             
             String arg = args[i];
@@ -126,6 +128,12 @@ public class DumpJournal {
                 dumpIndices = true;
                 
             }
+
+            if(arg.equals("-tuples")) {
+                
+                showTuples = true;
+                
+            }
             
         }
         
@@ -135,7 +143,7 @@ public class DumpJournal {
 
             try {
 
-                dumpJournal(file,dumpHistory,dumpIndices);
+                dumpJournal(file,dumpHistory,dumpIndices,showTuples);
                 
             } catch( RuntimeException ex) {
                 
@@ -151,7 +159,7 @@ public class DumpJournal {
         
     }
     
-    public static void dumpJournal(File file,boolean dumpHistory,boolean dumpIndices) {
+    public static void dumpJournal(File file,boolean dumpHistory,boolean dumpIndices,boolean showTuples) {
         
         /*
          * Stat the file and report on its size, etc.
@@ -252,7 +260,7 @@ public class DumpJournal {
                     
                     System.err.println(commitRecord.toString());
 
-                    dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices);
+                    dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices,showTuples);
                     
                 }
                 
@@ -266,7 +274,7 @@ public class DumpJournal {
                 
                 System.err.println(commitRecord.toString());
 
-                dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices);
+                dumpNamedIndicesMetadata(journal,commitRecord,dumpIndices,showTuples);
                 
             }
 
@@ -285,7 +293,7 @@ public class DumpJournal {
      * @param commitRecord
      */
     private static void dumpNamedIndicesMetadata(AbstractJournal journal,
-            ICommitRecord commitRecord, boolean dumpIndices) {
+            ICommitRecord commitRecord, boolean dumpIndices, boolean showTuples) {
 
         // view as of that commit record.
         final IIndex name2Addr = journal.getName2Addr(commitRecord.getTimestamp());
@@ -310,21 +318,28 @@ public class DumpJournal {
             // show metadata record.
             System.err.println("\t"+ndx.getIndexMetadata());
             
-            if(dumpIndices) dumpIndex(ndx);
+            if(dumpIndices) dumpIndex(ndx,showTuples);
             
         }
         
     }
 
     /**
-     * Utility method to dump the keys and values in an {@link AbstractBTree}.
+     * Utility method using an {@link ITupleIterator} to dump the keys and
+     * values in an {@link AbstractBTree}.
      * 
      * @param btree
+     * @param showTuples
+     *            When <code>true</code> the data for the keys and values will
+     *            be displayed. Otherwise the scan will simply exercise the
+     *            iterator.
      */
-    public static void dumpIndex(AbstractBTree btree) {
-
+    public static void dumpIndex(AbstractBTree btree, boolean showTuples) {
+        
         // @todo offer the version metadata also if the index supports isolation.
         final ITupleIterator itr = btree.rangeIterator(null, null);
+        
+        final long begin = System.currentTimeMillis();
         
         int i = 0;
         
@@ -336,11 +351,19 @@ public class DumpJournal {
             
             final byte[] val = tuple.getValue();
             
-            System.err.println("rec="+i+"\n key="+dumpKey(key)+"\n val="+dumpVal(val));
+            if(showTuples) {
+                
+                System.err.println("rec="+i+"\n key="+dumpKey(key)+"\n val="+dumpVal(val));
+            
+            }
             
             i++;
             
         }
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        System.err.println("Visited "+i+" tuples in "+elapsed+"ms");
         
     }
 

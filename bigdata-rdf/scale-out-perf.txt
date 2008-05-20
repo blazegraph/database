@@ -894,6 +894,11 @@ Short term tasks:
 
      - Offer commands to force overflow of a data service.
 
+   - Sparse row store support.
+
+     - Add a web application that let's people easily write on or read
+       from the sparse row store using JSon or the like.
+
    - Transaction support.
 
      - Overhaul transaction processing and support full, 2-/3- phase
@@ -1057,7 +1062,7 @@ Short term tasks:
 
    - DiskOnlyStrategy
    
-     - Lazy creation of the backing file.
+     - Done. Lazy creation of the backing file.
 
      - Done (No performance change for small stores - I still need to
        review the data for large stores.  Of interest, the write cache
@@ -1121,8 +1126,8 @@ Short term tasks:
        - Try out an mg4j integration for an alternative text indexer
          and search.
 
-   - Consider thread pool size defaults, especially for the temporary
-     stores such as the temp triple store.  What is a good policy?
+   - Consider thread pool size defaults, especially for the Temporary
+     Journal mode.  What is a good policy?
 
    - Done.  Either never retry an error task when the queue is likely
      to be full or make the retry itself robust.  Otherwise the CDL
@@ -1314,7 +1319,7 @@ Short term tasks:
        block io/out requests with that pool.  this will help about OOM
        problems with "temporary" direct byte buffers.
 
-     *** It is possible that we will need to use the TemporaryRawStore
+     - It is possible that we will need to use the TemporaryRawStore
        static buffer pool for all reads from the store (or writes that
        are not via a write cache backed by a direct buffer) since
        otherwise Java could allocate for us, and then fail to
@@ -1763,27 +1768,24 @@ JF-U1000-host12-2DS-noOverflow
 
 (*) Dynamic index partitioning
 
-    ****** I am seeing assertion errors on host3 when overflow is
-           enabled for EF-U100-host3-2DS.  I think that these are
-           probably related to the assumption that a read or write is
-           complete in one operation rather than looping until count
-           == nbytes.
-
-	   FIXME In tracking this down note that the maximumExtent is
-	   set at 5M and that the #of data services was 1 on host3 but
-	   I have replicated it with 2 data services on the
-	   workstation.
-
-	   I am currently trying to get at the list of actual cases
-	   thrown back from the parallel tasks.
-
     - What cost is associated with overflow processing?
 
       Evaluate for:
 
       (a) EF with one data service;
 
-EF-U100-host3-1DS: running
+EF-U100-host3-1DS-5M:
+
+	5965 tps w/ 5M initial extent and 5M maximum extent and 15
+	overflows in 46 minutes (a stress test run).  Note: The
+	initial and maximum extent were configured in the test suite
+	code.  Run was successful.  The only reported errors were
+	index partition split tasks that were still executing when the
+	run was terminated.
+
+EF-U100-host3-1DS:
+
+	____ tps w/ 200M initial extent and 200M maximum extent.
 
       (b) for JF with one data services with on one machine; 
 
@@ -1798,6 +1800,9 @@ JF-U100-host3-2DS:
 JF-U100-host23-2DS:
 
       Choose runs where we have the data w/o overflow from above.
+
+ *** Re-run at least one of the above with post-load validation
+     enabled.
 
     --------------------
 
@@ -1924,61 +1929,133 @@ JF-U100-host23-2DS:
       TestIndexSegmentBuilderWithLargeTrees (m=32, nentries=m**4)
       cause corrupt leaves in an index segment build.
 
-- Done. try w/ smaller extent via offsetBits (does not seem to clearly
-  trigger it earlier, but it still triggers the problem).
+    - Done. Modify IndexSegmentBuilder to support fast reverse scan,
+      at least in the data and in DumpIndexStore.
+     
+    - Done. IndexSegmentBuilder should be refactored to implement
+      Runnable/Callable.  The ctor can do the setup and the index
+      build will run in run()/call().  The return can be a status code
+      for the operation or statistics on the operation.  Throw an
+      exception for an error.
 
-- Done. write tests of transferTo.  I did find a bug in writeAll(),
-  but that was not the problem (it was writing each pass at the same
-  offset in the file when a write required multiple IOs).
+    - Done. Modify IndexSegmentBuilder to support fast forward scan,
+      at least in the data and in DumpIndexStore.
 
-- **** Modify IndexSegmentBuilder to support fast forward scan, at
-  least in the data and in DumpIndexStore.
-
-- Done. Modify IndexSegmentBuilder to support fast reverse scan, at
-  least in the data and in DumpIndexStore.
-
-- **** Modify IndexSegment to use fast forward and fast reverse scans.
-  I need to override or replace the iterator to do this.  It should
-  use a priorLeaf/nextLeaf method in order for this to be easy to do.
+    - **** Modify IndexSegment to use fast forward and fast reverse
+           scans.  I need to override or replace the iterator to do
+           this.  It should use a priorLeaf/nextLeaf method in order
+           for this to be easy to do.
   
-  Ah. There is a protected [AbstractBTree#leafIterator()] method, but
-  it is not being used.  Perhaps this could be modified to accept a
-  fromKey and toKey and then used to allow replacement of the
-  striterator-based postOrderNodeIterator().
+	   Ah. There is a protected [AbstractBTree#leafIterator()]
+	   method, but it is not being used.  Perhaps this could be
+	   modified to accept a fromKey and toKey and then used to
+	   allow replacement of the striterator-based
+	   postOrderNodeIterator().
 
-- Done. IndexSegmentBuilder should be refactored to implement
-  Runnable/Callable.  The ctor can do the setup and the index build
-  will run in run()/call().  The return can be a status code for the
-  operation or statistics on the operation.  Throw an exception for an
-  error.
+	   Modify the iterator to support prior/next and modification
+	   with concurrent traversal.  This really should not be any
+	   more complicated than the case for the GOM link set
+	   iterator.
 
-- Done. Refactor to create a Temporary BufferMode.
+    - **** I have seen the index segment store closed during iterator
+           traversal.  I've modified the class slightly to re-open the
+           store transparently and we will see how that goes.
+	   
+	   The observed problem was during iterator traversal.  I
+	   suspect that iterator traversal should not allow the index
+	   to be closed since it requires valid hard references to the
+	   stack of nodes being traversed.  Figure out who is closing
+	   the index.  We may have to ignore the close if there is an
+	   open iterator.
 
-- Done. Refactor DiskOnlyStrategy to permit lazy creation of the
-  backing file.
+	   If the iterator is modified to use prior/next leaf methods
+	   for traversal and those methods are robust, then they can
+	   simply reopen() the index if it has been asynchronously
+	   closed.  The version for the index segment will not need
+	   the node stack.  A version that does not rely on a node
+	   stack could also be written for the BTree using lookup() to
+	   re-discover the current leaf and tuple.
 
-- Done. Refactor of TemporaryRawStore to use DiskOnlyStrategy with
-  lazy creation of the backing file.
+    - Support transparent byte[] <=> value (de-)serialization using a
+      serializer object associated with the index metadata.  
 
-* Test suite for Temporary mode journals.
+    - Add Map and Set impls. based on the BTree.
 
-- Static config via System#getProperties() for the direct buffer pool
+    - Done (IUpdateStore). I need to create an interface extending
+      IRawStore, put those methods on that interface, and then declare
+      that interface on TemporaryRawStore in order to be able to
+      access these methods.
 
-- Commit.
+  - DiskOnlyStrategy
 
-- Scale-out runs now that I've fixed the index segment build problem.
- 
-FIXME Apply {@link DiskOnlyStrategy#allocate(int)} and {@link
-      DiskOnlyStrategy#update(long, int, ByteBuffer)} and the new
-      temporary "store" facility (w/ factory) to the {@link
-      IndexSegmentBuilder}.
-      
-      Note: I need to create an interface extending IRawStore, put
-      those methods on that interface, and then declare that interface
-      on TemporaryRawStore in order to be able to access these
-      methods.
+    - Done. write tests of transferTo.  I did find a bug in
+      writeAll(), but that was not the problem (it was writing each
+      pass at the same offset in the file when a write required
+      multiple IOs).
 
-- Done. Found a bug in DiskOnlyStrategy where it was always reading a
-  record three times....  Probably there was little performance impact
-  since the read would have come from the OS cache after the first
-  time, but still....
+    - Done. Refactor to create a Journal using a Temporary BufferMode.
+
+    - Done. Refactor DiskOnlyStrategy to permit lazy creation of the
+      backing file.
+
+    - Done. Refactor of TemporaryRawStore to use DiskOnlyStrategy with
+      lazy creation of the backing file.
+
+    - Done. Found a bug in DiskOnlyStrategy where it was always
+      reading a record three times....  Probably there was little
+      performance impact since the read would have come from the OS
+      cache after the first time, but still....
+
+    - Evaluate effect of the write cache capacity.  If 1M is as good
+      as 10M then just use the DirectBufferPool for the write cache
+      for the live journal, which will simplify some things.
+
+      Add counters reporting the #of bytes written/commit.
+
+    * Test suite for Temporary mode journals.
+
+  - DirectBufferPool
+
+    - Done. Static config via System#getProperties() for the direct buffer pool
+
+    - Done. Counters for reporting out the pool state.
+
+- Presentations
+
+  - Provenance
+
+  - Scale-out 
+
+  - LUBM & Modified LUBM
+
+  - Updated whitepapers
+
+  - Cloud computing & travel plans.
+
+============================================================
+
+file : test_buildOrder10.seg checkpoint : magic=87ab34f5,
+segmentUUID=6794d657-68ec-4df1-8c79-06bde3959c4b, offsetBits=38,
+height=0, nleaves=1, nnodes=0, nentries=10, maxNodeOrLeafLength=655,
+leavesRegion={extent=655, offset=420}, nodesRegion={extent=0,
+offset=0}, blobsRegion={extent=0, offset=0},
+addrRoot={nbytes=655,offset=420,region=BASE},
+addrFirstLeaf={nbytes=655,offset=420,region=BASE},
+addrLastLeaf={nbytes=655,offset=420,region=BASE}, length=1626,
+addrMetadata={nbytes=551,offset=1075,region=BASE}, addrBloom=NULL,
+checksum=-1396895030, commitTime=Tue May 20 12:08:24 EDT 2008
+
+metadata : addrMetadata=0, name=N/A,
+indexUUID=b8a4caaf-6e3f-441c-a136-773a8993ff27, branchingFactor=10,
+indexSegmentBranchingFactor=512, pmd=null,
+class=com.bigdata.btree.IndexSegment,
+checkpointClass=com.bigdata.btree.Checkpoint,
+childAddrSerializer=com.bigdata.btree.AddressSerializer,
+nodeKeySerializer=com.bigdata.btree.IDataSerializer$SimplePrefixSerializer,
+leafKeySerializer=com.bigdata.btree.IDataSerializer$SimplePrefixSerializer,
+valueSerializer=com.bigdata.btree.IDataSerializer$DefaultDataSerializer,
+conflictResolver=N/A, deleteMarkers=false, versionTimestamps=false,
+isolatable=false, errorRate=0.0, overflowHandler=N/A,
+splitHandler=com.bigdata.resources.DefaultSplitHandler
+
+bloomFilter : N/A

@@ -710,6 +710,9 @@ public class NodeSerializer {
      * settle for writing only the prior or the next leaf address, but not both.
      * It is up to the caller to perform these tricks. All this method does is
      * to touch up the serialized record.
+     * <p>
+     * Note: This method has NO side-effects on the <i>position</i> or <i>limit</i>
+     * of the caller's {@link ByteBuffer}.
      * 
      * @param b
      *            The serialization leaf.
@@ -726,26 +729,7 @@ public class NodeSerializer {
      *            there is a next leaf; or (b) it is known but the address of
      *            that leaf is not known to the caller.
      * 
-     * FIXME finish support for (de-)serializing the prior/next references when
-     * known, at least for the {@link IndexSegment}. Either {@link ILeafData}
-     * or perhaps {@link INodeFactory} should be modified so that the prior and
-     * next leaf addresses can be recovered during de-serialization.
-     * <p>
-     * The {@link IndexSegmentBuilder} will have the easiest time of writing
-     * these data since it can just write behind by one leaf, which will make
-     * its flush logic a bit more complex.
-     * <p>
-     * The {@link BTree} will have a much harder time of it. It should be
-     * possible to write the address of the prior leaf if we extended the
-     * {@link ILeafData} interface since we flush dirty leaves from left to
-     * write and the address of the prior leaf could be written onto its
-     * rightSibling if that leaf was already materialized. However, this MUST
-     * NOT make the rightSibling dirty - this is just an opportunistic approach
-     * to getting the prior leaf address into the serialized representation. We
-     * could reverse the iterator traversal (right to left) for dirty nodes to
-     * get the rightSibling address instead, which is more typically useful. It
-     * is probably not possible to get both the prior and next leaf address into
-     * the record for the {@link BTree}.
+     * @see IndexSegmentBuilder
      */
     public void updateLeaf(ByteBuffer b, long priorAddr, long nextAddr) {
 
