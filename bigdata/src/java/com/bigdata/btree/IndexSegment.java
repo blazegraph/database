@@ -188,8 +188,12 @@ public class IndexSegment extends AbstractBTree {
 
                 if (root == null) {
 
-                    // reopen the file.
-                    fileStore.reopen();
+                    if (!fileStore.isOpen()) {
+
+                        // reopen the store.
+                        fileStore.reopen();
+                        
+                    }
 
                     _open();
 
@@ -364,14 +368,6 @@ public class IndexSegment extends AbstractBTree {
      */
     public ImmutableLeaf readLeaf(long addr) {
 
-        if (Thread.currentThread().isInterrupted()) {
-
-            final InterruptedException cause = new InterruptedException();
-
-            throw new RuntimeException("Interrupted", cause);
-
-        }
-
         return (ImmutableLeaf) readNodeOrLeaf(addr);
         
     }
@@ -399,6 +395,18 @@ public class IndexSegment extends AbstractBTree {
                 
             }
         
+        }
+
+        if (!fileStore.isOpen()) {
+
+            /*
+             * Make sure the backing store is open.
+             * 
+             * Note: DO NOT call IndexSegment#reopen() here since it invokes
+             * this method in order to read in the root node!
+             */
+            fileStore.reopen();
+            
         }
         
         // read the node or leaf
