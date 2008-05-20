@@ -23,8 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.util.NoSuchElementException;
+
 import it.unimi.dsi.mg4j.util.BloomFilter;
 
+import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
 import com.bigdata.resources.ResourceManager;
 
 /**
@@ -37,16 +42,6 @@ import com.bigdata.resources.ResourceManager;
  * <p>
  * Note: iterators returned by this class do not support removal (the nodes and
  * leaves will all refuse mutation operations).
- * 
- * FIXME Support efficient leaf scans in forward order, which requires writing
- * the size of the next leaf so that it can be read out when the current leaf is
- * read out, i.e., as a int field outside of the serialized leaf record. We
- * could also do reverse order by serializing the addr of the prior leaf into
- * the leaf since it is always on hand.
- * <p>
- * If this is done, also check {@link Thread#isInterrupted()} and throw an
- * exception when true to support fast abort of scans. See
- * {@link Node#getChild(int)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -65,6 +60,13 @@ public class IndexSegment extends AbstractBTree {
      * structures.
      */
     protected BloomFilter bloomFilter;
+
+    /**
+     * An LRU for {@link ImmutableLeaf}s. This cache takes advantage of the
+     * fact that the {@link LeafIterator} can read leaves without navigating
+     * down the node hierarchy.
+     */
+    private WeakValueCache<Long, ImmutableLeaf> leafCache;
 
     final public int getHeight() {
 
@@ -150,6 +152,10 @@ public class IndexSegment extends AbstractBTree {
 
         // release the optional bloom filter.
         bloomFilter = null;
+        
+        // release the leaf cache.
+        leafCache.clear();
+        leafCache = null;
 
         // release buffers and hard reference to the root node.
         super.close();
@@ -196,15 +202,28 @@ public class IndexSegment extends AbstractBTree {
     }
 
     /**
+     * Overriden to a more constrained type.
+     */
+    final public IndexSegmentStore getStore() {
+        
+        return fileStore;
+        
+    }
+    
+    /**
      * Note: This caller MUST be synchronized to ensure that at most one thread
      * gets to re-open the index from its backing store.
      */
     private void _open() {
 
+        // @todo config cache size on {@link IndexSegmentStore.Options}
+        this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
+                new LRUCache<Long, ImmutableLeaf>(10));
+
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.getCheckpoint().addrRoot);
 
-        // save reference to the optional bloom filter.
+        // Save reference to the optional bloom filter.
         this.bloomFilter = fileStore.getBloomFilter();
         
         // report on the event.
@@ -277,6 +296,8 @@ public class IndexSegment extends AbstractBTree {
      */
     public boolean contains(byte[] key) {
 
+        reopen();
+
         if (bloomFilter != null) {
 
             if (!containsKey(key)) {
@@ -302,7 +323,9 @@ public class IndexSegment extends AbstractBTree {
      * allows false positives, further the key might exist for a deleted entry).
      */
     public Tuple lookup(byte[] key, Tuple tuple) {
-        
+
+        reopen();
+
         if (bloomFilter != null) {
 
             if (!containsKey(key)) {
@@ -326,6 +349,541 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
+    /**
+     * Typesafe method reads the leaf from the backing file given the address of
+     * that leaf. This method is suitable for ad-hoc examination of the leaf or
+     * for a low-level iterator based on the prior/next leaf addresses.
+     * <p>
+     * Note: The parent is NOT set on the leaf but it MAY be defined if the leaf
+     * was read from the {@link #leafCache}.
+     * 
+     * @param addr
+     *            The address of a leaf.
+     * 
+     * @return That leaf.
+     */
+    public ImmutableLeaf readLeaf(long addr) {
+
+        if (Thread.currentThread().isInterrupted()) {
+
+            final InterruptedException cause = new InterruptedException();
+
+            throw new RuntimeException("Interrupted", cause);
+
+        }
+
+        return (ImmutableLeaf) readNodeOrLeaf(addr);
+        
+    }
+
+    /**
+     * Extended to use a private cache for {@link ImmutableLeaf}s. By adding a
+     * leaf cache here we are able to catch all reads of leaves from the backing
+     * store and impose an LRU cache semantics for those leaves. This includes
+     * reads by the {@link LeafIterator} which are made without using the node
+     * hierarchy.
+     */
+    protected AbstractNode readNodeOrLeaf(long addr) {
+
+        final Long tmp = Long.valueOf(addr);
+
+        {
+
+            // test the leaf cache.
+            final ImmutableLeaf leaf = leafCache.get(tmp);
+
+            if (leaf != null) {
+
+                // cache hit.
+                return leaf;
+                
+            }
+        
+        }
+        
+        // read the node or leaf
+        final AbstractNode node = super.readNodeOrLeaf(addr);
+
+        if (node.isLeaf()) {
+
+            /*
+             * Put the leaf in the LRU cache.
+             */
+            
+            final ImmutableLeaf leaf = (ImmutableLeaf) node;
+
+            /*
+             * Synchronize on the cache first to make sure that the leaf has not
+             * been concurrently entered into the cache.
+             */
+
+            synchronized (leafCache) {
+
+                if (leafCache.get(tmp) == null) {
+
+                    leafCache.put(tmp, leaf, false/* dirty */);
+
+                }
+
+            }
+
+        }
+
+        return node;
+        
+    }
+    
+    /**
+     * Variant for scanning all leaves in key order.
+     */
+    public LeafIterator leafIterator() {
+        
+        return new LeafIterator(true/* forwardScan */);
+        
+    }
+    
+    /**
+     * Variant for scanning all leaves.
+     * 
+     * @param forwardScan
+     *            When <code>true</code> {@link ILeafIterator#next()} will
+     *            scan in key order and the first leaf to be visited will be the
+     *            first leaf in the B+Tree. Otherwise
+     *            {@link ILeafIterator#next()} will scan in reverse key order
+     *            and the first leaf to be visited will be the last leaf in the
+     *            B+Tree.
+     */    
+    public LeafIterator leafIterator(boolean forwardScan) {
+        
+        return new LeafIterator(forwardScan);
+        
+    }
+    
+    /**
+     * Variant for scanning leaves spanning a key range.
+     * 
+     * @param forwardScan
+     *            When <code>true</code> {@link ILeafIterator#next()} will
+     *            scan in key order and the first leaf to be visited will be the
+     *            leaf which spans the <i>fromKey</i> (and the first leaf in
+     *            the B+Tree if the <i>fromKey</i> is <code>null</code>).
+     *            Otherwise {@link ILeafIterator#next()} will scan in reverse
+     *            key order and the first leaf to be visited will be the leaf
+     *            that spans the <i>toKey</i> (and the last leaf in the B+Tree
+     *            if the <i>toKey</i> is <code>null</code>).
+     * @param fromKey
+     *            When non-<code>null</code>, this identifies the first leaf
+     *            in <em>key order</em> to be visited. If a tuple for
+     *            <i>fromKey</i> exists in the index, this is the leaf which
+     *            contains that tuple. If no tuple exists for <i>fromKey</i>
+     *            then this is the leaf in which the insertion point for
+     *            <i>fromKey</i> would be located. When <code>null</code>
+     *            there is no lower bound.
+     * @param toKey
+     *            When non-<code>null</code>, this identifies the last leaf
+     *            in <em>key order</em> to be visited. If a tuple for <i>toKey</i>
+     *            exists in the index, this is the leaf which contains that
+     *            tuple. If no tuple exists for <i>toKey</i> then this is the
+     *            leaf in which the insertion point for <i>toKey</i> would be
+     *            located. When <code>null</code> there is no upper bound.
+     */
+    public LeafIterator leafIterator(boolean forwardScan, byte[] fromKey,
+            byte[] toKey) {
+        
+        return new LeafIterator(forwardScan, fromKey, toKey);
+        
+    }
+
+    /**
+     * Find the leaf that would span the key.
+     * 
+     * @param key
+     *            The key
+     * 
+     * @return The leaf which would span that key.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>key</i> is <code>null</code>.
+     */
+    public ImmutableLeaf findLeaf(final byte[] key) {
+        
+        if (key == null)
+            throw new IllegalArgumentException();
+        
+        rangeCheck(key, true/*allowUpperBound*/);
+        
+        if (getStore().getCheckpoint().height == 0) {
+
+            /*
+             * When only the root leaf exists, any key is spanned by that node.
+             */
+
+            return (ImmutableLeaf) getRoot();
+            
+        }
+        
+        return readLeaf( findLeafAddr( key ) );
+        
+    }
+
+    /**
+     * Find the address of the leaf that would span the key.
+     * 
+     * @param key
+     *            The key
+     * 
+     * @return The address of the leaf which would span that key.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>key</i> is <code>null</code>.
+     */
+    public long findLeafAddr(final byte[] key) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        rangeCheck(key, true/*allowUpperBound*/);
+
+        final int height = getStore().getCheckpoint().height; 
+        
+        if (height == 0) {
+
+            /*
+             * When only the root leaf exists, any key is spanned by that node.
+             */
+
+            return getStore().getCheckpoint().addrRoot;
+            
+        }
+
+        final IndexSegmentAddressManager am = getStore().getAddressManager();
+        
+        AbstractNode node = getRootOrFinger(key);
+        
+        int i = 0;
+        
+        while(true) {
+            
+            final int childIndex = ((Node)node).findChild(key);
+
+            final long childAddr = ((Node)node).childAddr[childIndex];
+            
+            if(am.isLeafAddr(childAddr)) {
+        
+                // This is a leaf address so we are done.
+                return childAddr;
+                
+            }
+
+            // desend the node hierarchy.
+            node = (Node)((Node)node).getChild(childIndex);
+            
+            i++;
+            
+            assert i <= height : "Exceeded tree height";
+            
+        }
+        
+    }
+    
+    /**
+     * Implementation uses the {@link ImmutableLeaf#priorAddr} and
+     * {@link ImmutableLeaf#nextAddr} fields to provide fast forward and reverse
+     * leaf scans without touching the node hierarchy.
+     * <p>
+     * Note: The <code>parent</code> reference will NOT be set of the leaves
+     * visited by this method.
+     * 
+     * @todo consider refactor so that {@link #next()}, {@link #prior()},
+     *       {@link #hasNext()} and {@link #hasPrior()} are wrappers around a
+     *       core impl class.
+     * 
+     * @todo consider adding a method to go to a specific leaf. we can verify
+     *       that the leaf is legal by comparing the address to the address
+     *       range for the leaves and to the first and last address that the
+     *       {@link LeafIterator} is allowed to visit.
+     * 
+     * @todo consider allowing a mark()/rewind() facility so that you can jump
+     *       back to a specific leaf.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class LeafIterator implements ILeafIterator<ImmutableLeaf> {
+
+        /** from the ctor. */
+        final protected boolean forwardScan;
+        
+        /** from the ctor. */
+        final protected byte[] fromKey;
+
+        /** from the ctor. */
+        final protected byte[] toKey;
+
+        /**
+         * The address of the first leaf in key order. This is the first leaf in
+         * the B+Tree if {@link #fromKey} is <code>null</code> and otherwise
+         * is the leaf in which {@link #fromKey} would be found if it exists in
+         * the index and the leaf which is the insertion point for the
+         * {@link #fromKey} if it is not in the index.
+         */
+        private final long addrFirstLeaf;
+
+        /**
+         * The address of the last leaf in key order. This is the last leaf in
+         * the B+Tree if {@link #toKey} is <code>null</code> and otherwise is
+         * the leaf in which {@link #toKey} would be found if it exists in the
+         * index and the leaf which is the insertion point for the
+         * {@link #toKey} if it is not in the index.
+         */
+        private final long addrLastLeaf;
+        
+        /**
+         * The current leaf (initially set by the ctor and always defined).
+         */
+        private ImmutableLeaf current;
+        
+        final public boolean isForwardScan() {
+            
+            return forwardScan;
+            
+        }
+
+        final public boolean isReverseScan() {
+            
+            return ! forwardScan;
+            
+        }
+
+        /**
+         * Ctor variant for scanning all leaves.
+         * 
+         * @param forwardScan
+         *            When <code>true</code> {@link #next()} will scan in key
+         *            order and the first leaf to be visited will be the first
+         *            leaf in the B+Tree. Otherwise {@link #next()} will scan in
+         *            reverse key order and the first leaf to be visited will be
+         *            the last leaf in the B+Tree.
+         */
+        protected LeafIterator(final boolean forwardScan) {
+
+            this(forwardScan, null, null);
+            
+        }
+        
+        /**
+         * Ctor variant for scanning leaves spanning a key range.
+         * 
+         * @param forwardScan
+         *            When <code>true</code> {@link #next()} will scan in key
+         *            order and the first leaf to be visited will be the leaf
+         *            which spans the <i>fromKey</i> (and the first leaf in the
+         *            B+Tree if the <i>fromKey</i> is <code>null</code>).
+         *            Otherwise {@link #next()} will scan in reverse key order
+         *            and the first leaf to be visited will be the leaf that
+         *            spans the <i>toKey</i> (and the last leaf in the B+Tree
+         *            if the <i>toKey</i> is <code>null</code>).
+         * @param fromKey
+         *            When non-<code>null</code>, this identifies the first
+         *            leaf in <em>key order</em> to be visited. If a tuple for
+         *            <i>fromKey</i> exists in the index, this is the leaf
+         *            which contains that tuple. If no tuple exists for
+         *            <i>fromKey</i> then this is the leaf in which the
+         *            insertion point for <i>fromKey</i> would be located. When
+         *            <code>null</code> there is no lower bound.
+         * @param toKey
+         *            When non-<code>null</code>, this identifies the last
+         *            leaf in <em>key order</em> to be visited. If a tuple for
+         *            <i>toKey</i> exists in the index, this is the leaf which
+         *            contains that tuple. If no tuple exists for <i>toKey</i>
+         *            then this is the leaf in which the insertion point for
+         *            <i>toKey</i> would be located. When <code>null</code>
+         *            there is no upper bound.
+         */
+        protected LeafIterator(final boolean forwardScan, final byte[] fromKey,
+                final byte[] toKey) {
+            
+            this.forwardScan = forwardScan;
+
+            this.fromKey = fromKey;
+            
+            this.toKey = toKey;
+            
+            if (fromKey == null) {
+
+                addrFirstLeaf = getStore().getCheckpoint().addrFirstLeaf;
+
+            } else {
+
+                // find leaf for fromKey
+                addrFirstLeaf = findLeafAddr(fromKey);
+
+            }
+
+            if (toKey == null) {
+
+                addrLastLeaf = getStore().getCheckpoint().addrLastLeaf;
+
+            } else {
+
+                // find leaf for toKey
+                addrLastLeaf = findLeafAddr(toKey);
+
+            }
+            
+            // addr of the first leaf to be visited.
+            final long addr;
+            
+            if (forwardScan) {
+                
+                // Start a forward scan with the first leaf in the key order.
+                addr = addrFirstLeaf;
+                
+            } else {
+                
+                // Start a reverse scan with the last leaf in the key order.
+                addr = addrLastLeaf;
+                
+            }
+            
+            assert addr != 0L;
+            
+            // read the first least in the scan order.
+            current = readLeaf(addr);
+            
+        }
+
+        public boolean hasNextInKeyOrder() {
+            
+            if (current.identity == addrLastLeaf) {
+
+                // on the last leaf allowed by the optional key range.
+                return false;
+
+            }
+
+            // next leaf must exist.
+            assert current.nextAddr != 0L;
+
+            return true;
+
+        }
+
+        public boolean hasPriorInKeyOrder() {
+
+            if (current.identity == addrFirstLeaf) {
+
+                // on the first leaf allowed by the optional key range.
+                return false;
+
+            }
+
+            // prior leaf must exist.
+            assert current.priorAddr != 0L;
+
+            return true;
+
+        }
+        
+        public boolean hasNext() {
+
+            if(forwardScan) {
+
+                return hasNextInKeyOrder();
+                
+            } else {
+                
+                return hasPriorInKeyOrder();
+                
+            }
+            
+        }
+
+        public boolean hasPrior() {
+
+            if(!forwardScan) {
+
+                return hasNextInKeyOrder();
+                
+            } else {
+                
+                return hasPriorInKeyOrder();
+                
+            }
+            
+        }
+
+        public ImmutableLeaf nextInKeyOrder() {
+
+            if (!hasNextInKeyOrder()) {
+
+                // No more leaves in key order.
+                return null;
+
+            }
+
+            return current = readLeaf(current.nextAddr);
+
+        }
+
+        public ImmutableLeaf priorInKeyOrder() {
+
+            if (!hasPriorInKeyOrder()) {
+
+                // No more leaves in reverse key order.
+                return null;
+                
+            }
+            
+            return current = readLeaf(current.priorAddr);
+            
+        }
+        
+        public ImmutableLeaf current() {
+
+            // should always be defined.
+            assert current != null;
+            
+            return current;
+            
+        }
+
+        public ImmutableLeaf next() {
+
+            if (!hasNext())
+                throw new NoSuchElementException();
+
+            if (forwardScan) {
+
+                return nextInKeyOrder();
+
+            } else {
+
+                return priorInKeyOrder();
+
+            }
+            
+        }
+
+        public ImmutableLeaf prior() {
+
+            if (!hasNext())
+                throw new NoSuchElementException();
+
+            if (forwardScan) {
+
+                return priorInKeyOrder();
+
+            } else {
+
+                return nextInKeyOrder();
+
+            }
+            
+        }
+
+    }
+    
     /*
      * INodeFactory
      */

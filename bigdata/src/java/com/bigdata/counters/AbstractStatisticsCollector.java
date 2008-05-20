@@ -46,8 +46,8 @@ import org.apache.system.SystemUtil;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -288,6 +288,31 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                     .addGarbageCollectorMXBeanCounters(serviceRoot
                             .makePath(ICounterHierarchy.Memory_GarbageCollectors));
             
+            /*
+             * Add counters reporting on the DirectBufferPool.
+             */
+            {
+                
+                final CounterSet tmp = serviceRoot
+                        .makePath(IProcessCounters.Memory
+                                + ICounterSet.pathSeparator
+                                + "DirectBufferPool");
+                
+                tmp.addCounter("poolCapacity", new OneShotInstrument<Integer>(
+                        DirectBufferPool.INSTANCE.getPoolCapacity()));
+
+                tmp.addCounter("bufferCapacity",
+                        new OneShotInstrument<Integer>(
+                                DirectBufferPool.INSTANCE.getBufferCapacity()));
+                
+                tmp.addCounter("poolSize", new Instrument<Integer>() {
+                    public void sample() {
+                        setValue(DirectBufferPool.INSTANCE.getPoolSize());
+                    }
+                });
+                
+            }
+
         }
                 
     }

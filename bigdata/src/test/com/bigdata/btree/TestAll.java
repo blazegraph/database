@@ -143,7 +143,13 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestReopen.class );
 
         /*
-         * index rebuilding.
+         * test index segment builds.
+         * 
+         * Note: the fast forward and fast reverse leaf scans are
+         * testing at the same time that we test the index segment
+         * builds.
+         * 
+         * See DumpIndexSegment.
          */
         // test static methods for the index builder.
         suite.addTestSuite( TestIndexSegmentPlan.class );
@@ -157,8 +163,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentBuilderWithLargeTrees.class );
         // test of the bloom filter integration.
         suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
-        // test of the fast forward and reverse leaf scans.
-        suite.addTestSuite( TestIndexSegmentFastLeafScan.class );
 
         /*
          * test fused views, including iterators for the fused view.

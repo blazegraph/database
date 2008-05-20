@@ -42,7 +42,7 @@ import com.bigdata.journal.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase {
+public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentTestCase {
 
     public TestIndexSegmentBuilderWithLargeTrees() {
     }
@@ -258,8 +258,6 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
             
             new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
                     btree.entryIterator(), m, btree.getIndexMetadata(), commitTime).call();
-            
-//            new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
 
             /*
              * Verify can load the index file and that the metadata associated
@@ -270,6 +268,13 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
              */
             System.err.println("Opening index segment.");
             final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
+            
+            // verify fast forward leaf scan.
+            testForwardScan(seg);
+
+            // verify fast reverse leaf scan.
+            testReverseScan(seg);
+
             /*
              * Verify the total index order.
              */

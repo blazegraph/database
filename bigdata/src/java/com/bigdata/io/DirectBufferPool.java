@@ -132,22 +132,76 @@ public class DirectBufferPool {
     }
 
     /**
+     * Options for provisioning the <em>static</em> instance of the
+     * {@link DirectBufferPool}.
+     * <p>
+     * Note: Since the {@link DirectBufferPool#INSTANCE} is static all of these
+     * options MUST be specified on the command line using <code>-D</code> to
+     * define the relevant property.
+     * <p>
+     * Note: The default configuration will never block but is not bounded in
+     * how many buffers it will allocate.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options {
+
+        /**
+         * The capacity of the {@link DirectBufferPool} is the maximum #of
+         * direct {@link ByteBuffer} instances that may reside in the pool
+         * (default {@value #DEFAULT_POOL_CAPACITY}).
+         * <p>
+         * Note: Placing a limit on the pool size could cause threads to
+         * deadlock awaiting a direct buffer from the pool. For this reason is
+         * it good practice to use
+         * {@link DirectBufferPool#acquire(long, TimeUnit)} with a timeout.
+         */
+        String POOL_CAPACITY = "bigdata.DirectBufferPool.poolCapacity";
+
+        /**
+         * The default pool capacity (no limit).
+         */
+        String DEFAULT_POOL_CAPACITY = ""+Integer.MAX_VALUE;
+
+        /**
+         * The capacity in bytes of the direct {@link ByteBuffer} instances
+         * allocated and managed by the {@link DirectBufferPool} ({@link #DEFAULT_BUFFER_CAPACITY}).
+         */
+        String BUFFER_CAPACITY = "bigdata.DirectBufferPool.bufferSize";
+
+        /**
+         * The default capacity of the allocated buffers.
+         */
+        String DEFAULT_BUFFER_CAPACITY = "" + Bytes.megabyte32 * 1;
+        
+    }
+    
+    /**
      * A JVM-wide pool of direct {@link ByteBuffer}s used for a variety of
      * purposes.
      * <p>
      * Note: {@link #acquire()} requests will block once the pool capacity has
      * been reached until a buffer is {@link #release(ByteBuffer)}ed.
-     * 
-     * FIXME static config on {@link System#getProperties()}
      */
-    public final static DirectBufferPool INSTANCE = new DirectBufferPool(//
-            
-            /*
-             * This configuration will never block but is not bounded in how
-             * many buffers it will allocate.
-             */
-            Integer.MAX_VALUE, //poolCapacity
-            Bytes.megabyte32 // bufferCapacity
+    public final static DirectBufferPool INSTANCE;
+
+    static {
+        
+        final int poolCapacity = Integer.parseInt(System.getProperty(
+                Options.POOL_CAPACITY, Options.DEFAULT_POOL_CAPACITY));
+
+        log.info(Options.POOL_CAPACITY+"="+poolCapacity);
+        
+        final int bufferCapacity = Integer.parseInt(System.getProperty(
+                Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
+
+        log.info(Options.BUFFER_CAPACITY+"="+bufferCapacity);
+
+        INSTANCE = new DirectBufferPool(
+                poolCapacity,
+                bufferCapacity
+                );
             
             /*
              * This configuration will block if there is a concurrent demand for
@@ -169,8 +223,9 @@ public class DirectBufferPool {
              */
 //            1, // poolCapacity
 //            Bytes.kilobyte32
-            );
 
+    }
+    
     /**
      * Create a direct {@link ByteBuffer} pool.
      * <p>

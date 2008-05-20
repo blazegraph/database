@@ -656,7 +656,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     /**
      * The backing store.
      */
-    final public IRawStore getStore() {
+    public IRawStore getStore() {
 
         return store;
 
@@ -1654,29 +1654,32 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
-    /**
-     * Iterator visits the leaves of the tree.
-     * 
-     * @return Iterator visiting the {@link Leaf leaves} of the tree.
-     * 
-     * @todo optimize this when prior-next leaf references are present, e.g.,
-     *       for an {@link IndexSegment}.
-     */
-    protected Iterator leafIterator() {
-
-        return new Striterator(getRoot().postOrderNodeIterator())
-                .addFilter(new Filter() {
-
-                    private static final long serialVersionUID = 1L;
-
-                    protected boolean isValid(Object arg0) {
-
-                        return arg0 instanceof Leaf;
-
-                    }
-                });
-
-    }
+//    /**
+//     * Iterator visits the leaves of the tree.
+//     * 
+//     * @return Iterator visiting the {@link Leaf leaves} of the tree.
+//     * 
+//     * @todo optimize this when prior-next leaf references are present, e.g.,
+//     *       for an {@link IndexSegment}.
+//     * 
+//     * @todo change the declared type to {@link ILeafIterator} and re-implement
+//     *       so that it has all of those semantics.
+//     */
+//    protected Iterator leafIterator() {
+//
+//        return new Striterator(getRoot().postOrderNodeIterator())
+//                .addFilter(new Filter() {
+//
+//                    private static final long serialVersionUID = 1L;
+//
+//                    protected boolean isValid(Object arg0) {
+//
+//                        return arg0 instanceof Leaf;
+//
+//                    }
+//                });
+//
+//    }
 
     /**
      * Computes and returns the utilization of the tree. The utilization figures

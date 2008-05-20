@@ -115,16 +115,42 @@ public class FileChannelUtility {
             // copy the data into the buffer
             final int nread = channel.read(src, pos + count);
 
+            if (nread == -1)
+                throw new IOException("EOF reading on channel: remaining="
+                        + (nbytes - count) + ", nread=" + nreads + ", pos="
+                        + pos + ", bytesRead=" + count);
+            
             count += nread; // #bytes read so far.
             
             nreads++;
+
+            if (nreads == 100) {
+
+                log.warn("reading on channel: remaining=" + (nbytes - count)
+                        + ", nread=" + nreads + ", pos=" + pos + ", bytesRead="
+                        + count);
+
+            } else if (nreads == 1000) {
+
+                log.error("reading on channel: remaining=" + (nbytes - count)
+                        + ", nread=" + nreads + ", pos=" + pos + ", bytesRead="
+                        + count);
+
+            } else if (nreads > 10000) {
+
+                throw new RuntimeException("reading on channel: remaining="
+                        + (nbytes - count) + ", nread=" + nreads + ", pos="
+                        + pos + ", bytesRead=" + count);
+
+            }
 
         }
 
         if (count != nbytes) {
 
             throw new RuntimeException("Expected to read " + nbytes
-                    + " bytes but read " + count + " in " + nreads + " reads");
+                    + " bytes but read " + count + " bytes in " + nreads
+                    + " reads");
 
         }
 
@@ -220,11 +246,6 @@ public class FileChannelUtility {
      * which case its position will have been changed anyway so this makes the
      * API more uniform).
      * 
-     * @issue There is a known bug with large transfers under Windows. See <a
-     *        href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=332d29312f820116d80442f33fb87?bug_id=6431344">
-     *        FileChannel.transferTo() doesn't work if address space runs out
-     *        </a>
-     * 
      * @param sourceChannel
      *            The source {@link FileChannel}.
      * @param fromPosition
@@ -240,6 +261,14 @@ public class FileChannelUtility {
      * @return #of IO operations required to effect the transfer.
      * 
      * @throws IOException
+     * 
+     * @issue There is a known bug with large transfers under Windows. See <a
+     *        href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=332d29312f820116d80442f33fb87?bug_id=6431344">
+     *        FileChannel.transferTo() doesn't work if address space runs out
+     *        </a>
+     * 
+     * @todo as a workaround, detect the Windows platform and do the IO
+     *       ourselves when the #of bytes to transfer exceeds 500M.
      */
      static public int transferAll(final FileChannel sourceChannel,
             final long fromPosition, final long count,

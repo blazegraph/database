@@ -829,10 +829,10 @@ public class IndexSegmentCheckpoint {
         sb.append(", nodesRegion={extent=" + extentNodes+", offset="+offsetNodes+"}");
         sb.append(", blobsRegion={extent=" + extentBlobs+", offset="+offsetBlobs+"}");
         sb.append(", addrRoot=" + am.toString(addrRoot));
-        sb.append(", addrMetadata=" + am.toString(addrMetadata));
-        sb.append(", addrBloom=" + am.toString(addrBloom));
         sb.append(", addrFirstLeaf=" + am.toString(addrFirstLeaf));
         sb.append(", addrLastLeaf=" + am.toString(addrLastLeaf));
+        sb.append(", addrMetadata=" + am.toString(addrMetadata));
+        sb.append(", addrBloom=" + am.toString(addrBloom));
         sb.append(", length=" + length);
         sb.append(", checksum="+checksum);
         sb.append(", commitTime=" + new Date(commitTime));

@@ -97,7 +97,7 @@ import com.bigdata.rawstore.WormAddressManager;
  * 
  * FIXME support efficient prior/next leaf scans (nextAddr and modify the itr to
  * use priorLeaf() and nextLeaf() methods for the scan). See
- * {@link DumpIndexStore}.
+ * {@link DumpIndexSegment}.
  * 
  * FIXME use the shortest separator key.
  * 
@@ -248,34 +248,42 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * order to use this buffer the {@link IndexMetadata} MUST specify an  
      */
     protected TemporaryRawStore blobBuffer;
-    
+        
     /**
-     * The address of the first leaf written on the file (there is always at
-     * least one, even if it is the root leaf).
+     * The encoded address of the first leaf written on the
+     * {@link IndexSegmentStore} (there is always at least one, even if it is
+     * the root leaf).
+     * <p>
+     * Note: A copy of this value is preserved by
+     * {@link IndexSegmentCheckpoint#addrFirstLeaf}.
      */
-    long addrFirstLeaf = 0L;
+    private long addrFirstLeaf = 0L;
 
     /**
-     * The address of the last leaf written on the file (there is always at
-     * least one, even if it is the root leaf).
+     * The encoded address of the last leaf written on the
+     * {@link IndexSegmentStore} (there is always at least one, even if it is
+     * the root leaf).
+     * <p>
+     * Note: A copy of this value is preserved by
+     * {@link IndexSegmentCheckpoint#addrLastLeaf}.
      */
-    long addrLastLeaf = 0L;
-    
-    /**
-     * The offset in the output file of the last leaf written onto that file.
-     * Together with {@link #lastLeafSize} this is used to compute the
-     * address of the prior leaf.
-     */
-    long lastLeafOffset = -1L;
-    
-    /**
-     * The size in bytes of the last leaf written onto the output file (the size
-     * of the compressed record that is actually written onto the output file
-     * NOT the size of the serialized leaf before it is compressed). Together
-     * with {@link #lastLeafOffset} this is used to compute the address of the
-     * prior leaf.
-     */
-    int lastLeafSize = -1;
+    private long addrLastLeaf = 0L;
+
+//    /**
+//     * The offset in the output file of the last leaf written onto that file.
+//     * Together with {@link #lastLeafSize} this is used to compute the
+//     * address of the prior leaf.
+//     */
+//    long lastLeafOffset = -1L;
+//    
+//    /**
+//     * The size in bytes of the last leaf written onto the output file (the size
+//     * of the compressed record that is actually written onto the output file
+//     * NOT the size of the serialized leaf before it is compressed). Together
+//     * with {@link #lastLeafOffset} this is used to compute the address of the
+//     * prior leaf.
+//     */
+//    int lastLeafSize = -1;
 
     /**
      * Tracks the maximum length of any serialized node or leaf.  This is used
@@ -1203,6 +1211,21 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
     /**
      * Serialize and write the leaf onto the {@link #leafBuffer}.
+     * <p>
+     * Note: For leaf addresses we know the absolute offset into the
+     * {@link IndexSegmentStore} where the leaf will wind up so we encoded the
+     * address of the leaf using the {@link IndexSegmentRegion#BASE} region.
+     * <p>
+     * Note: In order to write out the leaves using a double-linked list with
+     * prior-/next-leaf addresses we have to use a "write behind" strategy.
+     * Instead of writing out the leaf as soon as it is serialized, we save the
+     * unencoded address and a copy of the serialized record on private member
+     * fields. When we serialize the next leaf (or if we learn that we have no
+     * more leaves to serialize because {@link IndexSegmentPlan#nleaves} EQ
+     * {@link #nleavesWritten}) then we patch the serialized representation of
+     * the prior leaf and write it on the store at the previously obtained
+     * address, thereby linking the leaves together in both directions. It is
+     * definately confusing.
      * 
      * @return The address that may be used to read the leaf from the file
      *         backing the {@link IndexSegmentStore}.
@@ -1210,39 +1233,110 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     protected long writeLeaf(final SimpleLeafData leaf)
         throws IOException
     {
-       
-        // serialize the leaf.
-        final ByteBuffer buf = nodeSer.putLeaf(leaf);
 
         /*
-         * FIXME At this point we already know the address of the previous leaf
-         * [addrLastLeaf] and we use nodeSer.updateLeaf(...) to set it on the
-         * record. However, we MUST be a little bit trickier to get the address
-         * of the _next_ leaf into the record. Basically, we have to defer
-         * writing a leaf (we already know how large it is) until we have the
-         * next leaf serialized. The we patch the prior leaf and write it out.
-         */
-        nodeSer.updateLeaf(buf, addrLastLeaf, -1L/* UNKNOWN */);
-        
-        /*
-         * Write leaf on file, returning its address.
-         * 
-         * Note: We will encode this address before it is allowed out of this
-         * method! The encoded address will be relative to the BASE region.
-         */
-        final long addr1 = leafBuffer.write(buf);
-
-        assert addressManager.getByteCount(addr1) == buf.limit();
+         * The encoded address of the leaf that we allocated here. The encoded
+         * address will be relative to the BASE region.
+         */ 
+        final long addr;
+        {
             
-        final int nbytes = addressManager.getByteCount(addr1);
+            // serialize the leaf, obtaining a view onto a internal buffer.
+            final ByteBuffer buf = nodeSer.putLeaf(leaf);
 
-        /*
-         * Note: The offset is adjusted by the size of the metadata record such
-         * that the offset is correct for the generated file NOT the buffer into
-         * which the leaves are being written.
-         */
-        final long offset = addressManager.getOffset(addr1)
-                + IndexSegmentCheckpoint.SIZE;
+            // Allocate a record for the leaf on the temporary store.
+            final long addr1 = leafBuffer.allocate(buf.remaining());
+
+            // encode the address assigned to the serialized leaf.
+            addr = encodeLeafAddr(addr1);
+            
+            if (nleavesWritten > 0) {
+
+                if(DEBUG)
+                    log.info("Writing leaf: priorLeaf="+addrPriorLeaf+", nextLeaf="+addr);
+                else if (INFO)
+                    System.err.print("."); // wrote a leaf.
+
+                // patch representation of the previous leaf
+                nodeSer.updateLeaf(bufLastLeaf, addrPriorLeaf, addr/*addrNextLeaf*/);
+
+                // write the previous leaf onto the store.
+                leafBuffer.update(bufLastLeafAddr, 0/*offset*/, bufLastLeaf);
+                
+                // the encoded address of the leaf that we just wrote out.
+                addrPriorLeaf = encodeLeafAddr(bufLastLeafAddr);
+                
+            }
+            
+            // clear the old data.
+            bufLastLeaf.clear();
+            
+            if (buf.remaining() > bufLastLeaf.capacity()) {
+                
+                // reallocate buffer since too small.
+                bufLastLeaf = ByteBuffer.allocate(buf.remaining() * 2);
+                
+            }
+            
+            // copy in the new data
+            bufLastLeaf.put(buf); bufLastLeaf.flip();
+            
+            // the address allocated for the leaf in the temp store.
+            bufLastLeafAddr = addr1;
+            
+        }
+
+        if (nleavesWritten == 0) {
+            
+            // encoded addr of the 1st leaf - update only for the first leaf that we allocate.
+            addrFirstLeaf = addr;
+            
+        }
+        
+        // encoded addr of the last leaf - update for each leaf that we allocate.
+        addrLastLeaf = addr;
+        
+        // the #of leaves written so far.
+        nleavesWritten++;
+
+        if (plan.nleaves == nleavesWritten) {
+            
+            /*
+             * Force out the last leaf.
+             */
+    
+            if(DEBUG)
+                log.debug("Writing leaf: priorLeaf="+addrPriorLeaf+", nextLeaf="+0L);
+            else if (INFO)
+                System.err.print("."); // wrote a leaf.
+            
+            // patch representation of the last leaf.
+            nodeSer.updateLeaf(bufLastLeaf, addrPriorLeaf, 0L/*addrNextLeaf*/);
+
+            // write the last leaf onto the store.
+            leafBuffer.update(bufLastLeafAddr, 0/*offset*/, bufLastLeaf);
+            
+        }
+
+        return addr;
+        
+    }
+
+    /**
+     * Encode the address of a leaf.
+     * <p>
+     * Note: This updates {@link #maxNodeOrLeafLength} as a side-effect.
+     * 
+     * @param addr1
+     *            The address of a leaf as allocated by the {@link #leafBuffer}
+     * 
+     * @return The encoded address of the leaf relative to the
+     *         {@link IndexSegmentRegion#BASE} region where it will appear once
+     *         the leaves have been copied onto the output file.
+     */
+    private long encodeLeafAddr(long addr1) {
+
+        final int nbytes = addressManager.getByteCount(addr1);
 
         if (nbytes > maxNodeOrLeafLength) {
 
@@ -1251,40 +1345,63 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         }
 
-        // the offset where we just wrote the last leaf.
-        lastLeafOffset = offset;
-
-        // the size of the leaf that we just wrote out.
-        lastLeafSize = nbytes;
-
-        // the #of leaves written so far.
-        nleavesWritten++;
-
-        if (INFO)
-            System.err.print("."); // wrote a leaf.
-
         /*
-         * Encode the address of the leaf. Since this is a leaf address we know
-         * the absolute offset into the file at which the leaf was written and
-         * we use the BASE region.
+         * Note: The offset is adjusted by the size of the checkpoint record
+         * such that the offset is correct for the generated file NOT the buffer
+         * into which the leaves are being written.
          */
+        final long offset = addressManager.getOffset(addr1)
+                + IndexSegmentCheckpoint.SIZE;
+        
+        // Encode the address of the leaf.
         final long addr = addressManager.toAddr(nbytes, IndexSegmentRegion.BASE
                 .encodeOffset(offset));
         
-        if (nleavesWritten == 1) {
-            
-            // update only for the first leaf that we write.
-            addrFirstLeaf = addr;
-            
-        }
-        
-        // always update for each leaf that we write.
-        addrLastLeaf = addr;
-        
         return addr;
-        
+
     }
 
+    /*
+     * Data used to chain the leaves together in a prior/next double-linked
+     * list.
+     */
+    
+    /**
+     * The unencoded address of the previous leaf written on the
+     * {@link #leafBuffer}.
+     */
+    private long addrPriorLeaf = 0L;
+    
+    /**
+     * The address of the last leaf allocated (but not yet written) on the
+     * {@link #leafBuffer} (the {@link TemporaryRawStore} on which the leaves
+     * are buffered).
+     * <p>
+     * Note: This address is NOT encoded for the {@link IndexSegmentStore}. It
+     * is used to specify which record we want to update the record on the
+     * {@link #leafBuffer} using
+     * {@link TemporaryRawStore#update(long, int, ByteBuffer)}.
+     * <p>
+     * Note: This is used to patch the representation of the last serialized
+     * leaf in {@link #bufLastLeaf} with the address of the next leaf in key
+     * order.
+     * 
+     * @see #writeLeaf(SimpleLeafData)
+     * @see #writePriorLeaf(long nextLeafAddr)
+     */
+    private long bufLastLeafAddr = 0L;
+    
+    /**
+     * Buffer holds a copy of the serialized representation of the last leaf.
+     * This buffer is reset and written by {@link #writeLeaf(SimpleLeafData)}.
+     * The contents of this buffer are used by {@link #writePriorLeaf(long)} to
+     * write out the serialized representation of the previous leaf in key order
+     * after it has been patched to reflect the prior and next leaf addresses.
+     * 
+     * @todo must re-allocate if not large enough.
+     */
+    private ByteBuffer bufLastLeaf = ByteBuffer.allocate(20*Bytes.kilobyte32);
+    
     /**
      * Serialize and write the node onto the {@link #nodeBuffer}.
      * 
@@ -1460,8 +1577,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             extentNodes = 0L;
             
             // Address of the root leaf.
-            addrRoot = addressManager.toAddr(lastLeafSize,
-                    IndexSegmentRegion.BASE.encodeOffset(lastLeafOffset));
+            addrRoot = addrLastLeaf;
+//                addressManager.toAddr(lastLeafSize,IndexSegmentRegion.BASE.encodeOffset(lastLeafOffset));
 
             if (INFO)
                 log.info("addrRoot(Leaf): " + addrRoot + ", "

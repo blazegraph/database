@@ -25,18 +25,18 @@ package com.bigdata.btree;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.apache.log4j.Level;
+
+import com.bigdata.btree.IndexSegment.LeafIterator;
+import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 
 /**
  * Test suite based on a small btree with known keys and values.
  * 
  * @see src/architecture/btree.xls, which has the detailed examples.
- * 
- * @todo test post-condition for the temporary file.
  */
-public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase {
+public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTestCase {
 
     File outFile;
     File tmpDir;
@@ -67,8 +67,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
         if (outFile != null && outFile.exists() && !outFile.delete()) {
 
-            System.err
-                    .println("Warning: Could not delete file: " + outFile);
+            log.warn("Could not delete file: " + outFile);
 
         }
 
@@ -84,14 +83,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
         // materialize the leaves.
         
-        Iterator itr = seg.leafIterator();
+        final ILeafIterator itr = seg.leafIterator();
         
-        while (itr.hasNext()) {
-            
+        while(itr.hasNext()) {
+
             itr.next();
             
         }
-
+        
         // dump the tree to validate it.
 
         System.err.println("dumping index segment");
@@ -148,15 +147,15 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * specifics of the length of serialized nodes or leaves).
           */
         
-        final IndexSegmentStore fileStore = new IndexSegmentStore(outFile);
+        final IndexSegmentStore segStore = new IndexSegmentStore(outFile);
         
-        assertEquals(commitTime,fileStore.getCheckpoint().commitTime);
-        assertEquals(2,fileStore.getCheckpoint().height);
-        assertEquals(4,fileStore.getCheckpoint().nleaves);
-        assertEquals(3,fileStore.getCheckpoint().nnodes);
-        assertEquals(10,fileStore.getCheckpoint().nentries);
+        assertEquals(commitTime,segStore.getCheckpoint().commitTime);
+        assertEquals(2,segStore.getCheckpoint().height);
+        assertEquals(4,segStore.getCheckpoint().nleaves);
+        assertEquals(3,segStore.getCheckpoint().nnodes);
+        assertEquals(10,segStore.getCheckpoint().nentries);
         
-        final IndexSegment seg = fileStore.loadIndexSegment();
+        final IndexSegment seg = segStore.loadIndexSegment();
         
         assertEquals(3,seg.getBranchingFactor());
         assertEquals(2,seg.getHeight());
@@ -164,6 +163,9 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         assertEquals(3,seg.getNodeCount());
         assertEquals(10,seg.getEntryCount());
 
+        testForwardScan(seg);
+        testReverseScan(seg);
+        
         // test index segment structure.
         dumpIndexSegment(seg);
         
@@ -219,26 +221,80 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         
         final long commitTime = System.currentTimeMillis();
         
+//        IndexSegmentBuilder.log.setLevel(Level.DEBUG); 
+        
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
                 .entryIterator(), 9/* m */, btree.getIndexMetadata(), commitTime).call();
 
-//        new IndexSegmentBuilder(outFile,tmpDir,btree,9,0.);
+        /*
+         * Verify that we can load the index file and that the metadata
+         * associated with the index file is correct (we are only checking those
+         * aspects that are easily defined by the test case and not, for
+         * example, those aspects that depend on the specifics of the length of
+         * serialized nodes or leaves).
+         */
+        final IndexSegmentStore segStore = new IndexSegmentStore(outFile);
+        
+        assertEquals("#nodes",1,segStore.getCheckpoint().nnodes);
+        assertEquals("#leaves",2,segStore.getCheckpoint().nleaves);
+        assertEquals("#entries",10,segStore.getCheckpoint().nentries);
+        assertEquals("height",1,segStore.getCheckpoint().height);
+        assertNotSame(segStore.getCheckpoint().addrRoot,segStore.getCheckpoint().addrFirstLeaf);
+        assertNotSame(segStore.getCheckpoint().addrFirstLeaf,segStore.getCheckpoint().addrLastLeaf);
 
-         /*
-          * Verify can load the index file and that the metadata
-          * associated with the index file is correct (we are only
-          * checking those aspects that are easily defined by the test
-          * case and not, for example, those aspects that depend on the
-          * specifics of the length of serialized nodes or leaves).
-          */
-        final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
+        final IndexSegment seg = segStore.loadIndexSegment();
 
-        assertEquals(9,seg.getBranchingFactor());
-        assertEquals(1,seg.getHeight());
-        assertEquals(2,seg.getLeafCount());
-        assertEquals(1,seg.getNodeCount());
-        assertEquals(10,seg.getEntryCount());
+        assertEquals(9, seg.getBranchingFactor());
+        assertEquals(1, seg.getHeight());
+        assertEquals(2, seg.getLeafCount());
+        assertEquals(1, seg.getNodeCount());
+        assertEquals(10, seg.getEntryCount());
 
+        final ImmutableLeaf firstLeaf = seg.readLeaf(segStore.getCheckpoint().addrFirstLeaf);
+
+        assertEquals("priorAddr", 0L, firstLeaf.priorAddr);
+
+        assertEquals("nextAddr", segStore.getCheckpoint().addrLastLeaf, firstLeaf.nextAddr);
+
+        final ImmutableLeaf lastLeaf = seg.readLeaf(segStore.getCheckpoint().addrLastLeaf);
+
+        assertEquals("priorAddr", segStore.getCheckpoint().addrFirstLeaf,lastLeaf.priorAddr);
+
+        assertEquals("nextAddr", 0L, lastLeaf.nextAddr);
+
+        // test forward scan
+        {
+         
+            final LeafIterator itr = seg.leafIterator(true/* forwardScan */);
+            
+            assertTrue(firstLeaf == itr.current()); // Note: test depends on cache!
+            assertTrue(itr.hasNext());
+            assertFalse(itr.hasPrior());
+
+            assertTrue(lastLeaf == itr.next()); // Note: test depends on cache!
+            assertTrue(lastLeaf == itr.current()); // Note: test depends on cache!
+            
+        }
+        
+        /*
+         * test reverse scan
+         * 
+         * Note: the scan starts with the last leaf in the key order and then
+         * proceeds in reverse key order.
+         */
+        {
+            
+            final LeafIterator itr = seg.leafIterator(false/* forwardScan */);
+            
+            assertTrue(lastLeaf == itr.current()); // Note: test depends on cache!
+            assertTrue(itr.hasNext()); // yes, because we are scanning backward.
+            assertFalse(itr.hasPrior());// no, because we are scanning backward.
+
+            assertTrue(firstLeaf == itr.next()); // Note: test depends on cache!
+            assertTrue(firstLeaf == itr.current()); // Note: test depends on cache!
+
+        }
+        
         // test index segment structure.
         dumpIndexSegment(seg);
 
@@ -282,22 +338,40 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
                 .entryIterator(), 10/* m */, btree.getIndexMetadata(), commitTime).call();
 
-//        new IndexSegmentBuilder(outFile, tmpDir, btree, 10, 0.);
+        /*
+         * Verify that we can load the index file and that the metadata
+         * associated with the index file is correct (we are only checking those
+         * aspects that are easily defined by the test case and not, for
+         * example, those aspects that depend on the specifics of the length of
+         * serialized nodes or leaves).
+         */
 
-         /*
-             * Verify can load the index file and that the metadata associated
-             * with the index file is correct (we are only checking those
-             * aspects that are easily defined by the test case and not, for
-             * example, those aspects that depend on the specifics of the length
-             * of serialized nodes or leaves).
-             */
-        final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
+        final IndexSegmentStore segStore = new IndexSegmentStore(outFile);
+        
+        assertEquals("#nodes",0,segStore.getCheckpoint().nnodes);
+        assertEquals("#leaves",1,segStore.getCheckpoint().nleaves);
+        assertEquals("#entries",10,segStore.getCheckpoint().nentries);
+        assertEquals("height",0,segStore.getCheckpoint().height);
+        assertEquals(segStore.getCheckpoint().addrRoot,segStore.getCheckpoint().addrFirstLeaf);
+        assertEquals(segStore.getCheckpoint().addrFirstLeaf,segStore.getCheckpoint().addrLastLeaf);
+
+        final IndexSegment seg = segStore.loadIndexSegment();
 
         assertEquals(10,seg.getBranchingFactor());
         assertEquals(0,seg.getHeight());
         assertEquals(1,seg.getLeafCount());
         assertEquals(0,seg.getNodeCount());
         assertEquals(10,seg.getEntryCount());
+
+        final ImmutableLeaf leaf = seg.readLeaf(segStore.getCheckpoint().addrRoot);
+        assertEquals("priorAddr",0L,leaf.priorAddr);
+        assertEquals("nextAddr",0L,leaf.nextAddr);
+        
+        final LeafIterator itr = seg.leafIterator(true/*forwardScan*/);
+        assertNotNull(itr.current());
+        assertTrue(leaf == itr.current());
+        assertFalse(itr.hasNext());
+        assertFalse(itr.hasPrior());
         
         // test index segment structure.
         dumpIndexSegment(seg);

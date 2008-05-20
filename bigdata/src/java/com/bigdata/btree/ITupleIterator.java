@@ -39,7 +39,10 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo add #prior() method so that we can scan in reverse key order.
+ * @todo add isForwardScan(), isReverseScan(), #priorTuple(), #nextTuple(), and
+ *       prior() methods so that we can scan in reverse key order.  (prior/next tuple
+ *       are always relative to the key order while prior/next are relative to the 
+ *       iterator scan order).
  */
 public interface ITupleIterator extends Iterator<ITuple> {
 
