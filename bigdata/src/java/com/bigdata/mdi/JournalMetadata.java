@@ -82,6 +82,13 @@ public class JournalMetadata extends AbstractResourceMetadata {
         
     }
 
+    /**
+     * Note: The extent of the journal at the time that this ctor executes will
+     * be reported by {@link #size()}. If the journal is subsequently extended
+     * {@link #size()} will NOT reflect its new extent.
+     * 
+     * @param journal
+     */
     public JournalMetadata(AbstractJournal journal) {
 
         this(getFileString(journal), journal.getBufferStrategy().getExtent(),

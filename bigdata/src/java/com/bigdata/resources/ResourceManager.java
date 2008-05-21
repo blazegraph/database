@@ -274,6 +274,32 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     public void sample() {setValue(segmentStoreDeleteCount.get());}
                 });
 
+                tmp.addCounter("Bytes Under Management", new Instrument<Long>(){
+                    public void sample() {
+                                if (isRunning()) {
+                                    setValue(getBytesUnderManagement());
+                                }
+                            }
+                        });
+                
+                tmp.addCounter("Bytes Deleted", new Instrument<Long>(){
+                    public void sample() {
+                        setValue(bytesDeleted.get());
+                    }
+                });
+
+                tmp.addCounter("Free Space on Data Volume", new Instrument<Long>(){
+                    public void sample() {
+                        setValue(getDataDirFreeSpace());
+                    }
+                });
+
+                tmp.addCounter("Free Space on Temp Volume", new Instrument<Long>(){
+                    public void sample() {
+                        setValue(getTempDirFreeSpace());
+                    }
+                });
+
                 tmp.addCounter("Minimum Release Age",
                         new OneShotInstrument<Long>(minReleaseAge));
 

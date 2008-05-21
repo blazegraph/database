@@ -48,6 +48,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
@@ -79,10 +80,10 @@ import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -108,15 +109,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       that you have to explicitly clean up after a unit test using a
  *       {@link ResourceManager} or it will leave its files around.
  * 
- * @todo track the disk space used by the {@link #getDataDir()} and the free
- *       space remaining on the mount point that hosts the data directory and
- *       report via counters to the {@link ILoadBalancerService}. if we
- *       approach the limit on the space in use then we need to shed index
- *       partitions to other data services or potentially become more aggressive
- *       in releasing old resources.
- *       <p>
- *       See
- *       http://commons.apache.org/io/api-release/index.html?org/apache/commons/io/FileSystemUtils.html
+ * @todo If we approach the limit on free space for the {@link #dataDir} then we
+ *       need to shed index partitions to other data services or potentially
+ *       become more aggressive in releasing old resources. See
+ *       {@link #getDataDirFreeSpace(File)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -590,6 +586,94 @@ abstract public class StoreManager extends ResourceEvents implements
     final protected AtomicLong segmentStoreDeleteCount = new AtomicLong();
     
     /**
+     * The #of bytes currently under management EXCEPT those on the live
+     * journal. This is incremented each time a new resource is added using
+     * {@link #addResource(IResourceMetadata, File)} and decremented each
+     * time a resource is deleted.
+     */
+    final protected AtomicLong bytesUnderManagement = new AtomicLong();
+    
+    /**
+     * The #of bytes that have been deleted since startup.
+     */
+    final protected AtomicLong bytesDeleted = new AtomicLong();
+    
+    /**
+     * The #of bytes currently under management, including those written on the
+     * live journal.
+     * 
+     * @throws IllegalStateException
+     *             during startup or if the {@link StoreManager} is closed.
+     */
+    public long getBytesUnderManagement() {
+        
+        assertRunning();
+        
+        return bytesUnderManagement.get() + getLiveJournal().getBufferStrategy().getExtent();
+        
+    }
+    
+    /**
+     * The #of bytes of free space remaining on the volume hosting the
+     * {@link #dataDir}.
+     * 
+     * @return The #of bytes of free space remaining -or- <code>-1L</code> if
+     *         the free space could not be determined.
+     */
+    public long getDataDirFreeSpace() {
+
+        return getFreeSpace(dataDir);
+        
+    }
+    
+    /**
+     * The #of bytes of free space remaining on the volume hosting the
+     * {@link #tmpDir}.
+     * 
+     * @return The #of bytes of free space remaining -or- <code>-1L</code> if
+     *         the free space could not be determined.
+     */
+    public long getTempDirFreeSpace() {
+        
+        return getFreeSpace(tmpDir);
+        
+    }
+
+    /**
+     * Return the free space in bytes on the volume hosting some directory.
+     * <p>
+     * Note: This uses the apache IO commons {@link FileSystemUtils} to report
+     * the free space on the volume hosting the directory and then converts kb
+     * to bytes.
+     * 
+     * @param dir
+     *            A directory hosted on some volume.
+     * 
+     * @return The #of bytes of free space remaining for the volume hosting the
+     *         directory -or- <code>-1L</code> if the free space could not be
+     *         determined.
+     * 
+     * @see http://commons.apache.org/io/api-release/org/apache/commons/io/FileSystemUtils.html
+     */
+    private long getFreeSpace(File dir) {
+        
+        try {
+
+            return FileSystemUtils.freeSpaceKb(dir.toString())
+                    * Bytes.kilobyte;
+            
+        } catch(Throwable t) {
+            
+            log.error("Could not get free space: dir=" + dir + " : "
+                            + t, t);
+            
+            return -1L;
+            
+        }
+
+    }
+    
+    /**
      * An object wrapping the {@link Properties} given to the ctor.
      */
     public Properties getProperties() {
@@ -986,8 +1070,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     if (ignoreBadFiles) {
 
-                        log
-                                .warn("The following "
+                        log.warn("The following "
                                         + nbad
                                         + " file(s) had problems and are being ignored: "
                                         + stats.badFiles);
@@ -1157,6 +1240,11 @@ abstract public class StoreManager extends ResourceEvents implements
                         throw new InterruptedException();
 
                     liveJournalRef.set(tmp);
+                    
+                    /*
+                     * Subtract out the #of bytes in the live journal.
+                     */
+                    bytesUnderManagement.addAndGet(-tmp.getBufferStrategy().getExtent());
                     
                 }
 
@@ -1392,8 +1480,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 stats.njournals++;
 
-                stats.nbytes += file.length(); // tmp.size();
-                                                // //getBufferStrategy().getExtent();
+                stats.nbytes += file.length();
 
             } finally {
 
@@ -1436,7 +1523,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 stats.nsegments++;
 
-                stats.nbytes += file.length(); // segStore.size();
+                stats.nbytes += file.length();
 
             } finally {
 
@@ -1538,9 +1625,12 @@ abstract public class StoreManager extends ResourceEvents implements
     /**
      * Notify the resource manager of a new resource. The resource is added to
      * {@link #resourceFiles} and to either {@link #journalIndex} or
-     * {@link #segmentIndex} as appropriate. As a post-condition, you can
-     * use {@link #openStore(UUID)} to open the resource using the {@link UUID}
+     * {@link #segmentIndex} as appropriate. As a post-condition, you can use
+     * {@link #openStore(UUID)} to open the resource using the {@link UUID}
      * specified by {@link IResourceMetadata#getUUID()}.
+     * <p>
+     * Note: This also adds the extent of the store in bytes as reported by
+     * {@link IResourceMetadata#size()} to {@link #bytesUnderManagement}.
      * 
      * @param resourceMetadata
      *            The metadata describing that resource.
@@ -1553,8 +1643,8 @@ abstract public class StoreManager extends ResourceEvents implements
      *             if there is already a resource registered with the same UUID
      *             as reported by {@link IResourceMetadata#getUUID()}
      * @throws RuntimeException
-     *             if the {@link #journalIndex} or {@link #segmentIndex}
-     *             already know about that resource.
+     *             if the {@link #journalIndex} or {@link #segmentIndex} already
+     *             know about that resource.
      * @throws RuntimeException
      *             if {@link #openStore(UUID)} already knows about that
      *             resource.
@@ -1618,6 +1708,11 @@ abstract public class StoreManager extends ResourceEvents implements
             segmentIndex.add(resourceMetadata);
 
         }
+        
+        /*
+         * Track the #of bytes under management.
+         */
+        bytesUnderManagement.addAndGet(resourceMetadata.size());
 
     }
 
@@ -2029,6 +2124,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
         recursiveDelete(dataDir);
 
+        // approx. #of bytes deleted.
+        bytesDeleted.addAndGet(bytesUnderManagement.get());
+        
+        // nothing left under management.
+        bytesUnderManagement.set(0L);
+        
     }
 
     /**
@@ -2565,12 +2666,22 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     throw new RuntimeException("Not found: " + file);
 
-                } else if (!file.delete()) {
+                }
+                
+                final long length = file.length();
+                
+                if (!file.delete()) {
 
                     throw new RuntimeException("Could not delete: " + file);
 
                 }
 
+                // track #of bytes deleted since startup.
+                bytesDeleted.addAndGet(length);
+                
+                // track #of bytes still under management.
+                bytesUnderManagement.addAndGet(-length);
+                
             }
 
         } catch(Throwable t) {

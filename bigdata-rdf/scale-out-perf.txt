@@ -852,6 +852,9 @@ Short term tasks:
        dataDir is located and the volume on which the tmpDir is
        located.
 
+       Note: The StoreManager also reports the free space on the
+       volume for both the data dir and the temp dir.
+
      - The counters are overflowing to days before midnight.  Check
        the locale and see when timestamp causes an overflow to the
        next hour and the next day in some unit tests.
@@ -883,6 +886,15 @@ Short term tasks:
        using.
 
      - Done. Add reporting to the concurrent data loader for #errors.
+
+     - Done. The CDL tps counter needs to stop counter time once the
+       load is complete.  As it is the rate continues to drop with
+       elapsed non-load time.  This makes the value reported to the
+       load balancer wrong! (Even the value available from the client
+       is wrong since it can be off by up to 60 seconds of load time).
+
+     - Done. Problem w/ correlated view of counters. Was plotting a
+       String[] rather than its elements.
 
    - Admin UI
    
@@ -1783,26 +1795,37 @@ EF-U100-host3-1DS-5M:
 	index partition split tasks that were still executing when the
 	run was terminated.
 
-EF-U100-host3-1DS:
+EF-U100-host3-1DS: 5922
 
-	____ tps w/ 200M initial extent and 200M maximum extent.
+		   w/ 200M initial extent and 200M maximum extent.
+
+	--------------------
 
       (b) for JF with one data services with on one machine; 
 
-JF-U100-host3-2DS:
+JF-U100-host3-1DS: ************* RUN NEXT *********
+
+	--------------------
 
       (c) for JF with two data services with on one machine; and
 
 JF-U100-host3-2DS:
+
+	--------------------
       
       (d) for JF with two data services on two machines.
 
 JF-U100-host23-2DS:
 
+	--------------------
+
       Choose runs where we have the data w/o overflow from above.
 
- *** Re-run at least one of the above with post-load validation
-     enabled.
+ - Done. Add counter for bytes under management on the StoreManager.
+   I want to see bytes placed under management, bytes for stores that
+   have been deleted, and bytes for stores that are remaining.  It
+   would also be great to see the bytes remaining on the volume where
+   the data are stored in the same view.
 
     --------------------
 
@@ -1961,7 +1984,7 @@ JF-U100-host23-2DS:
            traversal.  I've modified the class slightly to re-open the
            store transparently and we will see how that goes.
 	   
-	   The observed problem was during iterator traversal.  I
+	   *** The observed problem was during iterator traversal.  I
 	   suspect that iterator traversal should not allow the index
 	   to be closed since it requires valid hard references to the
 	   stack of nodes being traversed.  Figure out who is closing
@@ -1976,10 +1999,21 @@ JF-U100-host23-2DS:
 	   stack could also be written for the BTree using lookup() to
 	   re-discover the current leaf and tuple.
 
-    - Support transparent byte[] <=> value (de-)serialization using a
+	   * Consider modifying the leaf iterator to require calling
+             next() for the first leaf.  Consider changing next() to
+             nextLeafInScanOrder().
+
+    - An index segment build that could operate without the actual #of
+      entries would avoid one pass over the data.  See how expensive
+      that traversal is (it is done in one location) and decide
+      whether it is worth trying to operate without that information
+      on hand.  Eg, by using the upper bound on the entry count and
+      then allowing leaves and nodes to underflow.
+
+    * Support transparent byte[] <=> value (de-)serialization using a
       serializer object associated with the index metadata.  
 
-    - Add Map and Set impls. based on the BTree.
+    * Add Map and Set impls. based on the BTree.
 
     - Done (IUpdateStore). I need to create an interface extending
       IRawStore, put those methods on that interface, and then declare

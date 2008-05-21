@@ -65,9 +65,6 @@ public interface IResourceMetadata extends Cloneable {
     
     /**
      * The #of bytes in the store file.
-     * 
-     * @todo Drop this field? I do not think that this is going to be useful for
-     *       any decision making.
      */
     public long size();
 

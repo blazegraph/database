@@ -117,6 +117,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * perform a database at once closure afterwards if you are bulk loading some
  * dataset into an empty database.
  * 
+ * @todo consider naming each instance and having the instance place its
+ *       counters under the client using that name as part of its namespace.
+ *       This will allow clients to avoid replacing the counters from prior runs
+ *       if they so choose.
+ * 
  * @todo experiment with varying #clients and buffer capacity.
  * 
  * @todo As an alternative to indexing the locally loaded data, experiment with
@@ -135,14 +140,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo support as a map/reduce job assigning files from a
  *       {@link BigdataRepository} to clients so the source is a queue of files
  *       assigned to that map task.
- * 
- * @todo the tps counter should halt once we are done loading data, but there is
- *       no way to signal that right now - this is only apparent if you are also
- *       running validation. Also, once we are done loading data the client
- *       should be told to flush its counters to the load balancer so that we
- *       have the final state snapshot once it is ready.
- * 
- * @todo I am no longer seeing the {@link QueueStatisticsTask} counters.
  * 
  * @todo reporting for tasks that fail after retry - perhaps on a file? Leave to
  *       the caller? (available from the {@link #failedQueue}).
@@ -229,6 +226,33 @@ public class ConcurrentDataLoader {
      *             other source).
      */
     final AtomicInteger nscanned = new AtomicInteger(0);
+    
+//    /**
+//     * The elapsed time during which one or more tasks was running on this
+//     * service.
+//     */
+//    public long getElapsedServiceTime() {
+//        
+//        final long elapsedThisRun;
+//        
+//        final long startTime = this.startTime;
+//
+//        if (startTime == 0L) {
+//        
+//            elapsedThisRun = 0L;
+//            
+//        } else {
+//            
+//            // still running.
+//            elapsedThisRun = System.currentTimeMillis() - startTime;
+//
+//        }
+//
+//        return elapsedPriorRuns + elapsedThisRun;
+//        
+//    }
+//    private long startTime;
+//    private long elapsedPriorRuns;
     
     final AbstractFederation fed;
     
@@ -1781,10 +1805,68 @@ public class ConcurrentDataLoader {
         final AbstractTripleStore db;
 
         /**
-         * The time when the ctor is executed - this is used to compute told
-         * triples per second.
+         * The timestamp set when {@link #notifyStart()} is invoked.
          */
-        final long begin = System.currentTimeMillis();
+        private long beginTime;
+
+        /**
+         * The timestamp set when {@link #notifyEnd()} is invoked.
+         */
+        private long endTime;
+        
+        /**
+         * Notify that the factory will begin running tasks. This sets the
+         * {@link #beginTime} used by {@link #elapsed()} to report the run time
+         * of the tasks.
+         */
+        public void notifyStart() {
+                        
+            endTime = 0L;
+            
+            beginTime = System.currentTimeMillis();
+            
+        }
+
+        /**
+         * Notify that the factory is done running tasks (for now).  This
+         * places a cap on the time reported by {@link #elapsed()}.
+         * 
+         * @todo Once we are done loading data the client should be told to
+         *       flush its counters to the load balancer so that we have the
+         *       final state snapshot once it is ready.
+         */
+        public void notifyEnd() {
+            
+            endTime = System.currentTimeMillis();
+
+            assert beginTime <= endTime;
+            
+        }
+        
+        /**
+         * The elapsed time, counting only the time between
+         * {@link #notifyStart()} and {@link #notifyEnd()}.
+         */
+        public long elapsed() {
+            
+            if(endTime==0L) {
+                
+                // Still running.
+                return System.currentTimeMillis() - beginTime;
+                
+            } else {
+                
+                // Done.
+                
+                final long elapsed = endTime - beginTime;
+                
+                assert elapsed >= 0L;
+                
+                return elapsed;
+                
+            }
+            
+        }
 
 //      /**
 //      * The baseURL and "" if none is needed.
@@ -1935,7 +2017,7 @@ public class ConcurrentDataLoader {
         public String reportTotals() {
 
             // total run time.
-            final long elapsed = System.currentTimeMillis() - begin;
+            final long elapsed = elapsed();
 
             final long tripleCount = getTripleCount();
 
@@ -1992,7 +2074,7 @@ public class ConcurrentDataLoader {
                 @Override
                 protected void sample() {
 
-                    final long elapsed = System.currentTimeMillis() - begin;
+                    final long elapsed = elapsed();
 
                     setValue(elapsed);
 
@@ -2010,7 +2092,7 @@ public class ConcurrentDataLoader {
                 @Override
                 protected void sample() {
 
-                    final long elapsed = System.currentTimeMillis() - begin;
+                    final long elapsed = elapsed();
 
                     final double tps = (long) (((double) toldTriples.get())
                             / ((double) elapsed) * 1000d);
@@ -2034,7 +2116,7 @@ public class ConcurrentDataLoader {
         public String reportTotals() {
 
             // total run time.
-            final long elapsed = System.currentTimeMillis() - begin;
+            final long elapsed = elapsed();
 
             final long nterms = db.getTermCount();
 
