@@ -121,12 +121,18 @@ public class RDFLoadAndValidateHelper {
         loadTaskFactory.setupCounters(service.getCounters(client
                 .getFederation()));
 
+        // notify will run tasks.
+        loadTaskFactory.notifyStart();
+
         // read files and run tasks.
         service.process(file, filter, loadTaskFactory);
 
         // await completion of all tasks.
         service.awaitCompletion(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
 
+        // notify did run tasks.
+        loadTaskFactory.notifyEnd();
+        
         System.err.println(loadTaskFactory.reportTotals());
 
     }
@@ -136,11 +142,17 @@ public class RDFLoadAndValidateHelper {
         final ConcurrentDataLoader.RDFVerifyTaskFactory verifyTaskFactory = new ConcurrentDataLoader.RDFVerifyTaskFactory(
                 db, bufferCapacity, verifyData, fallback);
 
+        // notify will run tasks.
+        verifyTaskFactory.notifyStart();
+        
         // read files and run tasks.
         service.process(file, filter, verifyTaskFactory);
 
         // await completion of all tasks.
         service.awaitCompletion(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+
+        // notify did run tasks.
+        verifyTaskFactory.notifyEnd();
 
         // Report on #terms and #stmts parsed, found, and not found
         System.err.println(verifyTaskFactory.reportTotals());

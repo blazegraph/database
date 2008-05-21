@@ -898,7 +898,7 @@ abstract public class OverflowManager extends IndexManager {
 
             // add to the journalIndex and the Map<UUID,File>.
             addResource(newJournal.getResourceMetadata(), newJournal.getFile());
-
+            
             // add to the cache.
             storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal,
                     false/* dirty */);
@@ -906,7 +906,16 @@ abstract public class OverflowManager extends IndexManager {
             // atomic cutover.
             this.liveJournalRef.set( newJournal );
 
-            log.info("Changed over to a new live journal");
+            /*
+             * Update the bytes under management to reflect the final extent of
+             * the old journal and to discount the extent of the new live
+             * journal.
+             */
+            bytesUnderManagement.addAndGet(oldJournal.getBufferStrategy().getExtent());
+            bytesUnderManagement.addAndGet(-newJournal.getBufferStrategy().getExtent());
+            
+            if (log.isInfoEnabled())
+                log.info("New live journal: " + newJournal.getFile());
 
         }
         

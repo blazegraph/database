@@ -139,7 +139,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
     
     final int bufferCapacity = 100000;
     
-    final boolean validate = false;
+    final boolean validate = true;
     
     final FilenameFilter filter = new FilenameFilter() {
 

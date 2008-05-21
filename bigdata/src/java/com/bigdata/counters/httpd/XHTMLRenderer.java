@@ -707,6 +707,7 @@ public class XHTMLRenderer {
         // depth of the hierarchy at the point where we are starting.
         final int ourDepth = counterSet.getDepth();
 
+        if(log.isInfoEnabled())
         log.info("path="+counterSet.getPath()+", depth="+depth+", ourDepth="+ourDepth);
 
         final String summary = "Showing counters for path="
@@ -740,6 +741,7 @@ public class XHTMLRenderer {
 
             final ICounterNode node = itr.next();
 
+            if(log.isDebugEnabled())
             log.debug("considering: "+node.getPath());
             
             if(depth != 0) { 
@@ -751,6 +753,7 @@ public class XHTMLRenderer {
                 if((counterDepth - ourDepth) > depth) {
                 
                     // prune rendering
+                    if(log.isDebugEnabled())
                     log.debug("skipping: "+node.getPath());
                     
                     continue;
@@ -1094,14 +1097,13 @@ public class XHTMLRenderer {
             throw new IllegalArgumentException();
 
         if (a.length == 0) {
-            
-            w.write("No data.");
+
+            // No data.
             
             return;
             
         }
-            
-
+        
         if (basePeriod == null)
             throw new IllegalArgumentException();
 
@@ -1113,8 +1115,7 @@ public class XHTMLRenderer {
         long firstTimestamp = Long.MAX_VALUE;
         long lastTimestamp = Long.MIN_VALUE;
         int maxSamplesIndex = -1;
-        final SampleIterator[] hitrs = new SampleIterator[
-                a.length];
+        final SampleIterator[] hitrs = new SampleIterator[a.length];
         {
 
             for (int i = 0; i < a.length; i++) {
@@ -1163,6 +1164,14 @@ public class XHTMLRenderer {
         // the maximum #of samples.
         final int maxSamples = hitrs[maxSamplesIndex].getSampleCount();
 
+        if(maxSamples == 0) {
+            
+            // No data.
+            
+            return;
+            
+        }
+        
         /*
          * Figure out the label for the units of the history.
          */
@@ -1311,7 +1320,7 @@ public class XHTMLRenderer {
             
             for(String s : valStr) {
 
-                w.write("  <td>" + valStr + "</td\n>");
+                w.write("  <td>" + s + "</td\n>");
                 
             }
 
@@ -1337,6 +1346,7 @@ public class XHTMLRenderer {
         // depth of the hierarchy at the point where we are starting.
         final int ourDepth = counterSet.getDepth();
 
+        if(log.isInfoEnabled())
         log.info("path="+counterSet.getPath()+", depth="+depth+", ourDepth="+ourDepth);
 
         final Iterator<ICounterNode> itr = counterSet.getNodes(model.pattern);
@@ -1347,6 +1357,7 @@ public class XHTMLRenderer {
 
             final ICounterNode node = itr.next();
 
+            if(log.isDebugEnabled())
             log.debug("considering: "+node.getPath());
             
             if(depth != 0) { 
@@ -1356,6 +1367,7 @@ public class XHTMLRenderer {
                 if((counterDepth - ourDepth) > depth) {
                 
                     // prune rendering
+                    if(log.isDebugEnabled())
                     log.debug("skipping: "+node.getPath());
                     
                     continue;

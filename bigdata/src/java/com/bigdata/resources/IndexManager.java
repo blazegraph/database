@@ -1042,12 +1042,13 @@ abstract public class IndexManager extends StoreManager {
          /*
           * Describe the index segment.
           */
+         final long length = outFile.length();
          final SegmentMetadata segmentMetadata = new SegmentMetadata(//
                  outFile, //
-                 outFile.length(),//
-                 builder.segmentUUID,//
-                 createTime//
-                 );
+                length, //
+                builder.segmentUUID, //
+                createTime //
+        );
 
          /*
           * notify the resource manager so that it can find this file.
