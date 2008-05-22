@@ -26,8 +26,12 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
+import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 
 /**
+ * This class was made public so that it could be extended by 
+ * {@link BigdataSailGraphQuery}.
+ * 
  * @author Arjohn Kampman
  */
 public class SailGraphQuery extends SailQuery implements GraphQuery {
