@@ -124,6 +124,9 @@ public class HistoryInstrument<T> implements IInstrument<T> {
      */
     public void add(long timestamp,T value) {
         
+        if (log.isInfoEnabled())
+            log.info("timestamp=" + timestamp + ", value=" + value);
+        
         minutes.add(timestamp, value);
         
     }

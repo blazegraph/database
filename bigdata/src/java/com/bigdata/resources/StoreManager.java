@@ -92,17 +92,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * segments), including the logic to compute the effective release time for the
  * managed resources and to release those resources by deleting them from the
  * file system.
- * <p>
- * Note: Since the journal already manages its own index resources we simply
- * keep the journals open until they are purged. When a journal is purged we
- * closeAndDelete() it and any readers will simply abort.
- * 
- * @todo This is Ok if the journal uses [bufferMode := DiskOnly] since a journal
- *       without a write cache and which is not fully buffered will not have a
- *       large memory footprint outside of its most recently used indices. In
- *       order to do better than this and proactively close historical journals
- *       we will require a mechanisms similar to the one for
- *       {@link IndexSegmentStore}s in the {@link IndexManager}.
  * 
  * @todo There is neither a "CREATE_TEMP_DIR" and "DELETE_ON_CLOSE" does not
  *       remove all directories created during setup. One of the consequences is

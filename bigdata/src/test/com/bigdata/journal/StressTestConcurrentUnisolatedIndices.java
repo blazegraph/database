@@ -328,8 +328,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         ret.put("tasks/sec", ""+(ncommitted * 1000 / elapsed));
         ret.put("maxRunning", ""+journal.getConcurrencyManager().writeService.getMaxRunning());
         ret.put("maxPoolSize", ""+journal.getConcurrencyManager().writeService.getMaxPoolSize());
-        ret.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxLatencyUntilCommit());
-        ret.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitLatency());
+        ret.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxCommitWaitingTime());
+        ret.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitServiceTime());
 
         System.err.println(ret.toString(true/*newline*/));
         

@@ -271,8 +271,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     private int maxPoolSize = 0;
     private long maxRunning = 0;
-    private long maxLatencyUntilCommit = 0;
-    private long maxCommitLatency = 0;
+    private long maxCommitWaitingTime = 0;
+    private long maxCommitServiceTime = 0;
     private AtomicLong ngroupCommits = new AtomicLong();
     private long naborts = 0;
     private long failedTaskCount = 0;
@@ -292,7 +292,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
     
     /**
-     * The maximum #of tasks that are concurrently executing.
+     * The maximum #of tasks that are concurrently executing without regard to
+     * whether or not the tasks have acquired their locks.
+     * <p>
+     * Note: Since this does not reflect tasks executing concurrently with locks
+     * held it is not a measure of the true concurrency of tasks executing on
+     * the service.
      */
     public long getMaxRunning() {
         
@@ -301,22 +306,23 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
     
     /**
-     * The maximum latency from when a task completes successfully until the
-     * next group commit (milliseconds).
+     * The maximum waiting time in millseconds from when a task completes
+     * successfully until the next group commit.
      */
-    public long getMaxLatencyUntilCommit() {
+    public long getMaxCommitWaitingTime() {
         
-        return maxLatencyUntilCommit;
+        return maxCommitWaitingTime;
         
     }
     
     /**
-     * The maximum latency of the atomic commit operation (the maximum duration
-     * of {@link AbstractJournal#commit()}) (milliseconds).
+     * The maximum service time in milliseconds of the atomic commit.
+     * 
+     * @see AbstractJournal#commit()
      */
-    public long getMaxCommitLatency() {
+    public long getMaxCommitServiceTime() {
         
-        return maxCommitLatency;
+        return maxCommitServiceTime;
         
     }
 
@@ -822,9 +828,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         sb.append(", maxRunning="+maxRunning);
         
-        sb.append(", maxCommitLatency="+maxCommitLatency);
+        sb.append(", maxCommitLatency="+maxCommitServiceTime);
         
-        sb.append(", maxLatencyUntilCommit="+maxLatencyUntilCommit);
+        sb.append(", maxLatencyUntilCommit="+maxCommitWaitingTime);
         
         sb.append(", groupCommitCount="+ngroupCommits);
 
@@ -1074,15 +1080,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // the commit latency.
             final long commitLatency = System.currentTimeMillis() - beginCommit;
 
-            if (commitLatency > maxCommitLatency) {
+            if (commitLatency > maxCommitServiceTime) {
 
-                maxCommitLatency = commitLatency;
+                maxCommitServiceTime = commitLatency;
 
             }
 
             if (INFO)
                 log.info("Commit Ok : commitLatency=" + commitLatency
-                        + ", maxCommitLatency=" + maxCommitLatency
+                        + ", maxCommitLatency=" + maxCommitServiceTime
                         + ", shouldOverflow=" + shouldOverflow);
 
             if (shouldOverflow && nrunning.get() == 0) {
@@ -1150,7 +1156,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * make that a very small moment to keep down latency for a single task that
      * is run all by itself without anything else in the queue.
      * <p>
-     * Note: This updates {@link #maxLatencyUntilCommit} as a side-effect.
+     * Note: This updates {@link #maxCommitWaitingTime} as a side-effect.
      * 
      * @param pauseWriteService
      *            When <code>true</code>, an attempt will be made to pause
@@ -1240,9 +1246,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         final long latencyUntilCommit = endWait - beginWait;
 
-        if (latencyUntilCommit > maxLatencyUntilCommit) {
+        if (latencyUntilCommit > maxCommitWaitingTime) {
 
-            maxLatencyUntilCommit = latencyUntilCommit;
+            maxCommitWaitingTime = latencyUntilCommit;
 
         }
 

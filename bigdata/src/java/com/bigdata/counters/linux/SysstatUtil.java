@@ -110,6 +110,14 @@ public class SysstatUtil {
      * <p>
      * Note: This is not thread-safe - use a distinct instance for each
      * {@link PIDStatCollector} or {@link SarCpuUtilizationCollector}.
+     * 
+     * @deprecated sysstat only reports the TIME OF DAY. In order to get the UTC
+     *             time it has to be corrected by the UTC time of the start of
+     *             the current day. Since very little latency is expected
+     *             between the report by sysstat of its performance counters and
+     *             the parsing of those performance counters by our code, it is
+     *             MUCH easier and more robust to simply use the current time as
+     *             reported by {@link System#currentTimeMillis()}.
      */
     static public DateFormat newDateFormat() {
         

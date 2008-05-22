@@ -502,8 +502,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         result.put("commits/sec", ""+commitsPerSecond);
         result.put("tasks/commit", ""+tasksPerCommit);
         result.put("maxRunning", ""+journal.getConcurrencyManager().writeService.getMaxRunning());
-        result.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxLatencyUntilCommit());
-        result.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitLatency());
+        result.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxCommitWaitingTime());
+        result.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitServiceTime());
         result.put("poolSize",""+journal.getConcurrencyManager().writeService.getPoolSize());
         
         System.err.println(result.toString(true/*newline*/));

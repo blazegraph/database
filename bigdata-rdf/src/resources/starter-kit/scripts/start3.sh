@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Clear out persistent data and log files.
-rm -rf /var/bigdata /var/log/bigdata
+rm -rf /var/bigdata
 
 cd /nas/config/TimestampServer0 && /nas/scripts/startService.sh com.bigdata.service.jini.TimestampServer && sleep 1
 

@@ -51,7 +51,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Type safe reference to the backing store.
      */
-    protected final IndexSegmentStore fileStore;
+    private final IndexSegmentStore fileStore;
 
     /**
      * An optional bloom filter that will be used to filter point tests. Since
@@ -147,7 +147,7 @@ public class IndexSegment extends AbstractBTree {
 
         }
 
-        // close the backing file.
+        // close the backing file (can be re-opened).
         fileStore.close();
 
         // release the optional bloom filter.

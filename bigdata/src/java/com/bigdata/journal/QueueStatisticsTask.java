@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.counters.Instrument;
 
 /**
@@ -51,7 +52,7 @@ public class QueueStatisticsTask implements Runnable {
      * The #of tasks not yet assigned to any thread which are waiting to run
      * (moving average).
      * 
-     * @see #getMovingAverage(double, double, double)
+     * @see IQueueCounters#averageQueueSize
      */
     public final Instrument<Double> averageQueueSizeInst = new Instrument<Double>() {
         
@@ -67,9 +68,9 @@ public class QueueStatisticsTask implements Runnable {
     /**
      * The #of tasks that are currently running (moving average).
      * 
-     * @see #getMovingAverage(double, double, double)
+     * @see IQueueCounters#averageActiveCount
      */
-    public final Instrument<Double> averageQueueActiveCountInst = new Instrument<Double>() {
+    public final Instrument<Double> averageActiveCountInst = new Instrument<Double>() {
         
         @Override
         protected void sample() {
@@ -85,9 +86,9 @@ public class QueueStatisticsTask implements Runnable {
      * (moving average) (this is only reported for the
      * {@link WriteExecutorService}).
      * 
-     * @see #getMovingAverage(double, double, double)
+     * @see IQueueCounters#averageActiveCountWithLocksHeld
      */
-    public final Instrument<Double> averageQueueActiveCountWithLocksHeldInst = new Instrument<Double>() {
+    public final Instrument<Double> averageActiveCountWithLocksHeldInst = new Instrument<Double>() {
         
         @Override
         protected void sample() {
@@ -105,7 +106,7 @@ public class QueueStatisticsTask implements Runnable {
      * tasks waiting to be run and those that are currently running in the
      * definition of the "queue length".
      * 
-     * @see #getMovingAverage(double, double, double)
+     * @see IQueueCounters#averageQueueLength
      */
     public final Instrument<Double> averageQueueLengthInst = new Instrument<Double>() {
         
@@ -159,6 +160,8 @@ public class QueueStatisticsTask implements Runnable {
     /**
      * Moving average in milliseconds of the time a task waits on a queue
      * pending execution.
+     * 
+     * @see IQueueCounters#averageTaskQueueWaitingTime
      */
     public final Instrument<Double> averageTaskQueueWaitingTimeInst = new Instrument<Double>() {
         
@@ -174,6 +177,8 @@ public class QueueStatisticsTask implements Runnable {
     /**
      * Moving average in milliseconds of the time that a task is waiting for
      * resource locks (zero unless the task is unisolated).
+     * 
+     * @see IQueueCounters#averageTaskLockWaitingTime
      */
     public final Instrument<Double> averageTaskLockWaitingTimeInst = new Instrument<Double>() {
 
@@ -190,6 +195,11 @@ public class QueueStatisticsTask implements Runnable {
      * Moving average in milliseconds of the time that a task is being serviced
      * by a worker thread (elapsed clock time from when the task was assigned to
      * the thread until the task completes its work).
+     * <p>
+     * Note: For tasks which acquire resource lock(s), this does NOT include the
+     * time waiting to acquire the resource lock(s).
+     * 
+     * @see IQueueCounters#averageTaskServiceTime
      */
     public final Instrument<Double> averageTaskServiceTimeInst = new Instrument<Double>() {
         
@@ -206,6 +216,8 @@ public class QueueStatisticsTask implements Runnable {
      * Moving average in milliseconds of the time between the submission of a
      * task and its completion including any time spent waiting for resource
      * locks, commit processing and any time spent servicing that task.
+     * 
+     * @see IQueueCounters#averageTaskQueuingTime
      */
     public final Instrument<Double> averageTaskQueuingTimeInst = new Instrument<Double>() {
         
@@ -222,6 +234,8 @@ public class QueueStatisticsTask implements Runnable {
      * Moving average in milliseconds of the time that the task that initiates
      * the group commit waits for other tasks to join the commit group (zero
      * unless the service is unisolated).
+     * 
+     * @see IQueueCounters#averageCommitWaitingTime
      */
     public final Instrument<Double> averageCommitWaitingTimeInst = new Instrument<Double>() {
 
@@ -237,6 +251,8 @@ public class QueueStatisticsTask implements Runnable {
     /**
      * Moving average in milliseconds of the time servicing the group commit
      * (zero unless the service is unisolated).
+     * 
+     * @see IQueueCounters#averageCommitServiceTime
      */
     public final Instrument<Double> averageCommitServiceTimeInst = new Instrument<Double>() {
 
@@ -633,7 +649,7 @@ public class QueueStatisticsTask implements Runnable {
              * Report iff not being reported via the TaskCounters.
              */
             
-            counterSet.addCounter("taskCompletedCount", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.taskCompleteCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(service.getCompletedTaskCount());
                 }
@@ -641,14 +657,14 @@ public class QueueStatisticsTask implements Runnable {
         
         }
         
-        counterSet.addCounter("poolSize",
+        counterSet.addCounter(IQueueCounters.poolSize,
                 new Instrument<Integer>() {
                     public void sample() {
                         setValue(service.getPoolSize());
                     }
                 });
 
-        counterSet.addCounter("largestPoolSize",
+        counterSet.addCounter(IQueueCounters.largestPoolSize,
                 new Instrument<Integer>() {
                     public void sample() {
                         setValue(service.getLargestPoolSize());
@@ -659,12 +675,12 @@ public class QueueStatisticsTask implements Runnable {
          * Computed variables based on the service itself.
          */
 
-        counterSet.addCounter("averageQueueSize", averageQueueSizeInst);
+        counterSet.addCounter(IQueueCounters.averageQueueSize, averageQueueSizeInst);
 
-        counterSet.addCounter("averageQueueActiveCount",
-                averageQueueActiveCountInst);
+        counterSet.addCounter(IQueueCounters.averageActiveCount,
+                averageActiveCountInst);
 
-        counterSet.addCounter("averageQueueLength", averageQueueLengthInst);
+        counterSet.addCounter(IQueueCounters.averageQueueLength, averageQueueLengthInst);
 
         /*
          * Computed variables based on the per-task counters.
@@ -676,28 +692,28 @@ public class QueueStatisticsTask implements Runnable {
              */
 
             // count of all tasks submitted to the service. 
-            counterSet.addCounter("taskSubmittedCount", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.taskSubmitCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(taskCounters.taskSubmitCount.get());
                 }
             });
 
             // count of all tasks completed by the service (failed + success).
-            counterSet.addCounter("taskCompleteCount", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.taskCompleteCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(taskCounters.taskCompleteCount.get());
                 }
             });
 
             // count of all tasks which failed during execution.
-            counterSet.addCounter("taskFailedCount", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.taskFailCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(taskCounters.taskFailCount.get());
                 }
             });
 
             // count of all tasks which were successfully executed.
-            counterSet.addCounter("taskSuccessCount", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.taskSuccessCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(taskCounters.taskSuccessCount.get());
                 }
@@ -707,13 +723,13 @@ public class QueueStatisticsTask implements Runnable {
              * Moving averages.
              */
             
-            counterSet.addCounter("averageTaskQueueWaitingTime",
+            counterSet.addCounter(IQueueCounters.averageTaskQueueWaitingTime,
                     averageTaskQueueWaitingTimeInst);
 
-            counterSet.addCounter("averageTaskServiceTime",
+            counterSet.addCounter(IQueueCounters.averageTaskServiceTime,
                     averageTaskServiceTimeInst);
 
-            counterSet.addCounter("averageTaskQueuingTime",
+            counterSet.addCounter(IQueueCounters.averageTaskQueuingTime,
                     averageTaskQueuingTimeInst);
             
         }
@@ -729,19 +745,19 @@ public class QueueStatisticsTask implements Runnable {
              * Simple counters.
              */
             
-            counterSet.addCounter("commits", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.commitCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(writeService.getGroupCommitCount());
                 }
             });
 
-            counterSet.addCounter("#aborts", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.abortCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(writeService.getAbortCount());
                 }
             });
 
-            counterSet.addCounter("overflowCount", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.overflowCount, new Instrument<Long>() {
                 public void sample() {
                     setValue(writeService.getOverflowCount());
                 }
@@ -751,20 +767,20 @@ public class QueueStatisticsTask implements Runnable {
              * Maximum observed values.
              */
 
-            counterSet.addCounter("maxLatencyUntilCommit",
+            counterSet.addCounter(IQueueCounters.maxCommitWaitingTime,
                     new Instrument<Long>() {
                         public void sample() {
-                            setValue(writeService.getMaxLatencyUntilCommit());
+                            setValue(writeService.getMaxCommitWaitingTime());
                         }
                     });
 
-            counterSet.addCounter("maxCommitLatency", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.maxCommitServiceTime, new Instrument<Long>() {
                 public void sample() {
-                    setValue(writeService.getMaxCommitLatency());
+                    setValue(writeService.getMaxCommitServiceTime());
                 }
             });
 
-            counterSet.addCounter("maxRunning", new Instrument<Long>() {
+            counterSet.addCounter(IQueueCounters.maxRunning, new Instrument<Long>() {
                 public void sample() {
                     setValue(writeService.getMaxRunning());
                 }
@@ -774,22 +790,185 @@ public class QueueStatisticsTask implements Runnable {
              * Moving averages available only for the write executor service.
              */
 
-            counterSet.addCounter("averageQueueActiveCountWithLocksHeld",
-                    averageQueueActiveCountWithLocksHeldInst);
+            counterSet.addCounter(IQueueCounters.averageActiveCountWithLocksHeld,
+                    averageActiveCountWithLocksHeldInst);
 
-            counterSet.addCounter("averageTaskLockWaitingTime",
+            counterSet.addCounter(IQueueCounters.averageTaskLockWaitingTime,
                     averageTaskLockWaitingTimeInst);
                 
-            counterSet.addCounter("averageCommitWaitingTime",
+            counterSet.addCounter(IQueueCounters.averageCommitWaitingTime,
                         averageCommitServiceTimeInst);
                     
-            counterSet.addCounter("averageCommitServiceTime",
+            counterSet.addCounter(IQueueCounters.averageCommitServiceTime,
                         averageCommitServiceTimeInst);
                     
             
         }
 
         return counterSet;
+
+    }
+
+    /**
+     * Interface defines and documents the names and meanings of counters
+     * pertaining to services executing tasks, including those additional
+     * counters pertaining to the service executing {@link ITx#UNISOLATED} tasks -
+     * the {@link WriteExecutorService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface IQueueCounters extends ICounterHierarchy {
+     
+        /**
+         * Count of all tasks submitted to the service.
+         */
+        String taskSubmitCount = "Task Submit Count";
+
+        /**
+         * Count of all tasks completed by the service (failed + success).
+         */
+        String taskCompleteCount = "Task Complete Count";
+
+        /**
+         * Count of all tasks which failed during execution.
+         */
+        String taskFailCount = "Task Failed Count";
+
+        /**
+         * Count of all tasks which were successfully executed.
+         */
+        String taskSuccessCount = "Task Success Count";
+
+        /**
+         * The #of tasks not yet assigned to any thread which are waiting to run
+         * (moving average).
+         */
+        String averageQueueSize = "Average Queue Size";
+
+        /**
+         * The #of tasks that are currently running (moving average).
+         * <p>
+         * Note: This count does NOT reflect the #of tasks holding locks for
+         * queues where tasks require locks to execute.
+         * 
+         * @see #averageActiveCountWithLocksHeld
+         */
+        String averageActiveCount = "Average Active Count";
+
+        /**
+         * The queue length (moving average).
+         * <p>
+         * Note: this is the primary average of interest - it includes both the
+         * tasks waiting to be run and those that are currently running in the
+         * definition of the "queue length".
+         */
+        String averageQueueLength = "Average Queue Length";
+
+        /**
+         * The #of tasks that are currently running <strong>with locks held</strong>
+         * (moving average) (this is only reported for the
+         * {@link WriteExecutorService} as that is the only service where tasks
+         * must acquire locks in order to execute).
+         */
+        String averageActiveCountWithLocksHeld = "Average Active Count With Locks Held";
+
+        /**
+         * Moving average in milliseconds of the time a task waits on a queue
+         * pending execution.
+         */
+        String averageTaskQueueWaitingTime = "Average Task Queue Waiting Time";
+
+        /**
+         * Moving average in milliseconds of the time that a task is waiting for
+         * resource locks (zero unless the task is unisolated).
+         */
+        String averageTaskLockWaitingTime = "Average Task Lock Waiting Time";
+
+        /**
+         * Moving average in milliseconds of the time that a task is being
+         * serviced by a worker thread (elapsed clock time from when the task
+         * was assigned to the thread until the task completes its work).
+         * <p>
+         * Note: For tasks which acquire resource lock(s), this does NOT include
+         * the time waiting to acquire the resource lock(s).
+         */
+        String averageTaskServiceTime = "Average Task Service Time";
+
+        /**
+         * Moving average in milliseconds of the time between the submission of
+         * a task and its completion including any time spent waiting for
+         * resource locks, commit processing and any time spent servicing that
+         * task.
+         */
+        String averageTaskQueuingTime = "Average Task Queuing Time";
+
+        /**
+         * Moving average in milliseconds of the time that the task that
+         * initiates the group commit waits for other tasks to join the commit
+         * group (zero unless the service is unisolated).
+         */
+        String averageCommitWaitingTime = "Average Commit Waiting Time";
+
+        /**
+         * Moving average in milliseconds of the time servicing the group commit
+         * (zero unless the service is unisolated).
+         */
+        String averageCommitServiceTime = "Average Commit Service Time";
+
+        /**
+         * The #of commits (only reported services which do commit processing).
+         */
+        String commitCount = "Commit Count";
+
+        /**
+         * The #of aborts (only reported services which do commit processing).
+         */
+        String abortCount = "Abort Count";
+
+        /**
+         * The #of synchronous overflow events (only reported services which do
+         * commit processing). A synchronous overflow event is when the index
+         * partitions on the live journal are re-defined onto a new live
+         * journal. Asynchronous overflow processing then proceeds in the
+         * background handling index partition builds, splits, joins, moves,
+         * etc.
+         */
+        String overflowCount = "Overflow Count";
+
+        /**
+         * The maximum observed value in milliseconds of the time that the task
+         * that initiates the group commit waits for other tasks to join the
+         * commit group (zero unless the service is unisolated).
+         */
+        String maxCommitWaitingTime = "Max Commit Waiting Time";
+
+        /**
+         * The maximum observed value in milliseconds of the time servicing the
+         * group commit (zero unless the service is unisolated).
+         */
+        String maxCommitServiceTime = "Max Commit Service Time";
+
+        /**
+         * The maximum #of tasks that are concurrently executing without regard
+         * to whether or not the tasks have acquired their locks.
+         * <p>
+         * Note: Since this does not reflect tasks executing concurrently with
+         * locks held it is not a measure of the true concurrency of tasks
+         * executing on the service.
+         */
+        String maxRunning = "Max Running";
+
+        /**
+         * The current size of the thread pool for the service.
+         */
+        String poolSize = "Pool Size";
+
+        /**
+         * The maximum observed value for the size of the thread pool for the
+         * service.
+         */
+        String largestPoolSize = "Largest Pool Size";
 
     }
 

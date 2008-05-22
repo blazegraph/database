@@ -146,9 +146,21 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                     }
                 });
                 
-                tmp.addCounter("Overflow Failed Count", new Instrument<Long>() {
+                tmp.addCounter("Asynchronous Overflow Failed Count", new Instrument<Long>() {
                     public void sample() {
-                        setValue(overflowFailedCounter.get());
+                        setValue(asyncOverflowFailedCounter.get());
+                    }
+                });
+                
+                tmp.addCounter("Asynchronous Overflow Task Failed Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(asyncOverflowTaskFailedCounter.get());
+                    }
+                });
+
+                tmp.addCounter("Asynchronous Overflow Task Cancelled Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(asyncOverflowTaskCancelledCounter.get());
                     }
                 });
 
@@ -186,10 +198,17 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                 // save a reference.
                 indexManagerRoot = tmp;
                 
-                tmp.addCounter("Stale Locator Cache Size",
-                        new Instrument<Long>() {
+                tmp.addCounter("Stale Locator Cache Capacity",
+                        new Instrument<Integer>() {
                             public void sample() {
-                                setValue((long) getStaleLocatorCount());
+                                setValue(staleLocatorCache.capacity());
+                            }
+                        });
+                
+                tmp.addCounter("Stale Locator Cache Size",
+                        new Instrument<Integer>() {
+                            public void sample() {
+                                setValue(getStaleLocatorCount());
                             }
                         });
                 
@@ -212,9 +231,16 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                         });
                 
                 tmp.addCounter("Index Segment Cache Size",
-                        new Instrument<Long>() {
+                        new Instrument<Integer>() {
                             public void sample() {
-                                setValue((long) getIndexSegmentCacheSize());
+                                setValue(getIndexSegmentCacheSize());
+                            }
+                        });
+                
+                tmp.addCounter("Index Segment Cache Capacity",
+                        new Instrument<Integer>() {
+                            public void sample() {
+                                setValue(getIndexSegmentCacheCapacity());
                             }
                         });
                 

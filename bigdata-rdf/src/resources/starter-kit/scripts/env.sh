@@ -27,6 +27,7 @@ export SRC=${NAS}/src/
 export CLASSPATH=\
 ${SRC}bigdata-rdf.jar\
 :${SRC}bigdata/lib/log4j-1.2.8.jar\
+:${SRC}bigdata/lib/apache/commons-io-1.4.jar\
 :${SRC}bigdata/lib/ctc_utils-5-4-2005.jar\
 :${SRC}bigdata/lib/icu/icu4j-3_6.jar\
 :${SRC}bigdata/lib/icu/icu4jni.jar\

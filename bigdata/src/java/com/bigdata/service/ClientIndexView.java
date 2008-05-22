@@ -1063,7 +1063,15 @@ public class ClientIndexView implements IClientIndex {
                     
                     if(INFO) log.info("Execution failed: task=" + task, e);
                     
-                    causes.addAll(task.causes);
+                    if (task.causes != null) {
+
+                        causes.addAll(task.causes);
+
+                    } else {
+                        
+                        causes.add(e);
+                        
+                    }
                     
                     nfailed++;
                     
@@ -1211,6 +1219,7 @@ public class ClientIndexView implements IClientIndex {
         /**
          * If the task fails then this will be populated with an ordered list of
          * the exceptions. There will be one exception per-retry of the task.
+         * For some kinds of failure this list MAY remain unbound.
          */
         protected List<Throwable> causes = null;
         
@@ -1739,6 +1748,8 @@ public class ClientIndexView implements IClientIndex {
             // partition spanning the current key (RMI)
             final PartitionLocator locator = getMetadataIndex().find(keys[currentIndex]);
 
+            if(locator==null) throw new RuntimeException("No index partitions?: name="+name);
+            
             final byte[] rightSeparatorKey = locator.getRightSeparatorKey();
 
             if (rightSeparatorKey == null) {
@@ -1807,7 +1818,7 @@ public class ClientIndexView implements IClientIndex {
                         
                     }
 
-                    log.debug("Exact match on rightSeparator: pos=" + pos
+                    if(DEBUG) log.debug("Exact match on rightSeparator: pos=" + pos
                             + ", key=" + BytesUtil.toString(keys[pos]));
 
                 } else if (pos < 0) {

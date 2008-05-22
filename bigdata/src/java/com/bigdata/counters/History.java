@@ -707,7 +707,7 @@ public class History<T> {
             
             if ((lastLogicalSlot - logicalSlot) >= capacity) {
 
-                log.warn("Ignoring sample WAY out of timestamp order: timestamp="
+                log.error("Ignoring sample WAY out of timestamp order: timestamp="
                                 + timestamp + ", value=" + value);
 
                 return;

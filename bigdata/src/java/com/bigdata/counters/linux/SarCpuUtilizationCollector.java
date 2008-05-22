@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters.linux;
 
 import java.text.DateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -345,17 +346,34 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 //                *   04:14:45 PM     CPU     %user     %nice   %system   %iowait    %steal     %idle
 //                *   04:14:46 PM     all      0.00      0.00      0.00      0.00      0.00    100.00
 
-                {
-                    final String s = data.substring(0, 11);
-                    try {
-                        
-                        lastModified = f.parse(s).getTime();
-                    } catch (Exception e) {
-                        log.warn("Could not parse time: [" + s + "] : " + e);
-                        // should be pretty close.
-                        lastModified = System.currentTimeMillis();
-                    }
-                }
+//                {
+//                    final String s = data.substring(0, 11);
+//                    try {
+//                        lastModified = f.parse(s).getTime();
+//                        if(INFO)
+//                            log.info("["
+//                                        + s
+//                                        + "] parsed as milliseconds="
+//                                        + lastModified
+//                                        + ", date="
+//                                        + DateFormat.getDateTimeInstance(
+//                                                DateFormat.FULL,
+//                                                DateFormat.FULL).format(new Date(lastModified)));
+//                    } catch (Exception e) {
+//                        log.warn("Could not parse time: [" + s + "] : " + e);
+//                        // should be pretty close.
+//                        lastModified = System.currentTimeMillis();
+//                    }
+//                }
+                /*
+                 * Note: This timestamp should be _very_ close to the value
+                 * reported by sysstat. Also, using the current time is MUCH
+                 * easier and less error prone than attempting to parse the TIME
+                 * OF DAY written by sysstat and correct it into a UTC time by
+                 * adjusting for the UTC time of the start of the current day,
+                 * which is what we would have to do.
+                 */
+                  lastModified = System.currentTimeMillis();
 
 //                final String user = data.substring(20-1, 30-1);
 ////              final String nice = data.substring(30-1, 40-1);

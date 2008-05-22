@@ -58,6 +58,8 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
     public void testForwardScan(IndexSegment seg)
     {
 
+        final int nleaves = seg.getStore().getCheckpoint().nleaves;
+        
         final ImmutableLeaf firstLeaf = seg.readLeaf(seg.getStore().getCheckpoint().addrFirstLeaf);
         assertEquals("priorAddr", 0L, firstLeaf.priorAddr);
 
@@ -69,6 +71,8 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
         assertTrue(firstLeaf==itr.current()); // Note: test depends on cache!
         
         ImmutableLeaf priorLeaf = itr.current();
+        
+        int n = 1;
         
         for(int i=1; i<seg.getLeafCount(); i++) {
             
@@ -90,7 +94,11 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
                 
             }
             
+            n++;
+            
         }
+        
+        assertEquals("#leaves",nleaves,n);
         
     }
     
@@ -101,7 +109,9 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
      * proceeds in reverse key order.
      */
     public void testReverseScan(IndexSegment seg) {
-        
+
+        final int nleaves = seg.getStore().getCheckpoint().nleaves;
+
         final ImmutableLeaf firstLeaf = seg.readLeaf(seg.getStore().getCheckpoint().addrFirstLeaf);
         assertEquals("priorAddr", 0L, firstLeaf.priorAddr);
 
@@ -113,6 +123,8 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
         assertTrue(lastLeaf==itr.current()); // Note: test depends on cache!
         
         ImmutableLeaf nextLeaf = itr.current();
+        
+        int n = 1;
         
         for(int i=1; i<seg.getLeafCount(); i++) {
             
@@ -134,8 +146,12 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
                 
             }
             
+            n++;
+            
         }
         
+        assertEquals("#leaves",nleaves,n);
+
     }
 
 }

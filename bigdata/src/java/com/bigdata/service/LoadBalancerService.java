@@ -36,6 +36,9 @@ import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
+import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
+import com.bigdata.journal.QueueStatisticsTask.IQueueCounters;
+import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
@@ -143,6 +146,8 @@ abstract public class LoadBalancerService extends AbstractService
 
     final static protected Logger log = Logger.getLogger(LoadBalancerService.class);
 
+    final protected String ps = ICounterSet.pathSeparator;
+    
     /**
      * Service join timeout in milliseconds - used when we need to wait for a
      * service to join before we can recommend an under-utilized service.
@@ -232,7 +237,14 @@ abstract public class LoadBalancerService extends AbstractService
     
     /**
      * Per-host metadata and a score for that host which gets updated
-     * periodically by {@link UpdateTask}.
+     * periodically by {@link UpdateTask}. {@link HostScore}s are a
+     * <em>resource utilization</em> measure. They are higher for a host which
+     * is more highly utilized. There are several ways to look at the score,
+     * including the {@link #rawScore}, the {@link #rank}, and the
+     * {@link #drank normalized double-precision rank}. The ranks move in the
+     * same direction as the {@link #rawScore}s - a higher rank indicates
+     * higher utilization. The least utilized host is always rank zero (0). The
+     * most utilized host is always in the last rank.
      * 
      * @todo We carry some additional metadata for hosts that bears on the
      *       question of whether or not the host might be subject to non-linear
@@ -297,8 +309,9 @@ abstract public class LoadBalancerService extends AbstractService
         }
         
         /**
-         * Places elements into order by ascending {@link #rawScore}. The
-         * {@link #hostname} is used to break any ties.
+         * Places elements into order by ascending {@link #rawScore} (aka
+         * increasing utilization). The {@link #hostname} is used to break any
+         * ties.
          */
         public int compareTo(HostScore arg0) {
             
@@ -316,11 +329,40 @@ abstract public class LoadBalancerService extends AbstractService
             
         }
 
+        /**
+         * Normalizes a raw score in the context of totals for some host.
+         * 
+         * @param rawScore
+         *            The raw score.
+         * @param totalRawScore
+         *            The raw score computed from the totals.
+         *            
+         * @return The normalized score.
+         */
+        static public double normalize(double rawScore, double totalRawScore ) {
+            
+            if(totalRawScore == 0d) {
+                
+                return 0d;
+                
+            }
+            
+            return rawScore / totalRawScore;
+            
+        }
+
     }
     
     /**
      * Per-service metadata and a score for that service which gets updated
-     * periodically by the {@link UpdateTask}.
+     * periodically by the {@link UpdateTask}. {@link ServiceScore}s are a
+     * <em>resource utilization</em> measure. They are higher for a service
+     * which is more highly utilized. There are several ways to look at the
+     * score, including the {@link #rawScore}, the {@link #rank}, and the
+     * {@link #drank normalized double-precision rank}. The ranks move in the
+     * same direction as the {@link #rawScore}s - a higher rank indicates
+     * higher utilization. The least utilized service is always rank zero (0).
+     * The most utilized service is always in the last rank.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -401,6 +443,28 @@ abstract public class LoadBalancerService extends AbstractService
             }
             
             return serviceUUID.compareTo(arg0.serviceUUID);
+            
+        }
+
+        /**
+         * Normalizes a raw score in the context of totals for some service.
+         * 
+         * @param rawScore
+         *            The raw score.
+         * @param totalRawScore
+         *            The raw score computed from the totals.
+         *            
+         * @return The normalized score.
+         */
+        static public double normalize(double rawScore, double totalRawScore ) {
+            
+            if(totalRawScore == 0d) {
+                
+                return 0d;
+                
+            }
+            
+            return rawScore / totalRawScore;
             
         }
 
@@ -668,7 +732,15 @@ abstract public class LoadBalancerService extends AbstractService
     }
 
     /**
-     * Extended to setup the generic per-service {@link CounterSet}.
+     * Extended to setup the generic per-service {@link CounterSet}, but NOT
+     * the per-host counters. This means that the {@link LoadBalancerService}
+     * will report the performance counters for its own service to itself, but
+     * it will not have any history for those counters. Since the counters as
+     * collected from the O/S do not have history, the
+     * {@link LoadBalancerService} does NOT collect the per-host counters
+     * directly from the O/S but relies on the existence of at least one other
+     * service running on the same host as it to collect and report the counters
+     * to the {@link LoadBalancerService}.
      */
     public void setServiceUUID(UUID serviceUUID) {
         
@@ -707,6 +779,64 @@ abstract public class LoadBalancerService extends AbstractService
      * @param a
      *            The new service scores.
      */
+    protected void setHostScores(HostScore[] a) {
+
+        log.info("#hostScores=" + a.length);
+        
+        /*
+         * sort scores into ascending order (least utilized to most utilized).
+         */
+        Arrays.sort(a);
+
+        /*
+         * Compute the totalRawScore.
+         */
+        double totalRawScore = 0d;
+
+        for (HostScore s : a) {
+        
+            totalRawScore += s.rawScore;
+            
+        }
+        
+        /*
+         * compute normalized score, rank, and drank.
+         */
+        for (int i = 0; i < a.length; i++) {
+            
+            final HostScore score = a[i];
+            
+            score.rank = i;
+            
+            score.drank = ((double)i)/a.length;
+
+            score.score = HostScore.normalize(score.rawScore, totalRawScore);
+            
+            // update score in global map.
+            activeHosts.put(score.hostname, score);
+
+            if (log.isInfoEnabled())
+                log.info(score.toString()); //@todo debug?
+            
+        }
+        
+        log.info("The most active host was: " + a[a.length - 1]);
+
+        log.info("The least active host was: " + a[0]);
+        
+        // Atomic replace of the old scores.
+        LoadBalancerService.this.hostScores.set( a );
+
+        log.info("Updated scores for "+a.length+" hosts");
+     
+    }
+    
+    /**
+     * Normalizes the {@link ServiceScore}s and set them in place.
+     * 
+     * @param a
+     *            The new service scores.
+     */
     protected void setServiceScores(ServiceScore[] a) {
         
         log.info("#serviceScores=" + a.length);
@@ -715,6 +845,17 @@ abstract public class LoadBalancerService extends AbstractService
          * sort scores into ascending order (least utilized to most utilized).
          */
         Arrays.sort(a);
+
+        /*
+         * Compute the totalRawScore.
+         */
+        double totalRawScore = 0d;
+
+        for (ServiceScore s : a) {
+        
+            totalRawScore += s.rawScore;
+            
+        }
 
         /*
          * compute normalized score, rank, and drank.
@@ -727,10 +868,13 @@ abstract public class LoadBalancerService extends AbstractService
             
             score.drank = ((double)i)/a.length;
            
+            score.score = HostScore.normalize(score.rawScore, totalRawScore);
+
             // update score in global map.
             activeServices.put(score.serviceUUID, score);
 
-            log.info(score.toString()); //@todo debug?
+            if (log.isInfoEnabled())
+                log.info(score.toString()); //@todo debug?
 
         }
         
@@ -884,7 +1028,7 @@ abstract public class LoadBalancerService extends AbstractService
 
                     if (score == null) {
 
-                        log.info("Host gone during update task: " + hostname);
+                        log.warn("Host gone during update task: " + hostname);
 
                         continue;
 
@@ -913,36 +1057,7 @@ abstract public class LoadBalancerService extends AbstractService
             // scores as an array.
             final HostScore[] a = scores.toArray(new HostScore[] {});
 
-            // sort scores into ascending order (least utilized to most
-            // utilized).
-            Arrays.sort(a);
-
-            /*
-             * compute normalized score, rank, and drank.
-             */
-            for (int i = 0; i < a.length; i++) {
-                
-                final HostScore score = a[i];
-                
-                score.rank = i;
-                
-                score.drank = ((double)i)/a.length;
-               
-                // update score in global map.
-                activeHosts.put(score.hostname, score);
-
-                log.info(score.toString()); //@todo debug?
-                
-            }
-            
-            log.info("The most active host was: " + a[a.length - 1]);
-
-            log.info("The least active host was: " + a[0]);
-            
-            // Atomic replace of the old scores.
-            LoadBalancerService.this.hostScores.set( a );
-
-            log.info("Updated scores for "+a.length+" hosts");
+            setHostScores(a);
             
         }
 
@@ -1043,7 +1158,7 @@ abstract public class LoadBalancerService extends AbstractService
                              * not active???
                              */
 
-                            log.info("Service is not active: "
+                            log.warn("Service is not active: "
                                     + serviceCounterSet.getPath());
 
                             continue;
@@ -1132,6 +1247,14 @@ abstract public class LoadBalancerService extends AbstractService
          * shutdown one or more processes on that host. <strong>If you do not
          * have failover provisioned for your data services then don't shutdown
          * data services or you WILL loose data!</strong>
+         * <p>
+         * Note: If we are not getting critical counters for some host then we
+         * are assuming a reasonable values for the missing data and computing
+         * the utilization based on those assumptions. Note that a value of zero
+         * (0) may be interepreted as either critically high utilization or no
+         * utilization depending on the performance counter involved and that
+         * the impact of the different counters can vary depending on the
+         * formula used to compute the utilization score.
          * 
          * @param hostname
          *            The fully qualified hostname.
@@ -1139,7 +1262,7 @@ abstract public class LoadBalancerService extends AbstractService
          *            The performance counters for that host.
          * @param serviceCounterSet
          *            The performance counters for that service.
-         *            
+         * 
          * @return The computed host score.
          */
         protected HostScore computeScore(String hostname,
@@ -1152,13 +1275,14 @@ abstract public class LoadBalancerService extends AbstractService
              * further.
              */
             final double majorFaultsPerSec = getCurrentValue(hostCounterSet,
-                    IRequiredHostCounters.Memory_majorFaultsPerSecond, 0d);
-            
+                    IRequiredHostCounters.Memory_majorFaultsPerSecond, 0d/* default */);
+
             /*
              * Is the host out of disk?
              * 
-             * @todo Really needs to check on each partition on which we have a
-             * data service.
+             * FIXME Really needs to check on each partition on which we have a
+             * data service (dataDir). This is available to us now, as is the
+             * free disk space for the tmpDir for each data service.
              * 
              * @todo this will issue a warning for a windows host on which a
              * service is just starting up. For some reason, it takes a few
@@ -1174,69 +1298,90 @@ abstract public class LoadBalancerService extends AbstractService
              * can smooth short term spikes.
              */
             final double percentDiskFreeSpace = getCurrentValue(hostCounterSet,
-                    IRequiredHostCounters.LogicalDisk_PercentFreeSpace, .5d);
+                    IRequiredHostCounters.LogicalDisk_PercentFreeSpace, .5d/* default */);
 
             /*
              * The percent of the time that the CPUs are idle.
              */
-            double percentProcessorIdle = 1d - getAverageValueForMinutes(
+            final double percentProcessorIdle = 1d - getAverageValueForMinutes(
                     hostCounterSet, IHostCounters.CPU_PercentProcessorTime,
                     .5d, TEN_MINUTES);
 
             /*
-             * The percent of the time that the CPUs are idle when there is
-             * an outstanding IO request.
+             * The percent of the time that the CPUs are idle when there is an
+             * outstanding IO request.
              */
-            double percentIOWait = getAverageValueForMinutes(hostCounterSet,
-                    IHostCounters.CPU_PercentIOWait, .1d, TEN_MINUTES);
+            final double percentIOWait = getAverageValueForMinutes(
+                    hostCounterSet, IHostCounters.CPU_PercentIOWait,
+                    .01d/* default */, TEN_MINUTES);
 
             /*
              * @todo This reflects the disk IO utilization primarily through
              * induced IOWAIT. Play around with other forumulas too.
              */
-            double rawScore = (1d / (1 + percentProcessorIdle + percentIOWait * 10d));
+            double rawScore = (1d + percentIOWait * 100d)
+                    / (1d + percentProcessorIdle);
 
-            log.info("rawScore(" + rawScore
-                    + ") = (1d / (1 + percentProcessorIdle("
-                    + percentProcessorIdle + ") + percentIOWait("
-                    + percentIOWait + ") * 10d)");
-            
-            if(majorFaultsPerSec>50) {
-                
+            if (INFO) {
+                log.info("hostname="+hostname+", majorFaultsPerSec="+majorFaultsPerSec);
+                log.info("hostname="+hostname+", percentDiskSpaceFree="+percentDiskFreeSpace);
+                log.info("hostname="+hostname+", percentProcessorIdle="+percentProcessorIdle);
+                log.info("hostname="+hostname+", percentIOWait="+percentIOWait);
+                log.info("hostname=" + hostname + " : rawScore(" + rawScore
+                        + ") = (1d + percentIOWait(" + percentIOWait
+                        + ") * 100d) / (1d + percentProcessorIdle("
+                        + percentProcessorIdle + ")");
+            }
+
+            if (majorFaultsPerSec > 50) {
+
                 // much higher utilization if the host is swapping heavily.
                 rawScore *= 10;
-                
-                log.warn("host is swapping heavily: "+hostname+", pages/sec="+majorFaultsPerSec);
-                
-            } else if (majorFaultsPerSec>10) {
-                
+
+                log.warn("hostname=" + hostname
+                                + " : swapping heavily: pages/sec="
+                                + majorFaultsPerSec);
+
+            } else if (majorFaultsPerSec > 10) {
+
                 // higher utilization if the host is swapping.
                 rawScore *= 2d;
 
-                log.warn("host is swapping: "+hostname+", pages/sec="+majorFaultsPerSec);
-                
+                log.warn("hostname=" + hostname + " : swapping: pages/sec="
+                        + majorFaultsPerSec);
+
             }
 
-            if(percentDiskFreeSpace<.05) {
+            if (percentDiskFreeSpace < .05) {
 
                 // much higher utilization if the host is very short on disk.
                 rawScore *= 10d;
-                
-                log.warn("host is very short on disk: "+hostname+", freeSpace="+percentDiskFreeSpace*100+"%");
-                
+
+                log.warn("hostname=" + hostname
+                        + " : very short on disk: freeSpace="
+                        + percentDiskFreeSpace * 100 + "%");
+
             } else if (percentDiskFreeSpace < .10) {
 
                 // higher utilization if the host is short on disk.
                 rawScore *= 2d;
 
-                log.warn("host is short on disk: "+hostname+", freeSpace="+percentDiskFreeSpace*100+"%");
+                log.warn("hostname=" + hostname
+                        + " : is short on disk: freeSpace="
+                        + percentDiskFreeSpace * 100 + "%");
 
             }
             
-            final HostScore hostScore = new HostScore(hostname,rawScore);
+            if(INFO) {
+                
+                log.info("hostname="+hostname+" : final rawScore="+rawScore);
+                
+            }
             
+            final HostScore hostScore = new HostScore(hostname, rawScore);
+
             return hostScore;
-            
+
         }
         
         /**
@@ -1272,26 +1417,30 @@ abstract public class LoadBalancerService extends AbstractService
             assert hostScore.rank != -1 : hostScore.toString();
             
             /*
-             * This is based only on the average queue length of the unisolated
-             * write service on the data service, which is perhaps a reasonable
-             * first order estimate of the load of the data service. The longer
-             * the average queue length the heavier the utilization of the data
-             * service.
+             * A simple approximation based on the average task queuing time
+             * (how long it takes a task to execute on the service) for the
+             * unisolated write service.
              * 
              * @todo There is a lot more that can be considered and under linux
              * we have access to per-process counters for CPU, DISK, and MEMORY.
              */
 
-            final double averageQueueLength = getAverageValueForMinutes(
-                    hostCounterSet,
-                    "Concurrency Manager/Unisolated Write Service/averageQueueLength",
-                    0d, TEN_MINUTES);
+            final double averageTaskQueuingTime = getAverageValueForMinutes(
+                    hostCounterSet, IDataServiceCounters.concurrencyManager
+                            + ps + IConcurrencyManagerCounters.writeService
+                            + ps + IQueueCounters.averageTaskQueuingTime,
+                    100d/* ms */, TEN_MINUTES);
 
-            double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
+            final double rawScore = (averageTaskQueuingTime + 1) * (hostScore.score + 1);
 
-            log.info("rawScore(" + rawScore + ") = (averageQueueLength("
-                    + averageQueueLength + ")+1) * (hostScore("
-                    + hostScore.score + ")+1)");
+            if (INFO) {
+             
+                log.info("rawScore(" + rawScore + ") = ("
+                        + IQueueCounters.averageTaskQueuingTime + "("
+                        + averageTaskQueuingTime + ")+1) * (hostScore("
+                        + hostScore.score + ")+1)");
+                
+            }
 
             final ServiceScore score = new ServiceScore(hostScore.hostname,
                     serviceUUID, rawScore);
@@ -1542,7 +1691,7 @@ abstract public class LoadBalancerService extends AbstractService
         
         final File file = new File(logDir, "counters" + basename + ".xml");
 
-        log.info("Writing counters on "+file);
+        if(log.isInfoEnabled()) log.info("Writing counters on "+file);
         
         OutputStream os = null;
         
@@ -1588,7 +1737,7 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected void join(UUID serviceUUID, String hostname) {
         
-        log.info("serviceUUID="+serviceUUID+", hostname="+hostname);
+        if(log.isInfoEnabled()) log.info("serviceUUID="+serviceUUID+", hostname="+hostname);
         
         lock.lock();
         
@@ -1645,7 +1794,7 @@ abstract public class LoadBalancerService extends AbstractService
      */
     public void leave(String msg, UUID serviceUUID) {
 
-        log.info("msg="+msg+", serviceUUID=" + serviceUUID);
+        if(log.isInfoEnabled()) log.info("msg="+msg+", serviceUUID=" + serviceUUID);
 
         lock.lock();
 
@@ -1700,7 +1849,7 @@ abstract public class LoadBalancerService extends AbstractService
         
         try {
         
-            log.info(msg+" : serviceUUID="+serviceUUID);
+            if(log.isInfoEnabled()) log.info(msg+" : iface="+serviceIFace+", uuid="+serviceUUID);
 
             if (IDataService.class.getName().equals(serviceIFace)) {
 

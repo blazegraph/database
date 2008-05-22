@@ -1256,6 +1256,24 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 }
             });
 
+            counters.addCounter("createTime", new Instrument<Long>() {
+                public void sample() {
+                    setValue(getRootBlockView().getCreateTime());
+                }
+             });
+
+            counters.addCounter("closeTime", new Instrument<Long>() {
+                public void sample() {
+                    setValue(getRootBlockView().getCloseTime());
+                }
+             });
+
+            counters.addCounter("commitCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(getRootBlockView().getCommitCounter());
+                }
+             });
+
             counters.attach(_bufferStrategy.getCounters());
 
         }

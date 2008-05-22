@@ -2,6 +2,8 @@ package com.bigdata.counters;
 
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.journal.QueueStatisticsTask;
+
 /**
  * An {@link IInstrument} that reports the instantaneous average during a
  * reporting period where the average is based on a counter of events and the
@@ -16,6 +18,10 @@ import java.util.concurrent.TimeUnit;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated I am not sure that this works correctly and it is not used
+ *             anywhere. It has been replaced by the use of the
+ *             {@link QueueStatisticsTask}.
  */
 abstract public class InstrumentInstantaneousAverage implements
         IInstrument<Double> {

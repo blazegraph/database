@@ -35,7 +35,6 @@ import java.io.ObjectOutput;
 
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rawstore.IRawStore;
 
 /**
  * Serializes each address as a long integer and does not attempt to pack or

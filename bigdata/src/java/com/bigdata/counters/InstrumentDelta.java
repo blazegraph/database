@@ -2,23 +2,28 @@ package com.bigdata.counters;
 
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.journal.QueueStatisticsTask;
+
 /**
  * An {@link IInstrument} that reports the change in a sample. The reported
- * change in the sampled value is based on exactly two samples - the
- * previous sample and the most recent sample. Samples are taken no more
- * frequently than the specified <i>duration</i> <i>unit</i>s. The
- * measured change in between the previous and the most recent samples is
- * normalized and reported as the change per <i>duration</i> <i>unit</i>.
- * An initial sample value of <code>0.0</code> is presumed. The reported
- * value will reflect this value until at least <i>duration</i> <i>unit</i>s
- * have elapsed.
+ * change in the sampled value is based on exactly two samples - the previous
+ * sample and the most recent sample. Samples are taken no more frequently than
+ * the specified <i>duration</i> <i>unit</i>s. The measured change in between
+ * the previous and the most recent samples is normalized and reported as the
+ * change per <i>duration</i> <i>unit</i>. An initial sample value of
+ * <code>0.0</code> is presumed. The reported value will reflect this value
+ * until at least <i>duration</i> <i>unit</i>s have elapsed.
  * <p>
- * Note: This {@link IInstrument} does NOT monitor {@link #sample()}.
- * Instead it decides each time {@link #getValue()} is invoked whether
- * sufficient time has elapsed to take another {@link #sample()}.
+ * Note: This {@link IInstrument} does NOT monitor {@link #sample()}. Instead
+ * it decides each time {@link #getValue()} is invoked whether sufficient time
+ * has elapsed to take another {@link #sample()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated I am not sure that this works correctly and it is not used
+ *             anywhere. It has been replaced by the use of the
+ *             {@link QueueStatisticsTask}.
  */
 abstract public class InstrumentDelta implements IInstrument<Double> {
 

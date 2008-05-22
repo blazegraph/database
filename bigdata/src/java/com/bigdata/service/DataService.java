@@ -700,6 +700,32 @@ abstract public class DataService extends AbstractService
 
 
     }
+
+    /**
+     * Interface defines and documents the counters and counter namespaces
+     * reported by the {@link DataService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IDataServiceCounters {
+       
+        /**
+         * The namespace for the counters pertaining to the {@link ConcurrencyManager}.
+         */
+        String concurrencyManager = "Concurrency Manager";
+
+        /**
+         * The namespace for the counters pertaining to the {@link ITransactionManager}.
+         */
+        String transactionManager = "Transaction Manager";
+        
+        /**
+         * The namespace for the counters pertaining to the {@link ResourceManager}.
+         */
+        String resourceManager = "Resource Manager";
+        
+    }
     
     /**
      * Return the {@link ICounterSet} hierarchy used to report on the activity
@@ -715,30 +741,18 @@ abstract public class DataService extends AbstractService
      * whether the service is embedded or using a distributed services framework
      * such as <code>jini</code>.
      * <p>
-     * <dl>
-     * <dt>resourceManager</dt>
-     * <dd></dd>
-     * <dt>concurrencyManager</dt>
-     * <dd></dd>
-     * <dt>transactionManager</dt>
-     * <dd></dd>
-     * </dl>
      * Subclasses MAY extend this method to report additional {@link ICounter}s.
      * 
      * @todo Add some counters providing a histogram of the index partitions
      *       that have touched or that are "hot"?
+     * 
+     * @see IDataServiceCounters
      */
     synchronized public ICounterSet getCounters() {
      
         if (countersRoot == null) {
 
-            final UUID serviceUUID;
-//            try {
-                // Note: this is a local method call.
-                serviceUUID = getServiceUUID();
-//            } catch(IOException ex) {
-//                throw new RuntimeException(ex);
-//            }
+            final UUID serviceUUID = getServiceUUID();
             
             if (serviceUUID == null) {
                 
@@ -748,12 +762,6 @@ abstract public class DataService extends AbstractService
             
             countersRoot = new CounterSet();
 
-//            if( statisticsCollector != null) {
-//
-//                countersRoot.attach(statisticsCollector.getCounters());
-//
-//            }
-            
             final String ps = ICounterSet.pathSeparator;
             
             final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
@@ -773,13 +781,13 @@ abstract public class DataService extends AbstractService
              * Service specific counters.
              */
             
-            serviceRoot.makePath("Resource Manager").attach(
+            serviceRoot.makePath(IDataServiceCounters.resourceManager).attach(
                     resourceManager.getCounters());
 
-            serviceRoot.makePath("Concurrency Manager").attach(
+            serviceRoot.makePath(IDataServiceCounters.concurrencyManager).attach(
                     concurrencyManager.getCounters());
 
-            serviceRoot.makePath("Transaction Manager").attach(
+            serviceRoot.makePath(IDataServiceCounters.transactionManager).attach(
                     localTransactionManager.getCounters());
 
             // block API.
@@ -1367,11 +1375,9 @@ abstract public class DataService extends AbstractService
         protected void reportPerformanceCounters() throws IOException {
 
             // Note: This _is_ a local method call.
-
             final UUID serviceUUID = getServiceUUID();
 
             // Will be null until assigned by the service registrar.
-
             if (serviceUUID == null) {
 
                 log.info("Service UUID not assigned yet.");
