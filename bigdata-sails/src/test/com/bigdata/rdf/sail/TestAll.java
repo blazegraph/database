@@ -91,6 +91,9 @@ public class TestAll extends TestCase {
         // bootstrap tests for the BigdataSail
         suite.addTestSuite(TestBigdataSail.class);
 
+        // test of the search magic predicate
+        suite.addTestSuite(TestSearchQuery.class);
+        
         // high-level query tests.
         suite.addTestSuite(TestQuery.class);
 

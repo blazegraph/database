@@ -108,5 +108,34 @@ public interface BNS {
      * it as either an axiom or an inference as appropriate.
      */
     String STATEMENT_TYPE = "statementType";
-        
+    
+    /**
+     * The name of a magic predicate recognized by the {@link BigdataSail} when
+     * it occurs in statement patterns such as:
+     * 
+     * <pre>
+     * 
+     * ( s?, bigdata:search, &quot;scale-out RDF triplestore&quot; )
+     * 
+     * </pre>
+     * 
+     * The value MUST be bound and MUST be a literal. The languageCode attribute
+     * is permitted, but a datatype attribute is not allowed. When specified,
+     * the languageCode attribute will be used to determine how the literal is
+     * tokenized - it does not filter for matches marked with that languageCode
+     * attribute.
+     * <p>
+     * The subject MUST NOT be bound.
+     * <p>
+     * 
+     * This expression will evaluate to a set of bindings for the subject
+     * position corresponding to the indexed literals matching any of the
+     * terms obtained when the literal was tokenized.
+     * 
+     * <p>
+     * Note: The context position should be unbound when using statement
+     * identifiers.
+     */
+    String SEARCH = NAMESPACE+"search";
+    
 }

@@ -49,6 +49,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -60,6 +61,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
@@ -111,7 +113,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.SPOConvertingIterator;
 import com.bigdata.rdf.spo.DelegateSPOIterator;
 import com.bigdata.rdf.spo.EmptySPOIterator;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -121,6 +122,7 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOComparator;
+import com.bigdata.rdf.spo.SPOConvertingIterator;
 import com.bigdata.rdf.store.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.store.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.store.WriteJustificationsProc.WriteJustificationsProcConstructor;
@@ -137,6 +139,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
+
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -3751,6 +3754,23 @@ abstract public class AbstractTripleStore implements ITripleStore,
             throws InterruptedException {
 
         return getSearchEngine().search(text, languageCode);
+
+    }
+
+    /**
+     * 
+     * @param minCosine
+     *            The minimum cosine that will be returned.
+     * @param maxRank
+     *            The upper bound on the #of hits in the result set.
+     * @return
+     * @throws InterruptedException 
+     */
+    @SuppressWarnings("unchecked")
+    public Iterator<IHit> textSearch(String languageCode, String text,
+            double minCosine, int maxRank) throws InterruptedException {
+
+        return getSearchEngine().search(text, languageCode, minCosine, maxRank);
 
     }
 

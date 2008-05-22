@@ -34,45 +34,35 @@ package com.bigdata.rdf.sail;
 import info.aduna.iteration.CloseableIteration;
 
 import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.DatasetImpl;
-import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.rdf.model.BigdataStatementImpl;
-import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.store.BNS;
 
 /**
  * Test suite for high-level query against a graph containing statements about
  * statements.
  * 
- * FIXME test result bindings
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
+public class TestSearchQuery extends AbstractBigdataSailTestCase {
 
     public void test_query() throws SailException, IOException, RDFHandlerException, QueryEvaluationException {
 
@@ -89,95 +79,45 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
          */
         {
  
-            DataLoader dataLoader = sail.database.getDataLoader();
-
-            dataLoader.loadData("src/test/com/bigdata/rdf/sail/provenance01.rdf", ""/*baseURL*/, RDFFormat.RDFXML);
+            StatementBuffer sb = new StatementBuffer(sail.database,100/*capacity*/);
             
-        }
-        
-        /*
-         * Serialize as RDF/XML using a vendor specific extension to represent
-         * the statement identifiers and statements about statements.
-         * 
-         * Note: This is just for debugging.
-         */
-        {
-         
-            final BigdataStatementIterator itr = sail.database.getStatements(null, null, null);
-            final String rdfXml;
-            try {
+            sb.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
+                    new LiteralImpl("Yellow Rose"));
 
-                Writer w = new StringWriter();
+            sb.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
+                    new LiteralImpl("Red Rose"));
 
-                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+            sb.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
+                    new LiteralImpl("Old Yellow House"));
 
-                rdfWriter.startRDF();
-
-                while (itr.hasNext()) {
-
-                    BigdataStatementImpl stmt = (BigdataStatementImpl)itr.next();
-
-                    // only write the explicit statements.
-                    if(!stmt.isExplicit()) continue;
-                    
-                    rdfWriter.handleStatement(stmt);
-
-                }
-
-                rdfWriter.endRDF();
-
-                rdfXml = w.toString();
-
-            } finally {
-
-                try {
-                    itr.close();
-                } catch (SailException e) {
-                    throw new RuntimeException(e);
-                }
-
-            }
-
-            // write the rdf/xml on the console.
-            System.err.println(rdfXml);
-
+            sb.flush();
+            
         }
         
         SailConnection conn = sail.getConnection();
 
         try {
 
-            final URI y = new URIImpl("http://www.foo.org/y");
-            
-            final URI B = new URIImpl("http://www.foo.org/B");
-
-            final URI dcCreator = new URIImpl("http://purl.org/dc/terms/creator");
-
-            final Literal bryan = new LiteralImpl("bryan");
-            
-            final Literal mike = new LiteralImpl("mike");
-
             /*
              * This is the hand-coded query.
              * 
-             * FIXME Try changing the evaluation order in the hand-coded join
-             * and verify that the join is evaluated correctly. When statement
-             * identifiers are enabled, the only way to bind the context
-             * position is to already have a statement on hand - there is no
-             * index which can be used to look up a statement by its context and
-             * the context is always a blank node.
-             */
+             * FIXME write the query, can be very simple to just get values, e.g.,
+             * the matching literals.  It can be made more complex to explore how
+             * to make the joins efficient, but that is also a story for another
+             * day.
+             * 
+select ?evidence
+where
+{ ?evidence rdf:type <the type> .
+?evidence ?anypredicate ?label .
+?label bigdata:search "the query" .
+}             */
 
-            TupleExpr tupleExpr = new Join(//
-                    new StatementPattern(//
-                            new Var("X", y),//
-                            new Var("1", RDF.TYPE),//
-                            new Var("2", B),//
-                            new Var("SID")),// unbound.
-                    new StatementPattern(//
-                            new Var("SID"),//
-                            new Var("3", dcCreator),//
-                            new Var("Y")));
+            TupleExpr tupleExpr = new StatementPattern(//
+                    new Var("X"),//
+                    new Var("1", new URIImpl(BNS.SEARCH)),//
+                    new Var("2", new LiteralImpl("Yellow"))//
+            );
 
             /*
              * Create a data set consisting of the contexts to be queried.
@@ -195,15 +135,19 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
             log.info("Verifying query.");
 
             /*
-             * These are the expected results for the query (the bindings for Y).
+             * These are the expected results for the query (the bindings for X).
              */
 
             final Set<Value> expected = new HashSet<Value>();
 
-            expected.add(bryan);
-            
-            expected.add(mike);
+//            expected.add(new URIImpl("http://www.bigdata.com/A"));
+//            
+//            expected.add(new URIImpl("http://www.bigdata.com/C"));
 
+            expected.add(new LiteralImpl("Yellow Rose"));
+            
+            expected.add(new LiteralImpl("Old Yellow House"));
+            
             /*
              * Verify that the query results is the correct solutions.
              */
@@ -220,9 +164,11 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
 
                     System.out.println("solution[" + i + "] : " + solution);
 
-                    Value actual = solution.getValue("Y");
+                    Value actual = solution.getValue("X");
 
-                    assertTrue("Not expecting Y=" + actual, expected
+                    System.out.println("X[" + i + "] = " + actual +" ("+actual.getClass().getName()+")");
+
+                    assertTrue("Not expecting X=" + actual, expected
                             .remove(actual));
 
                     i++;
