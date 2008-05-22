@@ -502,7 +502,7 @@ abstract public class MetadataService extends DataService implements
             
             if (pmd == null) {
                 
-                throw new RuntimeException("No such locator: "+oldLocator);
+                throw new RuntimeException("No such locator: name="+getOnlyResource()+", locator="+oldLocator);
                 
             }
             
@@ -516,7 +516,7 @@ abstract public class MetadataService extends DataService implements
                  * are probably not important and might be ignored.
                  */
 
-                throw new RuntimeException("Expected oldLocator=" + oldLocator
+                throw new RuntimeException("Expected different locator: name="+getOnlyResource()+", oldLocator=" + oldLocator
                         + ", but actual=" + pmd);
                 
             }
@@ -800,6 +800,13 @@ abstract public class MetadataService extends DataService implements
             final PartitionLocator pmd = (PartitionLocator) SerializerUtil
                     .deserialize(mdi.remove(oldLocator.getLeftSeparatorKey()));
 
+
+            if (pmd == null) {
+                
+                throw new RuntimeException("No such locator: name="+getOnlyResource()+", locator="+oldLocator);
+                
+            }
+            
             if (!oldLocator.equals(pmd)) {
 
                 /*

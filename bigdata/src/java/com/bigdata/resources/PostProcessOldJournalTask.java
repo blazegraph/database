@@ -40,6 +40,7 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.AbstractBufferStrategyTestCase;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
@@ -478,10 +479,14 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            log.debug("The most active index was: "
-                            + scores[scores.length - 1]);
+            if (DEBUG) {
 
-            log.debug("The least active index was: " + scores[0]);
+                log.debug("The most active index was: "
+                        + scores[scores.length - 1]);
+
+                log.debug("The least active index was: " + scores[0]);
+                
+            }
 
         }
 
@@ -1474,18 +1479,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         try {
 
-            log.warn("begin");
+            log.info("begin");
 
             if(Thread.currentThread().isInterrupted()) return null;
             
             tmpStore = new TemporaryRawStore();
             
+            if(Thread.currentThread().isInterrupted()) return null;
+            
             if(INFO) {
                 
                 // The pre-condition views.
-            
-                if(Thread.currentThread().isInterrupted()) return null;
-                
                 log.info("\npre-condition views: overflowCounter="
                         + resourceManager.overflowCounter.get() + "\n"
                         + resourceManager.listIndexPartitions(-lastCommitTime));
@@ -1494,12 +1498,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             if(Thread.currentThread().isInterrupted()) return null;
             
-            List<AbstractTask> tasks = chooseTasks();
+            final List<AbstractTask> tasks = chooseTasks();
             
             if(Thread.currentThread().isInterrupted()) return null;
             
             // runTasks()
             {
+                if(INFO)
                 log.info("begin : will run "+tasks.size()+" update tasks");
 
                 /*
@@ -1515,10 +1520,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                 TimeUnit.MILLISECONDS);
 
                 if(Thread.currentThread().isInterrupted()) return null;
+
+                // Note: list is 1:1 correlated with [futures].
+                final Iterator<AbstractTask> titr = tasks.iterator();
                 
                 // verify that all tasks completed successfully.
                 for (Future<Object> f : futures) {
 
+                    // the task for that future.
+                    final AbstractTask task = titr.next();
+                    
                     /*
                      * Note: An error here MAY be ignored. The index partition
                      * will remain coherent and valid but its view will continue
@@ -1542,15 +1553,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                         if(t instanceof CancellationException) {
                             
-                            log.warn("Task cancelled: "+t);
+                            log.warn("Task cancelled: task="+task+" : "+t);
+                            
+                            resourceManager.asyncOverflowTaskCancelledCounter.incrementAndGet();
                             
                         } else if(isNormalShutdown(t)) { 
                             
-                            log.warn("Normal shutdown? : "+t);
+                            log.warn("Normal shutdown? : task="+task+" : "+t);
                             
                         } else {
                         
-                            log.error("Update task failed", t);
+                            resourceManager.asyncOverflowTaskFailedCounter.incrementAndGet();
+
+                            log.error("Task failed: task="+task+" : "+t, t);
                             
                         }
                         
@@ -1574,18 +1589,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
-            if(INFO) {
-                
-                // The post-condition views.
-            
-                if(Thread.currentThread().isInterrupted()) return null;
-                
-                log.info("\npost-condition views: overflowCounter="
-                        + resourceManager.overflowCounter.get() + "\n"
-                        + resourceManager.listIndexPartitions(ITx.UNISOLATED));
-                
-            }
-
             /*
              * Note: At this point we have the history as of the lastCommitTime
              * entirely contained in index segments. Also, since we constained
@@ -1598,8 +1601,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             final long elapsed = System.currentTimeMillis()-begin;
             
-            log.info("done: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
-            
+            if(INFO) {
+                
+                log.info("done: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
+                
+                // The post-condition views.
+                log.info("\npost-condition views: overflowCounter="
+                        + resourceManager.overflowCounter.get() + "\n"
+                        + resourceManager.listIndexPartitions(ITx.UNISOLATED));
+                
+            }
+
             return null;
             
         } catch(Throwable t) {
@@ -1615,7 +1627,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * those exceptions do not indicate a problem.
              */
             
-            resourceManager.overflowFailedCounter.incrementAndGet();
+            resourceManager.asyncOverflowFailedCounter.incrementAndGet();
             
             if(isNormalShutdown(t)) { 
                 
@@ -1656,7 +1668,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * These are all good indicators that the data service was shutdown.
      */
     protected boolean isNormalShutdown(Throwable t) {
-       
+
+        return isNormalShutdown(resourceManager,t);
+        
+    }
+    
+    /**
+     * These are all good indicators that the data service was shutdown.
+     */
+    static protected boolean isNormalShutdown(ResourceManager resourceManager, Throwable t) {
+
         if(Thread.currentThread().isInterrupted()) return true;
         
         if (!resourceManager.isRunning()

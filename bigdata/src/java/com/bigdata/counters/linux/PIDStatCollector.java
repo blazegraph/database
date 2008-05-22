@@ -451,24 +451,33 @@ public class PIDStatCollector extends AbstractProcessCollector implements
             try {
                 
             // timestamp
-            {
-
-                final String s = data.substring(0, 11);
-
-                try {
-
-                    lastModified = f.parse(s).getTime();
-
-                } catch (Exception e) {
-
-                    log.warn("Could not parse time: [" + s + "] : " + e);
-
-                    // should be pretty close.
-                    lastModified = System.currentTimeMillis();
-
-                }
-
-            }
+//            {
+//
+//                final String s = data.substring(0, 11);
+//
+//                try {
+//
+//                    lastModified = f.parse(s).getTime();
+//
+//                } catch (Exception e) {
+//
+//                    log.warn("Could not parse time: [" + s + "] : " + e);
+//
+//                    // should be pretty close.
+//                    lastModified = System.currentTimeMillis();
+//
+//                }
+//
+//            }                /*
+            /*
+             * Note: This timestamp should be _very_ close to the value reported
+             * by sysstat. Also, using the current time is MUCH easier and less
+             * error prone than attempting to parse the TIME OF DAY written by
+             * sysstat and correct it into a UTC time by adjusting for the UTC
+             * time of the start of the current day, which is what we would have
+             * to do.
+             */
+            lastModified = System.currentTimeMillis();
                             
             if(header.contains("%CPU")) {
                 

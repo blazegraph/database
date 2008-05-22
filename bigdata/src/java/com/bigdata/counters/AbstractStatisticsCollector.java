@@ -304,10 +304,21 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                 tmp.addCounter("bufferCapacity",
                         new OneShotInstrument<Integer>(
                                 DirectBufferPool.INSTANCE.getBufferCapacity()));
-                
+
                 tmp.addCounter("poolSize", new Instrument<Integer>() {
                     public void sample() {
                         setValue(DirectBufferPool.INSTANCE.getPoolSize());
+                    }
+                });
+                
+                /*
+                 * #of bytes allocated and held by the DirectBufferPool.
+                 */
+                tmp.addCounter("bytesUsed",
+                        new Instrument<Integer>() {
+                    public void sample() {
+                        setValue(DirectBufferPool.INSTANCE.getPoolSize()
+                                * DirectBufferPool.INSTANCE.getBufferCapacity());
                     }
                 });
                 

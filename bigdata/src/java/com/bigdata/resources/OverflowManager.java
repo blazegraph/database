@@ -202,7 +202,21 @@ abstract public class OverflowManager extends IndexManager {
      * 
      * @see PostProcessOldJournalTask
      */
-    protected final AtomicLong overflowFailedCounter = new AtomicLong(0L);
+    protected final AtomicLong asyncOverflowFailedCounter = new AtomicLong(0L);
+
+    /**
+     * The #of asynchronous overflow tasks (index partition splits, joins, or moves)
+     * that failed.
+     */
+    protected final AtomicLong asyncOverflowTaskFailedCounter = new AtomicLong(0L);
+
+    /**
+     * The #of asynchronous overflow tasks (index partition splits, joins, or
+     * moves) that were cancelled due to timeout.
+     * 
+     * @see Options#OVERFLOW_TIMEOUT
+     */
+    protected final AtomicLong asyncOverflowTaskCancelledCounter = new AtomicLong(0L);
 
     /**
      * #of successful index partition build operations.
@@ -368,10 +382,10 @@ abstract public class OverflowManager extends IndexManager {
         String OVERFLOW_TIMEOUT = "overflow.timeout";
         
         /**
-         * The default timeout for asynchronous overflow processing is 10
-         * minutes.
+         * The default timeout in milliseconds for asynchronous overflow
+         * processing.
          */
-        String DEFAULT_OVERFLOW_TIMEOUT = "" + 10 * 1000 * 60L;
+        String DEFAULT_OVERFLOW_TIMEOUT = "" + 20 * 1000 * 60L; // 20 minutes.
         
     }
     

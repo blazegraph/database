@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -49,7 +48,6 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
-import com.bigdata.cache.WeakValueCache.IClearReferenceListener;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitRecord;
@@ -147,17 +145,19 @@ abstract public class IndexManager extends StoreManager {
          * indices which are strongly reachable are never "closed" this provides
          * our guarentee that indices are never closed if they are in use.
          * <p>
-         * Note: {@link IndexSegment}s have a reference to the
-         * {@link IndexSegmentStore} and an {@link IClearReferenceListener} is
-         * used to see to it that the {@link IndexSegmentStore} is also closed,
-         * thereby releasing its buffers and the associated file handle.
+         * Note: {@link IndexSegment}s have a hard reference to the backing
+         * {@link IndexSegmentStore} and will keep the {@link IndexSegmentStore}
+         * from being finalized as long as a hard reference exists to the
+         * {@link IndexSegment} (the reverse is not true - the
+         * {@link IndexSegmentStore} does NOT hold a hard reference to the
+         * {@link IndexSegment}).
          * 
          * @see #DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY
          */
         String INDEX_SEGMENT_CACHE_CAPACITY = "indexSegmentCacheCapacity";
 
         /**
-         * The default for the {@link #INDEX_SEGMEWNT_CACHE_CAPACITY} option.
+         * The default for the {@link #INDEX_SEGMENT_CACHE_CAPACITY} option.
          */
         String DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY = "60";
 
@@ -183,6 +183,17 @@ abstract public class IndexManager extends StoreManager {
     public int getIndexSegmentCacheSize() {
         
         return indexSegmentCache.size();
+        
+    }
+    
+    /**
+     * The configured capacity of the index segment cache.
+     * 
+     * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
+     */
+    public int getIndexSegmentCacheCapacity() {
+        
+        return indexSegmentCache.capacity();
         
     }
     

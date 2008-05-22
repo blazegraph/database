@@ -111,18 +111,32 @@ public class XMLUtility {
                 
                 final Object value = counter.getValue();
                 
-                final String type = getXSDType(value);
-            
                 final long time = counter.lastModified();
 
-                if (time <= 0L) {
+                if (time == 0L || value == null) {
                     
                     /*
-                     * Zero and negative timestamps are generally an indicator
-                     * that the counter value is not yet defined.
+                     * Zero timestamps and null values are generally an
+                     * indicator that the counter value is not yet defined.
                      */
                     
-                    log.info("Ignoring counter with invalid timestamp: name="
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring counter: name=" + name
+                                + ", timestamp=" + time + ", value=" + value);
+
+                    continue;
+                    
+                }
+                
+                final String type = getXSDType(value);
+            
+                if (time < 0L) {
+                    
+                    /*
+                     * Negative timestamps are not expected.
+                     */
+                    
+                    log.warn("Ignoring counter with invalid timestamp: name="
                                     + name
                                     + ", timestamp="
                                     + time
@@ -333,6 +347,7 @@ public class XMLUtility {
         public void startElement(String uri, String localName, String qName,
                 Attributes attributes) throws SAXException {
 
+            if (log.isInfoEnabled())
             log.info("uri=" + uri + ",localName=" + localName + ", qName="
                     + qName);
 
@@ -344,6 +359,7 @@ public class XMLUtility {
                 
                 path = attributes.getValue("path");
                 
+                if (log.isInfoEnabled())
                 log.info("path="+path);
                 
             } else if(qName.equals(c)) {
@@ -354,7 +370,10 @@ public class XMLUtility {
                 
                 final long time = Long.parseLong(attributes.getValue("time"));
                 
-                log.info("name="+name+", type="+type+", time="+time);
+                final String value = attributes.getValue("value");
+
+                if (log.isInfoEnabled())
+                log.info("path="+path+", name="+name+", type="+type+", value="+value+", time="+time);
 
                 // determine value class from XSD attribute.
                 final Class typ = getType(type);
@@ -362,9 +381,11 @@ public class XMLUtility {
                 // find/create counter given its path, etc.
                 final ICounter counter = getCounter(path, name, typ);
 
-                if (counter != null) {
-
-                    final String value = attributes.getValue("value");
+                if (counter == null) {
+                
+                    log.warn("Conflict: path="+path+", name="+name);
+                    
+                } else {
 
                     // set the value on the counter.
                     setValue(counter, typ, value, time);
@@ -453,6 +474,7 @@ public class XMLUtility {
 
                 final String value = attributes.getValue("value");
 
+                if (log.isInfoEnabled())
                 log.info("counter=" + counter + ", time=" + time+", value="+value);
 
                 addValue(history, time, value);
@@ -529,10 +551,6 @@ public class XMLUtility {
                     counter = (ICounter) node;
 
                 } else {
-
-                    log.error("Can not load counter: path=" + path
-                            + ", name=" + name
-                            + " : existing counter set with same name");
 
                     return null;
 

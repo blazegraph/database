@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
 
 import com.bigdata.btree.AbstractBTree;
@@ -262,7 +263,21 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
         
             splits = splitHandler.getSplits(resourceManager, src);
             
-        } catch (Exception ex) {
+        } catch (Throwable t) {
+
+            if (PostProcessOldJournalTask.isNormalShutdown(resourceManager,t)) {
+
+                /*
+                 * This looks like an exception arising from the normal shutdown
+                 * of the data service so we return immediately.  As of this point
+                 * we have not had any side effects on the data service.
+                 */
+                
+                log.warn("Normal shutdown? : " + t);
+
+                return null;
+                
+            }
 
             /*
              * Note: this makes the asynchronous overflow more robust to a
@@ -270,12 +285,12 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
              * succeeds then the index will never get split and it will
              * eventually dominate the data service on which it resides.
              */
-            
+
             log.error("Split handler failure - will do build instead: name="
-                    + name + " : " + ex, ex);
-            
+                    + name + " : " + t, t);
+
             splits = null;
-            
+
         }
 
         if (splits == null) {
@@ -315,6 +330,7 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
         // The #of splits.
         final int nsplits = splits.length;
         
+        if(INFO)
         log.info("Will build index segments for " + nsplits
                 + " splits for " + name+" : "+Arrays.toString(splits));
         
@@ -821,7 +837,7 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                             ),
                     locators);
 
-            log.info("Notified metadata service: name=" + name
+            if(INFO)log.info("Notified metadata service: name=" + name
                     + " was split into " + Arrays.toString(locators));
 
             // will notify tasks that index partition was split.

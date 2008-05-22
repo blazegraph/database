@@ -754,7 +754,40 @@ public class ConcurrencyManager implements IConcurrencyManager {
     private final QueueStatisticsTask txWriteServiceQueueStatisticsTask;
     private final QueueStatisticsTask readServiceQueueStatisticsTask;
     
-    private CounterSet countersRoot;
+    /**
+     * Interface defines and documents the counters and counter namespaces for
+     * the {@link ConcurrencyManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IConcurrencyManagerCounters {
+       
+        /**
+         * The service to which historical read tasks are submitted.
+         */
+        String readService = "Read Service";
+
+        /**
+         * The service to which isolated write tasks are submitted.
+         */
+        String txWriteService = "Transaction Write Service";
+        
+        /**
+         * The service to which {@link ITx#UNISOLATED} tasks are submitted. This
+         * is the service that handles commit processing. Tasks submitted to
+         * this service are required to declare resource lock(s) and must
+         * acquire those locks before they can begin executing.
+         */
+        String writeService = "Unisolated Write Service";
+
+        /**
+         * The {@link LockManager} that manages the resource locks for the
+         * {@link #writeService}.
+         */
+        String writeServiceLockManager = writeService + ICounterSet.pathSeparator + "LockManager";
+        
+    }
     
     /**
      * Return the {@link CounterSet}.
@@ -775,7 +808,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             // readService
             {
                 readServiceQueueStatisticsTask
-                        .addCounters(countersRoot.makePath("Read Service"));
+                        .addCounters(countersRoot.makePath(IConcurrencyManagerCounters.readService));
 
             }
 
@@ -784,22 +817,23 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 txWriteServiceQueueStatisticsTask
                         .addCounters(countersRoot
-                                .makePath("Transaction Write Service"));
+                                .makePath(IConcurrencyManagerCounters.txWriteService));
 
             }
 
             // writeService
             {
 
-                final CounterSet tmp = writeServiceQueueStatisticsTask
-                        .addCounters(countersRoot
-                                .makePath("Unisolated Write Service"));
+                writeServiceQueueStatisticsTask.addCounters(countersRoot
+                        .makePath(IConcurrencyManagerCounters.writeService));
                 
                 /*
                  * The lock manager for the write service.
                  */
 
-                tmp.makePath("LockManager").attach(writeService.getLockManager().getCounters());
+                countersRoot.makePath(
+                        IConcurrencyManagerCounters.writeServiceLockManager)
+                        .attach(writeService.getLockManager().getCounters());
 
             }
             
@@ -808,7 +842,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
         return countersRoot;
         
     }
-
+    private CounterSet countersRoot;
+    
     /**
      * Submit a task (asynchronous). Tasks will execute asynchronously in the
      * appropriate thread pool with as much concurrency as possible.

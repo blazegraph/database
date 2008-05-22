@@ -30,6 +30,8 @@ package com.bigdata.counters;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
+
 /**
  * Abstract class for reporting instrumented values supporting some useful
  * conversions.
@@ -39,6 +41,8 @@ import java.util.concurrent.TimeUnit;
  */
 abstract public class Instrument<T> implements IInstrument<T> {
 
+    protected static Logger log = Logger.getLogger(Instrument.class);
+    
     /** <code>N/A</code> */
     protected static final transient String NA = "N/A";
     
@@ -82,7 +86,7 @@ abstract public class Instrument<T> implements IInstrument<T> {
      */
     final public void setValue(T value) {
         
-        setValue(value,System.currentTimeMillis());
+        setValue(value, System.currentTimeMillis());
         
     }
 
@@ -95,6 +99,9 @@ abstract public class Instrument<T> implements IInstrument<T> {
      *            The timestamp for that value.
      */
     final public void setValue(T value,long timestamp) {
+
+        if(log.isInfoEnabled())
+            log.info("value="+value+", timestamp="+timestamp);
         
         this.value = value;
         
