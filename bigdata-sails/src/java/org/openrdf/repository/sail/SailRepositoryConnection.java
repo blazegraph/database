@@ -6,7 +6,6 @@
 package org.openrdf.repository.sail;
 
 import info.aduna.iteration.CloseableIteration;
-
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -28,10 +27,14 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 
 /**
  * An implementation of the {@link RepositoryConnection} interface that wraps a
  * {@link SailConnection}.
+ * <p>
+ *  This class was made public so that it could be extended by 
+ * {@link BigdataSailRepositoryConnection}.
  * 
  * @author jeen
  * @author Arjohn Kampman
