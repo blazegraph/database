@@ -2185,6 +2185,15 @@ public class BigdataSail extends SailBase implements Sail {
              * 
              * FIXME THIS MUST USE A CHUNKED EVALUATION PATTERN TO BE EFFICIENT.
              * 
+             * FIXME consider stopword lists and how they might be setup for the
+             * SAIL.
+             * 
+             * FIXME consider options for term weights and normalization. Search
+             * on the KB is probably all terms with anything matching, stopwords
+             * are excluded, and term weights can be without normalization since
+             * ranking does not matter. And maxRank should probably be defeated
+             * (Integer.MAX_VALUE or ZERO - whichever does the trick).
+             * 
              * @return
              * 
              * @throws QueryEvaluationException
