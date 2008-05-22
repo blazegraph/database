@@ -525,11 +525,7 @@ public class FullTextIndex {
      * Return the token analyzer to be used for the given language code.
      * 
      * @param languageCode
-     *            The language code from a {@link Literal}.
-     *            <p>
-     *            Note: When the language code is not explicitly stated on a
-     *            literal the configured {@link Locale} for the database should
-     *            be used.
+     *            The language code or <code>null</code> to use the default {@link Locale}.
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
@@ -879,7 +875,8 @@ public class FullTextIndex {
      * @param fieldId
      *            The field identifier.
      * @param languageCode
-     *            The language code (defaults to the configured language code).
+     *            The language code -or- <code>null</code> to use the default
+     *            {@link Locale}.
      * @param r
      *            A reader on the text to be indexed.
      * 
@@ -929,8 +926,8 @@ public class FullTextIndex {
      * specified language family.
      * 
      * @param languageCode
-     *            The language code (an empty string will be interpreted as
-     *            the default {@link Locale}).
+     *            The language code -or- <code>null</code> to use the default
+     *            {@link Locale}).
      * 
      * @param r
      *            A reader on the text to be indexed.
@@ -1144,8 +1141,8 @@ public class FullTextIndex {
 
         final long begin = System.currentTimeMillis();
         
-        if (languageCode == null)
-            throw new IllegalArgumentException();
+//        if (languageCode == null)
+//            throw new IllegalArgumentException();
 
         if (query == null)
             throw new IllegalArgumentException();
@@ -1156,7 +1153,8 @@ public class FullTextIndex {
         if (maxRank <= 0)
             throw new IllegalArgumentException();
 
-        log.info("languageCode=[" + languageCode + "], text=[" + query + "]");
+        if (log.isInfoEnabled())
+            log.info("languageCode=[" + languageCode + "], text=[" + query + "]");
 
         // tokenize the query.
         final TermFrequencyData qdata;

@@ -106,7 +106,7 @@ public class TestBigdataSail extends TestCase {
     }
 
     /**
-     * Test create a shutdown of a named store.
+     * Test create and shutdown of a named store.
      * 
      * @throws SailException
      */
