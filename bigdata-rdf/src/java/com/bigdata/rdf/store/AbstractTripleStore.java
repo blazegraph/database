@@ -1231,6 +1231,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
          */
         if (numNotFound > 0) {
 
+            if(log.isInfoEnabled())
             log.info("Will resolve "+numNotFound+" term identifers against the index.");
             
             // sort term identifiers into index order.
@@ -3754,23 +3755,6 @@ abstract public class AbstractTripleStore implements ITripleStore,
             throws InterruptedException {
 
         return getSearchEngine().search(text, languageCode);
-
-    }
-
-    /**
-     * 
-     * @param minCosine
-     *            The minimum cosine that will be returned.
-     * @param maxRank
-     *            The upper bound on the #of hits in the result set.
-     * @return
-     * @throws InterruptedException 
-     */
-    @SuppressWarnings("unchecked")
-    public Iterator<IHit> textSearch(String languageCode, String text,
-            double minCosine, int maxRank) throws InterruptedException {
-
-        return getSearchEngine().search(text, languageCode, minCosine, maxRank);
 
     }
 

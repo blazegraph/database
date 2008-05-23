@@ -31,10 +31,8 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
@@ -47,8 +45,8 @@ import com.bigdata.rdf.spo.SPO;
  * Wraps the raw iterator that traverses a statement index and exposes each
  * visited statement as a {@link BigdataStatement} (batch API).
  * 
- * FIXME The resolution of term identifiers to terms should happen during
- * asynchronous read-ahead for better performance.
+ * @todo The resolution of term identifiers to terms should happen during
+ *       asynchronous read-ahead for even better performance.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -154,6 +152,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
             // fetch the next chunk of SPOs.
             chunk = src.nextChunk();
 
+            if(log.isInfoEnabled())
             log.info("Fetched chunk: size="+chunk.length);
 
             /*
@@ -161,7 +160,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
              * chunk.
              */
 
-            final Collection<Long> ids = new HashSet<Long>();
+            final Collection<Long> ids = new HashSet<Long>(chunk.length * 4);
 
             for (SPO spo : chunk) {
 
@@ -179,6 +178,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
             }
 
+            if(log.isInfoEnabled())
             log.info("Resolving "+ids.size()+" term identifiers");
             
             // batch resolve term identifiers to terms.

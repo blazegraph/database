@@ -128,6 +128,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection.BigdataTripleSource;
+import com.bigdata.rdf.spo.ChunkedIterator;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.InferredSPOFilter;
@@ -136,6 +137,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
+import com.bigdata.rdf.store.BigdataValueIterator;
+import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.store.EmptyAccessPath;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IAccessPath;
@@ -144,7 +147,11 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Sesame <code>2.x</code> integration.
@@ -2106,13 +2113,49 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
+         * Evaluates the {@link BNS#SEARCH} magic predicate as a full-text
+         * search against the index literal in the database, binding <i>svar</i>
+         * to each matched literal in turn.
+         * <p>
+         * Note: The minimum cosine (relevance score) is set to ZERO (0d) in
+         * order to make sure that any match within a literal qualifies that
+         * literal for inclusion within the set of bindings that are
+         * materialized. This is in contrast to a standard search engine, where
+         * a minimum relevance score is used to filter out less likely matches.
+         * However, it is my sense that query against the KB is often used to
+         * find ALL matches. Regardless, the matches will be materialized in
+         * order of decreasing relevance and an upper bound of 10000 matches is
+         * imposed by the search implementation. See
+         * {@link FullTextIndex#search(String, String, double, int)}.
          * 
          * @param svar
+         *            The variable from the subject position of the
+         *            {@link StatementPattern} in which the {@link BNS#SEARCH}
+         *            magic predicate appears.
          * @param languageCode
+         *            An optional language code from the bound literal appearing
+         *            in the object position of that {@link StatementPattern}.
          * @param label
+         *            The required label from the bound literal appearing in the
+         *            object position of that {@link StatementPattern}.
          * @param bindings
-         * @return
-         * @throws QueryEvaluationException 
+         *            The current bindings.
+         * 
+         * @return Iteration visiting the bindings obtained by the search.
+         * 
+         * @throws QueryEvaluationException
+         * 
+         * @todo consider options for term weights and normalization. Search on
+         *       the KB is probably all terms with anything matching, stopwords
+         *       are excluded, and term weights can be without normalization
+         *       since ranking does not matter. And maxRank should probably be
+         *       defeated (Integer.MAX_VALUE or ZERO - whichever does the
+         *       trick).
+         * 
+         * @todo it would be nice if there were a way for the caller to express
+         *       more parameters for the search, e.g., to give the minCosine and
+         *       maxRank values directly as a tuple-based function call. I'm not
+         *       sure if that is supported within Sesame/SPARQL.
          */
         protected CloseableIteration<BindingSet, QueryEvaluationException> search(
                 Var svar, String languageCode, String label, BindingSet bindings) throws QueryEvaluationException {
@@ -2123,7 +2166,8 @@ public class BigdataSail extends SailBase implements Sail {
             final Iterator<IHit> itr;
             try {
 
-                itr = database.textSearch(languageCode, label,0d/*minCosine*/,10000/*maxRank*/);
+                itr = database.getSearchEngine().search(label, languageCode,
+                        0d/* minCosine */, 10000/* maxRank */);
                 
             } catch (InterruptedException e) {
                 
@@ -2144,22 +2188,49 @@ public class BigdataSail extends SailBase implements Sail {
          *         Thompson</a>
          * @version $Id$
          */
-        private class HitConvertor implements
+        static private class HitConvertor implements
                 CloseableIteration<BindingSet, QueryEvaluationException> {
 
             final AbstractTripleStore database;
 
-            final Iterator<IHit> src;
-            
+            final BigdataValueIterator src;
+
             final Var svar;
-            
+
             final BindingSet bindings;
-            
-            HitConvertor(AbstractTripleStore database, Iterator<IHit> src,Var svar,BindingSet bindings) {
+
+            @SuppressWarnings("unchecked")
+            HitConvertor(AbstractTripleStore database, Iterator<IHit> src,
+                    Var svar, BindingSet bindings) {
 
                 this.database = database;
 
-                this.src = src;
+                /*
+                 * Resolve the document identifier from the hit (the term
+                 * identifers are treated as "documents" by the search engine).
+                 * 
+                 * And then wrap up the term identifier iterator as a chunked
+                 * iterator.
+                 * 
+                 * And finally wrap up the chunked term identifier iterator with
+                 * an iterator that efficiently resolves term identifiers to
+                 * BigdataValue objects that we can pass along to Sesame.
+                 */
+                this.src = new BigdataValueIteratorImpl(database,
+                        new ChunkedIterator<Long>(new Striterator(src)
+                                .addFilter(new Resolver() {
+
+                                    private static final long serialVersionUID = 1L;
+                                    
+                                    @Override
+                                    protected Object resolve(final Object arg0) {
+
+                                        final IHit hit = (IHit) arg0;
+
+                                        return hit.getDocId();
+                                    }
+
+                                })));
 
                 this.svar = svar;
                 
@@ -2169,32 +2240,34 @@ public class BigdataSail extends SailBase implements Sail {
             
             public void close() throws QueryEvaluationException {
 
-                // NOP.
+                try {
+                    
+                    src.close();
+                    
+                } catch (SailException e) {
+                    
+                    throw new QueryEvaluationException(e);
+                    
+                }
                 
             }
 
             public boolean hasNext() throws QueryEvaluationException {
 
-                return src.hasNext();
+                try {
+                    
+                    return src.hasNext();
+                    
+                } catch (SailException e) {
+                    
+                    throw new QueryEvaluationException(e);
+                    
+                }
                 
             }
 
             /**
-             * Converts an {@link IHit} identifying a literal matching one or
-             * more of the search terms into an {@link Value} for that literal.
-             * 
-             * FIXME THIS MUST USE A CHUNKED EVALUATION PATTERN TO BE EFFICIENT.
-             * 
-             * FIXME consider stopword lists and how they might be setup for the
-             * SAIL.
-             * 
-             * FIXME consider options for term weights and normalization. Search
-             * on the KB is probably all terms with anything matching, stopwords
-             * are excluded, and term weights can be without normalization since
-             * ranking does not matter. And maxRank should probably be defeated
-             * (Integer.MAX_VALUE or ZERO - whichever does the trick).
-             * 
-             * @return
+             * Binds the next {@link BigdataValue} (must be a Literal).
              * 
              * @throws QueryEvaluationException
              */
@@ -2202,28 +2275,20 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 final QueryBindingSet result = new QueryBindingSet(bindings);
 
-                final IHit hit = src.next();
-
-                /*
-                 * This is in fact the term identifier for a literal that was
-                 * matched by the search. (The term identifers are treated as
-                 * "documents" by the search engine).
-                 */
-                final long termId = hit.getDocId();
-                
-                final Value val = OptimizedValueFactory.INSTANCE.toSesameObject(database.getTerm(termId));
-
-                if (val == null) {
+                final BigdataValue val;
+                try {
                     
-                    throw new QueryEvaluationException(
-                            "No value for term identifier: id=" + termId);
+                    val = src.next();
+                    
+                } catch (SailException e) {
+                    
+                    throw new QueryEvaluationException(e);
                     
                 }
-                
+
                 if( !(val instanceof Literal)) {
                     
-                    throw new QueryEvaluationException("Not a literal: id="
-                            + termId + " evaluates to " + val);
+                    throw new QueryEvaluationException("Not a literal? : " + val);
                     
                 }
                 
@@ -2231,6 +2296,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * Note: Hopefully nothing will choke when we bind a Literal to
                  * a variable that appears in the subject position!
                  */
+
                 result.addBinding(svar.getName(), val);
                 
                 return result;

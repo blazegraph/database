@@ -137,19 +137,19 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
         while (hasNext() && n < chunkSize) {
 
             T t = next();
-            
-            if(chunk==null) {
+
+            if (chunk == null) {
 
                 /*
                  * Dynamically instantiation an array of the same component type
                  * as the objects that we are visiting.
                  */
-                
-                chunk = (T[])java.lang.reflect.Array.newInstance(
-                        t.getClass().getComponentType(), chunkSize);
+
+                chunk = (T[]) java.lang.reflect.Array.newInstance(t.getClass(),
+                        chunkSize);
 
             }
-            
+
             // add to this chunk.
             chunk[n++] = t;
             
@@ -160,7 +160,7 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
             // make it dense.
             
             T[] tmp = (T[])java.lang.reflect.Array.newInstance(
-                    chunk[0].getClass().getComponentType(), chunkSize);
+                    chunk[0].getClass(), n);
             
             System.arraycopy(chunk, 0, tmp, 0, n);
             

@@ -232,7 +232,7 @@ import com.bigdata.service.IBigdataFederation;
  * @todo key compression: prefix compression, possibly with hamming codes for
  *       the docId and fieldId.
  * 
- * @todo support more term weighting schemes.
+ * @todo support more term weighting schemes and make them easy to configure.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -488,7 +488,7 @@ public class FullTextIndex {
         ndx = indexManager.getIndex(name, timestamp);
 
         this.ndx = ndx;
-        
+
     }
 
     /**
@@ -500,38 +500,39 @@ public class FullTextIndex {
      *       concurrent client has write access.
      */
     synchronized public void clear() {
-    
+
         log.info("");
-        
+
         assertWritable();
 
-        if(ndx instanceof BTree && !ndx.getIndexMetadata().getDeleteMarkers()) {
-            
-            ((BTree)ndx).removeAll();
-            
+        if (ndx instanceof BTree && !ndx.getIndexMetadata().getDeleteMarkers()) {
+
+            ((BTree) ndx).removeAll();
+
         } else {
 
             final String name = namespace + "search";
 
             indexManager.dropIndex(name);
-            
+
             setupIndices();
-            
+
         }
-        
+
     }
-    
+
     /**
      * Return the token analyzer to be used for the given language code.
      * 
      * @param languageCode
-     *            The language code or <code>null</code> to use the default {@link Locale}.
+     *            The language code or <code>null</code> to use the default
+     *            {@link Locale}.
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
     protected Analyzer getAnalyzer(String languageCode) {
-        
-        Map<String,AnalyzerConstructor> map = getAnalyzers();
+
+        Map<String, AnalyzerConstructor> map = getAnalyzers();
         
         AnalyzerConstructor ctor = null;
         
@@ -823,9 +824,9 @@ public class FullTextIndex {
              * often want to recognize more differences when generating keys for
              * a B+Tree.
              */
-            
+
             Properties properties = getProperties();
-                        
+
             properties.setProperty(KeyBuilder.Options.STRENGTH, properties
                     .getProperty(Options.INDEXER_COLLATOR_STRENGTH,
                             Options.DEFAULT_INDEXER_COLLATOR_STRENGTH));
@@ -917,7 +918,9 @@ public class FullTextIndex {
 
         }
         
-        log.info("Indexed "+n+" tokens: docId="+docId+", fieldId="+fieldId);
+        if (INFO)
+            log.info("Indexed " + n + " tokens: docId=" + docId + ", fieldId="
+                    + fieldId);
 
     }
     
@@ -972,7 +975,8 @@ public class FullTextIndex {
      * 
      * @return The key.
      */
-    protected byte[] getTokenKey(IKeyBuilder keyBuilder, String termText, boolean successor, long docId, int fieldId) {
+    protected byte[] getTokenKey(IKeyBuilder keyBuilder, String termText,
+            boolean successor, long docId, int fieldId) {
         
         keyBuilder.reset();
 
@@ -1109,7 +1113,7 @@ public class FullTextIndex {
      *            The query (it will be parsed into tokens).
      * @param languageCode
      *            The language code that should be used when tokenizing the
-     *            query (an empty string will be interpreted as the default
+     *            query -or- <code>null</code> to use the default
      *            {@link Locale}).
      * @param minCosine
      *            The minimum cosine that will be returned.
@@ -1117,6 +1121,10 @@ public class FullTextIndex {
      *            The upper bound on the #of hits in the result set.
      * 
      * @return The hit list.
+     * 
+     * @todo there is a upper bound on [maxRank] of 10000 results that is
+     *       currently hard-coded. this could be raised, but at some point the
+     *       evaluate needs to be pruned further.
      * 
      * @todo manage the life of the result sets and perhaps serialize them onto
      *       an index backed by a {@link TemporaryStore}. The fromIndex/toIndex
