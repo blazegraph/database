@@ -33,7 +33,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
-import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Class supports range query across against an unpartitioned index on an

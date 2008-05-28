@@ -620,7 +620,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     }
 
-                    tmp.insert(pmd.getLeftSeparatorKey(), pmd);
+                    tmp.insert(pmd.getLeftSeparatorKey(), SerializerUtil.serialize(pmd));
 
                     log.info("join candidate: " + name);
 

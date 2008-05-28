@@ -96,7 +96,7 @@ public class FusedView implements IIndex {
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(VALS);
+            return new Tuple(srcs[0],VALS);
 
         }
 
@@ -115,7 +115,7 @@ public class FusedView implements IIndex {
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(0);
+            return new Tuple(srcs[0],0);
             
         }
         

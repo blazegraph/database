@@ -396,7 +396,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 //                System.err.println("insert("+key+", "+val+")");
                 SimpleEntry old = expected.put(ikey, val);
                 
-                SimpleEntry old2 = (SimpleEntry) SerializerUtil.deserialize(btree.insert(key, val));
+                SimpleEntry old2 = (SimpleEntry) btree.insert(key, val);
                 
 //                btree.dump(Level.DEBUG,System.err);
                 

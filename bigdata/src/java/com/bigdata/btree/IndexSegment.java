@@ -354,6 +354,16 @@ public class IndexSegment extends AbstractBTree {
     }
 
     /**
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    final public void removeAll() {
+        
+        throw new UnsupportedOperationException(MSG_READ_ONLY);
+        
+    }
+    
+    /**
      * Typesafe method reads the leaf from the backing file given the address of
      * that leaf. This method is suitable for ad-hoc examination of the leaf or
      * for a low-level iterator based on the prior/next leaf addresses.

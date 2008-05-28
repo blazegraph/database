@@ -426,8 +426,7 @@ abstract public class ResourceManager extends OverflowManager implements IResour
      * Note: You MUST use {@link #setConcurrencyManager(IConcurrencyManager)}
      * after calling this constructor (the parameter can not be passed in since
      * there is a circular dependency between the {@link IConcurrencyManager}
-     * and {@link #commit(long)} on this class, which requires access to the
-     * {@link IConcurrencyManager} to submit a task).
+     * and {@link ManagedJournal#getLocalTransactionManager()}.
      * 
      * @param properties
      *            See {@link Options}.

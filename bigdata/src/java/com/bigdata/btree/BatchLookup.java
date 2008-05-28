@@ -108,7 +108,7 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IBatc
 
         }
         
-        return new ResultBuffer(n,ret,ndx.getIndexMetadata().getValueSerializer());
+        return new ResultBuffer(n,ret,ndx.getIndexMetadata().getLeafValueSerializer());
 
     }
 

@@ -432,7 +432,9 @@ public class IsolatedFusedView extends FusedView {
                 0/* capacity */, ALL /* flags */, null);
 
         // tuple for reading from the groundState index.
-        final Tuple groundStateTuple = new Tuple(KEYS | VALS);
+        final Tuple groundStateTuple = new Tuple(
+                (groundState instanceof AbstractBTree ? (AbstractBTree) groundState
+                        : ((FusedView) groundState).getSources()[0]), KEYS | VALS);
 
         while (itr.hasNext()) {
 

@@ -312,7 +312,7 @@ public class NodeSerializer {
 
         this.leafKeySerializer = indexMetadata.getLeafKeySerializer();
 
-        this.valueSerializer = indexMetadata.getValueSerializer();
+        this.valueSerializer = indexMetadata.getLeafValueSerializer();
 
         if (readOnly) {
 

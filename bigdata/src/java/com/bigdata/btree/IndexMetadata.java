@@ -206,7 +206,9 @@ import com.bigdata.sparse.SparseRowStore;
  *       wrapping an {@link AbstractBTree} (or an {@link IIndex}). These might
  *       be written using objects such as described above for converting
  *       application objects to unsigned byte[] keys and application objects
- *       to/from byte[] values.
+ *       to/from byte[] values.  In order to be able to visit the keySet the
+ *       caller must provide a suitable {@link IKeySerializer}.
+ *       <p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -254,10 +256,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private IAddressSerializer addrSer;
     private IDataSerializer nodeKeySer;
     private IDataSerializer leafKeySer;
-    private IDataSerializer valSer;
+    private IDataSerializer leafValSer;
+    private ITupleSerializer tupleSer;
     private IConflictResolver conflictResolver;
-//    private RecordCompressor recordCompressor;
-//    private boolean useChecksum;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
     private double errorRate;
@@ -371,25 +372,56 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     public final IAddressSerializer getAddressSerializer() {return addrSer;}
     
     /**
-     * Object used to (de-)serialize the keys in a node.
+     * Object used to (de-)serialize/(de-)compress the keys in a node.
      * <p>
      * Note: The keys for nodes are separator keys for the leaves. Since they
      * are choosen to be the minimum length separator keys dynamically when a
      * leaf is split or joined the keys in the node typically DO NOT conform to
      * application expectations and are normally assigned a different serializer
      * for that reason.
+     * <p>
+     * Note: This handles the "serialization" of the <code>byte[][]</code>
+     * containing all of the keys for some node of the index. As such it may be
+     * used to provide compression across the already serialized node for the
+     * leaf.
+     * 
+     * @see #getKeySerializer()
      */
     public final IDataSerializer getNodeKeySerializer() {return nodeKeySer;}
     
     /**
-     * The object used to (de-)serialize the keys in a leaf.
+     * The object used to (de-)serialize/(de-)compress the values in a leaf.
+     * <p>
+     * Note: This handles the "serialization" of the <code>byte[][]</code>
+     * containing all of the keys for some leaf of the index. As such it may be
+     * used to provide compression across the already serialized keys in the
+     * leaf.
+     * 
+     * @see #getKeySerializer()
+     */
+    public final IDataSerializer getLeafValueSerializer() {return leafValSer;}
+   
+    /**
+     * The object used to (de-)serialize/(de-)compress the keys in a leaf.
+     * <p>
+     * Note: This handles the "serialization" of the <code>byte[][]</code>
+     * containing all of the values for some leaf of the index. As such it may
+     * be used to provide compression across the already serialized values in
+     * the leaf.
+     * 
+     * @see #getValueSerializer()
      */
     public final IDataSerializer getLeafKeySerializer() {return leafKeySer;}
     
     /**
-     * The object used to (de-)serialize the values in a leaf.
+     * The object form unsigned byte[] keys from Java objects and to
+     * (de-)serialize Java object stored in the index.
+     * <p>
+     * Note: If you NOT change this value in a manner that is not backward
+     * compatable once entries have been written on the index then you will be
+     * unable to any read data already written.
      */
-    public final IDataSerializer getValueSerializer() {return valSer;}
+    public final ITupleSerializer getTupleSerializer() {return tupleSer;}
     
     /**
      * The optional object for handling write-write conflicts.
@@ -409,39 +441,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      */
     public final IConflictResolver getConflictResolver() {return conflictResolver;}
     
-//    /**
-//     * Object that knows how to (de-)compress serialized nodes and leaves
-//     * (optional).
-//     * 
-//     * @deprecated See {@link #setRecordCompressor(RecordCompressor)}
-//     */
-//    public final RecordCompressor getRecordCompressor() {return recordCompressor;}
-//
-//    /**
-//     * When <code>true</code>, checksums will be generated for serialized
-//     * nodes and leaves and verified on read. Checksums provide a check for
-//     * corrupt media and make the database more robust at the expense of some
-//     * added cost to compute a validate the checksums.
-//     * <p>
-//     * Computing the checksum is ~ 40% of the cost of (de-)serialization.
-//     * <p>
-//     * When the backing store is fully buffered (it is entirely in RAM) then
-//     * checksums are automatically disabled.
-//     * 
-//     * @deprecated See {@link #setUseChecksum(boolean)}
-//     */
-//    public final boolean getUseChecksum() {return useChecksum;}
-//    
-//    /**
-//     * 
-//     * @deprecated This will be refactored as a store-level option. See
-//     *             {@link #setRecordCompressor(RecordCompressor)} for more
-//     *             musing on this.
-//     */
-//    public void setUseChecksum(boolean useChecksum) {
-//        this.useChecksum = useChecksum;
-//    }
-
     /**
      * When <code>true</code> the index will write a delete marker when an
      * attempt is made to delete the entry under a key. Delete markers will be
@@ -491,7 +490,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     }
 
     public void setPartitionMetadata(LocalPartitionMetadata pmd) {
+        
         this.pmd = pmd;
+        
     }
 
     public void setAddressSerializer(IAddressSerializer addrSer) {
@@ -521,12 +522,21 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
     }
 
-    public void setValueSerializer(IDataSerializer valueSer) {
+    public void setLeafValueSerializer(IDataSerializer valueSer) {
         
-        if (valSer == null)
+        if (valueSer == null)
             throw new IllegalArgumentException();
 
-        this.valSer = valueSer;
+        this.leafValSer = valueSer;
+        
+    }
+
+    public void setTupleSerializer(ITupleSerializer tupleSer) {
+
+        if (tupleSer == null)
+            throw new IllegalArgumentException();
+
+        this.tupleSer = tupleSer;
         
     }
 
@@ -574,28 +584,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         this.conflictResolver = conflictResolver;
         
     }
-
-//    /**
-//     * 
-//     * @deprecated Use {@link IDataSerializer} to provide custom compression or
-//     *             the keys or values in a btree node via
-//     *             {@link #setNodeKeySerializer(IDataSerializer)},
-//     *             {@link #setLeafKeySerializer(IDataSerializer)}, and
-//     *             {@link #setValueSerializer(IDataSerializer)}.
-//     *             <p>
-//     *             An option is contemplated to provide optional record level
-//     *             compression and optional record level checksums for the store
-//     *             which would replace the use of this record compressor. This
-//     *             would of course break binary compatibilty.
-//     *             <p>
-//     *             The {@link SparseRowStore} already benefits from leading key
-//     *             compression. A value compression for the
-//     *             {@link SparseRowStore} might look for common strings
-//     *             (dictionary based compression).
-//     */
-//    public void setRecordCompressor(RecordCompressor recordCompressor) {
-//        this.recordCompressor = recordCompressor;
-//    }
 
     /**
      * A value in [0:1] that is interpreted as an allowable false positive error
@@ -735,14 +723,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         this.leafKeySer = SimplePrefixSerializer.INSTANCE;
         
-        this.valSer = DefaultDataSerializer.INSTANCE;
+        this.leafValSer = DefaultDataSerializer.INSTANCE;
         
+        this.tupleSer = DefaultTupleSerializer.INSTANCE;
+
         this.conflictResolver = null;
         
-//        this.recordCompressor = null;
-//        
-//        this.useChecksum = false;
-    
         this.deleteMarkers = false;
         
         this.versionTimestamps = false;
@@ -851,7 +837,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
         sb.append(", leafKeySerializer=" + leafKeySer.getClass().getName());
-        sb.append(", valueSerializer=" + valSer.getClass().getName());
+        sb.append(", leafValueSerializer=" + leafValSer.getClass().getName());
+        sb.append(", tupleSerializer=" + tupleSer.getClass().getName());
         sb.append(", conflictResolver="
                 + (conflictResolver == null ? "N/A" : conflictResolver
                         .getClass().getName()));
@@ -913,13 +900,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         leafKeySer = (IDataSerializer)in.readObject();
 
-        valSer = (IDataSerializer)in.readObject();
+        leafValSer = (IDataSerializer)in.readObject();
 
-        conflictResolver = (IConflictResolver)in.readObject();
+        tupleSer = (ITupleSerializer)in.readObject();
         
-//        recordCompressor = (RecordCompressor)in.readObject();
-//        
-//        useChecksum = in.readBoolean();
+        conflictResolver = (IConflictResolver)in.readObject();
         
         deleteMarkers = in.readBoolean();
         
@@ -969,13 +954,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         out.writeObject(leafKeySer);
 
-        out.writeObject(valSer);
+        out.writeObject(leafValSer);
+        
+        out.writeObject(tupleSer);
         
         out.writeObject(conflictResolver);
-
-//        out.writeObject(recordCompressor);
-//        
-//        out.writeBoolean(useChecksum);
 
         out.writeBoolean(deleteMarkers);
         

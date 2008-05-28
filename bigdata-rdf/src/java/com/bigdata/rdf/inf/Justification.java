@@ -760,7 +760,7 @@ public class Justification implements Comparable<Justification> {
             
             metadata.setBranchingFactor(32);
             
-            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+            metadata.setLeafValueSerializer(NoDataSerializer.INSTANCE);
   
             btree = BTree.create(tempStore,metadata);
             

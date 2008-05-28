@@ -42,6 +42,8 @@ import com.bigdata.rawstore.IBlock;
  */
 public class Tuple implements ITuple {
 
+    final private AbstractBTree btree;
+    
     final private int flags;
     
     final private boolean needKeys;
@@ -176,8 +178,8 @@ public class Tuple implements ITuple {
 
     /**
      * Note: The default of <code>false</code> has the correct semantics if
-     * the btree does not support isolation since entries are can not be marked
-     * as deleted unless the index supports isolation.
+     * the btree does not support isolation since isolation requires that both
+     * deleted entries and version timestamps are enabled.
      */
     private boolean versionDeleted = false;
     
@@ -205,7 +207,12 @@ public class Tuple implements ITuple {
         
     }
 
-    public Tuple(int flags) {
+    public Tuple(AbstractBTree btree, int flags) {
+        
+        if (btree == null)
+            throw new IllegalArgumentException();
+        
+        this.btree = btree;
         
         this.flags = flags;
         
@@ -283,6 +290,23 @@ public class Tuple implements ITuple {
         
     }
 
+    public Object getObject() {
+
+        if (versionDeleted) {
+
+            // Visiting a deleted entry.
+            return null;
+            
+        }
+
+        /*
+         * Note: The tuple serializer will see tuples whose value is null.
+         */
+
+        return btree.metadata.getTupleSerializer().deserialize(this);
+        
+    }
+    
     /**
      * @todo Implement. In order to work the tuple needs to know the source
      *       store from which the index entry was read. In the context of a

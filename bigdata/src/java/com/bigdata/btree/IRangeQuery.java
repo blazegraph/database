@@ -63,6 +63,12 @@ public interface IRangeQuery {
     public long rangeCount(byte[] fromKey, byte[] toKey);
 
     /**
+     * Flag specifies no data (the #of scanned index entries matching the optional
+     * filter will still be reported).
+     */
+    public static final int NONE = 0;
+    
+    /**
      * Flag specifies that keys in the key range will be returned. The keys are
      * guarenteed to be made available via {@link ITupleIterator#getKey()} only
      * when this flag is given.
@@ -115,6 +121,31 @@ public interface IRangeQuery {
      */
     public static final int REMOVEALL = 1 << 4;
 
+    /**
+     * Flag specifies that the entries will be visited using a reverse scan. The
+     * first tuple to be visited will be the tuple having the largest key
+     * strictly less than the optional upper bound for the key range. The
+     * iterator will then visit the previous tuple(s) until it has visited the
+     * tuple having the smallest key greater than or equal to the optional lower
+     * bound for the key range.
+     * <p>
+     * This flag may be used to realize a number of interesting constructions,
+     * including atomic operations on the tail of a queue and obtaining the last
+     * key in the key range.
+     * 
+     * FIXME Support for this flag is NOT finished. I am in the process of
+     * reworking the iterators to support this. The {@link IndexSegment} now
+     * supports a fast leaf iterator that can scan forwards and backwards but
+     * the {@link AbstractBTree} uses an iterator based on recursive descent of
+     * the index nodes and which does not support prior/next tuple operations.
+     * The {@link ITupleIterator} or perhaps the {@link ITuple} should allow you
+     * to walk the prior/next tuple. I am also going to support traversal with
+     * concurrent modification (but the writer still needs to be single-threaded
+     * without concurrent readers so this only addresses cases where you are
+     * iterating and also modifying the btree,e.g. using insert()).
+     */
+    public static final int REVERSE = 1 << 5;
+    
     /**
      * The flags that should be used by default ({@link #KEYS},{@link #VALS})
      * in contexts where the flags are not explicitly specified by the

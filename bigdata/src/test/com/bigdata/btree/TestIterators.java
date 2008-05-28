@@ -477,7 +477,7 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // visit everything in the root leaf using an explicit EntryIterator ctor.
         assertSameIterator(new byte[][] { v3, v5, v7 }, new TupleIterator(a,
-                new Tuple(IRangeQuery.DEFAULT), null, null, null));
+                new Tuple(btree,IRangeQuery.DEFAULT), null, null, null));
         
         /*
          * FIXME Exceptions will be thrown for all of these filter tests since

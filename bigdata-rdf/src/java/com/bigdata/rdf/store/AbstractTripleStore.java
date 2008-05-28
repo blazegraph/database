@@ -796,7 +796,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
              * statement indices when statement identifiers are enabled.
              */
 
-            metadata.setValueSerializer(new FastRDFValueCompression());
+            metadata.setLeafValueSerializer(new FastRDFValueCompression());
 
         }
 
@@ -811,7 +811,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         final IndexMetadata metadata = getIndexMetadata(name);
 
-        metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+        metadata.setLeafValueSerializer(NoDataSerializer.INSTANCE);
 
         return metadata;
 
@@ -906,6 +906,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             while (itr.hasNext()) {
 
+                itr.next();
+                
                 n++;
 
             }
@@ -1253,7 +1255,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
             // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
-                    numNotFound, ndx.getIndexMetadata().getValueSerializer());
+                    numNotFound, ndx.getIndexMetadata().getLeafValueSerializer());
 
             // batch lookup
             ndx.submit(0/* fromIndex */, numNotFound/* toIndex */, keys,
@@ -2918,7 +2920,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
                         final ResultBufferHandler resultHandler =
                                 new ResultBufferHandler(keys.length, index
                                         .getIndexMetadata()
-                                        .getValueSerializer());
+                                        .getLeafValueSerializer());
                         // submit the batch contains procedure to the SPO index
                         index.submit(
                                 0/* fromIndex */, keys.length/* toIndex */,

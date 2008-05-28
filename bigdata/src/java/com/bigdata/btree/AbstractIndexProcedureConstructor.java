@@ -17,7 +17,7 @@ public abstract class AbstractIndexProcedureConstructor<T extends IKeyArrayIndex
     /**
      * Uses the {@link IDataSerializer}s reported by
      * {@link IndexMetadata#getLeafKeySerializer()} and
-     * {@link IndexMetadata#getValueSerializer()} for the specified
+     * {@link IndexMetadata#getLeafValueSerializer()} for the specified
      * {@link IIndex}.
      * 
      * @param ndx
@@ -47,7 +47,7 @@ public abstract class AbstractIndexProcedureConstructor<T extends IKeyArrayIndex
     /**
      * Uses the {@link IDataSerializer}s reported by
      * {@link IndexMetadata#getLeafKeySerializer()} and
-     * {@link IndexMetadata#getValueSerializer()}.
+     * {@link IndexMetadata#getLeafValueSerializer()}.
      * 
      * @param indexMetadata
      * @param fromIndex
@@ -60,7 +60,7 @@ public abstract class AbstractIndexProcedureConstructor<T extends IKeyArrayIndex
             byte[][] keys, byte[][] vals) {
         
         return newInstance(indexMetadata.getLeafKeySerializer(),
-                indexMetadata.getValueSerializer(), fromIndex, toIndex, keys, vals);
+                indexMetadata.getLeafValueSerializer(), fromIndex, toIndex, keys, vals);
         
     }
 

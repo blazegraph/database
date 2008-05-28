@@ -299,37 +299,28 @@ public class ResultSet implements Externalizable {
     /**
      * Set automatically based on the {@link IndexMetadata}.
      */
-    private IDataSerializer keySerializer;
+    private IDataSerializer leafKeySerializer;
 
     /**
      * Set automatically based on the {@link IndexMetadata}.
      */
-    private IDataSerializer valSerializer;
+    private IDataSerializer leafValSerializer;
     
-//    /**
-//     * Return the object used to (de-)serialize the keys.
-//     * <p>
-//     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
-//     * be overriden to use custom serialization or compression of the keys.
-//     */
-//    protected IDataSerializer getKeySerializer() {
-//
-//        return new DefaultDataSerializer();
-//
-//    }
-//
-//    /**
-//     * Return the object used to (de-)serialize the values.
-//     * <p>
-//     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
-//     * be overriden to use custom serialization or compression of the values.
-//     */
-//    protected IDataSerializer getValSerializer() {
-//
-//        return new DefaultDataSerializer();
-//
-//    }
-
+    /**
+     * Set automatically based on the {@link IndexMetadata}.
+     */
+    private ITupleSerializer tupleSerializer;
+    
+    /**
+     * The {@link ITupleSerializer} that may be used to de-serialize the tuples
+     * in the {@link ResultSet}.
+     */
+    public ITupleSerializer getTupleSerializer() {
+        
+        return tupleSerializer;
+        
+    }
+    
     /**
      * Return the ordered array of sources from which the iterator read and the
      * {@link ResultSet} was populated.
@@ -394,9 +385,11 @@ public class ResultSet implements Externalizable {
 
         }
 
-        keySerializer = indexMetadata.getLeafKeySerializer();
+        leafKeySerializer = indexMetadata.getLeafKeySerializer();
         
-        valSerializer = indexMetadata.getValueSerializer();
+        leafValSerializer = indexMetadata.getLeafValueSerializer();
+        
+        tupleSerializer = indexMetadata.getTupleSerializer();
         
         sources = ndx.getResourceMetadata();
 
@@ -538,9 +531,11 @@ public class ResultSet implements Externalizable {
 
         }
         
-        keySerializer = (IDataSerializer)in.readObject();
+        leafKeySerializer = (IDataSerializer)in.readObject();
 
-        valSerializer = (IDataSerializer)in.readObject();
+        leafValSerializer = (IDataSerializer)in.readObject();
+        
+        tupleSerializer = (ITupleSerializer)in.readObject();
         
 // if (ntuples == 0) {
 //
@@ -552,14 +547,14 @@ public class ResultSet implements Externalizable {
         
         if (haveKeys) {
             keys = new RandomAccessByteArray( 0, 0, new byte[ntuples][] );
-            keySerializer.read(in, keys);
+            leafKeySerializer.read(in, keys);
         } else {
             keys = null;
         }
 
         if (haveVals) {
             vals = new RandomAccessByteArray(0, 0, new byte[ntuples][]);
-            valSerializer.read(in, vals);
+            leafValSerializer.read(in, vals);
         } else {
             vals = null;
         }
@@ -651,9 +646,11 @@ public class ResultSet implements Externalizable {
 
         }
         
-        out.writeObject(keySerializer);
+        out.writeObject(leafKeySerializer);
 
-        out.writeObject(valSerializer);
+        out.writeObject(leafValSerializer);
+
+        out.writeObject(tupleSerializer);
         
 // if (ntuples == 0) {
 //
@@ -665,13 +662,13 @@ public class ResultSet implements Externalizable {
             
         if (keys != null) {
 
-            keySerializer.write(out, keys);
+            leafKeySerializer.write(out, keys);
             
         }
 
         if (vals != null) {
 
-            valSerializer.write(out, vals);
+            leafValSerializer.write(out, vals);
 
         }
         
