@@ -47,9 +47,9 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IAtomicStore;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
@@ -967,7 +967,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * Private instance used for mutation operations (insert, remove) which are
      * single threaded.
      */
-    protected final Tuple writeTuple = new Tuple(/*KEYS|*/VALS);
+    protected final Tuple writeTuple = new Tuple(this,/*KEYS|*/VALS);
 
     /**
      * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
@@ -978,7 +978,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(VALS);
+            return new Tuple(AbstractBTree.this, VALS);
             
         }
         
@@ -997,27 +997,38 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(0);
+            return new Tuple(AbstractBTree.this, 0);
 
         }
         
     };
     
-    final public byte[] insert(Object key, Object value) {
+    final public Object insert(Object key, Object value) {
 
         if (!(key instanceof byte[])) {
 
-            key = KeyBuilder.asSortKey(key);
+            key = metadata.getTupleSerializer().serializeKey(key);
 
         }
 
         if( !(value instanceof byte[])) {
             
-            value = SerializerUtil.serialize(value);
+            value = metadata.getTupleSerializer().serializeVal(value);
             
         }
         
-        return insert((byte[])key,(byte[])value);
+        final ITuple tuple = insert((byte[]) key, (byte[]) value,
+                false/* delete */, 0L/* timestamp */, writeTuple);
+        
+        if (tuple == null || tuple.isDeletedVersion()) {
+            
+            // There was no old tuple for that key.
+            return null;
+            
+        }
+        
+        // de-serialize the old tuple.
+        return metadata.getTupleSerializer().deserialize(tuple);
         
     }
 
@@ -1085,15 +1096,25 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
-    final public byte[] remove(Object key) {
+    final public Object remove(Object key) {
 
         if (!(key instanceof byte[])) {
 
-            key = KeyBuilder.asSortKey(key);
+            key = metadata.getTupleSerializer().serializeKey(key);
 
         }
         
-        return remove((byte[]) key);
+        final ITuple tuple = remove((byte[]) key, writeTuple);
+
+        if (tuple == null || tuple.isDeletedVersion()) {
+
+            // no old value under that key.
+            return null;
+            
+        }
+
+        // de-serialize the old value under that key.
+        return metadata.getTupleSerializer().deserialize(tuple);
         
     }
 
@@ -1161,15 +1182,34 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
-    public byte[] lookup(Object key) {
+    /**
+     * Remove all entries in the B+Tree.
+     * <p>
+     * Note: The {@link IIndexManager} defines methods for registering (adding)
+     * and dropping indices vs removing the entries in an individual
+     * {@link AbstractBTree}.
+     */
+    abstract public void removeAll();
+    
+    public Object lookup(Object key) {
 
         if (!(key instanceof byte[])) {
 
-            key = KeyBuilder.asSortKey(key);
+            key = metadata.getTupleSerializer().serializeKey(key);
 
         }
 
-        return lookup((byte[])key);
+        final ITuple tuple = lookup((byte[]) key, lookupTuple.get());
+
+        if (tuple == null || tuple.isDeletedVersion()) {
+
+            // no value under that key.
+            return null;
+            
+        }
+
+        // de-serialize the value under that key.
+        return metadata.getTupleSerializer().deserialize(tuple);
 
     }
 
@@ -1221,7 +1261,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         
         if (!(key instanceof byte[])) {
 
-            key = KeyBuilder.asSortKey(key);
+            key = metadata.getTupleSerializer().serializeKey(key);
 
         }
  
@@ -1387,6 +1427,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             int capacity, int flags, ITupleFilter filter) {
 
         counters.nrangeIterator++;
+
+        if ((flags & REVERSE) != 0) {
+            
+            // FIXME The reverse scan option has not been implemented yet.
+            throw new UnsupportedOperationException("Reverse scan is not implemented");
+            
+        }
 
         if ((flags & REMOVEALL) != 0) {
 

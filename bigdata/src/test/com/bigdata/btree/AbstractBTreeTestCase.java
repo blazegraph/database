@@ -505,20 +505,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         return (NoEvictionBTree) BTree.create(store,metadata);
         
-//        BTree btree = new BTree(store, //
-//                branchingFactor, //
-//                UUID.randomUUID(),//
-//                false, //isolatable
-//                null,//conflictResolver
-//                new HardReferenceQueue<PO>(new NoEvictionListener(),
-//                        leafQueueCapacity, nscan),
-//                KeyBufferSerializer.INSTANCE,
-//                ByteArrayValueSerializer.INSTANCE,
-//                null // no record compressor
-//        );
-//
-//        return btree;
-        
     }
     
     /**
@@ -1449,7 +1435,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 //                System.err.println("insert("+key+", "+val+")");
                 SimpleEntry old = expected.put(ikey, val);
                 
-                SimpleEntry old2 = (SimpleEntry) SerializerUtil.deserialize(btree.insert(key, val));
+                SimpleEntry old2 = (SimpleEntry) btree.insert(key, val);
                 
                 assertTrue(btree.dump(Level.ERROR,System.err));
                 

@@ -131,7 +131,7 @@ public class TestAll extends TestCase {
          * isolation package.
          */
         suite.addTestSuite( TestDeleteMarkers.class );
-        
+
         /*
          * test persistence protocols. 
          */
@@ -168,6 +168,12 @@ public class TestAll extends TestCase {
          * test fused views, including iterators for the fused view.
          */
         suite.addTestSuite( TestFusedView.class );
+        
+        /*
+         * test the Map and Set implementations.
+         */
+        suite.addTestSuite( TestBigdataMap.class );
+        suite.addTestSuite( TestBigdataSet.class );
         
         return suite;
         

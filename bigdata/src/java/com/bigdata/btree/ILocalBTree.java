@@ -32,7 +32,9 @@ package com.bigdata.btree;
 /**
  * An interface defining non-batch methods available on a local (non-remote)
  * btree, including method for inserting, removing, lookup, and containment
- * tests where keys and values are implicitly converted to and from byte[]s.
+ * tests where keys and values are implicitly converted to and from byte[]s
+ * using the {@link ITupleSerializer} configured on the {@link IndexMetadata}
+ * object for the index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -44,34 +46,41 @@ public interface ILocalBTree extends ILinearList {
      * 
      * @param key
      *            The key - when not a byte[] the key is implicitly converted to
-     *            a byte[] using {@link KeyBuilder#asSortKey(Object)}
+     *            an <strong>unsigned</strong> byte[] the
+     *            {@link ITupleSerializer} configured on the
+     *            {@link IndexMetadata} for this index.
      * @param value
      *            The value - when not a byte[] the value is converted to a
-     *            byte[] using Java standard serialization.
+     *            byte[] using the {@link ITupleSerializer} configured on the
+     *            {@link IndexMetadata} for this index.
      * 
-     * @return The old value, if any. The application MUST de-serialize the
-     *         byte[] if they are storing objects.
+     * @return The de-serialized old value -or- <code>null</code> if there was no
+     * value stored under that key.
      */
-    public byte[] insert(Object key, Object value);
+    public Object insert(Object key, Object value);
     
     /**
      * Lookup a value for a key.
      * 
      * @param key
      *            The key - when not a byte[] the key is implicitly converted to
-     *            a byte[] using {@link KeyBuilder#asSortKey(Object)}
-     *            
-     * @return The value or <code>null</code> if there is no entry for that
+     *            an <strong>unsigned</strong> byte[] the
+     *            {@link ITupleSerializer} configured on the
+     *            {@link IndexMetadata} for this index.
+     * 
+     * @return The de-serialized value or <code>null</code> if there is no entry for that
      *         key.
      */
-    public byte[] lookup(Object key);
+    public Object lookup(Object key);
 
     /**
      * Return true iff there is an entry for the key.
      * 
      * @param key
      *            The key - when not a byte[] the key is implicitly converted to
-     *            a byte[] using {@link KeyBuilder#asSortKey(Object)}
+     *            an <strong>unsigned</strong> byte[] the
+     *            {@link ITupleSerializer} configured on the
+     *            {@link IndexMetadata} for this index.
      * 
      * @return True if the btree contains an entry for that key.
      */
@@ -82,11 +91,13 @@ public interface ILocalBTree extends ILinearList {
      * 
      * @param key
      *            The key - when not a byte[] the key is implicitly converted to
-     *            a byte[] using {@link KeyBuilder#asSortKey(Object)}
+     *            an <strong>unsigned</strong> byte[] the
+     *            {@link ITupleSerializer} configured on the
+     *            {@link IndexMetadata} for this index.
      * 
-     * @return The value stored under that key or <code>null</code> if the key
-     *         was not found.
+     * @return The de-serialized value stored under that key or
+     *         <code>null</code> if the key was not found.
      */
-    public byte[] remove(Object key);
+    public Object remove(Object key);
 
 }

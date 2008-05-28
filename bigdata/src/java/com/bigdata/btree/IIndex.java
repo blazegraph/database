@@ -62,15 +62,8 @@ public interface IIndex extends ISimpleBTree {
      */
     public ICounter getCounter();
     
-//    /**
-//     * Interesting statistics about the index.
-//     * 
-//     * @deprecated by #getCounters().
-//     */
-//    public String getStatistics();
-    
     /**
-     * Interesting statistics about the index.
+     * Interesting performance counters and other statistics about the index.
      */
     public ICounterSet getCounters();
     

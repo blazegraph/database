@@ -443,7 +443,7 @@ abstract public class AbstractKeyArrayIndexProcedure implements
          * @param valSer
          *            The data are serialized using using this object. Typically
          *            this is the value returned by
-         *            {@link IndexMetadata#getValueSerializer()}.
+         *            {@link IndexMetadata#getLeafValueSerializer()}.
          */
         public ResultBuffer(int n, byte[][] a, IDataSerializer valSer) {
 

@@ -205,7 +205,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
         if (returnOldValues) {
 
             return new ResultBuffer(n, ret, ndx.getIndexMetadata()
-                    .getValueSerializer());
+                    .getLeafValueSerializer());
 
         }
 

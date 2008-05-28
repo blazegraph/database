@@ -113,4 +113,8 @@ public class DelegateTuple implements ITuple {
         return delegate.readBlock(addr);
     }
     
+    public Object getObject() {
+        return delegate.getObject();
+    }
+    
 }

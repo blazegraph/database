@@ -59,7 +59,7 @@ public class TupleIterator implements ITupleIterator {
 
     public TupleIterator(Leaf leaf) {
 
-        this(leaf, new Tuple(IRangeQuery.DEFAULT), null, null, null);
+        this(leaf, new Tuple(leaf.btree,IRangeQuery.DEFAULT), null, null, null);
 
     }
 
@@ -249,7 +249,7 @@ public class TupleIterator implements ITupleIterator {
                 if (tmp == null) {
 
                     // temp tuple copies all available data about the index entry.
-                    tmp = new Tuple(IRangeQuery.KEYS|IRangeQuery.VALS);
+                    tmp = new Tuple(leaf.btree,IRangeQuery.KEYS|IRangeQuery.VALS);
 
                 }
                 

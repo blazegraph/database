@@ -189,7 +189,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
         
         if (returnOldValues) {
             
-            return new ResultBuffer(n,ret,ndx.getIndexMetadata().getValueSerializer());
+            return new ResultBuffer(n,ret,ndx.getIndexMetadata().getLeafValueSerializer());
             
         }
         

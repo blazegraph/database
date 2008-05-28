@@ -84,6 +84,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -1734,6 +1735,15 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     public abstract IConcurrencyManager getConcurrencyManager();
 
+    public abstract void setConcurrencyManager(IConcurrencyManager concurrencyManager);
+    
+    /**
+     * Declaration allows access to the {@link IMetadataService}.  The method is also
+     * declared by {@link IResourceManager} and is implemented by concrete instances of
+     * the {@link ResourceManager} class. 
+     */
+    public abstract IMetadataService getMetadataService();
+    
     /**
      * Implementation designed to use a shared {@link ConcurrencyManager}.
      * 
@@ -1767,6 +1777,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
+        public IMetadataService getMetadataService() {
+            
+            return getMetadataService();
+            
+        }
+        
     }
 
     /**

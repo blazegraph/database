@@ -177,6 +177,15 @@ public interface ITuple {
      * to {@link #getValue()}.
      */
     public DataInputBuffer getValueStream();
+
+    /**
+     * De-serializes the object from the key and/or value.
+     * 
+     * @return The de-serialized object.
+     * 
+     * @see ITupleSerializer#deserialize(ITuple)
+     */
+    public Object getObject();
     
     /**
      * Return an object that may be used to perform a streaming read of a large

@@ -617,7 +617,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int flags, ITupleFilter filter) {
 
-        return new PostOrderEntryIterator(postOrderIterator(fromKey, toKey),
+        return new PostOrderEntryIterator(btree,postOrderIterator(fromKey, toKey),
                 fromKey, toKey, flags, filter);
 
     }
@@ -663,7 +663,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     private static class PostOrderEntryIterator implements ITupleIterator {
         
         private final Tuple tuple;
-        
         private final IStriterator src;
 
         public boolean hasNext() {
@@ -686,13 +685,13 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             
         }
         
-        public PostOrderEntryIterator(Iterator postOrderNodeIterator,
-                final byte[] fromKey, final byte[] toKey, int flags,
-                final ITupleFilter filter) {
+        public PostOrderEntryIterator(AbstractBTree btree,
+                Iterator postOrderNodeIterator, final byte[] fromKey,
+                final byte[] toKey, int flags, final ITupleFilter filter) {
             
             assert postOrderNodeIterator != null;
             
-            this.tuple = new Tuple(flags);
+            this.tuple = new Tuple(btree,flags);
             
             this.src = new Striterator(postOrderNodeIterator);
             

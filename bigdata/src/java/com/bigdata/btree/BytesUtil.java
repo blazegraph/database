@@ -154,7 +154,8 @@ public class BytesUtil {
      * @param b
      *            Another byte[].
      * 
-     * @return If the two arrays have the same data.
+     * @return If the two arrays have the same reference (including
+     *         <code>null</code>) or if they have the same data.
      */
     final public static boolean bytesEqual(final byte[] a, final byte[] b) {
 

@@ -387,8 +387,10 @@ public class TestTx extends ProxyTestCase {
             // check the version timestamp in the unisolated index.
             {
 
-                ITuple tuple = ((BTree) journal.getIndex(name)).lookup(k1,
-                        new Tuple(IRangeQuery.ALL));
+                BTree btree = ((BTree) journal.getIndex(name));
+                
+                ITuple tuple = btree.lookup(k1, new Tuple(btree,
+                        IRangeQuery.ALL));
                 
                 assertNotNull(tuple);
                 
@@ -412,8 +414,10 @@ public class TestTx extends ProxyTestCase {
                 IsolatedFusedView isolatedView = (IsolatedFusedView) journal
                         .getIndex(name, tx2);
 
-                Tuple tuple = ((BTree) journal.getIndex(name)).lookup(k1,
-                        new Tuple(IRangeQuery.ALL));
+                BTree btree = ((BTree) journal.getIndex(name));
+                
+                Tuple tuple = btree.lookup(k1,
+                        new Tuple(btree,IRangeQuery.ALL));
 
                 tuple = isolatedView.getWriteSet().lookup(k1, tuple);
 

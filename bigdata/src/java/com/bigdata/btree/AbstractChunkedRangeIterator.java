@@ -532,17 +532,6 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
             
         }
         
-//        public DataInputBuffer getKeyStream() {
-//            byte[] key = getKey();
-//            if (keyStream == null) {
-//                keyStream = new DataInputBuffer(key);
-//            } else {
-//                keyStream.setBuffer(key);
-//            }
-//            return keyStream;
-//        }
-//        private DataInputBuffer keyStream = null;
-
         public byte[] getValue() {
 
             if (lastVisited == -1)
@@ -599,31 +588,15 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
             
         }
         
-//        public ByteArrayBuffer getValueBuffer() {
-//
-//            final byte[] val = getValue();
-//            
-//            if (val == null)
-//                throw new UnsupportedOperationException();
-//
-//            return new ByteArrayBuffer(val);
-//
-//        }
-//
-//        public DataInputBuffer getValueStream() {
-//            byte[] val = getValue();
-//            if (val == null)
-//                throw new UnsupportedOperationException();
-//            if (valStream == null) {
-//                valStream = new DataInputBuffer(val);
-//            } else {
-//                valStream.setBuffer(val);
-//            }
-//            return valStream;
-//        }
-//
-//        private DataInputBuffer valStream = null;
+        public Object getObject() {
+            
+            if (lastVisited == -1)
+                throw new IllegalStateException();
 
+            return rset.getTupleSerializer().deserialize(this); 
+            
+        }
+        
         public long getVersionTimestamp() {
 
             if (lastVisited == -1)
