@@ -28,6 +28,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 
 import com.bigdata.btree.IKeyBuilder;
@@ -36,13 +37,11 @@ import com.bigdata.btree.SuccessorUtil;
 
 /**
  * A schema for a sparse row store. Note that more than one schema may be used
- * with the same index. The name of the schema is always encoded as the
+ * with the same index. The name of the schema is always encoded as the first
  * component of the key.
  * 
  * @todo support optional strong typing for column values?
  * @todo support optional required columns?
- * @todo verify schema name primary key names are legit (column and schema name
- *       checker utility).
  */
 public class Schema implements Externalizable {
     
@@ -70,10 +69,11 @@ public class Schema implements Externalizable {
      * @param primaryKey
      *            The name of the column whose value is the (application
      *            defined) primary key.
-     * 
      * @param primaryKeyType
+     *            The data type for the primary key.
      */
-    public Schema(String name, String primaryKey, KeyType primaryKeyType) {
+    public Schema(final String name, final String primaryKey,
+            final KeyType primaryKeyType) {
 
         NameChecker.assertSchemaName(name);
         
@@ -87,9 +87,9 @@ public class Schema implements Externalizable {
         this.primaryKey = primaryKey;
         
         this.primaryKeyType = primaryKeyType;
-
-        // one time encoding of the name of the schema.
-        schemaBytes = KeyBuilder.asSortKey(name);
+        
+        // eager computation of the encoded scheme name.
+        getSchemaBytes();
 
     }
 
@@ -126,18 +126,30 @@ public class Schema implements Externalizable {
      */
     final protected byte[] getSchemaBytes() {
 
+        if (schemaBytes == null) {
+
+            /*
+             * One time encoding of the schema name as a Unicode sort key.
+             */
+        
+            schemaBytes = KeyBuilder.asSortKey(name);
+            
+//            schemaBytes = KeyBuilder.newInstance().append(name).append("\0").getKey();
+
+        }
+        
         return schemaBytes;
 
     }
  
-    /**
-     * The length of the value that will be returned by {@link #getSchemaBytes()}
-     */
-    final protected int getSchemaBytesLength() {
-
-        return schemaBytes.length;
-        
-    }
+//    /**
+//     * The length of the value that will be returned by {@link #getSchemaBytes()}
+//     */
+//    final protected int getSchemaBytesLength() {
+//
+//        return getSchemaBytes().length;
+//        
+//    }
 
     /*
      * Key builder stuff.
@@ -146,6 +158,10 @@ public class Schema implements Externalizable {
     /**
      * Helper method appends a typed value to the compound key (this is used to
      * get the primary key into the compound key).
+     * <p>
+     * Note: This automatically appends the <code>nul</code> terminator byte
+     * if {@link KeyType#isFixedLength()} is <code>false</code>. That byte
+     * flags the end of the primary key for variable length primary keys.
      * 
      * @param keyType
      *            The target data type.
@@ -154,15 +170,7 @@ public class Schema implements Externalizable {
      * 
      * @return The {@link #keyBuilder}.
      * 
-     * @todo support variable length byte[]s as a primary key type.
-     * 
-     * FIXME Verify that variable length primary keys do not cause problems in
-     * the total ordering. Do we need a code (e.g., nul nul) that never occurs
-     * in a valid primary key when the primary key can vary in length? The
-     * problem occurs when the column name could become confused with the
-     * primary key in comparisons owing to the lack of an unambiguous delimiter
-     * and a variable length primary key. Another approach is to fill the
-     * variable length primary key to a set length...
+     * @see KeyDecoder
      */
     final protected IKeyBuilder appendPrimaryKey(IKeyBuilder keyBuilder, Object v, boolean successor) {
         
@@ -181,9 +189,9 @@ public class Schema implements Externalizable {
             case Double:
                 return keyBuilder.append(successor(keyBuilder,((Number) v).doubleValue()));
             case Unicode:
-                return keyBuilder.appendText(v.toString(), true/*unicode*/, true/*successor*/);
+                return keyBuilder.appendText(v.toString(), true/*unicode*/, true/*successor*/).appendNul();
             case ASCII:
-                return keyBuilder.appendText(v.toString(), false/*unicode*/, true/*successor*/);
+                return keyBuilder.appendText(v.toString(), false/*unicode*/, true/*successor*/).appendNul();
             case Date:
                 return keyBuilder.append(successor(keyBuilder,((Date) v).getTime()));
             }
@@ -201,9 +209,9 @@ public class Schema implements Externalizable {
             case Double:
                 return keyBuilder.append(((Number) v).doubleValue());
             case Unicode:
-                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/);
+                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/).appendNul();
             case ASCII:
-                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/);
+                return keyBuilder.appendText(v.toString(),false/*unicode*/,false/*successor*/).appendNul();
             case Date:
                 return keyBuilder.append(((Date) v).getTime());
             }
@@ -268,6 +276,8 @@ public class Schema implements Externalizable {
      * 
      * @return The {@link #keyBuilder}, which will have the schema and the
      *         primary key already formatted in its buffer.
+     * 
+     * @see KeyDecoder
      */
     final protected IKeyBuilder fromKey(IKeyBuilder keyBuilder,Object primaryKey) {
         
@@ -275,39 +285,114 @@ public class Schema implements Externalizable {
 
         // append the (encoded) schema name.
         keyBuilder.append(getSchemaBytes());
-        
-        // append the (encoded) primary key.
-        appendPrimaryKey(keyBuilder,primaryKey,false/*successor*/);
+        keyBuilder.append(primaryKeyType.getByteCode());
+        keyBuilder.appendNul();
+
+        if (primaryKey != null) {
+
+            // append the (encoded) primary key.
+            appendPrimaryKey(keyBuilder, primaryKey, false/* successor */);
+
+        }
         
         return keyBuilder;
 
     }
+
+    /*
+     * Note: use SuccessorUtil.successor(key.clone()) instead.
+     */
+    
+//    /**
+//     * Forms the key in {@link #keyBuilder} that should be used as the last key
+//     * (exclusive) for a range query that will visit all index entries for the
+//     * specified primary key.
+//     * 
+//     * @param primaryKey
+//     *            The primary key.
+//     * 
+//     * @return The {@link #keyBuilder}, which will have the schema and the
+//     *         successor of the primary key already formatted in its buffer.
+//     * 
+//     * @see KeyDecoder
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if either argument is <code>null</code>.
+//     */
+//    final protected IKeyBuilder toKey(IKeyBuilder keyBuilder, Object primaryKey) {
+//
+//        if (primaryKey == null)
+//            throw new IllegalArgumentException();
+//        
+//        keyBuilder.reset();
+//
+//        // append the (encoded) schema name.
+//        keyBuilder.append(getSchemaBytes());
+//        keyBuilder.append(primaryKeyType.getByteCode());
+//        keyBuilder.appendNul();
+//
+//        // append successor of the (encoded) primary key.
+//        appendPrimaryKey(keyBuilder, primaryKey, true/* successor */);
+//
+//        return keyBuilder;
+//
+//    }
 
     /**
-     * Forms the key in {@link #keyBuilder} that should be used as the last key
-     * (exclusive) for a range query that will visit all index entries for the
-     * specified primary key.
+     * Encodes a key for the {@link Schema}.
      * 
+     * @param keyBuilder
      * @param primaryKey
-     *            The primary key.
+     *            The primary key for the logical row (required).
+     * @param col
+     *            The column name (required).
+     * @param timestamp
+     *            The timestamp (required).
      * 
-     * @return The {@link #keyBuilder}, which will have the schema and the
-     *         successor of the primary key already formatted in its buffer.
+     * @return The encoded key.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>keyBuilder</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>primaryKey</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>col</i> is not valid as the name of a column.
      */
-    final protected IKeyBuilder toKey(IKeyBuilder keyBuilder,Object primaryKey) {
+    public byte[] getKey(IKeyBuilder keyBuilder, Object primaryKey, String col,
+            long timestamp) {
+
+        if (keyBuilder == null)
+            throw new IllegalArgumentException();
+
+        if (primaryKey == null)
+            throw new IllegalArgumentException();
         
-        keyBuilder.reset();
+        NameChecker.assertColumnName(col);
+        
+        // encode the schema name and the primary key.
+        fromKey(keyBuilder, primaryKey);
 
-        // append the (encoded) schema name.
-        keyBuilder.append(getSchemaBytes());
+        /*
+         * The column name. Note that the column name is NOT stored with Unicode
+         * compression so that we can decode it without loss.
+         */
+        try {
 
-        // append successor of the (encoded) primary key.
-        appendPrimaryKey(keyBuilder,primaryKey, true/*successor*/);
+            keyBuilder.append(col.getBytes(SparseRowStore.UTF8)).appendNul();
+            
+        } catch(UnsupportedEncodingException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+        keyBuilder.append(timestamp);
 
-        return keyBuilder;
+        final byte[] key = keyBuilder.getKey();
+        
+        return key;
 
     }
-
     
     private final transient short VERSION0 = 0x0;
     
@@ -322,11 +407,11 @@ public class Schema implements Externalizable {
 
         primaryKey = in.readUTF();
         
-        primaryKeyType = (KeyType) in.readObject();
+        primaryKeyType = KeyType.getKeyType(in.readByte());
         
-        // one time encoding of the name of the schema.
-        schemaBytes = KeyBuilder.asSortKey(name);
-        
+        // eager computation of the encoded scheme name.
+        getSchemaBytes();
+
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
@@ -337,7 +422,7 @@ public class Schema implements Externalizable {
         
         out.writeUTF(primaryKey);
         
-        out.writeObject(primaryKeyType);
+        out.writeByte(primaryKeyType.getByteCode());
         
     }
     

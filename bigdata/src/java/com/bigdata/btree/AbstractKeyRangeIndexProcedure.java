@@ -40,8 +40,9 @@ import com.bigdata.mdi.ISeparatorKeys;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractKeyRangeIndexProcedure implements
-        IKeyRangeIndexProcedure, Externalizable {
+abstract public class AbstractKeyRangeIndexProcedure extends
+        AbstractIndexProcedure implements IKeyRangeIndexProcedure,
+        Externalizable {
 
     protected byte[] fromKey;
 

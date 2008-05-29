@@ -72,8 +72,9 @@ import com.bigdata.service.Split;
 // * 
 // *    &lt;R, H extends IResultHandler&lt;R, A&gt;, A&gt;
 // * </pre>
-abstract public class AbstractKeyArrayIndexProcedure implements
-        IKeyArrayIndexProcedure, Externalizable {
+abstract public class AbstractKeyArrayIndexProcedure extends
+        AbstractIndexProcedure implements IKeyArrayIndexProcedure,
+        Externalizable {
 
     protected static final Logger log = Logger.getLogger(AbstractKeyArrayIndexProcedure.class);
     

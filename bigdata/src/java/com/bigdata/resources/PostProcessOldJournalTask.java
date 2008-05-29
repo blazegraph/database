@@ -40,7 +40,6 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.AbstractBufferStrategyTestCase;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
@@ -1231,6 +1230,27 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * forcing transactions to abort.
      * 
      * FIXME codify the suggestions when nearing DISK exhaustion into code.
+     * 
+     * FIXME add partial build whose source is just the checkpoint record
+     * corresponding to the lastCommitTime of the BTree on the old journal. This
+     * can be much faster to build that a full view since the latter includes
+     * all data in the index (partition). The index segment should be modified
+     * to flag full vs partial builds and also to indicate the source for the
+     * build (the view definition) in order to facilitate re-builds of scale-out
+     * indices from their component files.
+     * 
+     * FIXME modify move to be a (full or partial) build followed by a copy of
+     * the index segment(s) in the view to the target data service and finally
+     * followed by the atomic update, which will copy over any tuples that have
+     * been buffered on the live journal. Assuming that it is more expensive to
+     * do copy all tuples individually (even in batch) then should reduce the
+     * cost of the move. Try it out both ways.
+     * 
+     * FIXME limit the #of full builds choosing partial builds instead. Full
+     * builds could be choosen instead when the #of index segments is greater
+     * than some parameter ~ 5. Full builds will also reduce the amount of data
+     * transferred for a move (there will be less overwritten tuples) but will
+     * incur more latency for the build.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 

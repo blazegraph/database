@@ -33,6 +33,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.sparse.AtomicRowScan.TPSList;
 
 /**
  * A client-side class that knows how to use an {@link IIndex} to provide an
@@ -135,13 +136,11 @@ import com.bigdata.journal.ITimestampService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * FIXME write a REST service using Json to interchange data with the
+ * {@link SparseRowStore}
+ * 
  * @todo add an atomic delete for all current property values as of a called
  *       given timestamp?
- * 
- * @todo We do not have a means to decode a primary key that is Unicode (or
- *       variable length) ??? Is this true ???
- * 
- * @todo support byte[] as a primary key type.
  * 
  * @todo I am not sure that the timestamp filtering mechanism is of much use.
  *       You can't really filter out the low end for a property value since a
@@ -208,7 +207,7 @@ public class SparseRowStore {
     public static final long AUTO_TIMESTAMP_UNIQUE = 0L;
 
     /**
-     * Create a client-side abstraction that treats and {@link IIndex} as a
+     * Create a client-side abstraction that treats an {@link IIndex} as a
      * {@link SparseRowStore}.
      * 
      * @param ndx
@@ -296,27 +295,6 @@ public class SparseRowStore {
         final AtomicRead proc = new AtomicRead(schema, primaryKey, timestamp,
                 filter);
         
-//        if(ndx instanceof ClientIndexView) {
-//
-//            /*
-//             * Remote index.
-//             */
-//
-//            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
-//
-//            // Submit the atomic read operation.
-//            return (TPS) ((ClientIndexView)ndx).submit(key, proc);
-//
-//        } else {
-//
-//            /*
-//             * Local index.
-//             */
-//            
-//            return (ITPS) proc.apply(ndx);
-//            
-//        }
-
         final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
 
         // Submit the atomic read operation.
@@ -425,28 +403,6 @@ public class SparseRowStore {
         final AtomicWriteRead proc = new AtomicWriteRead(schema, propertySet,
                 timestamp, filter);
         
-//        if(ndx instanceof ClientIndexView) {
-//
-//            /*
-//             * Remote index.
-//             */
-//
-//            final Object primaryKey = propertySet.get(schema.getPrimaryKey());
-//
-//            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
-//
-//            return (TPS) ((ClientIndexView) ndx).submit(key, proc);
-//
-//        } else {
-//
-//            /*
-//             * Local index.
-//             */
-//            
-//            return (ITPS) proc.apply(ndx);
-//            
-//        }
-
         final Object primaryKey = propertySet.get(schema.getPrimaryKey());
 
         final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
@@ -456,7 +412,9 @@ public class SparseRowStore {
     }
 
     /**
-     * A logical row scan.
+     * A logical row scan. Each logical row will be read atomically. More than
+     * one logical row MAY be read in a single atomic operation but that is not
+     * guarenteed.
      * 
      * @param keyBuilder
      *            An object used to build keys for the backing index.
@@ -472,7 +430,9 @@ public class SparseRowStore {
      *            bound.
      * @param capacity
      *            When non-zero, this is the maximum #of logical rows that will
-     *            be buffered.
+     *            be read atomically. This is only an upper bound. The actual
+     *            #of logical rows in an atomic read depends on a variety of
+     *            factors.
      * @param timestamp
      *            The property values whose timestamp is larger than this value
      *            will be ignored (i.e., the maximum timestamp that will be
@@ -482,23 +442,72 @@ public class SparseRowStore {
      *            An optional filter used to select the property(s) of interest.
      * 
      * @return An iterator visiting each logical row in the specified key range.
-     * 
-     * FIXME implement logical row scan. This may require a modification to how
-     * we do key range scans since each logical row read needs to be atomic.
-     * While rows will not be split across index partitions, it is possible that
-     * the iterator would otherwise stop when it had N index entries rather than
-     * N logical rows, thereby requiring a restart of the iterator from the
-     * successor of the last fully read logical row. One way to handle that is
-     * to make the limit a function that can be interpreted on the data service
-     * in terms of index entries or some other abstraction -- in this case the
-     * #of logical rows. (A logical row ends when the primary key changes.)
      */
-    public Iterator<ITPS> rangeQuery(IKeyBuilder keyBuilder, Schema schema,
+    public Iterator<? extends ITPS> rangeQuery(IKeyBuilder keyBuilder, Schema schema,
             Object fromKey, Object toKey, int capacity, long timestamp,
             INameFilter filter) {
         
-        throw new UnsupportedOperationException();
+        if (keyBuilder == null)
+            throw new IllegalArgumentException();
+
+        if (fromKey != null) {
+
+           // convert to an unsigned byte[].
+            fromKey = schema.fromKey(keyBuilder, fromKey).getKey();
+        }
+
+        if (toKey != null) {
+
+            // convert to an unsigned byte[].
+            toKey = schema.fromKey(keyBuilder, toKey).getKey();
+            
+        }
+
+        AtomicRowScan proc = new AtomicRowScan(schema, (byte[]) fromKey,
+                (byte[]) toKey, timestamp, filter, capacity);
+
+        /*
+         * FIXME This is how it needs to be invoked to be mapped across more
+         * than one index partition.
+         */
+//        ndx.submit((byte[]) fromKey, (byte[]) toKey, proc, null/* resultHandler */);
+        /*
+         * FIXME This is forcing a direct call on a local index and will fail if
+         * the index is remote, etc. I am just doing this to test the procedure
+         * logic.
+         */
+        final TPSList results = proc.apply(ndx);
+        
+        return results.iterator();
         
     }
-        
+
+    /**
+     * A logical row scan. Each logical row will be read atomically. More than
+     * one logical row MAY be read in a single atomic operation but that is not
+     * guarenteed.
+     * 
+     * @param keyBuilder
+     *            An object used to build keys for the backing index.
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param fromKey
+     *            The value of the primary key for lower bound (inclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * @param toKey
+     *            The value of the primary key for upper bound (exclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * 
+     * @return An iterator visiting each logical row in the specified key range.
+     */
+    public Iterator<? extends ITPS> rangeQuery(IKeyBuilder keyBuilder, Schema schema,
+            Object fromKey, Object toKey) {
+
+        return rangeQuery(keyBuilder, schema, fromKey, toKey, 0/* capacity */,
+                MAX_TIMESTAMP, null/*filter*/);
+
+    }
+
 }
