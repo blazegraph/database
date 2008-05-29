@@ -30,6 +30,7 @@ package com.bigdata.sparse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
@@ -39,18 +40,16 @@ import java.util.Vector;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.repo.BigdataRepository;
-import com.bigdata.service.DataService;
 import com.bigdata.util.CSVReader;
 
 /**
@@ -67,8 +66,6 @@ import com.bigdata.util.CSVReader;
  * @todo test read of historical revision (1st, nth, last).
  * 
  * @todo test history policy (expunging of entries).
- * 
- * @todo verify atomic read/write/scan of rows
  * 
  * @todo specialized compression for the keys using knowledge of schema and
  *       column names? can we directly produce a compressed representation that
@@ -136,15 +133,9 @@ public class TestSparseRowStore extends TestCase2 {
      * 
      * @todo Make this into a utility class.
      * 
-     * @todo Allow the caller to specify either a column name that will be the
-     *       timestamp or the use of an auto-timestamping mechanism on the
-     *       server.
-     * 
      * @todo Only store the difference between the last "row" and the current
      *       "row" for a given primary key. This MUST be done on the server in
      *       order for the difference operation to be atomic.
-     * 
-     * @todo Generalize filters and use on {@link BTree} and {@link DataService}.
      * 
      * @throws IOException
      */
@@ -237,20 +228,10 @@ public class TestSparseRowStore extends TestCase2 {
 
         /*
          * Dump the data in the index.
-         *
-         * @todo make this a utility method on the sparse row store if I can solve
-         * the general problem of locating the column name.
          */
         {
             
             ITupleIterator itr = btree.entryIterator();
-
-            /*
-             * @todo this is tricky and hardcoded. we lack a general solution to
-             * locate the column name in the key.
-             */
-            final int offsetColumnName = schema.getSchemaBytesLength()
-                    + Bytes.SIZEOF_LONG; 
             
             while(itr.hasNext()) {
             
@@ -260,10 +241,11 @@ public class TestSparseRowStore extends TestCase2 {
                 
                 final byte[] key = tuple.getKey();
 
-                KeyDecoder keyDecoder = new KeyDecoder(schema,key,offsetColumnName);
+                KeyDecoder keyDecoder = new KeyDecoder(key);
                 
-                System.err.println(keyDecoder.col + "=" + ValueType.decode(val)
-                        + " (" + keyDecoder.timestamp + ")");
+                log.info(keyDecoder.getColumnName() + "="
+                        + ValueType.decode(val) + " (" + keyDecoder.timestamp
+                        + ")");
                 
             }
             
@@ -326,7 +308,288 @@ public class TestSparseRowStore extends TestCase2 {
         assertNull(srs.read(keyBuilder,schema,Long.valueOf(0L)));
         
     }
+
+    /**
+     * Simple test of write and read back of logical rows.
+     */
+    public void test_readWrite() {
+         
+        final Schema schema = new Schema("Employee", "Id", KeyType.Long);
+
+        SparseRowStore srs = new SparseRowStore(btree);
+
+        {
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 1L);
+            propertySet.put("Name", "Bryan");
+            propertySet.put("State", "NC");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        {
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 2L);
+            propertySet.put("Name", "Mike");
+            propertySet.put("State", "UT");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        {
+            
+            final Map<String,Object> row = srs.read(keyBuilder, schema, 1L);
+
+            assertTrue( row != null );
+            
+            assertEquals( 1L, row.get("Id") );
+            assertEquals( "Bryan", row.get("Name"));
+            assertEquals( "NC", row.get("State"));
+            
+        }
+        
+        {
+            
+            final Map<String,Object> row = srs.read(keyBuilder, schema, 2L);
+         
+            assertTrue( row != null );
+            
+            assertEquals( 2L, row.get("Id") );
+            assertEquals( "Mike", row.get("Name"));
+            assertEquals( "UT", row.get("State"));
+            
+        }
+
+    }
+
+    /**
+     * Test of a logical row scan.
+     * 
+     * @todo Write a variant in which we test with multiple index partitions to
+     *       verify that the {@link AtomicRowScan} is correctly mapped across
+     *       the various index partitions.
+     */
+    public void test_rowScan() {
+     
+        final Schema schema = new Schema("Employee","Id",KeyType.Long);
+        
+        SparseRowStore srs = new SparseRowStore(btree);
+        
+        {
+            
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 1L);
+            propertySet.put("Name", "Bryan");
+            propertySet.put("State", "NC");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        {
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 2L);
+            propertySet.put("Name", "Mike");
+            propertySet.put("State", "UT");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+                null/* fromKey */, null/* toKey */);
+        
+        {
+            
+            assertTrue(itr.hasNext());
+
+            final ITPS tps = itr.next();
+         
+            assertTrue( tps != null );
+            
+            assertEquals(1L, tps.get("Id").getValue());
+            assertEquals("Bryan", tps.get("Name").getValue());
+            assertEquals("NC", tps.get("State").getValue());
+            
+        }
+        
+        {
+            
+            assertTrue(itr.hasNext());
+
+            final ITPS tps = itr.next();
+         
+            assertTrue( tps != null );
+            
+            assertEquals(2L, tps.get("Id").getValue());
+            assertEquals("Mike", tps.get("Name").getValue());
+            assertEquals("UT", tps.get("State").getValue());
+            
+        }
+
+        assertFalse(itr.hasNext());
+        
+    }
     
+    /**
+     * Test of a logical row scan using a key range limit.
+     */
+    public void test_rowScan_withKeyRange() {
+     
+        final Schema schema = new Schema("Employee","Id",KeyType.Long);
+        
+        SparseRowStore srs = new SparseRowStore(btree);
+        
+        {
+            
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 1L);
+            propertySet.put("Name", "Bryan");
+            propertySet.put("State", "NC");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        {
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 2L);
+            propertySet.put("Name", "Mike");
+            propertySet.put("State", "UT");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        {
+            
+            Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+                    1L, 2L);
+            
+            assertTrue(itr.hasNext());
+
+            final ITPS tps = itr.next();
+         
+            assertTrue( tps != null );
+            
+            assertEquals(1L, tps.get("Id").getValue());
+            assertEquals("Bryan", tps.get("Name").getValue());
+            assertEquals("NC", tps.get("State").getValue());
+
+            assertFalse(itr.hasNext());
+            
+        }
+        
+        {
+
+            Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+                    2L, null/* toKey */);
+            
+            assertTrue(itr.hasNext());
+
+            final ITPS tps = itr.next();
+         
+            assertTrue( tps != null );
+            
+            assertEquals(2L, tps.get("Id").getValue());
+            assertEquals("Mike", tps.get("Name").getValue());
+            assertEquals("UT", tps.get("State").getValue());
+
+            assertFalse(itr.hasNext());
+            
+        }
+    
+    }
+    
+    /**
+     * Test of a logical row scan requiring continuation queries by forcing the
+     * capacity to 1 when there are in fact two logical rows.
+     * 
+     * FIXME This test fails for a known reason - continuation query semantics
+     * have not been implemented yet. See {@link AtomicRowScan}.
+     */
+    public void test_rowScan_continuationQuery() {
+     
+        final Schema schema = new Schema("Employee","Id",KeyType.Long);
+        
+        SparseRowStore srs = new SparseRowStore(btree);
+        
+        {
+            
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 1L);
+            propertySet.put("Name", "Bryan");
+            propertySet.put("State", "NC");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        {
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 2L);
+            propertySet.put("Name", "Mike");
+            propertySet.put("State", "UT");
+
+            srs.write(keyBuilder, schema, propertySet);
+
+        }
+
+        Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+                null/* fromKey */, null/* toKey */, 1/* capacity */,
+                SparseRowStore.MAX_TIMESTAMP, null/*filter*/);
+        
+        {
+            
+            assertTrue(itr.hasNext());
+
+            final ITPS tps = itr.next();
+         
+            assertTrue( tps != null );
+            
+            assertEquals(1L, tps.get("Id").getValue());
+            assertEquals("Bryan", tps.get("Name").getValue());
+            assertEquals("NC", tps.get("State").getValue());
+            
+        }
+        
+        {
+
+            /*
+             * FIXME The test will fail here since continuation queries are not
+             * implemented.
+             */
+            assertTrue(itr.hasNext());
+
+            final ITPS tps = itr.next();
+         
+            assertTrue( tps != null );
+            
+            assertEquals(2L, tps.get("Id").getValue());
+            assertEquals("Mike", tps.get("Name").getValue());
+            assertEquals("UT", tps.get("State").getValue());
+            
+        }
+
+        assertFalse(itr.hasNext());
+        
+    }
+
     /**
      * Verify that two rows have the same column values.
      */
@@ -355,34 +618,5 @@ public class TestSparseRowStore extends TestCase2 {
         }
         
     }
-
-//    /**
-//     * Tests for keys formed from the application key, a column name, and a long
-//     * timestamp. A zero(0) byte is used as a delimiter between components of
-//     * the key.
-//     * 
-//     * @todo this is not testing much yet and should be in its own test suite.
-//     */
-//    public void test_cstore_keys() {
-//        
-//        IKeyBuilder keyBuilder = new UnicodeKeyBuilder();
-//        
-//        final byte[] colname1 = keyBuilder.reset().append("column1").getKey();
-//        
-//        final byte[] colname2 = keyBuilder.reset().append("another column").getKey();
-//        
-//        final long timestamp = System.currentTimeMillis();
-//        
-//        byte[] k1 = keyBuilder.reset().append(12L).appendNul().append(colname1)
-//        .appendNul().append(timestamp).getKey();
-//
-//        byte[] k2 = keyBuilder.reset().append(12L).appendNul().append(colname2)
-//        .appendNul().append(timestamp).getKey();
-//
-//        System.err.println("k1="+BytesUtil.toString(k1));
-//        System.err.println("k2="+BytesUtil.toString(k2));
-//
-//        fail("this does not test anything yet");
-//    }
 
 }

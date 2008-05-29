@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.UnsupportedEncodingException;
 import java.text.Collator;
 import java.util.Locale;
 import java.util.Properties;
@@ -58,11 +59,6 @@ import org.apache.log4j.Logger;
  * @todo Integrate support for ICU versioning into the client and perhaps into
  *       the index metadata so clients can discover which version and
  *       configuration properties to use when generating keys for an index.
- * 
- * @todo provide a synchronization factory for the keybuilder using a delegation
- *       model. KeyBuilder.synchronizedKeyBuilder():KeyBuilder? (Note that
- *       {@link #asSortKey(Object)} already handles the most common use cases
- *       and is thread-safe.)
  */
 public class KeyBuilder implements IKeyBuilder {
 
@@ -419,6 +415,44 @@ public class KeyBuilder implements IKeyBuilder {
     }
 
     /**
+     * Decodes an ASCII string from a key.
+     * 
+     * @param key
+     *            The key.
+     * @param off
+     *            The offset of the start of the string.
+     * @param len
+     *            The #of bytes to decode (one byte per character).
+     * 
+     * @return The ASCII characters decoded from the key.
+     * 
+     * @see #appendASCII(String)
+     */
+    public static String decodeASCII(byte[] key, int off, int len) {
+
+        byte[] b = new byte[len];
+
+        System.arraycopy(key, off, b, 0, len);
+
+        for (int i = 0; i < len; i++) {
+
+            b[i] = decodeByte(b[i]);
+
+        }
+
+        try {
+            
+            return new String(b, "US-ASCII");
+
+        } catch (UnsupportedEncodingException e) {
+
+            throw new RuntimeException(e);
+            
+        }
+        
+    }
+    
+    /**
      * The default pad character (a space).
      * <p>
      * Note: Any character may be choosen as the pad character as long as it has
@@ -598,6 +632,21 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
 
+    static public double decodeDouble(byte[] key,int off) {
+        
+        long v = decodeLong(key, off);
+        
+        // convert to twos-complement long.
+        if (v < 0) {
+            
+            v = 0x8000000000000000L - v;
+
+        }
+        
+        return Double.longBitsToDouble(v);
+        
+    }
+
     final public IKeyBuilder append(float f) {
 
         // performance tweak.
@@ -618,6 +667,21 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
 
+    static public float decodeFloat(byte[] key,int off) {
+        
+        int v = decodeInt(key, off);
+        
+        // convert to twos complement int.
+        if (v < 0) {
+
+            v = 0x80000000 - v;
+
+        }
+        
+        return Float.intBitsToFloat(v);
+        
+    }
+    
     final public IKeyBuilder append(UUID uuid) {
 
         if (len + 16 > buf.length) ensureCapacity(len+16);

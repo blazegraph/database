@@ -57,11 +57,14 @@ public class NameChecker {
     static public void assertSchemaName(String s)
             throws IllegalArgumentException {
 
-        if(s==null) throw new IllegalArgumentException();
-        
-        if(s.length()==0) throw new IllegalArgumentException();
-        
-        if(s.indexOf('\0')!=-1) throw new IllegalArgumentException(); 
+        if (s == null)
+            throw new IllegalArgumentException();
+
+        if (s.length() == 0)
+            throw new IllegalArgumentException();
+
+        if (s.indexOf('\0') != -1)
+            throw new IllegalArgumentException(); 
 
         Matcher m = pattern_name.matcher(s);
         
@@ -80,18 +83,22 @@ public class NameChecker {
      * @throws IllegalArgumentException
      *             if the string is not valid as the name of a column.
      */
-    static public void assertColumnName(String s) 
+    static public void assertColumnName(String s)
             throws IllegalArgumentException {
 
-        if(s==null) throw new IllegalArgumentException();
+        if (s == null)
+            throw new IllegalArgumentException();
 
-        if(s.length()==0) throw new IllegalArgumentException();
+        if (s.length() == 0)
+            throw new IllegalArgumentException();
 
-        if(s.indexOf('\0')!=-1) throw new IllegalArgumentException(); 
-        
+        if (s.indexOf('\0') != -1)
+            throw new IllegalArgumentException();
+
         Matcher m = pattern_name.matcher(s);
-        
-        if(!m.matches()) throw new IllegalArgumentException();
+
+        if (!m.matches())
+            throw new IllegalArgumentException();
 
     }
 

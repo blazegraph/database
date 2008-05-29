@@ -4,18 +4,18 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.Arrays;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.AbstractIndexProcedure;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.SuccessorUtil;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
-import com.bigdata.journal.AbstractJournal;
 
 /**
  * Atomic read of the logical row associated with some {@link Schema} and
@@ -24,7 +24,8 @@ import com.bigdata.journal.AbstractJournal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AtomicRead implements ISimpleIndexProcedure, Externalizable {
+public class AtomicRead extends AbstractIndexProcedure implements
+        ISimpleIndexProcedure, Externalizable {
 
     /**
      * 
@@ -104,22 +105,8 @@ public class AtomicRead implements ISimpleIndexProcedure, Externalizable {
      */
     public Object apply(IIndex ndx) {
 
-        return atomicRead(ndx, schema, primaryKey, timestamp, filter);
+        return atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey, timestamp, filter);
         
-    }
-
-    /**
-     * Return the thread-local key builder configured for the data service
-     * on which this procedure is being run.
-     * 
-     * @param ndx The index.
-     * 
-     * @return The {@link IKeyBuilder}.
-     */
-    protected IKeyBuilder getKeyBuilder(IIndex ndx) {
-
-        return ((AbstractJournal) ((AbstractBTree) ndx).getStore()).getKeyBuilder();
-
     }
             
     /**
@@ -142,30 +129,58 @@ public class AtomicRead implements ISimpleIndexProcedure, Externalizable {
      * 
      * @return The logical row for that primary key.
      */
-    protected TPS atomicRead(IIndex ndx, Schema schema, Object primaryKey,
-            long timestamp, INameFilter filter) {
+    static protected TPS atomicRead(IKeyBuilder keyBuilder, IIndex ndx,
+            Schema schema, Object primaryKey, long timestamp, INameFilter filter) {
 
-        final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
-        
         final byte[] fromKey = schema.fromKey(keyBuilder,primaryKey).getKey(); 
 
-        final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
+//        final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
         
-        if (DEBUG) {
-            log.info("read: fromKey=" + Arrays.toString(fromKey));
-            log.info("read:   toKey=" + Arrays.toString(toKey));
+        final TPS tps = atomicRead(ndx, fromKey, schema, timestamp, filter);
+
+        if (tps == null) {
+
+            if (log.isInfoEnabled())
+                log.info("No data for primaryKey: " + primaryKey);
+
         }
 
-        // Result set object.
-        
-        final TPS tps = new TPS(schema, timestamp);
+        return tps;
+
+    }
+
+    /**
+     * Alternative form useful when you have the raw key (unsigned byte[])
+     * rather than a primary key (application object).
+     * 
+     * @param tps
+     * @param fromKey
+     * @param ndx
+     * @param schema
+     * @param timestamp
+     * @param filter
+     * 
+     * @return {@link TPS}
+     */
+    static protected TPS atomicRead(IIndex ndx, final byte[] fromKey,
+            final Schema schema, final long timestamp, final INameFilter filter) {
 
         /*
-         * Scan all entries within the fromKey/toKey range populating [tps]
-         * as we go.
+         * Scan all entries within the fromKey/toKey range populating [tps] as
+         * we go.
          */
 
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
+
+        if (log.isInfoEnabled()) {
+            log.info("read: fromKey=" + BytesUtil.toString(fromKey));
+            log.info("read:   toKey=" + BytesUtil.toString(toKey));
+        }
+
         final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
+
+        // Result set object.
+        final TPS tps = new TPS(schema, timestamp);
 
         // #of entries scanned for that primary key.
         int nscanned = 0;
@@ -187,31 +202,35 @@ public class AtomicRead implements ISimpleIndexProcedure, Externalizable {
              * fromKey is the index of the 1st byte in the column name.
              */
 
-            final KeyDecoder keyDecoder = new KeyDecoder(schema,key,fromKey.length);
+            final KeyDecoder keyDecoder = new KeyDecoder(key);
 
             // The column name.
-            final String col = keyDecoder.col;
-            
+            final String col = keyDecoder.getColumnName();
+
             if (filter != null && !filter.accept(col)) {
 
                 // Skip property names that have been filtered out.
-                
-                log.debug("Skipping property: name="+col);
+
+                if (log.isDebugEnabled()) {
+
+                    log.debug("Skipping property: name=" + col);
+                    
+                }
 
                 continue;
-                
+
             }
-            
+
             /*
-             * Skip column values having a timestamp strictly greater than
-             * the given value.
+             * Skip column values having a timestamp strictly greater than the
+             * given value.
              */
             final long columnValueTimestamp = keyDecoder.getTimestamp();
             {
 
                 if (columnValueTimestamp > timestamp) {
 
-                    if (DEBUG) {
+                    if (log.isDebugEnabled()) {
 
                         log.debug("Ignoring newer revision: col=" + col
                                 + ", timestamp=" + columnValueTimestamp);
@@ -236,29 +255,25 @@ public class AtomicRead implements ISimpleIndexProcedure, Externalizable {
              */
 
             tps.set(col, columnValueTimestamp, v);
-            
-            log.info("Read: name=" + col + ", timestamp="
-                    + columnValueTimestamp + ", value=" + v);
+
+            if (log.isInfoEnabled())
+                log.info("Read: name=" + col + ", timestamp="
+                        + columnValueTimestamp + ", value=" + v);
 
         }
 
         if (nscanned == 0) {
             
             /*
-             * Return null iff there are no column values for that primary
-             * key.
+             * Return null iff there are no column values for that primary key.
+             * 
+             * Note: this is a stronger criteria than none being matched.
              */
             
-            log.info("No data for primaryKey: " + primaryKey);
-        
-            // Note: [null] return since no data for the primary key.
-            
             return null;
-            
+
         }
-        
-        // Note: MAY be empty.
-        
+
         return tps;
         
     }

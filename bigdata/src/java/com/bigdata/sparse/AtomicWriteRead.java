@@ -3,7 +3,6 @@ package com.bigdata.sparse;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.io.UnsupportedEncodingException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -149,8 +148,8 @@ public class AtomicWriteRead extends AtomicRead {
          * Note: Read uses whatever timestamp was selected above!
          */
 
-        return atomicRead(ndx, schema, propertySet.get(schema
-                .getPrimaryKey()), timestamp, filter);
+        return atomicRead(getKeyBuilder(ndx), ndx, schema, propertySet
+                .get(schema.getPrimaryKey()), timestamp, filter);
         
     }
 
@@ -158,6 +157,7 @@ public class AtomicWriteRead extends AtomicRead {
             Object primaryKey, Map<String, Object> propertySet,
             long timestamp) {
 
+        if(log.isInfoEnabled())
         log.info("Schema=" + schema + ", primaryKey="
                 + schema.getPrimaryKey() + ", value=" + primaryKey
                 + ", ntuples=" + propertySet.size());
@@ -195,32 +195,20 @@ public class AtomicWriteRead extends AtomicRead {
 
             }
 
-            
-            // encode the schema name and the primary key.
-            schema.fromKey(keyBuilder, primaryKey);
-            
-            /*
-             * The column name. Note that the column name is NOT stored with
-             * Unicode compression so that we can decode it without loss.
-             */
-            try {
-                
-                keyBuilder.append(col.getBytes(SparseRowStore.UTF8)).appendNul();
-                
-            } catch(UnsupportedEncodingException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-            
-            keyBuilder.append(timestamp);
-
-            byte[] key = keyBuilder.getKey();
+            // encode the key.
+            final byte[] key = schema.getKey(keyBuilder, primaryKey, col, timestamp);
             
             // encode the value.
-            byte[] val = ValueType.encode( value );
+            final byte[] val = ValueType.encode( value );
 
-            ndx.insert(key,val);
+            // insert into the index.
+            ndx.insert(key, val);
+
+            if(log.isDebugEnabled()) {
+                
+                log.debug("col=" + col + ", value=" + value);
+                
+            }
             
         }
 
@@ -234,8 +222,8 @@ public class AtomicWriteRead extends AtomicRead {
     protected long inc(IIndex ndx, Schema schema, Object primaryKey,
             long timestamp, final String col) {
         
-        final TPS tps = atomicRead(ndx, schema, primaryKey, timestamp,
-                new INameFilter() {
+        final TPS tps = atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey,
+                timestamp, new INameFilter() {
 
             public boolean accept(String name) {
                 

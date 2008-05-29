@@ -253,6 +253,8 @@ public interface IKeyBuilder {
      * @throws UnsupportedOperationException
      *             if <i>unicode == true</i> but the {@link IKeyBuilder} does
      *             not support Unicode.
+     * 
+     * @see http://www.unicode.org/reports/tr10/tr10-10.html#Interleaved_Levels
      */
     public IKeyBuilder appendText(String text, boolean unicode,
             boolean successor);
@@ -295,7 +297,7 @@ public interface IKeyBuilder {
     final public int maxlen = 65535;
 
     /**
-     * Encodes a uncode string by assuming that its contents are ASCII
+     * Encodes a unicode string by assuming that its contents are ASCII
      * characters. For each character, this method simply chops of the high byte
      * and converts the low byte to an unsigned byte.
      * <p>

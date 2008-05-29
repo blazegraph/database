@@ -439,6 +439,17 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue("k0<kp1",BytesUtil.compareBytes(k0, kp1)<0);
         assertTrue("kp1<kmax",BytesUtil.compareBytes(kp1, kmax)<0);
 
+        /*
+         * verify decoding.
+         * 
+         * @todo test decoding at offsets != 0.
+         */
+        assertEquals("kmin",imin,KeyBuilder.decodeInt(kmin, 0));
+        assertEquals("km1" ,im1 ,KeyBuilder.decodeInt(km1 , 0));
+        assertEquals("k0"  ,i0  ,KeyBuilder.decodeInt(k0  , 0));
+        assertEquals("kp1" ,ip1 ,KeyBuilder.decodeInt(kp1 , 0));
+        assertEquals("kmax",imax,KeyBuilder.decodeInt(kmax, 0));
+
     }
 
     public void test_keyBuilder_long_key() {
@@ -493,14 +504,14 @@ public class TestKeyBuilder extends TestCase2 {
         
         IKeyBuilder keyBuilder = new KeyBuilder();
         
-        byte[] kmin = keyBuilder.reset().append(SuccessorUtil.FNEG_MAX).getKey(); // largest negative float.
-        byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.FNEG_ONE).getKey(); // -1f
-        byte[] kneg = keyBuilder.reset().append(SuccessorUtil.FNEG_MIN).getKey(); // smallest negative float.
-        byte[] km0 = keyBuilder.reset().append(SuccessorUtil.FNEG_ZERO).getKey(); // -0.0f
-        byte[] kp0 = keyBuilder.reset().append(SuccessorUtil.FPOS_ZERO).getKey(); // +0.0f
-        byte[] kpos = keyBuilder.reset().append(SuccessorUtil.FPOS_MIN).getKey(); // smallest positive float.
-        byte[] kp1 = keyBuilder.reset().append(SuccessorUtil.FPOS_ONE).getKey(); // +1f;
-        byte[] kmax = keyBuilder.reset().append(SuccessorUtil.FPOS_MAX).getKey(); // max pos float.
+        final byte[] kmin = keyBuilder.reset().append(SuccessorUtil.FNEG_MAX).getKey(); // largest negative float.
+        final byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.FNEG_ONE).getKey(); // -1f
+        final byte[] kneg = keyBuilder.reset().append(SuccessorUtil.FNEG_MIN).getKey(); // smallest negative float.
+        final byte[] km0 = keyBuilder.reset().append(SuccessorUtil.FNEG_ZERO).getKey(); // -0.0f
+        final byte[] kp0 = keyBuilder.reset().append(SuccessorUtil.FPOS_ZERO).getKey(); // +0.0f
+        final byte[] kpos = keyBuilder.reset().append(SuccessorUtil.FPOS_MIN).getKey(); // smallest positive float.
+        final byte[] kp1 = keyBuilder.reset().append(SuccessorUtil.FPOS_ONE).getKey(); // +1f;
+        final byte[] kmax = keyBuilder.reset().append(SuccessorUtil.FPOS_MAX).getKey(); // max pos float.
 
         assertEquals(4,kmin.length);
         assertEquals(4,kn1.length);
@@ -528,20 +539,34 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue("kpos<kp1",BytesUtil.compareBytes(kpos, kp1)<0);
         assertTrue("kp1<kmax",BytesUtil.compareBytes(kp1, kmax)<0);
         
+        /*
+         * verify decoding.
+         * 
+         * @todo test decoding at offsets != 0.
+         */
+        assertEquals("kmin",SuccessorUtil.FNEG_MAX,KeyBuilder.decodeFloat(kmin, 0));
+        assertEquals("kn1",SuccessorUtil.FNEG_ONE,KeyBuilder.decodeFloat(kn1, 0));
+        assertEquals("kneg",SuccessorUtil.FNEG_MIN,KeyBuilder.decodeFloat(kneg, 0));
+        assertEquals("km0",SuccessorUtil.FNEG_ZERO,KeyBuilder.decodeFloat(km0, 0));
+        assertEquals("kp0",SuccessorUtil.FPOS_ZERO,KeyBuilder.decodeFloat(kp0, 0));
+        assertEquals("kpos",SuccessorUtil.FPOS_MIN,KeyBuilder.decodeFloat(kpos, 0));
+        assertEquals("kp1",SuccessorUtil.FPOS_ONE,KeyBuilder.decodeFloat(kp1, 0));
+        assertEquals("kmax",SuccessorUtil.FPOS_MAX,KeyBuilder.decodeFloat(kmax, 0));
+        
     }
 
     public void test_keyBuilder_double_key() throws NoSuccessorException {
         
         IKeyBuilder keyBuilder = new KeyBuilder();
         
-        byte[] kmin = keyBuilder.reset().append(SuccessorUtil.DNEG_MAX).getKey(); // largest negative double.
-        byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.DNEG_ONE).getKey(); // -1f
-        byte[] kneg = keyBuilder.reset().append(SuccessorUtil.DNEG_MIN).getKey(); // smallest negative double.
-        byte[] km0 = keyBuilder.reset().append(SuccessorUtil.DNEG_ZERO).getKey(); // -0.0f
-        byte[] kp0 = keyBuilder.reset().append(SuccessorUtil.DPOS_ZERO).getKey(); // +0.0f
-        byte[] kpos = keyBuilder.reset().append(SuccessorUtil.DPOS_MIN).getKey(); // smallest positive double.
-        byte[] kp1 = keyBuilder.reset().append(SuccessorUtil.DPOS_ONE).getKey(); // +1f;
-        byte[] kmax = keyBuilder.reset().append(SuccessorUtil.DPOS_MAX).getKey(); // max pos double.
+        final byte[] kmin = keyBuilder.reset().append(SuccessorUtil.DNEG_MAX).getKey(); // largest negative double.
+        final byte[] kn1 = keyBuilder.reset().append(SuccessorUtil.DNEG_ONE).getKey(); // -1f
+        final byte[] kneg = keyBuilder.reset().append(SuccessorUtil.DNEG_MIN).getKey(); // smallest negative double.
+        final byte[] km0 = keyBuilder.reset().append(SuccessorUtil.DNEG_ZERO).getKey(); // -0.0f
+        final byte[] kp0 = keyBuilder.reset().append(SuccessorUtil.DPOS_ZERO).getKey(); // +0.0f
+        final byte[] kpos = keyBuilder.reset().append(SuccessorUtil.DPOS_MIN).getKey(); // smallest positive double.
+        final byte[] kp1 = keyBuilder.reset().append(SuccessorUtil.DPOS_ONE).getKey(); // +1f;
+        final byte[] kmax = keyBuilder.reset().append(SuccessorUtil.DPOS_MAX).getKey(); // max pos double.
 
         assertEquals(8,kmin.length);
         assertEquals(8,kn1.length);
@@ -569,6 +594,20 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue("kpos<kp1",BytesUtil.compareBytes(kpos, kp1)<0);
         assertTrue("kp1<kmax",BytesUtil.compareBytes(kp1, kmax)<0);
         
+        /*
+         * verify decoding.
+         * 
+         * @todo test decoding at offsets != 0.
+         */
+        assertEquals("kmin",SuccessorUtil.DNEG_MAX,KeyBuilder.decodeDouble(kmin, 0));
+        assertEquals("kn1",SuccessorUtil.DNEG_ONE,KeyBuilder.decodeDouble(kn1, 0));
+        assertEquals("kneg",SuccessorUtil.DNEG_MIN,KeyBuilder.decodeDouble(kneg, 0));
+        assertEquals("km0",SuccessorUtil.DNEG_ZERO,KeyBuilder.decodeDouble(km0, 0));
+        assertEquals("kp0",SuccessorUtil.DPOS_ZERO,KeyBuilder.decodeDouble(kp0, 0));
+        assertEquals("kpos",SuccessorUtil.DPOS_MIN,KeyBuilder.decodeDouble(kpos, 0));
+        assertEquals("kp1",SuccessorUtil.DPOS_ONE,KeyBuilder.decodeDouble(kp1, 0));
+        assertEquals("kmax",SuccessorUtil.DPOS_MAX,KeyBuilder.decodeDouble(kmax, 0));
+
     }
 
     /**
@@ -602,6 +641,10 @@ public class TestKeyBuilder extends TestCase2 {
          */
         assertTrue(BytesUtil.compareBytes(key1, key2)>0);
         assertTrue(BytesUtil.compareBytes(key2, key3)<0);
+        
+        assertEquals("abc",KeyBuilder.decodeASCII(key1,0,3));
+        assertEquals("ABC",KeyBuilder.decodeASCII(key2,0,3));
+        assertEquals("Abc",KeyBuilder.decodeASCII(key3,0,3));
         
     }
 

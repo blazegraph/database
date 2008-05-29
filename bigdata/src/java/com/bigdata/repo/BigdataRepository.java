@@ -301,7 +301,7 @@ public class BigdataRepository implements ContentRepository {
     
     /**
      * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
-     * using the properties specified to the journal constructor.
+     * using the properties specified for the {@link IBigdataClient}.
      */
     public IKeyBuilder getKeyBuilder() {
         

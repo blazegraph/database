@@ -65,6 +65,9 @@ public class TestAll extends TestCase {
         
         // sparse property set object.
         suite.addTestSuite(TestTPS.class);
+
+        // encoding and decoding of keys.
+        suite.addTestSuite(TestKeyEncodeDecode.class);
         
         // sparse row store operations.
         suite.addTestSuite(TestSparseRowStore.class);

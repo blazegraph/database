@@ -154,6 +154,7 @@ public class TPS implements ITPS, Externalizable {
 
             if (tpv != null) {
 
+                if(log.isInfoEnabled())
                 log.info("Exact timestamp match: name="
                         + name
                         + (timestamp == Long.MAX_VALUE ? ", current value"
@@ -201,6 +202,7 @@ public class TPS implements ITPS, Externalizable {
              * encountered by the iterator.
              */
 
+            if(log.isInfoEnabled())
             log.info("No match: name="
                     + name
                     + (timestamp == Long.MAX_VALUE ? ", current value"
@@ -210,6 +212,7 @@ public class TPS implements ITPS, Externalizable {
 
         }
 
+        if(log.isInfoEnabled())
         log.info("Most recent match: name="
                 + name
                 + (timestamp == Long.MAX_VALUE ? ", current value"
@@ -449,6 +452,7 @@ public class TPS implements ITPS, Externalizable {
         // #of tuples.
         final int n = in.readInt();
 
+        if(log.isInfoEnabled())
         log.info("Reading "+n+" tuples: schema="+schema);
 
         for(int i=0; i<n; i++) {
@@ -473,6 +477,7 @@ public class TPS implements ITPS, Externalizable {
             
             tuples.put(new TP(name, timestamp), tpv);
             
+            if(log.isInfoEnabled())
             log.info("tuple: name=" + name + ", timestamp=" + timestamp
                     + ", value=" + value);
             
@@ -637,6 +642,12 @@ public class TPS implements ITPS, Externalizable {
             return ret;
 
         }
+        
+    }
+    
+    public String toString() {
+        
+        return "TPS{schema="+schema+",timestamp="+timestamp+",tuples="+tuples+"}";
         
     }
     
