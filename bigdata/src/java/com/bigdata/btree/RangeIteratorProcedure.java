@@ -161,7 +161,9 @@ public class RangeIteratorProcedure extends AbstractKeyRangeIndexProcedure
      */
     protected ResultSet newResultSet(IIndex ndx) {
         
-        return new ResultSet( ndx, fromKey, toKey, capacity, flags, filter );
+        throw new UnsupportedOperationException(); 
+        
+//        return new ResultSet( ndx, fromKey, toKey, capacity, flags, filter );
         
     }
 

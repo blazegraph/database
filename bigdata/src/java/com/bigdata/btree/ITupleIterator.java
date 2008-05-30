@@ -44,7 +44,7 @@ import java.util.NoSuchElementException;
  *       are always relative to the key order while prior/next are relative to the 
  *       iterator scan order).
  */
-public interface ITupleIterator extends Iterator<ITuple> {
+public interface ITupleIterator<E> extends Iterator<ITuple<E>> {
 
     /**
      * Advance the iterator and return the {@link ITuple} from which you can
@@ -61,6 +61,6 @@ public interface ITupleIterator extends Iterator<ITuple> {
      * @throws NoSuchElementException
      *             if there is no next entry.
      */
-    public ITuple next();
+    public ITuple<E> next();
     
 }

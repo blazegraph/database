@@ -107,6 +107,8 @@ public class TestBigdataMap extends TestCase {
 
         assertFalse(map.containsKey("abc"));
 
+        assertFalse(map.containsValue("abc"));
+
         assertNull(map.get("abc"));
 
         try {
@@ -123,6 +125,8 @@ public class TestBigdataMap extends TestCase {
         assertEquals(1, map.size());
         
         assertTrue(map.containsKey("abc"));
+
+        assertTrue(map.containsValue("abc"));
 
         assertEquals("abc", map.get("abc"));
 
@@ -142,6 +146,10 @@ public class TestBigdataMap extends TestCase {
         assertEquals(0L, map.rangeCount(false/* exactCount */));
 
         assertEquals(0L, map.rangeCount(true/* exactCount */));
+
+        assertFalse(map.containsKey("abc"));
+
+        assertFalse(map.containsValue("abc"));
 
     }
 

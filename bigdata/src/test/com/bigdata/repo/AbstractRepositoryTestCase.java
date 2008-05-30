@@ -35,6 +35,7 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.util.Properties;
 
+import com.bigdata.journal.BufferMode;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.service.AbstractEmbeddedFederationTestCase;

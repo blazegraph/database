@@ -45,7 +45,7 @@ import com.bigdata.rawstore.IRawStore;
  *       vs the {@link #getKeyBuffer()} and {@link #getValueBuffer()} methods.
  *       do we need both?
  */
-public interface ITuple {
+public interface ITuple<E extends Object> {
 
     /**
      * The {@link IRangeQuery} flags
@@ -185,7 +185,7 @@ public interface ITuple {
      * 
      * @see ITupleSerializer#deserialize(ITuple)
      */
-    public Object getObject();
+    public E getObject();
     
     /**
      * Return an object that may be used to perform a streaming read of a large

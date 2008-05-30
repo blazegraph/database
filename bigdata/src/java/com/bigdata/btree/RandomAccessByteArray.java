@@ -224,4 +224,36 @@ public class RandomAccessByteArray implements IRandomAccessByteArray {
 
     }
 
+    /**
+     * Resize the buffer, copying the references to the existing data into the
+     * new buffer.
+     * <p>
+     * Note: the new buffer will be dense (fromIndex will be zero).
+     * 
+     * @param n
+     *            The size of the new buffer.
+     * 
+     * @return The new buffer.
+     */
+    public RandomAccessByteArray resize(int n) {
+        
+        if (n < 0)
+            throw new IllegalArgumentException();
+
+        // #of entries in the source.
+        final int m = getKeyCount();
+
+        // #of entries to be copied into the new buffer.
+        final int p = Math.min(m, n);
+        
+        // new backing array sized to [n].
+        final byte[][] b = new byte[n][];
+
+        // copy references to the new buffer.
+        System.arraycopy(a, fromIndex, b, 0, p);
+        
+        return new RandomAccessByteArray(0,p,a);
+        
+    }
+
 }

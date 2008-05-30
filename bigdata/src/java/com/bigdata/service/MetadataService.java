@@ -34,9 +34,9 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ChunkedLocalRangeIterator;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractTask;
@@ -49,6 +49,7 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * Implementation of a metadata service for a named scale-out index.
@@ -1134,14 +1135,21 @@ abstract public class MetadataService extends DataService implements
      * Drops a scale-out index.
      * <p>
      * Since this task is unisolated, it basically has a lock on the writable
-     * version of the metadata index. It then drops each index partition and
-     * finally drops the metadata index itself.
+     * version of the metadata index. It drops each index partition and finally
+     * drops the metadata index itself.
+     * <p>
+     * Historical reads against the metadata index will continue to succeed both
+     * during and after this operation has completed successfully. However,
+     * {@link ITx#READ_COMMITTED} operations will succeed only until this
+     * operation completes at which point the scale-out index will no longer be
+     * visible.
+     * <p>
+     * The data comprising the scale-out index will remain available for
+     * historical reads until it is released by whatever policy is in effect for
+     * the {@link ResourceManager}s for the {@link DataService}s on which that
+     * data resides.
      * 
-     * @todo Commits by the write service could be delayed by the remote RPCs,
-     *       but a change to the commit protocol to use checkpoints will fix
-     *       that issue.
-     * 
-     * @todo This does it try to handle errors gracefully. E.g., if there is a
+     * @todo This does not try to handle errors gracefully. E.g., if there is a
      *       problem with one of the data services hosting an index partition it
      *       does not fail over to the next data service for that index
      *       partition.
@@ -1186,16 +1194,18 @@ abstract public class MetadataService extends DataService implements
             
             log.info("Will drop index partitions for "+name);
             
-            final ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
-                    ndx, null, null, 0/* capacity */, IRangeQuery.VALS, null/* filter */);
+//            final ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
+//                    ndx, null, null, 0/* capacity */, IRangeQuery.VALS, null/* filter */);
+            final ITupleIterator itr = ndx.rangeIterator(null, null,
+                    0/* capacity */, IRangeQuery.VALS, null/* filter */);
             
             int ndropped = 0;
             
             while(itr.hasNext()) {
                 
-                ITuple tuple = itr.next();
+                final ITuple tuple = itr.next();
 
-                // @TODO use getValueStream() variant once I resolve problem with stream.
+                // FIXME There is still (5/30/08) a problem with using getValueStream() here!
                 PartitionLocator pmd = (PartitionLocator) SerializerUtil
                         .deserialize(tuple.getValue());
 //                .deserialize(tuple.getValueStream());
@@ -1221,8 +1231,8 @@ abstract public class MetadataService extends DataService implements
                 
             }
             
-            // flush all delete requests.
-            itr.flush();
+//            // flush all delete requests.
+//            itr.flush();
             
             log.info("Dropped "+ndropped+" index partitions for "+name);
 

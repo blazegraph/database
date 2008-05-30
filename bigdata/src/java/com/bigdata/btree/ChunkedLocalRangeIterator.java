@@ -43,6 +43,10 @@ import com.bigdata.rawstore.IRawStore;
  * its buffers up to the capacity and then delete behind once the buffer is full
  * or as soon as the iterator is exhausted.
  * 
+ * @deprecated This is only used for delete-behind semantics ({@link IRangeQuery#REMOVEALL})
+ *             on a local index and that will be redone using the new iterator
+ *             shortly.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -87,7 +91,31 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedRangeIterator {
          */
         final int tmpFlags = flags & ~IRangeQuery.REMOVEALL;
         
-        return new ResultSet(ndx, fromKey, toKey, capacity, tmpFlags, filter);
+        /*
+         * Figure out the upper bound on the #of tuples that could be
+         * materialized.
+         * 
+         * Note: the upper bound on the #of key-value pairs in the range is
+         * truncated to an [int].
+         */
+        
+        final int rangeCount = (int) ndx.rangeCount(fromKey, toKey);
+
+        final int limit = (rangeCount > capacity ? capacity : rangeCount);
+
+        /*
+         * Iterator that will visit the key range.
+         * 
+         * Note: We always visit the keys regardless of whether we pass them
+         * on to the caller. This is necessary in order for us to set the
+         * [lastKey] field on the result set and that is necessary to
+         * support continuation queries.
+         */
+        
+        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, limit,
+                tmpFlags | IRangeQuery.KEYS, filter);
+        
+        return new ResultSet(ndx, limit, tmpFlags, itr);
         
     }
 

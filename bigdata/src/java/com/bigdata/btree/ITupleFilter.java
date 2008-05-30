@@ -35,10 +35,12 @@ import java.io.Serializable;
  * 
  * @see ITupleIterator
  * 
- * @see AbstractBTree#rangeIterator(byte[], byte[], int, int, EntryFilter)
+ * @see AbstractBTree#rangeIterator(byte[], byte[], int, int, ITupleFilter)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link AbstractTupleFilterator}
  */
 public interface ITupleFilter extends Serializable {
 

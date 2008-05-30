@@ -47,8 +47,9 @@ import com.bigdata.rawstore.IBlock;
  * {@link IDataService} but DOES NOT handle index partition splits, moves or
  * joins.
  * <p>
- * Note: This class exists mainly to support caching of the remove metadata
- * index, which does not use index partitions, by the bigdata federation.
+ * Note: This class supports caching of the remote metadata index, which does
+ * not use index partitions, by the {@link AbstractRemoteFederation} and also
+ * supports the {@link LocalDataServiceFederation}.
  * 
  * @todo write tests for read-consistent.
  * 
@@ -166,7 +167,7 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
     protected ResultSet getResultSet(long timestamp, byte[] _fromKey, byte[] toKey, int capacity,
             int flags, ITupleFilter filter) {
 
-        log.info("name=" + name + ", fromKey=" + BytesUtil.toString(_fromKey)
+        if(log.isInfoEnabled()) log.info("name=" + name + ", fromKey=" + BytesUtil.toString(_fromKey)
                 + ", toKey=" + BytesUtil.toString(toKey)+", dataService="+dataService);
 
         try {

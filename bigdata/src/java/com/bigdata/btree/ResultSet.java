@@ -33,33 +33,40 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
+import java.util.Iterator;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractTupleFilterator.AbstractTransformingTupleFilter;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 
 /**
  * An object used to stream key scan results back to the client.
+ * 
+ * FIXME support {@link AbstractTransformingTupleFilter} - must apply its
+ * compression and serialization handlers and serialize them for the client.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class ResultSet implements Externalizable {
 
+    private static final long serialVersionUID = -390738836663476282L;
+
     protected static final Logger log = Logger.getLogger(ResultSet.class);
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 8823205844134046434L;
+//  protected int rangeCountx;
 
-    private int rangeCount;
+    /** true iff keys were requested. */
+    private boolean sendKeys;
 
+    /** true iff values were requested. */
+    private boolean sendVals;
+    
     private int ntuples;
 
     private boolean exhausted;
@@ -81,13 +88,28 @@ public class ResultSet implements Externalizable {
     private long commitTime;
     
     /**
-     * Total #of key-value pairs within the key range (approximate).
+     * Set automatically based on the {@link IndexMetadata}.
      */
-    public int getRangeCount() {
-       
-        return rangeCount;
-        
-    }
+    private IDataSerializer leafKeySerializer;
+
+    /**
+     * Set automatically based on the {@link IndexMetadata}.
+     */
+    private IDataSerializer leafValSerializer;
+    
+    /**
+     * Set automatically based on the {@link IndexMetadata}.
+     */
+    private ITupleSerializer tupleSerializer;
+    
+//    /**
+//     * Total #of key-value pairs within the key range (approximate).
+//     */
+//    public int getRangeCount() {
+//       
+//        return rangeCount;
+//        
+//    }
 
     /**
      * Actual #of key-value pairs in the {@link ResultSet}
@@ -103,7 +125,7 @@ public class ResultSet implements Externalizable {
      * results would be available if you formed the successor of the
      * {@link #lastKey}.
      */
-    public boolean isExhausted() {
+    final public boolean isExhausted() {
         
         return exhausted;
         
@@ -116,7 +138,7 @@ public class ResultSet implements Externalizable {
      * 
      * @see #successor()
      */
-    public byte[] getLastKey() {
+    final public byte[] getLastKey() {
         
         return lastKey;
         
@@ -134,7 +156,7 @@ public class ResultSet implements Externalizable {
      * @exception UnsupportedOperationException
      *                if the {@link #lastKey} is <code>null</code>.
      */
-    public byte[] successor() {
+    final public byte[] successor() {
 
         if (lastKey == null)
             throw new UnsupportedOperationException();
@@ -143,22 +165,41 @@ public class ResultSet implements Externalizable {
 
     }
 
-//    /**
-//     * The visited keys iff the keys were requested.
-//     */
-//    public byte[][] getKeys() {
-//        
-//        return keys;
-//        
-//    }
-
+    /**
+     * The {@link IDataSerializer} used to (de-)compress the {@link #keys}.
+     */
+    final public IDataSerializer getLeafKeySerializer() {
+        
+        return leafKeySerializer;
+        
+    }
+    
+    /**
+     * The {@link IDataSerializer} used to (de-)compress the {@link #vals}.
+     */
+    final public IDataSerializer getLeafValueSerializer() {
+        
+        return leafValSerializer;
+        
+    }
+    
+    /**
+     * The {@link ITupleSerializer} that may be used to de-serialize the tuples
+     * in the {@link ResultSet}.
+     */
+    final public ITupleSerializer getTupleSerializer() {
+        
+        return tupleSerializer;
+        
+    }
+    
     /**
      * Return the keys.
      * 
      * @throws IllegalStateException
      *             if the keys were not retrieved.
      */
-    public IRandomAccessByteArray getKeys() {
+    final public IRandomAccessByteArray getKeys() {
         
         if (keys == null)
             throw new IllegalStateException();
@@ -173,7 +214,7 @@ public class ResultSet implements Externalizable {
      * @throws IllegalStateException
      *             if the values were not retrieved.
      */
-    public IRandomAccessByteArray getValues() {
+    final public IRandomAccessByteArray getValues() {
         
         if (vals == null)
             throw new IllegalStateException();
@@ -193,7 +234,7 @@ public class ResultSet implements Externalizable {
      * @throws IllegalStateException
      *             if the keys were not retrieved.
      */
-    public byte[] getKey(int index) {
+    final public byte[] getKey(int index) {
         
         if (keys == null)
             throw new IllegalStateException();
@@ -213,7 +254,7 @@ public class ResultSet implements Externalizable {
      * @throws IllegalStateException
      *             if the values were not retrieved.
      */
-    public byte[] getValue(int index) {
+    final public byte[] getValue(int index) {
         
         if (vals == null)
             throw new IllegalStateException();
@@ -221,15 +262,6 @@ public class ResultSet implements Externalizable {
         return vals.getKey(index);
         
     }
-    
-//    /**
-//     * The visited values iff the values were requested.
-//     */
-//    public byte[][] getValues() {
-//        
-//        return vals;
-//        
-//    }
 
     /**
      * The visited version timestamps iff the index maintains version
@@ -238,7 +270,7 @@ public class ResultSet implements Externalizable {
      * @return The version timestamps -or- <code>null</code> iff the index
      *         does not maintain version timestamps.
      */
-    public long[] getVersionTimestamps() {
+    final public long[] getVersionTimestamps() {
         
         return versionTimestamps;
         
@@ -251,7 +283,7 @@ public class ResultSet implements Externalizable {
      * @return The delete markers -or- <code>null</code> iff the index does
      *         not maintain delete markers.
      */
-    public byte[] getDeleteMarkers() {
+    final public byte[] getDeleteMarkers() {
         
         return deleteMarkers;
         
@@ -261,7 +293,7 @@ public class ResultSet implements Externalizable {
      * The values returned by {@link ITuple#getSourceIndex()} for each visited
      * index entry.
      */
-    public int getSourceIndex(int index) {
+    final public int getSourceIndex(int index) {
         
         if (sources.length == 1) {
 
@@ -284,40 +316,9 @@ public class ResultSet implements Externalizable {
      * 
      * @return
      */
-    public long getCommitTime() {
+    final public long getCommitTime() {
 
         return commitTime;
-        
-    }
-    
-    /**
-     * Deserialization constructor.
-     */
-    public ResultSet() {
-    }
-
-    /**
-     * Set automatically based on the {@link IndexMetadata}.
-     */
-    private IDataSerializer leafKeySerializer;
-
-    /**
-     * Set automatically based on the {@link IndexMetadata}.
-     */
-    private IDataSerializer leafValSerializer;
-    
-    /**
-     * Set automatically based on the {@link IndexMetadata}.
-     */
-    private ITupleSerializer tupleSerializer;
-    
-    /**
-     * The {@link ITupleSerializer} that may be used to de-serialize the tuples
-     * in the {@link ResultSet}.
-     */
-    public ITupleSerializer getTupleSerializer() {
-        
-        return tupleSerializer;
         
     }
     
@@ -330,46 +331,65 @@ public class ResultSet implements Externalizable {
      * is used to direct {@link ITuple#readBlock(long)} requests to the correct
      * resource on the {@link IDataService}.
      */
-    public IResourceMetadata[] getSources() {
+    final public IResourceMetadata[] getSources() {
         
         return sources;
         
     }
+
+    /**
+     * The value of the <i>limit</i> specified to the ctor. This is the
+     * dimension of the internal arrays used to buffer the data for the tuples.
+     * <p>
+     * Note: This field is transient - it does not get (de-)serialized.
+     */
+    protected int getLimit() {
+
+        return limit;
+        
+    }
+    transient private int limit;
     
     /**
-     * Constructor used by the {@link DataService} to populate the
-     * {@link ResultSet}.
-     * 
-     * @param ndx
-     * @param fromKey
-     * @param toKey
-     * @param capacity
-     * @param flags
-     * @param filter
+     * The {@link IndexMetadata}.
+     * <p>
+     * Note: This field is transient - it does not get (de-)serialized.
      */
-    public ResultSet(IIndex ndx, byte[] fromKey, byte[] toKey, int capacity,
-            int flags, ITupleFilter filter) {
+    transient private IndexMetadata indexMetadata;
 
-        /*
-         * The upper bound on the #of key-value pairs in the range.
-         * 
-         * Note: truncated to [int].
-         */
-        rangeCount = (int) ndx.rangeCount(fromKey, toKey);
+    /**
+     * Setup the internal buffers.
+     * 
+     * @param limit
+     *            The maximum #of tuples that will be materialized. Use (-limit)
+     *            for a soft limit. The caller should either use the suggested
+     *            capacity, compute either an actual limit or the upper bound
+     *            based on additional information, such as a range count, or
+     *            treat the suggested capacity as a soft limit if it is not
+     *            possible to determine the upper bound.
+     */
+    protected void init(int limit) {
 
-        final int limit = (rangeCount > capacity ? capacity : rangeCount);
+        if (init)
+            throw new IllegalStateException();
 
-//        int ntuples = 0;
-
-        final boolean sendKeys = (flags & IRangeQuery.KEYS) != 0;
-
-        final boolean sendVals = (flags & IRangeQuery.VALS) != 0;
-
-        keys = (sendKeys ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
-
-        vals = (sendVals ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
+        init = true;
         
-        final IndexMetadata indexMetadata = ndx.getIndexMetadata();
+//        if (limit < 0)
+//            throw new IllegalArgumentException();
+        
+        this.limit = limit;
+
+        if (limit < 0) {
+
+            // make the limit positive to allocate the arrays.
+            limit = -limit;
+            
+        }
+        
+        this.keys = (sendKeys ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
+
+        this.vals = (sendVals ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
         
         if(indexMetadata.getDeleteMarkers()) {
             
@@ -385,100 +405,139 @@ public class ResultSet implements Externalizable {
 
         }
 
-        leafKeySerializer = indexMetadata.getLeafKeySerializer();
-        
-        leafValSerializer = indexMetadata.getLeafValueSerializer();
-        
-        tupleSerializer = indexMetadata.getTupleSerializer();
-        
-        sources = ndx.getResourceMetadata();
-
-        // if one source then the index is always zero @todo presumes #sources in view <= 127
+        // if one source then the index is always zero
+        // @todo byte[] presumes #sources in view <= 127, which it SHOULD be (not checked).
         sourceIndices = sources.length > 1 ? new byte[limit] : null;
 
-        commitTime = (ndx instanceof AbstractBTree ? ((AbstractBTree) ndx)
-                .getLastCommitTime() : ((FusedView) ndx).srcs[0]
-                .getLastCommitTime());
+    }
+    private boolean init = false;
+    
+    /**
+     * Increase the size of the internal buffers.
+     */
+    private void resize() {
         
-        /*
-         * Iterator that will visit the key range.
-         * 
-         * Note: We always visit the keys regardless of whether we pass them on
-         * to the caller. This is necessary in order for us to set the [lastKey]
-         * field on the result set.
-         */
-        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
-                flags | IRangeQuery.KEYS, filter);
+        assert limit < 0;
 
-        /*
-         * true if any keys were visited regardless of whether or not they
-         * satisified the optional filter. This is used to make sure that we
-         * always return the lastKey visited if any keys were visited and
-         * otherwise set lastKey := null.
-         */
-        boolean anything = false;
-
-        /*
-         * @todo we could directly serialize the keys and values into a compact
-         * data model as they are copied out of the tuple.
-         */
-        ITuple tuple = null;
+        // double the limit.
+        limit = limit * 2;
         
-        if ((flags & IRangeQuery.REMOVEALL) != 0) {
+        int limit = this.limit;
 
-            log.info("Iterator will remove up to " + capacity
-                    + " entries (capacity=" + capacity + ", rangeCount="
-                    + rangeCount + ")");
-            
-        }
-        
-        while (ntuples < limit && itr.hasNext()) {
+        if (limit < 0)
+            limit = -limit;
 
-            anything = true;
+        // @todo restore info level once working smoothly.
+//        if (log.isInfoEnabled()) {
 
-            tuple = itr.next();
-            
-            if (sendKeys) // @todo define and use copyKey(ITuple)?
-                keys.add(tuple.getKey());
+            log.warn("resizing buffers: ntuples=" + ntuples + ", new limit=" + limit);
 
-            if (sendVals) // @todo define and use copyValue(ITuple)?
-                vals.add(tuple.getValue());
+        // }
 
-            if (deleteMarkers != null) {
+        if (this.keys != null) {
 
-                deleteMarkers[ntuples] = (byte) (tuple.isDeletedVersion() ? 1
-                        : 0);
-
-            }
-
-            if (versionTimestamps != null) {
-
-                versionTimestamps[ntuples] = tuple.getVersionTimestamp();
-
-            }
-
-            if (sourceIndices != null) {
-                
-                final int sourceIndex = tuple.getSourceIndex();
-                
-                assert sourceIndex < Byte.MAX_VALUE;
-                
-                sourceIndices[ntuples] = (byte) sourceIndex;
-                
-            }
-            
-            // #of results that will be returned.
-            ntuples++;
+            this.keys = this.keys.resize(limit);
 
         }
 
-//        this.ntuples = ntuples;
+        if (this.vals != null) {
 
-        this.lastKey = (anything ? tuple.getKey() : null);
+            this.vals = this.vals.resize(limit);
 
-        this.exhausted = !itr.hasNext();
+        }
 
-        log.info("ntuples=" + ntuples + ", capacity=" + capacity
+        if (this.deleteMarkers != null) {
+
+            byte[] deleteMarkers = new byte[limit];
+            
+            System.arraycopy(this.deleteMarkers, 0, deleteMarkers, 0, ntuples);
+
+            this.deleteMarkers = deleteMarkers;
+            
+        }
+
+        if (this.versionTimestamps != null) {
+
+            long[] versionTimestamps = new long[limit];
+
+            System.arraycopy(this.versionTimestamps, 0, versionTimestamps, 0, ntuples);
+
+            this.versionTimestamps = versionTimestamps;
+            
+        }
+
+        if(this.sourceIndices != null) {
+
+            byte[] sourceIndices = new byte[limit];
+            
+            System.arraycopy(this.sourceIndices, 0, sourceIndices, 0, ntuples);
+            
+            this.sourceIndices = sourceIndices;
+            
+        }
+        
+    }
+    
+    /**
+     * Notify that the iterator is done and communicate metadata back to the
+     * client about whether or not a continuation query should be issued against
+     * this index partition.
+     * <p>
+     * Note: the point of this method is to communicate the restart point for a
+     * continuation query (or that no continuation query is necessary). If you
+     * are scanning ahead to decide whether or not the next coherent chunk of
+     * tuples (e.g., a logical row) would fit in the buffer, then the restart
+     * point is the point from which the continuation query should start and the
+     * key to report is the last key before the start of the first logical row
+     * that was rejected because it would overflow the internal buffers.
+     * <p>
+     * Note: <code>!exhausted</code> the caller will issue a continuation
+     * query against this index partition whose <i>fromKey</i> is the successor
+     * of <i>lastKey</i> (the successor is formed using
+     * {@link BytesUtil#successor(byte[])}).
+     * <p>
+     * Note: If an index partition is <i>exhausted</i> there may still be data
+     * for the key range on subsequent index partitions the caller will discover
+     * the locator for the next index partition in key order whose left
+     * separator key is LE the <i>toKey</i> and query it for more results. If
+     * there is no such index partition then the aggregate iterator is finished.
+     * 
+     * @param exhausted
+     *            <code>true</code> iff the source iterator will not visit any
+     *            more tuples {@link Iterator#hasNext()} is <code>false</code>.
+     * @param lastKey
+     *            The key from the last tuple scanned by the source iterator
+     *            regardless of whether it was included in the result set -or-
+     *            <code>null</code> iff no tuples were scanned (this implies
+     *            that there is no data for the query in the key range on this
+     *            index partition and hence that it is <i>exhausted</i>).
+     */
+    protected void done(boolean exhausted, byte[] lastKey) {
+
+        if (!exhausted && lastKey == null) {
+
+            /*
+             * The iterator must be exhausted if [lastKey == null] since that
+             * implies that NO tuples were visited and hence that none lie
+             * within the optional key-range constraint for this index
+             * partition.
+             */
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        if (done)
+            throw new IllegalStateException();
+        
+        done = true;
+        
+        this.exhausted = exhausted;
+        
+        this.lastKey = lastKey;
+        
+        if(log.isInfoEnabled())
+        log.info("ntuples=" + ntuples // + ", capacity=" + capacity
                 + ", exhausted=" + exhausted + ", sendKeys=" + sendKeys
                 + ", sendVals=" + sendVals + ", deleteMarkers="
                 + (deleteMarkers != null ? true : false) + ", timestamps="
@@ -486,7 +545,83 @@ public class ResultSet implements Externalizable {
                 + commitTime);
 
     }
+    private boolean done = false;
 
+    /**
+     * <code>true</code> iff the internal buffers are full. 
+     */
+    protected boolean isFull() {
+
+        return ntuples >= limit;
+        
+    }
+    
+    /**
+     * Copies the data from the tuple into the internal buffers.
+     * 
+     * @param tuple
+     *            The tuple.
+     */
+    protected void copyTuple(ITuple tuple) {
+
+        if (tuple == null)
+            throw new IllegalArgumentException();
+        
+        assertRunning();
+
+        if(isFull() && limit<0) {
+            
+            resize();
+            
+        }
+        
+        if (sendKeys) // @todo define and use copyKey(ITuple)?
+            keys.add(tuple.getKey());
+
+        if (sendVals) // @todo define and use copyValue(ITuple)?
+            vals.add(tuple.getValue());
+
+        if (deleteMarkers != null) {
+
+            deleteMarkers[ntuples] = (byte) (tuple.isDeletedVersion() ? 1
+                    : 0);
+
+        }
+
+        if (versionTimestamps != null) {
+
+            versionTimestamps[ntuples] = tuple.getVersionTimestamp();
+
+        }
+
+        if (sourceIndices != null) {
+            
+            final int sourceIndex = tuple.getSourceIndex();
+            
+            assert sourceIndex < Byte.MAX_VALUE;
+            
+            sourceIndices[ntuples] = (byte) sourceIndex;
+            
+        }
+        
+        // #of results that will be returned.
+        ntuples++;
+
+    }
+    
+    /**
+     * true once {@link #init(int)} has been called and until
+     * {@link #done(byte[])} is called.
+     */
+    protected void assertRunning() {
+
+        if (init && !done)
+            return;
+        
+        throw new IllegalStateException();
+        
+    }
+    
     protected static short VERSION0 = 0x0;
 
     public void readExternal(ObjectInput in) throws IOException,
@@ -497,7 +632,7 @@ public class ResultSet implements Externalizable {
         if (version != VERSION0)
             throw new IOException("Unknown version=" + version);
 
-        rangeCount = (int) LongPacker.unpackLong(in);
+//        rangeCount = (int) LongPacker.unpackLong(in);
 
         ntuples = (int) LongPacker.unpackLong(in);
 
@@ -509,9 +644,9 @@ public class ResultSet implements Externalizable {
         
         exhausted = in.readBoolean();
 
-        final boolean haveKeys = in.readBoolean();
+        final boolean haveKeys = in.readBoolean(); sendKeys = haveKeys;
 
-        final boolean haveVals = in.readBoolean();
+        final boolean haveVals = in.readBoolean(); sendVals = haveVals;
 
         final boolean haveDeleteMarkers = in.readBoolean();
 
@@ -613,7 +748,7 @@ public class ResultSet implements Externalizable {
 
         ShortPacker.packShort(out, VERSION0);
 
-        LongPacker.packLong(out, rangeCount);
+//        LongPacker.packLong(out, rangeCount);
 
         LongPacker.packLong(out, ntuples);
 
@@ -685,8 +820,10 @@ public class ResultSet implements Externalizable {
         /*
          * @todo reuse the timestamp serialization logic from the NodeSerializer
          * once something efficient has been identifier, e.g., huffman encoding
-         * of timestamps.  @todo config on IndexMetadata along with serialization
-         * for the deletemarkers.
+         * of timestamps.
+         * 
+         * @todo config on IndexMetadata along with serialization for the
+         * deleteMarkers.
          */
 
         if (versionTimestamps != null) {
@@ -716,4 +853,108 @@ public class ResultSet implements Externalizable {
         
     }
 
+    /**
+     * Deserialization constructor.
+     */
+    public ResultSet() {
+    }
+
+    /**
+     * The basic approach is:
+     * <ol>
+     * 
+     * <li>Create a new {@link ResultSet}</li>
+     * 
+     * <li>Invoke {@link #init(int)} to setup the internal buffers.</li>
+     * 
+     * <li>Apply the source {@link ITupleIterator}, using
+     * {@link #copyTuple(ITuple)} to copy data into those buffers.</li>
+     * 
+     * <li>Signal completion using {@link #done(boolean, byte[])}</li>
+     * 
+     * </ol>
+     * 
+     * @param ndx
+     *            The index.
+     * @param flags
+     *            The flags specified for the iterator. See {@link IRangeQuery}.
+     */
+    public ResultSet(IIndex ndx, int flags) {
+
+        if (ndx == null)
+            throw new IllegalArgumentException();
+        
+        sendKeys = (flags & IRangeQuery.KEYS) != 0;
+
+        sendVals = (flags & IRangeQuery.VALS) != 0;
+
+        indexMetadata = ndx.getIndexMetadata();
+        
+        leafKeySerializer = indexMetadata.getLeafKeySerializer();
+        
+        leafValSerializer = indexMetadata.getLeafValueSerializer();
+        
+        tupleSerializer = indexMetadata.getTupleSerializer();
+        
+        sources = ndx.getResourceMetadata();
+
+        commitTime = (ndx instanceof AbstractBTree ? ((AbstractBTree) ndx)
+                .getLastCommitTime() : ((FusedView) ndx).srcs[0]
+                .getLastCommitTime());
+
+    }
+
+    /**
+     * Constructor used to populate the {@link ResultSet} directly from an
+     * iterator.
+     * <p>
+     * Note: The <i>itr</i> provided to this method MUST be created with
+     * {@link IRangeQuery#KEYS} so that we can report the lastKey visited for
+     * continuation queries.
+     * 
+     * @param ndx
+     *            The index.
+     * @param capacity
+     *            The requested capacity for the operation.
+     * @param flags
+     *            The flags specified for the iterator.
+     * @param itr
+     *            The source iterator.
+     */
+    public ResultSet(IIndex ndx, int capacity, int flags, ITupleIterator itr) {
+
+        this(ndx, flags);
+        
+        // initialize the buffers.
+        init(capacity);
+        
+        /*
+         * Copy tuples into the result set buffers.
+         */
+
+        ITuple tuple = null;
+
+        while (!isFull() && itr.hasNext()) {
+
+            copyTuple(tuple = itr.next());
+            
+        }
+
+        /*
+         * True iff the source iterator will not visit any more tuples.
+         */
+        final boolean exhausted = !itr.hasNext();
+        
+        /*
+         * We always return the lastKey visited and set lastKey := null iff no
+         * keys were scanned. This ensures that tuples that are filtered out are
+         * not re-scanned by a continuation query.
+         */
+        final byte[] lastKey = (tuple == null ? null : tuple.getKey());
+
+        // Signal completion.
+        done(exhausted, lastKey);
+
+    }
+    
 }

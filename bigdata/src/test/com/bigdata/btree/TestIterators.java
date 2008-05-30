@@ -63,10 +63,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         super(name);
     }
 
-    /**
-     * @todo test the effect of these flags.
-     */
-    final int flags = IRangeQuery.KEYS|IRangeQuery.VALS;
+    final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
     
     /**
      * Test ability to visit the entries on a leaf in key order.
@@ -479,22 +476,15 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new byte[][] { v3, v5, v7 }, new TupleIterator(a,
                 new Tuple(btree,IRangeQuery.DEFAULT), null, null, null));
         
-        /*
-         * FIXME Exceptions will be thrown for all of these filter tests since
-         * they were written with the assumption that the IEntryIterator visited
-         * the values stored under the keys in the index. In fact, it now visits
-         * Tuples (actually, it returns a Tuple that reflects the current index
-         * entry each time you call next()).
-         */
-        
         // visit everything except v3.
         assertSameIterator(new byte[][] { v5, v7 },//
                 a.rangeIterator(null, null, flags, new TupleFilter() {
                     private static final long serialVersionUID = 1L;
 
                     public boolean isValid(ITuple tuple) {
-                        return BytesUtil.compareBytesWithLenAndOffset(0,
-                                v3.length, v3, 0, v3.length, tuple.getValue()) != 0;
+                        return !BytesUtil.bytesEqual(v3, tuple.getValue());
+//                        return BytesUtil.compareBytesWithLenAndOffset(0,
+//                                v3.length, v3, 0, v3.length, tuple.getValue()) != 0;
                     }
                 }));
         
@@ -503,8 +493,9 @@ public class TestIterators extends AbstractBTreeTestCase {
                 a.rangeIterator(null, null, flags, new TupleFilter() {
                     private static final long serialVersionUID = 1L;
                     public boolean isValid(ITuple tuple) {
-                        return BytesUtil.compareBytesWithLenAndOffset(0,
-                                v5.length, v5, 0, v5.length, tuple.getValue()) != 0;
+                        return !BytesUtil.bytesEqual(v5, tuple.getValue());
+//                        return BytesUtil.compareBytesWithLenAndOffset(0,
+//                                v5.length, v5, 0, v5.length, tuple.getValue()) != 0;
                     }
                     }
                 ));
@@ -522,8 +513,9 @@ public class TestIterators extends AbstractBTreeTestCase {
                 a.rangeIterator(null, null, flags, new TupleFilter() {
                     private static final long serialVersionUID = 1L;
                     public boolean isValid(ITuple tuple) {
-                        return BytesUtil.compareBytesWithLenAndOffset(0,
-                                v7.length, v7, 0, v7.length, tuple.getValue()) != 0;
+                        return !BytesUtil.bytesEqual(v7, tuple.getValue());
+//                        compareBytesWithLenAndOffset(0,
+//                                v7.length, v7, 0, v7.length, tuple.getValue()) != 0;
                     }
                     }
                 ));

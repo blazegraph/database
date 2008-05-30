@@ -49,10 +49,12 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.Banner;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -72,6 +74,7 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
@@ -1788,10 +1791,39 @@ abstract public class DataService extends AbstractService
 
         }
 
-        public Object doTask() throws Exception {
+        public ResultSet doTask() throws Exception {
 
-            return new ResultSet(getIndex(getOnlyResource()), fromKey, toKey,
-                    capacity, flags, filter);
+            final IIndex ndx = getIndex(getOnlyResource());
+            
+            /*
+             * Figure out the upper bound on the #of tuples that could be
+             * materialized.
+             * 
+             * Note: the upper bound on the #of key-value pairs in the range is
+             * truncated to an [int].
+             */
+            
+            final int rangeCount = (int) ndx.rangeCount(fromKey, toKey);
+
+            final int limit = (rangeCount > capacity ? capacity : rangeCount);
+
+            /*
+             * Iterator that will visit the key range.
+             * 
+             * Note: We always visit the keys regardless of whether we pass them
+             * on to the caller. This is necessary in order for us to set the
+             * [lastKey] field on the result set and that is necessary to
+             * support continuation queries.
+             */
+            
+            final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, limit,
+                    flags | IRangeQuery.KEYS, filter);
+            
+            /*
+             * Populate the result set from the iterator.
+             */
+
+            return new ResultSet(ndx, capacity, flags, itr);
 
         }
         
