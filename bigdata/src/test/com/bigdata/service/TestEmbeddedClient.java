@@ -53,7 +53,8 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
     }
 
     /**
-     * Test ability to register a scale-out index.
+     * Test ability to register a scale-out index, access it, and then drop the
+     * index.
      */
     public void test_registerIndex() {
 
@@ -63,23 +64,60 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
         
         metadata.setDeleteMarkers(true);
 
-        final long tx = ITx.UNISOLATED;
-        
         // verify index does not exist.
-        assertNull(fed.getIndex(name,tx));
+        assertNull(fed.getIndex(name,ITx.UNISOLATED));
+        assertNull(fed.getIndex(name,ITx.READ_COMMITTED));
         
         // register.
         fed.registerIndex(metadata);
         
-        // obtain view.
-        IIndex ndx = fed.getIndex(name,tx);
+        // obtain unisolated view.
+        {
 
-        // verify view is non-null
-        assertNotNull(ndx);
+            final long tx = ITx.UNISOLATED;
+
+            final IIndex ndx = fed.getIndex(name, tx);
+
+            // verify view is non-null
+            assertNotNull(ndx);
+
+            // verify same index UUID.
+            assertEquals(metadata.getIndexUUID(), ndx.getIndexMetadata()
+                    .getIndexUUID());
+            
+        }
         
-        // verify same index UUID.
-        assertEquals(metadata.getIndexUUID(),ndx.getIndexMetadata().getIndexUUID());
+        // obtain read-committed view.
+        {
+
+            final long tx = ITx.READ_COMMITTED;
+
+            final IIndex ndx = fed.getIndex(name, tx);
+
+            // verify view is non-null
+            assertNotNull(ndx);
+
+            // verify same index UUID.
+            assertEquals(metadata.getIndexUUID(), ndx.getIndexMetadata()
+                    .getIndexUUID());
+
+        }
         
+        // drop the index.
+        fed.dropIndex(name);
+        
+        // no longer available to read committed requests.
+        assertNull(fed.getIndex(name, ITx.READ_COMMITTED));
+        
+        // no longer available to unisolated requests.
+        assertNull(fed.getIndex(name, ITx.UNISOLATED));
+        
+        /*
+         * @todo obtain a valid commit timestamp for the index during the period
+         * in which it existed and verify that a historical view may still be
+         * obtained for that timestamp.
+         */
+
     }
 
     /**
