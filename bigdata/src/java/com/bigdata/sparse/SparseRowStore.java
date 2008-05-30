@@ -32,6 +32,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.AbstractTupleFilterator.AtomicRowIterator2;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.sparse.AtomicRowScan.TPSList;
 
@@ -60,7 +61,7 @@ import com.bigdata.sparse.AtomicRowScan.TPSList;
  * 
  * <pre>
  *                                             
- *                            [schemaName][primaryKey][columnName][timestamp]
+ * [schemaName][primaryKey][columnName][timestamp]
  *                                             
  * </pre>
  * 
@@ -150,6 +151,12 @@ import com.bigdata.sparse.AtomicRowScan.TPSList;
  *       for a property. Also, the returned
  *       {@link ITPS timestamped property sets} make it relatively easy to find
  *       the value of interest.
+ * 
+ * @todo It would be nice to allow blob references in the {@link SparseRowStore}.
+ *       That will require another {@link ValueType} and the {@link TPS} will
+ *       need to carry the additional metadata for the blob (the source resource
+ *       from which the block may be read). This effects the
+ *       {@link AtomicRowScan} or {@link AtomicRowIterator2} as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

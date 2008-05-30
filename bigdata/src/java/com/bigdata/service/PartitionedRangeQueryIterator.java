@@ -37,7 +37,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
@@ -246,7 +245,8 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
         /*
          * FIXME we need the KEYS in order to keep [lastKeyVisited] up to date.
          * See [lastKeyVisited] to resolve this, but we STILL will need KEYS for
-         * REMOVEALL (above).
+         * REMOVEALL (above) until the iterator supports remove semantics during
+         * traversal.
          */
         this.flags = IRangeQuery.KEYS | flags;
         
@@ -342,7 +342,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
                 // Recursive query.
                 return hasNext();
                 
-            }
+            } else throw ex;
             
         }
         
@@ -445,7 +445,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
             
             final int partitionId = locator.getPartitionId();
             
-            log.info("name=" + ndx.getName() + ", tx=" + timestamp + ", partition="
+            if(log.isInfoEnabled()) log.info("name=" + ndx.getName() + ", tx=" + timestamp + ", partition="
                     + partitionId + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
             

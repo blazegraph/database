@@ -141,17 +141,6 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
         ndx.submit(0/*fromIndex*/,n/*toIndex*/, keys, null/* vals */,
                 BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
 
-//        try {
-//
-//            dataService.submit(tx, name, new BatchRemove(n, 0/* offset */,
-//                    keys, false/* returnOldValues */));
-//
-//        } catch (Exception e) {
-//
-//            throw new RuntimeException(e);
-//
-//        }
-
     }
 
     @Override
@@ -163,19 +152,7 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
 
         ndx.submit(0/*fromIndex*/,1/*toIndex*/, new byte[][] { key }, null/* vals */,
                 BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
-
-//        try {
-//            
-//            dataService.submit(tx, name, new BatchRemove(1, 0/* offset */,
-//                    new byte[][] { key }, false/* returnOldValues */));
-//
-//        } catch (Exception e) {
-//            
-//            throw new RuntimeException(e);
-//            
-//        }
         
     }
-
     
 }

@@ -63,10 +63,13 @@ import com.bigdata.service.Split;
  *       {@link ILinearList#indexOf(byte[])} a key is to use an iterator over
  *       the fused view and scan until the key is matched.
  * 
+ * @todo consider implementing {@link ILocalBTree} here and collapsing
+ *       {@link ILocalBTreeView} and {@link ILocalBTree}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FusedView implements IIndex {
+public class FusedView implements IIndex, ILocalBTreeView {
 
     protected static final Logger log = Logger.getLogger(FusedView.class);
 
@@ -128,6 +131,12 @@ public class FusedView implements IIndex {
         
     }
 
+    public BTree getMutableBTree() {
+        
+        return (BTree) srcs[0];
+        
+    }
+    
     public IResourceMetadata[] getResourceMetadata() {
         
         IResourceMetadata[] resources = new IResourceMetadata[srcs.length];

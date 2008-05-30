@@ -223,7 +223,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements IIndex, ICommitter {
+public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBTreeView {
     
     /**
      * The default branching factor.
@@ -1407,6 +1407,12 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             return wrap( src.incrementAndGet() );
 
         }
+        
+    }
+    
+    final public BTree getMutableBTree() {
+        
+        return this;
         
     }
     

@@ -477,7 +477,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             final IDataService targetDataService = resourceManager
                     .getDataService(moveResult.targetDataServiceUUID);
             
-            final int chunkSize = 10000;
+            final int capacity = 10000;
             
             final IIndex src = getIndex(getOnlyResource());
 
@@ -490,12 +490,28 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             long ncopied = 0; // #of tuples copied.
             byte[] fromKey = null; // updated after each pass.
             final byte[] toKey = null; // upper bound is fixed.
+            final int flags = IRangeQuery.ALL;
             
             while (true) {
+                
+                /*
+                 * Figure out the upper bound on the #of tuples that could be
+                 * materialized.
+                 * 
+                 * Note: the upper bound on the #of key-value pairs in the range is
+                 * truncated to an [int].
+                 */
+                
+                final int rangeCount = (int) src.rangeCount(fromKey, toKey);
 
-                // Build result set from the unisolated view.
-                final ResultSet rset = new ResultSet(src, fromKey, toKey,
-                        chunkSize/* capacity */, IRangeQuery.ALL, null/* filter */);
+                final int limit = (rangeCount > capacity ? capacity : rangeCount);
+
+                // iterator reading from the unisolated view.
+                final ITupleIterator itr = src.rangeIterator(fromKey, toKey, limit,
+                        flags, null/*filter*/);
+                
+                // Build result set from the iterator.
+                final ResultSet rset = new ResultSet(src, capacity, flags, itr);
 
                 /*
                  * Copy data in result set onto the target index partition.

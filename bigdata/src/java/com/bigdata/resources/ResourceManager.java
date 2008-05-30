@@ -316,6 +316,7 @@ abstract public class ResourceManager extends OverflowManager implements IResour
 
                 tmp.addCounter("Free Space on Data Volume", new Instrument<Long>(){
                     public void sample() {
+                        if(!isTransient())
                         setValue(getDataDirFreeSpace());
                     }
                 });

@@ -3,10 +3,10 @@ package com.bigdata.resources;
 import java.io.File;
 import java.util.Arrays;
 
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
@@ -75,16 +75,17 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         final String name = getOnlyResource();
 
         // The source view.
-        final IIndex src = getIndex(name);
+        final ILocalBTreeView src = (ILocalBTreeView)getIndex(name);
 
-        // note: the mutable btree - accessed here for debugging only.
-        final BTree btree;
-        if (src instanceof AbstractBTree) {
-            btree = (BTree) src;
-        } else {
-            btree = (BTree) ((FusedView) src).getSources()[0];
+        if (log.isInfoEnabled()) {
+
+            // note: the mutable btree - accessed here for debugging only.
+            final BTree btree = src.getMutableBTree();
+
+            log.info("src=" + name + ",counter=" + src.getCounter().get()
+                    + ",checkpoint=" + btree.getCheckpoint());
+
         }
-        log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+btree.getCheckpoint());
         
         // Build the index segment.
         final BuildResult result = resourceManager.buildIndexSegment(name, src,

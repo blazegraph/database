@@ -44,7 +44,10 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.DataServiceRangeIterator;
 
 /**
- * A chunked iterator that proceeds a {@link ResultSet} at a time.
+ * A chunked iterator that proceeds a {@link ResultSet} at a time. This
+ * introduces the concept of a {@link #continuationQuery()} so that the iterator
+ * can materialize the tuples using a sequence of queries that progresses
+ * through the index until all tuples in the key range have been visited.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -281,8 +284,9 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
 
         assert !exhausted;
 
-        log.info("fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
-                + BytesUtil.toString(toKey));
+        if (log.isInfoEnabled())
+            log.info("fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
+                    + BytesUtil.toString(toKey));
 
         // initial query.
         rset = getResultSet(getTimestamp(), fromKey, toKey, capacity, flags, filter);
@@ -305,9 +309,9 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
 
     /**
      * Issues a "continuation" query against the same index. This is invoked iff
-     * the there are no entries left to visit in the current {@link ResultSet}
-     * but {@link ResultSet#isExhausted()} is [false], indicating that there is
-     * more data available.
+     * there are no entries left to visit in the current {@link ResultSet} but
+     * {@link ResultSet#isExhausted()} is [false], indicating that there is more
+     * data available.
      */
     protected void continuationQuery() {
 
@@ -328,8 +332,9 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
 
         final byte[] _fromKey = rset.successor();
 
-        log.info("fromKey=" + BytesUtil.toString(_fromKey) + ", toKey="
-                + BytesUtil.toString(toKey));
+        if (log.isInfoEnabled())
+            log.info("fromKey=" + BytesUtil.toString(_fromKey) + ", toKey="
+                    + BytesUtil.toString(toKey));
 
         // continuation query.
         rset = getResultSet(getReadTime(),_fromKey, toKey, capacity, flags, filter);
