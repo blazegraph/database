@@ -87,6 +87,7 @@ public class TestAll extends TestCase {
         
         // test journal overflow scenarios (split/join).
         suite.addTestSuite( TestOverflow.class );
+        
         // test journal overflow scenarios (move) 
         suite.addTestSuite( TestIndexPartitionMove.class );
         
