@@ -132,7 +132,7 @@ public class AtomicRead extends AbstractIndexProcedure implements
     static protected TPS atomicRead(IKeyBuilder keyBuilder, IIndex ndx,
             Schema schema, Object primaryKey, long timestamp, INameFilter filter) {
 
-        final byte[] fromKey = schema.fromKey(keyBuilder,primaryKey).getKey(); 
+        final byte[] fromKey = schema.getPrefix(keyBuilder, primaryKey); 
 
 //        final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
         

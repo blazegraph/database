@@ -47,6 +47,13 @@ public interface ITPS {
     public Schema getSchema();
 
     /**
+     * The value of the primary key.
+     * 
+     * @return The value of the primary key
+     */
+    public Object getPrimaryKey();
+  
+    /**
      * The timestamp assigned by an atomic write operation.
      * 
      * @return The timestamp.
