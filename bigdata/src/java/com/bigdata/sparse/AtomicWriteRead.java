@@ -63,14 +63,14 @@ public class AtomicWriteRead extends AtomicRead {
     public AtomicWriteRead(Schema schema, Map<String, Object> propertySet,
             long timestamp, INameFilter filter) {
         
-        super(schema, propertySet.get(schema.getPrimaryKey()), timestamp,
+        super(schema, propertySet.get(schema.getPrimaryKeyName()), timestamp,
                 filter);
 
-        if (propertySet.get(schema.getPrimaryKey()) == null) {
+        if (propertySet.get(schema.getPrimaryKeyName()) == null) {
 
             throw new IllegalArgumentException(
                     "No value for primary key: name="
-                            + schema.getPrimaryKey());
+                            + schema.getPrimaryKeyName());
 
         }
 
@@ -149,7 +149,7 @@ public class AtomicWriteRead extends AtomicRead {
          */
 
         return atomicRead(getKeyBuilder(ndx), ndx, schema, propertySet
-                .get(schema.getPrimaryKey()), timestamp, filter);
+                .get(schema.getPrimaryKeyName()), timestamp, filter);
         
     }
 
@@ -159,7 +159,7 @@ public class AtomicWriteRead extends AtomicRead {
 
         if(log.isInfoEnabled())
         log.info("Schema=" + schema + ", primaryKey="
-                + schema.getPrimaryKey() + ", value=" + primaryKey
+                + schema.getPrimaryKeyName() + ", value=" + primaryKey
                 + ", ntuples=" + propertySet.size());
         
         final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
@@ -255,6 +255,7 @@ public class AtomicWriteRead extends AtomicRead {
 
                         counter = ((Number) val.getValue()).longValue();
                         
+                        if(log.isInfoEnabled())
                         log.info("Previous value: name=" + col
                                 + ", counter=" + counter + ", timestamp="
                                 + val.getTimestamp());
@@ -302,6 +303,7 @@ public class AtomicWriteRead extends AtomicRead {
         // #of property values.
         final int n = in.readInt();
 
+        if(log.isInfoEnabled())
         log.info("Reading "+n+" property values");
 
         for(int i=0; i<n; i++) {
@@ -312,6 +314,7 @@ public class AtomicWriteRead extends AtomicRead {
 
             propertySet.put(name,value);
             
+            if(log.isInfoEnabled())
             log.info("name=" + name + ", value=" + value);
             
         }

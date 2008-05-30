@@ -98,6 +98,19 @@ public class TestTPS extends TestCase2 {
         assertEquals(null,tps.get("foo", t1).getValue());
         
     }
+    
+    public void test_getPrimaryKey() {
+        
+        // note: null since not bound.
+        assertEquals(null,tps.getPrimaryKey());
+
+        // set the primary key.
+        tps.set(schema.getPrimaryKeyName(), t1, "ABC");
+
+        // note: it is now not bound.
+        assertEquals("ABC",tps.getPrimaryKey());
+
+    }
 
     public void test_getSet_boundOnce() {
         
@@ -398,7 +411,7 @@ public class TestTPS extends TestCase2 {
         
         assertEquals(msg+".name", expected.getName(),actual.getName());
         
-        assertEquals(msg+".primaryKey", expected.getPrimaryKey(),actual.getPrimaryKey());
+        assertEquals(msg+".primaryKey", expected.getPrimaryKeyName(),actual.getPrimaryKeyName());
         
         assertEquals(msg+".primaryKeyType", expected.getPrimaryKeyType(),actual.getPrimaryKeyType());
         

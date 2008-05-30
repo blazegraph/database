@@ -283,6 +283,8 @@ public class KeyDecoder {
                         
                         found = true;
                         
+                        break;
+                        
                     }
 
                 }
@@ -374,7 +376,9 @@ public class KeyDecoder {
 
                 throw new RuntimeException(
                         "Could not locate the end of the column name: keyType="
-                                + primaryKeyType+", key="+BytesUtil.toString(key));
+                                + primaryKeyType + ", columnNameOffset="
+                                + columnNameOffset + ", key="
+                                + BytesUtil.toString(key));
 
             }
             
@@ -394,7 +398,9 @@ public class KeyDecoder {
 
                 throw new RuntimeException(
                         "Could not decode the column name: keyType="
-                                + primaryKeyType + ", key="
+                                + primaryKeyType + ", columnNameOffset="
+                                + columnNameOffset + ", columnNameLength="
+                                + columnNameLength + ", key="
                                 + BytesUtil.toString(key));
 
             }
@@ -424,6 +430,15 @@ public class KeyDecoder {
         System.arraycopy(key, 0, b, 0, n);
         
         return b;
+        
+    }
+    
+    /**
+     * Shows some of the data that is extracted.
+     */
+    public String toString() {
+        
+        return "KeyDecoder{primaryKeyType="+primaryKeyType+",col="+col+",timestamp="+timestamp+",key="+key+"}";
         
     }
     

@@ -206,7 +206,7 @@ public class TestSparseRowStore extends TestCase2 {
                 {
 
                     // extract the primary key for this row.
-                    Object primaryKey = row.get(schema.getPrimaryKey());
+                    Object primaryKey = row.get(schema.getPrimaryKeyName());
 
                     // read the row from the store.
                     ITPS tps = srs.read(keyBuilder, schema, primaryKey,
@@ -269,7 +269,7 @@ public class TestSparseRowStore extends TestCase2 {
                 Map<String,Object> expected = rows.get(i);
                 
                 // extract the primary key for this row.
-                Object primaryKey = expected.get(schema.getPrimaryKey());
+                Object primaryKey = expected.get(schema.getPrimaryKeyName());
                 
                 /*
                  * Use the date of hire column as the timestamp on the record.

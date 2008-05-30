@@ -105,7 +105,7 @@ public class Schema implements Externalizable {
     /**
      * The name of the column whose value is the primary key.
      */
-    public String getPrimaryKey() {
+    public String getPrimaryKeyName() {
         
         return primaryKey;
         
@@ -299,6 +299,21 @@ public class Schema implements Externalizable {
 
     }
 
+    /**
+     * The prefix that identifies all tuples in the logical row for this schema
+     * having the indicated value for their primary key.
+     * 
+     * @param primaryKey
+     *            The value of the primary key for the logical row.
+     * 
+     * @return
+     */
+    final public byte[] getPrefix(IKeyBuilder keyBuilder,Object primaryKey) {
+        
+        return fromKey(keyBuilder, primaryKey).getKey();
+        
+    }
+    
     /*
      * Note: use SuccessorUtil.successor(key.clone()) instead.
      */
@@ -423,6 +438,13 @@ public class Schema implements Externalizable {
         out.writeUTF(primaryKey);
         
         out.writeByte(primaryKeyType.getByteCode());
+        
+    }
+
+    public String toString() {
+        
+        return "Schema{name=" + getName() + ",primaryKeyName=" + getPrimaryKeyName()
+                + ",primaryKeyType=" + getPrimaryKeyType() + "}";
         
     }
     

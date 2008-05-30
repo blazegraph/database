@@ -90,11 +90,12 @@ public class TPS implements ITPS, Externalizable {
     /**
      * 
      * @param schema
+     *            The schema.
      * @param timestamp
      *            The timestamp used as the basis for the read. When the data
      *            were read back as part of an atomic write, then this MUST be
      *            the timestamp of the atomic write. That can be either a caller
-     *            given timestamp or a server assigned timestamp.  Regardless the
+     *            given timestamp or a server assigned timestamp. Regardless the
      *            value will be returned by {@link #getTimestamp()}.
      */
     public TPS(Schema schema,long timestamp) {
@@ -107,6 +108,22 @@ public class TPS implements ITPS, Externalizable {
         this.tuples = new TreeMap<TP,ITPV>();
         
         this.timestamp = timestamp;
+        
+    }
+    
+    /**
+     * The value of the primary key.
+     * <p>
+     * Note: This looks up and returns the value of the
+     * {@link Schema#getPrimaryKeyName()} property
+     * 
+     * @return The value of the primary key -or- <code>null</code> if there
+     *         are no property values bound for the property named by
+     *         {@link Schema#getName()}.
+     */
+    public Object getPrimaryKey() {
+        
+        return get(schema.getPrimaryKeyName()).getValue();
         
     }
 

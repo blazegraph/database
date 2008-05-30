@@ -403,7 +403,7 @@ public class SparseRowStore {
         final AtomicWriteRead proc = new AtomicWriteRead(schema, propertySet,
                 timestamp, filter);
         
-        final Object primaryKey = propertySet.get(schema.getPrimaryKey());
+        final Object primaryKey = propertySet.get(schema.getPrimaryKeyName());
 
         final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
 
