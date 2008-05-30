@@ -311,7 +311,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
          */
         try {
 
-            log.info(toString() + ": run - start");
+            if(log.isInfoEnabled()) log.info(toString() + ": run - start");
 
             if(Thread.interrupted()) {
                 
@@ -340,7 +340,7 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
             }
 
-            log.info(toString() + ": run - end");
+            if(log.isInfoEnabled()) log.info(toString() + ": run - end");
 
             lockManager.didSucceed(this);
 
