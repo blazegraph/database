@@ -97,8 +97,23 @@ public interface IKeyBuffer extends IRandomAccessByteArray {
      * insert position for that search key. When invoked by a node, the insert
      * position is translated to identify the child that spans the search key.
      * When invoked by a leaf, the insert position is interpreted as either a
-     * key not found or a key found.
+     * key not found or a key found. You can translate an insert position into a
+     * tuple index using
      * </p>
+     * 
+     * <pre>
+     * entryIndex = -entryIndex - 1
+     * </pre>
+     * 
+     * <p>
+     * or just
+     * </p>
+     * 
+     * <pre>
+     * entryIndex = -entryIndex
+     * </pre>
+     * 
+     * if you are looking for the first key after the searchKey.
      * 
      * @param searchKey
      *            The search key.

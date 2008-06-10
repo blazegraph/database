@@ -163,6 +163,14 @@ public interface IRangeQuery {
      *            The first key that will NOT be visited (exclusive). When
      *            <code>null</code> there is no upper bound.
      * 
+     * @throws RuntimeException
+     *             if <i>fromKey</i> is non-<code>null</code> and orders LT
+     *             the inclusive lower bound for an index partition.
+     * 
+     * @throws RuntimeException
+     *             if <i>toKey</i> is non-<code>null</code> and orders GTE
+     *             the exclusive upper bound for an index partition.
+     * 
      * @see #entryIterator(), which visits all entries in the btree.
      * 
      * @see SuccessorUtil, which may be used to compute the successor of a value

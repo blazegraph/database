@@ -41,6 +41,10 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @param E
+ *            The generic type of the de-serialized objects stored in the values
+ *            of the index.
+ * 
  * @todo consider only the {@link #getKeyStream()} and {@link #getValueStream()}
  *       vs the {@link #getKeyBuffer()} and {@link #getValueBuffer()} methods.
  *       do we need both?

@@ -68,34 +68,6 @@ import com.bigdata.sparse.ValueType;
  * {@link AbstractTupleFilteratorConstructor} so that we can describe the filter
  * on the client and have it instantiated with its state on the server.
  * 
- * FIXME Modify {@link TupleIterator} to use
- * {@link Node#getLeftSibling(AbstractNode, boolean)} and
- * {@link Node#getRightSibling(AbstractNode, boolean)} and to traverse the leafs
- * in either order and without the post-order striterator (but we still need
- * post- order traversal for flushing evicted nodes to the store!) We need to
- * keep the hard reference stack of the parent nodes during the traversal
- * because the child NEVER has the address of its parent (this is true for the
- * index segment also).
- * 
- * FIXME Support {@link TupleIterator#remove()}. The iterator needs to touch up
- * its state when a tuple is deleted. This can not be treated directly within
- * remove() since deleting a tuple can cause a leaf to underflow resulting in a
- * cascade of structural changes to the B+Tree. We need a listener that is
- * registered by the iterator and notices when a structural change has
- * invalidated either the leaf on which it is sitting or the location of the
- * tuple (it may have been rotated to another leaf or even deleted). It then
- * needs to re-establish the stack of hard references from the root (which may
- * have changed) all the way down to whatever leaf has the insertion point for
- * the tuple that was just deleted. next() or prior() will then do the right
- * thing from there. This implies that the TupleIterator needs a {@link Node}
- * {@link Stack} and must not use recursion when it establishes the point from
- * which it needs to traverse - either when it delivers the first tuple or after
- * the structure has been invalidated. This will also let the iterator survive
- * concurrent modification of the BTree by code in the same thread (it is not
- * thread-safe for writes, but you can write on the index while running through
- * the iterator and it will do the right thing). This is similar to how GOM
- * handles traversal of the linked list.
- * 
  * FIXME Get rid of the nasty code using {@link ChunkedLocalRangeIterator} to
  * handle {@link IRangeQuery#REMOVEALL}
  * 
@@ -107,10 +79,10 @@ import com.bigdata.sparse.ValueType;
  * maps a caller supplied {@link AbstractTupleFilterator} across those keys.
  * This will be used for the prefix scan.
  * 
- * FIXME The distinct term scan can be written just yet. It needs to advance the
- * {@link ITupleIterator} to a key formed from the successor of the current key.
- * In order to support that {@link TupleIterator} needs to support the "gotoKey"
- * (as long as it is within the half-open range) and an
+ * FIXME The distinct term scan can not be written just yet. It needs to advance
+ * the {@link ITupleIterator} to a key formed from the successor of the current
+ * key. In order to support that {@link TupleIterator} needs to support the
+ * "gotoKey" (as long as it is within the half-open range) and an
  * {@link AbstractTupleFilterator} can then be written that advances the source
  * iterator. Since it will all be "just an iterator" the client code will map it
  * across the index partitions without change. (Note: this does suggest that
@@ -580,6 +552,11 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
                  *       have to carry the UUID for the store from which the
                  *       blob could be read as part of the property value stored
                  *       in a TPS.
+                 *       <p>
+                 *       Currently, blobs are stored in the same index as the
+                 *       blob reference. In order to allow blobs to be stored in
+                 *       a different index the name of the scale out index would
+                 *       have to be in the blob reference.
                  */
                 @Override
                 public int getSourceIndex() {

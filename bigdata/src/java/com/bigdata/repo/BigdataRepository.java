@@ -56,9 +56,9 @@ import cutthecrap.utils.striterators.Striterator;
  * structured so as to look like a hierarchical file system using any desired
  * convention. Files are versioned and historical versions MAY be accessed until
  * the next compacting merge discards their data. File data is stored in large
- * {@link #blockSize} blocks. Partial and even empty blocks are allowed and
- * only the data written will be stored. <code>2^63-1</code> distinct blocks
- * may be written per file version, making the maximum possible file size
+ * {@link #blockSize} blocks. Partial and even empty blocks are allowed and only
+ * the data written will be stored. <code>2^63-1</code> distinct blocks may be
+ * written per file version, making the maximum possible file size
  * <code>536,870,912</code> exabytes. Files may be used as queues, in which
  * case blocks containing new records are atomically appended while a map/reduce
  * style master consumes the head block of the file.
@@ -169,6 +169,15 @@ import cutthecrap.utils.striterators.Striterator;
  * This approach is necessary since files may moved from one "zone" to another
  * and since the file data must reside on the index partition(s) identified by
  * its file version.
+ * 
+ * FIXME refactor using an intrinsic "blob" column type in the
+ * {@link SparseRowStore} and dropping the {@link #dataIndex}. This will
+ * co-locate the blob data with the blob references and make the
+ * {@link BigdataRepository} just added logic supporting a specific schema over
+ * the {@link SparseRowStore}.
+ * 
+ * FIXME write a JSON API that interoperates to the extent possible with GAE and
+ * HBASE.
  * 
  * @todo implement "zones" and their various policies (replication, retention,
  *       and media indexing). access control could also be part of the zones.

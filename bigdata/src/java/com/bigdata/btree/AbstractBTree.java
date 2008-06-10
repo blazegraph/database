@@ -1429,7 +1429,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         counters.nrangeIterator++;
 
         if ((flags & REVERSE) != 0) {
-            
+
             // FIXME The reverse scan option has not been implemented yet.
             throw new UnsupportedOperationException("Reverse scan is not implemented");
             
