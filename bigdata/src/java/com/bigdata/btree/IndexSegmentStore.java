@@ -243,6 +243,28 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          * @see #BUFFER_NODES
          */
         String DEFAULT_BUFFER_NODES = "true";
+     
+        /**
+         * The size of the LRU cache backing the weak reference cache for leaves
+         * (default {@value #DEFAULT_LEAF_CACHE_SIZE}).
+         * <p>
+         * While the {@link AbstractBTree} already provides caching for nodes
+         * and leaves based on navigation down the hierarchy from the root node,
+         * the {@link IndexSegment} uses an additional leaf cache to optimize
+         * access to leaves based on the double-linked list connecting the
+         * leaves.
+         * <p>
+         * A larger value will tend to retain leaves longer at the expense of
+         * consuming more RAM when many parts of the {@link IndexSegment} are
+         * hot.
+         */
+        String LEAF_CACHE_SIZE = "leafCacheSize";
+        
+        /**
+         * 
+         * @see #LEAF_CACHE_SIZE
+         */
+        String DEFAULT_LEAF_CACHE_SIZE = "100";
         
     }
     

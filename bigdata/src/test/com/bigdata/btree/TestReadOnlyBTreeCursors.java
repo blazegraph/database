@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,44 +20,54 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Dec 12, 2006
+ * Created on Jun 10, 2008
  */
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
+
 /**
- * A key-value pair used to facilitate some iterator constructs.
+ * Unit tests for {@link ITupleCursor} for a read-only {@link BTree}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Tuple<E> extends AbstractTuple<E> {
+public class TestReadOnlyBTreeCursors extends AbstractBTreeCursorTestCase {
 
-    protected final AbstractBTree btree;
-    
-    public int getSourceIndex() {
-        
-        return 0;
-        
+    /**
+     * 
+     */
+    public TestReadOnlyBTreeCursors() {
     }
-    
-    public Tuple(AbstractBTree btree, int flags) {
 
-        super(flags);
-        
-        if (btree == null)
-            throw new IllegalArgumentException();
-        
-        this.btree = btree;
-        
+    /**
+     * @param arg0
+     */
+    public TestReadOnlyBTreeCursors(String arg0) {
+        super(arg0);
     }
+
 
     @Override
-    ITupleSerializer getTupleSerializer() {
+    protected boolean isReadOnly() {
+    
+        return true;
+        
+    }
+    
+    @Override
+    protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags,
+            byte[] fromKey, byte[] toKey) {
 
-        return btree.getIndexMetadata().getTupleSerializer();
+        assert btree.isReadOnly();
+        
+        return new ReadOnlyBTreeTupleCursor<String>((BTree) btree,
+                new Tuple<String>(btree, IRangeQuery.DEFAULT),
+                null/* fromKey */, null/* toKey */);
         
     }
     

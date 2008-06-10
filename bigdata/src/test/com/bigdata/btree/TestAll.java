@@ -102,10 +102,12 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestLinearListMethods.class );
         // test getCounter()
         suite.addTestSuite( TestIndexCounter.class );
+        
         // test iterator semantics.
         suite.addTestSuite( TestIterators.class );
         // test chunked iterator semantics.
         suite.addTestSuite(TestChunkedIterators.class);
+
         // test delete semantics (also see the isolation package).
         suite.addTestSuite( TestRemoveAll.class );
         // test contract for BTree#touch(node) w/o IO.
@@ -117,8 +119,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestPackedAddressSerializer.class );
         // test node/leaf serialization.
         suite.addTestSuite( TestNodeSerializer.class );
+        
         // test iterator semantics for visiting only "dirty" nodes or leaves.
         suite.addTestSuite( TestDirtyIterators.class );
+        
         // test incremental write of leaves and nodes.
         suite.addTestSuite( TestIncrementalWrite.class );
         // test copy-on-write scenarios.
@@ -175,6 +179,17 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBigdataMap.class );
         suite.addTestSuite( TestBigdataSet.class );
         
+        /*
+         * FIXME This is the test suite for new iterator/cursor semantics.
+         * These tests really need to be inlined up above but they are gather
+         * together here until everything is working.
+         */
+        suite.addTestSuite(TestIndexSegmentCursors.class);
+        suite.addTestSuite(TestReadOnlyBTreeCursors.class);
+        suite.addTestSuite(TestMutableBTreeCursors.class);
+//      suite.addTestSuite(TestFusedViewCursors.class);
+//      suite.addTestSuite(TestIsolatedFusedViewCursors.class); // FIXME this belongs in the isolation package.
+
         return suite;
         
     }

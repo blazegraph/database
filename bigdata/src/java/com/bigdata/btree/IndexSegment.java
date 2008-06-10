@@ -23,11 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import java.util.NoSuchElementException;
-
 import it.unimi.dsi.mg4j.util.BloomFilter;
 
+import java.util.NoSuchElementException;
+
+import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
+import com.bigdata.btree.IndexSegmentStore.Options;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.resources.ResourceManager;
@@ -220,9 +222,12 @@ public class IndexSegment extends AbstractBTree {
      */
     private void _open() {
 
-        // @todo config cache size on {@link IndexSegmentStore.Options}
+        final int leafCacheSize = Integer.parseInt(fileStore.getProperties()
+                .getProperty(Options.LEAF_CACHE_SIZE,
+                        Options.DEFAULT_LEAF_CACHE_SIZE));
+        
         this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
-                new LRUCache<Long, ImmutableLeaf>(10));
+                new LRUCache<Long, ImmutableLeaf>(leafCacheSize));
 
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.getCheckpoint().addrRoot);
@@ -451,6 +456,49 @@ public class IndexSegment extends AbstractBTree {
         
     }
     
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter) {
+
+        /*
+         * FIXME This implementation ignores the optional filter. I think that
+         * the filter will be going away to be replaced by a wrapping iterator
+         * but that refactor is not complete yet. When it does go away I can
+         * remove this call to the base class and use the cursor-based version
+         * (below) instead.
+         */
+        if(true) return super.rangeIterator(fromKey, toKey, capacity, flags, filter);
+        
+        counters.nrangeIterator++;
+
+        if ((flags & REMOVEALL) != 0) {
+
+            assertNotReadOnly();
+
+        }
+
+        // range checks.
+        if (fromKey != null)
+            rangeCheck(fromKey, false/*allowUpperBound*/);
+
+        if (toKey != null)
+            rangeCheck(toKey, true/*allowUpperBound*/);
+
+        // setup cursor. 
+        final ITupleCursor src = new IndexSegmentTupleCursor(this, new Tuple(
+                this, flags | IRangeQuery.KEYS), fromKey, toKey);
+
+        if ((flags & REVERSE) != 0) {
+
+            // masquerade cursor as reverse order iterator.
+            return src.asReverseIterator();
+            
+        }
+
+        // return the cursor.
+        return src;
+        
+    }
+
     /**
      * Variant for scanning all leaves in key order.
      */
@@ -554,6 +602,9 @@ public class IndexSegment extends AbstractBTree {
      * 
      * @throws IllegalArgumentException
      *             if the <i>key</i> is <code>null</code>.
+     * @throws RUntimeException
+     *             if the key does not lie within the optional key-range
+     *             constraints for an index partition.
      */
     public long findLeafAddr(final byte[] key) {
 
@@ -611,6 +662,10 @@ public class IndexSegment extends AbstractBTree {
      * <p>
      * Note: The <code>parent</code> reference will NOT be set of the leaves
      * visited by this method.
+     * 
+     * @todo consider dropping the {@link LeafIterator} altogether. It was
+     *       originally written to vet the fast leaf scans but the cursor now
+     *       handles that itself.
      * 
      * @todo consider refactor so that {@link #next()}, {@link #prior()},
      *       {@link #hasNext()} and {@link #hasPrior()} are wrappers around a
@@ -1050,4 +1105,270 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
+    /**
+     * A position for the {@link IndexSegmentTupleCursor}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     *            The generic type for objects de-serialized from the values in
+     *            the index.
+     */
+    static private class CursorPosition<E> extends AbstractCursorPosition<ImmutableLeaf,E> {
+        
+        @SuppressWarnings("unchecked")
+        public IndexSegmentTupleCursor<E> getCursor() {
+            
+            return (IndexSegmentTupleCursor)cursor;
+            
+        }
+        
+        /**
+         * Create position on the specified key, or on the successor of the
+         * specified key if that key is not found in the index.
+         * 
+         * @param cursor
+         *            The {@link ITupleCursor}.
+         * @param leaf
+         *            The current leaf.
+         * @param index
+         *            The index of the tuple in the <i>leaf</i>.
+         */
+        public CursorPosition(IndexSegmentTupleCursor<E> cursor,
+                ImmutableLeaf leaf, int index) {
+            
+            super(cursor,leaf,index);
+
+        }
+
+        /**
+         * Copy constructor.
+         * 
+         * @param p
+         */
+        public CursorPosition(CursorPosition<E> p) {
+            
+            super( p );
+            
+        }
+        
+        protected boolean nextLeaf() {
+
+            final long addr = leaf.nextAddr;
+            
+            if(addr == 0L) {
+
+                // no more leaves.
+
+                log.info("No more leaves");
+                
+                return false;
+                
+            }
+            
+            // try the next leaf in the key order.
+            leaf = getCursor().getIndex().readLeaf(addr);
+            
+            // always start at index ZERO(0) after the first leaf.
+            index = 0;
+
+            return true;
+            
+        }
+        
+        protected boolean priorLeaf() {
+            
+            final long addr = leaf.priorAddr;
+            
+            if(addr == 0L) {
+
+                // no more leaves.
+
+                log.info("No more leaves");
+                
+                return false;
+                
+            }
+            
+            // try the next leaf in the key order.
+            leaf = getCursor().getIndex().readLeaf(addr);
+            
+            // always start at index [nkeys-1] after the first leaf.
+            index = leaf.getKeyCount() - 1;
+
+            return true;
+            
+        }
+
+    }
+    
+    /**
+     * Implementation for an immutable {@link IndexSegment}. This
+     * implementation uses the prior/next leaf references for fast forward and
+     * reference scans of the {@link IndexSegment}.
+     * <p>
+     * Note: Since the {@link IndexSegment} is immutable it does not maintain
+     * listeners for concurrent modifications.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     *            The generic type for the objects de-serialized from the index.
+     */
+    public static class IndexSegmentTupleCursor<E> extends AbstractBTreeTupleCursor<IndexSegment,ImmutableLeaf,E> {
+
+//        /**
+//         * The current cursor position.
+//         */
+//        protected CursorPosition<E> currentPosition;
+//
+//        /**
+//         * Used by {@link #hasNext()} to scan forward to the next visitable
+//         * tuple without a side-effect on the current cursor position and
+//         * cleared to <code>null</code> by any method that changes the current
+//         * cursor position.
+//         */
+//        protected CursorPosition<E> nextPosition;
+//
+//        /**
+//         * Used by {@link #hasPrior()} to scan backward to the previous
+//         * visitable tuple without a side-effect on the current cursor position and
+//         * cleared to <code>null</code> by any method that changes the current
+//         * cursor position.
+//         */
+//        protected CursorPosition<E> priorPosition;
+
+        public IndexSegmentTupleCursor(IndexSegment btree, Tuple<E> tuple, byte[] fromKey, byte[] toKey) {
+
+            super(btree, tuple, fromKey, toKey);
+
+            // Note: the cursor position is NOT defined!
+            currentPosition = nextPosition = priorPosition = null;
+            
+        }
+
+        @Override
+        final protected CursorPosition<E> newPosition(ImmutableLeaf leaf, int index) {
+
+            CursorPosition<E> pos = new CursorPosition<E>(this, leaf, index);
+
+            return pos;
+
+        }
+
+        @Override
+        protected CursorPosition<E> newPosition(ICursorPosition<ImmutableLeaf, E> p) {
+
+            return new CursorPosition<E>((CursorPosition<E>)p );
+            
+        }
+
+        /**
+         * The {@link IndexSegmentStore} backing the {@link IndexSegment} for
+         * that is being traversed by the {@link ITupleCursor}.
+         */
+        protected IndexSegmentStore getStore() {
+            
+            return btree.getStore();
+            
+        }
+
+        /**
+         * Return the leaf that spans the optional {@link #getFromKey()}
+         * constraint and the first leaf if there is no {@link #getFromKey()}
+         * constraint.
+         * 
+         * @return The leaf that spans the first tuple that can be visited by
+         *         this cursor.
+         * 
+         * @see Leaf#getKeys()
+         * @see IKeyBuffer#search(byte[])
+         */
+        protected ImmutableLeaf getLeafSpanningFromKey() {
+            
+            final long addr;
+            
+            if (fromKey == null) {
+
+                addr = getStore().getCheckpoint().addrFirstLeaf;
+
+            } else {
+
+                // find leaf for fromKey
+                addr = getIndex().findLeafAddr(fromKey);
+
+            }
+
+            assert addr != 0L;
+            
+            final ImmutableLeaf leaf = getIndex().readLeaf(addr);
+
+            assert leaf != null;
+            
+            return leaf;
+
+        }
+
+
+        /**
+         * Return the leaf that spans the optional {@link #getToKey()}
+         * constraint and the last leaf if there is no {@link #getFromKey()}
+         * constraint.
+         * 
+         * @return The leaf that spans the first tuple that can NOT be visited
+         *         by this cursor (exclusive upper bound).
+         * 
+         * @see Leaf#getKeys()
+         * @see IKeyBuffer#search(byte[])
+         */
+        protected ImmutableLeaf getLeafSpanningToKey() {
+            
+            final long addr;
+            
+            if (toKey == null) {
+
+                addr = getStore().getCheckpoint().addrLastLeaf;
+
+            } else {
+
+                // find leaf for toKey
+                addr = getIndex().findLeafAddr(toKey);
+
+            }
+
+            assert addr != 0L;
+            
+            final ImmutableLeaf leaf = getIndex().readLeaf(addr);
+
+            assert leaf != null;
+            
+            return leaf;
+
+        }
+
+        /**
+         * Return the leaf that spans the key.  The caller must check to see
+         * whether the key actually exists in the leaf.
+         * 
+         * @param key
+         *            The key.
+         *            
+         * @return The leaf spanning that key.
+         */
+        protected ImmutableLeaf getLeafSpanningKey(byte[] key) {
+            
+            final long addr = getIndex().findLeafAddr(key);
+
+            assert addr != 0L;
+
+            final ImmutableLeaf leaf = getIndex().readLeaf(addr);
+
+            assert leaf != null;
+
+            return leaf;
+
+        }
+
+    }
+    
 }

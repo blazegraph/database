@@ -440,7 +440,44 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         }
 
     }
+
+    /**
+     * Clears the buffered data copied into the {@link AbstractTuple} from the
+     * source btree.
+     */
+    protected void clear() {
+        
+        this.versionDeleted = false;
+        
+        this.versionTimestamp = 0L;
+        
+        if (kbuf != null)
+            this.kbuf.reset();
+
+        if (vbuf != null)
+            this.vbuf.reset();
+        
+        this.isNull = true;
+        
+    }
     
+    /**
+     * Change the tuple state to reflect the fact that the tuple has been
+     * deleted from the backing index.
+     */
+    void markDeleted() {
+
+        this.versionDeleted = true;
+        
+        this.versionTimestamp = 0L;
+
+        if (vbuf != null)
+            this.vbuf.reset();
+
+        this.isNull = true;
+                
+    }
+
     public String toString() {
         
         return super.toString()+
@@ -449,6 +486,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         (versionTimestamp == 0L ? "" : ", timestamp="+ getVersionTimestamp())+
         ", key="+(getKeysRequested()?Arrays.toString(getKey()):"N/A")+
         ", val="+(getValuesRequested()?(isNull()?"null":Arrays.toString(getValue())):"N/A")+
+        ", obj="+getObject()+
         "}";
         
     }

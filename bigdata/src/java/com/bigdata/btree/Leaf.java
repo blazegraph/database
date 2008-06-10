@@ -31,6 +31,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.WeakHashMap;
 
 import org.apache.log4j.Level;
 
@@ -240,6 +241,8 @@ public class Leaf extends AbstractNode implements ILeafData {
         
         deleteMarkers = null;
         
+        leafListeners = null;
+        
     }
     
     /**
@@ -326,7 +329,7 @@ public class Leaf extends AbstractNode implements ILeafData {
      */
     public Tuple insert(byte[] searchKey, byte[] newval, boolean delete, long timestamp, Tuple tuple) {
 
-        if(delete && deleteMarkers==null) {
+        if (delete && deleteMarkers == null) {
             
             /*
              * You may not specify the delete flag unless delete markers are
@@ -351,7 +354,17 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (copy != this) {
 
-            return copy.insert(searchKey, newval, delete, timestamp, tuple);
+            // delegate the operation to the new leaf.
+            final Tuple t = copy.insert(searchKey, newval, delete, timestamp, tuple);
+            
+            /*
+             * Notify any listeners that the tuples found in the leaf have been
+             * changed (the leaf is in fact no longer in use).
+             */
+
+            fireInvalidateLeafEvent();
+
+            return t;
             
         }
 
@@ -397,6 +410,9 @@ public class Leaf extends AbstractNode implements ILeafData {
                 this.versionTimestamps[entryIndex] = timestamp;
 
             }
+            
+            // notify any listeners that this tuple's state has been changed.
+            fireInvalidateTuple(entryIndex);
 
             // return the old value.
             return tuple;
@@ -481,6 +497,12 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         // assert invarients post-split.
         if(btree.debug) assertInvariants();
+        
+        /*
+         * Notify any listeners that the tuples found in the leaf have been
+         * changed (one was added but others may have been moved out).
+         */
+        fireInvalidateLeafEvent();
 
         // return null since there was no pre-existing entry.
         return null;
@@ -1081,7 +1103,17 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (copy != this) {
 
-            return copy.remove(key, tuple);
+            // Note: leaf was copied so delegate to the new leaf (the old leaf is now unused).
+            final Tuple t = copy.remove(key, tuple);
+            
+            /*
+             * Notify any listeners that the tuples found in the leaf have been
+             * changed (the leaf is in fact no longer in use).
+             */
+
+            fireInvalidateLeafEvent();
+            
+            return t;
 
         }
 
@@ -1218,8 +1250,8 @@ public class Leaf extends AbstractNode implements ILeafData {
                  * minimum branching factor is two (2) so a valid tree never has
                  * a node with a single sibling.
                  * 
-                 * Note that we must invoked copy-on-write before modifying a
-                 * sibling.  However, the parent of the leave MUST already be
+                 * Note that we must invoke copy-on-write before modifying a
+                 * sibling.  However, the parent of the leaf MUST already be
                  * mutable (aka dirty) since that is a precondition for removing
                  * a key from the leaf.  This means that copy-on-write will not
                  * force the parent to be cloned.
@@ -1232,6 +1264,11 @@ public class Leaf extends AbstractNode implements ILeafData {
         }
             
         if(btree.debug) assertInvariants();
+        
+        /*
+         * Notify any listeners that the tuple(s) in the leaf have been changed.
+         */
+        fireInvalidateLeafEvent();
         
         return tuple;
         
@@ -1382,6 +1419,127 @@ public class Leaf extends AbstractNode implements ILeafData {
         
         return sb.toString();
         
+    }
+
+    /**
+     * An interface that may be used to register for and receive events when the
+     * state of a {@link Leaf} is changed (update of a tuple, insert of a tuple,
+     * or removal of a tuple) or when the leaf is discarded in response by
+     * copy-on-write.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface ILeafListener {
+       
+        /**
+         * Notice that the leaf state has changed and that the listener must not
+         * assume: (a) that a tuple of interest still resides within the leaf
+         * (it may have been moved up or down within the leaf or it may be in
+         * another leaf altogether as a result of underflow or overflow); (b)
+         * that the leaf is still in use (it may have been discarded by a
+         * copy-on-write operation).
+         */
+        public void invalidateLeaf();
+        
+        /**
+         * Notice that the state of a tuple in the leaf has been changed (the
+         * tuple is still known to be located within the leaf).
+         * 
+         * @param index
+         *            The index of the tuple whose state was changed.
+         */
+        public void invalidateTuple(int index);
+        
+    }
+    
+    /**
+     * Listeners for {@link ILeafListener} events.
+     * <p>
+     * Note: The values in the map are <code>null</code>.
+     * <p>
+     * Note: Listeners are cleared from the map automatically by the JVM soon
+     * after the listener becomes only weakly reachable.
+     * <p>
+     * Note: Mutable {@link BTree}s are single-threaded so there is no need to
+     * synchronize access to this collection.
+     * <p>
+     * Note: These listeners are primarily used to support {@link ITupleCursor}s.
+     * The #of listeners at any one time is therefore directly related to the
+     * #of open iterators on the owning <em>mutable</em> {@link BTree}.
+     * Normally that is ONE (1) since the {@link BTree} is not thread-safe for
+     * mutation and each cursor has a current, prior, and next position meaning
+     * that we have typically either NO listeners or the current and either
+     * prior or next listener. This tends to make visiting the members of the
+     * collection (when it is defined) very fast, especially since we do not
+     * need to synchronize on anything.
+     * <p>
+     * Note: The trigger conditions for the events of interest to the listeners
+     * are scattered throughout the {@link Leaf} class.
+     */
+    private transient WeakHashMap<ILeafListener,Void> leafListeners = null;
+
+    /**
+     * Register an {@link ILeafListener} with this {@link Leaf}. Listeners are
+     * automatically removed by the JVM shortly after they become only weakly
+     * reachable.
+     * 
+     * @param l
+     *            The listener.
+     * 
+     * @throws IllegalStateException
+     *             if the owning {@link AbstractBTree} is read-only.
+     */
+    final public void addLeafListener(ILeafListener l) {
+
+        if (l == null)
+            throw new IllegalArgumentException();
+
+        btree.assertNotReadOnly();
+
+        if(leafListeners==null) {
+            
+            leafListeners = new WeakHashMap<ILeafListener, Void>();
+            
+        }
+        
+        leafListeners.put(l, null);
+        
+    }
+
+    /**
+     * Fire an {@link ILeafListener#invalidateLeaf()} event to any registered
+     * listeners.
+     */
+    final protected void fireInvalidateLeafEvent() {
+        
+        if(leafListeners == null) return;
+
+        for(ILeafListener l : leafListeners.keySet()) {
+            
+            l.invalidateLeaf();
+            
+        }
+        
+    }
+
+    /**
+     * Fire an {@link ILeafListener#invalidateTuple(int)} event to any
+     * registered listeners.
+     * 
+     * @param index
+     *            The index of the tuple whose state was changed.
+     */
+    final protected void fireInvalidateTuple(int index) {
+
+        if(leafListeners == null) return;
+
+        for(ILeafListener l : leafListeners.keySet()) {
+            
+            l.invalidateTuple(index);
+            
+        }
+
     }
 
 }
