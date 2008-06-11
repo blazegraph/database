@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import it.unimi.dsi.fastutil.Stack;
-
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -57,7 +55,7 @@ import com.bigdata.sparse.ValueType;
  * of tuples based on their key and/or value and aggregation of atomic reads to
  * higher level data structures such as the {@link AtomicRowScan}.
  * 
- * FIXME he {@link AbstractTupleFilterator} is now a full {@link ITupleIterator}
+ * FIXME The {@link AbstractTupleFilterator} is now a full {@link ITupleIterator}
  * and it WRAPS the base iterator requested by the caller. It can be used
  * directly when you know that you are operating on a local index or you can use
  * the {@link AbstractTupleFilteratorConstructor} when you need to describe the

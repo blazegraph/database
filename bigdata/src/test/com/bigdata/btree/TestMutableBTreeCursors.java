@@ -28,29 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
-import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.TemporaryRawStore;
 
 /**
  * Test ability to traverse tuples using an {@link ITupleCursor} while the SAME
  * THREAD is used to insert, update, or remove tuples from a mutable
  * {@link BTree}.
- * 
- * @todo unit test that verifies that the tuple exposed by the cursor will
- *       appear to be deleted if the corresponding tuple is deleted from the
- *       index (mutable BTree and FusedView only).
- * 
- * @todo test with multiple inserts such that the leaf becomes invalidated
- *       several times over in order to verify that the cursor position is
- *       re-establishing it's listener each time it re-locates the leaf spanning
- *       the current tuple. (do this for remove also).
- * 
- * @todo most tests should be run with and without delete markers.
- * 
- * @todo most tests should have variants for the {@link IsolatedFusedView}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -86,8 +73,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         assert ! btree.isReadOnly();
         
         return new MutableBTreeTupleCursor<String>((BTree) btree,
-                new Tuple<String>(btree, IRangeQuery.DEFAULT),
-                fromKey,  toKey);
+                new Tuple<String>(btree, flags), fromKey, toKey);
         
     }
 
@@ -256,9 +242,6 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
      * <p>
      * Note that copy-on-write is handled differently even when the trigger is
      * an update (vs an insert or a remove).
-     * 
-     * @todo test delete of a tuple when delete markers are supported (this is a
-     *       actually an update of the tuple in the index).
      */
     public void test_concurrent_modification_update() {
 
@@ -575,6 +558,129 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             // visit the prior tuple (the one that we just inserted).
             assertEquals(new TestTuple<String>(10,"Bryan"),cursor.prior());
             
+        }
+        
+    }
+
+    /**
+     * Test examines the behavior of the cursor when delete markers are enabled
+     * and the cursor is willing to visited deleted tuples. Since delete markers
+     * are enabled remove() will actually be an update that sets the delete
+     * marker on the tuple and clears the value associated with that tuple.
+     * Since deleted tuples are being visited by the cursor, the caller will see
+     * the deleted tuples.
+     */
+    public void test_delete_markers_visitDeleted() {
+        
+        final BTree btree;
+        {
+       
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+            // enable delete markers.
+            md.setDeleteMarkers(true);
+            
+            btree = BTree.create(new TemporaryRawStore(), md);
+
+            btree.insert(10, "Bryan");
+            btree.insert(20, "Mike");
+            btree.insert(30, "James");
+            
+        }
+
+        final int flags = IRangeQuery.DEFAULT | IRangeQuery.DELETED;
+        
+        /*
+         * remove()
+         */
+        {
+
+            ITupleCursor<String> cursor = newCursor(btree, flags,
+                    null/* fromKey */, null/* toKey */);
+
+            assertEquals(new TestTuple<String>(flags, 10, "Bryan",
+                    false/* deleted */, 0L/* timestamp */), cursor.seek(10));
+
+            cursor.remove();
+
+            assertEquals(new TestTuple<String>(flags, 10, null,
+                    true/* deleted */, 0L/* timestamp */), cursor.tuple());
+
+            assertTrue(cursor.hasNext());
+
+            assertEquals(new TestTuple<String>(flags, 20, "Mike",
+                    false/* deleted */, 0L/* timestamp */), cursor.next());
+
+            assertTrue(cursor.hasPrior());
+
+            assertEquals(new TestTuple<String>(flags, 10, null,
+                    true/* deleted */, 0L/* timestamp */), cursor.prior());
+
+        }
+        
+    }
+    
+    /**
+     * Test examines the behavior of the cursor when delete markers are enabled
+     * and the cursor is NOT willing to visited deleted tuples. Since delete
+     * markers are enabled remove() will actually be an update that sets the
+     * delete marker on the tuple and clears the value associated with that
+     * tuple. Since deleted tuples are NOT being visited by the cursor, the
+     * caller deleted tuples will appear to "disappear" just like they do when a
+     * tuple is remove()'d from an index that does not support delete markers.
+     */
+    public void test_delete_markers_doNotVisitDeleted() {
+        
+        final BTree btree;
+        {
+       
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+            // enable delete markers.
+            md.setDeleteMarkers(true);
+
+            btree = BTree.create(new TemporaryRawStore(), md);
+
+            btree.insert(10, "Bryan");
+            btree.insert(20, "Mike");
+            btree.insert(30, "James");
+            
+        }
+        
+        // Note: Cursor will NOT visit the deleted tuples.
+        final int flags = IRangeQuery.DEFAULT;
+        
+        /*
+         * remove()
+         */
+        {
+
+            ITupleCursor<String> cursor = newCursor(btree, flags,
+                    null/* fromKey */, null/* toKey */);
+
+            assertEquals(new TestTuple<String>(flags, 10, "Bryan",
+                    false/* deleted */, 0L/* timestamp */), cursor.seek(10));
+
+            cursor.remove();
+
+            // tuple is no longer visitable since the delete flag was set.
+            assertEquals(null, cursor.tuple());
+
+            assertTrue(cursor.hasNext());
+
+            assertEquals(new TestTuple<String>(flags, 20, "Mike",
+                    false/* deleted */, 0L/* timestamp */), cursor.next());
+
+            // the prior tuple is the one that we deleted so it is not visitable.
+            assertFalse(cursor.hasPrior());
+
+            try {
+                cursor.prior();
+                fail("Expecting " + NoSuchElementException.class);
+            } catch (NoSuchElementException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
         }
         
     }

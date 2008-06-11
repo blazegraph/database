@@ -38,6 +38,15 @@ import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo test variant using delete markers. note that delete markers can be
+ *       present in an index segment (unless a compacting merge was performed)
+ *       but that they have to be pre-populated in the index in order for them
+ *       to be visible (vs just appearing as a result of mutation).
+ *       <p>
+ *       Note: Delete markers are already tested by
+ *       {@link TestMutableBTreeCursors} and there is little reason to think
+ *       that they would not work for an {@link IndexSegment}.
  */
 public class TestIndexSegmentCursors extends AbstractCursorTestCase {
 

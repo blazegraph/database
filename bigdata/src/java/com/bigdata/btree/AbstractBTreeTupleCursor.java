@@ -82,13 +82,16 @@ import com.bigdata.service.ClientIndexView;
  * interator constructs and things that can be changed once they are running,
  * including the implementation of the prefix scans, etc.
  * 
- * FIXME Consider {@link AbstractTupleFilterator}, whether the [nextPosition]
- * and [priorPosition] fields should be discarded and we just re-scan forward /
- * backward in prior() / next() (they should not invoke hasNext() and hasPrior()
- * in that case but a priorTuple() and nextTuple() that return null if there is
- * no such tuple in order to avoid scanning twice for each request. Those
- * methods can be placed on the {@link ITupleCursor} interface and they will be
- * more efficient: while((t = priorTuple())!=null) { ... }
+ * FIXME When iterators are stacked make sure that remove() semantics are not
+ * broken by buffering - it should always remove the "current" tuple.
+ * 
+ * FIXME Consider whether the [nextPosition] and [priorPosition] fields should
+ * be discarded and we just re-scan forward / backward in prior() / next() (they
+ * should not invoke hasNext() and hasPrior() in that case but a priorTuple()
+ * and nextTuple() that return null if there is no such tuple in order to avoid
+ * scanning twice for each request. Those methods can be placed on the
+ * {@link ITupleCursor} interface and they will be more efficient: while((t =
+ * priorTuple())!=null) { ... }
  * <p>
  * The problem is how to scan forward/backward conditionally - without changing
  * the actual cursor position. That is why [nextPosition] and [priorPosition]
@@ -96,15 +99,10 @@ import com.bigdata.service.ClientIndexView;
  * and invalidated if the current position was invalidated. This would let us
  * use only a single listener for the iterator and the listener would be moved
  * from leaf to leaf as we go (it could be explicitly unregistered).
- * <p>
- * It seems that the cursor position DOES need to track the current key
- * explicitly in its own buffer so that seek() to a non-existent key will work
- * correctly and so that we can re-establish the cursor position without fail if
- * the leaf is invalidated.
- * <p>
- * The cursor position could carry a flag if it becomes invalid so that we do
- * not have to re-allocate it, but that seems a minor cost since it should not
- * be commit.
+ * 
+ * @todo The cursor position could carry a flag if it becomes invalid so that we
+ *       do not have to re-allocate it, but that seems a minor cost since it
+ *       should not be commit.
  * 
  * FIXME finish layering of iterators/cursors to support logical row scans, etc.
  * 
@@ -130,7 +128,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
     /** true iff the cursor was provisioned to visit deleted tuples. */
     final protected boolean visitDeleted;
-    
+
     final public I getIndex() {
 
         return btree;
@@ -1498,8 +1496,6 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
         }
         
-        // @todo skipCurrent can be dropped as a parameter.
-        // @todo if the index is an insert position then we need to convert it when we start the scan.
         public boolean reverseScan(boolean skipCurrent) {
 
             relocateLeaf();
@@ -1850,16 +1846,17 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         }
 
         /**
-         * This cause the cursor to update the tuple state from the index
-         * (synchronous).
-         * 
-         * @todo as an alternative this could cause the tuple state to be
-         *       updated no later than the next time
-         *       {@link ITupleCursor#tuple()} or any of the methods that change
-         *       the cursor position is invoked.
+         * This causes the cursor to update the tuple state from the index no
+         * later than the next time {@link ITupleCursor#tuple()} or any of the
+         * methods that change the cursor position is invoked.
          */
         public void invalidateTuple(int index) {
 
+            /*
+             * Note: This is in fact a NOP. We always copy out the state of the
+             * tuple in tuple() so this notification is not really required.
+             */
+            
 //            if (index == this.index) {
 //
 //                /*
