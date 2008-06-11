@@ -1430,7 +1430,16 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         if ((flags & REVERSE) != 0) {
 
-            // FIXME The reverse scan option has not been implemented yet.
+            /*
+             * FIXME The reverse scan option has not been implemented yet - it
+             * could be realized with ITupleCursor#asReverseIterator() or by a
+             * filtering cursor that simply reverses the directional semantics
+             * of the cursor.
+             * 
+             * FIXME The REMOVEALL option could be implemented by a filtering
+             * cursor that copies the tuple into its own buffer and then deletes
+             * the tuple from the underlying iterator.
+             */
             throw new UnsupportedOperationException("Reverse scan is not implemented");
             
         }

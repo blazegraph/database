@@ -46,13 +46,6 @@ import com.bigdata.rawstore.IBlock;
  *       variant (progressive forward or reverse scan against a partitioned
  *       index).
  * 
- * @todo unit tests to verify that the optional constraints on the key-range for
- *       the cursor are correctly imposed. E.g., #first() or #next() must not
- *       visit a tuple that lies outside of the allowable key range for the
- *       cursor.
- * 
- * @todo unit test variant when delete markers are enabled.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -123,11 +116,13 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
      * 
      * @see #getBaseCaseBTree()
      * 
-     * @todo test variant with a key-range constraint on the index partition.
-     * 
-     * @todo test variant using delete markers. note that delete markers can be
-     *       present in an index segment (unless a compacting merge was
-     *       performed).
+     * @todo unit tests to verify that the optional constraints on the key-range
+     *       for the cursor are correctly imposed. E.g., #first() or #next()
+     *       must not visit a tuple that lies outside of the allowable key range
+     *       for the cursor
+     *       <p>
+     *       Note: this is already done for
+     *       {@link #doOneTupleTest(AbstractBTree)}
      */
     protected void doBaseCaseTest(AbstractBTree btree) {
 
