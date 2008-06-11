@@ -28,12 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.IOException;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.btree.Leaf.ILeafListener;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.ClientIndexView;
@@ -51,19 +53,58 @@ import com.bigdata.service.ClientIndexView;
  * under the key is changed either using this class or the {@link BTree} then
  * the new values will be visible via this class.
  * 
- * FIXME Either modify the API for {@link AbstractBTree#lookup(byte[], Tuple)}
- * to return an {@link ITupleCursor} or add a method iterator(byte[] key, Tuple
- * tuple) that can be used to obtain a cursor initialized with the specified
- * starting key or just use {@link IRangeQuery#REVERSE} (rename as LAST_KEY?) to
- * pre-position the scan at the last key then let people use the strengthened
- * return type of {@link ITupleCursor} to access handle prior/next access. Note
- * that the {@link ClientIndexView} will need to be aware of this flag so that
- * it can process the index partitions in the reverse of their natural key
- * order.
+ * FIXME Rewrite FusedView's iterator to implement {@link ITupleCursor}.
+ * 
+ * FIXME Rewrite the iterators based on the {@link ResultSet} to implement
+ * {@link ITupleCursor}.
+ * 
+ * FIXME Modify {@link AbstractBTree} to use an {@link ITupleCursor} without the
+ * post-order striterator (but we still need post-order traversal for flushing
+ * evicted nodes to the store!)
+ * 
+ * FIXME change the return type of
+ * {@link AbstractBTree#rangeIterator(byte[], byte[], int, int, ITupleFilter)}
+ * to {@link ITupleCursor} in order to allow access handle prior/next access.
+ * 
+ * FIXME The {@link ClientIndexView} will need be modified to defer request of
+ * the initial result set until the caller uses first(), last(), seek(),
+ * hasNext(), or hasPrior().
+ * 
+ * FIXME get rid of the {@link ChunkedLocalRangeIterator}. Make sure that the
+ * {@link IRangeQuery#REMOVEALL} flag is correctly interpreted as not allowing
+ * more than [capacity] tuples to be deleted.
+ * 
+ * FIXME Examine how REMOVEALL is used together with a capacity limit for atomic
+ * deletes on the server and verify that we can handle those use cases for head
+ * and tail deletes using the {@link ITupleCursor} instead.
  * 
  * FIXME See {@link AbstractTupleFilterator} for many, many notes about the new
  * interator constructs and things that can be changed once they are running,
  * including the implementation of the prefix scans, etc.
+ * 
+ * FIXME Consider {@link AbstractTupleFilterator}, whether the [nextPosition]
+ * and [priorPosition] fields should be discarded and we just re-scan forward /
+ * backward in prior() / next() (they should not invoke hasNext() and hasPrior()
+ * in that case but a priorTuple() and nextTuple() that return null if there is
+ * no such tuple in order to avoid scanning twice for each request. Those
+ * methods can be placed on the {@link ITupleCursor} interface and they will be
+ * more efficient: while((t = priorTuple())!=null) { ... }
+ * <p>
+ * The problem is how to scan forward/backward conditionally - without changing
+ * the actual cursor position. That is why [nextPosition] and [priorPosition]
+ * exist. However, those could be cached internally in the _current_ position
+ * and invalidated if the current position was invalidated. This would let us
+ * use only a single listener for the iterator and the listener would be moved
+ * from leaf to leaf as we go (it could be explicitly unregistered).
+ * <p>
+ * It seems that the cursor position DOES need to track the current key
+ * explicitly in its own buffer so that seek() to a non-existent key will work
+ * correctly and so that we can re-establish the cursor position without fail if
+ * the leaf is invalidated.
+ * <p>
+ * The cursor position could carry a flag if it becomes invalid so that we do
+ * not have to re-allocate it, but that seems a minor cost since it should not
+ * be commit.
  * 
  * FIXME finish layering of iterators/cursors to support logical row scans, etc.
  * 
@@ -96,16 +137,6 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
     }
 
-    final public ITuple<E> seek(Object key) {
-
-        if (key == null)
-            throw new IllegalArgumentException();
-
-        return seek(getIndex().getIndexMetadata().getTupleSerializer()
-                .serializeKey(key));
-        
-    }
-    
     /** From the ctor. */
     final public byte[] getFromKey() {
         
@@ -165,6 +196,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      *             if the <i>tuple</i> is <code>null</code>.
      * @throws IllegalArgumentException
      *             if the <i>tuple</i> is not associated with that <i>btree</i>.
+     * @throws IllegalArgumentException
+     *             if the <i>fromKey</i> is GTE the <i>toKey</i>.
      */
     public AbstractBTreeTupleCursor(I btree, Tuple<E> tuple,
             byte[] fromKey, byte[] toKey) {
@@ -189,6 +222,17 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             btree.rangeCheck(toKey, true/* allowUpperBound */);
             
         }
+
+        if (fromKey != null && toKey != null) {
+
+            if (BytesUtil.compareBytes(fromKey, toKey) >= 0) {
+
+                throw new IllegalArgumentException(
+                        "fromKey/toKey are out of order.");
+                
+            }
+            
+        }
         
         this.btree = btree;
         
@@ -205,6 +249,15 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
 
+    public String toString() {
+        
+        return "Cursor{fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
+                + BytesUtil.toString(toKey) + ", currentKey="
+                + BytesUtil.toString(currentKey()) + ", visitDeleted="
+                + visitDeleted + "}";
+        
+    }
+    
     /**
      * The optional inclusive lower bound. If the <i>fromKey</i> constraint was
      * specified when the {@link ITupleCursor} was created, then that value is
@@ -244,7 +297,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     }
     
     /**
-     * The optional exclusive lower bound. If the <i>toKey</i> constraint was
+     * The optional exclusive upper bound. If the <i>toKey</i> constraint was
      * specified when the {@link ITupleCursor} was created, then that value is
      * returned. Otherwise, if the index is an index partition then the
      * {@link LocalPartitionMetadata#getRightSeparatorKey()} is returned.
@@ -286,6 +339,16 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
     }
 
+    final public ITuple<E> seek(Object key) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        return seek(getIndex().getIndexMetadata().getTupleSerializer()
+                .serializeKey(key));
+        
+    }
+    
     /**
      * The current cursor position.
      */
@@ -351,30 +414,27 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     abstract protected L getLeafSpanningKey(byte[] key);
     
     /**
-     * Return a new {@link ICursorPosition} that is initially positioned on
-     * the first tuple in the key-range (does not skip over deleted tuples).
-     */
-    protected AbstractCursorPosition<L,E> firstPosition() {
-
-        final byte[] key = getInclusiveLowerBound();
-        
-        final L leaf = getLeafSpanningFromKey();
-        
-        return newPosition(leaf, key);
-        
-    }
-    
-    /**
      * Return a new {@link ICursorPosition} from the leaf and the tuple index.
      * 
      * @param leaf
      *            The leaf.
      * @param index
-     *            The tuple index within that leaf.
+     *            The tuple index within that <i>leaf</i> -or- a negative
+     *            integer representing the insertion point for the <i>key</i>
+     *            if the <i>key</i> is spanned by leaf but there is no tuple
+     *            for that <i>key</i> in the <i>leaf</i>.
+     * @param key
+     *            The key.
      * 
      * @return The new {@link ICursorPosition}.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>leaf</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>key</i> is <code>null</code>.
      */
-    abstract protected AbstractCursorPosition<L, E> newPosition(L leaf, int index);
+    abstract protected AbstractCursorPosition<L, E> newPosition(L leaf,
+            int index, byte[] key);
 
     /**
      * Return a clone of the given {@link ICursorPosition}.
@@ -383,19 +443,41 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      *            The cursor position.
      *            
      * @return A clone of that cursor position.
+     * 
+     * @todo if we drop [nextPosition] and [priorPosition] then we can also drop this method.
      */
     abstract protected AbstractCursorPosition<L, E> newPosition(ICursorPosition<L, E> p);
     
     /**
      * Return a new {@link ICursorPosition} that is initially positioned on
-     * the first tuple found in the leaf whose key is GTE to the given
-     * <i>key</i> (does not skip over deleted tuples).
+     * the first tuple in the key-range (does not skip over deleted tuples).
+     */
+    protected AbstractCursorPosition<L,E> firstPosition() {
+
+        byte[] key = getInclusiveLowerBound();
+
+        if (key == null) {
+
+            key = BytesUtil.EMPTY;
+
+        }
+        
+        final L leaf = getLeafSpanningFromKey();
+        
+        final int index = leaf.getKeys().search(key);
+        
+        return newPosition(leaf, index, key);
+        
+    }
+    
+    /**
+     * Return a new {@link ICursorPosition} that is initially positioned on the
+     * given <i>key</i> (does not skip over deleted tuples).
      * 
      * @param leaf
      *            A leaf.
      * @param key
-     *            A key that is spanned by that leaf (MAY be null in which
-     *            case the first key in the index will be visited).
+     *            A key that is spanned by that leaf.
      * 
      * @return The new {@link ICursorPosition}.
      */
@@ -403,7 +485,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
         assert leaf != null;
         
-//        assert key != null;
+        assert key != null;
         
         /*
          * Find the starting tuple index for the key in that leaf.
@@ -413,49 +495,51 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * of the first tuple ordered after the key.
          */
 
-        int index;
+        final int index = leaf.getKeys().search(key);
         
-        if (key == null) {
-            
-            index = 0;
-            
-        } else {
-
-            // find the position of the key in the leaf.
-            index = leaf.getKeys().search(key);
-
-            if (log.isInfoEnabled())
-                log.info("position=" + index);
-            
-            if (index < 0) {
-
-                /*
-                 * Convert the insert position into the index of the
-                 * successor.
-                 * 
-                 * Note: This can result in index == nkeys, in which case
-                 * the first tuple of interest does not actually lie within
-                 * the starting leaf.
-                 */
-
-                index = -index - 1;
-
-            }
-
-        }
+//        if (key == null) {
+//            
+//            index = 0;
+//            
+//        } else {
+//
+//
+//            if (log.isInfoEnabled())
+//                log.info("position=" + index);
+//            
+//            if (index < 0) {
+//
+//                /*
+//                 * Convert the insert position into the index of the
+//                 * successor.
+//                 * 
+//                 * Note: This can result in index == nkeys, in which case
+//                 * the first tuple of interest does not actually lie within
+//                 * the starting leaf.
+//                 */
+//
+//                index = -index - 1;
+//
+//            }
+//
+//        }
 
         if (log.isInfoEnabled())
             log.info("index=" + index);
 
-        final AbstractCursorPosition<L,E> pos = newPosition(leaf, index);
+        final AbstractCursorPosition<L,E> pos = newPosition(leaf, index, key);
 
         return pos;
         
     }
     
     /**
-     * Return a new {@link CursorPosition} that is initially positioned on
-     * the last tuple in the key-range (does not skip over deleted tuples).
+     * Return a new {@link ICursorPosition} that is initially positioned on the
+     * last tuple in the key-range (does not skip over deleted tuples).
+     * <p>
+     * Note: If there is no exclusive upper bound and there are no tuples in the
+     * index then the position is set to <code>new byte[]{}</code> (the same
+     * behavior as first for an empty index).
      * 
      * @return The leaf spanning {@link #getExclusiveUpperBound()}.
      */
@@ -463,59 +547,58 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         final L leaf = getLeafSpanningToKey();
         
-        final byte[] key = getExclusiveUpperBound();
+        byte[] key = getExclusiveUpperBound();
         
-        int index;
+        final int index;
         
         if (key == null) {
             
-            if(leaf.getKeyCount() == 0) {
+            /*
+             * Use the last key in the leaf.
+             * 
+             * Note: This will be an insertion point if this this an empty root
+             * leaf.
+             */
 
-                // This is the root leaf and the B+Tree is empty.
-                index = 0;
-                
-            } else {
+            index = leaf.getKeyCount() - 1;
             
-                // use the last key in the leaf.
-                index = leaf.getKeyCount() - 1;
-                
-            }
+            key = BytesUtil.EMPTY;
             
         } else {
 
             // find the position of the key in the leaf.
             index = leaf.getKeys().search(key);
 
-            if (log.isInfoEnabled())
-                log.info("position=" + index);
-
-            if (index < 0) {
-
-                /*
-                 * Convert the insert position into the index of the
-                 * predecessor.
-                 */
-
-                index = -index - 1;
-
-            } else {
-
-                index = index - 1;
-                
-            }
+//            if (log.isInfoEnabled())
+//                log.info("position=" + index);
+//
+//            if (index < 0) {
+//
+//                /*
+//                 * Convert the insert position into the index of the
+//                 * predecessor.
+//                 */
+//
+//                index = -index - 1;
+//
+//            } else {
+//
+//                index = index - 1;
+//                
+//            }
 
         }
 
         if (log.isInfoEnabled())
             log.info("index=" + index);
 
-        final AbstractCursorPosition<L,E> pos = newPosition(leaf, index);
+        final AbstractCursorPosition<L,E> pos = newPosition(leaf, index, key);
 
         return pos;
 
     }
 
-    public ITuple<E> tuple() {
+    public byte[] currentKey() {
         
         if(!isCursorPositionDefined()) {
             
@@ -524,7 +607,25 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
         }
         
-        return tuple;
+        return currentPosition.getKey();
+        
+    }
+    
+    public ITuple<E> tuple() {
+        
+        if(!isCursorPositionDefined()) {
+            
+            // the cursor position is not defined.
+            return null;
+            
+        }
+
+        /*
+         * Copy out the state of the current tuple if the cursor position is on
+         * a tuple and if that tuple is visitable.
+         */
+        
+        return currentPosition.get(tuple);
         
     }
     
@@ -584,35 +685,93 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         // clear references since no longer valid.
         nextPosition = priorPosition = null;
 
-        // new position GTE that key.
+        // new position is that key.
         currentPosition = newPosition(getLeafSpanningKey(key), key);
 
-        // Scan until we reach the first visitable tuple.
-        if (!currentPosition.forwardScan(false/*skipCurrent*/)) {
-        
-            // discard the current position since we have seeked beyond the end of the index / key range.
-            currentPosition = null;
-            
-            // Nothing visitable.
-            return null;
-
-        }
+//        // Scan until we reach the first visitable tuple.
+//        if (!currentPosition.forwardScan(false/*skipCurrent*/)) {
+//        
+//            // discard the current position since we have seeked beyond the end of the index / key range.
+//            currentPosition = null;
+//            
+//            // Nothing visitable.
+//            return null;
+//
+//        }
 
         // Copy the data into [tuple].
-        currentPosition.get(tuple);
+        return currentPosition.get(tuple);
 
-        if (BytesUtil.compareBytes(key, currentPosition.getKey()) != 0) {
-            
-            // Found a successor of the probe key.
-            return null;
-            
-        }
-
-        // Return [tuple].
-        return tuple;
+//        if (BytesUtil.compareBytes(key, currentPosition.getKey()) != 0) {
+//            
+//            // Found a successor of the probe key.
+//            return null;
+//            
+//        }
+//
+//        // no visitable tuple for that key.
+//        return null;
         
     }
 
+    /**
+     * FIXME This is a sketch of an alternative implementation that does not use
+     * [nextPosition] and [priorPosition] and that returns null if the cursor
+     * position is not defined or if there is no visitable successor.
+     * 
+     * @return
+     */
+    public ITuple<E> nextTuple() {
+        
+        if(!isCursorPositionDefined()) {
+            
+            // Cursor position is not defined.
+            return null;
+            
+        }
+        
+        if(!currentPosition.forwardScan(true/*skipCurrent*/)) {
+
+            // no visitable successor.
+            currentPosition = null;
+            
+            return null;
+            
+        }
+        
+        return currentPosition.get(tuple);
+        
+    }
+    
+    /**
+     * FIXME This is a sketch of an alternative implementation that does not use
+     * [nextPosition] and [priorPosition] and that returns null if the cursor
+     * position is not defined or if there is no visitable successor.
+     * 
+     * @return
+     */
+    public ITuple<E> priorTuple() {
+        
+        if(!isCursorPositionDefined()) {
+            
+            // Cursor position is not defined.
+            return null;
+            
+        }
+        
+        if(!currentPosition.reverseScan(true/*skipCurrent*/)) {
+
+            // no visitable predecessor.
+            currentPosition = null;
+            
+            return null;
+            
+        }
+        
+        return currentPosition.get(tuple);
+        
+    }
+    
     public boolean hasNext() {
 
         // the next position is already known.
@@ -650,26 +809,11 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             /*
              * The cursor position is defined so scan forward (skipping the
              * current tuple) to the next visitable tuple.
-             * 
-             * FIXME Verify this setup and then replicate to first(), last(),
-             * seek(), tuple(), etc. It allows us to use the context of the
-             * request to decide how to handle a tuple that is no longer in the
-             * index, which could be different for a forward and reverse scan.
              */
 
-            if(!currentPosition.leafValid) {
-                
-                currentPosition.relocateLeaf();
+            nextPosition = newPosition(currentPosition);
 
-                nextPosition = currentPosition;
-                
-            } else {
-
-                nextPosition = newPosition(currentPosition);
-
-            }
-        
-            if (!nextPosition.forwardScan(true/* skipCurrent */)) {
+            if (!nextPosition.forwardScan(true/*skipCurrent*/)) {
 
                 // we know that there is no next position.
                 nextPosition = null;
@@ -808,8 +952,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         btree.remove(key);
 
         /*
-         * Note: The ILeafListener will note that on the tuple that it was
-         * deleted from the index.
+         * Note: The ILeafListener will notice that the tuple was deleted from
+         * the index.
          */
         
     }
@@ -869,33 +1013,29 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         public int getIndex();
             
         /**
+         * Return the key corresponding to the cursor position.
+         * 
+         * @return The key.
+         */
+        public byte[] getKey();
+
+        /**
          * Copy the data from the tuple at the {@link ICursorPosition} into the
          * caller's buffer.
          * <p>
-         * Note: If the {@link ICursorPosition} is not on a tuple then this
-         * method will return <code>null</code> rather than the caller's
+         * Note: If the {@link ICursorPosition} is not on a visitable tuple then
+         * this method will return <code>null</code> rather than the caller's
          * tuple. This situation can arise if the index is empty (e.g., a root
-         * leaf with nothing in it) or if the caller fails to scan to the
-         * next/prior visitable tuple when establishing a new
-         * {@link ICursorPosition}.
+         * leaf with nothing in it) or if current cursor position does not
+         * correspond to a visitable tuple in the index.
          * 
          * @param tuple
          *            The caller's buffer.
          * 
          * @return The caller's buffer -or- <code>null</code> if the
-         *         {@link ICursorPosition} is not on a tuple.
+         *         {@link ICursorPosition} is not on a visitable tuple.
          */
         public Tuple<E> get(Tuple<E> tuple);
-
-        /**
-         * Return the key corresponding to the cursor position.
-         * 
-         * @return The key -or- <code>null</code> if the
-         *         {@link ICursorPosition} is not on a tuple.
-         * 
-         * @see #get(Tuple)
-         */
-        public byte[] getKey();
 
         /**
          * Return <code>true</code> iff the tuple corresponding to the cursor
@@ -955,6 +1095,16 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         protected int index;
 
         /**
+         * The key corresponding to the current cursor position. This is update
+         * each time we settle on a new tuple or when the cursor position is
+         * directed to an explicit key using seek(). Having this state allows us
+         * to unambiguously position the cursor in response to a seek() and also
+         * allows us to unambiguously re-position the cursor if the current leaf
+         * has been invalidated.
+         */
+        private final DataOutputBuffer kbuf;
+        
+        /**
          * When true the methods on this class will re-locate the leaf using the
          * key associated with the current tuple before doing anything else
          * (this flag is cleared as a side-effect once the leaf has been
@@ -980,23 +1130,29 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         }
         
         public int getIndex() {
-            relocateLeaf();
+
+            relocateLeaf(); 
+            
             return index;
             
         }
         
         /**
-         * Create position on the specified key, or on the successor of the
-         * specified key if that key is not found in the index.
+         * Create position on the specified tuple.
          * 
          * @param cursor
          *            The {@link ITupleCursor}.
          * @param leaf
          *            The current leaf.
          * @param index
-         *            The index of the tuple in the <i>leaf</i>.
+         *            The index of the tuple in the <i>leaf</i> -or- the
+         *            insertion point for the <i>key</i> if there is no tuple
+         *            for that key in the leaf.
+         * @param key
+         *            The key (required).
          */
-        protected AbstractCursorPosition(ITupleCursor<E> cursor,L leaf, int index) {
+        protected AbstractCursorPosition(ITupleCursor<E> cursor, L leaf,
+                int index, byte[] key) {
             
             if (cursor == null)
                 throw new IllegalArgumentException();
@@ -1004,17 +1160,21 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             if (leaf == null)
                 throw new IllegalArgumentException();
 
-            /*
-             * Note: The <i>index</i> MAY be equal to the #of keys in the leaf,
-             * in which case the {@link CursorPosition} MUST be understood to
-             * lie in the next leaf (if it exists). The scanForward() method
-             * handles this case automatically.
-             */
-            if(index < 0 || index > leaf.getKeyCount()) {
-                
-                throw new IllegalArgumentException("index="+index+", nkeys="+leaf.getKeyCount());
-                
-            }
+            if (key == null)
+                throw new IllegalArgumentException();
+
+//            /*
+//             * Note: The <i>index</i> MAY be equal to the #of keys in the leaf,
+//             * in which case the {@link CursorPosition} MUST be understood to
+//             * lie in the next leaf (if it exists). The scanForward() method
+//             * handles this case automatically.
+//             */
+//            if(index < 0 || index > leaf.getKeyCount()) {
+//                
+//                throw new IllegalArgumentException("index="+index+", nkeys="+leaf.getKeyCount());
+//                
+//            }
+            // @todo the valid range on [index] also includes the insertion points (negative integers).
 
             this.leafValid = true;
             
@@ -1023,6 +1183,10 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             this.leaf = leaf;
             
             this.index = index;
+            
+            this.kbuf = new DataOutputBuffer(key.length);
+            
+            this.kbuf.put( key );
             
         }
 
@@ -1044,16 +1208,29 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             this.leaf = p.getLeaf();
             
             this.index = p.getIndex();
+
+            final byte[] key = p.getKey();
+            
+            this.kbuf = new DataOutputBuffer(key.length);
+            
+            this.kbuf.put( key );
             
         }
         
         public String toString() {
             
             return "CursorPosition{" + cursor + ", leaf=" + leaf + ", index="
-                    + index + ", leafValid="+leafValid+"}";
+                    + index + ", leafValid=" + leafValid + ", key="
+                    + BytesUtil.toString(kbuf.toByteArray()) + "}";
             
         }
 
+        final public byte[] getKey() {
+            
+            return kbuf.toByteArray();
+            
+        }
+        
         /**
          * <code>true</code> if the cursor position corresponds to a tuple in
          * the index.
@@ -1068,41 +1245,31 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          */
         protected boolean isOnTuple() {
 
-            if (index == leaf.getKeyCount()) {
+            if (index>=0 && index < leaf.getKeyCount()) {
 
-                return false;
+                return true;
                 
             }
             
-            return true;
+            return false;
 
         }
         
-        public Tuple<E> get(Tuple<E> tuple) {
-
-            relocateLeaf();
-            
-            if(!isOnTuple()) return null;
-            
-            tuple.copy(index, leaf); // Note: increments [tuple.nvisited] !!!
-
-            return tuple;
-            
-        }
-
-        public byte[] getKey() {
-            
-            relocateLeaf();
-            
-            if(!isOnTuple()) return null;
-            
-            return leaf.getKeys().getKey(index);
-            
-        }
-
         public boolean isVisitableTuple() {
             
             relocateLeaf();
+            
+            if(!isOnTuple()) {
+                
+                /*
+                 * Note: This happens when [index] is an insertion point
+                 * (negative) because there was no tuple in the index for the
+                 * current key.
+                 */
+                
+                return false;
+                
+            }
             
             /*
              * Either delete markers are not supported or we are visiting
@@ -1112,6 +1279,71 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             return !leaf.hasDeleteMarkers() || cursor.isDeletedTupleVisitor()
                     || !leaf.getDeleteMarker(index);
 
+        }
+
+        public Tuple<E> get(Tuple<E> tuple) {
+
+            relocateLeaf();
+            
+            if(!isVisitableTuple()) return null;
+            
+            tuple.copy(index, leaf); // Note: increments [tuple.nvisited] !!!
+
+            return tuple;
+            
+        }
+        
+        /**
+         * Return <code>true</code> if the key at the current {@link #index}
+         * in the current {@link #leaf} lies inside of the optional half-open
+         * range constraint.
+         * 
+         * @return <code>true</code> unless tuple is LT [fromKey] or GTE [toKey].
+         */
+        private boolean rangeCheck() {
+
+            // optional inclusive lower bound (may be null).
+            final byte[] fromKey = cursor.getFromKey();
+            
+            // optional exclusive upper bound (may be null).
+            final byte[] toKey = cursor.getToKey();
+            
+            if (fromKey == null || toKey == null) {
+
+                // no range constraint.
+                return true;
+                
+            }
+
+            // the key for the cursor position.
+            final byte[] key = leaf.getKeys().getKey(index);
+
+            assert key != null : "null key @ index="+index;
+            
+            if (fromKey != null) {
+
+                if (BytesUtil.compareBytes(key, fromKey) < 0) {
+
+                    // key is LT then the optional inclusive lower bound.
+                    return false;
+
+                }
+
+            }
+
+            if (toKey != null) {
+
+                if (BytesUtil.compareBytes(key, toKey) >= 0) {
+
+                    // key is GTE the optional exclusive upper bound
+                    return false;
+
+                }
+
+            }
+
+            return true;
+            
         }
 
         /**
@@ -1125,19 +1357,27 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * <code>true</code> (and it will always be true if the B+Tree is
          * read-only).
          * 
+         * @return true unless if the leaf was re-located but the current tuple
+         *         is no longer present in the leaf (e.g., it was deleted from
+         *         the index). Note that the return is always <code>true</code>
+         *         if delete markers are in effect since a remove() is actually
+         *         an update in that case.
+         * 
          * @throws UnsupportedOperationException
          *             if {@link #leafValid} is <code>false</code>
          */
-        protected void relocateLeaf() {
+        protected boolean relocateLeaf() {
         
-            if(leafValid) return;
+            if(leafValid) return true;
             
             throw new UnsupportedOperationException();
             
         }
         
         /**
-         * Materialize the next leaf in the natural order of the index.
+         * Materialize the next leaf in the natural order of the index and set
+         * the {@link #index} to the first tuple in the leaf
+         * <code> index := 0 </code>.
          * <p>
          * Note: This method is NOT required to validate that the next leaf lies
          * within the optional key-range constraint on the owning
@@ -1149,7 +1389,9 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         abstract protected boolean nextLeaf();
 
         /**
-         * Materialize the prior leaf in the natural order of the index.
+         * Materialize the prior leaf in the natural order of the index and set
+         * the {@link #index} to the last tuple in the leaf
+         * <code> index := nkeys - 1 </code>.
          * <p>
          * Note: This method is NOT required to validate that the prior leaf
          * lies within the optional key-range constraint on the owning
@@ -1166,6 +1408,22 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
             int nleaves = 0;
             int ntuples = 0;
+
+            if (index < 0) {
+
+                // if it is an insert position then convert it to an index first.
+                index = -index - 1;
+
+            } else if (skipCurrent) {
+
+                /*
+                 * Note: don't skip the current tuple if we had an insertion
+                 * point (and hence we were not actually on a tuple).
+                 */
+
+                index++;
+                
+            }
             
             /*
              * Scan leafs until we find a visitable tuple.
@@ -1173,12 +1431,6 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
              * Note: If [index >= nkeys] then the scan will immediately skip to
              * the next leaf (if any) in the index.
              */
-            
-            if (skipCurrent) {
-
-                index++;
-                
-            }
             
             // set true iff the scan exceeds the optional exclusive upper bound.
             boolean done = false;
@@ -1193,30 +1445,25 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                  */
                 for (; index < nkeys; index++, ntuples++) {
 
-                    if (cursor.getToKey() != null) {
-
-                        /*
-                         * Done if GTE the toKey
-                         */
-
-                        final byte[] t = leaf.getKeys().getKey(index);
-
-                        if (BytesUtil.compareBytes(cursor.getToKey(), t) >= 0) {
-
-                            done = true;
-
-                            if(log.isInfoEnabled()) 
-                                log.info("Scan GTE optional exclusive upper bound: leavesScanned="
-                                                + nleaves
-                                                + ", tuplesScanned="
-                                                + ntuples);
-                            
-                            break;
-                            
-                        }
+                    if(!rangeCheck()) {
+                        
+                        // tuple is LT [fromKey] or GTE [toKey].
+                        
+                        done = true;
+                        
+                        break;
                         
                     }
                     
+                    // copy the current key.
+                    kbuf.reset();
+                    try {
+                        leaf.getKeys().copyKey(index, kbuf);
+                    } catch(IOException ex) {
+                        // note: IOException never get thrown.
+                        throw new RuntimeException(ex);
+                    }
+
                     if (isVisitableTuple()) {
 
                         if (log.isInfoEnabled())
@@ -1251,11 +1498,15 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
         }
         
+        // @todo skipCurrent can be dropped as a parameter.
+        // @todo if the index is an insert position then we need to convert it when we start the scan.
         public boolean reverseScan(boolean skipCurrent) {
 
             relocateLeaf();
             
-            if (leaf.getKeyCount() == 0) {
+            final int nkeys = leaf.getKeyCount();
+            
+            if (nkeys == 0) {
 
                 /*
                  * This happens when there is an empty root leaf. We have to
@@ -1270,18 +1521,42 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             int nleaves = 0;
             int ntuples = 0;
             
+            if (index < 0) {
+
+                // if it is an insert position then convert it to an index first.
+                index = -index - 1;
+                
+//                if(index == nkeys) {
+//                    
+//                    /*
+//                     * if the insertion point is on the right edge of the leaf
+//                     * then we skip to the prior tuple index since there is no
+//                     * tuple at leaf.keys[nkeys] - it is only used for transient
+//                     * overflow during insert.
+//                     */ 
+//                    index--;
+//                    
+//                }
+
+            }
+//             else
+            if (skipCurrent) {
+
+//                /* 
+//                 * Note: don't skip the current tuple if we had an insertion
+//                 * point (and hence we were not actually on a tuple).
+//                 */
+                
+                index--;
+
+            }
+            
             /*
              * Scan leafs until we find a visitable tuple.
              * 
              * Note: If [index < 0] then the scan will immediately skip to the
              * prior leaf (if any) in the index.
              */
-            
-            if (skipCurrent) {
-
-                index--;
-                
-            }
             
             // set true iff the scan reaches or exceeds the optional inclusive lower bound.
             boolean done = false;
@@ -1295,30 +1570,25 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                 
                 for (; index >= 0; index--, ntuples++) {
 
-                    final byte[] fromKey = cursor.getFromKey();
+                    if(index==nkeys) continue;
                     
-                    if (fromKey != null) {
-
-                        /*
-                         * Done if LT then fromKey
-                         */
-
-                        final byte[] t = leaf.getKeys().getKey(index);
-
-                        if (BytesUtil.compareBytes(fromKey, t) < 0) {
-
-                            done = true;
-
-                            if(log.isInfoEnabled()) 
-                                log.info("Scan LE optional inclusive upper bound: leavesScanned="
-                                                + nleaves
-                                                + ", tuplesScanned="
-                                                + ntuples);
-                            
-                            break;
-                            
-                        }
+                    if(!rangeCheck()) {
                         
+                        // tuple is LT [fromKey] or GTE [toKey].
+                        
+                        done = true;
+                        
+                        break;
+                        
+                    }
+
+                    // copy the current key.
+                    kbuf.reset();
+                    try {
+                        leaf.getKeys().copyKey(index, kbuf);
+                    } catch(IOException ex) {
+                        // note: IOException never get thrown.
+                        throw new RuntimeException(ex);
                     }
                     
                     if (isVisitableTuple()) {
@@ -1376,10 +1646,11 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @param cursor
          * @param leaf
          * @param index
+         * @param key
          */
-        public ReadOnlyCursorPosition(ITupleCursor<E> cursor, Leaf leaf, int index) {
+        public ReadOnlyCursorPosition(ITupleCursor<E> cursor, Leaf leaf, int index,byte[] key) {
 
-            super(cursor, leaf, index);
+            super(cursor, leaf, index, key);
             
         }
 
@@ -1419,7 +1690,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          *         parent).
          */
         protected Node getParent(Leaf leaf) {
-         
+
             Node parent = leaf.getParent();
             
             if (parent == null) {
@@ -1546,9 +1817,9 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @param leaf
          * @param index
          */
-        protected MutableCursorPosition(ITupleCursor<E> cursor, Leaf leaf, int index) {
+        protected MutableCursorPosition(ITupleCursor<E> cursor, Leaf leaf, int index,byte[] key) {
 
-            super(cursor, leaf, index);
+            super(cursor, leaf, index, key);
             
             leaf.addLeafListener(this);
             
@@ -1589,55 +1860,84 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          */
         public void invalidateTuple(int index) {
 
-            if (index == this.index) {
-
-                /*
-                 * Note: The tuple whose state was changed is the tuple
-                 * corresponding to this cursor position.
-                 */
-                
-                final MutableBTreeTupleCursor cursor = (MutableBTreeTupleCursor<E>)this.cursor;
-                
-                if(cursor.currentPosition == this) {
-                    
-                    /*
-                     * Note: This is the _current_ cursor position (vs the prior
-                     * or next cursor position) so update the state of the tuple
-                     * from the leaf.
-                     */
-                    
-                    if (get(cursor.tuple) == null) {
-                        
-                        throw new AssertionError();
-                        
-                    }
-                    
-                }
-                
-            }
+//            if (index == this.index) {
+//
+//                /*
+//                 * Note: The tuple whose state was changed is the tuple
+//                 * corresponding to this cursor position.
+//                 */
+//                
+//                final MutableBTreeTupleCursor cursor = (MutableBTreeTupleCursor<E>)this.cursor;
+//                
+//                if(cursor.currentPosition == this) {
+//                    
+//                    /*
+//                     * Note: This is the _current_ cursor position (vs the prior
+//                     * or next cursor position) so update the state of the tuple
+//                     * from the leaf.
+//                     * 
+//                     * FIXME rather than being synchronous, simply flag the
+//                     * tuple state as changed in order to be faster. The flag
+//                     * will be cleared if the cursor is moved to another tuple.
+//                     * get(Tuple) can be modified or invoked conditionally if
+//                     * the flag is set, or the Tuple can be added to the
+//                     * _current_ position since that is the only tuple whose
+//                     * state we ever report and that will remove the ambiguity
+//                     * concerning which Tuple is updated in get(Tuple).
+//                     */
+//                    
+//                    if (get(cursor.tuple) == null) {
+//                        
+//                        throw new AssertionError();
+//                        
+//                    }
+//                    
+//                }
+//                
+//            }
             
         }
 
-        protected void relocateLeaf() {
+        /**
+         * Extended to register ourselves as a listener to the new leaf.
+         */
+        protected boolean priorLeaf() {
             
-            if(leafValid) return;
-            
-            if (!isOnTuple()) {
+            if(super.priorLeaf()) {
                 
-                /*
-                 * FIXME What do to if the cursor position was not on a tuple
-                 * for the old leaf? If the btree is empty, then we can just use
-                 * the root leaf. Otherwise I am not sure exactly what leaf
-                 * needs to be located nor what tuple on that leaf should be
-                 * located! Write some unit tests that trigger this condition
-                 * and figure out what to do.
-                 */
+                leaf.addLeafListener(this);
 
-                throw new AssertionError("index="+index);
+                return true;
                 
             }
             
-            final byte[] key = leaf.getKeys().getKey(index);
+            return false;
+            
+        }
+        
+        /**
+         * Extended to register ourselves as a listener to the new leaf.
+         */
+        protected boolean nextLeaf() {
+            
+            if(super.nextLeaf()) {
+                
+                leaf.addLeafListener(this);
+
+                return true;
+                
+            }
+            
+            return false;
+            
+        }
+        
+        protected boolean relocateLeaf() {
+            
+            if(leafValid) return true;
+            
+            // the key corresponding to the cursor position.
+            final byte[] key = getKey();
 
             if(log.isInfoEnabled()) log.info("Relocating leaf: key="+BytesUtil.toString(key));
             
@@ -1651,50 +1951,60 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             // Re-locate the tuple index for the key in that leaf.
             index = leaf.getKeys().search(key);
             
+            final boolean tupleDeleted;
+            
             if (index < 0) {
 
-                /*
-                 * Note: We have re-located the leaf that spans the [key] but
-                 * there is no longer any tuple in the leaf for that [key].
-                 * 
-                 * Convert the insertion point into an index into the leaf.
-                 * 
-//                 * Note: We choose the index in the leaf that corresponds to the
-//                 * successor of the tuple. Since deleting the tuple created a
-//                 * gap (at least logically) in the leaf, the successor is the
-//                 * tuple that filled that gap. Since the successor was already
-//                 * moved down the [-1] is commented out below in order to give
-//                 * us the correct index for the successor.
-                 */
-
-                index = -index - 1; // @todo verify this.
-
-                /*
-                 * Since the tuple is not found we may need to mark the tuple on
-                 * the cursor as deleted (while this is synchronous just like
-                 * when the tuple state is updated, the [leafValid] flag itself
-                 * is NOT handled synchronously so the update will in fact be
-                 * delayed).
-                 */
+//                /*
+//                 * Note: We have re-located the leaf that spans the [key] but
+//                 * there is no longer any tuple in the leaf for that [key].
+//                 * 
+//                 * Convert the insertion point into an index into the leaf.
+//                 * 
+////                 * Note: We choose the index in the leaf that corresponds to the
+////                 * successor of the tuple. Since deleting the tuple created a
+////                 * gap (at least logically) in the leaf, the successor is the
+////                 * tuple that filled that gap. Since the successor was already
+////                 * moved down the [-1] is commented out below in order to give
+////                 * us the correct index for the successor.
+//                 */
+//
+//                index = -index - 1; // @todo verify this.
+//
+//                /*
+//                 * Since the tuple is not found we may need to mark the tuple on
+//                 * the cursor as deleted (while this is synchronous just like
+//                 * when the tuple state is updated, the [leafValid] flag itself
+//                 * is NOT handled synchronously so the update will in fact be
+//                 * delayed).
+//                 */
+//                
+//                final MutableBTreeTupleCursor cursor = (MutableBTreeTupleCursor<E>)this.cursor;
+//                
+//                if(cursor.currentPosition == this) {
+//
+//                    /*
+//                     * Note: The tuple whose state was changed is the tuple
+//                     * corresponding to the _current_ cursor position so flag
+//                     * that tuple as deleted now that it no longer appears in
+//                     * the leaf.
+//                     */
+//
+//                    cursor.tuple.markDeleted();
+//                    
+//                }
                 
-                final MutableBTreeTupleCursor cursor = (MutableBTreeTupleCursor<E>)this.cursor;
+                tupleDeleted = true;
                 
-                if(cursor.currentPosition == this) {
-
-                    /*
-                     * Note: The tuple whose state was changed is the tuple
-                     * corresponding to the _current_ cursor position so flag
-                     * that tuple as deleted now that it no longer appears in
-                     * the leaf.
-                     */
-
-                    cursor.tuple.markDeleted();
-                    
-                }
+            } else {
+                
+                tupleDeleted = false;
                 
             }
 
             leafValid = true;
+            
+            return tupleDeleted;
             
         }
         
@@ -1703,10 +2013,6 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     /**
      * An {@link ITuple} that directly supports forward and reverse cursor
      * operations on a local {@link BTree}.
-     * 
-     * FIXME Modify {@link AbstractBTree} to use an {@link ITupleCursor} without
-     * the post-order striterator (but we still need post-order traversal for
-     * flushing evicted nodes to the store!)
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1818,9 +2124,9 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         }
 
         @Override
-        protected ReadOnlyCursorPosition<E> newPosition(Leaf leaf, int index) {
+        protected ReadOnlyCursorPosition<E> newPosition(Leaf leaf, int index, byte[] key) {
             
-            return new ReadOnlyCursorPosition<E>(this, leaf, index);
+            return new ReadOnlyCursorPosition<E>(this, leaf, index, key);
             
         }
 
@@ -1843,23 +2149,6 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      * {@link BTree}. However, the {@link BTree} itself is NOT thread-safe for
      * mutation and this class does not relax that limitation.
      * 
-     * FIXME get rid of the {@link ChunkedLocalRangeIterator}. Make sure that
-     * the {@link IRangeQuery#REMOVEALL} flag is correctly interpreted as not
-     * allowing more than [capacity] tuples to be deleted.
-     * 
-     * @todo Support direct mutation of the tuple in the index corresponding to
-     *       the current cursor position using a mutable {@link ITuple}? (You
-     *       can always do an insert or remove on the index using
-     *       {@link ITuple#getKey()} so this is only a convenience).
-     * 
-     * @todo The returned tuple is always the tuple supplied to the ctor so a
-     *       concurrent modification will cause the state of the tuple already
-     *       in the caller's hands to be immediately changed (the change will be
-     *       synchronous). This "feature" should be documented and should be
-     *       observable for the {@link FusedView}'s cursor as well (in fact it
-     *       is only synchronous when a tuple is updated NOT when the leaf is
-     *       invalidated).
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * @param <E>
@@ -1875,9 +2164,9 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         }
 
         @Override
-        protected MutableCursorPosition<E> newPosition(Leaf leaf, int index) {
+        protected MutableCursorPosition<E> newPosition(Leaf leaf, int index, byte[] key) {
             
-            return new MutableCursorPosition<E>(this, leaf, index);
+            return new MutableCursorPosition<E>(this, leaf, index, key);
             
         }
 

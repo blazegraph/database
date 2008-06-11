@@ -39,6 +39,10 @@ import com.bigdata.journal.TemporaryRawStore;
  * THREAD is used to insert, update, or remove tuples from a mutable
  * {@link BTree}.
  * 
+ * @todo unit test that verifies that the tuple exposed by the cursor will
+ *       appear to be deleted if the corresponding tuple is deleted from the
+ *       index (mutable BTree and FusedView only).
+ * 
  * @todo test with multiple inserts such that the leaf becomes invalidated
  *       several times over in order to verify that the cursor position is
  *       re-establishing it's listener each time it re-locates the leaf spanning
@@ -83,14 +87,15 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         
         return new MutableBTreeTupleCursor<String>((BTree) btree,
                 new Tuple<String>(btree, IRangeQuery.DEFAULT),
-                null/* fromKey */, null/* toKey */);
+                fromKey,  toKey);
         
     }
 
     /**
-     * Test ability to remove tuples using {@link ITupleCursor#remove()}.
+     * Test ability to remove tuples using {@link ITupleCursor#remove()} during
+     * forward traversal.
      */
-    public void test_cursor_remove() {
+    public void test_cursor_remove_during_forward_traversal() {
 
         final BTree btree;
         {
@@ -117,76 +122,129 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             // visit (10,Bryan) and then delete that tuple.
             {
 
-                assertTrue(cursor.hasNext());
+                // visit the first tuple and verify its state.
+                assertEquals(new TestTuple<String>(10,"Bryan"),cursor.next());
                 
-                ITuple tuple = cursor.next();
-                
-                assertEquals(new TestTuple<String>(10,"Bryan"),tuple);
-                
-                assertTrue(btree.contains(tuple.getKey()));
-
+                // remove it.
                 cursor.remove();
 
-                assertFalse(btree.contains(tuple.getKey()));
+                // verify cursor reports tuple is null since it no longer exists in the index.
+                assertNull(cursor.tuple());
 
             }
 
             // visit (20,Mike) and then delete that tuple.
             {
 
-                assertTrue(cursor.hasNext());
+                // visit the next tuple and verify its state.
+                assertEquals(new TestTuple<String>(20,"Mike"),cursor.next());
                 
-                ITuple tuple = cursor.next();
-                
-                assertEquals(new TestTuple<String>(20,"Mike"),tuple);
-                
-                assertTrue(btree.contains(tuple.getKey()));
-
+                // remove it.
                 cursor.remove();
 
-                assertFalse(btree.contains(tuple.getKey()));
+                // verify cursor reports tuple is null since it no longer exists in the index.
+                assertNull(cursor.tuple());
 
             }
 
             // visit (30,James) and then delete that tuple.
             {
 
-                assertTrue(cursor.hasNext());
+                // visit the next tuple and verify its state.
+                assertEquals(new TestTuple<String>(30,"James"),cursor.next());
                 
-                ITuple tuple = cursor.next();
-                
-                assertEquals(new TestTuple<String>(30,"James"),tuple);
-                
-                assertTrue(btree.contains(tuple.getKey()));
-
+                // remove it.
                 cursor.remove();
 
-                assertFalse(btree.contains(tuple.getKey()));
+                // verify cursor reports tuple is null since it no longer exists in the index.
+                assertNull(cursor.tuple());
 
             }
             
             // the iterator is exhausted.
             assertFalse(cursor.hasNext());
+
+            // the index is empty.
+            assertEquals(0,btree.getEntryCount());
             
-            // and the index is empty.
+        }
+        
+    }
+    
+    /**
+     * Test ability to remove tuples using {@link ITupleCursor#remove()} during
+     * reverse traversal.
+     */
+    public void test_cursor_remove_during_reverse_traversal() {
+
+        final BTree btree;
+        {
+       
+            btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(
+                    UUID.randomUUID()));
+
+            btree.insert(10, "Bryan");
+            btree.insert(20, "Mike");
+            btree.insert(30, "James");
+            
+        }
+        
+        /*
+         * loop over the index removing entries as we go.
+         * 
+         * Note: this loop is unrolled in order to make it easier to track the
+         * state changed as tuples are deleted.
+         */
+        {
+            
+            ITupleCursor<String> cursor = newCursor(btree);
+
+            // visit (30,James) and then delete that tuple.
+            {
+
+                // verify the state of the last tuple.
+                assertEquals(new TestTuple<String>(30,"James"),cursor.prior());
+
+                // remove it.
+                cursor.remove();
+                
+                // verify tuple() reports null since it was deleted.
+                assertNull(cursor.tuple());
+
+            }
+            
+            // visit (20,Mike) and then delete that tuple.
+            {
+
+                // visit the prior tuple and verify its state.
+                assertEquals(new TestTuple<String>(20,"Mike"),cursor.prior());
+
+                // remove it.
+                cursor.remove();
+
+                // verify tuple() reports null since it was deleted.
+                assertNull(cursor.tuple());
+
+            }
+
+            // visit (10,Bryan) and then delete that tuple.
+            {
+
+                // visit the prior tuple and verify its state.
+                assertEquals(new TestTuple<String>(10,"Bryan"),cursor.prior());
+                
+                // remote it.
+                cursor.remove();
+
+                // verify tuple() reports null since it was deleted.
+                assertNull(cursor.tuple());
+                
+            }
+
+            // the iterator is exhausted.
             assertFalse(cursor.hasPrior());
 
-            /*
-             * This is the rolled up version of the loop.
-             */
-            
-//            while(cursor.hasNext()) {
-//                
-//                ITuple tuple = cursor.next();
-//                
-//                assertTrue(btree.contains(tuple.getKey()));
-//
-//                cursor.remove();
-//
-//                assertFalse(btree.contains(tuple.getKey()));
-//
-//            }
-            
+            // the index is empty.
             assertEquals(0,btree.getEntryCount());
             
         }
@@ -216,55 +274,233 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             
         }
         
-        // loop over the index removing entries as we go.
+        /*
+         * seek to a tuple, update it using the btree api and then verify that
+         * the tuple state is re-copied from the btree by tuple().
+         */
         {
-            
+
             ITupleCursor<String> cursor = newCursor(btree);
 
-            assertNotNull(cursor.seek(20));
+            // seek to a tuple and verify its state.
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.seek(20));
             
-            assertEquals("Mike",cursor.tuple().getObject());
+            // verify state reported by tuple()
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
 
             // update the tuple.
             btree.insert(20, "Michael");
 
             // verify update is reflected by the tuple.
-            assertEquals("Michael",cursor.tuple().getObject());
+            assertEquals(new TestTuple<String>(20, "Michael"), cursor.tuple());
 
         }
         
     }
     
     /**
-     * Unit test for concurrent modification resulting from an insert() of a
-     * precedessor (the tuple may have been moved down in the leaf or the tree
-     * structure may have been changed more broadly if the leaf overflows). The
-     * cursor position's listener needs to notice the event and relocate itself
-     * within the BTree.
-     * 
-     * @todo test when splitting the root leaf (at m=3 this example would split
-     *       the root leaf).
+     * Unit test for concurrent modification resulting from insert() and remove().
      */
     public void test_concurrent_modification_insert() {
-
-        fail("write test");
         
-    }
-   
-    /**
-     * Unit test for concurrent modification resulting from an remove() of a
-     * predecessor (the tuple may have been moved down in the leaf or the tree
-     * structure may have been changed more broadly if the leaf underflows). The
-     * cursor position's listener needs to notice the event and relocate itself
-     * within the BTree.
-     * 
-     * @todo test when a leaf underflows causing it to be joined with its
-     *       neighbor (a) when a tuple is rotated from the neighbor; and (b)
-     *       when the leaves are joined and the root is replaced by a root leaf.
-     */
-    public void test_concurrent_modification_remove() {
+        final BTree btree;
+        {
+       
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
 
-        fail("write test");
+            // Explictly specify a large branching factor so that we do not split the root leaf.
+            md.setBranchingFactor(20);
+            
+            btree = BTree.create(new TemporaryRawStore(), md);
+
+            btree.insert(10, "Bryan");
+            btree.insert(20, "Mike");
+            btree.insert(30, "James");
+            
+        }
+
+        /*
+         * seek to a tuple, insert another tuple using the btree api and then
+         * verify that the current tuple / cursor position appears unchanged
+         * from the perspective of the cursor.
+         */
+        {
+
+            ITupleCursor<String> cursor = newCursor(btree);
+
+            // seek to a tuple and verify its state.
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.seek(20));
+
+            // verify same state reported by tuple().
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
+
+            /*
+             * insert a tuple before the current tuple (moves the current tuple
+             * down by one).
+             */
+            btree.insert(15, "Paul");
+
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+            // verify the current tuple state is unchanged.
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
+
+            // visit the prior tuple (the one we just inserted).
+            assertEquals(new TestTuple<String>(15, "Paul"), cursor.prior());
+            
+            // verify the tuple state using tuple().
+            assertEquals(new TestTuple<String>(15, "Paul"), cursor.tuple());
+
+            /*
+             * remove the current tuple (moves the successors of this tuple in
+             * the leaf down by one).
+             */
+            btree.remove(15);
+
+            // verify the tuple state - it should be null since the tuple for that key was just deleted.
+            assertEquals(null, cursor.tuple());
+
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(15),cursor.currentKey());
+
+            // visit the next tuple.
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.next());
+
+            // delete that tuple.
+            btree.remove(20);
+            
+            // verify the tuple state - it should be null since the tuple for that key was just deleted.
+            assertEquals(null, cursor.tuple());
+            
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            
+            // insert another tuple that is a successor of the deleted tuple.
+            btree.insert(25, "Allen");
+
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+            // verify the tuple state - still null since we have not repositioned the cursor.
+            assertEquals(null, cursor.tuple());
+            
+            // advance the cursor and verify the tuple state
+            assertEquals(new TestTuple<String>(25,"Allen"), cursor.next());
+
+            // verify the tuple state using tuple().
+            assertEquals(new TestTuple<String>(25,"Allen"), cursor.tuple());
+
+        }
+
+    }
+     
+    /**
+     * Unit test for concurrent modification resulting from insert() and
+     * remove() including (a) where the root leaf is split by the insert() and
+     * (b) where remove() causes an underflow that triggers a join of the leaf
+     * with its sibling forcing the underflow of the parent such that the leaf
+     * then becomes the new root leaf.
+     * <p>
+     * Note: This test does not covert overflow where a tuple is rotated to the
+     * sibling or underflow where a tuple is rotated from the sibling. Those
+     * cases (and all cases involving deeper trees) are covered by the various
+     * stress tests where a BTree is perturbed randomly and checked against
+     * ground truth.
+     */
+    public void test_concurrent_modification_insert_split_root_leaf() {
+
+        final BTree btree;
+        {
+       
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+            // Note: at m=3 this example splits the root leaf).
+            md.setBranchingFactor(3);
+            
+            btree = BTree.create(new TemporaryRawStore(), md);
+
+            btree.insert(10, "Bryan");
+            btree.insert(20, "Mike");
+            btree.insert(30, "James");
+            
+        }
+
+        /*
+         * seek to a tuple, insert another tuple using the btree api and then
+         * verify that the current tuple / cursor position appears unchanged
+         * from the perspective of the cursor.
+         * 
+         * @todo this must be done for both forward and reverse traversal as
+         * well as that tests the handling of the [nextPosition] and
+         * [priorPosition] respectively.
+         */
+        {
+
+            ITupleCursor<String> cursor = newCursor(btree);
+
+            // seek to a tuple and verify its state.
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.seek(20));
+
+            // verify same state reported by tuple().
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
+
+            // insert a tuple before the current tuple (forces the leaf to be split).
+            btree.insert(15, "Paul");
+
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+            // verify the current tuple state is unchanged.
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
+
+            // visit the prior tuple (the one we just inserted).
+            assertEquals(new TestTuple<String>(15, "Paul"), cursor.prior());
+            
+            // verify the tuple state using tuple().
+            assertEquals(new TestTuple<String>(15, "Paul"), cursor.tuple());
+
+            /*
+             * remove the current tuple. This causes the leaf to underflow and
+             * since the parent would then be deficient the leaf becomes the new
+             * root leaf and its right sibling is discarded.
+             */
+            btree.remove(15);
+
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(15),cursor.currentKey());
+
+            // verify the tuple state - it should be null since the tuple for that key was just deleted.
+            assertEquals(null, cursor.tuple());
+            
+            // visit the next tuple.
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.next());
+
+            // delete that tuple.
+            btree.remove(20);
+            
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+            // verify the tuple state - it should be null since the tuple for that key was just deleted.
+            assertEquals(null, cursor.tuple());
+            
+            // insert another tuple that is a successor of the deleted tuple.
+            btree.insert(25, "Allen");
+
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+            // verify the tuple state - still null since we have not repositioned the cursor.
+            assertEquals(null, cursor.tuple());
+            
+            // advance the cursor and verify the tuple state
+            assertEquals(new TestTuple<String>(25,"Allen"), cursor.next());
+
+            // verify the tuple state using tuple().
+            assertEquals(new TestTuple<String>(25,"Allen"), cursor.tuple());
+
+        }
         
     }
     
@@ -276,8 +512,71 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
      */
     public void test_concurrent_modification_copy_on_write() {
 
-        fail("write test");
+        final BTree btree;
+        {
+       
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
 
+            // Note: at m=3 this example splits the root leaf if anything is inserted.
+            md.setBranchingFactor(3);
+            
+            btree = BTree.create(new TemporaryRawStore(), md);
+
+            btree.insert(10, "Bryan");
+            btree.insert(20, "Mike");
+            btree.insert(30, "James");
+            
+        }
+
+        {
+
+            ITupleCursor<String> cursor = newCursor(btree);
+
+            /*
+             * flush the btree to the store making all nodes clean. any mutation
+             * will trigger copy on write.
+             */
+            assertTrue( btree.flush() );
+
+            assertTrue(cursor.hasNext());
+
+            // visit the first tuple.
+            assertEquals(new TestTuple<String>(10,"Bryan"),cursor.next());
+            
+            // remove that tuple from the index (triggers copy-on-write).
+            btree.remove(10);
+            
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+
+            // verify the tuple state - still null since we have not repositioned the cursor.
+            assertEquals(null, cursor.tuple());
+            
+            // visit the next tuple.
+            assertEquals(new TestTuple<String>(20,"Mike"),cursor.next());
+
+            // verify the cursor position.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+            /*
+             * flush the btree again making all nodes clean.
+             */
+            assertTrue(btree.flush());
+
+            // insert a tuple (triggers copy-on-write).
+            btree.insert(10, "Bryan");
+            
+            // verify the cursor position is unchanged.
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+            // verify the current tuple state.
+            assertEquals(new TestTuple<String>(20,"Mike"),cursor.tuple());
+
+            // visit the prior tuple (the one that we just inserted).
+            assertEquals(new TestTuple<String>(10,"Bryan"),cursor.prior());
+            
+        }
+        
     }
     
 }

@@ -48,10 +48,10 @@ import com.bigdata.util.ChecksumUtility;
 
 /**
  * A non-restart-safe store for temporary data that buffers data in memory until
- * the write cache overflows and then converts to a disk-based store. The
- * backing file (if any) is released when the temporary store is
- * {@link #close()}d.
- *  
+ * the write cache overflows (or is flushed to the disk) and then converts to a
+ * disk-based store. The backing file (if any) is released when the temporary
+ * store is {@link #close()}d.
+ * 
  * @see BufferMode#Temporary
  * @see DiskOnlyStrategy
  * 
@@ -224,7 +224,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
             
                 if (buf.isOpen()) {
 
-                    log.warn("Closing temp store.");
+                    log.info("Closing temp store.");
 
                     close();
 

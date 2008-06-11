@@ -1133,11 +1133,13 @@ public class IndexSegment extends AbstractBTree {
          *            The current leaf.
          * @param index
          *            The index of the tuple in the <i>leaf</i>.
+         * @param key
+         *            The key.
          */
         public CursorPosition(IndexSegmentTupleCursor<E> cursor,
-                ImmutableLeaf leaf, int index) {
-            
-            super(cursor,leaf,index);
+                ImmutableLeaf leaf, int index, byte[] key) {
+
+            super(cursor, leaf, index, key);
 
         }
 
@@ -1248,9 +1250,9 @@ public class IndexSegment extends AbstractBTree {
         }
 
         @Override
-        final protected CursorPosition<E> newPosition(ImmutableLeaf leaf, int index) {
+        final protected CursorPosition<E> newPosition(ImmutableLeaf leaf, int index, byte[] key) {
 
-            CursorPosition<E> pos = new CursorPosition<E>(this, leaf, index);
+            CursorPosition<E> pos = new CursorPosition<E>(this, leaf, index, key);
 
             return pos;
 

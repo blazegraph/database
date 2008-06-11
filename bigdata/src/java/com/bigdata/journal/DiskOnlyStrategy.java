@@ -1277,7 +1277,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
         
-        if( ! file.delete() ) {
+        if( fileOpened && ! file.delete() ) {
             
             throw new RuntimeException("Could not delete file: "
                     + file.getAbsoluteFile());
