@@ -67,7 +67,7 @@ public class TestReadOnlyBTreeCursors extends AbstractBTreeCursorTestCase {
         
         return new ReadOnlyBTreeTupleCursor<String>((BTree) btree,
                 new Tuple<String>(btree, IRangeQuery.DEFAULT),
-                null/* fromKey */, null/* toKey */);
+                fromKey, toKey);
         
     }
     

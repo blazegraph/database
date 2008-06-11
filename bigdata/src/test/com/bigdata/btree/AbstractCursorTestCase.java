@@ -42,22 +42,16 @@ import com.bigdata.rawstore.IBlock;
 /**
  * Abstract base class for {@link ITupleCursor} test suites.
  * 
- * @todo run tests against read-only BTree as well as against mutable BTree and
- *       mutable FusedView and the scale-out federation variant (progressive
- *       forward or reverse scan against a partitioned index).
- * 
- * @todo write test of remove() for mutable variants.
- * 
- * @todo write test of concurrent removal for mutable variants.
- * 
- * @todo unit test that verifies that the tuple exposed by the cursor will
- *       appear to be deleted if the corresponding tuple is deleted from the
- *       index (mutable BTree and FusedView only).
+ * @todo also run tests against the FusedView and the scale-out federation
+ *       variant (progressive forward or reverse scan against a partitioned
+ *       index).
  * 
  * @todo unit tests to verify that the optional constraints on the key-range for
  *       the cursor are correctly imposed. E.g., #first() or #next() must not
  *       visit a tuple that lies outside of the allowable key range for the
  *       cursor.
+ * 
+ * @todo unit test variant when delete markers are enabled.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -131,7 +125,9 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
      * 
      * @todo test variant with a key-range constraint on the index partition.
      * 
-     * @todo test variant using delete markers.
+     * @todo test variant using delete markers. note that delete markers can be
+     *       present in an index segment (unless a compacting merge was
+     *       performed).
      */
     protected void doBaseCaseTest(AbstractBTree btree) {
 
@@ -173,7 +169,7 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
         }
 
         // test next()
-        if (true) {
+        {
 
             ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
                     null/* fromKey */, null/* toKey */);
@@ -190,8 +186,10 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
 
             assertEquals(new TestTuple<String>(30, "James"), cursor.next());
 
+            // itr is exhausted.
             assertFalse(cursor.hasNext());
 
+            // itr is exhausted.
             try {
                 cursor.next();
                 fail("Expecting " + NoSuchElementException.class);
@@ -199,10 +197,21 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
                 log.info("Ignoring expected exception: " + ex);
             }
 
+            // make sure that the iterator will not restart.
+            assertFalse(cursor.hasNext());
+            
+            // make sure that the iterator will not restart.
+            try {
+                cursor.next();
+                fail("Expecting " + NoSuchElementException.class);
+            } catch (NoSuchElementException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+            
         }
 
         // test prior()
-        if (true) {
+        {
 
             ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
                     null/* fromKey */, null/* toKey */);
@@ -219,8 +228,21 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
 
             assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
 
+            // itr is exhausted.
             assertFalse(cursor.hasPrior());
 
+            // itr is exhausted.
+            try {
+                cursor.prior();
+                fail("Expecting " + NoSuchElementException.class);
+            } catch (NoSuchElementException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
+            // make sure that the iterator will not restart.
+            assertFalse(cursor.hasPrior());
+
+            // make sure that the iterator will not restart.
             try {
                 cursor.prior();
                 fail("Expecting " + NoSuchElementException.class);
@@ -255,8 +277,21 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
             assertEquals(new TestTuple<String>(10, "Bryan"), itr.next());
             assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
 
+            // exhausted.
             assertFalse(itr.hasNext());
 
+            // exhausted.
+            try {
+                itr.next();
+                fail("Expecting " + NoSuchElementException.class);
+            } catch (NoSuchElementException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
+            // make sure itr will not restart.
+            assertFalse(itr.hasNext());
+
+            // make sure itr will not restart.
             try {
                 itr.next();
                 fail("Expecting " + NoSuchElementException.class);
@@ -298,55 +333,77 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
         }
 
         /*
-         * test seek(), prior(), and next() when the probe key is not found /
-         * visitable and when there is no successor of a probe key not found in
-         * the index.
+         * test seek() when the probe key is not found / visitable.
+         * 
+         * this also tests prior() and next() after the seek to a probe key that
+         * does not exist in the index.
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
-                    null/* fromKey */, null/* toKey */);
+            ITupleCursor<String> cursor = newCursor(btree);
 
-            // seek finds the visitable successor of the probe key.
+            // seek to a probe key that does not exist.
             assertEquals(null, cursor.seek(29));
+            assertEquals(null, cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(29),cursor.currentKey());
+            assertTrue(cursor.hasNext());
+            assertEquals(new TestTuple<String>(30, "James"), cursor.next());
             assertEquals(new TestTuple<String>(30, "James"), cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(30),cursor.currentKey());
             assertFalse(cursor.hasNext());
             assertTrue(cursor.hasPrior());
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.prior());
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
 
-            // seek finds the visitable successor of the probe key.
+            // seek to a probe key that does not exist.
             assertEquals(null, cursor.seek(9));
+            assertEquals(null, cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(9),cursor.currentKey());
+            assertTrue(cursor.hasNext());
+            assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
             assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
             assertFalse(cursor.hasPrior());
             assertTrue(cursor.hasNext());
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.next());
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
 
-            // seek finds the visitable successor of the probe key.
+            // seek to a probe key that does not exist and scan forward.
             assertEquals(null, cursor.seek(19));
+            assertEquals(null, cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(19),cursor.currentKey());
+            assertTrue(cursor.hasNext());
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.next());
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
             assertTrue(cursor.hasNext());
             assertEquals(new TestTuple<String>(30, "James"), cursor.next());
+            assertEquals(new TestTuple<String>(30, "James"), cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(30),cursor.currentKey());
 
+            // seek to a probe key that does not exist and scan backward.
             assertEquals(null, cursor.seek(19));
-            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
+            assertEquals(null, cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(19),cursor.currentKey());
             assertTrue(cursor.hasPrior());
             assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+            assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
+            assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+            assertFalse(cursor.hasPrior());
 
-            // seek finds no successor for the probe key.
+            // seek to a probe key that does not exist (after all valid tuples).
             assertEquals(null, cursor.seek(31));
             assertEquals(null, cursor.tuple());
-            assertFalse(cursor.isCursorPositionDefined());
-            // Note: iterator starts from the start of the key range since
-            // cursor position is not defined!
-            assertTrue(cursor.hasNext());
-            assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
+            assertTrue(cursor.isCursorPositionDefined());
+            assertEquals(KeyBuilder.asSortKey(31),cursor.currentKey());
+            assertFalse(cursor.hasNext());
 
-            // seek finds no successor for the probe key.
+            // seek to a probe key that does not exist (after all valid tuples).
             assertEquals(null, cursor.seek(31));
             assertEquals(null, cursor.tuple());
-            assertFalse(cursor.isCursorPositionDefined());
-            // Note: starts from the end of the key range since cursor position
-            // is not defined!
+            assertTrue(cursor.isCursorPositionDefined());
+            assertEquals(KeyBuilder.asSortKey(31),cursor.currentKey());
             assertTrue(cursor.hasPrior());
             assertEquals(new TestTuple<String>(30, "James"), cursor.prior());
 
@@ -361,115 +418,609 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
      * can't have an empty {@link IndexSegment}.
      * 
      * @param btree
-     * 
-     * @todo also test with key-range limits when the index is empty.
-     * 
-     * @todo also test with a key-range that does not overlap the data actually
-     *       present in a non-empty index.
+     *            An empty B+Tree.
      */
     protected void doEmptyIndexTest(AbstractBTree btree) {
-        
-        // first()
-        {
-         
-            final ITupleCursor<String> cursor = newCursor(btree);
-            
-            assertNull(cursor.first());
-            
-            assertFalse(cursor.isCursorPositionDefined());
 
-            assertNull(cursor.tuple());
-            
-            assertFalse(cursor.hasNext());
-
-            assertFalse(cursor.hasPrior());
-            
-        }
-        
-        // last()
-        {
-            
-            final ITupleCursor<String> cursor = newCursor(btree);
-            
-            assertNull(cursor.last());
-            
-            assertFalse(cursor.isCursorPositionDefined());
-
-            assertNull(cursor.tuple());
-            
-            assertFalse(cursor.hasNext());
-
-            assertFalse(cursor.hasPrior());
-
-        }
-
-        // tuple()
+        /*
+         * Test with no range limits.
+         */
         {
 
-            final ITupleCursor<String> cursor = newCursor(btree);
+            // first()
+            {
 
-            assertNull(cursor.tuple());
+                final ITupleCursor<String> cursor = newCursor(btree);
 
-        }
-        
-        // hasNext(), next().
-        {
-            
-            final ITupleCursor<String> cursor = newCursor(btree);
-            
-            assertFalse(cursor.hasNext());
+                assertNull(cursor.first());
 
-            try {
-                cursor.next();
-                fail("Expecting " + NoSuchElementException.class);
-            } catch (NoSuchElementException ex) {
-                log.info("Ignoring expected exception: " + ex);
+                // since there was nothing visitable the cursor position NOT
+                // defined
+                assertFalse(cursor.isCursorPositionDefined());
+
+                // no current key.
+                assertEquals(null, cursor.currentKey());
+
+                assertNull(cursor.tuple());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // last()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertNull(cursor.last());
+
+                // since there was nothing visitable the cursor position NOT
+                // defined
+                assertFalse(cursor.isCursorPositionDefined());
+
+                // no current key.
+                assertEquals(null, cursor.currentKey());
+
+                assertNull(cursor.tuple());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // tuple()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertNull(cursor.tuple());
+
+            }
+
+            // hasNext(), next().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertFalse(cursor.hasNext());
+
+                try {
+                    cursor.next();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // hasPrior(), prior().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertFalse(cursor.hasPrior());
+
+                try {
+                    cursor.prior();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // seek()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertNull(cursor.seek(1));
+
+                assertFalse(cursor.hasPrior());
+
+                assertFalse(cursor.hasNext());
+
             }
 
         }
 
-        // hasPrior(), prior().
+        /*
+         * Test with range limit. Since there is no data in the index the actual
+         * range limits imposed matter very little.
+         */
         {
 
-            final ITupleCursor<String> cursor = newCursor(btree);
+            final byte[] fromKey = new byte[]{2};
             
-            assertFalse(cursor.hasPrior());
+            final byte[] toKey = new byte[]{7};
+            
+            // first()
+            {
 
-            try {
-                cursor.prior();
-                fail("Expecting " + NoSuchElementException.class);
-            } catch (NoSuchElementException ex) {
-                log.info("Ignoring expected exception: " + ex);
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertNull(cursor.first());
+
+                // since there was nothing visitable the cursor position NOT
+                // defined
+                assertFalse(cursor.isCursorPositionDefined());
+
+                // no current key.
+                assertEquals(null, cursor.currentKey());
+
+                assertNull(cursor.tuple());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
             }
 
-        }
-        
-        // seek()
-        {
+            // last()
+            {
 
-            final ITupleCursor<String> cursor = newCursor(btree);
-            
-            assertNull(cursor.seek(1));
-            
-            assertFalse(cursor.hasPrior());
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
 
-            assertFalse(cursor.hasNext());
-            
+                assertNull(cursor.last());
+
+                // since there was nothing visitable the cursor position NOT
+                // defined
+                assertFalse(cursor.isCursorPositionDefined());
+
+                // no current key.
+                assertEquals(null, cursor.currentKey());
+
+                assertNull(cursor.tuple());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // tuple()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertNull(cursor.tuple());
+
+            }
+
+            // hasNext(), next().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertFalse(cursor.hasNext());
+
+                try {
+                    cursor.next();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // hasPrior(), prior().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertFalse(cursor.hasPrior());
+
+                try {
+                    cursor.prior();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // seek()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertNull(cursor.seek(1));
+
+                assertFalse(cursor.hasPrior());
+
+                assertFalse(cursor.hasNext());
+
+            }
+
         }
 
     }
 
     /**
-     * @todo write test for fence posts when there is only a single tuple
-     *       including when attempting to visit tuples in a key range that does
-     *       not overlap with the tuple that is actually in the index.
+     * Creates, populates and returns a {@link BTree} for
+     * {@link #doOneTupleTest(AbstractBTree)}
      */
-    public void test_oneTuple() {
+    protected BTree getOneTupleBTree() {
 
-        fail("write test");
+        BTree btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(
+                UUID.randomUUID()));
+
+        btree.insert(10, "Bryan");
+
+        return btree;
 
     }
+    
+    /**
+     * Test helper for fence posts when there is only a single tuple. including
+     * when attempting to visit tuples in a key range that does not overlap with
+     * the tuple that is actually in the index.
+     * 
+     * @param btree
+     */
+    protected void doOneTupleTest(AbstractBTree btree) {
 
+        /*
+         * Test with no range limits.
+         */
+        {
+            
+            // first()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.first());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // last()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.last());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // tuple()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertNull(cursor.tuple());
+
+            }
+
+            // hasNext(), next().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertTrue(cursor.hasNext());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
+
+                assertFalse(cursor.hasNext());
+
+                try {
+                    cursor.next();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // hasPrior(), prior().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertTrue(cursor.hasPrior());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
+
+                assertFalse(cursor.hasPrior());
+
+                try {
+                    cursor.prior();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // seek() (found)
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor
+                        .seek(10));
+
+                assertFalse(cursor.hasPrior());
+
+                assertFalse(cursor.hasNext());
+
+            }
+
+            // seek() (not found before a valid tuple)
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertNull(cursor.seek(1));
+
+                assertEquals(KeyBuilder.asSortKey(1), cursor.currentKey());
+
+                assertFalse(cursor.hasPrior());
+
+                assertTrue(cursor.hasNext());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
+
+            }
+
+            // seek() (not found after a valid tuple)
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree);
+
+                assertNull(cursor.seek(11));
+
+                assertTrue(cursor.hasPrior());
+
+                assertFalse(cursor.hasNext());
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+
+            }
+
+        }
+
+        /*
+         * Now use a cursor whose key-range constraint does not overlap the
+         * tuple (the cursor is constrained to only visit tuples that are
+         * ordered BEFORE the sole tuple actually present in the index).
+         */
+        {
+            
+            final byte[] fromKey = KeyBuilder.asSortKey(5);
+
+            final byte[] toKey = KeyBuilder.asSortKey(9);
+            
+            // first()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertEquals(null, cursor.first());
+
+                // since there was nothing visitable the cursor position NOT defined 
+                assertFalse(cursor.isCursorPositionDefined());
+                
+                // no current key.
+                assertEquals(null,cursor.currentKey());
+                
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // last()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertEquals(null, cursor.last());
+
+                // since there was nothing visitable the cursor position NOT defined 
+                assertFalse(cursor.isCursorPositionDefined());
+                
+                // no current key.
+                assertEquals(null,cursor.currentKey());
+                
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // tuple()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertNull(cursor.tuple());
+
+            }
+
+            // hasNext(), next().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertFalse(cursor.hasNext());
+
+                try {
+                    cursor.next();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // hasPrior(), prior().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertFalse(cursor.hasPrior());
+
+                try {
+                    cursor.prior();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // seek() (not found)
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertNull(cursor.seek(7));
+
+                assertEquals(KeyBuilder.asSortKey(7), cursor.currentKey());
+
+                assertFalse(cursor.hasPrior());
+
+                assertFalse(cursor.hasNext());
+
+            }
+
+        }
+        
+        /*
+         * Now use a cursor whose key-range constraint does not overlap the
+         * tuple (the cursor is constrained to only visit tuples that are
+         * ordered AFTER the sole tuple actually present in the index).
+         */
+        {
+            
+            final byte[] fromKey = KeyBuilder.asSortKey(15);
+
+            final byte[] toKey = KeyBuilder.asSortKey(19);
+            
+            // first()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertEquals(null, cursor.first());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // last()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertEquals(null, cursor.last());
+
+                assertFalse(cursor.hasNext());
+
+                assertFalse(cursor.hasPrior());
+
+            }
+
+            // tuple()
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertNull(cursor.tuple());
+
+            }
+
+            // hasNext(), next().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertFalse(cursor.hasNext());
+
+                try {
+                    cursor.next();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // hasPrior(), prior().
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertFalse(cursor.hasPrior());
+
+                try {
+                    cursor.prior();
+                    fail("Expecting " + NoSuchElementException.class);
+                } catch (NoSuchElementException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
+            }
+
+            // seek() (not found)
+            {
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertNull(cursor.seek(17));
+
+                assertEquals(KeyBuilder.asSortKey(17), cursor.currentKey());
+
+                assertFalse(cursor.hasPrior());
+
+                assertFalse(cursor.hasNext());
+
+            }
+
+        }
+        
+    }
+    
     /**
      * Compares two tuples for equality based on their data (flags, keys,
      * values, deleted marker, and version timestamp).

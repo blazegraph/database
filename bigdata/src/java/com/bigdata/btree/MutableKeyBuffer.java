@@ -171,7 +171,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     
     final public int copyKey(int index, DataOutput out) throws IOException {
 
-        assert index >= 0 && index < nkeys;
+        assert index >= 0 && index < nkeys : "index="+index+" not in [0:"+nkeys+"]";
 
         byte[] tmp = keys[index];
 

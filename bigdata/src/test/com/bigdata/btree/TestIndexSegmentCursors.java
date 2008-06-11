@@ -56,12 +56,75 @@ public class TestIndexSegmentCursors extends AbstractCursorTestCase {
 
     }
 
+    File outFile, tmpDir;
+    
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        outFile = new File(getName() + ".seg");
+
+        if (outFile.exists() && !outFile.delete()) {
+
+            throw new RuntimeException("Could not delete file: " + outFile);
+
+        }
+
+        tmpDir = outFile.getAbsoluteFile().getParentFile();
+
+    }
+
+    protected void tearDown() throws Exception {
+        
+        super.tearDown();
+
+        if (outFile != null && outFile.exists() && !outFile.delete()) {
+
+            log.warn("Could not delete file: " + outFile);
+
+        }
+
+    }
+
+    /**
+     * Builds an {@link IndexSegment} from a {@link BTree}.
+     * 
+     * @param btree
+     * 
+     * @return
+     * 
+     * @throws IOException
+     * @throws Exception
+     */
+    protected IndexSegment buildIndexSegment(BTree btree) throws IOException, Exception {
+
+        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
+                btree.entryIterator(), 30/* m */,
+                btree.getIndexMetadata(), System.currentTimeMillis()/* commitTime */)
+                .call();
+
+        IndexSegmentStore segStore = new IndexSegmentStore(outFile);
+
+        return segStore.loadIndexSegment();
+        
+    }
+    
     protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags,
             byte[] fromKey, byte[] toKey) {
 
         return new IndexSegmentTupleCursor<String>((IndexSegment) btree,
                 new Tuple<String>(btree, IRangeQuery.DEFAULT),
-                null/* fromKey */, null/* toKey */);
+                fromKey, toKey);
+
+    }
+
+    public void test_oneTuple() throws IOException, Exception {
+
+        BTree btree = getOneTupleBTree();
+ 
+        IndexSegment seg = buildIndexSegment(btree);
+        
+        doOneTupleTest(seg);
 
     }
 
@@ -74,45 +137,11 @@ public class TestIndexSegmentCursors extends AbstractCursorTestCase {
      */
     public void test_baseCase() throws IOException, Exception {
 
-        File outFile = new File(getName() + ".seg");
+        BTree btree = getBaseCaseBTree();
 
-        if (outFile.exists() && !outFile.delete()) {
+        IndexSegment seg = buildIndexSegment(btree);
 
-            throw new RuntimeException("Could not delete file: " + outFile);
-
-        }
-
-        File tmpDir = outFile.getAbsoluteFile().getParentFile();
-
-        try {
-
-            final IndexSegment seg;
-            {
-
-                BTree btree = getBaseCaseBTree();
-
-                new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                        btree.entryIterator(), 30/* m */, btree
-                                .getIndexMetadata(), System.currentTimeMillis()/* commitTime */)
-                        .call();
-
-                IndexSegmentStore segStore = new IndexSegmentStore(outFile);
-
-                seg = segStore.loadIndexSegment();
-
-            }
-
-            doBaseCaseTest(seg);
-
-        } finally {
-
-            if (outFile != null && outFile.exists() && !outFile.delete()) {
-
-                log.warn("Could not delete file: " + outFile);
-
-            }
-
-        }
+        doBaseCaseTest(seg);
 
     }
 

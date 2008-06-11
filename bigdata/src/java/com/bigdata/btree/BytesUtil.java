@@ -61,6 +61,11 @@ public class BytesUtil {
     protected static final Logger log = Logger.getLogger(BytesUtil.class);
 
     /**
+     * An empty byte array.
+     */
+    public static final byte[] EMPTY = new byte[]{};
+
+    /**
      * Flag set iff JNI linking succeeds.  When this flag is false we run with
      * the pure Java implementations of these methods.  When the flag is true,
      * the JNI versions are used.

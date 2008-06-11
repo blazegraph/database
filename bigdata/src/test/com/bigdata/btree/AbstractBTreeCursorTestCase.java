@@ -30,7 +30,6 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.TemporaryRawStore;
 
 /**
@@ -59,10 +58,6 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractCursorTestCase
      */
     abstract protected boolean isReadOnly();
 
-    /**
-     * @todo run against {@link FusedView} and {@link IsolatedFusedView} as
-     *       well.
-     */
     public void test_emptyIndex() {
 
         BTree btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(UUID.randomUUID()));
@@ -72,6 +67,17 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractCursorTestCase
  
         doEmptyIndexTest(btree);
         
+    }
+
+    public void test_oneTuple() {
+
+        BTree btree = getOneTupleBTree();
+        
+        if (isReadOnly())
+            btree.setReadOnly(true);
+ 
+        doOneTupleTest(btree);
+
     }
 
     public void test_baseCase() {

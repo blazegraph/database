@@ -230,7 +230,17 @@ public class Leaf extends AbstractNode implements ILeafData {
     }
 
     public void delete() {
-        
+
+        /*
+         * Note: This event MUST go out before we clear [leafListners].
+         * 
+         * Note: Since we fire this event here we do NOT need to fire it
+         * explicitly after a copy-on-write since copy-on-write ALWAYS calls
+         * delete() on the original leaf if it makes a copy.
+         */
+
+        fireInvalidateLeafEvent();
+
         super.delete();
 
         // clear references.
@@ -350,21 +360,22 @@ public class Leaf extends AbstractNode implements ILeafData {
          * mutable leaf here, we can assert that the leaf must be mutable in
          * other methods.
          */
-        Leaf copy = (Leaf) copyOnWrite();
+        final Leaf copy = (Leaf) copyOnWrite();
 
         if (copy != this) {
 
-            // delegate the operation to the new leaf.
-            final Tuple t = copy.insert(searchKey, newval, delete, timestamp, tuple);
-            
             /*
-             * Notify any listeners that the tuples found in the leaf have been
-             * changed (the leaf is in fact no longer in use).
+             * This leaf has been copied so delegate the operation to the new
+             * leaf.
+             * 
+             * Note: copy-on-write deletes [this] leaf and delete() notifies any
+             * leaf listeners before it clears the [leafListeners] reference so
+             * not only don't we have to do that here, but we can't since the
+             * listeners would be cleared before we could fire off the event
+             * ourselves.
              */
-
-            fireInvalidateLeafEvent();
-
-            return t;
+            
+            return copy.insert(searchKey, newval, delete, timestamp, tuple);
             
         }
 
@@ -500,7 +511,8 @@ public class Leaf extends AbstractNode implements ILeafData {
         
         /*
          * Notify any listeners that the tuples found in the leaf have been
-         * changed (one was added but others may have been moved out).
+         * changed (one was added but others will have been moved into a new
+         * right sibling if the leaf was split).
          */
         fireInvalidateLeafEvent();
 
@@ -1099,22 +1111,22 @@ public class Leaf extends AbstractNode implements ILeafData {
          * mutable in other methods.
          */
 
-        Leaf copy = (Leaf) copyOnWrite();
+        final Leaf copy = (Leaf) copyOnWrite();
 
         if (copy != this) {
 
-            // Note: leaf was copied so delegate to the new leaf (the old leaf is now unused).
-            final Tuple t = copy.remove(key, tuple);
-            
             /*
-             * Notify any listeners that the tuples found in the leaf have been
-             * changed (the leaf is in fact no longer in use).
+             * Note: This leaf was copied so delegate to the new leaf (the old
+             * leaf is now unused).
+             * 
+             * Note: copy-on-write deletes [this] leaf and delete() notifies any
+             * leaf listeners before it clears the [leafListeners] reference so
+             * not only don't we have to do that here, but we can't since the
+             * listeners would be cleared before we could fire off the event
+             * ourselves.
              */
-
-            fireInvalidateLeafEvent();
+            return copy.remove(key, tuple);
             
-            return t;
-
         }
 
 //        // The value that is being removed.
