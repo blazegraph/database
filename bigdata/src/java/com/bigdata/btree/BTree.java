@@ -1770,6 +1770,13 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
             if (src == null)
                 throw new IllegalArgumentException();
             
+            if (src == this) {
+
+                // NOP
+                return leaf;
+                
+            }
+            
             if (src.getBTree() != BTree.this) {
                 
                 throw new IllegalArgumentException();

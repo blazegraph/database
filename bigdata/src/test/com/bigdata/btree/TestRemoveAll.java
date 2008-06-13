@@ -95,13 +95,13 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
             assertTrue(btree.dump(Level.DEBUG,System.err));
     
             assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
-                    btree.entryIterator());
+                    btree.rangeIterator());
 
             btree.removeAll();
 
             assertTrue(btree.dump(Level.DEBUG,System.err));
             
-            assertSameIterator(new Object[] {}, btree.entryIterator());
+            assertSameIterator(new Object[] {}, btree.rangeIterator());
             
         }
 

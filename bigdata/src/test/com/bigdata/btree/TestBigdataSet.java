@@ -30,9 +30,9 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.journal.TemporaryRawStore;
-
 import junit.framework.TestCase;
+
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for {@link BigdataSet}.
@@ -77,7 +77,7 @@ public class TestBigdataSet extends TestCase {
 //        indexMetadata.setIsolatable(true);
         
         set = new BigdataSet<String>(BTree.create(
-                new TemporaryRawStore(), indexMetadata));
+                new SimpleMemoryRawStore(), indexMetadata));
 
     }
 

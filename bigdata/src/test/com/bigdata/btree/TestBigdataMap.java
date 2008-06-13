@@ -34,7 +34,7 @@ import java.util.UUID;
 import junit.framework.TestCase;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for {@link BigdataMap}.
@@ -88,7 +88,7 @@ public class TestBigdataMap extends TestCase {
 //        indexMetadata.setIsolatable(true);
         
         map = new BigdataMap<String, String>(BTree.create(
-                new TemporaryRawStore(), indexMetadata));
+                new SimpleMemoryRawStore(), indexMetadata));
 
     }
 

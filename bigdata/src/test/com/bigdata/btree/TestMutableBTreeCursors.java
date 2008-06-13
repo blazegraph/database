@@ -32,7 +32,7 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
-import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test ability to traverse tuples using an {@link ITupleCursor} while the SAME
@@ -86,7 +86,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         final BTree btree;
         {
        
-            btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(
+            btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
                     UUID.randomUUID()));
 
             btree.insert(10, "Bryan");
@@ -166,7 +166,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         final BTree btree;
         {
        
-            btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(
+            btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
                     UUID.randomUUID()));
 
             btree.insert(10, "Bryan");
@@ -248,7 +248,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         final BTree btree;
         {
        
-            btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(
+            btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
                     UUID.randomUUID()));
 
             btree.insert(10, "Bryan");
@@ -294,7 +294,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             // Explictly specify a large branching factor so that we do not split the root leaf.
             md.setBranchingFactor(20);
             
-            btree = BTree.create(new TemporaryRawStore(), md);
+            btree = BTree.create(new SimpleMemoryRawStore(), md);
 
             btree.insert(10, "Bryan");
             btree.insert(20, "Mike");
@@ -401,7 +401,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             // Note: at m=3 this example splits the root leaf).
             md.setBranchingFactor(3);
             
-            btree = BTree.create(new TemporaryRawStore(), md);
+            btree = BTree.create(new SimpleMemoryRawStore(), md);
 
             btree.insert(10, "Bryan");
             btree.insert(20, "Mike");
@@ -413,10 +413,6 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          * seek to a tuple, insert another tuple using the btree api and then
          * verify that the current tuple / cursor position appears unchanged
          * from the perspective of the cursor.
-         * 
-         * @todo this must be done for both forward and reverse traversal as
-         * well as that tests the handling of the [nextPosition] and
-         * [priorPosition] respectively.
          */
         {
 
@@ -503,7 +499,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             // Note: at m=3 this example splits the root leaf if anything is inserted.
             md.setBranchingFactor(3);
             
-            btree = BTree.create(new TemporaryRawStore(), md);
+            btree = BTree.create(new SimpleMemoryRawStore(), md);
 
             btree.insert(10, "Bryan");
             btree.insert(20, "Mike");
@@ -580,7 +576,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             // enable delete markers.
             md.setDeleteMarkers(true);
             
-            btree = BTree.create(new TemporaryRawStore(), md);
+            btree = BTree.create(new SimpleMemoryRawStore(), md);
 
             btree.insert(10, "Bryan");
             btree.insert(20, "Mike");
@@ -639,7 +635,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             // enable delete markers.
             md.setDeleteMarkers(true);
 
-            btree = BTree.create(new TemporaryRawStore(), md);
+            btree = BTree.create(new SimpleMemoryRawStore(), md);
 
             btree.insert(10, "Bryan");
             btree.insert(20, "Mike");
@@ -698,7 +694,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
        
             IndexMetadata md = new IndexMetadata(UUID.randomUUID());
 
-            btree = BTree.create(new TemporaryRawStore(), md);
+            btree = BTree.create(new SimpleMemoryRawStore(), md);
 
             btree.insert(10, "Bryan");
             
@@ -740,7 +736,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
        
             IndexMetadata md = new IndexMetadata(UUID.randomUUID());
 
-            btree = BTree.create(new TemporaryRawStore(), md);
+            btree = BTree.create(new SimpleMemoryRawStore(), md);
 
             btree.insert(20, "Mike");
             

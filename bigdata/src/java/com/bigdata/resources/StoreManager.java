@@ -2464,7 +2464,7 @@ abstract public class StoreManager extends ResourceEvents implements
             final Set<byte[]> keys = new TreeSet<byte[]>(
                     UnsignedByteArrayComparator.INSTANCE);
 
-            final ITupleIterator itr = journalIndex.entryIterator();
+            final ITupleIterator itr = journalIndex.rangeIterator();
 
             while (itr.hasNext()) {
 
@@ -2535,7 +2535,7 @@ abstract public class StoreManager extends ResourceEvents implements
             final Set<byte[]> keys = new TreeSet<byte[]>(
                     UnsignedByteArrayComparator.INSTANCE);
 
-            final ITupleIterator itr = segmentIndex.entryIterator();
+            final ITupleIterator itr = segmentIndex.rangeIterator();
 
             while (itr.hasNext()) {
 

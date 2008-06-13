@@ -581,6 +581,12 @@ public class ClientIndexView implements IClientIndex {
         
     }
 
+    final public ITupleIterator rangeIterator() {
+
+        return rangeIterator(null, null);
+
+    }
+    
     /**
      * An {@link ITupleIterator} that kinds the use of a series of
      * {@link ResultSet}s to cover all index partitions spanned by the key

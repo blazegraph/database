@@ -69,7 +69,7 @@ public class TestRemoverator extends AbstractCursorTestCase {
         btree.insert(20, "Mike");
         btree.insert(30, "James");
 
-        ITupleIterator<String> itr = new Removerator(btree.entryIterator());
+        ITupleIterator<String> itr = new Removerator(btree.rangeIterator());
         
         assertTrue(itr.hasNext());
 

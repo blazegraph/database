@@ -337,7 +337,13 @@ public class DataServiceIndex implements IClientIndex {
         return rangeCount;
 
     }
-  
+
+    final public ITupleIterator rangeIterator() {
+
+        return rangeIterator(null, null);
+
+    }
+    
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS

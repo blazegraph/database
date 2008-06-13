@@ -257,7 +257,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
             final long commitTime = System.currentTimeMillis();
             
             new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                    btree.entryIterator(), m, btree.getIndexMetadata(), commitTime).call();
+                    btree.rangeIterator(), m, btree.getIndexMetadata(), commitTime).call();
 
             /*
              * Verify can load the index file and that the metadata associated

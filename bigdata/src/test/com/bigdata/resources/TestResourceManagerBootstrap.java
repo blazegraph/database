@@ -402,7 +402,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
                     final IndexSegmentBuilder builder = new IndexSegmentBuilder(
                             outFile, tmpDir, ndx.getEntryCount(), ndx
-                                    .entryIterator(), branchingFactor, ndx
+                                    .rangeIterator(), branchingFactor, ndx
                                     .getIndexMetadata(), commitTime);
                     
                     builder.call();

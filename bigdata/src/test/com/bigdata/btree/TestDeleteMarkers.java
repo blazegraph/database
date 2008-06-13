@@ -243,7 +243,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         assertFalse(btree.contains(k5));
         assertFalse(btree.contains(k7));
         
-        assertSameIterator(new byte[][]{},btree.entryIterator());
+        assertSameIterator(new byte[][]{},btree.rangeIterator());
 
         /*
          * verify presence of deletion markers for the deleted index entries.

@@ -43,7 +43,6 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.Reverserator;
 import com.bigdata.btree.AbstractTupleFilterator.Removerator;
-import com.bigdata.btree.BTree.LeafCursor;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
@@ -59,7 +58,10 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.PartitionedRangeQueryIterator;
 import com.bigdata.service.Split;
+
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * <p>
@@ -1426,37 +1428,27 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     }
 
     /**
-     * Returns a {@link ChunkedLocalRangeIterator} that supports
-     * {@link Iterator#remove()} (old version based on the post-order
-     * striterator does not support random seeks, reverse scans, or
-     * concurrent modification during traversal).
+     * Return an iterator based on the post-order {@link Striterator}. This
+     * iterator does not support random seeks, reverse scans, or concurrent
+     * modification during traversal but it is <em>faster</em> than the
+     * {@link AbstractBTreeTupleCursor} when all you need is a forward
+     * visitation of the tuples in the key range.
+     * <p>
+     * This iterator is automatically used for a {@link BTree} unless one of the
+     * following flags is specified:
+     * <ul>
+     * <li>{@link IRangeQuery#CURSOR}</li>
+     * <li>{@link IRangeQuery#REVERSE}</li>
+     * <li>{@link IRangeQuery#REMOVEALL}</li>
+     * </ul>
+     * This iterator is NOT be used for an {@link IndexSegment} since it does
+     * not exploit the double-linked leaves and is therefore slower than the
+     * {@link IndexSegmentTupleCursor}.
      */
-    public ITupleIterator rangeIterator2(byte[] fromKey, byte[] toKey,
+    protected ITupleIterator fastForwardIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, ITupleFilter filter) {
 
         counters.nrangeIterator++;
-
-        if ((flags & REVERSE) != 0) {
-
-            /*
-             * FIXME The reverse scan option has not been implemented yet - it
-             * could be realized with ITupleCursor#asReverseIterator() or by a
-             * filtering cursor that simply reverses the directional semantics
-             * of the cursor.
-             * 
-             * FIXME The REMOVEALL option could be implemented by a filtering
-             * cursor that copies the tuple into its own buffer and then deletes
-             * the tuple from the underlying iterator.
-             */
-            throw new UnsupportedOperationException("Reverse scan is not implemented");
-            
-        }
-
-        if ((flags & REMOVEALL) != 0) {
-
-            assertNotReadOnly();
-
-        }
 
         // conditional range check on the key.
         
@@ -1466,52 +1458,28 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         if (toKey != null)
             assert rangeCheck(toKey,true);
 
-        final ITupleIterator src;
+        final ITupleIterator src = getRoot().rangeIterator(fromKey, toKey,
+                flags, filter);
 
-        if ((flags & REMOVEALL) == 0) {
-
-            /*
-             * Simple case since we will not be writing on the btree.
-             */
-
-            src = getRoot().rangeIterator(fromKey, toKey, flags, filter);
-
-        } else {
-
-            /*
-             * The iterator will populate its buffers up to the capacity and
-             * then delete behind once the buffer is full or as soon as the
-             * iterator is exhausted.
-             * 
-             * Note: This would cause a stack overflow if the caller is already
-             * using a chunked range iterator. The problem is that the ResultSet
-             * is populated using IIndex#rangeIterator(...). This situation is
-             * handled by explicitly turning off the REMOVEALL flag when forming
-             * the iterator for the ResultSet. See ChunkedRangeIterator.
-             */
-
-            src = new ChunkedLocalRangeIterator(this, fromKey, toKey, capacity,
-                    KEYS | flags, filter);
-
-        }
-
-        if (isReadOnly()) {
-
-            /*
-             * Must explicitly disable Iterator#remove().
-             */
-
-            return new ReadOnlyEntryIterator(src);
-
-        } else {
-
-            /*
-             * Iterator#remove() MAY be supported.
-             */
-
-            return src;
-
-        }
+        return src;
+        
+//        if (isReadOnly()) {
+//
+//            /*
+//             * Must explicitly disable Iterator#remove().
+//             */
+//
+//            return new ReadOnlyEntryIterator(src);
+//
+//        } else {
+//
+//            /*
+//             * Iterator#remove() MAY be supported.
+//             */
+//
+//            return src;
+//
+//        }
 
     }
 
@@ -1533,10 +1501,17 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * FIXME Rewrite the iterators based on the {@link ResultSet} to implement
      * {@link ITupleCursor}.
      * 
+     * FIXME Modify {@link PartitionedRangeQueryIterator} to not always require
+     * KEYS.
+     * 
      * FIXME change the return type of
      * {@link AbstractBTree#rangeIterator(byte[], byte[], int, int, ITupleFilter)}
      * to {@link ITupleCursor} in order to allow access handle prior/next
-     * access.
+     * access. This will require an {@link ITupleCursor} implementation that
+     * delegates to an {@link ITupleIterator} and throws an
+     * {@link UnsupportedOperationException} for the methods not found on that
+     * interface.  The {@link AbstractTupleFilterator} should use that delegate
+     * class.
      * 
      * FIXME The {@link ClientIndexView} will need be modified to defer request
      * of the initial result set until the caller uses first(), last(), seek(),
@@ -1549,14 +1524,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * FIXME When iterators are stacked make sure that remove() semantics are
      * not broken by buffering - it should always remove the "current" tuple.
      * The problem mainly arises with look-ahead (1) constructions.
-     * 
-     * FIXME Do some performance comparisons of the new cursor construct against
-     * the old iterator construct. There are some things about the cursors that
-     * are perhaps a bit heavier weight, mainly how
-     * {@link ITupleCursor#hasNext()} is written using a temporary cursor
-     * position (including a temporary {@link ILeafCursor}) and how
-     * {@link LeafCursor} handles prior() and next() using a backup copy of the
-     * {@link Node} stack.
      */
     public ITupleIterator rangeIterator(final byte[] fromKey,
             final byte[] toKey, final int capacity, final int flags,
@@ -1564,6 +1531,17 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         counters.nrangeIterator++;
 
+        if (true && (this instanceof BTree) && ((flags & REVERSE) == 0)
+                && ((flags & REMOVEALL) == 0) && ((flags & CURSOR) == 0)) {
+
+            /*
+             * Use the faster recursion-based striterator.
+             */
+            
+            return fastForwardIterator(fromKey, toKey, capacity, flags, filter);
+            
+        }
+        
         final Tuple tuple = new Tuple(this, flags);
 
         ITupleIterator src;
@@ -1845,18 +1823,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         
     }
     
-    /**
-     * Visits all entries in key order. This is identical to
-     * 
-     * <pre>
-     * rangeIterator(null, null)
-     * </pre>
-     * 
-     * @return An iterator that will visit all entries in key order.
-     * 
-     * @todo rename as rangeIterator and promote to IRangeQuery interface.
-     */
-    final public ITupleIterator entryIterator() {
+    final public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);
 

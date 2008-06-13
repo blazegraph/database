@@ -244,7 +244,7 @@ public class DumpJournal {
                 
                 CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
                 
-                ITupleIterator itr = commitRecordIndex.entryIterator();
+                ITupleIterator itr = commitRecordIndex.rangeIterator();
                 
                 while(itr.hasNext()) {
                     

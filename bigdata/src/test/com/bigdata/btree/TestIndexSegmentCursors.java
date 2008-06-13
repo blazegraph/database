@@ -108,7 +108,7 @@ public class TestIndexSegmentCursors extends AbstractCursorTestCase {
     protected IndexSegment buildIndexSegment(BTree btree) throws IOException, Exception {
 
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                btree.entryIterator(), 30/* m */,
+                btree.rangeIterator(), 30/* m */,
                 btree.getIndexMetadata(), System.currentTimeMillis()/* commitTime */)
                 .call();
 

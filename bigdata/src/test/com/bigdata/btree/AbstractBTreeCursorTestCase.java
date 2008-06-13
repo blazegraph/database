@@ -30,7 +30,7 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Abstract base class for some unit tests that can only be run against a
@@ -60,7 +60,7 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractCursorTestCase
 
     public void test_emptyIndex() {
 
-        BTree btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(UUID.randomUUID()));
+        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(UUID.randomUUID()));
         
         if (isReadOnly())
             btree.setReadOnly(true);
