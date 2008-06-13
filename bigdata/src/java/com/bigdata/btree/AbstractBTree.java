@@ -32,7 +32,6 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -40,8 +39,14 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
+import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
+import com.bigdata.btree.AbstractBTreeTupleCursor.Reverserator;
+import com.bigdata.btree.AbstractTupleFilterator.Removerator;
+import com.bigdata.btree.BTree.LeafCursor;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
@@ -53,6 +58,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.Split;
 
 /**
@@ -1421,9 +1427,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     /**
      * Returns a {@link ChunkedLocalRangeIterator} that supports
-     * {@link Iterator#remove()}.
+     * {@link Iterator#remove()} (old version based on the post-order
+     * striterator does not support random seeks, reverse scans, or
+     * concurrent modification during traversal).
      */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+    public ITupleIterator rangeIterator2(byte[] fromKey, byte[] toKey,
             int capacity, int flags, ITupleFilter filter) {
 
         counters.nrangeIterator++;
@@ -1506,7 +1514,154 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         }
 
     }
-    
+
+    /**
+     * Core implementation.
+     * <p>
+     * Note: The returned iterator supports traversal with concurrent
+     * modification by a single-threaded process (the {@link BTree} is NOT
+     * thread-safe for writers) if the {@link BTree} allows writes.
+     * <p>
+     * Note: {@link IRangeQuery#REVERSE} is handled here by wrapping the
+     * underlying {@link ITupleCursor}.
+     * <p>
+     * Note: {@link IRangeQuery#REMOVEALL} is handled here by wrapping the
+     * iterator.
+     * 
+     * FIXME Rewrite FusedView's iterator to implement {@link ITupleCursor}.
+     * 
+     * FIXME Rewrite the iterators based on the {@link ResultSet} to implement
+     * {@link ITupleCursor}.
+     * 
+     * FIXME change the return type of
+     * {@link AbstractBTree#rangeIterator(byte[], byte[], int, int, ITupleFilter)}
+     * to {@link ITupleCursor} in order to allow access handle prior/next
+     * access.
+     * 
+     * FIXME The {@link ClientIndexView} will need be modified to defer request
+     * of the initial result set until the caller uses first(), last(), seek(),
+     * hasNext(), or hasPrior().
+     * 
+     * FIXME See {@link AbstractTupleFilterator} for many, many notes about the
+     * new interator constructs and things that can be changed once they are
+     * running, including the implementation of the prefix scans, etc.
+     * 
+     * FIXME When iterators are stacked make sure that remove() semantics are
+     * not broken by buffering - it should always remove the "current" tuple.
+     * The problem mainly arises with look-ahead (1) constructions.
+     * 
+     * FIXME Do some performance comparisons of the new cursor construct against
+     * the old iterator construct. There are some things about the cursors that
+     * are perhaps a bit heavier weight, mainly how
+     * {@link ITupleCursor#hasNext()} is written using a temporary cursor
+     * position (including a temporary {@link ILeafCursor}) and how
+     * {@link LeafCursor} handles prior() and next() using a backup copy of the
+     * {@link Node} stack.
+     */
+    public ITupleIterator rangeIterator(final byte[] fromKey,
+            final byte[] toKey, final int capacity, final int flags,
+            final ITupleFilter filter) {
+
+        counters.nrangeIterator++;
+
+        final Tuple tuple = new Tuple(this, flags);
+
+        ITupleIterator src;
+
+        if (this instanceof IndexSegment) {
+
+            src = new IndexSegmentTupleCursor((IndexSegment) this, tuple,
+                    fromKey, toKey);
+
+        } else if (this instanceof BTree) {
+
+            if (isReadOnly()) {
+
+                // Note: this iterator does not allow removal.
+                src = new ReadOnlyBTreeTupleCursor(((BTree) this), tuple,
+                        fromKey, toKey);
+
+            } else {
+
+                // Note: this iterator supports traversal with concurrent
+                // modification.
+                src = new MutableBTreeTupleCursor(((BTree) this), new Tuple(
+                        this, flags), fromKey, toKey);
+
+            }
+
+        } else {
+            
+            throw new UnsupportedOperationException(
+                    "Unknown B+Tree implementation: "
+                            + this.getClass().getName());
+            
+        }
+        
+        if ((flags & REVERSE) != 0) {
+
+            /*
+             * Reverse scan iterator.
+             * 
+             * Note: The reverse scan MUST be layered directly over the
+             * ITupleCursor. Most critically, REMOVEALL combined with a REVERSE
+             * scan needs to process the tuples in reverse index order and then
+             * delete them as it goes.
+             * 
+             * @todo As an alternative the ITupleCursor could be used in place
+             * of the ITupleIterator return type throughout the system and then
+             * you can just do whatever you want from the client.
+             */
+            
+            src = new Reverserator((ITupleCursor)src);
+            
+        }
+        
+        if (filter != null) {
+
+            /*
+             * Apply the optional filter.
+             * 
+             * Note: This needs to be after the reverse scan and before
+             * REMOVEALL (those are the assumptions for the flags - in fact a
+             * general purpose layering of iterators or cursors would allow
+             * other stackings here such as remove everything but only pass
+             * back to me those things that pass this filter).
+             * 
+             * FIXME ITupleFilter is slated for replacement by a more general
+             * purpose layering of iterators and/or cursors.
+             * 
+             * @todo there should be explicit unit tests for the filter.
+             */
+            src = new AbstractTupleFilterator(src) {
+
+                @Override
+                protected boolean isValid(ITuple tuple) {
+
+                    return filter.isValid(tuple);
+                    
+                }
+                
+            };
+            
+        }
+        
+        if ((flags & REMOVEALL) != 0) {
+            
+            assertNotReadOnly();
+
+            /*
+             * Note: This iterator removes each tuple that it visits from the
+             * source iterator.
+             */
+            src = new Removerator(src);
+
+        }
+
+        return src;
+
+    }
+
     /**
      * Copy all data, including deleted index entry markers and timestamps iff
      * supported by the source and target. The goal is an exact copy of the data
@@ -1707,33 +1862,42 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
+    /**
+     * Return a cursor that may be used to efficiently locate and scan the
+     * leaves in the B+Tree. The cursor will be initially positioned on the leaf
+     * identified by the symbolic constant.
+     */
+    abstract public ILeafCursor newLeafCursor(SeekEnum where);
+    
+    /**
+     * Return a cursor that may be used to efficiently locate and scan the
+     * leaves in the B+Tree. The cursor will be initially positioned on the leaf
+     * that spans the given <i>key</i>.
+     * 
+     * @param key
+     *            The key (required).
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>key</i> is <code>null</code>.
+     */
+    abstract public ILeafCursor newLeafCursor(byte[] key);
+    
 //    /**
-//     * Iterator visits the leaves of the tree.
+//     * Clone the caller's cursor.
+//     *
+//     * @param leafCursor
+//     *            Another leaf cursor.
 //     * 
-//     * @return Iterator visiting the {@link Leaf leaves} of the tree.
+//     * @return A clone of the caller's cursor.
 //     * 
-//     * @todo optimize this when prior-next leaf references are present, e.g.,
-//     *       for an {@link IndexSegment}.
-//     * 
-//     * @todo change the declared type to {@link ILeafIterator} and re-implement
-//     *       so that it has all of those semantics.
+//     * @throws IllegalArgumentException
+//     *             if the argument is <code>null</code>
+//     * @throws IllegalArgumentException
+//     *             if the argument is a cursor for a different
+//     *             {@link AbstractBTree}.
 //     */
-//    protected Iterator leafIterator() {
-//
-//        return new Striterator(getRoot().postOrderNodeIterator())
-//                .addFilter(new Filter() {
-//
-//                    private static final long serialVersionUID = 1L;
-//
-//                    protected boolean isValid(Object arg0) {
-//
-//                        return arg0 instanceof Leaf;
-//
-//                    }
-//                });
-//
-//    }
-
+//    abstract public ILeafCursor newLeafCursor(ILeafCursor leafCursor);
+    
     /**
      * Computes and returns the utilization of the tree. The utilization figures
      * do not factor in the space requirements of nodes and leaves.
@@ -2294,38 +2458,38 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 //     */
 //    private final static boolean softReferences = false;
 
-    /**
-     * Dump a raw record from the store.
-     * 
-     * @param store
-     *            The backing store.
-     * @param addr
-     *            The address from which the record was read.
-     * @param buf
-     *            The {@link ByteBuffer} containing the raw record.
-     * 
-     * @deprecated This will go away as soon as I am done debugging something.
-     */
-    private static String toString(IRawStore store, long addr, ByteBuffer b) {
-
-        final int byteCount = store.getByteCount(addr);
-
-        // independent view of the buffer.
-        b = b.asReadOnlyBuffer();
-
-        // setup the view implied by the address and the store API.
-        b.limit(byteCount);
-
-        b.position(0);
-
-        byte[] a = new byte[byteCount];
-
-        // transfer to a byte[].
-        b.get(a);
-
-        return Arrays.toString(a);
-        
-    }
+//    /**
+//     * Dump a raw record from the store.
+//     * 
+//     * @param store
+//     *            The backing store.
+//     * @param addr
+//     *            The address from which the record was read.
+//     * @param buf
+//     *            The {@link ByteBuffer} containing the raw record.
+//     * 
+//     * @deprecated This will go away as soon as I am done debugging something.
+//     */
+//    private static String toString(IRawStore store, long addr, ByteBuffer b) {
+//
+//        final int byteCount = store.getByteCount(addr);
+//
+//        // independent view of the buffer.
+//        b = b.asReadOnlyBuffer();
+//
+//        // setup the view implied by the address and the store API.
+//        b.limit(byteCount);
+//
+//        b.position(0);
+//
+//        byte[] a = new byte[byteCount];
+//
+//        // transfer to a byte[].
+//        b.get(a);
+//
+//        return Arrays.toString(a);
+//        
+//    }
     
     /**
      * Create the reference that will be used by a {@link Node} to refer to its

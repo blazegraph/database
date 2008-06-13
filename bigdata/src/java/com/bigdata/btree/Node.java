@@ -1635,15 +1635,17 @@ public class Node extends AbstractNode implements INodeData {
      *         and the caller MUST invoke copy-on-write before attempting to
      *         modify the returned sibling.
      */
-    protected AbstractNode getLeftSibling(AbstractNode child, boolean materialize) {
-
-        int i = getIndexOf(child);
+    protected AbstractNode getLeftSibling(final AbstractNode child, boolean materialize) {
+        
+        final int i = getIndexOf(child);
 
         if (i == 0) {
 
             /*
-             * There is no left sibling for this child.
+             * There is no left sibling for this child that is a child of the
+             * same parent.
              */
+            
             return null;
 
         } else {
@@ -1689,15 +1691,17 @@ public class Node extends AbstractNode implements INodeData {
      *         and the caller MUST invoke copy-on-write before attempting to
      *         modify the returned sibling.
      */
-    protected AbstractNode getRightSibling(AbstractNode child, boolean materialize) {
+    protected AbstractNode getRightSibling(final AbstractNode child, boolean materialize) {
 
-        int i = getIndexOf(child);
+        final int i = getIndexOf(child);
 
         if (i == nkeys ) {
 
             /*
-             * There is no right sibling for this child.
+             * There is no right sibling for this child that is a child of the
+             * same parent.
              */
+            
             return null;
 
         } else {

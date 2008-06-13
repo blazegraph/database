@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.IndexSegment.LeafIterator;
+import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 
 /**
@@ -66,11 +66,11 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
         final ImmutableLeaf lastLeaf = seg.readLeaf(seg.getStore().getCheckpoint().addrLastLeaf);
         assertEquals("nextAddr", 0L, lastLeaf.nextAddr);
 
-        final LeafIterator itr = seg.leafIterator(true/*forwardScan*/);
+        final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
         
-        assertTrue(firstLeaf==itr.current()); // Note: test depends on cache!
+        assertTrue(firstLeaf==itr.leaf()); // Note: test depends on cache!
         
-        ImmutableLeaf priorLeaf = itr.current();
+        ImmutableLeaf priorLeaf = itr.leaf();
         
         int n = 1;
         
@@ -85,12 +85,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
             if (current == lastLeaf) {
 
                 // last leaf.
-                assertFalse(itr.hasNext());
-                
-            } else {
-                
-                // should be more.
-                assertTrue(itr.hasNext());
+                assertNull(itr.next());
                 
             }
             
@@ -118,31 +113,26 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
         final ImmutableLeaf lastLeaf = seg.readLeaf(seg.getStore().getCheckpoint().addrLastLeaf);
         assertEquals("nextAddr", 0L, lastLeaf.nextAddr);
 
-        final LeafIterator itr = seg.leafIterator(false/*forwardScan*/);
+        final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.Last);
         
-        assertTrue(lastLeaf==itr.current()); // Note: test depends on cache!
+        assertTrue(lastLeaf==itr.leaf()); // Note: test depends on cache!
         
-        ImmutableLeaf nextLeaf = itr.current();
+        ImmutableLeaf nextLeaf = itr.leaf();
         
         int n = 1;
         
         for(int i=1; i<seg.getLeafCount(); i++) {
             
-            ImmutableLeaf current = itr.next();
+            ImmutableLeaf current = itr.prior();
             
-            assertEquals("nextAddr",nextLeaf.getIdentity(),current.nextAddr);
+            assertEquals("nextAddr", nextLeaf.getIdentity(), current.nextAddr);
 
             nextLeaf = current;
 
             if (current == firstLeaf) {
 
                 // last leaf.
-                assertFalse(itr.hasNext());
-                
-            } else {
-                
-                // should be more.
-                assertTrue(itr.hasNext());
+                assertNull(itr.prior());
                 
             }
             

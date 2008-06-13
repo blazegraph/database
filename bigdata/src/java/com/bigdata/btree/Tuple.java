@@ -54,8 +54,7 @@ public class Tuple<E> extends AbstractTuple<E> {
         
     }
 
-    @Override
-    ITupleSerializer getTupleSerializer() {
+    public ITupleSerializer getTupleSerializer() {
 
         return btree.getIndexMetadata().getTupleSerializer();
         

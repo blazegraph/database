@@ -203,7 +203,7 @@ public class BytesUtil {
      * @param b
      *            A byte[].
      * 
-     * @return a negative integer, zero, or a positive integer as the first
+     * @return a negative integer, zero, or a positive integer if the first
      *         argument is less than, equal to, or greater than the second.
      * 
      * @todo consider returning the index of the byte at which the difference

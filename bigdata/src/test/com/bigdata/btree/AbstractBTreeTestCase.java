@@ -487,12 +487,16 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * avoids copy-on-write scenarios and let's us test with the knowledge that
      * there should always be a hard reference to a child or parent.
      * 
-     * The {@link SimpleLeafSplitPolicy} is used.
-     * 
      * @param branchingFactor
      *            The branching factor.
      */
     public BTree getBTree(int branchingFactor) {
+        
+        return getBTree(branchingFactor , DefaultTupleSerializer.INSTANCE);
+        
+    }
+    
+    public BTree getBTree(int branchingFactor,ITupleSerializer tupleSer) {
         
         IRawStore store = new SimpleMemoryRawStore();
 
@@ -500,6 +504,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         metadata.setBranchingFactor(branchingFactor);
 
+        metadata.setTupleSerializer(tupleSer);
+        
         // override the BTree class.
         metadata.setClassName(NoEvictionBTree.class.getName());
         

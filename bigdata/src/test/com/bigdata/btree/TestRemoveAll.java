@@ -115,17 +115,17 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
      */
     public void test_removeAll_02() {
 
-        final int branchingFactor = 3;
+        final BTree btree;
+        {
+            IRawStore store = new SimpleMemoryRawStore();
 
-        IRawStore store = new SimpleMemoryRawStore();
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-        
-        metadata.setBranchingFactor(branchingFactor);
-        
-        BTree btree = BTree.create(store,metadata);
+            metadata.setBranchingFactor(3);
 
-//        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID());
+            btree = BTree.create(store, metadata);
+
+        }
 
         KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
         
@@ -133,13 +133,13 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
         
         final int NINSERTS = 1000;
         
-        final double removeAllRate = 0.05;
+        final double removeAllRate = 0.02;
         
         for(int i=0; i<NTRIALS; i++) {
             
             for(int j=0; j<NINSERTS; j++) {
 
-                if(r.nextDouble()<removeAllRate) {
+                if (r.nextDouble() < removeAllRate) {
                     
                     log.info("removeAll with "+btree.getEntryCount()+" entries");
                     
@@ -147,9 +147,9 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
                     
                 }
                 
-                int tmp = r.nextInt(10000);
+                final int tmp = r.nextInt(10000);
                 
-                byte[] key = keyBuilder.reset().append(tmp).getKey();
+                final byte[] key = keyBuilder.reset().append(tmp).getKey();
                 
                 btree.insert(key, new SimpleEntry(tmp));
                 

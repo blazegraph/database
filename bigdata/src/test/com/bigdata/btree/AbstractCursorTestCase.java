@@ -33,11 +33,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.TemporaryRawStore;
-import com.bigdata.rawstore.IBlock;
 
 /**
  * Abstract base class for {@link ITupleCursor} test suites.
@@ -115,14 +111,6 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
      *            The B+Tree.
      * 
      * @see #getBaseCaseBTree()
-     * 
-     * @todo unit tests to verify that the optional constraints on the key-range
-     *       for the cursor are correctly imposed. E.g., #first() or #next()
-     *       must not visit a tuple that lies outside of the allowable key range
-     *       for the cursor
-     *       <p>
-     *       Note: this is already done for
-     *       {@link #doOneTupleTest(AbstractBTree)}
      */
     protected void doBaseCaseTest(AbstractBTree btree) {
 
@@ -184,6 +172,9 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
             // itr is exhausted.
             assertFalse(cursor.hasNext());
 
+            // the cursor position is still defined.
+            assertTrue(cursor.isCursorPositionDefined());
+            
             // itr is exhausted.
             try {
                 cursor.next();
@@ -226,6 +217,9 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
             // itr is exhausted.
             assertFalse(cursor.hasPrior());
 
+            // the cursor position is still defined.
+            assertTrue(cursor.isCursorPositionDefined());
+
             // itr is exhausted.
             try {
                 cursor.prior();
@@ -240,55 +234,6 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
             // make sure that the iterator will not restart.
             try {
                 cursor.prior();
-                fail("Expecting " + NoSuchElementException.class);
-            } catch (NoSuchElementException ex) {
-                log.info("Ignoring expected exception: " + ex);
-            }
-
-        }
-
-        // test reverse iterator, including linked state with cursor.
-        {
-
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
-                    null/* fromKey */, null/* toKey */);
-
-            ITupleIterator<String> itr = cursor.asReverseIterator();
-
-            assertEquals(null, cursor.tuple());
-
-            assertTrue(itr.hasNext());
-
-            assertEquals(new TestTuple<String>(30, "James"), itr.next());
-            assertEquals(new TestTuple<String>(30, "James"), cursor.tuple());
-
-            assertTrue(itr.hasNext());
-
-            assertEquals(new TestTuple<String>(20, "Mike"), itr.next());
-            assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
-
-            assertTrue(itr.hasNext());
-
-            assertEquals(new TestTuple<String>(10, "Bryan"), itr.next());
-            assertEquals(new TestTuple<String>(10, "Bryan"), cursor.tuple());
-
-            // exhausted.
-            assertFalse(itr.hasNext());
-
-            // exhausted.
-            try {
-                itr.next();
-                fail("Expecting " + NoSuchElementException.class);
-            } catch (NoSuchElementException ex) {
-                log.info("Ignoring expected exception: " + ex);
-            }
-
-            // make sure itr will not restart.
-            assertFalse(itr.hasNext());
-
-            // make sure itr will not restart.
-            try {
-                itr.next();
                 fail("Expecting " + NoSuchElementException.class);
             } catch (NoSuchElementException ex) {
                 log.info("Ignoring expected exception: " + ex);
@@ -404,6 +349,110 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
 
         }
 
+        /*
+         * Test to verify that optional range constraints are correctly imposed,
+         * including when the inclusive lower bound and the exclusive upper
+         * bound correspond to tuples actually present in the B+Tree.
+         */
+        {
+
+            /*
+             * The inclusive lower bound (fromKey) is on a tuple that exists in
+             * the B+Tree (the first tuple).
+             * 
+             * The exclusive upper bound (toKey) is on a tuple that exists and
+             * which is the successor of the first tuple.
+             * 
+             * The cursor should only visit the first tuple.
+             */
+            {
+             
+                final byte[] fromKey = KeyBuilder.asSortKey(10);
+                
+                final byte[] toKey = KeyBuilder.asSortKey(20);
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertTrue(cursor.hasNext());
+                
+                assertEquals(new TestTuple<String>(10,"Bryan"),cursor.next());
+                
+                assertFalse(cursor.hasNext());
+
+                // now seek to the last tuple.
+                assertEquals(new TestTuple<String>(10,"Bryan"),cursor.last());
+
+                assertFalse(cursor.hasNext());
+                assertFalse(cursor.hasPrior());
+
+                // accessible via seek()
+                assertEquals(new TestTuple<String>(10,"Bryan"),cursor.seek(10));
+
+                // not accessible via seek().
+                try {
+                    cursor.seek(20);
+                    fail("Expecting: "+IllegalArgumentException.class);
+                } catch(IllegalArgumentException ex) {
+                    log.info("Ignoring expected exception: "+ex);
+                }
+                
+            }
+            
+            /*
+             * The inclusive lower bound (fromKey) is on a tuple that exists in
+             * the B+Tree (the second tuple).
+             * 
+             * The exclusive upper bound (toKey) is on a tuple that exists in
+             * the B+Tree (the third and last tuple).
+             * 
+             * The cursor should only visit the 2nd tuple.
+             */
+            {
+             
+                final byte[] fromKey = KeyBuilder.asSortKey(20);
+                
+                final byte[] toKey = KeyBuilder.asSortKey(30);
+
+                final ITupleCursor<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertTrue(cursor.hasNext());
+                
+                assertEquals(new TestTuple<String>(20,"Mike"),cursor.next());
+                
+                assertFalse(cursor.hasNext());
+                assertFalse(cursor.hasPrior());
+
+                // now seek to the last tuple.
+                assertEquals(new TestTuple<String>(20,"Mike"),cursor.last());
+
+                assertFalse(cursor.hasNext());
+                assertFalse(cursor.hasPrior());
+
+                // accessible via seek()
+                assertEquals(new TestTuple<String>(20,"Mike"),cursor.seek(20));
+
+                // not accessible via seek().
+                try {
+                    cursor.seek(10);
+                    fail("Expecting: "+IllegalArgumentException.class);
+                } catch(IllegalArgumentException ex) {
+                    log.info("Ignoring expected exception: "+ex);
+                }
+                
+                // not accessible via seek().
+                try {
+                    cursor.seek(30);
+                    fail("Expecting: "+IllegalArgumentException.class);
+                } catch(IllegalArgumentException ex) {
+                    log.info("Ignoring expected exception: "+ex);
+                }
+                
+            }
+
+        }
+        
     }
 
     /**
@@ -528,9 +577,9 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
          */
         {
 
-            final byte[] fromKey = new byte[]{2};
+            final byte[] fromKey = KeyBuilder.asSortKey(2);
             
-            final byte[] toKey = new byte[]{7};
+            final byte[] toKey = KeyBuilder.asSortKey(7);
             
             // first()
             {
@@ -628,7 +677,7 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
                 final ITupleCursor<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
-                assertNull(cursor.seek(1));
+                assertNull(cursor.seek(4));
 
                 assertFalse(cursor.hasPrior());
 
@@ -1066,143 +1115,6 @@ abstract public class AbstractCursorTestCase extends TestCase2 {
 
         assertEquals("timestamp", expected.getVersionTimestamp(), actual
                 .getVersionTimestamp());
-
-    }
-
-    /**
-     * Test helper for a tuple with static data.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <E>
-     */
-    static class TestTuple<E> implements ITuple<E> {
-
-        private final int flags;
-
-        private final byte[] key;
-
-        private final byte[] val;
-
-        private final boolean deleted;
-
-        final private long timestamp;
-
-        public TestTuple(Object key, E value) {
-
-            this(IRangeQuery.DEFAULT, key, value);
-
-        }
-
-        public TestTuple(int flags, Object key, E value) {
-
-            this(flags, key, value, false/* deleted */, 0L/* timestamp */);
-
-        }
-
-        public TestTuple(int flags, Object key, E val, boolean deleted,
-                long timestamp) {
-
-            this.flags = flags;
-
-            this.key = KeyBuilder.asSortKey(key);
-
-            this.val = SerializerUtil.serialize(val);
-
-            this.deleted = deleted;
-
-            this.timestamp = timestamp;
-
-        }
-
-        public int flags() {
-
-            return flags;
-
-        }
-
-        public byte[] getKey() {
-
-            return key;
-
-        }
-
-        public ByteArrayBuffer getKeyBuffer() {
-
-            return new ByteArrayBuffer(0, key.length, key);
-
-        }
-
-        public DataInputBuffer getKeyStream() {
-
-            return new DataInputBuffer(key);
-
-        }
-
-        public boolean getKeysRequested() {
-
-            return ((flags & IRangeQuery.KEYS) != 0);
-
-        }
-
-        @SuppressWarnings("unchecked")
-        public E getObject() {
-
-            return (E) SerializerUtil.deserialize(val);
-
-        }
-
-        public int getSourceIndex() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public byte[] getValue() {
-            return val;
-        }
-
-        public ByteArrayBuffer getValueBuffer() {
-
-            if (val == null)
-                throw new UnsupportedOperationException();
-
-            return new ByteArrayBuffer(0, val.length, val);
-
-        }
-
-        public DataInputBuffer getValueStream() {
-
-            return new DataInputBuffer(val);
-
-        }
-
-        public boolean getValuesRequested() {
-
-            return ((flags & IRangeQuery.VALS) != 0);
-
-        }
-
-        public long getVersionTimestamp() {
-            return timestamp;
-        }
-
-        public long getVisitCount() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public boolean isDeletedVersion() {
-            return deleted;
-        }
-
-        public boolean isNull() {
-            return val == null;
-        }
-
-        public IBlock readBlock(long addr) {
-            // TODO Auto-generated method stub
-            return null;
-        }
 
     }
 

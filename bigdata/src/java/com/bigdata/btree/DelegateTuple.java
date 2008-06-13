@@ -116,5 +116,9 @@ public class DelegateTuple implements ITuple {
     public Object getObject() {
         return delegate.getObject();
     }
-    
+
+    public ITupleSerializer getTupleSerializer() {
+        return delegate.getTupleSerializer();
+    }
+
 }

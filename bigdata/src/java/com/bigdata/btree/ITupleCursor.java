@@ -200,18 +200,20 @@ interface ITupleCursor<E> extends ITupleIterator<E> {
      * is undefined.
      * 
      * @throws NoSuchElementException
-     *             If the current cursor position is undefined and there are no
-     *             visitable tuples in the index.
-     * @throws NoSuchElementException
-     *             if the current cursor position is defined but there is no
-     *             visitable tuple that is a successor of the current cursor
-     *             position in the natural order of the index.
-     * 
-     * @todo these two exceptions can both be summarized by "if hasNext() would
-     *       return false".
+     *             if {@link #hasNext()} would return <code>false</code>.
      */
     ITuple<E> next();
 
+    /**
+     * Position the cursor on the first visitable tuple ordered greater than the
+     * current cursor position in the natural key order of the index and return
+     * that tuple.
+     * 
+     * @return The tuple -or- <code>null</code> iff there is no such visitable
+     *         tuple.
+     */
+    ITuple<E> nextTuple();
+    
     /**
      * Return <code>true</code> if there is another tuple that orders before
      * the current cursor position in the natural order of the index and that
@@ -226,26 +228,29 @@ interface ITupleCursor<E> extends ITupleIterator<E> {
     boolean hasPrior();
 
     /**
-     * Position the cursor on the previous tuple in the natural key order of the
-     * index.
+     * Position the cursor on the first visitable tuple ordered less than the
+     * current cursor position in the natural key order of the index and return
+     * that tuple.
      * <p>
      * Note: in order to maintain semantics parallel to standard iterator
      * semantics, this method will visit the {@link #last()} visitable tuple if
      * the current cursor position is undefined.
      * 
      * @throws NoSuchElementException
-     *             If the current cursor position is undefined and there are no
-     *             visitable tuples in the index.
-     * @throws NoSuchElementException
-     *             if the current cursor position is defined but there is no
-     *             visitable tuple that is a predecessor of the current cursor
-     *             position in the natural order of the index.
-     *             
-     * @todo these two exceptions can both be summarized by "if hasNext() would
-     *       return false".
+     *             if {@link #hasPrior()} would return <code>false</code>.
      */
     ITuple<E> prior();
 
+    /**
+     * Position the cursor on the first visitable tuple ordered less than the
+     * current cursor position in the natural key order of the index and return
+     * that tuple.
+     * 
+     * @return The tuple -or- <code>null</code> iff there is no such visitable
+     *         tuple.
+     */
+    ITuple<E> priorTuple();
+    
     /**
      * Removes the tuple (if any) from the index corresponding to the current
      * cursor position. The cursor position is NOT changed by this method. After
@@ -259,13 +264,5 @@ interface ITupleCursor<E> extends ITupleIterator<E> {
      *             if the cursor position is not defined.
      */
     void remove();
-
-    /**
-     * Return an iterator that traverses the tuples in the reverse of the
-     * natural index order. The iterator is backed by the {@link ITupleCursor}
-     * and operations on the iterator effect the state of the cursor and visa
-     * versa.
-     */
-    ITupleIterator<E> asReverseIterator();
 
 }

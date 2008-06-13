@@ -28,7 +28,7 @@ import java.io.IOException;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.IndexSegment.LeafIterator;
+import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 
 /**
@@ -83,13 +83,23 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
 
         // materialize the leaves.
         
-        final ILeafIterator itr = seg.leafIterator();
+        ILeafCursor cursor = seg.newLeafCursor(SeekEnum.First);
         
-        while(itr.hasNext()) {
-
-            itr.next();
-            
+        int n = 0;
+        while(cursor.next()!=null) {
+            n++;
         }
+
+        cursor.last();
+        while(cursor.prior()!=null) {
+            n--;
+        }
+        
+        /*
+         * Note: n will be zero if the same number of leaves were visited in
+         * each direction.
+         */
+        assertEquals(0, n);
         
         // dump the tree to validate it.
 
@@ -265,14 +275,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         // test forward scan
         {
          
-            final LeafIterator itr = seg.leafIterator(true/* forwardScan */);
+            final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
             
-            assertTrue(firstLeaf == itr.current()); // Note: test depends on cache!
-            assertTrue(itr.hasNext());
-            assertFalse(itr.hasPrior());
+            assertTrue(firstLeaf == itr.leaf()); // Note: test depends on cache!
+            assertNull(itr.prior());
 
             assertTrue(lastLeaf == itr.next()); // Note: test depends on cache!
-            assertTrue(lastLeaf == itr.current()); // Note: test depends on cache!
+            assertTrue(lastLeaf == itr.leaf()); // Note: test depends on cache!
             
         }
         
@@ -284,14 +293,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
          */
         {
             
-            final LeafIterator itr = seg.leafIterator(false/* forwardScan */);
+            final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.Last);
             
-            assertTrue(lastLeaf == itr.current()); // Note: test depends on cache!
-            assertTrue(itr.hasNext()); // yes, because we are scanning backward.
-            assertFalse(itr.hasPrior());// no, because we are scanning backward.
+            assertTrue(lastLeaf == itr.leaf()); // Note: test depends on cache!
+            assertNull(itr.next());
 
-            assertTrue(firstLeaf == itr.next()); // Note: test depends on cache!
-            assertTrue(firstLeaf == itr.current()); // Note: test depends on cache!
+            assertTrue(firstLeaf == itr.prior()); // Note: test depends on cache!
+            assertTrue(firstLeaf == itr.leaf()); // Note: test depends on cache!
 
         }
         
@@ -367,11 +375,10 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         assertEquals("priorAddr",0L,leaf.priorAddr);
         assertEquals("nextAddr",0L,leaf.nextAddr);
         
-        final LeafIterator itr = seg.leafIterator(true/*forwardScan*/);
-        assertNotNull(itr.current());
-        assertTrue(leaf == itr.current());
-        assertFalse(itr.hasNext());
-        assertFalse(itr.hasPrior());
+        final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
+        assertTrue(leaf == itr.leaf());
+        assertNull(itr.prior());
+        assertNull(itr.next());
         
         // test index segment structure.
         dumpIndexSegment(seg);

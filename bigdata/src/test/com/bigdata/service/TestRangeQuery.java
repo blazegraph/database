@@ -30,14 +30,14 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.UUID;
 
-import com.bigdata.btree.TupleFilter;
-import com.bigdata.btree.ITupleFilter;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.TupleFilter;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
