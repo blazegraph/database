@@ -34,6 +34,8 @@ import java.util.NoSuchElementException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link AbstractBTreeTupleCursor}
  */
 public class TupleIterator implements ITupleIterator {
 

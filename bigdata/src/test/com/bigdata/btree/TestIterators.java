@@ -458,7 +458,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         final byte[] v5 = new byte[]{5};
         final byte[] v7 = new byte[]{7};
 
-        BTree btree = getBTree(3);
+        BTree btree = getBTree(3,NOPTupleSerializer.INSTANCE);
 
         btree.insert(k3,v3);
         btree.insert(k5,v5);

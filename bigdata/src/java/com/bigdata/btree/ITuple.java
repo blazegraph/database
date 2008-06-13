@@ -217,4 +217,9 @@ public interface ITuple<E extends Object> {
      */
     public boolean isDeletedVersion();
 
+    /**
+     * Return the object that can be used to de-serialize the tuple.
+     */
+    public ITupleSerializer getTupleSerializer();
+    
 }

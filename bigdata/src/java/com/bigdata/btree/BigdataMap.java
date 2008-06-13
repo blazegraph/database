@@ -362,7 +362,7 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
         final byte[] val = tupleSer.serializeVal(value);
 
         final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
-                0/* capacity */, IRangeQuery.NONE/* flags */,
+                0/* capacity */, IRangeQuery.VALS/* flags */,
                 new TupleFilter(val) {
 
                     private static final long serialVersionUID = 1L;

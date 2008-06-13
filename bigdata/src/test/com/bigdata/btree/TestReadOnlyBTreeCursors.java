@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.UUID;
+
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
+import com.bigdata.journal.TemporaryRawStore;
 
 /**
  * Unit tests for {@link ITupleCursor} for a read-only {@link BTree}.
@@ -68,6 +71,32 @@ public class TestReadOnlyBTreeCursors extends AbstractBTreeCursorTestCase {
         return new ReadOnlyBTreeTupleCursor<String>((BTree) btree,
                 new Tuple<String>(btree, IRangeQuery.DEFAULT),
                 fromKey, toKey);
+        
+    }
+    
+    /**
+     * Verify that {@link ITupleCursor#remove()} will thrown an exception if
+     * the source {@link BTree} does not allow writes.
+     */
+    public void test_remove_not_allowed() {
+        
+        BTree btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(
+                UUID.randomUUID()));
+
+        btree.insert(10, "Bryan");
+        
+        btree.setReadOnly(true);
+        
+        ITupleCursor<String> cursor = newCursor(btree);
+        
+        assertEquals(new TestTuple<String>(10,"Bryan"),cursor.next());
+        
+        try {
+            cursor.remove();
+            fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+            log.info("Ignoring expected exception: "+ex);
+        }
         
     }
     

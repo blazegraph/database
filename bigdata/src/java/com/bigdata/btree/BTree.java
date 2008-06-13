@@ -29,6 +29,8 @@ package com.bigdata.btree;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
+import com.bigdata.btree.Leaf.ILeafListener;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
@@ -36,6 +38,7 @@ import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.sun.corba.se.spi.orbutil.fsm.State;
 
 /**
  * <p>
@@ -66,9 +69,6 @@ import com.bigdata.rawstore.IRawStore;
  * incoherent traversal whether or not they result in addition or removal of
  * nodes in the tree.
  * </p>
- * 
- * @todo write tests to verify that {@link #setReadOnly(boolean)} in fact
- *       disables all means to write on or modify the state of the {@link BTree}.
  * 
  * @todo consider also tracking the #of deleted entries in a key range (parallel
  *       to how we track the #of entries in a key range) so that we can report
@@ -126,58 +126,12 @@ import com.bigdata.rawstore.IRawStore;
  *       whether to split or join index segments during a journal overflow
  *       event.
  * 
- * @todo Modify the values in the tree to be variable length byte[]s.
- * 
- * @todo indexOf, keyAt, valueAt need batch api compatibility (they use the old
- *       findChild, search, and autobox logic).
- * 
- * @todo test a GOM integration. this will also require an extser service /
- *       index. extser support could be handled using an extensible metadata
- *       record for the {@link BTree} or {@link IndexSegment}, at least for an
- *       embedded database scenario. http://xstream.codehaus.org/ is also an
- *       interesting serialization package with somewhat different goals (you do
- *       not have to write serializers, but it is doubtless less compact and
- *       does not have extensible versioning).
- * 
- * @todo Implement an "extser" index that does not use extser itself, but which
- *       could provide the basis for a database that does use extser. The index
- *       needs to map class names to entries. Those entries are a classId and
- *       set of {version : Serializer} entries.
- * 
  * @todo we could defer splits by redistributing keys to left/right siblings
  *       that are under capacity - this makes the tree a b*-tree. however, this
  *       is not critical since the journal is designed to be fully buffered and
  *       the index segments are read-only but it would reduce memory by reducing
  *       the #of nodes -- and we can expect that the siblings will be either
  *       resident or in the direct buffer for the journal
- * 
- * @todo consider using extser an option for serialization so that we can
- *       continually evolve the node and leaf formats. we will also need a node
- *       serializer that does NOT use extser in order to store the persistent
- *       extser mappings themselves, and perhaps for other things such as an
- *       index of the index ranges that are multiplexed on a given journal.
- *       finally, we will need to use extser to simplify reopening an index so
- *       that we can recover its key serializer, value serializer, and key
- *       comparator as well as various configuration values from its metadata
- *       record. that encapsulation will have to be layered over the basic btree
- *       class so that we can use a more parameterized btree instance to support
- *       extser itself. there will also need to be metadata maintained about the
- *       perfect index range segments so that we know how to decompress blocks,
- *       deserialize keys and values, and compare keys.
- * 
- * @todo automated version history policies that expire old values based on
- *       either an external timestamp or write time on the server.
- * 
- * @todo support key range iterators that allow concurrent structural
- *       modification. structural mutations in a b+tree are relatively limited.
- *       When prior-next references are available, an iterator should be easily
- *       able to adjust for insertion and removal of keys.
- * 
- * @todo maintain prior-next references among leaves (and nodes?) in memory even
- *       if we are not able to write them onto the disk. when reading in a leaf,
- *       always set the prior/next reference iff the corresponding leaf is in
- *       memory - this is easily handled by checking the weak references on the
- *       parent node.
  * 
  * @todo evict subranges by touching the node on the way up so that a node that
  *       is evicted from the hard reference cache will span a subrange that can
@@ -192,20 +146,6 @@ import com.bigdata.rawstore.IRawStore;
  *       journal is normally fully buffered and the perfect index segments will
  *       not have this problem).
  * 
- * @todo Actually, I could save both prior and next references using a
- *       hand-over-hand chaining in which I pre-serialize the leaf and separate
- *       the allocation step from the write on the store. With just a small
- *       change to the leaf serialization format so that I can write in the
- *       prior and next fields at a known location (which could even be the end
- *       of the buffer), I would then be able to persistent the prior/next
- *       references. <br>
- *       The first step is to start maintaining those references. Also, consider
- *       that it may be useful to maintain them at the node as well as the leaf
- *       level.<br>
- *       If this is done, also check {@link Thread#isInterrupted()} and throw an
- *       exception when true to support fast abort of scans. See
- *       {@link Node#getChild(int)}.
- * 
  * @todo pre-fetch leaves for range scans?
  * 
  * @todo Note that efficient support for large branching factors requires a more
@@ -214,8 +154,6 @@ import com.bigdata.rawstore.IRawStore;
  *       However, we can use smaller branching factors for btrees in the journal
  *       and use a separate implementation for bulk generating and reading
  *       "perfect" read-only key range segments.
- * 
- * @todo prior/next key on entry iterator? prior/next leaf on leaf iterator?
  * 
  * @todo derive a string index that uses patricia trees in the leaves per
  *       several published papers.
@@ -353,10 +291,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
 
     /**
      * The #of non-leaf nodes in the btree. The is zero (0) for a new btree.
-     * 
-     * @todo this field as well as nleaves and nentries could be taken from the
-     *       root node rather than being maintained directly. when the root is a
-     *       leaf, then nnodes=0, nleaves=1, and nentries=root.nkeys
      */
     protected int nnodes;
 
@@ -1262,9 +1196,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
                     versionTimestamp, deleteMarkers);
             
             /*
-             * FIXME The prior/next leaf addr information is generally not
-             * available for mutable BTree, but it is also not being preserved
-             * here when a leaf is de-serialized.
+             * Note: The prior/next leaf addr information is not available for
+             * mutable BTree so it is not being preserved here when a leaf is
+             * de-serialized.
              */
             
             return leaf;
@@ -1415,5 +1349,613 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         return this;
         
     }
+
+    public LeafCursor newLeafCursor(SeekEnum where) {
+     
+        return new LeafCursor( where );
+        
+    }
+
+    public LeafCursor newLeafCursor(byte[] key) {
+     
+        return new LeafCursor( key );
+        
+    }
+        
+    /**
+     * A simple stack based on an array used to maintain hard references for the
+     * parent {@link Node}s in the {@link LeafCursor}. This class is optimized
+     * for light-weight push/pop and copy operations. In particular, the copy
+     * operation is used to support atomic state changes for
+     * {@link LeafCursor#prior()} and {@link LeafCursor#next()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected static class Stack {
+
+        /** backing array used to store the elements in the stack. */
+        private Node[] a;
+
+        /** #of elements in the stack. */
+        private int n = 0; 
+
+        /**
+         * Stack with initial capacity of 10.
+         * <p>
+         * Note: The initial capacity is a relatively small since a B+Tree of
+         * depth 10 will have a very large number of tuples even with a small
+         * branching factor.
+         */
+        public Stack() {
+        
+            this( 10 );
+            
+        }
+        
+        public Stack(int capacity) {
+            
+            a = new Node[capacity];
+            
+        }
+        
+        /**
+         * The size of the backing array.
+         */
+        final public int capacity() {
+            
+            return a.length;
+            
+        }
+
+        /**
+         * The #of elements on the stack.
+         */
+        final public int size() {
+            
+            return n;
+            
+        }
+
+        /**
+         * Push an element onto the stack.
+         * 
+         * @param item
+         *            The element (required).
+         */
+        public void push(Node item) {
+            
+            assert item != null;
+            
+            if (n == a.length) {
+
+                // extend the size of the backing array.
+                final Node[] t = new Node[a.length * 2];
+
+                // copy the data into the new array.
+                System.arraycopy(a, 0, t, 0, n);
+
+                // replace the backing array.
+                a = t;
+
+            }
+
+            a[n++] = item;
+            
+        }
+        
+        /**
+         * Pop an element off of the stack.
+         * 
+         * @return The element that was on the top of the stack.
+         * 
+         * @throws IllegalStateException
+         *             if the stack is empty.
+         */
+        public Node pop() {
+
+            if (n == 0)
+                throw new IllegalStateException();
+
+            final Node item = a[--n]; 
+            
+            /*
+             * Note: it is important to clear the reference since this stack
+             * is being used to manage weak references to parent nodes.
+             */ 
+
+            a[n] = null;
+            
+            return item;
+
+        }
+
+        /**
+         * Return the element on the top of the stack.
+         * 
+         * @throws IllegalStateException
+         *             if the stack is empty.
+         */
+        public Node peek() {
+            
+            if (n == 0)
+                throw new IllegalStateException();
+            
+            return a[n-1];
+            
+        }
+        
+        /**
+         * Replace the state of this {@link Stack} with the {@link State} of
+         * the source {@link Stack}.
+         * 
+         * @param src
+         *            The source {@link Stack}.
+         */
+        public void copyFrom(Stack src) {
+
+            assert src != null;
+            
+            if (src.n > a.length) {
+             
+                // new backing array of same size as the source's backing array.
+                a = new Node[src.a.length];
+                
+            } else {
+
+                clear();
+                
+            }
+
+            // copy the data into the backing array.
+            System.arraycopy(src.a, 0, a, 0, src.n);
+
+            // update the size of the stack.
+            n = src.n;
+
+        }
+
+        /**
+         * Clear the stack.
+         */
+        public void clear() {
+            
+            while (n > 0) {
+
+                /*
+                 * Again, clearing the reference is important since we are
+                 * managing weak reference reachability with this stack.
+                 */
+
+                a[--n] = null;
+
+            }
+            
+        }
+        
+    }
     
+    /**
+     * A cursor that may be used to traversal {@link Leaf}s.
+     * <p>
+     * Note: Instances of this class do NOT register an {@link ILeafListener}
+     * and therefore do NOT notice if mutation causes the current leaf to become
+     * invalid. In general, you need to have a specific <em>key</em> in mind
+     * in order to re-locate the appropriate leaf after such mutation events.
+     * <p>
+     * Note: The {@link MutableBTreeTupleCursor} does register such listeners.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class LeafCursor implements ILeafCursor<Leaf> {
+
+        /**
+         * A stack containing the ordered ancestors of the current leaf. The
+         * root of the B+Tree will always be on the bottom of the stack. Nodes
+         * are pushed onto the stack during top-down navigation by the various
+         * methods that (re-)locate the current leaf.
+         * <p>
+         * The purpose of this stack is to ensure that the ancestors of the
+         * current leaf remain strongly reachable while the cursor is positioned
+         * on that leaf. This is necessary in order for the methods that change
+         * the cursor position {@link #next()} {@link #prior()} to succeeed
+         * since they depend on the parent references which could otherwise be
+         * cleared (parent references of nodes and leaves are weak references).
+         * This means that hard references MUST be held to all {@link Node}s
+         * that are ancestors of the current {@link Leaf}. This criteria is
+         * satisfied by normal top-down navigation since the hard references are
+         * on the stack frame. However, non-recursive constructions violate this
+         * requirement since the hard references to the parents are not on the
+         * stack frame. This {@link Stack} of {@link Node}s is therefore
+         * maintained by all of the methods on this class such that we always
+         * have hard references for the ancestors of the leaf that is being
+         * visited.
+         * <p>
+         * Another benefit of this stack is that is ensures that not only the
+         * current leaf but also all nodes above the current leaf remain
+         * strongly reachable and hence require NO IOs. This should have the
+         * most pronounced effect on a read-only {@link BTree} with a large
+         * number of concurrent cursors as the hard reference queue for the
+         * index might otherwise let the relevant nodes become weakly reachable.
+         * It will have less of a performance effect for a mutable {@link BTree}
+         * since that class is single-threaded for writers.
+         * <p>
+         * Note: The {@link IndexSegment} handles this differently since it has
+         * the address of the prior and next leaf on hand and does not need the
+         * parent references for navigation.
+         */
+        private Stack stack = new Stack();
+        
+        /**
+         * {@link #prior()} and {@link #next()} use this in order to make their
+         * operations on the {@link #stack} atomic. If they are unable to find
+         * the prior/next leaf (because the cursor is already on the first/last
+         * leaf) then they undo their operations on the stack by restoring it
+         * from this copy.
+         */
+        private Stack backup = null;
+        
+        /**
+         * Save a copy of the {@link #stack}.
+         */
+        @SuppressWarnings("unchecked")
+        private void backup() {
+            
+            assert stack != null;
+
+            if (backup == null) {
+
+                backup = new Stack(stack.capacity());
+                
+            }
+            
+            backup.copyFrom(stack);
+            
+        }
+
+        /**
+         * Restore the {@link #stack} from its backup copy.
+         */
+        private void restore() {
+
+            assert backup != null;
+            
+            stack = backup;
+            
+            backup = null;
+            
+        }
+        
+        /**
+         * The current leaf (always defined).
+         */
+        private Leaf leaf;
+
+        public Leaf leaf() {
+            
+            return leaf;
+            
+        }
+
+        public BTree getBTree() {
+            
+            return BTree.this;
+            
+        }
+        
+        public LeafCursor clone() {
+            
+            return new LeafCursor(this);
+            
+        }
+        
+        /**
+         * Copy constructor used by {@link #clone()}.
+         */
+        private LeafCursor(LeafCursor src) {
+            
+            if (src == null)
+                throw new IllegalArgumentException();
+            
+            // copy the stack state from the source cursor.
+            stack = new Stack(src.stack.capacity());
+            stack.copyFrom(src.stack);
+
+            leaf = src.leaf();
+            
+        }
+        
+        public LeafCursor(SeekEnum where) {
+
+            switch (where) {
+
+            case First:
+                
+                first();
+                
+                break;
+                
+            case Last:
+                
+                last();
+                
+                break;
+                
+            default:
+                
+                throw new AssertionError("Unknown seek directive: " + where);
+            
+            }
+            
+        }
+        
+        public LeafCursor(byte[] key) {
+            
+            seek(key);
+            
+        }
+        
+        public Leaf first() {
+
+            stack.clear();
+            
+            AbstractNode node = getRoot();
+
+            while (!node.isLeaf()) {
+
+                final Node n = (Node) node;
+
+                stack.push(n);
+
+                // left-most child.
+                node = n.getChild(0);
+                
+            }
+            
+            return leaf = (Leaf)node;
+            
+        }
+
+        public Leaf last() {
+            
+            stack.clear();
+            
+            AbstractNode node = getRoot();
+
+            while (!node.isLeaf()) {
+
+                final Node n = (Node) node;
+
+                stack.push(n);
+
+                // right-most child.
+                node = n.getChild(n.getKeyCount());
+                
+            }
+            
+            return leaf = (Leaf)node;
+
+        }
+
+        /**
+         * Descend from the root node to the leaf spanning that key. Note that
+         * the leaf may not actually contain the key, in which case it is the
+         * leaf that contains the insertion point for the key.
+         */
+        public Leaf seek(byte[] key) {
+
+            stack.clear();
+            
+            AbstractNode node = getRoot();
+            
+            while(!node.isLeaf()) {
+                
+                final Node n = (Node)node;
+                
+                final int index = n.findChild(key);
+                
+                stack.push( n );
+                
+                node = n.getChild( index );
+                
+            }
+
+            return leaf = (Leaf)node;
+            
+        }
+
+        public Leaf seek(ILeafCursor<Leaf> src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
+            
+            if (src.getBTree() != BTree.this) {
+                
+                throw new IllegalArgumentException();
+                
+            }
+
+            // copy the stack state from the source cursor.
+            stack.copyFrom(((LeafCursor) src).stack);
+
+            return leaf = src.leaf();
+            
+        }
+        
+        public Leaf next() {
+
+            // make sure that the current leaf is valid.
+            if (leaf.isDeleted())
+                throw new IllegalStateException("deleted");
+
+            // save a copy of the stack.
+            backup();
+
+            /*
+             * Starting with the current leaf, recursive ascent until there is a
+             * right-sibling of the current child.
+             */
+            AbstractNode sibling = null;
+            {
+
+                AbstractNode child = leaf;
+
+                Node p = child.getParent();
+
+                while (true) {
+
+                    if(p == null) {
+                        
+                        /*
+                         * No right-sibling (must be the last leaf).
+                         */
+                        
+                        // undo changes to the stack.
+                        restore();
+                        
+                        // do not change the cursor position.
+                        return null;
+                        
+                    }
+
+                    sibling = p.getRightSibling(child, true/*materialize*/);
+                    
+                    if(sibling != null) break;
+                    
+                    if (p != stack.pop())
+                        throw new AssertionError();
+
+                    // check the parent.
+
+                    child = p;
+                    
+                    p = p.getParent();
+                    
+                }
+                
+            }
+            
+            /*
+             * Recursive descent to the left-most child. 
+             */
+            {
+                
+                while(!sibling.isLeaf()) {
+                    
+                    stack.push((Node)sibling);
+                    
+                    sibling = ((Node) sibling).getChild(0);
+                    
+                }
+                
+            }
+            
+            return leaf = (Leaf) sibling;
+            
+        }
+
+        /**
+         * Materialize the prior leaf in the natural order of the index (this is
+         * more general than the right sibling which is restricted to leaves
+         * that are children of the same direct parent). The algorithm is:
+         * 
+         * <ol>
+         * 
+         * <li>Recursive ascent via the parent until there is a left-sibling of
+         * the child node (the index of the child in the parent must be GT
+         * zero). If we reach the root and there is no left-sibling then we are
+         * already on the left-most leaf and we are done.</li>
+         * 
+         * <li>t = leftSibling</li>
+         * 
+         * <li>while(!t.isLeaf()) right-descend</li>
+         * 
+         * </ol>
+         * 
+         * As we go up we pop each parent off of the hard reference stack.
+         * <p>
+         * As we go down we add each non-leaf node to the hard reference stack.
+         * <p>
+         * In order to make this operation atomic, the nodes to be popped are
+         * added to a temporary stack until we 
+         * 
+         * @return The prior leaf -or- <code>null</code> if there is no
+         *         predecessor of this leaf.
+         */
+        public Leaf prior() {
+
+            // make sure that the current leaf is valid.
+            if (leaf.isDeleted())
+                throw new IllegalStateException("deleted");
+
+            // save a copy of the stack.
+            backup();
+
+            /*
+             * Starting with the current leaf, recursive ascent until there is a
+             * left-sibling of the current child.
+             */
+            AbstractNode sibling = null;
+            {
+
+                AbstractNode child = leaf;
+
+                Node p = child.getParent();
+
+                while (true) {
+
+                    if(p == null) {
+                        
+                        /*
+                         * No left-sibling (must be the first leaf).
+                         */
+                        
+                        // undo changes to the stack.
+                        restore();
+                        
+                        // do not change the cursor position.
+                        return null;
+                        
+                    }
+
+                    sibling = p.getLeftSibling(child, true/*materialize*/);
+                    
+                    if(sibling != null) break;
+                    
+                    if (p != stack.pop())
+                        throw new AssertionError();
+
+                    // check the parent.
+
+                    child = p;
+                    
+                    p = p.getParent();
+                    
+                }
+                
+            }
+            
+            /*
+             * Recursive descent to the right-most child. 
+             */
+            {
+                
+                while(!sibling.isLeaf()) {
+                    
+                    stack.push((Node)sibling);
+                    
+                    sibling = ((Node) sibling)
+                            .getChild(sibling.getKeyCount());
+                    
+                }
+                
+            }
+            
+            return leaf = (Leaf) sibling;
+            
+        }
+        
+    }
+
 }

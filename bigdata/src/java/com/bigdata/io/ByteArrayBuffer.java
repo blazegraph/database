@@ -697,6 +697,28 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     }
     
     /**
+     * Relative copy of data into <i>this</i> buffer. 
+     * 
+     * @param src
+     *            The source.
+     * 
+     * @return The #of bytes copied.
+     */
+    final public int copy(ByteArrayBuffer src) {
+        
+        final int n = src.remaining();
+
+        if (n > 0) {
+
+            put(src.buf, src.pos, n);
+            
+        }
+        
+        return n;
+        
+    }
+    
+    /**
      * Wraps up a reference to the data in a {@link ByteBuffer} between the
      * position and the limit.
      * 

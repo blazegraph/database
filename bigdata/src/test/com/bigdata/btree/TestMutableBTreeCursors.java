@@ -685,4 +685,88 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         
     }
     
+    /**
+     * Test verifies that an iterator which is scanning in forward order can be
+     * exhausted when it reaches the end of the visitable tuples but that a
+     * visitable tuple inserted after the current cursor position will be
+     * noticed by {@link ITupleCursor#hasNext()} and visited.
+     */
+    public void test_hasNext_continues_after_insert() {
+        
+        final BTree btree;
+        {
+       
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+            btree = BTree.create(new TemporaryRawStore(), md);
+
+            btree.insert(10, "Bryan");
+            
+        }
+
+        {
+            
+            ITupleCursor<String> cursor = newCursor(btree);
+            
+            assertTrue(cursor.hasNext());
+            
+            assertEquals(new TestTuple<String>(10,"Bryan"),cursor.next());
+            
+            assertFalse(cursor.hasNext());
+            
+            // insert after
+            btree.insert(20, "Mike");
+            
+            assertEquals(new TestTuple<String>(10,"Bryan"),cursor.tuple());
+            
+            assertTrue(cursor.hasNext());
+            
+            assertEquals(new TestTuple<String>(20,"Mike"),cursor.next());
+            
+        }
+        
+    }
+    
+    /**
+     * Test verifies that an iterator which is scanning in reverse order can be
+     * exhausted when it reaches the end of the visitable tuples but that a
+     * visitable tuple inserted after the current cursor position will be
+     * noticed by {@link ITupleCursor#hasPrior()} and visited.
+     */
+    public void test_hasPrior_continues_after_insert() {
+        
+        final BTree btree;
+        {
+       
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+            btree = BTree.create(new TemporaryRawStore(), md);
+
+            btree.insert(20, "Mike");
+            
+        }
+
+        {
+            
+            ITupleCursor<String> cursor = newCursor(btree);
+            
+            assertTrue(cursor.hasPrior());
+            
+            assertEquals(new TestTuple<String>(20,"Mike"),cursor.prior());
+            
+            assertFalse(cursor.hasPrior());
+            
+            // insert before.
+            btree.insert(10, "Bryan");
+            
+            assertEquals(new TestTuple<String>(20,"Mike"),cursor.tuple());
+            
+            assertTrue(cursor.hasPrior());
+            
+            assertEquals(new TestTuple<String>(10,"Bryan"),cursor.prior());
+            
+        }
+        
+    }
+    
 }

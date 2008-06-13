@@ -645,6 +645,12 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
             return nvisited;
 
         }
+        
+        public ITupleSerializer getTupleSerializer() {
+            
+            return rset.getTupleSerializer();
+            
+        }
 
         public IBlock readBlock(long addr) {
 

@@ -323,15 +323,6 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         
     }
     
-//  private int sourceIndex;
-    
-    // @todo should be set by copyTuple().
-    abstract public int getSourceIndex();
-//        
-//        return sourceIndex;
-//        
-//    }
-    
     /**
      * Copy data and metadata for the index entry from the {@link Leaf} into the
      * {@link Tuple} and increment the counter of the #of visited entries.
@@ -340,6 +331,10 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      *            The index entry.
      * @param leaf
      *            The leaf.
+     * 
+     * @todo The various copy methods should also set the [sourceIndex] property
+     *       and {@link ITuple#getSourceIndex()} should be implemented by this
+     *       class (or maybe add a setSourceIndex() to be more flexible).
      */
     public void copy(int index, ILeafData leaf) {
         
@@ -440,6 +435,46 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         }
 
     }
+    
+//    /**
+//     * Sets all fields and increments the tuple visited counter.
+//     * 
+//     * @param t
+//     *            Some tuple.
+//     */
+//    protected void copyTuple(ITuple t) {
+//        
+//        this.nvisited++;
+//        
+//        this.versionDeleted = t.isDeletedVersion();
+//        
+//        this.versionTimestamp = t.getVersionTimestamp();
+//
+//        if (needKeys) {
+//
+//            kbuf.reset().copy(t.getKeyBuffer());
+//
+//        }
+//
+//        if (needVals) {
+//
+//            vbuf.reset();
+//
+//            if (!versionDeleted) {
+//             
+//                isNull = t.isNull();
+//
+//                if (!isNull) {
+//
+//                    vbuf.copy(t.getValueBuffer());
+//                    
+//                }
+//                
+//            }
+//
+//        }
+//
+//    }
 
     /**
      * Clears the buffered data copied into the {@link AbstractTuple} from the
@@ -490,10 +525,5 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         "}";
         
     }
-
-    /**
-     * Return the object that can be used to de-serialize the tuple.
-     */
-    abstract ITupleSerializer getTupleSerializer();
     
 }

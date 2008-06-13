@@ -33,25 +33,24 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.io.SerializerUtil;
-
 /**
  * Default implementation uses the {@link KeyBuilder} to format the object as a
- * key and uses Java default serialization for the value.
+ * key and requires that the values are byte[]s which it passes on without
+ * change. Deserialization of the tuple value always the byte[] itself.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DefaultTupleSerializer implements ITupleSerializer, Externalizable {
+public class NOPTupleSerializer implements ITupleSerializer, Externalizable {
 
     /**
      * 
      */
     private static final long serialVersionUID = 2211020411074955099L;
 
-    public static transient final ITupleSerializer INSTANCE = new DefaultTupleSerializer();
+    public static transient final ITupleSerializer INSTANCE = new NOPTupleSerializer();
     
-    public DefaultTupleSerializer() {
+    public NOPTupleSerializer() {
         
     }
 
@@ -68,31 +67,18 @@ public class DefaultTupleSerializer implements ITupleSerializer, Externalizable 
         
     }
 
-    /**
-     * Serializes the object as a byte[] using Java default serialization.
-     * 
-     * @param obj
-     *            The object to be serialized (MAY be <code>null</code>).
-     * 
-     * @return The serialized representation of the object as a byte[] -or-
-     *         <code>null</code> if the reference is <code>null</code>.
-     */
     public byte[] serializeVal(Object obj) {
 
-        return SerializerUtil.serialize(obj);
+        return (byte[])obj;
         
     }
 
-    /**
-     * De-serializes an object from the {@link ITuple#getValue() value} stored
-     * in the tuple (ignores the key stored in the tuple).
-     */
     public Object deserialize(ITuple tuple) {
 
         if (tuple == null)
             throw new IllegalArgumentException();
         
-        return SerializerUtil.deserialize(tuple.getValue());
+        return tuple.getValue();
         
     }
 

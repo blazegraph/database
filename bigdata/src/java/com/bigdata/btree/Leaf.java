@@ -422,8 +422,8 @@ public class Leaf extends AbstractNode implements ILeafData {
 
             }
             
-            // notify any listeners that this tuple's state has been changed.
-            fireInvalidateTuple(entryIndex);
+//            // notify any listeners that this tuple's state has been changed.
+//            fireInvalidateTuple(entryIndex);
 
             // return the old value.
             return tuple;
@@ -1435,12 +1435,17 @@ public class Leaf extends AbstractNode implements ILeafData {
 
     /**
      * An interface that may be used to register for and receive events when the
-     * state of a {@link Leaf} is changed (update of a tuple, insert of a tuple,
-     * or removal of a tuple) or when the leaf is discarded in response by
-     * copy-on-write.
+     * state of a {@link Leaf} is changed. This includes (a) adding a new tuple
+     * to a leaf; (b) removing a tuple from a leaf (but not flagging an existing
+     * tuple as deleted); and (c) when the leaf is discarded by copy-on-write.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo another listener API could be developed for tuple state changes.
+     *       that would be useful if there was a desire for pre- or
+     *       post-processing for each tuple. This might be useful for
+     *       introducing triggers.
      */
     public static interface ILeafListener {
        
@@ -1454,14 +1459,14 @@ public class Leaf extends AbstractNode implements ILeafData {
          */
         public void invalidateLeaf();
         
-        /**
-         * Notice that the state of a tuple in the leaf has been changed (the
-         * tuple is still known to be located within the leaf).
-         * 
-         * @param index
-         *            The index of the tuple whose state was changed.
-         */
-        public void invalidateTuple(int index);
+//        /**
+//         * Notice that the state of a tuple in the leaf has been changed (the
+//         * tuple is still known to be located within the leaf).
+//         * 
+//         * @param index
+//         *            The index of the tuple whose state was changed.
+//         */
+//        public void invalidateTuple(int index);
         
     }
     
@@ -1535,23 +1540,23 @@ public class Leaf extends AbstractNode implements ILeafData {
         
     }
 
-    /**
-     * Fire an {@link ILeafListener#invalidateTuple(int)} event to any
-     * registered listeners.
-     * 
-     * @param index
-     *            The index of the tuple whose state was changed.
-     */
-    final protected void fireInvalidateTuple(int index) {
-
-        if(leafListeners == null) return;
-
-        for(ILeafListener l : leafListeners.keySet()) {
-            
-            l.invalidateTuple(index);
-            
-        }
-
-    }
+//    /**
+//     * Fire an {@link ILeafListener#invalidateTuple(int)} event to any
+//     * registered listeners.
+//     * 
+//     * @param index
+//     *            The index of the tuple whose state was changed.
+//     */
+//    final protected void fireInvalidateTuple(int index) {
+//
+//        if(leafListeners == null) return;
+//
+//        for(ILeafListener l : leafListeners.keySet()) {
+//            
+//            l.invalidateTuple(index);
+//            
+//        }
+//
+//    }
 
 }

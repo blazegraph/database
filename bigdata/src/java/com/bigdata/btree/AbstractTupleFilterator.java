@@ -151,16 +151,9 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
 
     }
 
-    /**
-     * @todo not implemented because we are using a lookahead(1) paradigm and
-     *       the source iterator will be on a different tuple than the last one
-     *       returned by {@link #next()} if {@link #hasNext()} was been invoked
-     *       before invoking {@link #remove()} -- test this out to verify.  how
-     *       does the striterator handle this?
-     */
     public void remove() {
 
-        throw new UnsupportedOperationException();
+        src.remove();
 
     }
 
@@ -556,14 +549,13 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
                  *       a different index the name of the scale out index would
                  *       have to be in the blob reference.
                  */
-                @Override
                 public int getSourceIndex() {
 
                     throw new UnsupportedOperationException();
                     
                 }
                 
-                protected ITupleSerializer getTupleSerializer() {
+                public ITupleSerializer getTupleSerializer() {
                     
                     return tupleSer;
                     
@@ -654,6 +646,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
         public void remove() {
 
             // TODO look at the remove semantics for the sparse row store.
+            throw new UnsupportedOperationException(); 
             
         }
         
@@ -819,6 +812,57 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
             
             throw new UnsupportedOperationException();
             
+        }
+        
+    }
+
+    /**
+     * A filter that removes the tuples that it visits from the source iterator.
+     * <p>
+     * Note: This filter may be used to cause tuples to be atomically deleted on
+     * the server.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Removerator<E> implements ITupleIterator<E> {
+
+        private final ITupleIterator<E> src;
+        
+        /**
+         * @param src
+         *            The source iterator.
+         */
+        protected Removerator(ITupleIterator<E> src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            this.src = src;
+            
+        }
+
+        public ITuple<E> next() {
+
+            final ITuple<E> t = src.next();
+
+            src.remove();
+            
+            return t;
+            
+        }
+
+        public boolean hasNext() {
+
+            return src.hasNext();
+            
+        }
+
+        /**
+         * NOP - the visited tuples are ALWAYS removed by {@link #next()}.
+         */
+        public void remove() {
+          
         }
         
     }

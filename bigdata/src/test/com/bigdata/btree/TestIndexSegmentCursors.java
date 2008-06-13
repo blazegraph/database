@@ -134,7 +134,25 @@ public class TestIndexSegmentCursors extends AbstractCursorTestCase {
         IndexSegment seg = buildIndexSegment(btree);
         
         doOneTupleTest(seg);
+        
+        /*
+         * Verify that {@link ITupleCursor#remove()} will thrown an exception if
+         * the source {@link BTree} does not allow writes.
+         */
+        {
+            ITupleCursor<String> cursor = newCursor(seg);
 
+            assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
+
+            try {
+                cursor.remove();
+                fail("Expecting: " + UnsupportedOperationException.class);
+            } catch (UnsupportedOperationException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
+        }
+        
     }
 
     /**

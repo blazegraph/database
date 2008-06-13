@@ -104,9 +104,14 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexCounter.class );
         
         // test iterator semantics.
-        suite.addTestSuite( TestIterators.class );
-        // test chunked iterator semantics.
-        suite.addTestSuite(TestChunkedIterators.class);
+        suite.addTestSuite(TestBTreeLeafCursors.class);
+        suite.addTestSuite(TestIterators.class);
+        suite.addTestSuite(TestReadOnlyBTreeCursors.class);
+        suite.addTestSuite(TestMutableBTreeCursors.class);
+        suite.addTestSuite(TestReverserator.class);
+        suite.addTestSuite(TestRemoverator.class);
+        // test chunked iterator semantics (note: was replaced by the cursors stuff).
+//        suite.addTestSuite(TestChunkedIterators.class);
 
         // test delete semantics (also see the isolation package).
         suite.addTestSuite( TestRemoveAll.class );
@@ -163,6 +168,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentCheckpoint.class );
         // test with small known examples in detail.
         suite.addTestSuite( TestIndexSegmentBuilderWithSmallTree.class );
+        // test iterators for the index segment.
+        suite.addTestSuite(TestIndexSegmentCursors.class);
         // stress test with larger random input trees and a variety of branching factors.
         suite.addTestSuite( TestIndexSegmentBuilderWithLargeTrees.class );
         // test of the bloom filter integration.
@@ -179,16 +186,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBigdataMap.class );
         suite.addTestSuite( TestBigdataSet.class );
         
-        /*
-         * FIXME This is the test suite for new iterator/cursor semantics.
-         * These tests really need to be inlined up above but they are gather
-         * together here until everything is working.
-         */
-        suite.addTestSuite(TestIndexSegmentCursors.class);
-        suite.addTestSuite(TestReadOnlyBTreeCursors.class);
-        suite.addTestSuite(TestMutableBTreeCursors.class);
+        // FIXME this test has not been written (FusedView still uses the iterator API - not the cursor API).
 //      suite.addTestSuite(TestFusedViewCursors.class);
-//      suite.addTestSuite(TestIsolatedFusedViewCursors.class); // FIXME this belongs in the isolation package.
+
+        // FIXME this test belongs in the isolation package.
+//      suite.addTestSuite(TestIsolatedFusedViewCursors.class);
 
         return suite;
         
