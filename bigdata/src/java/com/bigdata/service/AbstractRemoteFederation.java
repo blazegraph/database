@@ -392,6 +392,12 @@ abstract public class AbstractRemoteFederation extends AbstractFederation {
 
         }
 
+        public ITupleIterator rangeIterator() {
+            
+            return rangeIterator(null,null);
+            
+        }
+        
         public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
             return rangeIterator(fromKey, toKey, 0/* capacity */,

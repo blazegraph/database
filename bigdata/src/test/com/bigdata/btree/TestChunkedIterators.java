@@ -384,7 +384,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             
             int nremaining = 0;
             
-            ITupleIterator itr = btree.entryIterator();
+            ITupleIterator itr = btree.rangeIterator();
             
             while(itr.hasNext()) {
                 
@@ -505,7 +505,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
 
             int nremaining = 0;
             
-            ITupleIterator itr = btree.entryIterator();
+            ITupleIterator itr = btree.rangeIterator();
             
             while(itr.hasNext()) {
                 

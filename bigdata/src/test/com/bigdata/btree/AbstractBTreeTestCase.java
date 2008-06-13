@@ -802,7 +802,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * Verify entries in the expected order.
          */
-        assertSameIterator(entries, btree.entryIterator());
+        assertSameIterator(entries, btree.rangeIterator());
 
         // remove keys in forward order.
         {
@@ -913,7 +913,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * Verify entries in the expected order.
          */
-        assertSameIterator(reverseEntries, btree.entryIterator());
+        assertSameIterator(reverseEntries, btree.rangeIterator());
 
         // Note: The height, #of nodes, and #of leaves is path dependent.
         assertEquals("#entries", keys.length, btree.nentries);
@@ -1223,7 +1223,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             /*
              * Verify entries in the expected order.
              */
-            assertSameIterator(entries, btree.entryIterator());
+            assertSameIterator(entries, btree.rangeIterator());
 
             return btree;
             
@@ -1375,7 +1375,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * presentation order, the entries MUST now be in the original generated
          * order.
          */
-        assertSameIterator(entries,btree.entryIterator());
+        assertSameIterator(entries,btree.rangeIterator());
 
         // Note: The height, #of nodes, and #of leaves are path dependent.
         assertEquals("#entries", keys.length, btree.nentries);
@@ -1538,7 +1538,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * verify the total order.
          */
-        assertSameIterator(vals, btree.entryIterator());
+        assertSameIterator(vals, btree.rangeIterator());
         
         assertTrue(btree.dump(Level.ERROR,System.out));
         
@@ -1588,7 +1588,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     /**
      * A suite of tests designed to verify that one btree correctly represents
      * the information present in a ground truth btree. The test verifies the
-     * #of entries, key type, the {@link AbstractBTree#entryIterator()}, and
+     * #of entries, key type, the {@link AbstractBTree#rangeIterator()}, and
      * also both lookup by key and lookup by entry index. The height, branching
      * factor, #of nodes and #of leaves may differ (the test does not presume
      * that the btrees were built with the same branching factor, but merely
@@ -1665,7 +1665,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * Compares the total ordering of a btree against the total ordering of a
      * ground truth btree.
      * <p>
-     * Note: This uses the {@link AbstractBTree#entryIterator()} method. Due to
+     * Note: This uses the {@link AbstractBTree#rangeIterator()} method. Due to
      * the manner in which that iterator is implemented, the iterator does NOT
      * rely on the separator keys. Therefore while this validates the total
      * order it does NOT validate that the index may be searched by key (or by
@@ -1682,7 +1682,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     static public void doEntryIteratorTest(AbstractBTree expected, IIndex actual ) {
 
-        ITupleIterator expectedItr = expected.entryIterator();
+        ITupleIterator expectedItr = expected.rangeIterator();
         
         ITupleIterator actualItr = actual.rangeIterator(null,null);
         
@@ -1788,7 +1788,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     static public void getKeysAndValues(AbstractBTree btree, byte[][] keys,
             byte[][] vals) {
         
-        ITupleIterator itr = btree.entryIterator();
+        ITupleIterator itr = btree.rangeIterator();
 
         int i = 0;
         

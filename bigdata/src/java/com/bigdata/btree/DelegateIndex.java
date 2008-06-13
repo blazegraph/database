@@ -91,6 +91,10 @@ public class DelegateIndex implements IIndex {
         return delegate.rangeCount(fromKey, toKey);
     }
 
+    public ITupleIterator rangeIterator() {
+        return rangeIterator(null,null);
+    }
+
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) {
         return delegate.rangeIterator(fromKey, toKey, capacity, flags, filter);
     }

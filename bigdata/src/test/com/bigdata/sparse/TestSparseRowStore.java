@@ -231,7 +231,7 @@ public class TestSparseRowStore extends TestCase2 {
          */
         {
             
-            ITupleIterator itr = btree.entryIterator();
+            ITupleIterator itr = btree.rangeIterator();
             
             while(itr.hasNext()) {
             

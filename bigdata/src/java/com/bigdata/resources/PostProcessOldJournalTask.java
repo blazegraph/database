@@ -697,7 +697,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 assert ncandidates > 0 : "Expecting at least one candidate";
                 
-                final ITupleIterator titr = tmp.entryIterator();
+                final ITupleIterator titr = tmp.rangeIterator();
 
                 /*
                  * Setup a BatchLookup query designed to locate the rightSibling

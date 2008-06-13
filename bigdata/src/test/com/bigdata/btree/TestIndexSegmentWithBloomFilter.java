@@ -245,7 +245,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         final long commitTime = System.currentTimeMillis();
         
         IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
-                tmpDir, btree.getEntryCount(), btree.entryIterator(), m, btree
+                tmpDir, btree.getEntryCount(), btree.rangeIterator(), m, btree
                         .getIndexMetadata(), commitTime);
         
         builder2.call();
@@ -356,7 +356,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 metadata.setErrorRate(0.0);
 
                 new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                        btree.entryIterator(), m, metadata, commitTime).call();
+                        btree.rangeIterator(), m, metadata, commitTime).call();
                 
 //              new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
                 
@@ -374,7 +374,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 metadata.setErrorRate(1/64d);
                 
                 builder2 = new IndexSegmentBuilder(outFile2, tmpDir, btree
-                        .getEntryCount(), btree.entryIterator(), m, metadata,
+                        .getEntryCount(), btree.rangeIterator(), m, metadata,
                         commitTime);
                 
                 builder2.call();

@@ -31,7 +31,7 @@ package com.bigdata.btree;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
-import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Unit tests for {@link ITupleCursor} for a read-only {@link BTree}.
@@ -80,7 +80,7 @@ public class TestReadOnlyBTreeCursors extends AbstractBTreeCursorTestCase {
      */
     public void test_remove_not_allowed() {
         
-        BTree btree = BTree.create(new TemporaryRawStore(), new IndexMetadata(
+        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
                 UUID.randomUUID()));
 
         btree.insert(10, "Bryan");

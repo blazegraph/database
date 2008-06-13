@@ -27,8 +27,11 @@
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.IDataService;
+
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Interface for range count and range query operations (non-batch api).
@@ -120,6 +123,28 @@ public interface IRangeQuery {
      *       constructions.
      */
     public static final int REMOVEALL = 1 << 4;
+    
+    /**
+     * Flag specifies that the iterator will support the full
+     * {@link ITupleCursor} API, including bi-directional tuple navigation and
+     * random seeks within the key range. In addition, this flag enables
+     * traveral with concurrent modification when used with a local
+     * {@link BTree} (scale-out iterators buffer always support traversal with
+     * concurrent modification because they heavily buffer the iterator with
+     * {@link ResultSet}s).
+     * <p>
+     * Note: There are several pragmatic reasons why you would or would not
+     * specify this flag. Most importantly, the original {@link Striterator}
+     * construction for the {@link BTree} uses recursion and is in fact
+     * <em>faster</em> than the newer {@link AbstractBTreeTupleCursor}. It is
+     * used by default when this flag is NOT specified and the iterator is
+     * running across a {@link BTree}. However, the
+     * {@link IndexSegmentTupleCursor} is used regardless of the value of this
+     * flag since it exploits the double-linked leaves of the
+     * {@link IndexSegment} and is therefore MORE efficient than the
+     * {@link Striterator} based construct.
+     */
+    public static final int CURSOR = 1 << 5;
 
     /**
      * Flag specifies that the entries will be visited using a reverse scan. The
@@ -132,19 +157,8 @@ public interface IRangeQuery {
      * This flag may be used to realize a number of interesting constructions,
      * including atomic operations on the tail of a queue and obtaining the last
      * key in the key range.
-     * 
-     * FIXME Support for this flag is NOT finished. I am in the process of
-     * reworking the iterators to support this. The {@link IndexSegment} now
-     * supports a fast leaf iterator that can scan forwards and backwards but
-     * the {@link AbstractBTree} uses an iterator based on recursive descent of
-     * the index nodes and which does not support prior/next tuple operations.
-     * The {@link ITupleIterator} or perhaps the {@link ITuple} should allow you
-     * to walk the prior/next tuple. I am also going to support traversal with
-     * concurrent modification (but the writer still needs to be single-threaded
-     * without concurrent readers so this only addresses cases where you are
-     * iterating and also modifying the btree,e.g. using insert()).
      */
-    public static final int REVERSE = 1 << 5;
+    public static final int REVERSE = 1 << 6 | CURSOR;
     
     /**
      * The flags that should be used by default ({@link #KEYS},{@link #VALS})
@@ -154,14 +168,27 @@ public interface IRangeQuery {
     public static final int DEFAULT = KEYS | VALS;
 
     /**
-     * Return an iterator that visits the entries in a half-open key range.
+     * Visits all tuples in key order. This is identical to
+     * 
+     * <pre>
+     * rangeIterator(null, null)
+     * </pre>
+     * 
+     * @return An iterator that will visit all entries in key order.
+     */
+    public ITupleIterator rangeIterator();
+    
+    /**
+     * Return an iterator that visits the entries in a half-open key range. When
+     * <i>toKey</i> <em>EQ</em> <i>fromKey</i> nothing will be visited. It
+     * is an error if <i>toKey</i> <em>LT</em> <i>fromKey</i>.
      * 
      * @param fromKey
-     *            The first key that will be visited (inclusive). When
-     *            <code>null</code> there is no lower bound.
+     *            The first key that will be visited (inclusive lower bound).
+     *            When <code>null</code> there is no lower bound.
      * @param toKey
-     *            The first key that will NOT be visited (exclusive). When
-     *            <code>null</code> there is no upper bound.
+     *            The first key that will NOT be visited (exclusive upper
+     *            bound). When <code>null</code> there is no upper bound.
      * 
      * @throws RuntimeException
      *             if <i>fromKey</i> is non-<code>null</code> and orders LT
@@ -170,8 +197,6 @@ public interface IRangeQuery {
      * @throws RuntimeException
      *             if <i>toKey</i> is non-<code>null</code> and orders GTE
      *             the exclusive upper bound for an index partition.
-     * 
-     * @see #entryIterator(), which visits all entries in the btree.
      * 
      * @see SuccessorUtil, which may be used to compute the successor of a value
      *      before encoding it as a component of a key.
@@ -188,14 +213,16 @@ public interface IRangeQuery {
 
     /**
      * Designated variant (the one that gets overriden) for an iterator that
-     * visits the entries in a half-open key range.
+     * visits the entries in a half-open key range. When <i>toKey</i>
+     * <em>EQ</em> <i>fromKey</i> nothing will be visited. It is an error if
+     * <i>toKey</i> <em>LT</em> <i>fromKey</i>.
      * 
      * @param fromKey
-     *            The first key that will be visited (inclusive). When
-     *            <code>null</code> there is no lower bound.
+     *            The first key that will be visited (inclusive lower bound).
+     *            When <code>null</code> there is no lower bound.
      * @param toKey
-     *            The first key that will NOT be visited (exclusive). When
-     *            <code>null</code> there is no upper bound.
+     *            The first key that will NOT be visited (exclusive upper
+     *            bound). When <code>null</code> there is no upper bound.
      * @param capacity
      *            The #of entries to buffer at a time. This is a hint and MAY be
      *            zero (0) to use an implementation specific <i>default</i>
@@ -208,8 +235,6 @@ public interface IRangeQuery {
      *            iterator.
      * @param filter
      *            An optional filter and/or resolver.
-     * 
-     * @see #entryIterator(), which visits all entries in the btree.
      * 
      * @see SuccessorUtil, which may be used to compute the successor of a value
      *      before encoding it as a component of a key.

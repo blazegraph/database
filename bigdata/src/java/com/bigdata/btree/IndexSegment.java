@@ -1021,6 +1021,13 @@ public class IndexSegment extends AbstractBTree {
             if (src == null)
                 throw new IllegalArgumentException();
             
+            if (src == this) {
+
+                // NOP
+                return leaf;
+                
+            }
+            
             if (src.getBTree() != IndexSegment.this) {
                 
                 throw new IllegalArgumentException();

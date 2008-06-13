@@ -461,6 +461,12 @@ public class FusedView implements IIndex, ILocalBTreeView {
         
     }
 
+    public ITupleIterator rangeIterator() {
+
+        return rangeIterator(null, null);
+        
+    }
+
     /**
      * Returns an iterator that visits the distinct entries. When an entry
      * appears in more than one index, the entry is choosen based on the order

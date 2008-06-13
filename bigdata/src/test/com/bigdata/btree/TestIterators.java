@@ -182,7 +182,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new IAbstractNode[] { a, b }, ((Node) btree.root)
                 .childIterator(false));
         // verify visiting all entries.
-        assertSameIterator(new Object[]{v3,v5,v7,v9},btree.entryIterator());
+        assertSameIterator(new Object[]{v3,v5,v7,v9},btree.rangeIterator());
         /*
          * verify child range iterator.
          * 
@@ -467,7 +467,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         final Leaf a = (Leaf) btree.root;
         
         // visit everything in the root leaf.
-        assertSameIterator(new byte[][]{v3,v5,v7},btree.entryIterator());
+        assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator());
 
         // visit everything in the root leaf.
         assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator(null,null));
