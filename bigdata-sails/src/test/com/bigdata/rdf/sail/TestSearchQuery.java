@@ -32,26 +32,38 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
-
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Properties;
 import java.util.Set;
-
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.GraphQuery;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
-
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.BNS;
 
@@ -64,7 +76,7 @@ import com.bigdata.rdf.store.BNS;
  */
 public class TestSearchQuery extends AbstractBigdataSailTestCase {
 
-    public void test_query() throws SailException, IOException, RDFHandlerException, QueryEvaluationException {
+    private void ___test_query() throws SailException, IOException, RDFHandlerException, QueryEvaluationException {
 
         if (!((BigdataSail) sail).database.getStatementIdentifiers()) {
 
@@ -189,6 +201,122 @@ where
 
         }
 
+    }
+
+    public void test_restart() throws Exception {
+
+        final boolean doYouWantMeToBreak = true;
+        
+        URI MIKE =
+                new URIImpl(
+                        "http://bigdata.com/elm#fae68c8a-ee86-42ac-a179-edaabd189619");
+        URI SYSTAP =
+            new URIImpl(
+                        "http://bigdata.com/elm#a479c37c-407e-4f4a-be30-5a643a54561f");
+        URI PERSON = new URIImpl("http://bigdata.com/domain#Person");
+        URI ENTITY = new URIImpl("http://bigdata.com/system#Entity");
+        String journal =
+                System.getProperty("java.io.tmpdir") + "test-restart.jnl";
+        // new File(journal).delete();
+        log.info(journal);
+        Properties sailProps = new Properties();
+        sailProps.setProperty(BigdataSail.Options.FILE, journal);
+        BigdataSail sail = new BigdataSail(sailProps);
+        BigdataSailRepository repo = new BigdataSailRepository(sail);
+        repo.initialize();
+        { // initialize
+            final RepositoryConnection cxn = repo.getConnection();
+            cxn.setAutoCommit(false);
+            try {
+                boolean includeInferred = false;
+                if (cxn.hasStatement(PERSON, RDFS.SUBCLASSOF, ENTITY, includeInferred) == false) {
+                    log.info("creating graph new graph");
+                    log.info("loading ontology");
+                    cxn.add(new InputStreamReader(getClass().getResourceAsStream(
+                            "test_restart_1.rdf")), "", RDFFormat.RDFXML);
+                    if (!doYouWantMeToBreak) {
+                        cxn.add(new InputStreamReader(getClass().getResourceAsStream(
+                                "test_restart_2.rdf")), "", RDFFormat.RDFXML);
+                    }
+                    cxn.commit();
+                } else {
+                    log.info("loading existing graph");
+                }
+            } catch (Exception ex) {
+                cxn.rollback();
+                throw ex;
+            } finally {
+                cxn.close();
+            }
+        }
+        if (doYouWantMeToBreak) {
+            final RepositoryConnection cxn = repo.getConnection();
+            cxn.setAutoCommit(false);
+            try {
+                boolean includeInferred = false;
+                if (cxn.hasStatement(MIKE, RDF.TYPE, PERSON, includeInferred) == false) {
+                    log.info("loading entity data");
+                    cxn.add(new InputStreamReader(getClass().getResourceAsStream(
+                            "test_restart_2.rdf")), "", RDFFormat.RDFXML);
+                    cxn.commit();
+                }
+            } catch (Exception ex) {
+                cxn.rollback();
+                throw ex;
+            } finally {
+                cxn.close();
+            }
+        }
+        { // run the query
+            final String query = 
+                "construct { ?s <"+RDF.TYPE+"> <"+ENTITY+"> . } " +
+                "where     { ?s <"+RDF.TYPE+"> <"+ENTITY+"> . ?s ?p ?lit . ?lit <"+BNS.SEARCH+"> \"systap\" . }";
+            final RepositoryConnection cxn = repo.getConnection();
+            try {
+                // silly construct queries, can't guarantee distinct results
+                final Set<Statement> results = new LinkedHashSet<Statement>();
+                final GraphQuery graphQuery = 
+                    cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
+                final boolean includeInferred = true;
+                graphQuery
+                        .evaluate(new StatementCollector(results, includeInferred));
+                for(Statement stmt : results) {
+                    log.info(stmt);
+                }
+                assertTrue(results.contains(new StatementImpl(SYSTAP, RDF.TYPE, ENTITY)));
+            } finally {
+                cxn.close();
+            }
+        }
+        repo.shutDown();
+        
+    }
+
+    private static class StatementCollector extends
+        org.openrdf.rio.helpers.StatementCollector {
+        private boolean includeInferred = true;
+        
+        public StatementCollector(Collection<Statement> stmts) {
+            this(stmts, true);
+        }
+        
+        public StatementCollector(Collection<Statement> stmts,
+                boolean includeInferred) {
+            super(stmts);
+            this.includeInferred = includeInferred;
+        }
+        
+        @Override
+        public void handleStatement(Statement stmt) {
+            if (includeInferred) {
+                super.handleStatement(stmt);
+            } else {
+                if (stmt instanceof BigdataStatement == false
+                        || ((BigdataStatement) stmt).isExplicit()) {
+                    super.handleStatement(stmt);
+                }
+            }
+        }
     }
 
 }
