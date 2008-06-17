@@ -35,14 +35,15 @@ import info.aduna.iteration.CloseableIteration;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Set;
+import org.openrdf.model.Graph;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -63,7 +64,6 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
-import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.BNS;
 
@@ -207,36 +207,39 @@ where
 
         final boolean doYouWantMeToBreak = true;
         
-        URI MIKE =
-                new URIImpl(
-                        "http://bigdata.com/elm#fae68c8a-ee86-42ac-a179-edaabd189619");
         URI SYSTAP =
             new URIImpl(
                         "http://bigdata.com/elm#a479c37c-407e-4f4a-be30-5a643a54561f");
-        URI PERSON = new URIImpl("http://bigdata.com/domain#Person");
+        URI ORGANIZATION = new URIImpl("http://bigdata.com/domain#Organization");
         URI ENTITY = new URIImpl("http://bigdata.com/system#Entity");
+        Graph test_restart_1 = new GraphImpl();
+        test_restart_1.add(new StatementImpl(ORGANIZATION, RDFS.SUBCLASSOF, ENTITY));
+        Graph test_restart_2 = new GraphImpl();
+        test_restart_2.add(new StatementImpl(SYSTAP, RDF.TYPE, ORGANIZATION));
+        test_restart_2.add(new StatementImpl(SYSTAP, RDFS.LABEL, new LiteralImpl("SYSTAP")));
+        
         String journal =
                 System.getProperty("java.io.tmpdir") + "test-restart.jnl";
-        // new File(journal).delete();
+        new File(journal).delete();
         log.info(journal);
+        
         Properties sailProps = new Properties();
         sailProps.setProperty(BigdataSail.Options.FILE, journal);
         BigdataSail sail = new BigdataSail(sailProps);
         BigdataSailRepository repo = new BigdataSailRepository(sail);
         repo.initialize();
+        
         { // initialize
             final RepositoryConnection cxn = repo.getConnection();
             cxn.setAutoCommit(false);
             try {
                 boolean includeInferred = false;
-                if (cxn.hasStatement(PERSON, RDFS.SUBCLASSOF, ENTITY, includeInferred) == false) {
+                if (cxn.hasStatement(ORGANIZATION, RDFS.SUBCLASSOF, ENTITY, includeInferred) == false) {
                     log.info("creating graph new graph");
                     log.info("loading ontology");
-                    cxn.add(new InputStreamReader(getClass().getResourceAsStream(
-                            "test_restart_1.rdf")), "", RDFFormat.RDFXML);
+                    cxn.add(test_restart_1);
                     if (!doYouWantMeToBreak) {
-                        cxn.add(new InputStreamReader(getClass().getResourceAsStream(
-                                "test_restart_2.rdf")), "", RDFFormat.RDFXML);
+                        cxn.add(test_restart_2);
                     }
                     cxn.commit();
                 } else {
@@ -249,15 +252,15 @@ where
                 cxn.close();
             }
         }
+        
         if (doYouWantMeToBreak) {
             final RepositoryConnection cxn = repo.getConnection();
             cxn.setAutoCommit(false);
             try {
                 boolean includeInferred = false;
-                if (cxn.hasStatement(MIKE, RDF.TYPE, PERSON, includeInferred) == false) {
+                if (cxn.hasStatement(SYSTAP, RDF.TYPE, ORGANIZATION, includeInferred) == false) {
                     log.info("loading entity data");
-                    cxn.add(new InputStreamReader(getClass().getResourceAsStream(
-                            "test_restart_2.rdf")), "", RDFFormat.RDFXML);
+                    cxn.add(test_restart_2);
                     cxn.commit();
                 }
             } catch (Exception ex) {
@@ -267,6 +270,7 @@ where
                 cxn.close();
             }
         }
+        
         { // run the query
             final String query = 
                 "construct { ?s <"+RDF.TYPE+"> <"+ENTITY+"> . } " +
@@ -277,9 +281,10 @@ where
                 final Set<Statement> results = new LinkedHashSet<Statement>();
                 final GraphQuery graphQuery = 
                     cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
-                final boolean includeInferred = true;
+                // final boolean includeInferred = true;
                 graphQuery
-                        .evaluate(new StatementCollector(results, includeInferred));
+                        // .evaluate(new StatementCollector(results, includeInferred));
+                        .evaluate(new StatementCollector(results));
                 for(Statement stmt : results) {
                     log.info(stmt);
                 }
@@ -288,35 +293,36 @@ where
                 cxn.close();
             }
         }
+        
         repo.shutDown();
         
-    }
-
-    private static class StatementCollector extends
-        org.openrdf.rio.helpers.StatementCollector {
-        private boolean includeInferred = true;
-        
-        public StatementCollector(Collection<Statement> stmts) {
-            this(stmts, true);
-        }
-        
-        public StatementCollector(Collection<Statement> stmts,
-                boolean includeInferred) {
-            super(stmts);
-            this.includeInferred = includeInferred;
-        }
-        
-        @Override
-        public void handleStatement(Statement stmt) {
-            if (includeInferred) {
-                super.handleStatement(stmt);
-            } else {
-                if (stmt instanceof BigdataStatement == false
-                        || ((BigdataStatement) stmt).isExplicit()) {
-                    super.handleStatement(stmt);
+        { // reopen and run the query again
+            sail = new BigdataSail(sailProps);
+            repo = new BigdataSailRepository(sail);
+            repo.initialize();
+            { // run the query
+                final String query = 
+                    "construct { ?s <"+RDF.TYPE+"> <"+ENTITY+"> . } " +
+                    "where     { ?s <"+RDF.TYPE+"> <"+ENTITY+"> . ?s ?p ?lit . ?lit <"+BNS.SEARCH+"> \"systap\" . }";
+                final RepositoryConnection cxn = repo.getConnection();
+                try {
+                    // silly construct queries, can't guarantee distinct results
+                    final Set<Statement> results = new LinkedHashSet<Statement>();
+                    final GraphQuery graphQuery = 
+                        cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
+                    // final boolean includeInferred = true;
+                    graphQuery
+                            // .evaluate(new StatementCollector(results, includeInferred));
+                            .evaluate(new StatementCollector(results));
+                    for(Statement stmt : results) {
+                        log.info(stmt);
+                    }
+                    assertTrue(results.contains(new StatementImpl(SYSTAP, RDF.TYPE, ENTITY)));
+                } finally {
+                    cxn.close();
                 }
             }
-        }
+        }        
+        
     }
-
 }
