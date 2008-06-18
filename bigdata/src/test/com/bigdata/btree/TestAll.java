@@ -191,6 +191,12 @@ public class TestAll extends TestCase {
 
         // FIXME this test belongs in the isolation package.
 //      suite.addTestSuite(TestIsolatedFusedViewCursors.class);
+        
+        /*
+         * tests of various iterators or cursors that provide a facility, such
+         * as the completion scan, on which the core B+Tree has no dependency.
+         */
+        suite.addTestSuite( TestCompletionScan.class );
 
         return suite;
         

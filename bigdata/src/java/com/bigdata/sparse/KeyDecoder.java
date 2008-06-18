@@ -66,11 +66,6 @@ import com.bigdata.btree.KeyBuilder;
  * @see AtomicWriteRead
  * @see AtomicRead
  * 
- * @todo add decoding of the primary key for simple {@link KeyType}s. You can
- *       figure out which bytes are the primary key using the nul delimiters but
- *       you need the {@link Schema} to known how to decode the primary key into
- *       an application object.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -144,6 +139,20 @@ public class KeyDecoder {
      */
     public final long timestamp;
 
+    /**
+     * The bytes from the key that represent the encoded name of the
+     * {@link Schema}.
+     */
+    public byte[] getSchemaBytes() {
+
+        final byte[] a = new byte[schemaBytesLength];
+        
+        System.arraycopy(key, 0, a, 0, schemaBytesLength);
+        
+        return a;
+        
+    }
+    
     /**
      * The decoded {@link KeyType} for the primary key.
      */
@@ -438,7 +447,8 @@ public class KeyDecoder {
      */
     public String toString() {
         
-        return "KeyDecoder{primaryKeyType="+primaryKeyType+",col="+col+",timestamp="+timestamp+",key="+key+"}";
+        return "KeyDecoder{primaryKeyType=" + primaryKeyType + ",col=" + col
+                + ",timestamp=" + timestamp + ",key=" + key + "}";
         
     }
     

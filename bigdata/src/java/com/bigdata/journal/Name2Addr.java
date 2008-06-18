@@ -235,6 +235,8 @@ public class Name2Addr extends BTree {
 
             assert btree == this.btree;
 
+            final boolean added;
+            
             synchronized(Name2Addr.this) {
                 
                 final BTree cached = indexCache.get(name);
@@ -271,17 +273,29 @@ public class Name2Addr extends BTree {
                  * progress.
                  */
 
-                commitList.putIfAbsent(name, this);
+                added = commitList.putIfAbsent(name, this) != null;
 
                 needsCheckpoint = true;
                 
                 checkpointAddr = 0L;
                     
+                if(INFO) {
+
+                    /*
+                     * Note: The size of the commit list can appear to increment
+                     * by more than one if there are concurrent writes on
+                     * different indices (e.g., if this log message is written
+                     * outside of the synchronized block).
+                     */
+                    
+                    log.info("name=" + name + ", commitListSize="
+                            + commitList.size() + ", file="
+                            + getStore().getFile());
+                    
+                }
+
             } // synchronized.
             
-            if(INFO)
-                log.info("Added index to commit list: name=" + name);
-
         }
 
         /**
@@ -459,6 +473,8 @@ public class Name2Addr extends BTree {
         Arrays.sort(a);
         
         if (INFO) {
+            
+            log.info("Store file="+getStore().getFile());
             
             log.info("There are " + a.length + " dirty indices : "
                     + Arrays.toString(a));
@@ -811,6 +827,14 @@ public class Name2Addr extends BTree {
         
         // add to the commit list.
         commitList.put(name, l);
+     
+        if(INFO) {
+            
+            log.info("name=" + name + ", commitListSize=" + commitList.size()
+                    + ", needsCheckpoint=" + needsCheckpoint + ", file="
+                    + getStore().getFile());
+            
+        }
         
     }
 
@@ -885,6 +909,9 @@ public class Name2Addr extends BTree {
         if (name == null)
             throw new IllegalArgumentException();
 
+        if (INFO)
+            log.info("name=" + name);
+        
         final byte[] key = getKey(name);
         
         if(!super.contains(key)) {

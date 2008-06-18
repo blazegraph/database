@@ -90,9 +90,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.BinaryTupleOperator;
 import org.openrdf.query.algebra.Join;
-import org.openrdf.query.algebra.QueryModelVisitor;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
@@ -1353,20 +1351,40 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
+         * Note: This does NOT implicitly {@link #rollback()} the
+         * {@link SailConnection}. If you are doing error handling do NOT
+         * assume that {@link #close()} will discard all writes.<p>
+         * 
          * @todo Since there is a moderate amount of state (the buffers) it
          *       would be nice to not have to reallocate those. In order to
          *       reuse the buffer for writable connections we need to separate
          *       the concept of whether or not the connection is opened from its
-         *       buffer state.  Note that the scale-out triple store allows
+         *       buffer state. Note that the scale-out triple store allows
          *       concurrent writers, so each writer needs its own buffers for
          *       that scenario.
          */
         public void close() throws SailException {
 
             assertOpen();
+
+            /*
+             * Note: I have commented out the implicit [rollback]. It causes the
+             * live indices to be discarded by the backing journal which is a
+             * significant performance hit. This means that if you write on a
+             * SailConnection and do NOT explicitly rollback() the writes then
+             * any writes that were flushed through to the database will remain
+             * there and participate in the next commit.
+             */
             
-            // discard any changes that might be lying around.
-            rollback();
+//            * Note: Since {@link #close()} discards any uncommitted writes it is
+//            * important to commit the {@link #getDatabase()} made from OUTSIDE of
+//            * the {@link BigdataSail} before opening a {@link SailConnection},
+//            * even if the connection does not write on the database (this artifact
+//            * arises because the {@link SailConnection} is using unisolated writes
+//            * on the database).
+//            * 
+//            // discard any changes that might be lying around.
+//            rollback();
 
             // notify the SailBase that the connection is no longer in use.
             BigdataSail.this.connectionClosed(this);
@@ -1991,29 +2009,6 @@ public class BigdataSail extends SailBase implements Sail {
             }
         }
     } // end inner class     
-    
-    /**
-     * @todo Perhaps the right way to handle {@link BNS#SEARCH} is by re-writing
-     *       matching {@link StatementPattern}s into a {@link Search} operator
-     *       and then extending the {@link EvaluationStrategyImpl} to evaluate
-     *       that operator?
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class Search extends BinaryTupleOperator {
-
-        public Set<String> getBindingNames() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        public <X extends Exception> void visit(QueryModelVisitor<X> arg0) throws X {
-            // TODO Auto-generated method stub
-            
-        }
-        
-    }
     
     /**
      * Extended to allow magic predicates and the like.

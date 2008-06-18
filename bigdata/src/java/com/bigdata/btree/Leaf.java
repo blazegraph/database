@@ -1315,11 +1315,11 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (nkeys == 0) {
 
-            return EmptyEntryIterator.INSTANCE;
+            return EmptyTupleIterator.INSTANCE;
 
         }
 
-        return new TupleIterator(this);
+        return new LeafTupleIterator(this);
 
     }
 
@@ -1378,7 +1378,7 @@ public class Leaf extends AbstractNode implements ILeafData {
             out.println(indent(height) + "  keys=" + keys);
         
             // Note: signed byte[]s.
-            out.println(indent(height) + "  vals=" + toString(values));
+            out.println(indent(height) + "  vals=" + toString(nkeys,values));
             
             if(deleteMarkers!=null) {
                 
@@ -1404,11 +1404,11 @@ public class Leaf extends AbstractNode implements ILeafData {
      * @param data
      *            An array of <em>signed</em> byte arrays.
      */
-    static private String toString(byte[][] data) {
+    static private String toString(int n, byte[][] data) {
        
         StringBuilder sb = new StringBuilder();
         
-        final int n = data.length;
+//        final int n = data.length;
         
         sb.append("data(n=" + n + ")={");
 

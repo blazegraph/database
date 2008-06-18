@@ -1420,6 +1420,12 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
+    final public ITupleIterator rangeIterator() {
+
+        return rangeIterator(null, null);
+
+    }
+
     final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
@@ -1823,12 +1829,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         
     }
     
-    final public ITupleIterator rangeIterator() {
-
-        return rangeIterator(null, null);
-
-    }
-
     /**
      * Return a cursor that may be used to efficiently locate and scan the
      * leaves in the B+Tree. The cursor will be initially positioned on the leaf

@@ -473,7 +473,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator(null,null));
 
         // visit everything in the root leaf using an explicit EntryIterator ctor.
-        assertSameIterator(new byte[][] { v3, v5, v7 }, new TupleIterator(a,
+        assertSameIterator(new byte[][] { v3, v5, v7 }, new LeafTupleIterator(a,
                 new Tuple(btree,IRangeQuery.DEFAULT), null, null, null));
         
         // visit everything except v3.

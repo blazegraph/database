@@ -77,11 +77,13 @@ import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
+import com.bigdata.btree.AbstractTupleFilterator.CompletionScan;
 import com.bigdata.btree.BatchContains.BatchContainsConstructor;
 import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.ConcurrencyManager;
@@ -1113,6 +1115,9 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * @todo this always mints a new {@link BNode} instance when the term
      *       identifier is identifies a {@link BNode} or a statement. Should
      *       there be some cache effect to provide the same instance?
+     * 
+     * @todo this should return a BigdataValueImpl to be polite, r.g., as
+     *       variant of {@link #getTerms(Collection)}.
      */
     final public _Value getTerm(long id) {
 
@@ -2662,29 +2667,29 @@ abstract public class AbstractTripleStore implements ITripleStore,
     /**
      * Returns some usage information for the database.
      * 
-     * @todo either convert to a full XML representation or get rid of this in
-     *       favor of the counters exposed by the LBS which also provide
-     *       historical and post-mortem data.
+     * @deprecated by the {@link CounterSet}s exposed by the database which
+     *             provide live, historical and post-mortem data.
      */
     public String usage() {
 
         return "usage summary: class="
                 + getClass().getSimpleName()
-                + "\n"
-                + "\nsummary by index::\n"
-                + (lexicon //
-                ? "\n" + usage(name_term2Id, getTerm2IdIndex()) + "\n"
-                        + usage(name_id2Term, getId2TermIndex()) //
-                        : "")
-                //
-                + (oneAccessPath //
-                ? "\n" + usage(name_spo, getSPOIndex())
-                        : ("\n" + usage(name_spo, getSPOIndex()) //
-                                + "\n" + usage(name_pos, getPOSIndex()) //
-                                + "\n" + usage(name_osp, getOSPIndex())//
-                        ))//
-                + (justify ? "\n" + usage(name_just, getJustificationIndex())
-                        : "");
+//                + "\n"
+//                + "\nsummary by index::\n"
+//                + (lexicon //
+//                ? "\n" + usage(name_term2Id, getTerm2IdIndex()) + "\n"
+//                        + usage(name_id2Term, getId2TermIndex()) //
+//                        : "")
+//                //
+//                + (oneAccessPath //
+//                ? "\n" + usage(name_spo, getSPOIndex())
+//                        : ("\n" + usage(name_spo, getSPOIndex()) //
+//                                + "\n" + usage(name_pos, getPOSIndex()) //
+//                                + "\n" + usage(name_osp, getOSPIndex())//
+//                        ))//
+//                + (justify ? "\n" + usage(name_just, getJustificationIndex())
+//                        : "")
+                ;
 
     }
 

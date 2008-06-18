@@ -28,9 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.Properties;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -38,7 +39,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.io.SerializerUtil;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -70,6 +71,8 @@ import com.bigdata.rawstore.Bytes;
  */
 public class DumpJournal {
 
+    protected static Logger log = Logger.getLogger(DumpJournal.class);
+    
     public DumpJournal() {
         
     }
@@ -85,6 +88,8 @@ public class DumpJournal {
      *            only dumps the metadata for the indices as of the most current
      *            committed state).</dd>
      *            <dt>-indices</dt>
+     *            <dd>Dump the indices (does not show the tuples by default).</dd>
+     *            <dt>-tuples</dt>
      *            <dd>Dump the records in the indices.</dd>
      *            </dl>
      */
@@ -347,14 +352,10 @@ public class DumpJournal {
             
             final ITuple tuple = itr.next();
 
-            final byte[] key = tuple.getKey();
-            
-            final byte[] val = tuple.getValue();
-            
             if(showTuples) {
+
+                System.err.println("rec="+i+dumpTuple( tuple ));
                 
-                System.err.println("rec="+i+"\n key="+dumpKey(key)+"\n val="+dumpVal(val));
-            
             }
             
             i++;
@@ -366,49 +367,35 @@ public class DumpJournal {
         System.err.println("Visited "+i+" tuples in "+elapsed+"ms");
         
     }
-
-    /**
-     * Format key as unsigned byte[].
-     * 
-     * @param key
-     *            The key.
-     * 
-     * @return
-     */
-    private static String dumpKey(byte[] key) {
-        
-        return BytesUtil.toString(key);
-        
-    }
     
-    /**
-     * Formats value as object if using default java serialization and
-     * otherwised as a signed byte[].
-     * 
-     * @param val
-     *            The value.
-     *            
-     * @return
-     */
-    private static String dumpVal(byte[] val) {
+    private static String dumpTuple(ITuple tuple) {
         
-        if (val == null)
-            return null;
+        final ITupleSerializer tupleSer = tuple.getTupleSerializer();
+        
+        final StringBuilder sb = new StringBuilder();
         
         try {
 
-            // Attempt simple java de-serialization. 
+            sb.append("\nkey="+tupleSer.deserializeKey(tuple));
             
-            return SerializerUtil.deserialize(val).toString();
+        } catch(Throwable t) {
             
-        } catch (Throwable t) {
-            
-            // Not simple java serialization so dump the bytes.
-            
-            return Arrays.toString(val);
+            sb.append("\nkey="+BytesUtil.toString(tuple.getKey()));
             
         }
+
+        try {
+
+            sb.append("\nval="+tupleSer.deserialize(tuple));
+            
+        } catch(Throwable t) {
+
+            sb.append("\nval="+BytesUtil.toString(tuple.getValue()));
+            
+        }
+
+        return sb.toString();
         
     }
-
+    
 }

@@ -56,7 +56,7 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("full text indexing");
 
-        suite.addTestSuite(TestFullTextIndex.class);
+        suite.addTestSuite(TestRestartSafeWithLDS.class);
         
         suite.addTestSuite(TestSearch.class);
         

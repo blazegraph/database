@@ -56,7 +56,7 @@ import java.util.NoSuchElementException;
  *            The generic type for the de-serialized objects stored as the value
  *            under the key in the index.
  */
-interface ITupleCursor<E> extends ITupleIterator<E> {
+public interface ITupleCursor<E> extends ITupleIterator<E> {
 
     /**
      * The backing index being traversed by the {@link ITupleCursor}.
@@ -162,6 +162,32 @@ interface ITupleCursor<E> extends ITupleIterator<E> {
      *             on the cursor or on the index partition.
      */
     ITuple<E> seek(byte[] key);
+    
+//    /**
+//     * Change the half-open range for the cursor. This can be useful if you want
+//     * to perform a series of key-range scans. If the {@link #currentKey()} is
+//     * no longer within the bounds for the cursor it will not be on a visitable
+//     * tuple after invoking this method and you must {@link #seek(byte[])} to a
+//     * key in the new half-open range before you can use the sequential access
+//     * methods or visit the current tuple.
+//     * <p>
+//     * Note: The bounds may be constrained or relaxed, but never relaxed beyond
+//     * those given when the cursor was provisioned. For example, if you
+//     * initially specify neither a lower bound nor an upper bound then the
+//     * bounds may be set to any half-open range. However, if there is a lower
+//     * bound then you can never shift the lower bound to a lessor value so as to
+//     * expose additional keys. Likewise, if there is an upper bound then you can
+//     * never shift the upper bound to a greater value so as to expose additional
+//     * keys.
+//     * 
+//     * @param fromKey
+//     *            The optional inclusive lower bound imposed by the
+//     *            {@link ITupleCursor}.
+//     * @param toKey
+//     *            The optional exclusive upper bound imposed by the
+//     *            {@link ITupleCursor}.
+//     */
+//    void bounds(byte[] fromKey, byte[] toKey);
 
     /**
      * Variant that first encodes the key using the object returned by

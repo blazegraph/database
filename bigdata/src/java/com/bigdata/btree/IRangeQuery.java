@@ -158,7 +158,7 @@ public interface IRangeQuery {
      * including atomic operations on the tail of a queue and obtaining the last
      * key in the key range.
      */
-    public static final int REVERSE = 1 << 6 | CURSOR;
+    public static final int REVERSE = 1 << 6;
     
     /**
      * The flags that should be used by default ({@link #KEYS},{@link #VALS})
@@ -230,9 +230,7 @@ public interface IRangeQuery {
      *            heap imposed by the iterator if it needs to buffer data, e.g.,
      *            before sending it across a network interface.
      * @param flags
-     *            A bitwise OR of {@link #KEYS} and/or {@link #VALS} determining
-     *            whether the keys or the values or both will be visited by the
-     *            iterator.
+     *            A bitwise OR of {@link #KEYS}, {@link #VALS}, etc.
      * @param filter
      *            An optional filter and/or resolver.
      * 
@@ -248,6 +246,33 @@ public interface IRangeQuery {
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, ITupleFilter filter);
 
+//    /**
+//     * An iterator that is mapped over a set of key ranges.
+//     * 
+//     * @param fromKeys
+//     *            An array of inclusive lower bounds with one entry for each key
+//     *            range over which the iterator will be mapped. The elements of
+//     *            the array MUST be sorted. The first element MAY be a
+//     *            <code>null</code> to indicate that there is no lower bound
+//     *            for the first key range.
+//     * @param toKeys
+//     *            An array of exclusive upper bounds with one entry for each key
+//     *            range over which the iterator will be mapped. Each toKey MUST
+//     *            be GTE the corresponding fromKey. The last element MAY be a
+//     *            <code>null</code> to indicate that there is no exclusive
+//     *            upper bound bound for the last key range.
+//     * @param capacity
+//     *            The #of entries to buffer at a time. This is a hint and MAY be
+//     *            zero (0) to use an implementation specific <i>default</i>
+//     *            capacity. The capacity is intended to limit the burden on the
+//     *            heap imposed by the iterator if it needs to buffer data, e.g.,
+//     *            before sending it across a network interface.
+//     * @param flags
+//     *            A bitwise OR of {@link #KEYS}, {@link #VALS}, etc.
+//     */
+//    public ITupleIterator rangeIterator(byte[][] fromKeys, byte[][] toKeys,
+//            int capacity, int flags);
+    
     // removeAll() could be added, but the problem is that we often want
     // the keys or values of the deleted entries, at which point you have to
     // use the rangeIterator anyway.

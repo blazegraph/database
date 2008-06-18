@@ -64,10 +64,10 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
      */
     
     BigdataSail sail;
-    
-    protected void setUp() throws Exception {
-     
-        Properties properties = new Properties();
+
+    public Properties getProperties() {
+        
+        Properties properties = new Properties(super.getProperties());
 
         // transient means that there is nothing to delete after the test.
         properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
@@ -82,7 +82,13 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
         // option to turn off closure.
 //        properties.setProperty(Options.CLOSURE,ClosureEnum.None.toString());
         
-        sail = new BigdataSail(properties);
+        return properties;
+
+    }
+    
+    protected void setUp() throws Exception {
+     
+        sail = new BigdataSail(getProperties());
         
     }
     

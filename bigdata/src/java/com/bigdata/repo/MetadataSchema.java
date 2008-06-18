@@ -57,7 +57,9 @@ public class MetadataSchema extends Schema {
 
     /**
      * The file version number. Together the file {@link #ID} and the file
-     * {@link #VERSION} form the primary key for the data index.
+     * {@link #VERSION} form the primary key for the data index. A
+     * <code>null</code> value is stored in this field when the file version
+     * is deleted.
      */
     public static transient final String VERSION = "Version";
     

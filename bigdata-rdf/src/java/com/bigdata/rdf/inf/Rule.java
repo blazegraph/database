@@ -38,6 +38,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOAssertionBuffer;
 import com.bigdata.rdf.spo.ISPOBuffer;
+import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AccessPathFusedView;
@@ -113,7 +115,7 @@ abstract public class Rule {
      * 
      * @return The singleton variable for that name.
      */
-    static protected Var var(String name) {
+    static public Var var(String name) {
     
         if (name == null)
             throw new IllegalArgumentException();
@@ -1833,6 +1835,31 @@ abstract public class Rule {
 
         }
 
+        /**
+         * Return the iterator that should be used to read from the selected
+         * tail {@link Pred}. If the {@link Pred} is a {@link Triple} and is
+         * associated with an {@link ISPOFilter} then that filter will be
+         * incorporated by the returned {@link ISPOIterator}.
+         * 
+         * @param index
+         *            The index into {@link #body}.
+         * 
+         * @return The {@link ISPOIterator}.
+         * 
+         * @throws IndexOutOfBoundsException
+         *             if index is out of bounds.
+         */
+        public ISPOIterator iterator(int index) {
+            
+            final Pred pred = body[index];
+
+            final ISPOFilter filter = (pred instanceof Triple ? ((Triple) pred).filter
+                    : null);
+
+            return getAccessPath(index).iterator(filter);
+            
+        }
+        
         /**
          * Return the {@link IAccessPath} that would be used to read from the
          * selected tail {@link Pred} (no caching).

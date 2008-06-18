@@ -365,7 +365,13 @@ public class FileMetadata {
 
             }
 
-            log.info("Will create file: " + file.getAbsoluteFile());
+            /*
+             * Note: a temporary file that does not exist is created _lazily_.
+             * See below and DiskOnlyStrategy.
+             */
+            log.info("Backing file: exists=" + exists + ", temporary="
+                    + temporary + ", create=" + create + ", readOnly="
+                    + readOnly + ", file=" + file.getAbsoluteFile());
 
         }
         
@@ -727,7 +733,7 @@ public class FileMetadata {
         
         final boolean readOnly = "r".equals(fileMode);
         
-        RandomAccessFile raf = new RandomAccessFile(file, fileMode);
+        final RandomAccessFile raf = new RandomAccessFile(file, fileMode);
         
         if (!readOnly && bufferMode != BufferMode.Mapped) {
 

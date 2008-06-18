@@ -1383,384 +1383,384 @@ public class InferenceEngine extends RDFSHelper {
         
     }
     
-    /**
-     * An abstract base class for an iterator that records the a term identifier
-     * from the visited {@link SPO}s on the caller's {@link BTree}. The keys
-     * of the btree will be a byte[] encoding the long integer. The values will
-     * be <code>null</code>.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    abstract static public class TermIdRecordingResolver extends Resolver {
-        
-        private final BTree btree;
-        
-        /**
-         * Used to build keys for the {@link #btree}.
-         */
-        private final KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
-
-        public TermIdRecordingResolver(BTree btree) {
-        
-            this.btree = btree;
-            
-        }
-
-        public void add(long v) {
-
-            btree.insert(keyBuilder.reset().append(v).getKey(),null);
-
-            log.info("add: "+v+", size="+btree.getEntryCount());
-
-        }
-
-        abstract void add(SPO spo);
-        
-        protected Object resolve(Object arg0) {
-            
-            add((SPO)arg0);
-            
-            return arg0;
-            
-        }
-        
-    }
-
-    /**
-     * Visits the keys in the {@link BTree}, decoding each key as a
-     * {@link Long}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class TermIdKeyIterator implements Iterator<Long> {
-
-        private final BTree btree;
-        
-        /**
-         * Note: this is initialized lazily so that the btree are fully
-         * populated 1st.
-         */
-        private ITupleIterator src;
-        
-        /**
-         * 
-         * @param btree
-         *            A {@link BTree} whose keys are byte[]s encoded as long
-         *            integers using {@link KeyBuilder#append(long)}
-         */
-        public TermIdKeyIterator(BTree btree) {
-
-            this.btree = btree;
-            
-        }
-        
-        public boolean hasNext() {
-
-            if(src==null) {
-
-                /*
-                 * Note: Lazily initialized so that the btree can be fully
-                 * populated 1st.
-                 */
-
-                log.info("Will visit "+btree.getEntryCount()+" entries");
-
-                src = btree.rangeIterator(null, null, 0/* capacity */,
-                        IRangeQuery.KEYS, null/*filter*/);
-                                
-            }
-            
-            return src.hasNext();
-            
-        }
-
-        public Long next() {
-            
-            ITuple tuple = src.next();
-            
-            long v = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(), 0);
-
-            log.info("next="+v);
-            
-            return v;
-            
-        }
-
-        public void remove() {
-
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-    
-    /**
-     * Expand each distinct subject collected during some triple pattern query
-     * by constrained forward chaining of {@link RuleOwlSameAs2}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class OwlSameAs2Expander extends Expander {
-
-        private static final long serialVersionUID = -3101713347977424002L;
-
-        private final long NULL = IRawTripleStore.NULL;
-        private final InferenceEngine inf;
-        private final AbstractTripleStore db;
-        private final long s, p, o;
-        
-        /**
-         * 
-         * @param inf
-         * @param s
-         * @param p
-         * @param o
-         */
-        public OwlSameAs2Expander(InferenceEngine inf,long s, long p, long o) {
-            
-            this.inf = inf;
-            
-            this.db = inf.database;
-            
-            this.s = s;
-            
-            this.p = p;
-            
-            this.o = o;
-            
-        }
-        
-        protected Iterator expand(Object arg0) {
-            
-            return expand(((Long)arg0).longValue());
-            
-        }
-
-        /**
-         * Applies a specialization of {@link RuleOwlSameAs2} where the triple
-         * pattern given to the ctor has been bound on the head of the rule to
-         * compute the entailments for the specified subject.
-         * 
-         * <pre>
-         * (x owl:sameAs y), (x a z) -&gt; (y a z).
-         * </pre>
-         * 
-         * @param subject
-         *            A subject visited in the course of a triple pattern query
-         *            reading on some access path. The <i>subject</i> is bound
-         *            on <code>x</code>. The triple pattern given to the ctor
-         *            is bound on the head of the rule (y, a, z). The rule is
-         *            then forward chained to generate the entailments.
-         * 
-         * @return An iterator visiting the entailments for that <i>subject</i>.
-         */
-        private Iterator<SPO> expand(long subject) {
-            
-            if(p==inf.owlSameAs.id) {
-
-                /*
-                 * No entailments when predicate in triple pattern is bound to
-                 * owl:sameAs
-                 */
-                
-                return EmptyIterator.DEFAULT;
-                
-            }
-
-            assert subject != NULL;
-            
-            log.info("subject="+db.toString(subject)+"("+subject+")");
-            
-            // owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
-            Rule r = inf.ruleOwlSameAs2;
-
-            // setup bindings.
-            Map<Var,Long> bindings = new TreeMap<Var, Long>();
-            
-            // the current distinct subject.
-            if(s!=NULL) bindings.put((Var)r.head.s,subject);
-
-            // from the triple pattern.
-            if(p!=NULL) bindings.put((Var)r.head.p,p);
-            if(o!=NULL) bindings.put((Var)r.head.o,o);
-            
-//            // the current subject on (x)
-//            bindings.put((Var)r.body[0].s, subject);
-            
-            // specialize the rule.
-            final Rule r1 = r.specialize(//
-                    bindings,
-                    new IConstraint[] {//
-                        new NEConstant((Var) r.head.p, inf.owlSameAs.id) //
-                    });
-            
-            /*
-             * Buffer on which the rule will write.
-             * 
-             * @todo capacity parameter.
-             */
-            final SPOBlockingBuffer buffer = new SPOBlockingBuffer(db,
-                    null /* filter */, 10000/* capacity */);
-            
-            db.getThreadPool().submit(new Runnable() {
-
-                public void run() {
-
-                    try {
-                    
-                        // run the rule.
-                        r1.apply(false/* justify */, null/* focusStore */,
-                                db/* database */, buffer);
-                    } finally {
-
-                        // close the buffer
-                        buffer.close();
-
-                    }
-
-                }
-
-            });
-
-            return buffer.iterator();
-            
-        }
-        
-    }
-    
-    /**
-     * Expand each distinct object collected during some triple pattern query
-     * by constrained forward chaining of {@link RuleOwlSameAs3}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class OwlSameAs3Expander extends Expander {
-
-        private static final long serialVersionUID = -1806816164484260451L;
-        private final long NULL = IRawTripleStore.NULL;
-        private final InferenceEngine inf;
-        private final AbstractTripleStore db;
-        private final long s, p, o;
-        
-        /**
-         * 
-         * @param inf
-         * @param s
-         * @param p
-         * @param o
-         */
-        public OwlSameAs3Expander(InferenceEngine inf,long s, long p, long o) {
-            
-            this.inf = inf;
-            
-            this.db = inf.database;
-            
-            this.s = s;
-            
-            this.p = p;
-            
-            this.o = o;
-            
-        }
-        
-        protected Iterator expand(Object arg0) {
-            
-            return expand(((Long)arg0).longValue());
-            
-        }
-
-        /**
-         * Applies a specialization of {@link RuleOwlSameAs3} where the triple
-         * pattern given to the ctor has been bound on the head of the rule to
-         * compute the entailments for the specified subject.
-         * 
-         * <pre>
-         * (x owl:sameAs y), (z a x) -&gt; (z a y).
-         * </pre>
-         * 
-         * @param object
-         *            An object visited in the course of a triple pattern query
-         *            reading on some access path. The <i>object</i> is bound
-         *            on <code>x</code>. The triple pattern given to the ctor
-         *            is bound on the head of the rule (y, a, z). The rule is
-         *            then forward chained to generate the entailments.
-         * 
-         * @return An iterator visiting the entailments for that <i>object</i>.
-         */
-        private Iterator<SPO> expand(long object) {
-
-            if(p==inf.owlSameAs.id) {
-
-                /*
-                 * No entailments when predicate in triple pattern is bound to
-                 * owl:sameAs
-                 */
-                
-                return EmptyIterator.DEFAULT;
-                
-            }
-            
-            assert object != NULL;
-            
-            log.info("object="+db.toString(object)+"("+object+")");
-            
-            // owl:sameAs3: (x owl:sameAs y), (z a x) -&gt; (z a y).
-            Rule r = inf.ruleOwlSameAs3;
-
-            // setup bindings.
-            Map<Var,Long> bindings = new TreeMap<Var, Long>();
-            
-            if(s!=NULL) bindings.put((Var)r.head.s,s);
-            if(p!=NULL) bindings.put((Var)r.head.p,p);
-            if(o!=NULL) bindings.put((Var)r.head.o,o);
-            
-            // bind the current object on (x)
-            bindings.put((Var)r.body[0].s, object);
-            
-            // specialize the rule.
-            final Rule r1 = r.specialize(//
-                    bindings,
-                    new IConstraint[] {//
-                        new NEConstant((Var) r.head.p, inf.owlSameAs.id) //
-                    });
-            
-            /*
-             * Buffer on which the rule will write.
-             * 
-             * @todo capacity parameter.
-             */
-            final SPOBlockingBuffer buffer = new SPOBlockingBuffer(db,
-                    null /* filter */, 10000/* capacity */);
-            
-            db.getThreadPool().submit(new Runnable() {
-
-                public void run() {
-
-                    try {
-
-                        // run the rule.
-                        r1.apply(false/* justify */, null/* focusStore */,
-                                db/* database */, buffer);
-
-                    } finally {
-
-                        // close the buffer
-                        buffer.close();
-
-                    }
-                    
-                }
-
-            });
-
-            return buffer.iterator();
-            
-        }
-        
-    }
+//    /**
+//     * An abstract base class for an iterator that records the a term identifier
+//     * from the visited {@link SPO}s on the caller's {@link BTree}. The keys
+//     * of the btree will be a byte[] encoding the long integer. The values will
+//     * be <code>null</code>.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    abstract static public class TermIdRecordingResolver extends Resolver {
+//        
+//        private final BTree btree;
+//        
+//        /**
+//         * Used to build keys for the {@link #btree}.
+//         */
+//        private final KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
+//
+//        public TermIdRecordingResolver(BTree btree) {
+//        
+//            this.btree = btree;
+//            
+//        }
+//
+//        public void add(long v) {
+//
+//            btree.insert(keyBuilder.reset().append(v).getKey(),null);
+//
+//            log.info("add: "+v+", size="+btree.getEntryCount());
+//
+//        }
+//
+//        abstract void add(SPO spo);
+//        
+//        protected Object resolve(Object arg0) {
+//            
+//            add((SPO)arg0);
+//            
+//            return arg0;
+//            
+//        }
+//        
+//    }
+//
+//    /**
+//     * Visits the keys in the {@link BTree}, decoding each key as a
+//     * {@link Long}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class TermIdKeyIterator implements Iterator<Long> {
+//
+//        private final BTree btree;
+//        
+//        /**
+//         * Note: this is initialized lazily so that the btree are fully
+//         * populated 1st.
+//         */
+//        private ITupleIterator src;
+//        
+//        /**
+//         * 
+//         * @param btree
+//         *            A {@link BTree} whose keys are byte[]s encoded as long
+//         *            integers using {@link KeyBuilder#append(long)}
+//         */
+//        public TermIdKeyIterator(BTree btree) {
+//
+//            this.btree = btree;
+//            
+//        }
+//        
+//        public boolean hasNext() {
+//
+//            if(src==null) {
+//
+//                /*
+//                 * Note: Lazily initialized so that the btree can be fully
+//                 * populated 1st.
+//                 */
+//
+//                log.info("Will visit "+btree.getEntryCount()+" entries");
+//
+//                src = btree.rangeIterator(null, null, 0/* capacity */,
+//                        IRangeQuery.KEYS, null/*filter*/);
+//                                
+//            }
+//            
+//            return src.hasNext();
+//            
+//        }
+//
+//        public Long next() {
+//            
+//            ITuple tuple = src.next();
+//            
+//            long v = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(), 0);
+//
+//            log.info("next="+v);
+//            
+//            return v;
+//            
+//        }
+//
+//        public void remove() {
+//
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Expand each distinct subject collected during some triple pattern query
+//     * by constrained forward chaining of {@link RuleOwlSameAs2}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class OwlSameAs2Expander extends Expander {
+//
+//        private static final long serialVersionUID = -3101713347977424002L;
+//
+//        private final long NULL = IRawTripleStore.NULL;
+//        private final InferenceEngine inf;
+//        private final AbstractTripleStore db;
+//        private final long s, p, o;
+//        
+//        /**
+//         * 
+//         * @param inf
+//         * @param s
+//         * @param p
+//         * @param o
+//         */
+//        public OwlSameAs2Expander(InferenceEngine inf,long s, long p, long o) {
+//            
+//            this.inf = inf;
+//            
+//            this.db = inf.database;
+//            
+//            this.s = s;
+//            
+//            this.p = p;
+//            
+//            this.o = o;
+//            
+//        }
+//        
+//        protected Iterator expand(Object arg0) {
+//            
+//            return expand(((Long)arg0).longValue());
+//            
+//        }
+//
+//        /**
+//         * Applies a specialization of {@link RuleOwlSameAs2} where the triple
+//         * pattern given to the ctor has been bound on the head of the rule to
+//         * compute the entailments for the specified subject.
+//         * 
+//         * <pre>
+//         * (x owl:sameAs y), (x a z) -&gt; (y a z).
+//         * </pre>
+//         * 
+//         * @param subject
+//         *            A subject visited in the course of a triple pattern query
+//         *            reading on some access path. The <i>subject</i> is bound
+//         *            on <code>x</code>. The triple pattern given to the ctor
+//         *            is bound on the head of the rule (y, a, z). The rule is
+//         *            then forward chained to generate the entailments.
+//         * 
+//         * @return An iterator visiting the entailments for that <i>subject</i>.
+//         */
+//        private Iterator<SPO> expand(long subject) {
+//            
+//            if(p==inf.owlSameAs.id) {
+//
+//                /*
+//                 * No entailments when predicate in triple pattern is bound to
+//                 * owl:sameAs
+//                 */
+//                
+//                return EmptyIterator.DEFAULT;
+//                
+//            }
+//
+//            assert subject != NULL;
+//            
+//            log.info("subject="+db.toString(subject)+"("+subject+")");
+//            
+//            // owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
+//            Rule r = inf.ruleOwlSameAs2;
+//
+//            // setup bindings.
+//            Map<Var,Long> bindings = new TreeMap<Var, Long>();
+//            
+//            // the current distinct subject.
+//            if(s!=NULL) bindings.put((Var)r.head.s,subject);
+//
+//            // from the triple pattern.
+//            if(p!=NULL) bindings.put((Var)r.head.p,p);
+//            if(o!=NULL) bindings.put((Var)r.head.o,o);
+//            
+////            // the current subject on (x)
+////            bindings.put((Var)r.body[0].s, subject);
+//            
+//            // specialize the rule.
+//            final Rule r1 = r.specialize(//
+//                    bindings,
+//                    new IConstraint[] {//
+//                        new NEConstant((Var) r.head.p, inf.owlSameAs.id) //
+//                    });
+//            
+//            /*
+//             * Buffer on which the rule will write.
+//             * 
+//             * @todo capacity parameter.
+//             */
+//            final SPOBlockingBuffer buffer = new SPOBlockingBuffer(db,
+//                    null /* filter */, 10000/* capacity */);
+//            
+//            db.getThreadPool().submit(new Runnable() {
+//
+//                public void run() {
+//
+//                    try {
+//                    
+//                        // run the rule.
+//                        r1.apply(false/* justify */, null/* focusStore */,
+//                                db/* database */, buffer);
+//                    } finally {
+//
+//                        // close the buffer
+//                        buffer.close();
+//
+//                    }
+//
+//                }
+//
+//            });
+//
+//            return buffer.iterator();
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Expand each distinct object collected during some triple pattern query
+//     * by constrained forward chaining of {@link RuleOwlSameAs3}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class OwlSameAs3Expander extends Expander {
+//
+//        private static final long serialVersionUID = -1806816164484260451L;
+//        private final long NULL = IRawTripleStore.NULL;
+//        private final InferenceEngine inf;
+//        private final AbstractTripleStore db;
+//        private final long s, p, o;
+//        
+//        /**
+//         * 
+//         * @param inf
+//         * @param s
+//         * @param p
+//         * @param o
+//         */
+//        public OwlSameAs3Expander(InferenceEngine inf,long s, long p, long o) {
+//            
+//            this.inf = inf;
+//            
+//            this.db = inf.database;
+//            
+//            this.s = s;
+//            
+//            this.p = p;
+//            
+//            this.o = o;
+//            
+//        }
+//        
+//        protected Iterator expand(Object arg0) {
+//            
+//            return expand(((Long)arg0).longValue());
+//            
+//        }
+//
+//        /**
+//         * Applies a specialization of {@link RuleOwlSameAs3} where the triple
+//         * pattern given to the ctor has been bound on the head of the rule to
+//         * compute the entailments for the specified subject.
+//         * 
+//         * <pre>
+//         * (x owl:sameAs y), (z a x) -&gt; (z a y).
+//         * </pre>
+//         * 
+//         * @param object
+//         *            An object visited in the course of a triple pattern query
+//         *            reading on some access path. The <i>object</i> is bound
+//         *            on <code>x</code>. The triple pattern given to the ctor
+//         *            is bound on the head of the rule (y, a, z). The rule is
+//         *            then forward chained to generate the entailments.
+//         * 
+//         * @return An iterator visiting the entailments for that <i>object</i>.
+//         */
+//        private Iterator<SPO> expand(long object) {
+//
+//            if(p==inf.owlSameAs.id) {
+//
+//                /*
+//                 * No entailments when predicate in triple pattern is bound to
+//                 * owl:sameAs
+//                 */
+//                
+//                return EmptyIterator.DEFAULT;
+//                
+//            }
+//            
+//            assert object != NULL;
+//            
+//            log.info("object="+db.toString(object)+"("+object+")");
+//            
+//            // owl:sameAs3: (x owl:sameAs y), (z a x) -&gt; (z a y).
+//            Rule r = inf.ruleOwlSameAs3;
+//
+//            // setup bindings.
+//            Map<Var,Long> bindings = new TreeMap<Var, Long>();
+//            
+//            if(s!=NULL) bindings.put((Var)r.head.s,s);
+//            if(p!=NULL) bindings.put((Var)r.head.p,p);
+//            if(o!=NULL) bindings.put((Var)r.head.o,o);
+//            
+//            // bind the current object on (x)
+//            bindings.put((Var)r.body[0].s, object);
+//            
+//            // specialize the rule.
+//            final Rule r1 = r.specialize(//
+//                    bindings,
+//                    new IConstraint[] {//
+//                        new NEConstant((Var) r.head.p, inf.owlSameAs.id) //
+//                    });
+//            
+//            /*
+//             * Buffer on which the rule will write.
+//             * 
+//             * @todo capacity parameter.
+//             */
+//            final SPOBlockingBuffer buffer = new SPOBlockingBuffer(db,
+//                    null /* filter */, 10000/* capacity */);
+//            
+//            db.getThreadPool().submit(new Runnable() {
+//
+//                public void run() {
+//
+//                    try {
+//
+//                        // run the rule.
+//                        r1.apply(false/* justify */, null/* focusStore */,
+//                                db/* database */, buffer);
+//
+//                    } finally {
+//
+//                        // close the buffer
+//                        buffer.close();
+//
+//                    }
+//                    
+//                }
+//
+//            });
+//
+//            return buffer.iterator();
+//            
+//        }
+//        
+//    }
     
 }

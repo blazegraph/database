@@ -45,18 +45,18 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractCursorTestCase extends TestCase2 {
+abstract public class AbstractTupleCursorTestCase extends TestCase2 {
 
     /**
      * 
      */
-    public AbstractCursorTestCase() {
+    public AbstractTupleCursorTestCase() {
     }
 
     /**
      * @param arg0
      */
-    public AbstractCursorTestCase(String arg0) {
+    public AbstractTupleCursorTestCase(String arg0) {
         super(arg0);
     }
 

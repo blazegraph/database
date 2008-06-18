@@ -2,7 +2,6 @@ package com.bigdata.btree;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IBlock;
 
 /**
@@ -24,6 +23,8 @@ class TestTuple<E> implements ITuple<E> {
 
     final private long timestamp;
 
+    private final ITupleSerializer tupleSer;
+    
     public TestTuple(Object key, E value) {
 
         this(IRangeQuery.DEFAULT, key, value);
@@ -39,11 +40,21 @@ class TestTuple<E> implements ITuple<E> {
     public TestTuple(int flags, Object key, E val, boolean deleted,
             long timestamp) {
 
+        this(flags, DefaultTupleSerializer.INSTANCE, key, val, deleted,
+                timestamp);
+        
+    }
+    
+    public TestTuple(int flags, ITupleSerializer tupleSer, Object key, E val, boolean deleted,
+            long timestamp) {
+
         this.flags = flags;
 
-        this.key = KeyBuilder.asSortKey(key);
+        this.tupleSer = DefaultTupleSerializer.INSTANCE;
+        
+        this.key = tupleSer.serializeKey(key);
 
-        this.val = SerializerUtil.serialize(val);
+        this.val = tupleSer.serializeVal(val);
 
         this.deleted = deleted;
 
@@ -84,7 +95,7 @@ class TestTuple<E> implements ITuple<E> {
     @SuppressWarnings("unchecked")
     public E getObject() {
 
-        return (E) SerializerUtil.deserialize(val);
+        return (E) tupleSer.deserialize(this);
 
     }
 
@@ -94,7 +105,9 @@ class TestTuple<E> implements ITuple<E> {
     }
 
     public byte[] getValue() {
+        
         return val;
+        
     }
 
     public ByteArrayBuffer getValueBuffer() {
@@ -142,7 +155,7 @@ class TestTuple<E> implements ITuple<E> {
 
     public ITupleSerializer getTupleSerializer() {
 
-        return DefaultTupleSerializer.INSTANCE;
+        return tupleSer;
         
     }
 

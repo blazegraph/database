@@ -1,11 +1,16 @@
 package com.bigdata.rdf.spo;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Arrays;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.util.KeyOrder;
 
+/**
+ * Supports the bulk filter.
+ * 
+ * @version $Id$
+ */
 public class SPOConvertingIterator implements ISPOIterator {
     
     private final static Logger log = Logger.getLogger(SPOConvertingIterator.class);
@@ -45,6 +50,7 @@ public class SPOConvertingIterator implements ISPOIterator {
             converted = convert(src.nextChunk());
             pos = 0;
         }
+        if(log.isInfoEnabled())
         log.info("returning converted["+pos+"]");
         return converted[pos++];
     }
@@ -60,7 +66,7 @@ public class SPOConvertingIterator implements ISPOIterator {
             pos = 0;
         }
         boolean hasNext = pos < converted.length;
-        log.info(hasNext);
+        if(log.isInfoEnabled()) log.info(hasNext);
         // StringWriter sw = new StringWriter();
         // new Exception("stack trace").printStackTrace(new PrintWriter(sw));
         // log.info(sw.toString());

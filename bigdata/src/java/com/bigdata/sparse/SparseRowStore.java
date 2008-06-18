@@ -26,15 +26,21 @@ package com.bigdata.sparse;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.AbstractTupleFilterator.AtomicRowIterator2;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.sparse.AtomicRowScan.TPSList;
+import com.bigdata.sparse.TPS.TPV;
 
 /**
  * A client-side class that knows how to use an {@link IIndex} to provide an
@@ -229,6 +235,87 @@ public class SparseRowStore {
         
     }
 
+//    /**
+//     * Used to encode and decode tuples for the {@link SparseRowStore} index.
+//     * Each tuple corresponds to a {@link ITPV timestamped property value} for
+//     * some {@link Schema}.
+//     * 
+//     * @todo there needs to be some way to lookup the {@link Schema} from the
+//     *       schema name as encoded in the key. One possibility is to register
+//     *       the known {@link Schema} against a static factory. Another is to
+//     *       have the known {@link Schema} registered in the
+//     *       {@link IndexMetadata} for the index backing the
+//     *       {@link SparseRowStore} (much like an extSer integration). The
+//     *       schema can be resolved using its encoded bytes as the key and the
+//     *       Unicode text of the schema name can be persisted in the
+//     *       {@link Schema}'s data.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public class TPVTupleSerializer implements ITupleSerializer {
+//
+//        final IKeyBuilder keyBuilder;
+//        
+//        /**
+//         * De-serialization ctor.
+//         */
+//        public TPVTupleSerializer() {
+//
+//            /*
+//             * @todo store relevant properties in the IndexMetadata so that we
+//             * can create the appropriate KeyBuilder instances on demand.
+//             */
+//            
+//            Properties properties = new Properties();
+//            
+//            keyBuilder = KeyBuilder.newUnicodeInstance(properties);
+//            
+//        }
+//        
+//        public byte[] serializeKey(TPV t) {
+//            
+//            if(t == null) throw new IllegalArgumentException();
+//            
+//            final byte[] key = t.getSchema().getKey(keyBuilder, t.primaryKey, t.getName(), t.getTimestamp());
+//            
+//            return key;
+//        }
+//
+//        /**
+//         * De-serializes as much of the key as possible.
+//         * 
+//         * @see KeyDecoder
+//         */
+//        public KeyDecoder deserializeKey(ITuple tuple) {
+//
+//            return new KeyDecoder(tuple.getKey());
+//            
+//        }
+//
+//        public byte[] serializeVal(TPV t) {
+//
+//            return ValueType.encode(t.getValue());
+//            
+//        }
+//        
+//        public ITPV deserialize(ITuple tuple) {
+//            
+//            final KeyDecoder keyDecoder = new KeyDecoder(tuple.getKey());
+//
+//            final Schema schema = resolveSchema(keyDecoder.getSchemaBytes());
+//
+//            final Object value = ValueType.decode(tuple.getValue());
+//
+//            final TPV t = new TPV(schema, keyDecoder.getColumnName(), keyDecoder
+//                    .getTimestamp(), value);
+//            
+//            return t;
+//            
+//        }
+//
+//    }
+    
     /**
      * Read the most recent logical row from the index.
      * 
