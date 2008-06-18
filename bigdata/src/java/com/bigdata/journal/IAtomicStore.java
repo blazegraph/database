@@ -60,19 +60,6 @@ public interface IAtomicStore extends IRawStore {
     public long commit();
 
     /**
-     * Invoked when a journal is first created, re-opened, or when the
-     * committers have been {@link #discardCommitters() discarded}.
-     */
-    public void setupCommitters();
-
-    /**
-     * This method is invoked whenever the store must discard any hard
-     * references that it may be holding to objects registered as
-     * {@link ICommitter}s.
-     */
-    public void discardCommitters();
-    
-    /**
      * Set a persistence capable data structure for callback during the commit
      * protocol.
      * <p>

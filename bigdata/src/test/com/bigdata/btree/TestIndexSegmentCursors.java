@@ -48,7 +48,7 @@ import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
  *       {@link TestMutableBTreeCursors} and there is little reason to think
  *       that they would not work for an {@link IndexSegment}.
  */
-public class TestIndexSegmentCursors extends AbstractCursorTestCase {
+public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
 
     /**
      * 

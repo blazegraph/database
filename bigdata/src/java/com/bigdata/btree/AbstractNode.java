@@ -714,17 +714,17 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                         
                         if (leaf.nkeys == 0) {
 
-                            return EmptyEntryIterator.INSTANCE;
+                            return EmptyTupleIterator.INSTANCE;
 
                         }
 
-                        return new TupleIterator(leaf, tuple, fromKey, toKey, filter );
+                        return new LeafTupleIterator(leaf, tuple, fromKey, toKey, filter );
 
 //                        return ((Leaf)child).entryIterator();
 
                     } else {
 
-                        return EmptyEntryIterator.INSTANCE;
+                        return EmptyTupleIterator.INSTANCE;
 
                     }
                 }

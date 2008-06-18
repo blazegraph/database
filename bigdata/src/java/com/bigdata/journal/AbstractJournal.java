@@ -917,6 +917,20 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
             file = new File(val);
 
+            if (file.exists() && file.length() == 0) {
+
+                /*
+                 * The file exists but is empty. This is what happens if you use
+                 * File.createTempFile(...) to generate the name of the file to
+                 * be opened. As a special exception, the journal will be
+                 * initialized on the empty file.
+                 */
+                
+                isEmptyFile = true;
+                
+            }
+            
+            
             log.info(Options.FILE+"="+val);
 
         }
@@ -1679,7 +1693,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         setupCommitters();
         
         log.info("done");
-
+        
     }
 
     /**
@@ -1955,16 +1969,19 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     }
 
+
     /**
+     * This method is invoked whenever the store must discard any hard
+     * references that it may be holding to objects registered as
+     * {@link ICommitter}s.
+     * <p>
      * The default implementation discards the btree mapping names to named
      * btrees.
      * <p>
      * Subclasses MAY extend this method to discard their own committers but
      * MUST NOT override it completely.
-     * 
-     * @todo remove from {@link IJournal} (and all impls) and make [protected].
      */
-    public void discardCommitters() {
+    protected void discardCommitters() {
 
         // discard.
         name2Addr = null;
@@ -1972,14 +1989,15 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     }
 
     /**
+     * Invoked when a journal is first created, re-opened, or when the
+     * committers have been {@link #discardCommitters() discarded}.
+     * <p>
      * The basic implementation sets up the btree that is responsible for
      * resolving named btrees.
      * <p>
      * Subclasses may extend this method to setup their own committers.
-     * 
-     * @todo remove from {@link IJournal} (and all impls) and make [protected].
      */
-    public void setupCommitters() {
+    protected void setupCommitters() {
 
         setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
 
@@ -2016,6 +2034,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
              * exception on the journal.
              */
 
+            if(INFO) log.info("New "+Name2Addr.class.getName());
+            
             name2Addr = Name2Addr
                     .create((isReadOnly() ? new SimpleMemoryRawStore() : this));
 
@@ -2028,6 +2048,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
              * we DO NOT use the canonicalizing mapping since we do not want
              * anyone else to have access to this same instance of the B+Tree.
              */
+
+            if(INFO) log.info("Loading "+Name2Addr.class.getName()+" from "+addr);
 
             name2Addr = (Name2Addr) BTree.load(this, addr);
 

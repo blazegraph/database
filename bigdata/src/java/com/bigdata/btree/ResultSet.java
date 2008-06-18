@@ -39,7 +39,7 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractTupleFilterator.AbstractTransformingTupleFilter;
+import com.bigdata.btree.AbstractTupleFilterator.AbstractTransformingTupleIterator;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
@@ -47,7 +47,7 @@ import com.bigdata.service.IDataService;
 /**
  * An object used to stream key scan results back to the client.
  * 
- * FIXME support {@link AbstractTransformingTupleFilter} - must apply its
+ * FIXME support {@link AbstractTransformingTupleIterator} - must apply its
  * compression and serialization handlers and serialize them for the client.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

@@ -42,7 +42,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestReverserator extends AbstractCursorTestCase {
+public class TestReverserator extends AbstractTupleCursorTestCase {
 
     /**
      * 

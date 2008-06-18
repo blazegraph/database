@@ -74,6 +74,7 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.KeyBuilder.StrengthEnum;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.service.IBigdataClient;
@@ -476,17 +477,35 @@ public class FullTextIndex {
 
         if (ndx == null) {
 
+            log.warn("No such index: name="+name);
+            
             assertWritable();
             
             IndexMetadata indexMetadata = new IndexMetadata(name, UUID
                     .randomUUID());
 
+            /*
+             * FIXME register a tuple serializer that knows how to unpack the
+             * values and how to extract the bytes corresponding to the encoded
+             * text (they can not be decoded) from key and how to extract the
+             * document and field identifiers from the key. It should also
+             * encapsulate the use of PRIMARY strength for the key builder.
+             */
+            
             indexManager.registerIndex(indexMetadata);
+            
+            log.warn("Registered new text index: name="+name);
+
+            ndx = indexManager.getIndex(name, timestamp);
+            
+        } else {
+
+            log.warn("Re-opened text index: name="+name);
 
         }
 
-        ndx = indexManager.getIndex(name, timestamp);
-
+        assert ndx != null;
+        
         this.ndx = ndx;
 
     }

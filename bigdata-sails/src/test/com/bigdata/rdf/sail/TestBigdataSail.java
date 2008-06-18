@@ -112,11 +112,21 @@ public class TestBigdataSail extends TestCase {
      */
     public void test_ctor_2() throws SailException {
 
-        final String filename = getName() + Options.JNL;
+        final File file = new File(getName() + Options.JNL);
+        
+        if(file.exists()) {
+            
+            if(!file.delete()) {
+                
+                fail("Could not delete file before test: " + file);
 
+            }
+            
+        }
+        
         Properties properties = new Properties();
 
-        properties.setProperty(Options.FILE, filename);
+        properties.setProperty(Options.FILE, file.toString());
 
         BigdataSail sail = new BigdataSail(properties);
 
@@ -128,15 +138,13 @@ public class TestBigdataSail extends TestCase {
 
         finally {
 
-            File file = new File(filename);
-
             if (!file.exists()) {
 
-                fail("Could not locate store: " + filename);
+                fail("Could not locate store: " + file);
 
                 if (!file.delete()) {
 
-                    fail("Could not delete file after test: " + filename);
+                    fail("Could not delete file after test: " + file);
 
                 }
 
@@ -154,11 +162,21 @@ public class TestBigdataSail extends TestCase {
      */
     public void test_getConnection() throws SailException {
 
-        final String filename = getName() + Options.JNL;
+        final File file = new File(getName() + Options.JNL);
+        
+        if(file.exists()) {
+            
+            if(!file.delete()) {
+                
+                fail("Could not delete file before test: " + file);
+
+            }
+            
+        }
 
         Properties properties = new Properties();
 
-        properties.setProperty(Options.FILE, filename);
+        properties.setProperty(Options.FILE, file.toString());
 
         BigdataSail sail = new BigdataSail(properties);
 
@@ -174,15 +192,13 @@ public class TestBigdataSail extends TestCase {
 
         finally {
 
-            File file = new File(filename);
-
             if (!file.exists()) {
 
-                fail("Could not locate store: " + filename);
+                fail("Could not locate store: " + file);
 
                 if (!file.delete()) {
 
-                    fail("Could not delete file after test: " + filename);
+                    fail("Could not delete file after test: " + file);
 
                 }
 
@@ -206,11 +222,21 @@ public class TestBigdataSail extends TestCase {
      */
     public void test_isolation() throws SailException {
 
-        final String filename = getName() + Options.JNL;
+        final File file = new File(getName() + Options.JNL);
+        
+        if(file.exists()) {
+            
+            if(!file.delete()) {
+                
+                fail("Could not delete file before test: " + file);
+
+            }
+            
+        }
 
         Properties properties = new Properties();
 
-        properties.setProperty(Options.FILE, filename);
+        properties.setProperty(Options.FILE, file.toString());
 
         BigdataSail sail = new BigdataSail(properties);
 
@@ -315,15 +341,13 @@ public class TestBigdataSail extends TestCase {
             
             sail.shutDown();
 
-            final File file = new File(filename);
-
             if (!file.exists()) {
 
-                fail("Could not locate store: " + filename);
+                fail("Could not locate store: " + file);
 
                 if (!file.delete()) {
 
-                    fail("Could not delete file after test: " + filename);
+                    fail("Could not delete file after test: " + file);
 
                 }
 

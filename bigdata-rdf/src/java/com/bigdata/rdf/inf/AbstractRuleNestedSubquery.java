@@ -138,7 +138,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         /*
          * Subquery iterator.
          */
-        ISPOIterator itr = state.getAccessPath(state.order[index]).iterator();
+        final ISPOIterator itr = state.iterator(state.order[index]);
         
         try {
 
@@ -232,7 +232,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         assert index < body.length;
         
         // the sort order for chunks for this iterator (iff there is a subquery).
-        KeyOrder keyOrder = (index + 1 == body.length //
+        final KeyOrder keyOrder = (index + 1 == body.length //
                 ? null // no subquery
                 : getSortOrder(state, state.order[index], state.order[index + 1]) // subquery
                 );
@@ -245,7 +245,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
          * statement delivered by the outer subquery in order for subquery
          * elimination to work.
          */
-        ISPOIterator itr = state.getAccessPath(state.order[index]).iterator();
+        final ISPOIterator itr = state.iterator(state.order[index]);
         
         while(itr.hasNext()) {
 

@@ -138,9 +138,12 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             final String namespace = "";
 
             searchEngine = new FullTextIndex(getProperties(), namespace,
-                    getStore(), Executors
-                            .newSingleThreadExecutor(DaemonThreadFactory
-                                    .defaultThreadFactory()));
+                    getStore(), 
+                    getThreadPool()
+//                    Executors
+//                            .newSingleThreadExecutor(DaemonThreadFactory
+//                                    .defaultThreadFactory())
+                                    );
 
         }
 
@@ -152,4 +155,11 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
     abstract IIndexManager getStore();
 
+    public void abort() {
+        
+        searchEngine = null;
+
+        
+    }
+    
 }

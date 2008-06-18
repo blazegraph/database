@@ -38,15 +38,18 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
 import com.bigdata.btree.IDataSerializer.SimplePrefixSerializer;
-import com.bigdata.io.SerializerUtil;
+import com.bigdata.btree.KeyBuilder.StrengthEnum;
 import com.bigdata.sparse.AtomicRead;
 import com.bigdata.sparse.AtomicRowScan;
 import com.bigdata.sparse.INameFilter;
+import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.KeyDecoder;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.sparse.TPS;
+import com.bigdata.sparse.TPSTupleSerializer;
 import com.bigdata.sparse.ValueType;
+import com.bigdata.sparse.TPS.TPV;
 
 /**
  * Abstract base class for filter or transforming {@link ITupleIterator}s. This
@@ -55,23 +58,19 @@ import com.bigdata.sparse.ValueType;
  * of tuples based on their key and/or value and aggregation of atomic reads to
  * higher level data structures such as the {@link AtomicRowScan}.
  * 
- * FIXME The {@link AbstractTupleFilterator} is now a full {@link ITupleIterator}
- * and it WRAPS the base iterator requested by the caller. It can be used
- * directly when you know that you are operating on a local index or you can use
- * the {@link AbstractTupleFilteratorConstructor} when you need to describe the
- * filter on the client and have the wrapper setup for you on the server.
+ * FIXME The {@link AbstractTupleFilterator} is now a full
+ * {@link ITupleIterator} and it WRAPS the base iterator requested by the
+ * caller. It can be used directly when you know that you are operating on a
+ * local index or you can use the {@link AbstractTupleFilteratorConstructor}
+ * when you need to describe the filter on the client and have the wrapper setup
+ * for you on the server. (It would be nice if we could just construct the
+ * iterator have have it get serialized out correctly with the appropriate
+ * splits but that seems to be modestly complex).
  * 
  * FIXME Modify {@link IRangeQuery} to change the type of the "filter" argument
  * to a factory object for an {@link AbstractTupleFilterator}, e.g.,
  * {@link AbstractTupleFilteratorConstructor} so that we can describe the filter
  * on the client and have it instantiated with its state on the server.
- * 
- * FIXME Get rid of the nasty code using {@link ChunkedLocalRangeIterator} to
- * handle {@link IRangeQuery#REMOVEALL}
- * 
- * FIXME There are some bugs in the bigdata services package that appear to all
- * be linked to a problem with the {@link ChunkedLocalRangeIterator}. If I can
- * just get rid of that then I will be much happier!
  * 
  * FIXME Add a variant to {@link IRangeQuery} that accepts an array of keys and
  * maps a caller supplied {@link AbstractTupleFilterator} across those keys.
@@ -79,7 +78,7 @@ import com.bigdata.sparse.ValueType;
  * 
  * FIXME The distinct term scan can not be written just yet. It needs to advance
  * the {@link ITupleIterator} to a key formed from the successor of the current
- * key. In order to support that {@link TupleIterator} needs to support the
+ * key. In order to support that {@link LeafTupleIterator} needs to support the
  * "gotoKey" (as long as it is within the half-open range) and an
  * {@link AbstractTupleFilterator} can then be written that advances the source
  * iterator. Since it will all be "just an iterator" the client code will map it
@@ -87,18 +86,21 @@ import com.bigdata.sparse.ValueType;
  * skipping backwards could cause the client code to not terminate if the
  * filterator has its logic wrong).
  * 
+ * FIXME There is a strong relationship between a byte[][] keys iterator such as
+ * the {@link CompletionScan} and an unrolled JOIN operator.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractTupleFilterator implements ITupleIterator {
+abstract public class AbstractTupleFilterator<E> implements ITupleIterator<E> {
 
     protected static final Logger log = Logger.getLogger(AbstractTupleFilterator.class);
     
-    protected final ITupleIterator src;
+    protected final ITupleIterator<E> src;
     
-    private ITuple current = null;
+    private ITuple<E> current = null;
     
-    protected AbstractTupleFilterator(ITupleIterator src) {
+    protected AbstractTupleFilterator(ITupleIterator<E> src) {
         
         if (src == null)
             throw new IllegalArgumentException();
@@ -107,7 +109,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
         
     }
 
-    public ITuple next() {
+    public ITuple<E> next() {
 
         if (!hasNext()) {
 
@@ -117,7 +119,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
 
         assert current != null;
 
-        final ITuple t = current;
+        final ITuple<E> t = current;
 
         current = null;
 
@@ -135,7 +137,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
          */
         while (src.hasNext()) {
 
-            final ITuple tuple = src.next();
+            final ITuple<E> tuple = src.next();
 
             if (isValid(tuple)) {
 
@@ -163,7 +165,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
      * @param tuple
      *            The tuple.
      */
-    abstract protected boolean isValid(ITuple tuple);
+    abstract protected boolean isValid(ITuple<E> tuple);
     
     /**
      * Class creates configured instances of an {@link AbstractTupleFilterator} so
@@ -195,16 +197,33 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
+     * @param E
+     *            The generic type for the objects materialized from the source
+     *            tuples.
+     * @param F
+     *            The generic type for the objects that can be materialized from
+     *            the output tuples.
+     *            
      * FIXME make sure that the various compression and serialization handlers
      * specified here are imposed by the {@link ResultSet} which MUST notice
      * this class and use its properties in preference to those available from
      * the {@link IndexMetadata}
      */
-    abstract public static class AbstractTransformingTupleFilter extends AbstractTupleFilterator {
+    abstract protected static class AbstractTransformingTupleIterator<E,F> implements ITupleIterator<F> {
 
+        /** The flags specified for the source iterator. */
         final protected int flags;
+
+        /** The source iterator. */
+        final protected ITupleIterator<E> src;
+        
+        /** The compression provider for the key[]. */
         final protected IDataSerializer leafKeySer;
+        
+        /** The compression provider for the value[]. */
         final protected IDataSerializer leafValSer;
+
+        /** The serialization provider for the transformed tuples. */
         final protected ITupleSerializer tupleSer;
         
         /**
@@ -218,13 +237,14 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
          * @param leafValSer
          *            The compression provider for the value[].
          * @param tupleSer
-         *            The serialization provider for the individual tuples.
+         *            The serialization provider for the transformed tuples.
          */
-        protected AbstractTransformingTupleFilter(ITupleIterator src,
+        protected AbstractTransformingTupleIterator(ITupleIterator<E> src,
                 int flags, IDataSerializer leafKeySer,
                 IDataSerializer leafValSer, ITupleSerializer tupleSer) {
 
-            super(src);
+            if (src == null)
+                throw new IllegalArgumentException();
 
             if (leafKeySer == null)
                 throw new IllegalArgumentException();
@@ -237,6 +257,8 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
 
             this.flags = flags;
             
+            this.src = src;
+            
             this.leafKeySer = leafKeySer;
 
             this.leafValSer = leafValSer;
@@ -244,189 +266,13 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
             this.tupleSer = tupleSer;
 
         }
-        
+
     }
-    
-//    /**
-//     * Logical row scan for the {@link SparseRowStore}.
-//     * 
-//     * FIXME write this two ways.
-//     * 
-//     * First as a look ahead filter that enforces logical row boundaries and
-//     * filters out tuples whose column name or timestamp do not satisify the
-//     * query.
-//     * 
-//     * Second as a {@link AbstractTransformingTupleFilter} that sends back a
-//     * logical row in each tuple.
-//     * 
-//     * Note that neither version can be {@link Serializable} since the need
-//     * access to the source iterator so we need either a setSource(...) method
-//     * or a constructor object for the iterator that sends along the state and
-//     * create the iterator on the server.
-//     * 
-//     * FIXME figure out which implementation is "better" and move this to the
-//     * correct package.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class AtomicRowIterator1 extends AbstractTupleFilter {
-//        
-//        protected static final Logger log = Logger.getLogger(AtomicRowIterator1.class);
-//
-//        final private long timestamp;
-//        final private INameFilter nameFilter;
-//        
-//        /**
-//         * @param src
-//         */
-//        protected AtomicRowIterator1(ITupleIterator src, long timestamp,
-//                INameFilter nameFilter) {
-//
-//            super(src);
-//            
-//            this.timestamp = timestamp;
-//            
-//            this.nameFilter = nameFilter;
-//            
-//        }
-//
-//        /**
-//         * Reads zero or more logical rows, applying the timestamp and the optional
-//         * filter.
-//         * 
-//         * @return A serialized representation of those rows together with either
-//         *         the <i>fromKey</i> from which the scan should continue or
-//         *         <code>null</code> iff the procedure has scanned all logical
-//         *         rows in the specified key range (i.e., it has observed a primary
-//         *         key that is GTE <i>toKey</i>). Note that the other termination
-//         *         condition is when there are no more index partitions spanned by
-//         *         the key range, which is handled by the {@link ClientIndexView}.
-//         */
-//        public TPSList apply(IIndex ndx) {
-//         
-//            while (hasNext()) {
-//
-//                // read the logical row from the index.
-//                final TPS tps = AtomicRead.atomicRead(ndx, fromKey, schema,
-//                        timestamp, nameFilter);
-//
-//                /*
-//                 * Note: tps SHOULD NOT be null since null is reserved to indicate
-//                 * that there was NO data for a given primary key (not just no
-//                 * property values matching the optional constraints) and we are
-//                 * scanning with a [fromKey] that is known to exist.
-//                 */
-//                assert tps != null;
-//
-//                // add to the result set.
-//                rows.add(tps);
-//                
-//                /*
-//                 * This is the next possible key with which the following logical
-//                 * row could start. If we restart this loop we will scan the index
-//                 * starting at this key until we find the actual key for the next
-//                 * logical row. Otherwise this is where the scan should pick up if
-//                 * we have reached the capacity on the current request.
-//                 */
-//                fromKey = SuccessorUtil.successor(fromKey);
-//                
-//                if (rows.size() >= capacity) {
-//
-//                    /*
-//                     * Stop since we have reached the capacity for this request.
-//                     */
-//                    
-//                    break;
-//                    
-//                }
-//                
-//            }
-//
-//            if (log.isInfoEnabled()) {
-//
-//                log.info("Read " + rows.size()+" rows: capacity="+capacity);
-//            
-//            }
-//
-//            /*
-//             * Return both the key for continuing the scan and the ordered set of
-//             * logical rows identified by this request.
-//             */
-//
-//            return new TPSList(fromKey, rows.toArray(new TPS[rows.size()]));
-//            
-//        }
-//
-////        /**
-////         * Scans the source iterator and reports the first key GTE to that key
-////         * yet LE {@link #getToKey()}.
-////         * <p>
-////         * Note: This has a side-effect on the source iterator which is advanced
-////         * to the first tuple in the next logical row.
-////         * 
-////         * @return The first key GTE the given key -or- <code>null</code> iff
-////         *         there are NO keys remaining in the index partition GTE the
-////         *         given key.
-////         */
-////        protected boolean advanceToNextLogicalRow() {
-////            
-////            while (src.hasNext()) {
-////
-////                final byte[] key = src.next().getKey();
-////                
-////                final KeyDecoder decoded = new KeyDecoder(key);
-////
-////                // extract just the schema and the primary key.
-////                return decoded.getPrefix();
-////
-////            }
-////
-////            return null;
-////            
-////        }
-//
-//        /**
-//         * Each visited tuple corresponds to a logical row. The key for the
-//         * tuple is the {schema,primaryKey} for that logical row. The value is
-//         * the serialized {@link TPS} object for the corresponding logical row.
-//         * 
-//         * @see ITuple#getObject()
-//         */
-//        public ITuple<ITPS> next() {
-//            // TODO Auto-generated method stub
-//            return null;
-//        }
-//
-//        public boolean hasNext() {
-//            // TODO Auto-generated method stub
-//            return false;
-//        }
-//
-//        public void remove() {
-//            // TODO Auto-generated method stub
-//            
-//        }
-//
-//        /**
-//         * Always returns <code>true</code>.
-//         * 
-//         * @todo could just pass an {@link ITupleIterator} instead of an
-//         *       {@link ITupleFilter} for the server-side iterator override.
-//         */
-//        @Override
-//        protected boolean isValid(ITuple tuple) {
-//            
-//            return true; // FIXME apply the name and timestamp filter here.
-//            
-//        }
-//
-//    }
     
     /**
      * Transforms an {@link ITupleIterator} reading directly on an
      * {@link IIndex} backing a {@link SparseRowStore} into an
-     * {@link ITupleIterator} visiting logical rows.
+     * {@link ITupleIterator} visiting logical {@link ITPS} rows.
      * 
      * @todo You could replace the {@link AtomicRead} with this iterator by
      *       setting the capacity to ONE (1). However, that will do more work
@@ -446,7 +292,9 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AtomicRowIterator2 extends AbstractTransformingTupleFilter {
+    public static class AtomicRowIterator2 extends AbstractTransformingTupleIterator<TPV, TPS> {
+
+        protected static final Logger log = Logger.getLogger(AtomicRowIterator2.class);
         
         private final int capacity;
         private final Schema schema;
@@ -471,7 +319,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
          *            An optional filter used to select the values for property
          *            names accepted by that filter.
          */
-        protected AtomicRowIterator2(ITupleIterator src, int capacity, int flags,
+        protected AtomicRowIterator2(ITupleIterator<TPV> src, int capacity, int flags,
                 Schema schema, long timestamp, INameFilter nameFilter) {
 
             super(src, flags, SimplePrefixSerializer.INSTANCE,
@@ -493,8 +341,6 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
             
         }
 
-        protected static final Logger log = Logger.getLogger(AtomicRowIterator2.class);
-        
         /** #of logical rows read so far. */
         private int nvisited = 0;
         
@@ -563,7 +409,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
                 
             };
             
-            tuple.copyTuple(prefix, SerializerUtil.serialize(tps));
+            tuple.copyTuple(prefix, tupleSer.serializeVal(tps));
             
             // visited another logical row.
             nvisited++;
@@ -602,7 +448,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
             
             while (src.hasNext()) {
 
-                final ITuple tuple = src.next();
+                final ITuple<TPV> tuple = src.next();
 
                 final byte[] prefix = new KeyDecoder(tuple.getKey()).getPrefix();
 
@@ -670,13 +516,7 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
 
             final byte[] val = tuple.getValue();
 
-            /*
-             * Decode the key so that we can get the column name. We have the
-             * advantage of knowing the last byte in the primary key. Since the
-             * fromKey was formed as [schema][primaryKey], the length of the
-             * fromKey is the index of the 1st byte in the column name.
-             */
-
+            // Decode the key so that we can get the column name.
             final KeyDecoder keyDecoder = new KeyDecoder(key);
 
             // The column name.
@@ -737,85 +577,8 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
 
         }
 
-        /**
-         * Always returns <code>true</code>.
-         */
-        @Override
-        protected boolean isValid(ITuple tuple) {
-            
-            return true;
-            
-        }
-
     }
     
-    /**
-     * Helper class for <em>de-serializing</em> logical rows from an
-     * {@link AtomicRowIterator2}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class TPSTupleSerializer implements ITupleSerializer {
-
-        private static final long serialVersionUID = -2467715806323261423L;
-
-        public static transient final ITupleSerializer INSTANCE = new TPSTupleSerializer(); 
-        
-        /**
-         * De-serializator ctor.
-         */
-        public TPSTupleSerializer() {
-            
-        }
-        
-        public TPS deserialize(ITuple tuple) {
-
-            return (TPS) SerializerUtil.deserialize(tuple.getValueStream());
-            
-        }
-
-        /**
-         * You can get the {@link Schema} and the primary key from
-         * {@link #deserialize(ITuple)}.
-         * 
-         * @throws UnsupportedOperationException
-         *             always.
-         */
-        public Object deserializeKey(ITuple tuple) {
-
-            throw new UnsupportedOperationException();
-            
-        }
-
-        /**
-         * This method is not used since we do not store {@link TPS} objects
-         * directly in a {@link BTree}.
-         * 
-         * @throws UnsupportedOperationException
-         *             always.
-         */
-        public byte[] serializeKey(Object obj) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-        /**
-         * This method is not used since we do not store {@link TPS} objects
-         * directly in a {@link BTree}.
-         * 
-         * @throws UnsupportedOperationException
-         *             always.
-         */
-        public byte[] serializeVal(Object obj) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-
     /**
      * A filter that removes the tuples that it visits from the source iterator.
      * <p>
@@ -866,5 +629,480 @@ abstract public class AbstractTupleFilterator implements ITupleIterator {
         }
         
     }
-    
+
+    /**
+     * <p>
+     * Iterator-based scan visits all tuples having a shared prefix. The
+     * iterator accepts a key or an array of keys that define the key prefix(s)
+     * whose completions will be visited. It efficiently forms the successor of
+     * each key prefix, performs a key-range scan of the key prefix, and (if
+     * more than one key prefix is given), seeks to the start of the next
+     * key-range scan.
+     * </p>
+     * <h4>WARNING</h4>
+     * <p>
+     * <strong>The prefix keys MUST be formed with
+     * {@link StrengthEnum#Identical}. This is necessary in order to match all
+     * keys in the index since it causes the secondary characteristics to NOT be
+     * included in the prefix key even if they are present in the keys in the
+     * index.</strong> Using other {@link StrengthEnum}s will result in
+     * secondary characteristics being encoded by additional bytes appended to
+     * the key. This will result in scan matching ONLY the given prefix key(s)
+     * and matching nothing if those prefix keys are not actually present in the
+     * index.
+     * </p>
+     * <p>
+     * For example, the Unicode text "Bryan" is encoded as the <em>unsigned</em>
+     * byte[]
+     * </p>
+     * 
+     * <pre>
+     * [43, 75, 89, 41, 67]
+     * </pre>
+     * 
+     * <p>
+     * at PRIMARY strength but as the <em>unsigned</em> byte[]
+     * </p>
+     * 
+     * <pre>
+     * [43, 75, 89, 41, 67, 1, 9, 1, 143, 8]
+     * </pre>
+     * 
+     * <p>
+     * at IDENTICAL strength. The additional bytes for the IDENTICAL strength
+     * reflect the Locale specific Unicode sort key encoding of secondary
+     * characteristics such as case. The successor of the PRIMARY strength
+     * byte[] is
+     * </p>
+     * 
+     * <pre>
+     * [43, 75, 89, 41, 68]
+     * </pre>
+     * 
+     * <p>
+     * (one was added to the last byte) which spans all keys of interest.
+     * However the successor of the IDENTICAL strength byte[] would
+     * </p>
+     * 
+     * <pre>
+     * [43, 75, 89, 41, 67, 1, 9, 1, 143, 9]
+     * </pre>
+     * 
+     * <p>
+     * and would ONLY span the single tuple whose key was "Bryan".
+     * </p>
+     * <p>
+     * You can form an appropriate {@link IKeyBuilder} for the prefix keys using
+     * </p>
+     * 
+     * <pre>
+     * Properties properties = new Properties();
+     * 
+     * properties.setProperty(KeyBuilder.Options.STRENGTH, StrengthEnum.Primary
+     *         .toString());
+     * 
+     * prefixKeyBuilder = KeyBuilder.newUnicodeInstance(properties);
+     * </pre>
+     * 
+     * FIXME Support for remote and local processes.
+     * 
+     * FIXME Only pass the relevant elements of keyPrefix to any given index
+     * partition. It is possible that an element spans the end of an index
+     * partition, in which case the scan must resume with the next partition.
+     * There is no real way to know this without testing the next partition....
+     * 
+     * FIXME Note: It is NOT trivial to define filter that may be used to accept
+     * only keys that extend the prefix on a caller-defined boundary (e.g.,
+     * corresponding to the encoding of a whitespace or word break). There are
+     * two issues: (1) the keys are encoded so the filter needs to recognize the
+     * byte(s) in the Unicode sort key that correspond to, e.g., the work
+     * boundary. (2) the keys may have been encoded with secondary
+     * characteristics, in which case the boundary will not begin immediately
+     * after the prefix.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @see TestCompletionScan
+     */
+    public static class CompletionScan<E> implements ITupleIterator<E> {
+
+        /**
+         * The source iterator. The lower bound for the source iterator should
+         * be the first key prefix. The upper bound should be the fixed length
+         * successor of the last key prefix (formed by adding one bit, not by
+         * appending a <code>nul</code> byte).
+         */
+        protected final ITupleCursor<E> src;
+        
+        /** The array of key prefixes to be scanned. */
+        protected final byte[][] keyPrefix;
+
+        /**
+         * The index of the key prefix that is currently being scanned. The
+         * entire scan is complete when index == keyPrefix.length.
+         */
+        private int index = 0;
+
+        /**
+         * The exclusive upper bound. This is updated each time we begin to scan
+         * another key prefix.
+         */
+        protected byte[] toKey;
+        
+        /** The current tuple. */
+        private ITuple<E> current = null;
+
+        /**
+         * Completion scan with a single prefix. The iterator will visit all
+         * tuples having the given key prefix.
+         * 
+         * @param src
+         *            The source iterator.
+         * @param keyPrefix
+         *            An unsigned byte[] containing a key prefix.
+         */
+        public CompletionScan(ITupleCursor<E> src, byte[] keyPrefix) {
+
+            this(src, new byte[][] { keyPrefix });
+            
+        }
+        
+        /**
+         * Completion scan with an array of key prefixes. The iterator will
+         * visit all tuples having the first key prefix, then all tuples having
+         * the next key prefix, etc. until all key prefixes have been evaluated.
+         * 
+         * @param src
+         *            The source iterator (must specify at least
+         *            {@link IRangeQuery#KEYS}, AND {@link IRangeQuery#CURSOR}).
+         * @param keyPrefix
+         *            An array of unsigned byte prefixes (the elements of the
+         *            array MUST be presented in sorted order).
+         */
+        public CompletionScan(ITupleCursor<E> src, byte[][] keyPrefix) {
+            
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            if (keyPrefix == null)
+                throw new IllegalArgumentException();
+
+            if (keyPrefix.length == 0)
+                throw new IllegalArgumentException();
+            
+            this.src = src;
+            
+            this.keyPrefix = keyPrefix;
+
+            this.index = 0;
+            
+            nextPrefix();
+            
+        }
+        
+        public boolean hasNext() {
+
+            if (current != null)
+                return true;
+
+            /*
+             * Find the next tuple having the same prefix.
+             */
+            while (src.hasNext()) {
+
+                final ITuple<E> tuple = src.next();
+
+                final byte[] key = tuple.getKey();
+                
+                if (BytesUtil.compareBytes(key, toKey) >= 0) {
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Scanned beyond prefix: toKey="
+                                + BytesUtil.toString(toKey) + ", tuple=" + tuple);
+                    
+                    if (index + 1 < keyPrefix.length) {
+
+                        // next prefix.
+                        index++;
+                        
+                        nextPrefix();
+                        
+                        if (current != null) {
+
+                            // found an exact prefix match.
+                            return true;
+                            
+                        }
+                        
+                        continue;
+                        
+                    }
+                        
+                    log.info("No more prefixes.");
+                    
+                    return false;
+                        
+                }
+                
+                current = tuple;
+
+                // found another tuple that is a completion of the current prefix.
+                return true;
+
+            }
+
+            // no more tuples (at least in this index partition).
+            
+            log.info("No more tuples.");
+            
+            return false;
+
+        }
+
+        /**
+         * Start a sub-scan of the key prefix at the current {@link #index}.
+         */
+        protected void nextPrefix() {
+            
+            final byte[] prefix = keyPrefix[index];
+            
+            // make a note of the exclusive upper bound for that prefix.
+            toKey = SuccessorUtil.successor(keyPrefix[index].clone());
+
+            // seek to the inclusive lower bound for that key prefix.
+            src.seek(prefix);
+            
+            /*
+             * Note: if we seek to a key that has a visitable tuple then that
+             * will be the next tuple to be returned.
+             */
+            current = src.tuple();
+            
+            if (log.isInfoEnabled()) {
+
+                log.info("index=" + index + ", prefix="
+                        + BytesUtil.toString(prefix) + ", current=" + current);
+                
+            }
+            
+        }
+        
+        public ITuple<E> next() {
+
+            if (!hasNext()) {
+
+                throw new NoSuchElementException();
+
+            }
+
+            assert current != null;
+
+            final ITuple<E> t = current;
+
+            current = null;
+
+            return t;
+
+        }
+
+        public void remove() {
+
+            src.remove();
+
+        }
+
+    }
+
+    /**
+     * Delegates all operations to another {@link ITupleCursor}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    public static class DelegateTupleCursor<E> implements ITupleCursor<E>{    
+        
+        final private ITupleCursor<E> src;
+        
+        public DelegateTupleCursor(ITupleCursor<E> src) {
+            
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            this.src = src;
+        
+        }
+
+        public byte[] currentKey() {
+            return src.currentKey();
+        }
+
+        public ITuple<E> first() {
+            return src.first();
+        }
+
+        public byte[] getFromKey() {
+            return src.getFromKey();
+        }
+
+        public IIndex getIndex() {
+            return src.getIndex();
+        }
+
+        public byte[] getToKey() {
+            return src.getToKey();
+        }
+
+        public boolean hasNext() {
+            return src.hasNext();
+        }
+
+        public boolean hasPrior() {
+            return src.hasPrior();
+        }
+
+        public boolean isCursorPositionDefined() {
+            return src.isCursorPositionDefined();
+        }
+
+        public boolean isDeletedTupleVisitor() {
+            return src.isDeletedTupleVisitor();
+        }
+
+        public ITuple<E> last() {
+            return src.last();
+        }
+
+        public ITuple<E> next() {
+            return src.next();
+        }
+
+        public ITuple<E> nextTuple() {
+            return src.nextTuple();
+        }
+
+        public ITuple<E> prior() {
+            return src.prior();
+        }
+
+        public ITuple<E> priorTuple() {
+            return src.priorTuple();
+        }
+
+        public void remove() {
+            src.remove();
+        }
+
+        public ITuple<E> seek(byte[] key) {
+            return src.seek(key);
+        }
+
+        public ITuple<E> seek(Object key) {
+            return src.seek(key);
+        }
+
+        public ITuple<E> tuple() {
+            return src.tuple();
+        }
+        
+        
+    }
+
+    /**
+     * Wraps an {@link ITupleIterator} as an {@link ITupleCursor}. Methods that
+     * are not declared by {@link ITupleIterator} will throw an
+     * {@link UnsupportedOperationException}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    public static class WrappedTupleIterator<E> implements ITupleCursor<E> {
+
+        final private ITupleIterator<E> src;
+
+        public WrappedTupleIterator(ITupleIterator<E> src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            this.src = src;
+
+        }
+
+        public boolean hasNext() {
+            return src.hasNext();
+        }
+
+        public ITuple<E> next() {
+            return src.next();
+        }
+
+        public void remove() {
+            src.remove();
+        }
+
+        public byte[] currentKey() {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> first() {
+            throw new UnsupportedOperationException();
+        }
+
+        public byte[] getFromKey() {
+            throw new UnsupportedOperationException();
+        }
+
+        public IIndex getIndex() {
+            throw new UnsupportedOperationException();
+        }
+
+        public byte[] getToKey() {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean hasPrior() {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean isCursorPositionDefined() {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean isDeletedTupleVisitor() {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> last() {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> nextTuple() {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> prior() {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> priorTuple() {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> seek(byte[] key) {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> seek(Object key) {
+            throw new UnsupportedOperationException();
+        }
+
+        public ITuple<E> tuple() {
+            throw new UnsupportedOperationException();
+        }
+
+    }
+
 }

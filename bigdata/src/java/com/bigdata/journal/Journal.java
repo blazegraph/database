@@ -208,7 +208,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
             if (ts == 0L) {
 
-                log.warn("Nothing committed: read-committed operation.");
+                log.warn("Nothing committed: name="+name+" - read-committed operation.");
 
                 return null;
 
@@ -242,7 +242,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
             if (commitRecord == null) {
 
-                log.warn("No commit record: timestamp="+ts);
+                log.warn("No commit record: name="+name+", timestamp="+ts);
                 
                 return null;
                 
@@ -272,7 +272,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         if (btree == null) {
 
-            log.warn("No such index: timestamp="+timestamp);
+            log.warn("No such index: name="+name+", timestamp="+timestamp);
             
             return null;
         

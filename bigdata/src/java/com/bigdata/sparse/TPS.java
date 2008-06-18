@@ -154,7 +154,7 @@ public class TPS implements ITPS, Externalizable {
      */
     public void set(String name, long timestamp, Object value) {
         
-        tuples.put(new TP(name, timestamp), new TPV(this, name, timestamp,
+        tuples.put(new TP(name, timestamp), new TPV(schema, name, timestamp,
                 value));
         
     }
@@ -225,7 +225,7 @@ public class TPS implements ITPS, Externalizable {
                     + (timestamp == Long.MAX_VALUE ? ", current value"
                             : ", timestamp=" + timestamp));
 
-            return new TPV(this, name, 0L, null);
+            return new TPV(schema, name, 0L, null);
 
         }
 
@@ -490,7 +490,7 @@ public class TPS implements ITPS, Externalizable {
             
             final Object value = ValueType.decode(val);
             
-            final TPV tpv = new TPV(this,name,timestamp,value);
+            final TPV tpv = new TPV(schema,name,timestamp,value);
             
             tuples.put(new TP(name, timestamp), tpv);
             
@@ -565,20 +565,21 @@ public class TPS implements ITPS, Externalizable {
 
         private static final long serialVersionUID = -3301002622055086380L;
 
-        private TPS tps;
+//        private TPS tps;
+        private Schema schema;
         private String name;
         private long timestamp;
         private Object value;
         
-        public TPV(TPS tps, String name, long timestamp, Object value) {
+        public TPV(Schema schema, String name, long timestamp, Object value) {
 
-            if (tps == null)
+            if (schema == null)
                 throw new IllegalArgumentException();
             
             if (name == null)
                 throw new IllegalArgumentException();
             
-            this.tps = tps;
+            this.schema = schema;
             
             this.name = name;
             
@@ -590,7 +591,7 @@ public class TPS implements ITPS, Externalizable {
         
         public Schema getSchema() {
             
-            return tps.getSchema();
+            return schema;
             
         }
 

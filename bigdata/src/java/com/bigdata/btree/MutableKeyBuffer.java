@@ -418,12 +418,12 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         sb.append("nkeys=" + nkeys);
         sb.append(", maxKeys=" + keys.length);
         sb.append(", prefix=" + BytesUtil.toString(getPrefix()));
-        sb.append(", [");
+        sb.append(", [\n");
 
-        for (int i = 0; i < keys.length; i++) {
+        for (int i = 0; i < nkeys/*keys.length*/; i++) {
 
             if (i > 0)
-                sb.append(", ");
+                sb.append(",\n");
 
             byte[] key = keys[i];
 

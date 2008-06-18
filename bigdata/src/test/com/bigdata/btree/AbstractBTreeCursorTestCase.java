@@ -39,7 +39,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractBTreeCursorTestCase extends AbstractCursorTestCase {
+abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTestCase {
 
     /**
      * 

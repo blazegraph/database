@@ -476,7 +476,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
         for( int i=0; i<nkeys; i++) {
 
-            if( i > 0 ) sb.append(", ");
+            if( i > 0 ) sb.append(",\n");
             
             sb.append(BytesUtil.toString(getRemainder(i)));
             

@@ -2047,10 +2047,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             throw new UnsupportedOperationException();
         }
 
-        public void setupCommitters() {
-            throw new UnsupportedOperationException();
-        }
-
         public void shutdown() {
             throw new UnsupportedOperationException();
         }
@@ -2073,10 +2069,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         public Object deserialize(ByteBuffer buf) {
             return delegate.deserialize(buf);
-        }
-
-        public void discardCommitters() {
-            throw new UnsupportedOperationException();
         }
 
         public void force(boolean metadata) {
@@ -2277,15 +2269,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             throw new UnsupportedOperationException();
         }
 
-        public void discardCommitters() {
-            throw new UnsupportedOperationException();
-        }
-
         public void setCommitter(int index, ICommitter committer) {
-            throw new UnsupportedOperationException();
-        }
-
-        public void setupCommitters() {
             throw new UnsupportedOperationException();
         }
 

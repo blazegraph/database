@@ -22,14 +22,15 @@ import java.util.Vector;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractTupleFilterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
@@ -42,8 +43,11 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
+import com.bigdata.sparse.KeyDecoder;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.sparse.ValueType;
+import com.bigdata.sparse.TPS.TPV;
 import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
 
 import cutthecrap.utils.striterators.Resolver;
@@ -169,12 +173,6 @@ import cutthecrap.utils.striterators.Striterator;
  * This approach is necessary since files may moved from one "zone" to another
  * and since the file data must reside on the index partition(s) identified by
  * its file version.
- * 
- * FIXME refactor using an intrinsic "blob" column type in the
- * {@link SparseRowStore} and dropping the {@link #dataIndex}. This will
- * co-locate the blob data with the blob references and make the
- * {@link BigdataRepository} just added logic supporting a specific schema over
- * the {@link SparseRowStore}.
  * 
  * FIXME write a JSON API that interoperates to the extent possible with GAE and
  * HBASE.
@@ -918,12 +916,13 @@ public class BigdataRepository implements ContentRepository {
         {
 
             /*
-             * Delete file version metadata.
+             * Delete the file version metadata for each document in the key
+             * range by replacing its VERSION column value with a null value.
              */
-//            getMetadataIndex().getIndex().submit(fromKey, toKey,
-//                    new FileVersionDeleteProc(fromId, toId), null/* handler */);
+//            getMetadataIndex().getIndex().rangeIterator(fromKey, toKey,
+//                    0/* capacity */, IRangeQuery.CURSOR,
+//                    new FileVersionDeleteProc());
             
-            // FIXME deleteAll()
             if(true) throw new UnsupportedOperationException();
             
         }
@@ -962,27 +961,51 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    abstract protected static class FileVersionDeleteProc implements IKeyRangeIndexProcedure {
+    public static class FileVersionDeleteProc extends AbstractTupleFilterator<TPV> {
 
         /**
          * 
          */
         private static final long serialVersionUID = -31946508577453575L;
 
-        private String fromId;
-        private String toId;
+        private final ITupleCursor<TPV> src;
         
-        public FileVersionDeleteProc(String fromId, String toId) {
-        
-            this.fromId = fromId;
+        protected FileVersionDeleteProc(ITupleCursor<TPV> src) {
+
+            super(src);
             
-            this.toId = toId;
+            this.src = src;
+            
+        }
+
+        /**
+         * Visits the {@link MetadataSchema#VERSION} columns of the version
+         * that were deleted.
+         */
+        public ITuple<TPV> next() {
+            
+            ITuple<TPV> tuple = super.next();
+
+            // FIXME This does not update the timestamp!
+            src.getIndex().insert(tuple.getKey(), ValueType.encode(null));
+            
+            return tuple;
             
         }
         
-        public Object apply(IIndex ndx) {
+        /**
+         * Only visits the {@link MetadataSchema#VERSION} columns.
+         */
+        @Override
+        protected boolean isValid(ITuple<TPV> tuple) {
 
-            throw new UnsupportedOperationException();
+            KeyDecoder keyDecoder = new KeyDecoder(tuple.getKey());
+            
+            String name = keyDecoder.getColumnName();
+            
+            if(!name.equals(MetadataSchema.VERSION)) return false;
+
+            return true;
             
         }
         
@@ -1089,11 +1112,9 @@ public class BigdataRepository implements ContentRepository {
      * 
      * @return The #of blocks copied.
      * 
-     * @todo This could be made more efficient by sending the copy operation to
-     *       each index partition in turn. that would avoid having to copy the
-     *       data first to the client and thence to the target index partition.
-     *       However, that would involve the data service in RPCs which might
-     *       have high latency.
+     * FIXME This could be made more efficient by sending the copy operation to
+     * each index partition in turn. that would avoid having to copy the data
+     * first to the client and thence to the target index partition.
      */
     public long copyBlocks(String fromId, int fromVersion, String toId,
             int toVersion) {

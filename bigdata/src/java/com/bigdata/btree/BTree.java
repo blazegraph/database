@@ -1120,7 +1120,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
      * @return The {@link BTree} or derived class loaded from that
      *         {@link Checkpoint} record.
      */
-    public static BTree load(IRawStore store, long addrCheckpoint) {
+    public static BTree load(final IRawStore store, final long addrCheckpoint) {
 
         /*
          * Read checkpoint record from store.
@@ -1148,20 +1148,20 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
          */
         try {
             
-            Class cl = Class.forName(metadata.getClassName());
+            final Class cl = Class.forName(metadata.getClassName());
             
             /*
              * Note: A NoSuchMethodException thrown here means that you did not
              * declare the required public constructor for a class derived from
              * BTree.
              */
-            Constructor ctor = cl.getConstructor(new Class[] {
+            final Constructor ctor = cl.getConstructor(new Class[] {
                     IRawStore.class,//
                     Checkpoint.class,//
                     IndexMetadata.class //
                     });
 
-            BTree btree = (BTree) ctor.newInstance(new Object[] { //
+            final BTree btree = (BTree) ctor.newInstance(new Object[] { //
                     store,//
                     checkpoint, //
                     metadata //

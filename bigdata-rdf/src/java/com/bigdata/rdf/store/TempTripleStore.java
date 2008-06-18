@@ -340,6 +340,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
         }
 
+        if(textIndex) {
+            
+            getSearchEngine();
+            
+        }
+        
     }
     
     public String usage(){

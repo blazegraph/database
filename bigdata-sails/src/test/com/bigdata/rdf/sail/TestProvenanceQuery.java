@@ -74,6 +74,16 @@ import com.bigdata.rdf.store.BigdataStatementIterator;
  */
 public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
 
+    public TestProvenanceQuery() {
+        
+    }
+    
+    public TestProvenanceQuery(String name) {
+        
+        super(name);
+        
+    }
+    
     public void test_query() throws SailException, IOException, RDFHandlerException, QueryEvaluationException {
 
         if (!((BigdataSail) sail).database.getStatementIdentifiers()) {

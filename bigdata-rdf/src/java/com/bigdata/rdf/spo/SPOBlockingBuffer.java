@@ -47,7 +47,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
     /**
      * <code>true</code> until the buffer is {@link #close()}ed.
      */
-    private boolean open = true;
+    private volatile boolean open = true;
 
     /**
      * Used to resolve term identifiers to terms in log statements (optional).
@@ -123,8 +123,10 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      * made available).
      */
     public void close() {
-
+        
         this.open = false;
+
+        log.info("closed.");
         
     }
     
@@ -149,13 +151,15 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
         
         if(filter != null && filter.isMatch(spo)) {
             
-            log.info("reject: "+spo.toString(store));
+            if (log.isInfoEnabled())
+                log.info("reject: " + spo.toString(store));
 
             return false;
             
         }
 
-        log.info("add: "+spo.toString(store));
+        if (log.isInfoEnabled())
+            log.info("add: " + spo.toString(store));
         
         // wait if the queue is full.
         while(true) {
@@ -165,6 +169,9 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
                 if(buffer.offer(spo,100,TimeUnit.MILLISECONDS)) {
 
                     // item now on the queue.
+
+                    if (log.isInfoEnabled())
+                        log.info("added: " + spo.toString(store));
                     
                     return true;
                     
@@ -236,6 +243,18 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      */
     private class SPOBlockingIterator implements ISPOIterator {
         
+        /**
+         * <code>true</code> iff this iterator is open - it is closed when the
+         * thread consuming the iterator decides that it is done with the
+         * iterator.
+         * <p>
+         * Note: {@link SPOBlockingBuffer#open} is <code>true</code> until the
+         * thread WRITING on the buffer decides that it has nothing further to
+         * write. Once {@link SPOBlockingBuffer#open} becomes <code>false</code>
+         * and there are no more {@link SPO}s in the buffer then the iterator
+         * is exhausted since there is nothing left that it can visit and
+         * nothing new will enter into the buffer.
+         */
         private boolean open = true;
 
         /**
@@ -259,7 +278,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
         }
 
         /**
-         * Does nothing.
+         * Notes that the iterator is closed and hence may no longer be read.
          */
         public void close() {
 
@@ -291,7 +310,13 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
          */
         public boolean hasNext() {
 
-            if(!open) return false;
+            if(!open) {
+                
+                log.info("iterator is closed");
+                
+                return false;
+                
+            }
 
             while (SPOBlockingBuffer.this.open || !buffer.isEmpty()) {
 
@@ -318,7 +343,8 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
 
                     // rejected by the filter.
 
-                    log.info("reject: "+spo.toString(store));
+                    if (log.isInfoEnabled())
+                        log.info("reject: " + spo.toString(store));
 
                     // consume the head of the queue.
                     try {
@@ -337,7 +363,8 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
                 
             }
 
-            log.info("Exhausted: bufferOpen="+SPOBlockingBuffer.this.open+", size="+buffer.size());
+            if (log.isInfoEnabled())
+                log.info("Exhausted: bufferOpen="+SPOBlockingBuffer.this.open+", size="+buffer.size());
             
             return false;
 
@@ -365,7 +392,8 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
                 
             }
             
-            log.info("next: "+spo.toString(store));
+            if (log.isInfoEnabled())
+                log.info("next: " + spo.toString(store));
 
             return spo;
 
@@ -379,40 +407,34 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
 
             }
 
+//            /*
+//             * Note: this attempt to return everything in the buffer at the
+//             * moment we regard it in the next chunk.
+//             */
+//            
+//            final int n = buffer.size();
+//            
+//            return buffer.toArray(new SPO[0]);
+            
             /*
-             * Note: this attempt to return everything in the buffer at the
-             * moment we regard it in the next chunk.
+             * This is thee current size of the buffer. The buffer size MAY grow
+             * asynchronously but will not shrink since we are the only class
+             * that takes items from the buffer.
              */
+            final int chunkSize = buffer.size();
+
+            final SPO[] chunk = new SPO[chunkSize];
+
+            int n = 0;
+
+            while (n < chunkSize) {
+
+                // add to this chunk.
+                chunk[n++] = next();
+                
+            }
             
-            return buffer.toArray(new SPO[0]);
-            
-//            // size to the #of SPOs waiting in the buffer.
-//            final int chunkSize = buffer.size();
-//
-//            SPO[] chunk = new SPO[chunkSize];
-//
-//            int n = 0;
-//
-//            while (hasNext() && n < chunkSize) {
-//
-//                // add to this chunk.
-//                chunk[n++] = next();
-//                
-//            }
-//            
-//            if (n != chunkSize) {
-//
-//                // make it dense.
-//                
-//                SPO[] tmp = new SPO[n];
-//                
-//                System.arraycopy(chunk, 0, tmp, 0, n);
-//                
-//                chunk = tmp;
-//             
-//            }
-//            
-//            return stmts;
+            return chunk;
             
         }
 

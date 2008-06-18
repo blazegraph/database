@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.spo.ISPOFilter;
+
 /**
  * A triple pattern.
  * 
@@ -34,6 +36,8 @@ package com.bigdata.rdf.inf;
  * @version $Id$
  */
 public final class Triple extends Pred {
+    
+    final public ISPOFilter filter;
     
     /**
      * Create a triple/3 predicate.
@@ -44,8 +48,26 @@ public final class Triple extends Pred {
      */
     public Triple(VarOrId s, VarOrId p, VarOrId o) {
 
-        super(false,s,p,o);
-        
+        this(s, p, o, null/*filter*/);
+
+    }
+
+    /**
+     * Create a triple/3 predicate.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param filter
+     *            Optional filter may be used to further restrict the matched
+     *            triples.
+     */
+    public Triple(VarOrId s, VarOrId p, VarOrId o, ISPOFilter filter) {
+
+        super(false, s, p, o);
+
+        this.filter = filter;
+
     }
     
 }

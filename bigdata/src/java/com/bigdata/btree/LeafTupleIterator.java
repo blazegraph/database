@@ -35,7 +35,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TupleIterator implements ITupleIterator {
+public class LeafTupleIterator implements ITupleIterator {
 
     private final Leaf leaf;
 
@@ -57,19 +57,19 @@ public class TupleIterator implements ITupleIterator {
     // first index to NOT visit.
     private final int toIndex;
 
-    public TupleIterator(Leaf leaf) {
+    public LeafTupleIterator(Leaf leaf) {
 
         this(leaf, new Tuple(leaf.btree,IRangeQuery.DEFAULT), null, null, null);
 
     }
 
-    public TupleIterator(Leaf leaf, Tuple tuple) {
+    public LeafTupleIterator(Leaf leaf, Tuple tuple) {
 
         this(leaf, tuple, null, null, null);
 
     }
 
-    public TupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
+    public LeafTupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
 
         this(leaf, tuple, fromKey, toKey, null/*filter*/);
 
@@ -98,7 +98,7 @@ public class TupleIterator implements ITupleIterator {
      * @exception IllegalArgumentException
      *                if fromKey is given and is greater than toKey.
      */
-    public TupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey,
+    public LeafTupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey,
             ITupleFilter filter) {
 
         assert leaf != null;

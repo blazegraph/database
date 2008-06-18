@@ -767,6 +767,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
             return true;
             
         }
+
+        public String toString() {
+            
+            return "NT{name=" + name + ",timestamp=" + timestamp + "}";
+            
+        }
         
     }
     

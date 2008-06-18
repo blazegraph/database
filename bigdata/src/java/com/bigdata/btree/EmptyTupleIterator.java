@@ -35,11 +35,11 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyEntryIterator implements ITupleIterator {
+public class EmptyTupleIterator implements ITupleIterator {
 
-    public static final transient ITupleIterator INSTANCE = new EmptyEntryIterator();
+    public static final transient ITupleIterator INSTANCE = new EmptyTupleIterator();
 
-    private EmptyEntryIterator() {
+    private EmptyTupleIterator() {
     }
 
     public boolean hasNext() {
