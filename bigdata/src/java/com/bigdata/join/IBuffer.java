@@ -23,61 +23,43 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 19, 2008
+ * Created on Jun 20, 2008
  */
 
 package com.bigdata.join;
 
 /**
- * An abstraction used to buffer writes of (selected) values from a binding set.
+ * A buffer abstraction.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBindingSetBuffer {
-    
+public interface IBuffer<E> {
+
     /**
-     * The #of statements currently in the buffer.
+     * The #of elements currently in the buffer.
      */
     public int size();
 
     /**
-     * True iff there are no statements in the buffer.
+     * True iff there are no elements in the buffer.
      */
     public boolean isEmpty();
     
     /**
-     * Add a solution to the buffer.
+     * Add an element to the buffer.
      * 
-     * @param bindingSet
-     *            The solution.
+     * @param e
+     *            The element
      * 
      * @return <code>true</code> unless the buffer has a filter that excludes
      *         this solution.
      */
-    public boolean add(IBindingSet bindingSet);
+    public boolean add(E e);
     
     /**
-     * Flush the buffer to the backing store.
-     * 
-     * @return The cumulative #of solutions that were written on the indices
-     *         since the last time the counter was reset.
-     * 
-     * @see #flush(boolean)
+     * Flush the buffer.
      */
-    public int flush();
+    public void flush();
     
-    /**
-     * Flushes the buffer to the backing store and optionally resets the counter
-     * of the #of solutions actually written on the backing store.
-     * 
-     * @param reset
-     *            When <code>true</code> the counter is reset after the
-     *            {@link #flush()} operation.
-     * 
-     * @return The cumulative #of solutions that were written on the indices
-     *         since the last time the counter was reset.
-     */
-    public int flush(boolean reset);
-
 }

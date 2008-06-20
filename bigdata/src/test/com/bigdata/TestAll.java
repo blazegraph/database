@@ -99,6 +99,7 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.sparse.TestAll.suite() );
         suite.addTest( com.bigdata.search.TestAll.suite() );
         suite.addTest( com.bigdata.repo.TestAll.suite() );
+        suite.addTest( com.bigdata.join.TestAll.suite() );
         suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
 
         return suite;

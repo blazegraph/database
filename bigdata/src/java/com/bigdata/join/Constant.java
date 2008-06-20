@@ -109,4 +109,5 @@ final public class Constant<E> implements IConstant<E> {
         throw new UnsupportedOperationException();
         
     }
+
 }

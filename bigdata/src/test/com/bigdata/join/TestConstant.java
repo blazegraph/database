@@ -23,55 +23,61 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 19, 2008
+ * Created on Jun 20, 2008
  */
 
 package com.bigdata.join;
 
+import junit.framework.TestCase2;
+
 /**
- * Abstraction models either a constant or an unbound variable.
+ * Test suite for {@link Constant}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IVariableOrConstant<E> {
+public class TestConstant extends TestCase2 {
 
     /**
-     * Return <code>true</code> iff this is a variable.
-     */
-    boolean isVar();
-
-    /**
-     * Return <code>true</code> iff this is a constant.
-     */
-    boolean isConstant();
-    
-    /**
-     * Return <code>true</code> if this is the same variable or if both values
-     * are {@link Constant} whose values are the same.
      * 
-     * @todo if the generic types are different then always return false?
      */
-    boolean equals(IVariableOrConstant<E> o);
+    public TestConstant() {
+    }
 
     /**
-     * Return the bound value.
-     * 
-     * @throws UnsupportedOperationException
-     *             if this is a variable.
+     * @param name
      */
-    E get();
-    
-    int hashCode();
-    
-    String toString();
-    
-    /**
-     * Return the name of a variable.
-     * 
-     * @throws UnsupportedOperationException
-     *             if this is not a variable.
-     */
-    String getName();
+    public TestConstant(String name) {
+        super(name);
+    }
 
+    public void test_equals() {
+        
+        Constant c = new Constant<Integer>(1);
+        
+        Constant d = new Constant<Integer>(1);
+        
+        Constant e = new Constant<Integer>(3);
+
+        Constant f = new Constant<Long>(1L);
+
+        Constant g = new Constant<Long>(4L);
+
+        // same reference.
+        assertTrue(c.equals(c));
+
+        // same value.
+        assertTrue(c.equals(d));
+
+        // different value.
+        assertFalse(c.equals(e));
+        
+        // different type, but equivalent value.
+        assertFalse(c.equals(f));
+
+        // different type, different value.
+        assertFalse(c.equals(g));
+
+    }
+    
 }

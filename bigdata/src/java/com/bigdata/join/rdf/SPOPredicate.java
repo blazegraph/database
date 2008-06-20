@@ -21,7 +21,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.join;
+package com.bigdata.join.rdf;
+
+import com.bigdata.join.Constant;
+import com.bigdata.join.IBindingSet;
+import com.bigdata.join.IPredicate;
+import com.bigdata.join.IPredicateConstraint;
+import com.bigdata.join.IVariable;
+import com.bigdata.join.IVariableOrConstant;
 
 /**
  * A predicate that is a triple with one or more variables. While the general
@@ -133,9 +140,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         final IVariableOrConstant<Long> s;
         {
-            if (this.s.isVar() && bindingSet.isBound(this.s.getName())) {
+            if (this.s.isVar() && bindingSet.isBound((IVariable) this.s)) {
 
-                s = new Constant<Long>((Long)bindingSet.get(((Var) this.s).name));
+                s = bindingSet.get((IVariable) this.s);
 
             } else {
 
@@ -146,9 +153,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         final IVariableOrConstant<Long> p;
         {
-            if (this.p.isVar() && bindingSet.isBound(this.s.getName())) {
+            if (this.p.isVar() && bindingSet.isBound((IVariable)this.p)) {
 
-                p = new Constant<Long>((Long)bindingSet.get(((Var) this.p).name));
+                p = bindingSet.get((IVariable) this.p);
 
             } else {
 
@@ -159,9 +166,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         final IVariableOrConstant<Long> o;
         {
-            if (this.o.isVar() && bindingSet.isBound(this.s.getName())) {
+            if (this.o.isVar() && bindingSet.isBound((IVariable) this.o)) {
 
-                o = new Constant<Long>((Long)bindingSet.get(((Var) this.o).name));
+                o = bindingSet.get((IVariable) this.o);
 
             } else {
 
@@ -176,21 +183,21 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     public void copyValues(ISPO spo, IBindingSet bindingSet ) {
 
-        if(s.isVar()) {
-            
-            bindingSet.setLong(s.getName(), spo.s());
-            
-        }
-        
-        if(p.isVar()) {
-            
-            bindingSet.setLong(p.getName(), spo.p());
-            
+        if (s.isVar()) {
+
+            bindingSet.set((IVariable) s, new Constant<Long>(spo.s()));
+
         }
 
-        if(o.isVar()) {
-            
-            bindingSet.setLong(o.getName(), spo.o());
+        if (p.isVar()) {
+
+            bindingSet.set((IVariable) p, new Constant<Long>(spo.p()));
+
+        }
+
+        if (o.isVar()) {
+
+            bindingSet.set((IVariable) o, new Constant<Long>(spo.o()));
             
         }
         
@@ -208,18 +215,21 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
         sb.append("(");
 
-        sb.append(s.isConstant() || bindingSet == null ? s.toString()
-                : bindingSet.get(s.getName()));
+        sb.append(s.isConstant() || bindingSet == null
+                || !bindingSet.isBound((IVariable) s) ? s.toString()
+                : bindingSet.get((IVariable) s));
 
         sb.append(", ");
 
-        sb.append(p.isConstant() || bindingSet == null ? p.toString()
-                : bindingSet.get(p.getName()));
+        sb.append(p.isConstant() || bindingSet == null
+                || !bindingSet.isBound((IVariable) p) ? p.toString()
+                : bindingSet.get((IVariable) p));
 
         sb.append(", ");
 
-        sb.append(o.isConstant() || bindingSet == null ? o.toString()
-                : bindingSet.get(o.getName()));
+        sb.append(o.isConstant() || bindingSet == null
+                || !bindingSet.isBound((IVariable) o) ? o.toString()
+                : bindingSet.get((IVariable) o));
 
         sb.append(")");
 
@@ -232,5 +242,37 @@ public class SPOPredicate implements IPredicate<ISPO> {
         return constraint;
         
     }
+
+    public boolean equals(IPredicate<ISPO> other) {
+        
+        if(this==other) return true;
+        
+        final int arity = 3;
+        
+        if(arity != other.arity()) return false;
+        
+        for(int i=0; i<arity; i++) {
+            
+            if(!get(i).equals(other.get(i))) return false; 
+            
+        }
+        
+        return true;
+        
+    }
+    
+//    public boolean equals(SPOPredicate other) {
+//        
+//        if(this == other) return true;
+//        
+//        if(!s.equals(other.s)) return false;
+//        
+//        if(!p.equals(other.p)) return false;
+//        
+//        if(!o.equals(other.o)) return false;
+//        
+//        return true;
+//        
+//    }
 
 }

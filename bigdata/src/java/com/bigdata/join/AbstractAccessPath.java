@@ -172,7 +172,7 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
     public IChunkedIterator<E> iterator(int limit, int capacity) {
 
         // @todo optimizations for point tests and small limits.
-        return new ChunkedIterator<E>(new Striterator(rangeIterator(capacity,
+        return new ChunkedWrappedIterator<E>(new Striterator(rangeIterator(capacity,
                 flags, filter)).addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 0L;

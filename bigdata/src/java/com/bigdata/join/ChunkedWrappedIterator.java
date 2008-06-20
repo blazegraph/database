@@ -38,7 +38,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ChunkedIterator<T> implements IChunkedIterator<T> {
+public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
     
     private boolean open = true;
     
@@ -52,7 +52,7 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
      * @param src
      *            The source iterator.
      */
-    public ChunkedIterator(Iterator<T>src) {
+    public ChunkedWrappedIterator(Iterator<T>src) {
         
         this(src, 10000 );
         
@@ -66,7 +66,7 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
      * @param chunkSize
      *            The desired chunk size.
      */
-    public ChunkedIterator(Iterator<T>src, int chunkSize) {
+    public ChunkedWrappedIterator(Iterator<T>src, int chunkSize) {
         
         if (src == null)
             throw new IllegalArgumentException();

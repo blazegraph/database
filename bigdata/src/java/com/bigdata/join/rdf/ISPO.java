@@ -26,7 +26,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 19, 2008
  */
 
-package com.bigdata.join;
+package com.bigdata.join.rdf;
+
+import com.bigdata.join.IPredicate;
 
 /**
  * 

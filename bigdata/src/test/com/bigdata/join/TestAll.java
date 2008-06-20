@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.join;
 
 
+import com.bigdata.join.rdf.TestSPOPredicate;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -58,24 +60,43 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("JOINs");
 
+        // test variable and constant impls.
+        suite.addTestSuite(TestVar.class);
+        suite.addTestSuite(TestConstant.class);
+        
+        // test predicate impls.
+        suite.addTestSuite(TestPredicate.class);
+        suite.addTestSuite(TestSPOPredicate.class);
+        
+        // @todo test binding set impls.
+        suite.addTestSuite(TestBindingSet.class);
+        
+        // @todo chunked iterator tests.
+        // TestChunkedWrappedIterator
+        // TestChunkedArrayIterator (fully buffered)
+        // TestChunkedIterator (async reader)
+
+        // @todo test blocking buffer with iterator to drain solutions.
+        // TestBlockingBuffer
+        // @todo test array backed buffer flushing through to a database.
+        // TestArrayBuffer
+        
         // @todo test basic access path mechanisms.
         suite.addTestSuite(TestAccessPath.class);
 
+        // @todo access path using fused view : (focusStore+db).
+        suite.addTestSuite(TestFusedViewAccessPath.class);
+        
         // @todo test ability to select the right access path.
         suite.addTestSuite(TestAccessPathFactory.class);
         
-        // @todo access path using fused view : (focusStore+db).
-        
-        // @todo binding set tests.
-        
-        // @todo chunked iterator tests.
-        
-        // @todo binding set buffer tests.
-
         // test suite for basic rule mechanisms.
         suite.addTestSuite( TestRule.class );
        
-        // @todo test some simple rules.
+        // @todo write tests.
+        suite.addTestSuite(TestRuleState.class);
+        
+        // @todo test some simple rules (evaluate them).
         // suite.addTestSuite( TestRuleRdf01.class );
         
         return suite;

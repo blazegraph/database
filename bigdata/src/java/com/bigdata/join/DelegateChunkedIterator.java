@@ -42,66 +42,61 @@ Modifications:
 
 */
 /*
- * Created on Jun 17, 2008
+ * Created on Apr 10, 2008
  */
 
 package com.bigdata.join;
 
 /**
- * A constraint that a variable may only take on the bindings enumerated by some
- * set.
+ * Abstract class for delegation patterns for chunked iterators.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IN implements IConstraint {
+public abstract class DelegateChunkedIterator<T> implements IChunkedIterator<T> {
+
+    final protected IChunkedIterator<T> src;
 
     /**
-     * 
+     * @param src
+     *            All methods will delegate to this iterator.
      */
-    private static final long serialVersionUID = 6152887151773826714L;
-    
-    private final IVariable x;
-    private final IConstant[] set;
+    public DelegateChunkedIterator(IChunkedIterator<T> src) {
 
-    /**
-     * 
-     * @param x
-     *            Some variable.
-     * @param set
-     *            A set of allowable values for that variable.
-     */
-    public IN(IVariable x, IConstant[] set) {
-        
-        if (x == null || set == null)
+        if (src == null)
             throw new IllegalArgumentException();
 
-        if (set.length==0)
-            throw new IllegalArgumentException();
-        
-        this.x = x;
-        
-        this.set = set;
+        this.src = src;
         
     }
-    
-    public boolean accept(IBindingSet s) {
+
+    public void close() {
+
+        src.close();
         
-        // get binding for "x".
-        final IConstant x = s.get(this.x);
+    }
+
+    public T next() {
         
-        if (x == null)
-            return true; // not yet bound.
+        return src.next();
         
-        for (int i = 0; i < set.length; i++) {
+    }
 
-            if (x.equals(set[i]))
-                return true;
+    public T[] nextChunk() {
+        
+        return src.nextChunk();
+    }
 
-        }
+    public void remove() {
 
-        return false;
+        src.remove();
+        
+    }
 
+    public boolean hasNext() {
+
+        return src.hasNext();
+        
     }
 
 }

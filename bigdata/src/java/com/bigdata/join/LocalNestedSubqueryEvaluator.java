@@ -27,17 +27,37 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.util.Iterator;
+import java.util.concurrent.Callable;
+
+import org.apache.log4j.Logger;
+
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ConcurrencyManager;
+
 /**
- * Base class for rules comprised of one or more triple patterns to be evaluated
- * using a nested subquery. This is the most general technique for evaluation of
- * conjunctive triple patterns. The triple patterns are evaluated in the
- * {@link Rule#order} determined on the selectivity of the triple patterns.
+ * Evaluation uses nested subquery and is optimized under the assumption that
+ * the indices backing the {@link IAccessPath}s are all local (on the same
+ * {@link AbstractJournal}). Under these assumptions we can submit a task to
+ * the {@link ConcurrencyManager} that obtains all necessary locks and then runs
+ * with the local B+Tree objects.
  * 
- * @todo factor apart the rule declaration from the rule evaluation (this class
- *       is an evaluation strategy).
+ * FIXME write some rule execution tests before I refactor the evaluator for
+ * parallelism, loop unrolling, etc. See {@link RuleUtil} which is how this gets
+ * invoked for the moment.
  * 
- * @todo make the {@link BindingSet} explicit. It will need to be explicit when
- *       unrolling the loop for remote index eval.
+ * @todo JOINs all use the same eval strategy for the RDF DB but that is because
+ *       there is one relation (the triples) and multiple indices over that
+ *       relation (the access paths) (of course, in fact we only store the data
+ *       in the indices and all data from the relation is replicated into each
+ *       index so the relation is virtual - an abstraction only for RDF).
+ * 
+ * @todo make {@link Callable} and return {@link Iterator} if we are querying
+ *       and otherwise <code>null</code> since the solutions were {inserted
+ *       into, updated on, or removed from} the database?
+ * 
+ * @todo make the {@link HashBindingSet} explicit. It will need to be explicit
+ *       when unrolling the loop for remote index eval.
  * 
  * @todo do an variant of this evaluation that runs as a procedure on a LDS and
  *       which assumes that all indices required by the various access paths are
@@ -56,8 +76,10 @@ package com.bigdata.join;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRuleNestedSubquery extends Rule {
+public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 
+    protected static final Logger log = Logger.getLogger(LocalNestedSubqueryEvaluator.class);
+    
 //    /**
 //     * When true, enables subquery elimination by mapping a set of outer
 //     * {@link SPO}s that would result in the same subquery across the subquery.
@@ -72,57 +94,14 @@ abstract public class AbstractRuleNestedSubquery extends Rule {
 //     *       cleared correctly when the subqueries are formulated?
 //     */
 //    final boolean subqueryElimination = false;
-    
+   
     /**
-     * @param head
-     *            The subset of bindings that are selected by the rule.
-     * @param body
-     *            The body of the rule.
+     * Recursively evaluate the subqueries
+     * 
+     * @param state
+     *            The rule execution state.
      */
-    public AbstractRuleNestedSubquery(IPredicate head, IPredicate[] body) {
-
-        this(head, body, null);
-
-    }
-
-    /**
-     * @param head
-     *            The subset of bindings that are selected by the rule.
-     * @param body
-     *            The body of the rule.
-     * @param constraints
-     *            An array of constaints on the legal states of the bindings
-     *            materialized for the rule.
-     */
-    public AbstractRuleNestedSubquery(IPredicate head, IPredicate[] body,
-            IConstraint[] constraints) {
-
-        this(null/*name*/, head, body, constraints);
-
-    }
-
-    /**
-     * @param name
-     *            A label for the rule (optional).
-     * @param head
-     *            The subset of bindings that are selected by the rule.
-     * @param body
-     *            The body of the rule.
-     * @param constraints
-     *            An array of constaints on the legal states of the bindings
-     *            materialized for the rule.
-     */
-    public AbstractRuleNestedSubquery(String name, IPredicate head,
-            IPredicate[] body, IConstraint[] constraints) {
-
-        super(name, head, body, constraints);
-
-    }
-    
-    /**
-     * Recursively evaluate the subqueries.
-     */
-    final public void apply( State state ) {
+    final public void apply( RuleState state ) {
         
         final long begin = System.currentTimeMillis();
 
@@ -150,10 +129,14 @@ abstract public class AbstractRuleNestedSubquery extends Rule {
      *            obtain the index of the corresponding predicate in the
      *            evaluation order.
      */
-    final private void apply1(final int index, State state) {
+    final private void apply1(final int index, RuleState state) {
 
-        assert index >= 0;
-        assert index < body.length;
+        final Rule rule = state.getRule();
+        
+        final int tailCount = rule.getTailCount();
+        
+        if (index < 0 || index > tailCount)
+            throw new IllegalArgumentException();
         
         /*
          * Subquery iterator.
@@ -167,16 +150,16 @@ abstract public class AbstractRuleNestedSubquery extends Rule {
                 // next chunk of results from that access path.
                 final Object[] chunk = itr.nextChunk();
 
-                if (index + 1 < body.length) {
+                if (index + 1 < tailCount) {
 
                     // nexted subquery.
 
                     for (Object stmt : chunk) {
 
-                        if (DEBUG) {
+                        if (log.isDebugEnabled()) {
                             log.debug("Considering: " + stmt.toString()
                                     + ", index=" + index + ", rule="
-                                    + getName());
+                                    + rule.getName());
                         }
 
                         state.stats.nstmts[state.order[index]]++;
@@ -208,10 +191,10 @@ abstract public class AbstractRuleNestedSubquery extends Rule {
 
                     for (Object stmt : chunk) {
 
-                        if (DEBUG) {
+                        if (log.isDebugEnabled()) {
                             log.debug("Considering: " + stmt.toString()
                                     + ", index=" + index + ", rule="
-                                    + getName());
+                                    + rule.getName());
                         }
 
                         state.stats.nstmts[state.order[index]]++;

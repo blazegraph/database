@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,33 +20,35 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Nov 10, 2007
+ * Created on Jun 19, 2008
  */
 
 package com.bigdata.join;
 
+import junit.framework.TestCase2;
+
 /**
- * Instances of this class are created dynamically when a {@link Rule} is
- * specialized.
+ * FIXME test both {@link HashBindingSet} and {@link ArrayBindingSet}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SpecializedRule extends AbstractRuleNestedSubquery {
+public class TestBindingSet extends TestCase2 {
 
     /**
      * 
-     * @param name
-     * @param head
-     * @param body
      */
-    public SpecializedRule(String name, IPredicate head, IPredicate[] body,
-            IConstraint[] constraints) {
-
-        super(name, head, body, constraints);
-
+    public TestBindingSet() {
     }
-    
+
+    /**
+     * @param name
+     */
+    public TestBindingSet(String name) {
+        super(name);
+    }
+
 }

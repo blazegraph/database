@@ -1,10 +1,16 @@
 package com.bigdata.join;
 
+import java.io.ObjectStreamException;
+import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A variable.
+ * <p>
+ * Note: This implementation provides reference testing for equality. The rest
+ * of the package <em>assumes</em> that it can use reference testing for
+ * equality when comparing variables.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -12,9 +18,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * @todo variable canonicalization must be maintained during de-serialization.
  *       this matters when we start serializing predicates for remote execution.
  */
-final public class Var<E> implements IVariableOrConstant<E> {
+final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>>, Serializable 
+{
 
-    public final String name;
+    private static final long serialVersionUID = -7100443208125002485L;
+    
+    final private String name;
 
     final public boolean isVar() {
 
@@ -91,12 +100,8 @@ final public class Var<E> implements IVariableOrConstant<E> {
 
     /**
      * Canonicalizing map for {@link Var}s.
-     * 
-     * @todo variables will be serialized for remote joins since they occur in
-     *       the {@link IPredicate}. De-serialization must maintain a
-     *       canonicalizing mapping!
      */
-    static private final Map<String, Var> vars = new ConcurrentHashMap<String, Var>();
+    static private final Map<String, Var> vars = new HashMap<String, Var>();
 
     /**
      * Singleton factory for {@link Var}s.
@@ -140,4 +145,34 @@ final public class Var<E> implements IVariableOrConstant<E> {
 
     }
 
+    /**
+     * Orders variables alphabetically.
+     */
+    public int compareTo(IVariable<E> o) {
+
+        return name.compareTo(o.getName());
+
+    }
+
+//    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+//
+//        name = in.readUTF();
+//        
+//    }
+//
+//    public void writeExternal(ObjectOutput out) throws IOException {
+//
+//        out.writeUTF(name);
+//        
+//    }
+
+    /**
+     * Imposes the canonicalizing mapping during object de-serialization.
+     */
+    private Object readResolve() throws ObjectStreamException {
+        
+        return var(name);
+        
+    }
+    
 }

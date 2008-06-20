@@ -1561,55 +1561,6 @@ abstract public class DataService extends AbstractService
         
     }
 
-//    /**
-//     * This returns the counters for the index as reported by
-//     * {@link ConcurrencyManager#getCounters(String)}.
-//     * 
-//     * FIXME Those counters are reset by each journal overflow event. It would
-//     * be very nice to be able to report the counters over the life of an index
-//     * partition (at least since the data service was started). This would
-//     * require noticing when the index partition was dropped. Also, the only
-//     * counters that we keep from task to task are the counters for the
-//     * {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED} views of named
-//     * indices. We should be able to report counters/costs for historical reads
-//     * and transactions as well.
-//     * 
-//     * FIXME replace with serialized {@link ICounterSet} XML.
-//     */
-//    public String getStatistics(String name) throws IOException {
-//
-//        setupLoggingContext();
-//        
-//        try {
-//
-//            Counters counters = concurrencyManager.getCounters(name);
-//            
-//            if(counters == null) {
-//                
-//                /*
-//                 * Note: A null return above is not an indication that the named
-//                 * index does not exist, just an indication that there are no
-//                 * counters for that index. This will happen if noone has
-//                 * written on the index.
-//                 */
-//                return "No data for "+name;
-//                
-////                throw new NoSuchIndexException(name);
-//                
-//            }
-//            
-//            String statistics = counters.toString();
-//            
-//            return statistics;
-//            
-//        } finally {
-//            
-//            clearLoggingContext();
-//            
-//        }
-//        
-//    }
-    
     /**
      * Note: This chooses {@link ITx#READ_COMMITTED} if the the index has
      * {@link ITx#UNISOLATED} isolation and the {@link IIndexProcedure} is an

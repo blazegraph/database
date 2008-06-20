@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.io.Serializable;
+
 /**
  * An interface for specifying constraints the allowable states of an
  * {@link IBindingSet}. For example, you can impose the constraint that two
@@ -37,10 +39,8 @@ package com.bigdata.join;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME move the impl classes into this package.
  */
-public interface IConstraint {
+public interface IConstraint extends Serializable {
     
     public boolean accept(IBindingSet bindingSet);
     

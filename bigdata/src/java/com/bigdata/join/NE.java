@@ -32,10 +32,15 @@ package com.bigdata.join;
  */
 public class NE implements IConstraint {
 
-    private final String x;
-    private final String y;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -880242496108447671L;
     
-    public NE(Var x, Var y) {
+    private final IVariable x;
+    private final IVariable y;
+    
+    public NE(IVariable x, IVariable y) {
         
         if (x == null || y == null)
             throw new IllegalArgumentException();
@@ -43,26 +48,28 @@ public class NE implements IConstraint {
         if (x == y)
             throw new IllegalArgumentException();
         
-        this.x = x.getName();
+        this.x = x;
         
-        this.y = y.getName();
+        this.y = y;
         
     }
     
     public boolean accept(IBindingSet s) {
         
         // get binding for "x".
-        final Object x = s.get(this.x);
+        final IConstant x = s.get(this.x);
        
         if (x == null)
             return true; // not yet bound.
 
         // get binding for "y".
-        final Object y = s.get(this.y);
+        final IConstant y = s.get(this.y);
     
         if (y == null)
             return true; // not yet bound.
-    
+        
+//        System.err.println(this.x+"="+x+", "+this.y+"="+y);
+        
         return !x.equals(y); 
 
    }
