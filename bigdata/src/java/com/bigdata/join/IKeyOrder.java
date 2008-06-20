@@ -1,4 +1,4 @@
-/*
+/**
 
 Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
@@ -20,50 +20,38 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 */
+/*
+ * Created on Jan 26, 2007
+ */
+
 package com.bigdata.join;
 
+import java.util.Comparator;
+
 /**
- * Imposes the constraint <code>var != constant</code>.
+ * Represents the key order used by an index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME drive through {@link IChunkedIterator} or an extension of that
+ * interface that knows about natural traversal orders and how to reorder the
+ * elements that are being visited to support JOINs where the natural order for
+ * the access paths is different for the left- and right-hand side of the JOIN.
  */
-public class NEConstant implements IConstraint {
-    
+public interface IKeyOrder<E> {
+
     /**
-     * 
+     * Return the comparator that places elements into the natural order for the
+     * associated index.
      */
-    private static final long serialVersionUID = -2267584965908057945L;
-    
-    private final IVariable var;
-    private final IConstant val;
+    public Comparator<E> getComparator();
 
-    public NEConstant(IVariable var, IConstant val) {
-
-        if (var == null)
-            throw new IllegalArgumentException();
-        
-        if (val == null)
-            throw new IllegalArgumentException();
-
-        this.var = var;
-
-        this.val = val;
-        
-    }
-    
-    public boolean accept(IBindingSet s) {
-        
-        // get binding for the variable.
-        final IConstant tmp = s.get(this.var);
-    
-        if (tmp == null)
-            return true; // not yet bound.
-    
-        return !tmp.equals(val); 
-
-   }
+    /**
+     * Return the {@link IKeyOrder} that will be used to read from the statement
+     * index that is most efficient for the specified triple pattern.
+     */
+    public IKeyOrder<E> get(IPredicate<E> predicate);
 
 }

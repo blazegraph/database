@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import com.bigdata.join.rdf.ISPO;
+
 
 /**
  * A generic implementation.
@@ -141,9 +143,10 @@ abstract public class Predicate<E> implements IPredicate<E> {
             
             final IVariableOrConstant v = values[i];
             
-            if (v.isVar() && bindingSet!=null && bindingSet.isBound(v.getName())) {
+            if (v.isVar() && bindingSet != null
+                    && bindingSet.isBound((IVariable) v)) {
 
-                values[i] = new Constant(bindingSet.get(v.getName()));
+                values[i] = new Constant(bindingSet.get((IVariable) v));
                 
             } else {
                 
@@ -183,8 +186,9 @@ abstract public class Predicate<E> implements IPredicate<E> {
 
             final IVariableOrConstant<E> v = values[i];
 
-            sb.append(v.isConstant() || bindingSet == null ? v.toString()
-                    : bindingSet.get(v.getName()));
+            sb.append(v.isConstant() || bindingSet == null
+                    || !bindingSet.isBound((IVariable) v) ? v.toString()
+                    : bindingSet.get((IVariable) v));
 
         }
 
@@ -194,4 +198,23 @@ abstract public class Predicate<E> implements IPredicate<E> {
 
     }
 
+    public boolean equals(IPredicate<E> other) {
+
+        if (this == other)
+            return true;
+
+        final int arity = arity();
+        
+        if(arity != other.arity()) return false;
+        
+        for(int i=0; i<arity; i++) {
+            
+            if(!get(i).equals(other.get(i))) return false; 
+            
+        }
+        
+        return true;
+        
+    }
+    
 }

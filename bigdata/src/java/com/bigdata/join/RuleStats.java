@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
 
-import com.bigdata.join.Rule.State;
 
 /**
  * Statistics about what the Rule did.
@@ -56,7 +55,7 @@ public class RuleStats {
      * Initilizes statistics for a {@link Rule}.
      * <p>
      * Note: This form is used when statistics will be aggregated across
-     * multiple execution {@link State}s for the same rule.
+     * multiple execution {@link RuleState}s for the same rule.
      * 
      * @param rule The rule.
      */
@@ -66,11 +65,13 @@ public class RuleStats {
         
         this.name = rule.getName();
         
-        this.nstmts = new int[rule.body.length];
-
-        this.nsubqueries = new int[rule.body.length];
+        final int tailCount = rule.getTailCount();
         
-        this.order = new int[rule.body.length];
+        this.nstmts = new int[tailCount];
+
+        this.nsubqueries = new int[tailCount];
+        
+        this.order = new int[tailCount];
         
         this.nexecutions = 0;
         
@@ -79,7 +80,7 @@ public class RuleStats {
     }
 
     /**
-     * Initilizes statistics from a {@link Rule}'s execution {@link State}.
+     * Initilizes statistics from a {@link Rule}'s execution {@link RuleState}.
      * <p>
      * Note: This makes the order of execution for the body predicates
      * available.
@@ -87,7 +88,7 @@ public class RuleStats {
      * @param state
      *            The rule execution state.
      */
-    RuleStats(State state) {
+    RuleStats(RuleState state) {
         
         this(state.getRule());
         
@@ -104,7 +105,7 @@ public class RuleStats {
     }
 
     /**
-     * True iff this is an aggregation of individual rule execution {@link State}s.
+     * True iff this is an aggregation of individual rule execution {@link RuleState}s.
      */
     private boolean aggregate;
     
@@ -151,7 +152,7 @@ public class RuleStats {
     
     /**
      * The order of execution of the predicates in the body of the rule (only
-     * available at the detail level of a single {@link State} execution. When
+     * available at the detail level of a single {@link RuleState} execution. When
      * aggregated, the order[] will always contain zeros since it can not be
      * meaningfully combined across executions.
      */
@@ -167,7 +168,7 @@ public class RuleStats {
     /**
      * The #of entailments that were actually added to the statement indices
      * (that is to say, the entailments were new to the database). This is
-     * computed using {@link AbstractTripleStore#getStatementCount()} before and
+     * computed using {@link AbstractTripleStore#getBufferCount()} before and
      * after the rule is applied.
      */
     public int numAdded;
@@ -281,8 +282,8 @@ public class RuleStats {
 //    }
 
     /**
-     * When execution {@link State}s are being aggregated, this will contain
-     * the individual {@link RuleStats} for each execution {@link State}. 
+     * When execution {@link RuleState}s are being aggregated, this will contain
+     * the individual {@link RuleStats} for each execution {@link RuleState}. 
      */
     public List<RuleStats> detailStats = new Vector<RuleStats>();
     
@@ -291,7 +292,7 @@ public class RuleStats {
      * 
      * @param o Statistics for another rule.
      */
-    public void add(RuleStats o) {
+    synchronized public void add(RuleStats o) {
     
         detailStats.add(o);
         

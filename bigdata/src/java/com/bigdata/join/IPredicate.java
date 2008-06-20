@@ -74,8 +74,8 @@ public interface IPredicate<E> extends Cloneable {
     public IVariableOrConstant get(int index);
     
     /**
-     * A new {@link IPredicate} in which zero or more named slots have been
-     * bound to constants using the given {@link IBindingSet}.
+     * A copy of this {@link IPredicate} in which zero or more variables have
+     * been bound to constants using the given {@link IBindingSet}.
      */
     public IPredicate<E> asBound(IBindingSet bindingSet);
 
@@ -107,5 +107,22 @@ public interface IPredicate<E> extends Cloneable {
      *            The variable bindings
      */
     public String toString(IBindingSet bindingSet);
-    
+
+    /**
+     * Compares the bindings of two predicates for equality.
+     * 
+     * @param other
+     *            Another predicate.
+     * @return true iff the predicate have the same arity and their ordered
+     *         bindings are the same. when both predicates have a variable at a
+     *         given index, the names of the variables must be the same.
+     * 
+     * @todo this may not be the best definition of equality to use here. it
+     *       intentionally disregards any constraints and the generic type while
+     *       requiring that unbound variables have the same name at a given
+     *       index. This definition was motivated by the unit tests rather than
+     *       any functional use for the behavior.
+     */
+    public boolean equals(IPredicate<E> other);
+
 }

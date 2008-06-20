@@ -29,6 +29,7 @@ package com.bigdata.join;
 
 import java.util.Set;
 
+import com.bigdata.join.rdf.SPOPredicate;
 
 /**
  * Test suite for basic {@link Rule} mechanisms.
@@ -52,33 +53,21 @@ public class TestRule extends AbstractRuleTestCase {
         super(name);
     }
 
-    /**
-     * Test the singleton factory for {@link Var}s.
-     */
-    public void test_variableSingletonFactory() {
-        
-        final Var u = Var.var("u");
-
-        // same instance.
-        assertTrue(u == Var.var("u"));
-        
-        // different instance.
-        assertTrue(u != Var.var("x"));
-        
-    }
-
-    final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
+    private final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
             1L);
     
-    final static Constant<Long> rdfsResource = new Constant<Long>(
+    private final static Constant<Long> rdfsResource = new Constant<Long>(
             2L);
     
-    final static Constant<Long> rdfType = new Constant<Long>(
+    private final static Constant<Long> rdfType = new Constant<Long>(
             3L);
     
-    final static Constant<Long> rdfsClass = new Constant<Long>(
+    private final static Constant<Long> rdfsClass = new Constant<Long>(
             4L);
-    
+
+    private final static Constant<Long> rdfProperty = new Constant<Long>(
+            5L);
+
     /**
      * Verify constructor of a simple rule.
      */
@@ -86,77 +75,61 @@ public class TestRule extends AbstractRuleTestCase {
 
         final Var<Long> u = Var.var("u");
 
-        final SPOPredicate head = new SPOPredicate(u, rdfsSubClassOf, rdfsResource);
-
-        final SPOPredicate[] body = new SPOPredicate[] {//
-                new SPOPredicate(u, rdfType, rdfsClass)//
-        };
-
-        final Rule r = new MyRule(head, body);
+        final Rule r = new MyRule(
+                // head
+                new SPOPredicate(u, rdfsSubClassOf, rdfsResource),
+                // tail
+                new SPOPredicate[] {//
+                    new SPOPredicate(u, rdfType, rdfsClass) //
+                }
+                );
 
         // write out the rule on the console.
         System.err.println(r.toString());
 
-        fail("continue testing w/ state.");
-        
-//        State s = r.newState(false/* justify */, store,
-//                new SPOAssertionBuffer(store, store, null/* filter */,
-//                        100/* capacity */, false/* justify */));
-//
-//        // check bindings -- should be Ok.
-//        assertTrue(s.checkBindings());
-//
-//        // verify body[0] is not fully bound.
-//        assertFalse(s.isFullyBound(0));
-//
-//        // verify you can overwrite a variable in the tail.
-//        s.set(u, 1);
-//        assertTrue(s.checkBindings()); // no complaints.
-//        assertTrue(s.isFullyBound(0)); // is fully bound.
-//        s.resetBindings(); // restore the bindings.
-//        assertTrue(s.checkBindings()); // verify no complaints.
-//        assertFalse(s.isFullyBound(0)); // no longer fully bound.
-//
-//        /*
-//         * verify no binding for u.
-//         */
-//        assertEquals(NULL, s.get(u));
-//        assertEquals(NULL, s.get(Rule.var("u")));
-//
-//        try {
-//            s.get(Rule.var("v"));
-//            fail("Expecting: " + IllegalArgumentException.class);
-//        } catch (IllegalArgumentException ex) {
-//            log.info("Ignoring expected exception: " + ex);
-//        }
-//
-//        // set a binding and check things out.
-//        s.resetBindings(); // clean slate.
-//        assertEquals(NULL, s.get(u)); // no binding.
-//        assertEquals(NULL, s.get(Rule.var("u"))); // no binding.
-//        s.set(u, vocab.rdfsClass.id);
-//        assertTrue(s.checkBindings()); // verify we did not overwrite
-//                                        // constants.
-//        // write on the console.
-//        System.err.println(s.toString(true));
-//        // verify [u] is now bound.
-//        assertEquals(vocab.rdfsClass.id, s.get(u));
-//        assertEquals(vocab.rdfsClass.id, s.get(Rule.var("u")));
-//        // verify [u] is now bound.
-//        assertEquals(vocab.rdfsClass.id, s.get(u));
-//        assertEquals(vocab.rdfsClass.id, s.get(Rule.var("u")));
+        assertEquals("variableCount", 1, r.getVariableCount());
 
+        assertTrue("head", new SPOPredicate(u, rdfsSubClassOf, rdfsResource)
+                .equals(r.getHead()));
+
+        assertTrue("tail[0]", new SPOPredicate(u, rdfType, rdfsClass).equals(r
+                .getTailPredicate(0)));
+
+        assertSameIteratorAnyOrder(new Comparable[] { u }, r.getVariables());
+
+        assertTrue(r.isDeclared(u));
+
+        assertFalse(r.isDeclared(Var.var("x")));
+        
+    }
+
+    /**
+     * Test for computing the intersection of the variables in two predicates.
+     */
+    public void test_getSharedVars() {
+
+        SPOPredicate p1 = new SPOPredicate(Var.var("u"), rdfsSubClassOf,
+                rdfsResource);
+
+        SPOPredicate p2 = new SPOPredicate(Var.var("x"), rdfType, Var.var("u"));
+
+        Set<IVariable> actual = Rule.getSharedVars(p1, p2);
+
+        assertEquals(1, actual.size());
+
+        assertTrue(actual.contains(Var.var("u")));
+        
     }
     
     /**
      * Test the ability to compute the variables shared between two {@link Pred}s
      * in a {@link Rule}.
      */
-    public void test_getSharedVars() {
+    public void test_getSharedVarsInTail() {
 
-        Rule r = new MyRulePattern1();
+        final Rule r = new MyRulePattern1();
         
-        Set<Var> shared = r.getSharedVars(0, 1);
+        final Set<IVariable> shared = r.getSharedVars(0, 1);
 
         assertTrue(shared.contains(Rule.var("u")));
 
@@ -166,251 +139,187 @@ public class TestRule extends AbstractRuleTestCase {
 
     }
     
-//    /**
-//     * Test the ability to obtain the access path given the {@link Pred}.
-//     */
-//    public void test_getAccessPath() {
-//        
-//        AbstractTripleStore store = getStore();
-//        
-//        try {
-//
-//            Rule r = new MyRulePattern1(new RDFSHelper(store));
-//
-//            State s = r.newState(false/* justify */, store, new SPOAssertionBuffer(store, store,
-//                    null/* filter */, 100/* capacity */, false/* justify */));
-//            
-//            // (u rdfs:subClassOf x)
-//            assertEquals(KeyOrder.POS,s.getAccessPath(0).getKeyOrder());
-//
-//            // (v rdfs:subClassOf u)
-//            assertEquals(KeyOrder.POS,s.getAccessPath(1).getKeyOrder());
-//            
-//        } finally {
-//            
-//            store.closeAndDelete();
-//            
-//        }
-//
-//    }
-//    
-////    /**
-////     * Test the ability to choose the more selective access path, that the
-////     * selected path changes as predicates become bound, and that the resulting
-////     * entailment reflects the current variable bindings.
-////     */
-////    public void test_getMoreSelectiveAccessPath() {
-////        
-////        AbstractTripleStore store = getStore();
-////        
-////        try {
-////
-////            // define some vocabulary.
-////            RDFSHelper vocab = new RDFSHelper(store);
-////            
-//////            InferenceEngine inf = new InferenceEngine(store);
-////
-////            URI U1 = new URIImpl("http://www.foo.org/U1");
-////            URI U2 = new URIImpl("http://www.foo.org/U2");
-////            URI V1 = new URIImpl("http://www.foo.org/V1");
-////            URI V2 = new URIImpl("http://www.foo.org/V2");
-////            URI X1 = new URIImpl("http://www.foo.org/X1");
-//////            URI X2 = new URIImpl("http://www.foo.org/X2");
-////
-////            // body[0]                  body[1]          -> head
-////            // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
-////            Rule r = new MyRulePattern1(vocab);
-////
-////            // generate justifications for entailments.
-////            final boolean justify = true;
-////            
-////            State s = r.newState(justify, store, new SPOBuffer(store,justify));
-////           
-////            /*
-////             * Obtain the access paths corresponding to each predicate in the
-////             * body of the rule. Each access path is parameterized by the triple
-////             * pattern described by the corresponding predicate in the body of
-////             * the rule.
-////             * 
-////             * Note: even when using the same access paths the range counts CAN
-////             * differ based on what constants are bound in each predicate and on
-////             * what positions are variables.
-////             * 
-////             * Note: When there are shared variables the range count generally
-////             * will be different after those variable(s) become bound.
-////             */
-////            for (int i = 0; i < r.body.length; i++) {
-////
-////                assertEquals(0, s.getAccessPath(i).rangeCount());
-////
-////            }
-////            
-////            /*
-////             * Add some data into the store where it is visible to those access
-////             * paths and notice the change in the range count.
-////             */
-////            StatementBuffer buffer = new StatementBuffer(store,100/*capacity*/,true/*distinct*/);
-////
-////            // (u rdf:subClassOf x)
-////            buffer.add(U1, URIImpl.RDFS_SUBCLASSOF, X1);
-////            
-////            // (v rdf:type u)
-////            buffer.add(V1, URIImpl.RDF_TYPE, U1);
-////            buffer.add(V2, URIImpl.RDF_TYPE, U2);
-////            
-////            buffer.flush();
-////            
-////            store.dumpStore();
-////            
-////            assertEquals(3,store.getStatementCount());
-////            
-////            // (u rdf:subClassOf x)
-////            assertEquals(1,s.getAccessPath(0).rangeCount());
-////
-////            // (v rdf:type u)
-////            assertEquals(2,s.getAccessPath(1).rangeCount());
-////
-////            /*
-////             * Now use the more selective of the two 1-bound triple patterns to
-////             * query the store.
-////             */
-////
-////            // (u rdf:subClassOf x)
-////            assertEquals(0,s.getMostSelectiveAccessPathByRangeCount());
-////            
-////            /*
-////             * bind variables for (u rdf:subClassOf x) to known values from the
-////             * statement in the database that matches the predicate.
-////             */
-////            
-////            assertNotSame(NULL,store.getTermId(U1));
-////            s.set(Rule.var("u"), store.getTermId(U1));
-////            
-////            assertNotSame(NULL,store.getTermId(X1));
-////            s.set(Rule.var("x"), store.getTermId(X1));
-////            
-////            assertTrue(s.isFullyBound(0));
-////            
-////            // (v rdf:type u)
-////            assertEquals(1,s.getMostSelectiveAccessPathByRangeCount());
-////
-////            // bind the last variable.
-////            assertNotSame(NULL,store.getTermId(V1));
-////            s.set(Rule.var("v"), store.getTermId(V1));
-////
-////            assertTrue(s.isFullyBound(1));
-////
-////            // verify no access path is recommended since the rule is fully bound.
-////            assertEquals(-1,s.getMostSelectiveAccessPathByRangeCount());
-////
-////            // emit the entailment
-////            s.emit();
-////            
-////            assertEquals(1,s.buffer.size());
-////            assertEquals(justify?1:0,s.buffer.getJustificationCount());
-////            
-////            // verify bindings on the emitted entailment.
-////            SPO entailment = s.buffer.get(0);
-////            assertEquals(entailment.s,store.getTermId(V1));
-////            assertEquals(entailment.p,store.getTermId(URIImpl.RDF_TYPE));
-////            assertEquals(entailment.o,store.getTermId(X1));
-////            
-////            if(justify) {
-////             
-////                // @todo verify the justification
-////                
-////            }
-////            
-////        } finally {
-////            
-////            store.closeAndDelete();
-////            
-////        }
-////
-////    }
-//
-//    /**
-//     * Test case for specializing a rule by binding some of its variables.
-//     * 
-//     * @todo verify all combinations of override (NULL, NULL, NULL), binding a
-//     *       variable, binding a constant to the same value, and the illegal
-//     *       action of binding a constant to a different value.
-//     * 
-//     * @todo test adding constraints.
-//     */
-//    public void test_specializeRule() {
-//
-//        AbstractTripleStore store = getStore();
-//
-//        try {
-//
-//            RDFSHelper vocab = new RDFSHelper(store);
-//
-//            // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
-//            Rule r = new MyRulePattern1(vocab);
-//
-//            System.err.println(r.toString());
-//
-//            {
-//                /*
-//                 * Verify we can not override the rdf:type constant with a
-//                 * different constant.
-//                 */
-//
-//                try {
-//                    
-//                    r.specialize(NULL, vocab.rdfProperty.id, NULL, 
-//                            new IConstraint[] {});
-//                    
-//                    fail("Expecting: "+IllegalArgumentException.class);
-//                    
-//                } catch(IllegalArgumentException ex) {
-//                    
-//                    System.err.println("Ignoring expected exception: "+ex);
-//                    
-//                }
-//                
-//            }
-//            
-//            {
-//                /*
-//                 * Verify we can override the subject with a constant.
-//                 */
-//
-//                Rule r1 = r.specialize(vocab.rdfProperty.id, NULL, NULL,
-//                        new IConstraint[] {});
-//
-//                System.err.println(r1.toString());
-//
-//                // verify "v" bound in body[1].
-//                assertTrue(r1.body[1].s.isConstant());
-//                assertEquals(vocab.rdfProperty.id, r1.body[1].s.id);
-//
-//            }
-//
-//            {
-//                /*
-//                 * Verify we can override the object with a constant.
-//                 */
-//
-//                Rule r1 = r.specialize(NULL, NULL, vocab.rdfProperty.id,
-//                        new IConstraint[] {});
-//
-//                System.err.println(r1.toString());
-//
-//                // verify "x" bound in body[0].
-//                assertTrue(r1.body[0].o.isConstant());
-//                assertEquals(vocab.rdfProperty.id, r1.body[0].o.id);
-//
-//            }
-//
-//        } finally {
-//            
-//            store.closeAndDelete();
-//            
-//        }
-//        
-//    }
+    /**
+     * Verify variable binding stuff for a rule.
+     */
+    public void test_ruleBindings() {
+
+        final Var<Long> u = Var.var("u");
+
+        final SPOPredicate head = new SPOPredicate(u, rdfsSubClassOf, rdfsResource);
+
+        final SPOPredicate[] body = new SPOPredicate[] {//
+
+                new SPOPredicate(u, rdfType, rdfsClass)//
+                
+        };
+
+        final Rule r = new MyRule(head, body);
+
+        final IBindingSet bindingSet = new HashBindingSet();
+        
+        // verify body[0] is not fully bound.
+        assertFalse(r.isFullyBound(0,bindingSet));
+
+        // verify you can overwrite a variable in the tail.
+        bindingSet.set(u, new Constant<Long>(1L));
+
+        assertTrue(r.isFullyBound(0,bindingSet)); // is fully bound.
+        
+        bindingSet.clearAll(); // restore the bindings.
+        
+        assertFalse(r.isFullyBound(0,bindingSet)); // no longer fully bound.
+        
+    }
+    
+    /**
+     * Verify that constraint violations are being tested (specific
+     * {@link IConstraint}s are tested elsewhere).
+     */
+    public void test_constraints() {
+
+        /*
+         *  (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
+         *  
+         *  Note: u != x
+         */
+        final Rule r = new MyRulePattern1();
+
+        final IBindingSet bindingSet = new HashBindingSet();
+//        final IBindingSet bindingSet = new ArrayBindingSet(3);
+        
+        final IVariable u = Var.var("u");
+
+        final IVariable x = Var.var("x");
+        
+        // set a binding
+        bindingSet.set(u, rdfsClass);
+
+        // write on the console.
+        log.info(bindingSet.toString());
+        log.info(r.toString(bindingSet));
+        
+        // verify bindings are Ok.
+        assertTrue(r.isLegal(bindingSet));
+
+        /*
+         * Now try to bind [x] to a different constant with a different value
+         * and verify no violation is detected.
+         */
+
+        bindingSet.set(x, rdfsResource);
+        
+        // write on the console.
+        log.info(bindingSet.toString());
+        log.info(r.toString(bindingSet));
+        
+        // verify bindings are Ok.
+        assertTrue(r.isLegal(bindingSet));
+
+        /*
+         * Now try to re-bind [x] to the same constant as [u] and verify that
+         * the violation of the [u != x] constraint is detected.
+         */
+
+        bindingSet.set(x, rdfsClass);
+        
+        // write on the console.
+        log.info(bindingSet.toString());
+        log.info(r.toString(bindingSet));
+        
+        // verify bindings are illegal.
+        assertFalse(r.isLegal(bindingSet));
+
+        /*
+         * Now try to bind [x] to a distinct constant having the same value and
+         * verify that the violation of the [u != x] constraint is detected.
+         */
+
+        // spot check equals() for the Constant.
+        assertTrue(rdfsClass.equals(new Constant<Long>(rdfsClass.get())));
+        
+        // re-bind [x].
+        bindingSet.set(x, new Constant<Long>(rdfsClass.get()));
+        
+        // write on the console.
+        log.info(bindingSet.toString());
+        log.info(r.toString(bindingSet));
+        
+        // verify bindings are illegal.
+        assertFalse(r.isLegal(bindingSet));
+
+        /*
+         * Clear the binding for [u] and verify that the bindings are then legal.
+         */
+        bindingSet.clear(u);
+        
+        // write on the console.
+        log.info(bindingSet.toString());
+        log.info(r.toString(bindingSet));
+        
+        // verify bindings are Ok.
+        assertTrue(r.isLegal(bindingSet));
+        
+    }
+
+    /**
+     * Test case for specializing a rule by binding some of its variables.
+     * 
+     * @todo test adding constraints.
+     */
+    public void test_specializeRule() {
+
+        // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
+        final Rule r = new MyRulePattern1();
+
+        log.info(r.toString());
+
+        {
+
+            /*
+             * Verify we can override a variable with a constant.
+             */
+
+            final IBindingSet bindingSet = new ArrayBindingSet(//
+                    new IVariable[] { Var.var("v") },//
+                    new IConstant[] { rdfProperty }//
+            );
+
+            final Rule r1 = r
+                    .specialize("r1", bindingSet, new IConstraint[] {});
+
+            log.info(r1.toString());
+
+            // verify "v" bound in body[1].
+            assertTrue(r1.getTailPredicate(1).get(0).isConstant());
+
+            assertTrue(rdfProperty == r1.getTailPredicate(1).get(0));
+
+        }
+
+        {
+            /*
+             * Verify we can override another variable with a constant.
+             */
+
+            final IBindingSet bindingSet = new ArrayBindingSet(//
+                    new IVariable[] { Var.var("x") },//
+                    new IConstant[] { rdfProperty }//
+            );
+            
+            final Rule r2 = r
+                    .specialize("r2", bindingSet, new IConstraint[] {});
+
+            log.info(r2.toString());
+
+            // verify "x" bound in body[0].
+            assertTrue(r2.getTailPredicate(0).get(2).isConstant());
+            
+            assertTrue(rdfProperty == r2.getTailPredicate(0).get(2));
+
+        }
+
+    }
     
     private static class MyRule extends Rule {
 
@@ -420,7 +329,7 @@ public class TestRule extends AbstractRuleTestCase {
 
         }
 
-        public void apply(State state) {
+        public void apply(RuleState state) {
             
             // NOP.
             
@@ -447,14 +356,16 @@ public class TestRule extends AbstractRuleTestCase {
                             new SPOPredicate(var("u"), rdfsSubClassOf, var("x")),//
                             new SPOPredicate(var("v"), rdfType, var("u")) //
                     },//
-                    null // constraints
-                    );
+                    new IConstraint[] {
+                            new NE(var("u"),var("x"))
+                        }
+            );
         }
 
-        public void apply(State state) {
+        public void apply(RuleState state) {
             
         }
 
     }
-
+    
 }

@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,48 +22,18 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
+/*
+ * Created on Jun 20, 2008
+ */
+
 package com.bigdata.join;
 
 /**
- * Imposes the constraint <code>var != constant</code>.
+ * A variable.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NEConstant implements IConstraint {
-    
-    /**
-     * 
-     */
-    private static final long serialVersionUID = -2267584965908057945L;
-    
-    private final IVariable var;
-    private final IConstant val;
-
-    public NEConstant(IVariable var, IConstant val) {
-
-        if (var == null)
-            throw new IllegalArgumentException();
-        
-        if (val == null)
-            throw new IllegalArgumentException();
-
-        this.var = var;
-
-        this.val = val;
-        
-    }
-    
-    public boolean accept(IBindingSet s) {
-        
-        // get binding for the variable.
-        final IConstant tmp = s.get(this.var);
-    
-        if (tmp == null)
-            return true; // not yet bound.
-    
-        return !tmp.equals(val); 
-
-   }
+public interface IVariable<E> extends IVariableOrConstant<E> {
 
 }

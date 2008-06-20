@@ -23,55 +23,52 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 19, 2008
+ * Created on Jun 20, 2008
  */
 
 package com.bigdata.join;
 
+import junit.framework.TestCase2;
+
 /**
- * Abstraction models either a constant or an unbound variable.
+ * FIXME write tests but {@link RuleState} is still up for a major refactor to
+ * support scale-out joins and statistics collection.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IVariableOrConstant<E> {
+public class TestRuleState extends TestCase2 {
 
     /**
-     * Return <code>true</code> iff this is a variable.
+     * 
      */
-    boolean isVar();
+    public TestRuleState() {
+
+    }
 
     /**
-     * Return <code>true</code> iff this is a constant.
+     * @param name
      */
-    boolean isConstant();
-    
-    /**
-     * Return <code>true</code> if this is the same variable or if both values
-     * are {@link Constant} whose values are the same.
-     * 
-     * @todo if the generic types are different then always return false?
-     */
-    boolean equals(IVariableOrConstant<E> o);
+    public TestRuleState(String name) {
 
-    /**
-     * Return the bound value.
-     * 
-     * @throws UnsupportedOperationException
-     *             if this is a variable.
-     */
-    E get();
-    
-    int hashCode();
-    
-    String toString();
-    
-    /**
-     * Return the name of a variable.
-     * 
-     * @throws UnsupportedOperationException
-     *             if this is not a variable.
-     */
-    String getName();
+        super(name);
+        
+    }
+
+//  public void test_ruleState() {
+    //
+//            final IAccessPathFactory accessPathFactory = new MockAccessPathFactory();
+//            
+//            final BlockingBuffer<IBindingSet> buffer = new BlockingBuffer<IBindingSet>(
+//                    100);
+//            
+//            final IRuleEvaluator evaluator = new MockRuleEvaluator();
+//            
+//            final State s = new State(r, false/* justify */, accessPathFactory,
+//                    buffer, evaluator);
+    //
+//            fail("write test");
+    //
+//        }
 
 }

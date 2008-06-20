@@ -34,6 +34,33 @@ import com.bigdata.btree.ITuple;
 /**
  * Interface for an {@link IAccessPath} factory.
  * 
+ * FIXME introduce an abstraction of the binding pattern for a predicate that
+ * can identify the access path symbolically much like the KeyOrder of the RDF
+ * DB.
+ * 
+ * This is necessary for re-ordering tuples for joins.
+ * 
+ * This could be just the bit pattern of the bound vs unbound positions in a
+ * predicate if your predicates all have a fixed arity, like in an RDF DB.
+ * 
+ * If the tuples have varying arity, like in SQL, then the symbolic of interest
+ * is going to identify a specific index for a relation.
+ * 
+ * In both cases, the symbol is only valid for a given predicate/relation and in
+ * both cases it uniquely identifies the access path and sort order.
+ * 
+ * The factory needs to be able to return a comparator for sorting a relation
+ * per the access path's natural order for each access path for a given
+ * relation.
+ * 
+ * FIXME There needs to be an interface for choosing the JOIN operator impl. For
+ * RDF with its perfect indices this is always going to use the same operator
+ * for a given deployment (e.g., LDS vs Jini Federation).
+ * 
+ * Note that index maintenance is highly specialized for the RDF DB because of
+ * its perfect indices. GOM is a more typical example where there may be a
+ * primary (clustered) index and then zero or more secondary indices.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

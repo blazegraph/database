@@ -70,7 +70,7 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     @SuppressWarnings("unchecked")
     public IChunkedIterator<E> iterator(int limit, int capacity) {
         
-        return new ChunkedIterator<E>(Collections.EMPTY_LIST.iterator());
+        return new ChunkedWrappedIterator<E>(Collections.EMPTY_LIST.iterator());
         
     }
 

@@ -28,35 +28,71 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-
 /**
- * Interface for a set of bindings. The set of named values is extensible and
- * the values are loosely typed.
+ * Interface for a set of bindings. The set of variables values is extensible
+ * and the bound values are loosely typed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo use {@link Var} instead of name since we have cannonical references for
- *       variables?
  */
 public interface IBindingSet {
 
-    public boolean isBound(String name);
+    /**
+     * Return <code>true</code> iff the variable is bound.
+     * 
+     * @param var
+     *            The variable.
+     * 
+     * @return <code>true</code> if the variable is bound.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>var</i> is <code>null</code>.
+     */
+    public boolean isBound(IVariable var);
     
-    public void set(String name,Object val);
-    public void setLong(String name,long val);
-    public void setInt(String name,int val);
-    public void setDouble(String name,double val);
-    public void setFloat(String name,float val);
+    /**
+     * Bind the variable to the value.
+     * 
+     * @param var
+     *            The variable.
+     * @param val
+     *            The value (MAY NOT be <code>null</code>).
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>var</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>val</i> is <code>null</code>.
+     */
+    public void set(IVariable var,IConstant val);
     
-    public Object get(String name);
-    public long getLong(String name);
-    public int getInt(String name);
-    public double getDouble(String name);
-    public float getFloat(String name);
+    /**
+     * Return the binding for the variable.
+     * 
+     * @param var
+     *            The variable.
+     * 
+     * @return the binding for the variable -or- <code>null</code> iff the
+     *         variable is not bound.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>var</i> is <code>null</code>.
+     */
+    public IConstant get(IVariable var);
     
-    public void clear(String name);
+    /**
+     * Clear any binding for the variable.
+     * 
+     * @param var
+     *            The variable.
+     *            
+     * @throws IllegalArgumentException
+     *             if <i>var</i> is <code>null</code>.
+     */
+    public void clear(IVariable var);
 
+    /**
+     * Clear all bindings.
+     */
     public void clearAll();
     
 }
