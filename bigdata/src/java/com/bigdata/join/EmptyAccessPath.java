@@ -13,20 +13,43 @@ import com.bigdata.btree.ITupleIterator;
  */
 public class EmptyAccessPath<E> implements IAccessPath<E> {
 
-    /**
-     * Shared instance.
-     */
-    public static final transient IAccessPath INSTANCE = new EmptyAccessPath();
+//    /**
+//     * Shared instance.
+//     */
+//    public static final transient IAccessPath INSTANCE = new EmptyAccessPath();
+
+    private final IPredicate<E> predicate;
+    private final IKeyOrder<E> keyOrder;
+    
+    public EmptyAccessPath(IPredicate predicate,IKeyOrder keyOrder) {
+        
+        if (predicate == null)
+            throw new IllegalArgumentException();
+
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+
+        this.predicate = predicate;
+      
+        this.keyOrder = keyOrder;
+        
+    }
     
     /**
      * @throws UnsupportedOperationException
      */
     public IPredicate<E> getPredicate() {
         
-        throw new UnsupportedOperationException();
+        return predicate;
         
     }
 
+    public IKeyOrder<E> getKeyOrder() {
+        
+        return keyOrder;
+        
+    }
+    
     /**
      * Always returns <code>true</code>.
      */

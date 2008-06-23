@@ -46,8 +46,9 @@ import cutthecrap.utils.striterators.Striterator;
  */
 abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
 
-    private final IIndex ndx;
     private final IPredicate<E> predicate;
+    private final IKeyOrder<E> keyOrder;
+    private final IIndex ndx;
     private final int flags;
 
     /**
@@ -59,12 +60,21 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
     private byte[] fromKey;
     private byte[] toKey;
 
+    public IKeyOrder<E> getKeyOrder() {
+        
+        return keyOrder;
+        
+    }
+    
     /**
      * 
-     * @param ndx
-     *            The index on which the access path is reading.
      * @param predicate
      *            The constraints on the access path.
+     * @param keyOrder
+     *            The order in which the elements would be visited for this
+     *            access path.
+     * @param ndx
+     *            The index on which the access path is reading.
      * @param flags
      *            The default {@link IRangeQuery} flags.
      * 
@@ -74,17 +84,23 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
      *       constraint then that must be layer on top of this lower-level
      *       constaint.
      */
-    protected AbstractAccessPath(IIndex ndx, IPredicate<E> predicate, int flags) {
+    protected AbstractAccessPath(IPredicate<E> predicate,
+            IKeyOrder<E> keyOrder, IIndex ndx, int flags) {
 
-        if (ndx == null)
-            throw new IllegalArgumentException();
-        
         if (predicate == null)
             throw new IllegalArgumentException();
 
-        this.ndx = ndx;
-
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+        
+        if (ndx == null)
+            throw new IllegalArgumentException();
+        
         this.predicate = predicate;
+
+        this.keyOrder = keyOrder;
+        
+        this.ndx = ndx;
 
         this.flags = flags;
 

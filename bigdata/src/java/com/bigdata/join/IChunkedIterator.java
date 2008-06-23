@@ -30,6 +30,8 @@ package com.bigdata.join;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import com.bigdata.btree.IRangeQuery;
+
 /**
  * An iterator that is able visit items in chunks. The elements in the chunk
  * will be in the same order that they would be visited by
@@ -48,7 +50,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IChunkedIterator<T> extends Iterator<T> {
+public interface IChunkedIterator<E> extends Iterator<E> {
 
     /**
      * Closes the iterator, releasing any associated resources. This method MAY
@@ -62,12 +64,12 @@ public interface IChunkedIterator<T> extends Iterator<T> {
     public void close();
 
     /**
-     * The next {@link T} available from the iterator.
+     * The next {@link E} available from the iterator.
      * 
      * @throws NoSuchElementException
      *             if the iterator is exhausted.
      */
-    public T next();
+    public E next();
     
     /**
      * Return the next "chunk" from the iterator.
@@ -77,7 +79,7 @@ public interface IChunkedIterator<T> extends Iterator<T> {
      * @throws NoSuchElementException
      *             if the iterator is exhausted.
      */
-    public T[] nextChunk();
+    public E[] nextChunk();
 
     /**
      * Removes the last element visited by {@link #next()} (optional operation).
@@ -87,6 +89,9 @@ public interface IChunkedIterator<T> extends Iterator<T> {
      * {@link #remove()} would only remove the last item in the chunk. Normally
      * you will want to accumulate items to be removed in a buffer and then
      * submit the buffer to some batch api operation when it overflows.
+     * Alternatively, the {@link IRangeQuery#REMOVEALL} flag may be used with
+     * the source iterator to remove elements from the index as they are
+     * visited.
      */
     public void remove();
     

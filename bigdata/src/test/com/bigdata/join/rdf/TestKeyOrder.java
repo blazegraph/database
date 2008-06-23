@@ -23,29 +23,31 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 19, 2008
+ * Created on Jun 21, 2008
  */
 
-package com.bigdata.join;
+package com.bigdata.join.rdf;
 
 import junit.framework.TestCase2;
 
 /**
+ * Test suite for {@link KeyOrder}. 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFusedViewAccessPath extends TestCase2 {
+public class TestKeyOrder extends TestCase2 {
 
     /**
      * 
      */
-    public TestFusedViewAccessPath() {
+    public TestKeyOrder() {
     }
 
     /**
      * @param name
      */
-    public TestFusedViewAccessPath(String name) {
+    public TestKeyOrder(String name) {
         super(name);
     }
 

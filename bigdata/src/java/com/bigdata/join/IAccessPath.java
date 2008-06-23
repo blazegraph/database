@@ -50,6 +50,11 @@ public interface IAccessPath<E> extends Iterable<E> {
     public IPredicate<E> getPredicate();
 
     /**
+     * The order in which the elements will be visited.
+     */
+    public IKeyOrder<E> getKeyOrder();
+    
+    /**
      * True iff the access path is empty (there are no matches for the
      * {@link IPredicate}) This is more conclusive than {@link #rangeCount()}
      * since you MAY have a non-zero range count when the key range is in fact

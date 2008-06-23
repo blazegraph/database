@@ -31,6 +31,8 @@ package com.bigdata.join;
 import junit.framework.TestCase2;
 
 /**
+ * Test suite for {@link AbstractAccessPath}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

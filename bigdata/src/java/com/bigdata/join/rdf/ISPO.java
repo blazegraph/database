@@ -37,6 +37,9 @@ import com.bigdata.join.IPredicate;
  * 
  * @todo this is a placeholder showing how a type-specific {@link IPredicate}
  *       can be created.
+ * 
+ * @todo my preference for this type is a class not an interface and the class
+ *       has public final fields named {s,p,o}.
  */
 public interface ISPO {
 
