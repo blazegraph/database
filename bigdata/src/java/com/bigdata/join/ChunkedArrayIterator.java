@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.ITupleIterator;
@@ -37,7 +38,7 @@ import com.bigdata.btree.ITupleIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ChunkedArrayIterator<E> implements IChunkedIterator<E> {
+public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
 
     private boolean open = true;
     
@@ -47,6 +48,9 @@ public class ChunkedArrayIterator<E> implements IChunkedIterator<E> {
     /** #of valid entries in {@link #buffer}. */
     private int bufferCount;
 
+    /** The order of the elements in the buffer or <code>null</code> iff not known. */
+    private final IKeyOrder<E> keyOrder;
+    
     /**
      * The index of the next entry in {@link #buffer} that will be returned by
      * {@link #next()}.
@@ -74,37 +78,40 @@ public class ChunkedArrayIterator<E> implements IChunkedIterator<E> {
      *            The array of elements.
      * @param n
      *            The #of entries in <i>a</i> that are valid.
+     * @param keyOrder
+     *            The order of the elements in the buffer or <code>null</code>
+     *            iff not known.
      */
-    public ChunkedArrayIterator(E[] a, int n) {
+    public ChunkedArrayIterator(E[] a, int n, IKeyOrder<E> keyOrder) {
 
+        if (a == null)
+            throw new IllegalArgumentException();
+
+        if (n < 0 || n > a.length)
+            throw new IllegalArgumentException();
+        
         this.buffer = a;
         
         this.bufferCount = n;
+        
+        this.keyOrder = keyOrder;
 
     }
 
     /**
-     * Fully buffers all statements selected by the {@link IAccessPath}.
-     * <p>
-     * Note: This constructor variant supports {@link #remove()}.
-     * <p>
-     * Note: This constructor is much lighter weight than the
-     * {@link SPOIterator} when you are trying to do an existance test (limit of
-     * 1) or read only a few 100 {@link SPO}s.
-     * 
-     * @param db
-     *            The database (MAY be null, but then {@link #remove()} is not
-     *            supported).
+     * Fully buffers all elements that would be visited by the
+     * {@link IAccessPath} iterator.
      * 
      * @param accessPath
      *            The access path (including the triple pattern).
      * 
      * @param limit
-     *            When non-zero, this is the maximum #of {@link SPO}s that will
-     *            be read. When zero, all {@link SPO}s for that access path
-     *            will be read and buffered.
+     *            When non-zero, this is the maximum #of elements that will be
+     *            read. When zero(0), all elements for that access path will be
+     *            read and buffered. It is a runtime error if the #of elements
+     *            would exceed a large constant (10M).
      */
-    public ChunkedArrayIterator(IAccessPath accessPath, int limit) {
+    public ChunkedArrayIterator(IAccessPath<E> accessPath, int limit) {
 
         if (accessPath == null)
             throw new IllegalArgumentException();
@@ -114,6 +121,8 @@ public class ChunkedArrayIterator<E> implements IChunkedIterator<E> {
         
         final long rangeCount = accessPath.rangeCount();
 
+        this.keyOrder = accessPath.getKeyOrder();
+        
         if (rangeCount > 10000000) {
             
             /*
@@ -272,24 +281,30 @@ public class ChunkedArrayIterator<E> implements IChunkedIterator<E> {
         
     }
     
-//    public SPO[] nextChunk(KeyOrder keyOrder) {
-//
-//        if (keyOrder == null)
-//            throw new IllegalArgumentException();
-//
-//        SPO[] stmts = nextChunk();
-//
-//        if (keyOrder != this.keyOrder) {
-//
-//            // sort into the required order.
-//
-//            Arrays.sort(stmts, 0, stmts.length, keyOrder.getComparator());
-//
-//        }
-//
-//        return stmts;
-//
-//    }
+    public IKeyOrder<E> getKeyOrder() {
+        
+        return keyOrder;
+        
+    }
+    
+    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+
+        final E[] chunk = nextChunk();
+
+        if (!keyOrder.equals(getKeyOrder())) {
+
+            // sort into the required order.
+
+            Arrays.sort(chunk, 0, chunk.length, keyOrder.getComparator());
+
+        }
+
+        return chunk;
+
+    }
     
     /*
      * Note: Do NOT eagerly close the iterator since the makes it impossible to

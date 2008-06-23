@@ -26,35 +26,38 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.join;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
  * Converts an <code>Iterator</code> into chunked iterator.
  * <p>
- * Note: The visitation order is whatever the order was for the source
- * iterator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
+public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
+
+    protected static transient final int DEFAULT_CHUNK_SIZE = 10000;
     
     private boolean open = true;
-    
-    private final Iterator<T> src;
-    
+
+    private final Iterator<E> src;
+
     private final int chunkSize;
     
+    private final IKeyOrder<E> keyOrder;
+
     /**
      * Create an iterator that reads from the source.
      * 
      * @param src
      *            The source iterator.
      */
-    public ChunkedWrappedIterator(Iterator<T>src) {
-        
-        this(src, 10000 );
+    public ChunkedWrappedIterator(Iterator<E> src) {
+
+        this(src, DEFAULT_CHUNK_SIZE, null);
         
     }
 
@@ -65,8 +68,11 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
      *            The source iterator.
      * @param chunkSize
      *            The desired chunk size.
+     * @param keyOrder
+     *            The order in which the elements will be visited by the source
+     *            iterator if known and <code>null</code> otherwise.
      */
-    public ChunkedWrappedIterator(Iterator<T>src, int chunkSize) {
+    public ChunkedWrappedIterator(Iterator<E> src, int chunkSize, IKeyOrder<E> keyOrder) {
         
         if (src == null)
             throw new IllegalArgumentException();
@@ -77,6 +83,8 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
         this.src = src;
         
         this.chunkSize = chunkSize;
+        
+        this.keyOrder = keyOrder;
         
     }
     
@@ -89,15 +97,14 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
 
         if(src instanceof IChunkedIterator) {
             
-            ((IChunkedIterator<T>)src).close();
+            ((IChunkedIterator<E>)src).close();
             
         }
 
     }
 
     /**
-     * Return <code>true</code> if there are {@link SPO}s in the source
-     * iterator.
+     * Return <code>true</code> if there are elements in the source iterator.
      */
     public boolean hasNext() {
 
@@ -107,7 +114,10 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
         
     }
 
-    public T next() {
+    /**
+     * The next element from the source iterator.
+     */
+    public E next() {
 
         if (!hasNext()) {
 
@@ -123,7 +133,7 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
      * The next chunk of in whatever order the were visited by {@link #next()}.
      */
     @SuppressWarnings("unchecked")
-    public T[] nextChunk() {
+    public E[] nextChunk() {
 
         if (!hasNext()) {
 
@@ -133,11 +143,11 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
 
         int n = 0;
 
-        T[] chunk = null;
+        E[] chunk = null;
         
         while (hasNext() && n < chunkSize) {
 
-            T t = next();
+            E t = next();
 
             if (chunk == null) {
 
@@ -146,7 +156,7 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
                  * as the objects that we are visiting.
                  */
 
-                chunk = (T[]) java.lang.reflect.Array.newInstance(t.getClass(),
+                chunk = (E[]) java.lang.reflect.Array.newInstance(t.getClass(),
                         chunkSize);
 
             }
@@ -160,7 +170,7 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
 
             // make it dense.
             
-            T[] tmp = (T[])java.lang.reflect.Array.newInstance(
+            E[] tmp = (E[])java.lang.reflect.Array.newInstance(
                     chunk[0].getClass(), n);
             
             System.arraycopy(chunk, 0, tmp, 0, n);
@@ -180,6 +190,31 @@ public class ChunkedWrappedIterator<T> implements IChunkedIterator<T> {
         
         src.remove();
         
+    }
+
+    public IKeyOrder getKeyOrder() {
+
+        return keyOrder;
+        
+    }
+
+    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+
+        final E[] chunk = nextChunk();
+
+        if (!keyOrder.equals(getKeyOrder())) {
+
+            // sort into the required order.
+
+            Arrays.sort(chunk, 0, chunk.length, keyOrder.getComparator());
+
+        }
+
+        return chunk;
+
     }
     
 }

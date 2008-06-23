@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -59,18 +60,30 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     /**
      * The singleton for the iterator used to read from this buffer.
      */
-    private final IChunkedIterator<E> iterator;
+    private final IChunkedOrderedIterator<E> iterator;
+
+    /**
+     * The element write order IFF known.
+     */
+    private final IKeyOrder<E> keyOrder;
     
     /**
      * 
      * @param capacity
      *            The capacity of the buffer.
+     * @param keyOrder
+     *            The visitation order in which the elements will be
+     *            <em>written</em> onto the buffer and <code>null</code> if
+     *            you do not have a <em>strong</em> guarentee for the write
+     *            order.
      */
-    public BlockingBuffer(int capacity) {
+    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder) {
                 
         this.buffer = new ArrayBlockingQueue<E>(capacity);
         
         this.iterator = new BlockingIterator();
+
+        this.keyOrder = keyOrder;
         
     }
 
@@ -133,33 +146,30 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     }
     
     /**
-     * Adds the {@link SPO} to the buffer.
-     * 
-     * @throws UnsupportedOperationException
-     *             if <i>justification</i> is non-<code>null</code>.
+     * Adds the elements to the buffer.
      */
     public boolean add(E spo) {
-       
+
         assertOpen();
 
-        if(!isValid(spo)) {
-        
+        if (!isValid(spo)) {
+
             if (log.isInfoEnabled())
                 log.info("reject: " + spo.toString());
 
             return false;
-            
+
         }
 
         if (log.isInfoEnabled())
             log.info("add: " + spo.toString());
-        
+
         // wait if the queue is full.
-        while(true) {
+        while (true) {
 
             try {
-                
-                if(buffer.offer(spo,100,TimeUnit.MILLISECONDS)) {
+
+                if (buffer.offer(spo, 100, TimeUnit.MILLISECONDS)) {
 
                     // item now on the queue.
 
@@ -195,7 +205,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
      * 
      * @return The iterator (this is a singleton).
      */
-    public IChunkedIterator<E> iterator() {
+    public IChunkedOrderedIterator<E> iterator() {
 
         return iterator;
         
@@ -209,27 +219,22 @@ public class BlockingBuffer<E> implements IBuffer<E> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class BlockingIterator implements IChunkedIterator<E> {
+    private class BlockingIterator implements IChunkedOrderedIterator<E> {
         
         /**
          * <code>true</code> iff this iterator is open - it is closed when the
          * thread consuming the iterator decides that it is done with the
          * iterator.
          * <p>
-         * Note: {@link SPOBlockingBuffer#open} is <code>true</code> until the
+         * Note: {@link BlockingBuffer#open} is <code>true</code> until the
          * thread WRITING on the buffer decides that it has nothing further to
-         * write. Once {@link SPOBlockingBuffer#open} becomes <code>false</code>
-         * and there are no more {@link SPO}s in the buffer then the iterator
-         * is exhausted since there is nothing left that it can visit and
-         * nothing new will enter into the buffer.
+         * write. Once {@link BlockingBuffer#open} becomes <code>false</code>
+         * and there are no more elements in the buffer then the iterator is
+         * exhausted since there is nothing left that it can visit and nothing
+         * new will enter into the buffer.
          */
         private boolean open = true;
 
-//        /**
-//         * Optional filter applied by the iterator as it reads from the buffer.
-//         */
-//        private final ISPOFilter filter;
-        
         /**
          * Create an iterator that reads from the buffer.
          */
@@ -252,13 +257,13 @@ public class BlockingBuffer<E> implements IBuffer<E> {
         }
 
         /**
-         * Return <code>true</code> if there are {@link SPO}s in the buffer
-         * that can be visited and blocks when the buffer is empty. Returns
-         * false iff the buffer is {@link SPOBlockingBuffer#close()}ed.
+         * Return <code>true</code> if there are elements in the buffer that
+         * can be visited and blocks when the buffer is empty. Returns false iff
+         * the buffer is {@link BlockingBuffer#close()}ed.
          * 
          * @throws RuntimeException
          *             if the current thread is interrupted while waiting for
-         *             the buffer to be {@link SPOBlockingBuffer#flush()}ed.
+         *             the buffer to be {@link BlockingBuffer#flush()}ed.
          */
         public boolean hasNext() {
 
@@ -368,7 +373,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
              */
             final int chunkSize = buffer.size();
 
-            E[] chunk = null; //= new SPO[chunkSize];
+            E[] chunk = null;
 
             int n = 0;
 
@@ -392,21 +397,31 @@ public class BlockingBuffer<E> implements IBuffer<E> {
             
         }
 
-//        public SPO[] nextChunk(KeyOrder keyOrder) {
-//            
-//            if (keyOrder == null)
-//                throw new IllegalArgumentException();
-//
-//            SPO[] chunk = nextChunk();
-//            
-//            // sort into the required order.
-//
-//            Arrays.sort(chunk, 0, chunk.length, keyOrder.getComparator());
-//
-//            return chunk;
-//            
-//        }
+        public IKeyOrder<E> getKeyOrder() {
+            
+            return keyOrder;
+            
+        }
+        
+        public E[] nextChunk(IKeyOrder<E> keyOrder) {
 
+            if (keyOrder == null)
+                throw new IllegalArgumentException();
+
+            final E[] chunk = nextChunk();
+
+            if (!keyOrder.equals(getKeyOrder())) {
+
+                // sort into the required order.
+
+                Arrays.sort(chunk, 0, chunk.length, keyOrder.getComparator());
+
+            }
+
+            return chunk;
+
+        }
+        
         /**
          * The operation is not supported.
          */

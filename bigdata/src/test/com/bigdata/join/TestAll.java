@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.join;
 
 
+import com.bigdata.join.rdf.TestKeyOrder;
 import com.bigdata.join.rdf.TestSPOPredicate;
 
 import junit.framework.Test;
@@ -71,6 +72,9 @@ public class TestAll extends TestCase {
         // @todo test binding set impls.
         suite.addTestSuite(TestBindingSet.class);
         
+        // @todo test IKeyOrder impl.
+        suite.addTestSuite(TestKeyOrder.class);
+        
         // @todo chunked iterator tests.
         // TestChunkedWrappedIterator
         // TestChunkedArrayIterator (fully buffered)
@@ -80,12 +84,12 @@ public class TestAll extends TestCase {
         // TestBlockingBuffer
         // @todo test array backed buffer flushing through to a database.
         // TestArrayBuffer
-        
+
         // @todo test basic access path mechanisms.
         suite.addTestSuite(TestAccessPath.class);
 
         // @todo access path using fused view : (focusStore+db).
-        suite.addTestSuite(TestFusedViewAccessPath.class);
+        suite.addTestSuite(TestAccessPathFusedView.class);
         
         // @todo test ability to select the right access path.
         suite.addTestSuite(TestAccessPathFactory.class);

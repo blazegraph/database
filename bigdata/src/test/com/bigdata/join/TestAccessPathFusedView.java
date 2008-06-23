@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,28 +20,35 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Jun 19, 2008
  */
 
 package com.bigdata.join;
 
-import java.util.Comparator;
+import junit.framework.TestCase2;
 
 /**
- * An interface representing the natural traversal orders for the different
- * indices for some class of relation.
+ * Test suite for {@link AccessPathFusedView}. 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IKeyOrder<E> {
+public class TestAccessPathFusedView extends TestCase2 {
 
     /**
-     * Return the comparator that places elements into the natural order for the
-     * associated index.
+     * 
      */
-    public Comparator<E> getComparator();
+    public TestAccessPathFusedView() {
+    }
+
+    /**
+     * @param name
+     */
+    public TestAccessPathFusedView(String name) {
+        super(name);
+    }
 
 }

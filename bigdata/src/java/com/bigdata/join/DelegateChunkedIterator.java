@@ -53,15 +53,15 @@ package com.bigdata.join;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class DelegateChunkedIterator<T> implements IChunkedIterator<T> {
+public class DelegateChunkedIterator<E> implements IChunkedOrderedIterator<E> {
 
-    final protected IChunkedIterator<T> src;
-
+    final private IChunkedOrderedIterator<E> src;
+    
     /**
      * @param src
      *            All methods will delegate to this iterator.
      */
-    public DelegateChunkedIterator(IChunkedIterator<T> src) {
+    public DelegateChunkedIterator(IChunkedOrderedIterator<E> src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -76,13 +76,13 @@ public abstract class DelegateChunkedIterator<T> implements IChunkedIterator<T> 
         
     }
 
-    public T next() {
+    public E next() {
         
         return src.next();
         
     }
 
-    public T[] nextChunk() {
+    public E[] nextChunk() {
         
         return src.nextChunk();
     }
@@ -97,6 +97,17 @@ public abstract class DelegateChunkedIterator<T> implements IChunkedIterator<T> 
 
         return src.hasNext();
         
+    }
+
+    public IKeyOrder getKeyOrder() {
+
+        return src.getKeyOrder();
+        
+    }
+
+    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+        
+        return src.nextChunk(keyOrder);
     }
 
 }

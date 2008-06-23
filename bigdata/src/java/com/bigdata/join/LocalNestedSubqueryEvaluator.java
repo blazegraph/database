@@ -34,6 +34,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataClient;
 
 /**
  * Evaluation uses nested subquery and is optimized under the assumption that
@@ -55,6 +58,15 @@ import com.bigdata.journal.ConcurrencyManager;
  * @todo make {@link Callable} and return {@link Iterator} if we are querying
  *       and otherwise <code>null</code> since the solutions were {inserted
  *       into, updated on, or removed from} the database?
+ * 
+ * @todo The {@link RuleUtil} can map the N passes in parallel (or N rules in
+ *       parallel), each chunk[] from the first access path can be reordered for
+ *       the next access path and the {@link ClientIndexView} can split the
+ *       chunk[] and map N splits in parallel. This presumes that the
+ *       {@link DataService} can function as a full {@link IBigdataClient}.
+ *       Otherwise we bring all data back to the client from each JOIN before
+ *       sending out the next JOIN. The different also results in JOIN at once
+ *       vs solution at once processing.
  * 
  * @todo make the {@link HashBindingSet} explicit. It will need to be explicit
  *       when unrolling the loop for remote index eval.

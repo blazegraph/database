@@ -179,4 +179,10 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
         
     }
 
+    public IKeyOrder<E> getKeyOrder() {
+
+        return path1.getKeyOrder();
+        
+    }
+
 }

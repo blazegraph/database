@@ -32,6 +32,27 @@ package com.bigdata.join;
  * Interface for a set of bindings. The set of variables values is extensible
  * and the bound values are loosely typed.
  * 
+ * @todo The variable positions in a binding set can be assigned an index by the
+ *       order in which they are encountered across the predicates when the
+ *       predicates are considered in execution order. This gives us a dense
+ *       index in [0:nvars-1]. The index can be into an array. When the bindings
+ *       are of a primitive type, as they are for the RDF DB, that array can be
+ *       an array of the primitive type, e.g., long[nvars].
+ *       <p>
+ *       This change would require that the singleton factory for a variable was
+ *       on the {@link Rule} (different rules would have different index
+ *       assignments), it would require predicates to be cloned into a
+ *       {@link Rule} so that the variables possessed the necessary index
+ *       assignment, and that index assignment would have to be late - once the
+ *       evaluation order was determined, so maybe the Rule is cloned into the
+ *       {@link RuleState} once we have the evaluation order.
+ *       <p>
+ *       There would also need to be a type-specific means for copying bindings
+ *       from a visited element into a bindingSet if a want to avoid autoboxing.
+ *       <p>
+ *       The {@link IConstant} interface might have to disappear for this as
+ *       well. I am not convinced that it adds much.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
