@@ -146,13 +146,13 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
                 
     }
 
-    public IChunkedIterator<E> iterator() {
+    public IChunkedOrderedIterator<E> iterator() {
 
         return iterator(0,0);
 
     }
 
-    public IChunkedIterator<E> iterator(int limit, int capacity) {
+    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
 
         // @todo optimizations for point tests and small limits.
         return new ChunkedWrappedIterator<E>(new Striterator(rangeIterator(capacity,

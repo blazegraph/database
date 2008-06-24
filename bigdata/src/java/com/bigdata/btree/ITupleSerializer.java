@@ -36,8 +36,16 @@ import com.bigdata.journal.Journal;
 import com.bigdata.service.IMetadataService;
 
 /**
- * An interface that provides for the (de)-serialization of both the key and the
- * value of a tuple stored in an index.
+ * An interface that provides for the (de)-serialization of the value of a tuple
+ * stored in an index and, when possible, the key under which that value is
+ * stored.
+ * <p>
+ * The encoded key is always a variable length unsigned byte[]s. The purpose of
+ * the encoded key is to determine the total order over the tuple in the B+Tree.
+ * While some key encodings are reversable without less (e.g., int, long, float
+ * or double), many key encodings are simply not decodable (including Unicode
+ * keys). Applications that require the ability to decode complex keys may need
+ * to resort to storing the unencoded key state redundently in the tuple value.
  * 
  * FIXME extSer integration. There are two broad setups. (1) Local: when running
  * without an {@link IMetadataService} and hence on a single
@@ -69,8 +77,13 @@ import com.bigdata.service.IMetadataService;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param K
+ *            The generic type of the application key.
+ * @param V
+ *            The generic type of the application value.
  */
-public interface ITupleSerializer extends Serializable {
+public interface ITupleSerializer<K extends Object, V extends Object> extends
+        Serializable {
 
 //    /**
 //     * This method is invoked to notify the implementation of the backing store.
@@ -111,11 +124,11 @@ public interface ITupleSerializer extends Serializable {
 //    void setStore(IRawStore store);
     
     /**
-     * Serialize a facet of the object's state corresponding that places the
-     * object into the total sort order for the index. This method is
-     * automatically applied by {@link ILocalBTree#insert(Object, Object)} and
-     * friends to convert the <strong>key</strong> object into an
-     * <strong>unsigned</strong> variable length byte[].
+     * Serialize a facet of an object's state that places the object into the
+     * total sort order for the index. This method is automatically applied by
+     * {@link ILocalBTree#insert(Object, Object)} and friends to convert the
+     * <strong>key</strong> object into an <strong>unsigned</strong> variable
+     * length byte[].
      * <p>
      * Note: This handles the conversion between an object and the
      * <strong>unsigned</strong> variable length byte[] representation of that
@@ -152,7 +165,7 @@ public interface ITupleSerializer extends Serializable {
      * @throws IllegalArgumentException
      *             if <i>obj</i> is <code>null</code>.
      */
-    byte[] serializeVal(Object obj);
+    byte[] serializeVal(V obj);
 
     /**
      * De-serialize an object from an {@link ITuple}. This method is
@@ -168,7 +181,7 @@ public interface ITupleSerializer extends Serializable {
      * @throws IllegalArgumentException
      *             if <i>tuple</i> is <code>null</code>.
      */
-    Object deserialize(ITuple tuple);
+    V deserialize(ITuple tuple);
 
     /**
      * De-serialize the application key from an {@link ITuple} (optional
@@ -186,13 +199,13 @@ public interface ITupleSerializer extends Serializable {
      * this is NOT possible for Unicode {@link String}s.</li>
      * </ol>
      * <p>
-     * Note: The B+Tree does NOT rely on this method. It is ONLY used to support
-     * the materialization of the key required to allow {@link BigdataMap} and
+     * Note: The B+Tree does NOT rely on this method. It is used to support the
+     * materialization of the key required to allow {@link BigdataMap} and
      * {@link BigdataSet} to fullfill their respective APIs.
      * 
      * @throws UnsupportedOperationException
      *             if this operation is not implemented.
      */
-    Object deserializeKey(ITuple tuple);
+    K deserializeKey(ITuple tuple);
     
 }

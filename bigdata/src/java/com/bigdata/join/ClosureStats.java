@@ -29,8 +29,18 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
+
 /**
  * Statistics collected when performing inference.
+ * 
+ * FIXME re-factor this as counters that are reportable by the
+ * {@link IDataService} and aggregated by the {@link ILoadBalancerService}.
+ * This will mean that the counters are not directly available on a rule-by-rule
+ * evaluation basis, but they can't be if the rules are executed remotely and in
+ * parallel (or perhaps they could be if the aggregated statistics were reported
+ * back to the master that submitted the rule for execution).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

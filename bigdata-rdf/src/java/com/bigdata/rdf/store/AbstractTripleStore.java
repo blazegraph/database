@@ -884,46 +884,15 @@ abstract public class AbstractTripleStore implements ITripleStore,
 
         final IIndex ndx = getSPOIndex();
 
-        if (exact && ndx.getIndexMetadata().getDeleteMarkers()) {
+        if (exact) {
 
-            /*
-             * The use of delete markers means that index entries are not
-             * removed immediately but rather a delete flag is set. This is
-             * always true for the scale-out indices because delete markers are
-             * used to support index partition views. It is also true for
-             * indices that can support transactions regardless or whether or
-             * not the database is using scale-out indices. In any case, if you
-             * want an exact range count when delete markers are in use then you
-             * need to actually visit every tuple in the index, which is what
-             * this code does. Note that the [flags] are 0 since we do not need
-             * either the KEYS or VALS. We are just interested in the #of tuples
-             * that the iterator is willing to visit.
-             */
+            return ndx.rangeCountExact(null/* fromKey */, null/* toKey */);
 
-            long n = 0L;
+        } else {
 
-            final Iterator itr = ndx
-                    .rangeIterator(null/* fromKey */, null/* toKey */,
-                            0/* capacity */, 0/* flags */, null/* filter */);
-
-            while (itr.hasNext()) {
-
-                itr.next();
-                
-                n++;
-
-            }
-
-            return n;
-
+            return ndx.rangeCount(null/* fromKey */, null/* toKey */);
+            
         }
-
-        /*
-         * Either an exact count is not required or delete markers are not in
-         * use and therefore rangeCount() will report the exact count.
-         */
-
-        return ndx.rangeCount(null, null);
 
     }
 
@@ -2729,7 +2698,8 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * statements in <i>this</i> store use term identifiers that are consistent
      * with (term for term identical to) those in the destination store. If
      * statement identifiers are enabled, then they MUST be enabled for both
-     * stores (statement identifiers are stored in the foward lexicon).
+     * stores (statement identifiers are assigned by, and stored in, the foward
+     * lexicon and replicated into the statement indices).
      * <p>
      * Note: The statements in <i>this</i> store are NOT removed.
      * 
@@ -2744,6 +2714,9 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * @return The #of statements inserted into <i>dst</i> (the count only
      *         reports those statements that were not already in the main
      *         store).
+     * 
+     * @todo method signature could be changed to accept the source access path
+     *       for the read and then just write on the database
      */
     public int copyStatements(AbstractTripleStore dst, ISPOFilter filter,
             boolean copyJustifications) {

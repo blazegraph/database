@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import com.bigdata.journal.Journal;
+import com.bigdata.service.IBigdataClient;
+
 /**
  * An immutable constraint on the elements visited using an {@link IAccessPath}.
  * The slots in the predicate corresponding to variables are named and those
@@ -39,6 +42,25 @@ package com.bigdata.join;
  * @version $Id$
  */
 public interface IPredicate<E> extends Cloneable {
+
+    /**
+     * The {@link IRelation} that is queried by this {@link IPredicate}.
+     * 
+     * FIXME This must be an object that can be passed by value which means that
+     * it can not contain a hard reference to the database, the
+     * {@link IBigdataClient}, a {@link Journal}, etc. Yet, we must be able to
+     * resolve the appropriate database / persistence layer for the
+     * {@link IRelation} to function....
+     */
+    public IRelation<E> getRelation();
+    
+    /**
+     * Return the best {@link IAccessPath} for reading the data selected by this
+     * {@link IPredicate}.
+     * 
+     * @return The best access path.
+     */
+    public IAccessPath<E> getAccessPath();
 
     /**
      * An optional constraint on the visitable elements.

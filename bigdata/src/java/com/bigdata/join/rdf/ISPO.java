@@ -28,25 +28,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join.rdf;
 
-import com.bigdata.join.IPredicate;
 
 /**
+ * A predicate representing an RDF triple where the slots are 64-bit
+ * <code>long</code> term identifiers assigned by a lexicon.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo this is a placeholder showing how a type-specific {@link IPredicate}
- *       can be created.
- * 
- * @todo my preference for this type is a class not an interface and the class
- *       has public final fields named {s,p,o}.
  */
 public interface ISPO {
 
+    /** The term identifier for the subject position. */
     public long s();
 
+    /** The term identifier for the predicate position. */
     public long p();
 
+    /** The term identifier for the object position. */
     public long o();
 
 }

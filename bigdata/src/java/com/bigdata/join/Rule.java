@@ -32,14 +32,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 /**
- * A rule selects variables from solutions computed for the conjunctive query
- * (aka JOIN) of the {@link IPredicate}s in the body of the {@link Rule}. Each
- * solution is an {@link IBindingSet} and the variables in that
- * {@link IBindingSet} are those specified in the head of the {@link Rule}.
- * Each query pattern is an {@link IPredicate}. The {@link Rule} may express
- * {@link IConstraint}s on the allowable solutions. In addition, the
- * {@link IPredicate}s in the body of the {@link Rule} may have constraints
- * that will be evaluated close to the data.
+ * Default impl.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -57,7 +50,12 @@ import org.apache.log4j.Logger;
  *       there are interactions in the rules choosen for evaluation during
  *       forward closure and those choosen for evaluation at query time.
  */
-public class Rule {
+public class Rule implements IRule {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -3834383670300306143L;
 
     final static protected Logger log = Logger.getLogger(Rule.class);
 
@@ -155,6 +153,12 @@ public class Rule {
         
     }
     
+    public int getConstraintCount() {
+        
+        return constraints == null ? 0 : constraints.length;
+        
+    }
+
     /**
      * The optional constraints.
      */
@@ -391,7 +395,7 @@ public class Rule {
      * @throws IllegalArgumentException
      *             if <i>bindingSet</i> is <code>null</code>.
      */
-    public Rule specialize(IBindingSet bindingSet, IConstraint[] constraints) {
+    public IRule specialize(IBindingSet bindingSet, IConstraint[] constraints) {
 
         return specialize(getName() + "'", bindingSet, constraints);
 
@@ -417,7 +421,7 @@ public class Rule {
      * @exception IllegalArgumentException
      *                if <i>bindingSet</i> is <code>null</code>.
      */
-    public Rule specialize(String name, IBindingSet bindingSet,
+    public IRule specialize(String name, IBindingSet bindingSet,
             IConstraint[] constraints) {
 
         if (name == null)
@@ -467,7 +471,7 @@ public class Rule {
 
         }
         
-        final Rule newRule = new Rule(name, newHead, newTail, newConstraint);
+        final IRule newRule = new Rule(name, newHead, newTail, newConstraint);
 
         return newRule;
 
@@ -693,6 +697,51 @@ public class Rule {
             throw new IllegalArgumentException();
 
         return vars.contains(var);
+        
+    }
+
+    /*
+     * IProgram.
+     */
+
+    /**
+     * Returns <code>false</code> (the return value does not matter since a
+     * single step can not be parallelized).
+     */
+    public boolean isParallel() {
+        
+        return false;
+        
+    }
+
+    /**
+     * Returns <code>false</code>. If you want the closure of a single rule
+     * then add it to a suitable {@link Program} instance.
+     */
+    public boolean isClosure() {
+        
+        return false;
+        
+    }
+    
+    /**
+     * Always returns an empty iterator.
+     */
+    public Iterator<IProgram> steps() {
+
+        return Collections.EMPTY_LIST.iterator();
+        
+    }
+    
+    public int stepCount() {
+        
+        return 0;
+        
+    }
+    
+    public IProgram[] toArray() {
+        
+        return new Rule[] {};
         
     }
     

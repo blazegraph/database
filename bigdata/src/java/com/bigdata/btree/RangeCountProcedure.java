@@ -23,6 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
 import com.bigdata.mdi.LocalPartitionMetadata;
 
 /**
@@ -33,6 +37,8 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
 
     private static final long serialVersionUID = 5856712176446915328L;
 
+    private boolean exact;
+    
     /**
      * De-serialization ctor.
      *
@@ -53,7 +59,7 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
      *            The upper bound (exclusive) -or- <code>null</code> if there
      *            is no upper bound.
      */
-    public RangeCountProcedure(byte[] fromKey, byte[] toKey) {
+    public RangeCountProcedure(boolean exact, byte[] fromKey, byte[] toKey) {
 
         super( fromKey, toKey );
         
@@ -93,10 +99,27 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
 
         final byte[] toKey = constrainToKey(this.toKey, pmd);
 
-        final long rangeCount = ndx.rangeCount(fromKey, toKey);
+        final long rangeCount = exact ? ndx.rangeCountExact(fromKey, toKey)
+                : ndx.rangeCount(fromKey, toKey);
 
         return new Long(rangeCount);
 
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+        super.readExternal(in);
+        
+        exact = in.readBoolean();
+        
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        super.writeExternal(out);
+        
+        out.writeBoolean(exact);
+        
     }
 
 }

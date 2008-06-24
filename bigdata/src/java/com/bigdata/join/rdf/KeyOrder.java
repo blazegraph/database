@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join.rdf;
 
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.Comparator;
 
 import com.bigdata.join.IKeyOrder;
@@ -37,34 +39,73 @@ import com.bigdata.join.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class KeyOrder implements IKeyOrder<ISPO> {
+public class KeyOrder implements IKeyOrder<ISPO>, Serializable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 87501920529732159L;
+    
+    /*
+     * Note: these constants make it possible to use switch(index()) constructs.
+     */
+    public static final transient int _SPO = 0;
+    public static final transient int _OSP = 1;
+    public static final transient int _POS = 2;
+    
     /**
      * The index whose keys are formed with the {s,p,o} ordering of the triple.
      */
-    public static final transient KeyOrder SPO = new KeyOrder(0,"SPO");
+    public static final transient KeyOrder SPO = new KeyOrder(_SPO,"SPO");
 
     /**
      * The index whose keys are formed with the {p,o,s} ordering of the triple.
      */
-    public static final transient KeyOrder POS = new KeyOrder(1,"POS");
+    public static final transient KeyOrder POS = new KeyOrder(_POS,"POS");
 
     /**
      * The index whose keys are formed with the {o,s,p} ordering of the triple.
      */
-    public static final transient KeyOrder OSP = new KeyOrder(2,"OSP");
+    public static final transient KeyOrder OSP = new KeyOrder(_OSP,"OSP");
 
-    private final int i;
+    private final int index;
+
     private final String name;
 
-    private KeyOrder(int i,String name) {
+    private KeyOrder(final int index, final String name) {
 
-        this.i = i;
+        this.index = index;
         
         this.name = name;
 
     }
 
+    /**
+     * Returns the singleton corresponding to the index.
+     * 
+     * @param index
+     *            The index.
+     * 
+     * @return The singleton {@link KeyOrder} having that index.
+     * 
+     * @throws IllegalArgumentException
+     *             if the index is not valid.
+     */
+    static public KeyOrder valueOf(int index) {
+        
+        switch(index) {
+        case _SPO:
+            return SPO;
+        case _POS:
+            return POS;
+        case _OSP:
+            return OSP;
+        default:
+            throw new IllegalArgumentException("Unknown: index" + index);
+        }
+        
+    }
+    
     /**
      * The base name for the index.
      */
@@ -75,22 +116,13 @@ public class KeyOrder implements IKeyOrder<ISPO> {
     }
     
     /**
-     * The integer used to represent the {@link KeyOrder} according to the
-     * following table:
-     * <dl>
-     * <dt>ZERO (0)</dt>
-     * <dd>{@link #SPO}</dd>
-     * <dt>ONE (1)</dt>
-     * <dd>{@link #POS}</dd>
-     * <dt>TWO (2)</dt>
-     * <dd>{@link #OSP}</dd>
-     * </dl>
-     * 
-     * @return
+     * The integer used to represent the {@link KeyOrder} which will be one of
+     * the following symbolic constants: {@link #_SPO}, {@link #POS}, or
+     * {@link #OSP}.
      */
     public int index() {
         
-        return i;
+        return index;
         
     }
     
@@ -100,12 +132,12 @@ public class KeyOrder implements IKeyOrder<ISPO> {
      */
     final public Comparator<ISPO> getComparator() {
 
-        switch (i) {
-        case 0:
+        switch (index) {
+        case _SPO:
             return SPOComparator.INSTANCE;
-        case 1:
+        case _POS:
             return POSComparator.INSTANCE;
-        case 2:
+        case _OSP:
             return OSPComparator.INSTANCE;
         default:
             throw new IllegalArgumentException("Unknown: " + this);
@@ -113,4 +145,13 @@ public class KeyOrder implements IKeyOrder<ISPO> {
 
     }
 
+    /**
+     * Imposes the canonicalizing mapping during object de-serialization.
+     */
+    private Object readResolve() throws ObjectStreamException {
+
+        return KeyOrder.valueOf(index);
+
+    }
+    
 }

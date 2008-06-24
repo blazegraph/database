@@ -162,7 +162,7 @@ public class TestBigdataMap extends TestCase {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class StringSerializer implements ITupleSerializer {
+    static class StringSerializer implements ITupleSerializer<String, String> {
 
         private static final long serialVersionUID = -3916736517088617622L;
 
@@ -174,9 +174,9 @@ public class TestBigdataMap extends TestCase {
          * Note: The key is materialized from the value since the encoding to
          * the unsigned byte[] is not reversable.
          */
-        public Object deserializeKey(ITuple tuple) {
+        public String deserializeKey(ITuple tuple) {
 
-            return SerializerUtil.deserialize(tuple.getValue());
+            return (String) SerializerUtil.deserialize(tuple.getValue());
 
         }
 
@@ -186,15 +186,15 @@ public class TestBigdataMap extends TestCase {
             
         }
 
-        public byte[] serializeVal(Object obj) {
+        public byte[] serializeVal(String obj) {
             
             return SerializerUtil.serialize(obj);
             
         }
 
-        public Object deserialize(ITuple tuple) {
+        public String deserialize(ITuple tuple) {
 
-            return SerializerUtil.deserialize(tuple.getValue());
+            return (String) SerializerUtil.deserialize(tuple.getValue());
             
         }
         

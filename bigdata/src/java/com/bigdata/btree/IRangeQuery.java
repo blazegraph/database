@@ -42,15 +42,23 @@ import cutthecrap.utils.striterators.Striterator;
 public interface IRangeQuery {
 
     /**
-     * Return the #of entries in a half-open key range. The fromKey and toKey
-     * need not be defined in the btree. This method computes the #of entries in
-     * the half-open range exactly using {@link AbstractNode#indexOf(Object)}.
-     * The cost is equal to the cost of lookup of the both keys.
+     * Return the #of tuples in the index.
      * <p>
      * Note: If the index supports deletion markers then the range count will be
-     * the upper bound and will double count index entries that exist on an
-     * {@link IndexSegment} but which have been since overwritten, including the
-     * special case where the overwrite is a delete.
+     * an upper bound and may double count tuples which have been overwritten,
+     * including the special case where the overwrite is a delete.
+     * 
+     * @return The #of tuples in the index.
+     */
+    public long rangeCount();
+    
+    /**
+     * Return the #of tuples in a half-open key range. The fromKey and toKey
+     * need not exist in the B+Tree.
+     * <p>
+     * Note: If the index supports deletion markers then the range count will be
+     * an upper bound and may double count tuples which have been overwritten,
+     * including the special case where the overwrite is a delete.
      * 
      * @param fromKey
      *            The lowest key that will be counted (inclusive). When
@@ -59,11 +67,31 @@ public interface IRangeQuery {
      *            The first key that will not be counted (exclusive). When
      *            <code>null</code> there is no upper bound.
      * 
-     * @return The #of entries in the half-open key range. This will be zero if
-     *         <i>toKey</i> is less than or equal to <i>fromKey</i> in the
-     *         total ordering.
+     * @return The #of tuples in the half-open key range.
+     * 
+     * @todo ??? throw exception if LT but allow GTE? This will be zero if
+     *       <i>toKey</i> is less than or equal to <i>fromKey</i> in the total
+     *       ordering.
      */
     public long rangeCount(byte[] fromKey, byte[] toKey);
+
+    /**
+     * Return the exact #of tuples in a half-open key range. The fromKey and
+     * toKey need not exist in the B+Tree.
+     * <p>
+     * Note: If the index supports deletion markers then this operation will
+     * require a key-range scan.
+     * 
+     * @param fromKey
+     *            The lowest key that will be counted (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will not be counted (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * @return The exact #of tuples in the half-open key range.
+     */
+    public long rangeCountExact(byte[] fromKey, byte[] toKey);
 
     /**
      * Flag specifies no data (the #of scanned index entries matching the optional

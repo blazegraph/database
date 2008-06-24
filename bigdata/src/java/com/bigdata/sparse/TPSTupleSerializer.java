@@ -13,7 +13,7 @@ import com.bigdata.io.SerializerUtil;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TPSTupleSerializer implements ITupleSerializer {
+public class TPSTupleSerializer implements ITupleSerializer<Void,TPS> {
 
     private static final long serialVersionUID = -2467715806323261423L;
 
@@ -39,7 +39,7 @@ public class TPSTupleSerializer implements ITupleSerializer {
      * @throws UnsupportedOperationException
      *             always.
      */
-    public Object deserializeKey(ITuple tuple) {
+    public Void deserializeKey(ITuple tuple) {
 
         throw new UnsupportedOperationException();
         
@@ -65,7 +65,7 @@ public class TPSTupleSerializer implements ITupleSerializer {
      * @throws UnsupportedOperationException
      *             always.
      */
-    public byte[] serializeVal(Object obj) {
+    public byte[] serializeVal(TPS obj) {
         
         throw new UnsupportedOperationException();
         

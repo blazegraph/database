@@ -71,6 +71,17 @@ public class BlockingBuffer<E> implements IBuffer<E> {
      * 
      * @param capacity
      *            The capacity of the buffer.
+     */
+    public BlockingBuffer(int capacity) {
+
+        this(capacity, null/* keyOrder */);
+
+    }
+    
+    /**
+     * 
+     * @param capacity
+     *            The capacity of the buffer.
      * @param keyOrder
      *            The visitation order in which the elements will be
      *            <em>written</em> onto the buffer and <code>null</code> if

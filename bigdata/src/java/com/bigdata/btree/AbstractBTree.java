@@ -854,7 +854,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     /**
      * The #of entries (aka values) in the {@link AbstractBTree}. This is zero
-     * (0) for a new btree.
+     * (0) for a new B+Tree. Note that this value is tracked explicitly requires
+     * no IOs.
      * 
      * @todo this could be re-defined as the exact entry count if we tracked the
      *       #of deleted index entries and subtracted that from the total #of
@@ -1368,15 +1369,81 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     /*
      * IRangeQuery
      */
+
+    /**
+     * Return the exact tuple count for the half-open key range.
+     * <p>
+     * Note: When the index uses delete markers this requires a key-range scan.
+     * If delete markers are not being used, then the cost is equal to the cost
+     * of {@link #rangeCount(byte[], byte[])}.
+     */
+    final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+        
+        if (metadata.getDeleteMarkers()) {
+
+            /*
+             * The use of delete markers means that index entries are not
+             * removed immediately but rather a delete flag is set. This is
+             * always true for the scale-out indices because delete markers are
+             * used to support index partition views. It is also true for
+             * indices that can support transactions regardless or whether or
+             * not the database is using scale-out indices. In any case, if you
+             * want an exact range count when delete markers are in use then you
+             * need to actually visit every tuple in the index, which is what
+             * this code does. Note that the [flags] are 0 since we do not need
+             * either the KEYS or VALS. We are just interested in the #of tuples
+             * that the iterator is willing to visit.
+             */
+
+            long n = 0L;
+
+            final Iterator itr = rangeIterator(fromKey, toKey,
+                    0/* capacity */, 0/* flags */, null/* filter */);
+
+            while (itr.hasNext()) {
+
+                itr.next();
+                
+                n++;
+
+            }
+
+            return n;
+
+        }
+
+        /*
+         * Either an exact count is not required or delete markers are not in
+         * use and therefore rangeCount() will report the exact count.
+         */
+
+        return rangeCount(null, null);
+
+    }
     
+    final public long rangeCount() {
+        
+        return rangeCount(null, null);
+        
+    }
+    
+    /**
+     * This method computes the #of entries in the half-open range using
+     * {@link AbstractNode#indexOf(Object)}. Since it does not scan the tuples
+     * it can not differentiate between deleted and undeleted tuples for an
+     * index that supports delete markers, but the result will be exact if
+     * delete markers are not being used. The cost is equal to the cost of
+     * lookup of the both keys. If both keys are <code>null</code>, then the
+     * cost is zero (no IOs).
+     */
     final public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         if (fromKey == null && toKey == null) {
 
             /*
-             * Note: this assumes that getEntryCount() is more efficient. Both
-             * the BTree and the IndexSegment record the entryCount in a field
-             * and just return the value of that field.
+             * Note: getEntryCount() is very efficient. Both the BTree and the
+             * IndexSegment record the entryCount in a field and just return the
+             * value of that field.
              */
 
             return getEntryCount();

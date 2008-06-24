@@ -31,9 +31,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
 
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 
 /**
  * Statistics about what the Rule did.
+ * 
+ * FIXME re-factor this as counters that are reportable by the
+ * {@link IDataService} and aggregated by the {@link ILoadBalancerService}.
+ * This will mean that the counters are not directly available on a rule-by-rule
+ * evaluation basis, but they can't be if the rules are executed remotely and in
+ * parallel (or perhaps they could be if the aggregated statistics were reported
+ * back to the master that submitted the rule for execution).
  * 
  * @todo it would be nice to report the #of new entailments and not just the #of
  *       computed entailments. The {@link SPOAssertionBuffer} knows how many new
@@ -59,7 +68,7 @@ public class RuleStats {
      * 
      * @param rule The rule.
      */
-    RuleStats(Rule rule) {
+    RuleStats(IRule rule) {
        
         this.rule = rule;
         
@@ -82,25 +91,21 @@ public class RuleStats {
     /**
      * Initilizes statistics from a {@link Rule}'s execution {@link RuleState}.
      * <p>
-     * Note: This makes the order of execution for the body predicates
-     * available.
+     * Note: This ctor variant makes the order of execution for the
+     * {@link IPredicate}s in the {@link Rule} available.
      * 
-     * @param state
+     * @param ruleState
      *            The rule execution state.
      */
-    RuleStats(RuleState state) {
+    RuleStats(RuleState ruleState) {
         
-        this(state.getRule());
+        this(ruleState.getRule());
         
-        System.arraycopy(state.order, 0, order, 0, state.order.length);
+        System.arraycopy(ruleState.order, 0, order, 0, ruleState.order.length);
 
         this.nexecutions = 1;
         
         this.aggregate = false;
-        
-        this.focusIndex = state.focusIndex;
-        
-        // @todo report the focus index?
         
     }
 
@@ -117,7 +122,7 @@ public class RuleStats {
     /**
      * The rule itself.
      */
-    public final Rule rule;
+    public final IRule rule;
     
     /**
      * The #of times that the rule has been executed (ONE(1) if executed once;
@@ -126,14 +131,6 @@ public class RuleStats {
      */
     public int nexecutions;
 
-    /**
-     * This field has meaning iff the rule is being used for truth maintenance,
-     * in which case it is the index of the predicate in the body that will read
-     * from the [focusStore] rather than the fused view [focusStore+database].
-     * The field is only available for detail records.
-     */
-    public int focusIndex = -1;
-    
     /**
      * The #of statement considered for the each predicate in the body of the
      * rule (in the order in which they were declared, not the order in which
@@ -217,8 +214,7 @@ public class RuleStats {
 
         return name //
              + (!aggregate
-                     ?(", focusIndex="+focusIndex+//
-                       ", #order="+Arrays.toString(order)//
+                     ?(", #order="+Arrays.toString(order)//
                        )
                      :(", #exec="+nexecutions//
                      ))

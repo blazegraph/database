@@ -447,6 +447,29 @@ public class FusedView implements IIndex, ILocalBTreeView {
      * @todo this could be done using concurrent threads.
      * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
+    final public long rangeCount() {
+        
+        long count = 0;
+        
+        for (int i = 0; i < srcs.length; i++) {
+            
+            count += srcs[i].rangeCount();
+            
+        }
+        
+        return count;
+        
+    }
+
+    /**
+     * Returns the sum of the range count on each index in the view. This is the
+     * maximum #of entries that could lie within that key range. However, the
+     * actual number could be less if there are entries for the same key in more
+     * than one source index.
+     * 
+     * @todo this could be done using concurrent threads.
+     * @todo watch for overflow of {@link Long#MAX_VALUE}
+     */
     final public long rangeCount(byte[] fromKey, byte[] toKey) {
         
         long count = 0;
@@ -461,6 +484,30 @@ public class FusedView implements IIndex, ILocalBTreeView {
         
     }
 
+    /**
+     * The exact range count is obtained using a key-range scan over the view.
+     * 
+     * @todo watch for overflow of {@link Long#MAX_VALUE}
+     */
+    final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+
+        final ITupleIterator itr = rangeIterator(fromKey, toKey,
+                0/* capacity */, 0/* flags */, null/* filter */);
+
+        long n = 0;
+
+        while (itr.hasNext()) {
+
+            itr.next();
+
+            n++;
+
+        }
+
+        return n;
+        
+    }
+    
     public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);

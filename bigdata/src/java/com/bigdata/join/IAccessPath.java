@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 
 /**
@@ -42,10 +41,6 @@ public interface IAccessPath<E> extends Iterable<E> {
 
     /**
      * The constraints on the {@link IAccessPath}.
-     * 
-     * @todo there should be some way to summarize the binding pattern on the
-     *       predicate as an identifier of the natural order in which the
-     *       elements will be visited.
      */
     public IPredicate<E> getPredicate();
 
@@ -98,11 +93,8 @@ public interface IAccessPath<E> extends Iterable<E> {
      * of ZERO (0) means whatever is the default capacity.
      * 
      * @return The iterator.
-     * 
-     * @todo this could be just {@link ITuple#getObject()} for the
-     *       {@link ITupleIterator} returned by {@link #rangeIterator()}.
      */
-    public IChunkedIterator<E> iterator();
+    public IChunkedOrderedIterator<E> iterator();
 
     /**
      * An iterator visiting elements using the natural order of the index

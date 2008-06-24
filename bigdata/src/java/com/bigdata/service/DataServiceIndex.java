@@ -316,11 +316,37 @@ public class DataServiceIndex implements IClientIndex {
 
     }
 
+    public long rangeCount() {
+        
+        return rangeCount(null,null);
+        
+    }
+    
     public long rangeCount(byte[] fromKey, byte[] toKey) {
 
-        // final LongAggregator handler = new LongAggregator();
+        final RangeCountProcedure proc = new RangeCountProcedure(
+                false/* exact */, fromKey, toKey);
 
-        final RangeCountProcedure proc = new RangeCountProcedure(fromKey, toKey);
+        final long rangeCount;
+
+        try {
+
+            rangeCount = (Long) dataService.submit(timestamp, name, proc);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        return rangeCount;
+
+    }
+
+    public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+
+        final RangeCountProcedure proc = new RangeCountProcedure(
+                true/* exact */, fromKey, toKey);
 
         final long rangeCount;
 
