@@ -85,7 +85,7 @@ public class TestTruthMaintenanceRewrites extends AbstractRuleTestCase {
 
             log.info(r0.toString());
 
-            assertTrue(r0.getTailPredicate(0).getRelation() == focusStore);
+            assertTrue(r0.getTail(0).getRelation() == focusStore);
             
         }
         
@@ -118,12 +118,12 @@ public class TestTruthMaintenanceRewrites extends AbstractRuleTestCase {
             log.info(r0.toString());
 
             // 1st tail.
-            assertTrue(r0.getTailPredicate(0).getRelation() == focusStore);
+            assertTrue(r0.getTail(0).getRelation() == focusStore);
 
             // 2nd tail
-            assertTrue(r0.getTailPredicate(1).getRelation() instanceof RelationFusedView);
+            assertTrue(r0.getTail(1).getRelation() instanceof RelationFusedView);
 
-            RelationFusedView fusedView = (RelationFusedView)r0.getTailPredicate(1).getRelation();
+            RelationFusedView fusedView = (RelationFusedView)r0.getTail(1).getRelation();
 
             assertTrue(fusedView.getRelation1() == focusStore);
 
@@ -138,16 +138,16 @@ public class TestTruthMaintenanceRewrites extends AbstractRuleTestCase {
             log.info(r1.toString());
 
             // 1st tail.
-            assertTrue(r1.getTailPredicate(0).getRelation() instanceof RelationFusedView);
+            assertTrue(r1.getTail(0).getRelation() instanceof RelationFusedView);
 
-            RelationFusedView fusedView = (RelationFusedView)r1.getTailPredicate(0).getRelation();
+            RelationFusedView fusedView = (RelationFusedView)r1.getTail(0).getRelation();
 
             assertTrue(fusedView.getRelation1() == focusStore);
 
             assertTrue(fusedView.getRelation2() == database);
             
             // 2nd tail
-            assertTrue(r1.getTailPredicate(1).getRelation() == focusStore);
+            assertTrue(r1.getTail(1).getRelation() == focusStore);
 
         }
 

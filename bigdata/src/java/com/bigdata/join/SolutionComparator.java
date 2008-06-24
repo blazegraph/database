@@ -23,50 +23,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 20, 2008
+ * Created on Jun 24, 2008
  */
 
 package com.bigdata.join;
 
-import com.bigdata.join.rdf.ISPO;
+import java.util.Comparator;
+
+import com.bigdata.join.rdf.KeyOrder;
 
 /**
+ * Wraps the {@link Comparator} obtained from a {@link KeyOrder} such that it
+ * will ordered {@link ISolution}s by the elements reported by
+ * {@link ISolution#get()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRuleState extends AbstractRuleTestCase {
+public class SolutionComparator<E> implements Comparator<ISolution<E>> {
 
-    /**
-     * 
-     */
-    public TestRuleState() {
+    private final Comparator<E> comparator;
+
+    public SolutionComparator(IKeyOrder<E> keyOrder) {
+
+        this.comparator = keyOrder.getComparator();
 
     }
 
-    /**
-     * @param name
-     */
-    public TestRuleState(String name) {
+    public int compare(ISolution<E> arg0, ISolution<E> arg1) {
 
-        super(name);
-        
-    }
-
-    /**
-     * FIXME {@link RuleState} has become an evaluation order and some access
-     * path caching. In order to test this class we need to have either a mock
-     * access path or some real data.
-     */
-    public void test_ruleState() {
-
-        final IRelation<ISPO> relation = new MockRelation<ISPO>();
-        
-        final IRule r = new TestRuleRdfs9(relation);
-
-        final RuleState state = new RuleState(r);
-
-        fail("write test");
+        return comparator.compare(arg0.get(), arg1.get());
 
     }
 

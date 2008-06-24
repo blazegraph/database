@@ -121,11 +121,11 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 //    final boolean subqueryElimination = false;
    
     private final RuleState state;
-    private final IBuffer buffer;
+    private final IBuffer<ISolution> buffer;
     private final IBindingSet bindingSet;
     private final RuleStats ruleStats;
     
-    public LocalNestedSubqueryEvaluator(RuleState ruleState, IBuffer buffer) {
+    public LocalNestedSubqueryEvaluator(RuleState ruleState, IBuffer<ISolution> buffer) {
 
         if (ruleState == null)
             throw new IllegalArgumentException();
@@ -256,8 +256,17 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                         // bind variables from the current element.
                         if (state.bind(bindingSet, state.order[index], e)) {
 
-                            // emit entailment.
-                            buffer.add(bindingSet);
+                            /*
+                             * emit entailment
+                             * 
+                             * FIXME Compute the bindings on the head.
+                             * 
+                             * FIXME make bindingSet and rule optional. The rule
+                             * reference could be safely attached but not
+                             * serialized, but the bindingSet needs to be CLONED
+                             * so keeping that is relatively costly.
+                             */
+                            buffer.add(null/*FIXME*/);//new Solution(null/*FIXME e*/,bindingSet,rule));
                             
                         }
 

@@ -43,11 +43,14 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param R
+ *            The generic type of the [R]elation elements of the
+ *            {@link IRelation}.
  */
-abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
+abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
-    private final IPredicate<E> predicate;
-    private final IKeyOrder<E> keyOrder;
+    private final IPredicate<R> predicate;
+    private final IKeyOrder<R> keyOrder;
     private final IIndex ndx;
     private final int flags;
 
@@ -60,7 +63,7 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
     private byte[] fromKey;
     private byte[] toKey;
 
-    public IKeyOrder<E> getKeyOrder() {
+    public IKeyOrder<R> getKeyOrder() {
         
         return keyOrder;
         
@@ -84,8 +87,8 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
      *       constraint then that must be layer on top of this lower-level
      *       constaint.
      */
-    protected AbstractAccessPath(IPredicate<E> predicate,
-            IKeyOrder<E> keyOrder, IIndex ndx, int flags) {
+    protected AbstractAccessPath(IPredicate<R> predicate,
+            IKeyOrder<R> keyOrder, IIndex ndx, int flags) {
 
         if (predicate == null)
             throw new IllegalArgumentException();
@@ -104,7 +107,7 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
 
         this.flags = flags;
 
-        final IPredicateConstraint<E> constraint = predicate.getConstraint();
+        final IPredicateConstraint<R> constraint = predicate.getConstraint();
 
         if (constraint == null) {
 
@@ -125,7 +128,7 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
                 @SuppressWarnings("unchecked")
                 public boolean isValid(ITuple tuple) {
                     
-                    E e = (E)tuple.getValue();
+                    R e = (R)tuple.getValue();
                     
                     return constraint.accept(e);
                     
@@ -154,7 +157,7 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
 
     }
     
-    public IPredicate<E> getPredicate() {
+    public IPredicate<R> getPredicate() {
         
         assertInitialized();
         
@@ -164,7 +167,7 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
 
     public boolean isEmpty() {
 
-        final IChunkedIterator<E> itr = iterator(1,1);
+        final IChunkedIterator<R> itr = iterator(1,1);
         
         try {
             
@@ -178,17 +181,17 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
         
     }
 
-    public IChunkedOrderedIterator<E> iterator() {
+    public IChunkedOrderedIterator<R> iterator() {
         
         return iterator(0,0);
         
     }
 
     @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
+    public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
 
         // @todo optimizations for point tests and small limits.
-        return new ChunkedWrappedIterator<E>(new Striterator(rangeIterator(capacity,
+        return new ChunkedWrappedIterator<R>(new Striterator(rangeIterator(capacity,
                 flags, filter)).addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 0L;
@@ -274,14 +277,14 @@ abstract public class AbstractAccessPath<E> implements IAccessPath<E> {
         
     }
 
-    public ITupleIterator<E> rangeIterator() {
+    public ITupleIterator<R> rangeIterator() {
 
         return rangeIterator(0/* capacity */, flags, filter);
         
     }
     
     @SuppressWarnings({ "unchecked" })
-    protected ITupleIterator<E> rangeIterator(int capacity,int flags, ITupleFilter filter) {
+    protected ITupleIterator<R> rangeIterator(int capacity,int flags, ITupleFilter filter) {
 
         assertInitialized();
         

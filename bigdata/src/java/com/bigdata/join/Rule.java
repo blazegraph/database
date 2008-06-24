@@ -40,15 +40,6 @@ import org.apache.log4j.Logger;
  * @todo integration with package providing magic set rewrites of rules in order
  *       to test whether or not a statement is still provable when it is
  *       retracted during TM.
- * 
- * @todo add an XML serialization and parser for rules so that the rule sets may
- *       be declared. some very specialized rules might not be handled in this
- *       manner but the vast majority are executed as nested subqueries and can
- *       be just declared.
- *       <p>
- *       This will make it possible for people to extend the rule sets, but
- *       there are interactions in the rules choosen for evaluation during
- *       forward closure and those choosen for evaluation at query time.
  */
 public class Rule implements IRule {
 
@@ -133,7 +124,7 @@ public class Rule implements IRule {
      * Iterator visits the {@link IPredicate}s in the body (ala tail) of the
      * rule.
      */
-    public Iterator<IPredicate> getTailPredicates() {
+    public Iterator<IPredicate> getTail() {
         
         return Arrays.asList(tail).iterator();
         
@@ -147,7 +138,7 @@ public class Rule implements IRule {
      *            
      * @return The predicate at that index.
      */
-    public IPredicate getTailPredicate(int index) {
+    public IPredicate getTail(int index) {
         
         return tail[index];
         

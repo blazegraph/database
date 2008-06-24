@@ -49,6 +49,10 @@ import com.bigdata.btree.IRangeQuery;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @param <E>
+ *            The generic type for the [E]lements visited by the
+ *            {@link Iterator}.
  */
 public interface IChunkedIterator<E> extends Iterator<E> {
 
@@ -64,7 +68,7 @@ public interface IChunkedIterator<E> extends Iterator<E> {
     public void close();
 
     /**
-     * The next {@link E} available from the iterator.
+     * The next element available from the iterator.
      * 
      * @throws NoSuchElementException
      *             if the iterator is exhausted.

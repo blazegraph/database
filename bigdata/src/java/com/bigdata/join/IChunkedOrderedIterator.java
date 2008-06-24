@@ -32,14 +32,17 @@ import java.util.NoSuchElementException;
 
 /**
  * An extension of {@link IChunkedIterator} interface that knows about natural
- * traversal orders and how to reorder the elements that are being visited to
+ * traversal orders and how to re-order the elements that are being visited to
  * support JOINs where the natural order for the access paths is different for
  * the left- and right-hand side of the JOIN.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @param <R>
+ *            The generic type for the [R]elation elements.
  */
-public interface IChunkedOrderedIterator<E> extends IChunkedIterator<E> {
+public interface IChunkedOrderedIterator<R> extends IChunkedIterator<R> {
 
     /**
      * The natural order in which elements are being visited.
@@ -47,7 +50,7 @@ public interface IChunkedOrderedIterator<E> extends IChunkedIterator<E> {
      * @return The natural order in which the elements are being visited -or-
      *         <code>null</code> if not known.
      */
-    public IKeyOrder getKeyOrder();
+    public IKeyOrder<R> getKeyOrder();
     
     /**
      * Return the next "chunk" of elements. The elements will be in the
@@ -67,6 +70,6 @@ public interface IChunkedOrderedIterator<E> extends IChunkedIterator<E> {
      * @throws IllegalArgumentException
      *             if the <i>keyOrder</i> is <code>null</code>.
      */
-    public E[] nextChunk(IKeyOrder<E> keyOrder);
+    public R[] nextChunk(IKeyOrder<R> keyOrder);
     
 }

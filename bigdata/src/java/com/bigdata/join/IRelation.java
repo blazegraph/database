@@ -28,19 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 
 /**
  * An abstraction corresponding to a set of elements using some schema.
- * <p>
- * 
- * @todo A triple store is a relation with N access paths, one for each
- *       statement index. The term2id and id2term indices are a 2nd relation.
- *       The full text index is a third relation. When querying a focusStore and
- *       a db, the focusStore will have the same relation class (the triples)
- *       and the index classes declared (SPO, POS, OSP) but the relation
- *       instance and the indices will be distinct from those associated with
- *       the main db.
  * 
  * FIXME An {@link IRelation} introduces a dependency on access to the data. if
  * {@link IPredicate} knows its owning {@link IRelation} then rules can not be
@@ -48,14 +42,35 @@ import com.bigdata.btree.IRangeQuery;
  * binding between the predicates in a rule and the data source(s). that binding
  * really needs to be symbolic since the data sources can not be passed by value
  * when within a distributed JOIN. Instead they need to be things like the
- * namespace of the scale out triple store. And if they are symbolic then we
- * need a means to convert them to functional objects that can materialize
- * access paths that actually read or write on the appropriate relation.
+ * timestamp for the view (including the case of a checkpoint that evolves when
+ * bringing a rule set to fixed point) and the namespace of the scale out triple
+ * store so that we can locate the various index partitions. And if they are
+ * symbolic then we need a means to convert them to functional objects that can
+ * materialize access paths that actually read or write on the appropriate
+ * relation.
+ * <p>
+ * We need to bind the relation to the protocol for accessing that relation
+ * whenever we want to request anything for the relation. That binding needs to
+ * be (re-)established when reading rules from a file or when a data service
+ * receives a (part of a) rule for remote execution as part of a distributed
+ * JOIN.
+ * <p>
+ * It is perfectly reasonable for rules to write on a temporary index and there
+ * should be a facility for creating and destroying temporary indices. Perhaps
+ * they should be placed into their own namespace, e.g., "#x" would be a
+ * temporary index named "x" (could support scale-out) and "##x" would be a
+ * data-service local temporary index named "x". "x" by itself is a normal
+ * index.  Normally, such temporary indices should be scoped to something like
+ * a transaction but transaction support is not yet finished.
  * 
- * FIXME Is there no relation in the head or is this how we handle query (no
- * relation, results are written onto a buffer for eventual read by a client aka
- * SELECT) vs write (write on the relation via a suitable buffering mechanism
- * aka INSERT, UPDATE, DELETE)?
+ * FIXME Allow the head of a rule to return [null] for getRelation() so that
+ * query via rules can work even when there is no specific relation that
+ * corresponds to the head of the rule?
+ * <P>
+ * Is there no relation in the head or is this how we handle query (no relation,
+ * results are written onto a buffer for eventual read by a client aka SELECT)
+ * vs write (write on the relation via a suitable buffering mechanism aka
+ * INSERT, UPDATE, DELETE)?
  * 
  * @todo Note that a different subset of bindings might be used when feeding
  *       another JOIN.
@@ -68,7 +83,7 @@ import com.bigdata.btree.IRangeQuery;
  * @param E
  *            The generic type for the elements in the relation.
  */
-public interface IRelation<E> extends IAccessPathFactory<E> {
+public interface IRelation<E> {
 
     /**
      * The #of elements in the relation.
@@ -79,10 +94,42 @@ public interface IRelation<E> extends IAccessPathFactory<E> {
      *            use, in which case it will be more expensive. See
      *            {@link IRangeQuery}.
      * 
-     * @todo depending on this for fixed point termination is simpler but
-     *       potentially less efficient than reporting from the various write
-     *       methods whether any elements in the relation were modified.
+     * @todo Depending on this for fixed point termination is simpler but MUCH
+     *       less efficient than reporting from the various write methods
+     *       whether any elements in the relation were modified. (We need to
+     *       request an exact count in the general case since entailments may
+     *       have overwritten deleted tuples and we would miss that with exact :=
+     *       false).
      */
-    public long getElementCount(boolean exact);
+    long getElementCount(boolean exact);
+
+    /**
+     * Return the best {@link IAccessPath} for a relation given a predicate with
+     * zero or more unbound variables.
+     * <p>
+     * If there is an {@link IIndex} that directly corresponeds to the natural
+     * order implied by the variable pattern on the predicate then the access
+     * path should use that index. Otherwise you should choose the best index
+     * given the constraints and make sure that the {@link IAccessPath}
+     * incorporates additional filters that will allow you to filter out the
+     * irrelevant {@link ITuple}s during the scan - this is very important when
+     * the index is remote!
+     * <p>
+     * If there are any {@link IPredicateConstraint}s then the access path MUST
+     * incorporate those constraints such that only elements that satisify the
+     * constraints may be visited.
+     * <p>
+     * Whether the constraints arise because of the lack of a perfect index for
+     * the access path or because they were explicitly specified for the
+     * {@link IPredicate}, those constraints should be translated into
+     * constraints imposed on the underlying {@link ITupleIterator} and sent
+     * with it to be evaluated local to the data.
+     * 
+     * @param predicate
+     *            The constraint on the elements to be visited.
+     * 
+     * @return The best {@link IAccessPath} for that {@link IPredicate}.
+     */
+    IAccessPath<E> getAccessPath(IPredicate<E> predicate);
     
 }

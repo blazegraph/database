@@ -39,7 +39,7 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
 /**
- * Utility class for {@link IProgram}s.
+ * Utility class for evaluating {@link IProgram}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -54,10 +54,28 @@ public class ProgramUtility {
 
     }
 
-    public void execute(IProgram program, ExecutorService service,
-            IBuffer<IBindingSet> buffer) throws InterruptedException,
-            ExecutionException {
+    public void execute(IProgram program, ExecutorService service)
+            throws InterruptedException, ExecutionException {
 
+        /*
+         * FIXME Locate the distinct relations on which the rules will write and
+         * create an appropriate buffer for each.
+         * 
+         * If we are reading from the rule, then it writes on a BlockingBuffer
+         * and we return the iterator that drains that buffer.
+         * 
+         * If we are writing on a relation (insert, delete, or update) then we
+         * use an AbstractArrayBuffer that flushed onto the appropriate method
+         * on the IRelation.
+         * 
+         * @todo Is there anyway to read from a collection of rules whose heads
+         * are for more than one relation? - the iterator would have to be
+         * weakly typed.
+         */
+        
+        // FIXME This is only for reading solutions, not for writing on the relation.
+        final IBuffer<ISolution> buffer = new BlockingBuffer<ISolution>();
+        
         final List<Callable<Object>> tasks = newTasks(program, buffer);
 
         if (program.isParallel()) {
@@ -81,12 +99,11 @@ public class ProgramUtility {
      * 
      * @todo handle sub-programs (vs just rules).
      * 
-     * FIXME handle closure using
-     * {@link #fixPoint(IProgram, ExecutorService, IBuffer)}.
+     * FIXME handle closure using {@link #fixPoint(IProgram, ExecutorService, IBuffer)}.
      * 
      * @todo do we really want the buffer as a parameter here?
      */
-    protected List<Callable<Object>> newTasks(IProgram program, IBuffer<IBindingSet> buffer) {
+    protected List<Callable<Object>> newTasks(IProgram program, IBuffer<ISolution> buffer) {
 
         final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(program.stepCount());
 
@@ -261,7 +278,7 @@ public class ProgramUtility {
             for (IProgram step : steps) {
 
 //                final RuleStats stats =
-                execute(step, service, buffer);
+                execute(step, service);
 //                    apply(rule, focusStore, database, buffer, service);
                 
 // closureStats.add(stats);

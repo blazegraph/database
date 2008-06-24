@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+
 /**
  * A thread-safe buffer backed by a fixed capacity array. Concrete
  * implementations must empty the buffer in {@link #flush(int, Object[])}.
@@ -37,8 +38,9 @@ package com.bigdata.join;
  */
 abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
+    private final int capacity;
     private int n;
-    private Object[] buffer;
+    private E[] buffer;
     
     /**
      * @param capacity
@@ -49,7 +51,18 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         if (capacity <= 0)
             throw new IllegalArgumentException();
         
-        buffer = new Object[capacity];
+        this.capacity = capacity;
+        
+        /*
+         * Note: The backing array is allocated once we receive the first
+         * element so we can get the array component type right.
+         * 
+         * @todo this could be a problem if the element type was in fact Object
+         * since we should allocate an Object[] but we will in fact allocate an
+         * array of whatever type that first object is. This could in turn cause
+         * runtime errors. If it is then we need to pass in an object (or an
+         * empty array) of the correct type.
+         */
         
     }
     
@@ -98,6 +111,13 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         }
         
         synchronized(this) {
+
+            if(buffer == null) {
+                
+                buffer = (E[]) java.lang.reflect.Array.newInstance(
+                        e.getClass(), capacity);
+
+            }
             
             if (n == buffer.length) {
 
@@ -115,11 +135,41 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         
     }
 
-    synchronized public void flush() {
+    synchronized public long flush() {
 
-        if (n > 0)
-            flush(n, buffer);
+        if (n > 0) {
+
+            counter += flush(n, buffer);
+            
+            clearBuffer();
+            
+        }
+        
+        return counter;
     
+    }
+    
+    private long counter = 0L;
+    
+    synchronized public void reset() {
+        
+        clearBuffer();
+        
+        n = 0;
+
+        counter = 0L;
+        
+    }
+    
+    /** Clear hard references from the buffer for better GC. */
+    private void clearBuffer() {
+
+        for(int i=0; i<n; i++) {
+            
+            buffer[i] = null;
+            
+        }
+
     }
 
     /**
@@ -133,7 +183,12 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
      *            The #of elements in the array.
      * @param a
      *            The array of elements.
+     * 
+     * @return The #of elements that were modified in the backing relation when
+     *         the buffer was flushed (unlike {@link #flush()}, this is not a
+     *         cumulative counter, but the #of modified elements in the relation
+     *         for this operation only).
      */
-    abstract protected void flush(int n, Object[] a);
+    abstract protected long flush(int n, E[] a);
     
 }

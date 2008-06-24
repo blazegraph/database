@@ -37,17 +37,16 @@ import org.apache.log4j.Logger;
 /**
  * Mutable program may be used to create a variety of rule executions.
  * 
- * FIXME Refactor into "programs", aka, collections of rules to be run in
- * sequence and/or in parallel. The focusStore stuff needs to be a rewritten as
- * a rule (and program) rewrite in order to map the predicates correctly across
- * the db and the focusStore. Most of the "programs" allow the rules to run in
- * parallel and the fixedPoint support assumes that the order of rule execution
- * does not matter, but that the re-behind point changes with each iterator. The
- * counter example is the "fast" closure method - that is a specific sequence of
- * both custom and standard rules than runs once rather than to fixed point
- * (some of the rules in the program are run to fixed point so that needs to be
- * a program control parameter in addition to sequential vs parallel execution).
- *
+ * FIXME Make sure that we can handle the "fast" closure method - that is a
+ * specific sequence of both custom and standard rules than runs once rather
+ * than to fixed point (some of the rules in the program are run to fixed point
+ * so that needs to be a program control parameter in addition to sequential vs
+ * parallel execution).
+ * 
+ * FIXME Make sure that there is an option to run a {@link Program} without
+ * including the {@link IRule} and {@link IBindingSet} in the solution for
+ * efficient IO on scale-out runs.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

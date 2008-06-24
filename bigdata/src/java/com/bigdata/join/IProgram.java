@@ -36,7 +36,15 @@ import java.util.Iterator;
  * executed sequentially while others are (at least logically) parallel. A
  * program may also specify the transitive closure of its rules.
  * 
- * @todo XML (de-)serialization of programs and rules. 
+ * @todo add an XML (de-)serialization for programs and rules so that the rule
+ *       sets may be declared. Note that there are a few very specialized rules
+ *       whose semantics might not be fully declarable for the fast closure
+ *       method used by the RDF KB.
+ * 
+ * @todo Make it possible for people to easily extend the RDF KB rule sets or
+ *       run rules over a RDF data set, but note that there are interactions in
+ *       the rules choosen for evaluation during forward closure and those
+ *       choosen for evaluation at query time.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
