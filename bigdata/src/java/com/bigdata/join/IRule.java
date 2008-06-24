@@ -65,7 +65,7 @@ public interface IRule extends IProgram {
      * Iterator visits the {@link IPredicate}s in the body (ala tail) of the
      * rule.
      */
-    public Iterator<IPredicate> getTailPredicates();
+    public Iterator<IPredicate> getTail();
 
     /**
      * Return the predicate at the given index from the tail of the rule.
@@ -75,7 +75,7 @@ public interface IRule extends IProgram {
      *            
      * @return The predicate at that index.
      */
-    public IPredicate getTailPredicate(int index);
+    public IPredicate getTail(int index);
 
     /**
      * The #of constraints on the legal states for bindings of the variables

@@ -127,7 +127,7 @@ public class TMUtility {
              */
 
             fusedView = new RelationFusedView(focusStore, rule
-                    .getTailPredicate(0).getRelation());
+                    .getTail(0).getRelation());
 
         }
         
@@ -143,7 +143,7 @@ public class TMUtility {
         final IPredicate[] tail = new IPredicate[tailCount];
         {
             
-            final Iterator<IPredicate> itr = rule.getTailPredicates();
+            final Iterator<IPredicate> itr = rule.getTail();
             
             int i = 0;
             

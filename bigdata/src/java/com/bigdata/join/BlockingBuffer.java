@@ -66,6 +66,39 @@ public class BlockingBuffer<E> implements IBuffer<E> {
      * The element write order IFF known.
      */
     private final IKeyOrder<E> keyOrder;
+
+    private final int minChunkSize;
+    
+    private final long chunkTimeout;
+    
+    /**
+     * The default capacity for the internal buffer. Chunks can not be larger
+     * than this.
+     */
+    protected static transient final int DEFAULT_CAPACITY = 1000;
+    
+    /**
+     * The default minimum chunk size. If the buffer has fewer than this many
+     * elements and the buffer has not been {@link #close() closed} then it will
+     * wait up to {@link #DEFAULT_CHUNK_TIMEOUT} milliseconds before returning
+     * the next chunk based on what is already in the buffer.
+     */
+    protected static transient final int DEFAULT_MIN_CHUNK_SIZE = 100;
+    
+    /**
+     * The maximum amount of time to wait in
+     * {@link BlockingIterator#nextChunk()}.
+     */
+    protected static transient final int DEFAULT_CHUNK_TIMEOUT = 1000/*ms*/;
+
+    /**
+     *
+     */
+    public BlockingBuffer() {
+        
+        this(DEFAULT_CAPACITY);
+        
+    }
     
     /**
      * 
@@ -89,12 +122,54 @@ public class BlockingBuffer<E> implements IBuffer<E> {
      *            order.
      */
     public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder) {
-                
+       
+        this(capacity, keyOrder, DEFAULT_MIN_CHUNK_SIZE, DEFAULT_CHUNK_TIMEOUT);
+        
+    }
+
+    /**
+     * 
+     * @param capacity
+     *            The capacity for the internal buffer. Chunks can not be larger
+     *            than this.
+     * @param keyOrder
+     *            The visitation order in which the elements will be
+     *            <em>written</em> onto the buffer and <code>null</code> if
+     *            you do not have a <em>strong</em> guarentee for the write
+     *            order.
+     * @param minChunkSize
+     *            The minimum chunk size. If the buffer has fewer than this many
+     *            elements and the buffer has not been {@link #close() closed}
+     *            then {@link #iterator()} will wait up to
+     *            {@link #DEFAULT_CHUNK_TIMEOUT} milliseconds before returning
+     *            the next chunk based on what is already in the buffer.
+     * @param chunkTimeout
+     *            The maximum amount of time the {@link #iterator()} will wait
+     *            to satisify the minimum chunk size.
+     */
+    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder, int minChunkSize, long chunkTimeout) {
+        
+        if (capacity <= 0)
+            throw new IllegalArgumentException();
+
+        if (minChunkSize < 0)
+            throw new IllegalArgumentException();
+        
+        if (minChunkSize > capacity)
+            throw new IllegalArgumentException();
+        
+        if (chunkTimeout < 0)
+            throw new IllegalArgumentException();
+
         this.buffer = new ArrayBlockingQueue<E>(capacity);
         
         this.iterator = new BlockingIterator();
 
         this.keyOrder = keyOrder;
+        
+        this.minChunkSize = minChunkSize;
+        
+        this.chunkTimeout = chunkTimeout;
         
     }
 
@@ -204,11 +279,21 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     /**
      * This is a NOP since the {@link #iterator()} is the only way to consume
      * data written on the buffer.
+     * 
+     * @return ZERO (0L)
      */
-    public void flush() {
+    public long flush() {
 
+        return 0L;
+        
     }
 
+    public void reset() {
+        
+        buffer.clear();
+        
+    }
+    
     /**
      * Return an iterator reading from the buffer. The elements will be visited
      * in the order in which they were written on the buffer. The returned
@@ -369,6 +454,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
 
         }
 
+        @SuppressWarnings("unchecked")
         public E[] nextChunk() {
 
             if (!hasNext()) {
@@ -379,8 +465,15 @@ public class BlockingBuffer<E> implements IBuffer<E> {
             
             /*
              * This is thee current size of the buffer. The buffer size MAY grow
-             * asynchronously but will not shrink since we are the only class
-             * that takes items from the buffer.
+             * asynchronously but will not shrink outside of the effect of this
+             * method unless it is asynchronously reset().
+             * 
+             * @todo handle asynchronous reset() safely.
+             * 
+             * @todo if the buffer size LT MIN_CHUNK_SIZE then await
+             * minChunkSize with a timeout of ~250ms - ~1s (config param). This
+             * will give the buffer a chance to build up some data and make the
+             * chunk-at-a-time processing more efficient.
              */
             final int chunkSize = buffer.size();
 

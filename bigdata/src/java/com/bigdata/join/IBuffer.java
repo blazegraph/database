@@ -30,6 +30,10 @@ package com.bigdata.join;
 
 /**
  * A buffer abstraction.
+ * <p>
+ * {@link AbstractArrayBuffer} is generally used to write on an
+ * {@link IRelation} while {@link BlockingBuffer} is used to feed an iterator
+ * that a client can be read from asynchronously.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -58,8 +62,22 @@ public interface IBuffer<E> {
     public boolean add(E e);
     
     /**
-     * Flush the buffer.
+     * Flush the buffer and return the #of elements written on the backing
+     * {@link IRelation} since the counter was last {@link #reset()}.
+     * <p>
+     * Note: If the buffer does not write on an {@link IRelation} then it SHOULD
+     * return ZERO(0).
+     * 
+     * @return The #of elements written on the backing {@link IRelation}.
+     * 
+     * See {@link IMutableRelation}
      */
-    public void flush();
+    public long flush();
+
+    /**
+     * Reset the state of the buffer, including the counter whose value is
+     * reported by {@link #flush()}. Any data in the buffer will be discarded.
+     */
+    public void reset();
     
 }

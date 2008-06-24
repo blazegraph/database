@@ -28,26 +28,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import javax.swing.SpringLayout.Constraints;
+
 import com.bigdata.btree.ITupleIterator;
 
 /**
- * An abstraction for a key-range scan using the index whose natural order is
- * more efficient for a given {@link IPredicate}.
+ * An abstraction for efficient reads on an {@link IRelation} using the index
+ * selected by an {@link IPredicate} {@link Constraints}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @param <R>
+ *            The generic type of the [R]elation elements of the
+ *            {@link IRelation}.
  */
-public interface IAccessPath<E> extends Iterable<E> {
+public interface IAccessPath<R> extends Iterable<R> {
 
     /**
      * The constraints on the {@link IAccessPath}.
      */
-    public IPredicate<E> getPredicate();
+    public IPredicate<R> getPredicate();
 
     /**
      * The order in which the elements will be visited.
      */
-    public IKeyOrder<E> getKeyOrder();
+    public IKeyOrder<R> getKeyOrder();
     
     /**
      * True iff the access path is empty (there are no matches for the
@@ -79,7 +85,7 @@ public interface IAccessPath<E> extends Iterable<E> {
      * @todo for scale-out version, the optional {@link ISPOFilter} should be
      *       sent to the data service.
      */
-    public ITupleIterator<E> rangeIterator();
+    public ITupleIterator<R> rangeIterator();
     
     /**
      * An iterator visiting elements using the natural order of the index
@@ -94,7 +100,7 @@ public interface IAccessPath<E> extends Iterable<E> {
      * 
      * @return The iterator.
      */
-    public IChunkedOrderedIterator<E> iterator();
+    public IChunkedOrderedIterator<R> iterator();
 
     /**
      * An iterator visiting elements using the natural order of the index
@@ -111,7 +117,7 @@ public interface IAccessPath<E> extends Iterable<E> {
      * 
      * @return The iterator.
      */
-    public IChunkedIterator<E> iterator(int limit, int capacity);
+    public IChunkedIterator<R> iterator(int limit, int capacity);
 
     /**
      * Remove all elements selected by the {@link IPredicate} (batch, parallel,

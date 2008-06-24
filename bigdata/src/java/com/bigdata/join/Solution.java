@@ -23,51 +23,49 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 20, 2008
+ * Created on Jun 24, 2008
  */
 
 package com.bigdata.join;
 
-import com.bigdata.join.rdf.ISPO;
+import com.bigdata.btree.ITupleSerializer;
 
 /**
+ * Flyweight implementation.
+ * 
+ * FIXME smart and compact serialization! Reuse the {@link ITupleSerializer} for
+ * the elements and provide compact serialization for the binding sets as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRuleState extends AbstractRuleTestCase {
+public class Solution<E> implements ISolution<E> /*, FIXME Serializable*/ {
 
-    /**
-     * 
-     */
-    public TestRuleState() {
-
+    // FIXME ctor for just the [e] and for all three.
+    
+//    private final E e;
+//    private final IRule r;
+//    private final IBindingSet bindingSet;
+//    
+//    public Solution(E e) {
+//        
+//        this.e = e;
+//        
+//    }
+    
+    public E get() {
+        // TODO Auto-generated method stub
+        return null;
     }
 
-    /**
-     * @param name
-     */
-    public TestRuleState(String name) {
-
-        super(name);
-        
+    public IBindingSet getBindingSet() {
+        // TODO Auto-generated method stub
+        return null;
     }
 
-    /**
-     * FIXME {@link RuleState} has become an evaluation order and some access
-     * path caching. In order to test this class we need to have either a mock
-     * access path or some real data.
-     */
-    public void test_ruleState() {
-
-        final IRelation<ISPO> relation = new MockRelation<ISPO>();
-        
-        final IRule r = new TestRuleRdfs9(relation);
-
-        final RuleState state = new RuleState(r);
-
-        fail("write test");
-
+    public IRule getRule() {
+        // TODO Auto-generated method stub
+        return null;
     }
 
 }

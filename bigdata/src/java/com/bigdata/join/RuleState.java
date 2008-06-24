@@ -143,7 +143,7 @@ public class RuleState {
 //                 * range count that the predicate that is already first in
 //                 * the evaluation order.
 //                 * 
-//                 * @todo range counts here could be expensive when the index
+//                 * Note: range counts here could be expensive when the index
 //                 * is remote or partitioned.
 //                 */
 //                
@@ -243,7 +243,7 @@ public class RuleState {
         
         int i = 0;
         
-        for(Iterator<IPredicate> itr = rule.getTailPredicates(); itr.hasNext(); i++) {
+        for(Iterator<IPredicate> itr = rule.getTail(); itr.hasNext(); i++) {
 
             final IPredicate pred = itr.next();
             
@@ -316,7 +316,7 @@ public class RuleState {
                 
                 if(used[j]) continue; // already in the evaluation order. 
                 
-                final int varCount = rule.getTailPredicate(j)
+                final int varCount = rule.getTail(j)
                         .getVariableCount();
 
                 if (varCount < minVarCount) {
@@ -328,31 +328,29 @@ public class RuleState {
                 } else if (true && varCount == minVarCount) {
 
                     /*
-                     * Tweaks the evaluation order for predicates where the
-                     * #of variable bindings is the same by examining the
-                     * range counts.
+                     * Tweaks the evaluation order for predicates where the #of
+                     * variable bindings is the same by examining the range
+                     * counts.
                      * 
-                     * Note: In doing this, we disregard the bindings that
-                     * were propagated since they are -1 and will NOT match
-                     * anything anywhere!
+                     * Note: In doing this, we disregard the bindings that were
+                     * propagated since they are -1 and will NOT match anything
+                     * anywhere!
                      * 
-                     * Note: In the case where some other predicate is
-                     * already first in the evaluation order by the virtue
-                     * of having more variables bound this tweak is purely
-                     * heuristic regardless of the fact that it considers
-                     * the data. The reason is that the actual bindings that
-                     * are propagated during the execution of the rule will
-                     * determine which of the two predicates under
-                     * consideration is, in fact, more selective in the
-                     * data. However, in the special case where the two
-                     * predicates are competing for the 1st position in the
-                     * evaluation order, this "tweak" is exact.
+                     * Note: In the case where some other predicate is already
+                     * first in the evaluation order by the virtue of having
+                     * more variables bound this tweak is purely heuristic
+                     * regardless of the fact that it considers the data. The
+                     * reason is that the actual bindings that are propagated
+                     * during the execution of the rule will determine which of
+                     * the two predicates under consideration is, in fact, more
+                     * selective in the data. However, in the special case where
+                     * the two predicates are competing for the 1st position in
+                     * the evaluation order, this "tweak" is exact.
                      * 
-                     * @todo Some tails use the same triple pattern in both
-                     * predicates. E.g., rdfs11 (u subClassOf v) (v
-                     * subClassOf x). In these cases comparing range counts
-                     * is pointless and could be avoided by testing for this
-                     * pattern.
+                     * @todo Some tails use the same constant pattern in both
+                     * predicates. E.g., rdfs11 (u subClassOf v) (v subClassOf
+                     * x). In these cases comparing range counts is pointless
+                     * and could be avoided by testing for this pattern.
                      */
                     
                     if(minRangeCount == Integer.MAX_VALUE) {
@@ -401,7 +399,7 @@ public class RuleState {
             // set fake bindings for this predicate.
             {
                 
-                final IPredicate pred = rule.getTailPredicate(index);
+                final IPredicate pred = rule.getTail(index);
 
                 final int arity = pred.arity();
 
@@ -458,7 +456,7 @@ public class RuleState {
         
         for(int i=0; i<tailCount; i++) {
             
-            final IPredicate pred = rule.getTailPredicate(order[i]);
+            final IPredicate pred = rule.getTail(order[i]);
             
             final int arity = pred.arity();
             
@@ -627,7 +625,7 @@ public class RuleState {
         // clear cached access path for preds using that variable.
         for (int i = 0; i < tailCount; i++) {
 
-            final IPredicate pred = rule.getTailPredicate(i);
+            final IPredicate pred = rule.getTail(i);
 
             final int arity = pred.arity();
 
@@ -673,7 +671,7 @@ public class RuleState {
     public boolean bind(IBindingSet bindings,int index, Object e) {
        
         // propagate bindings.
-        rule.getTailPredicate(index).copyValues(e, bindings);
+        rule.getTail(index).copyValues(e, bindings);
 
         // verify constraints.
         return rule.isLegal(bindings);
@@ -702,7 +700,7 @@ public class RuleState {
         
         for (int i = index; i < tailCount; i++) {
 
-            final IPredicate pred = rule.getTailPredicate(order[index]);
+            final IPredicate pred = rule.getTail(order[index]);
 
             final int arity = pred.arity();
 
@@ -814,13 +812,13 @@ public class RuleState {
 
             // based on the current bindings.
 
-            predicate = rule.getTailPredicate(index).asBound(bindingSet);
+            predicate = rule.getTail(index).asBound(bindingSet);
 
         } else {
 
             // as declared by the predicate (no bindings).
 
-            predicate = rule.getTailPredicate(index);
+            predicate = rule.getTail(index);
 
         }
 
