@@ -24,9 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.join.rdf;
 
 import com.bigdata.join.Constant;
+import com.bigdata.join.IAccessPath;
 import com.bigdata.join.IBindingSet;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.IPredicateConstraint;
+import com.bigdata.join.IRelation;
 import com.bigdata.join.IVariable;
 import com.bigdata.join.IVariableOrConstant;
 
@@ -40,13 +42,27 @@ import com.bigdata.join.IVariableOrConstant;
  */
 public class SPOPredicate implements IPredicate<ISPO> {
 
-    private final IPredicateConstraint<ISPO> constraint;
-
+    private final IRelation<ISPO> relation;
+    
     private final IVariableOrConstant<Long> s;
 
     private final IVariableOrConstant<Long> p;
 
     private final IVariableOrConstant<Long> o;
+
+    private final IPredicateConstraint<ISPO> constraint;
+
+    public IRelation<ISPO> getRelation() {
+        
+        return relation;
+        
+    }
+
+    public IAccessPath<ISPO> getAccessPath() {
+
+        return getRelation().getAccessPath(this);
+        
+    }
 
     public final int arity() {
         
@@ -54,26 +70,31 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-    public SPOPredicate(IVariableOrConstant<Long> s,
+    public SPOPredicate(IRelation<ISPO> relation, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
-        this(null, s, p, o);
+        this(relation, s, p, o, null/* constraints */);
         
     }
     
-    public SPOPredicate(IPredicateConstraint<ISPO> constraint,
-            IVariableOrConstant<Long> s, IVariableOrConstant<Long> p,
-            IVariableOrConstant<Long> o) {
+    public SPOPredicate(IRelation<ISPO> relation,
+            IVariableOrConstant<Long> s,
+            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
+            IPredicateConstraint<ISPO> constraint) {
+        
+        assert relation != null;
         
         assert s != null;
         assert p != null;
         assert o != null;
         
-        this.constraint = constraint;
+        this.relation = relation;
         
         this.s = s;
         this.p = p;
         this.o = o;
+        
+        this.constraint = constraint;
         
     }
 
@@ -177,7 +198,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             }
         }
         
-        return new SPOPredicate(constraint,s,p,o);
+        return new SPOPredicate(relation, s, p, o, constraint);
         
     }
 

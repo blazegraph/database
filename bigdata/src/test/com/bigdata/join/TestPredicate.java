@@ -52,6 +52,8 @@ public class TestPredicate extends TestCase2 {
     public TestPredicate(String name) {
         super(name);
     }
+    
+    private final IRelation relation = new MockRelation();
 
     private final static Constant<Long> c1 = new Constant<Long>(1L);
 
@@ -67,7 +69,7 @@ public class TestPredicate extends TestCase2 {
 
             final Var<Long> u = Var.var("u");
 
-            final IPredicate p1 = new P(new IVariableOrConstant[] { u, c1, c2 });
+            final IPredicate p1 = new P(relation, new IVariableOrConstant[] { u, c1, c2 });
             
             log.info(p1.toString());
 
@@ -89,7 +91,7 @@ public class TestPredicate extends TestCase2 {
 
             final Var<Long> v = Var.var("v");
 
-            final IPredicate p1 = new P(new IVariableOrConstant[]{u, c1, v});
+            final IPredicate p1 = new P(relation, new IVariableOrConstant[]{u, c1, v});
 
             log.info(p1.toString());
 
@@ -114,17 +116,17 @@ public class TestPredicate extends TestCase2 {
 
         final Var<Long> u = Var.var("u");
 
-        final IPredicate p1 = new P(new IVariableOrConstant[] { u, c1, c2 });
+        final IPredicate p1 = new P(relation, new IVariableOrConstant[] { u, c1, c2 });
 
-        final IPredicate p2 = new P(new IVariableOrConstant[] { u, c3, c4 });
+        final IPredicate p2 = new P(relation, new IVariableOrConstant[] { u, c3, c4 });
 
         log.info(p1.toString());
 
         log.info(p2.toString());
 
-        assertTrue(p1.equals(new SPOPredicate(u, c1, c2)));
+        assertTrue(p1.equals(new SPOPredicate(relation, u, c1, c2)));
 
-        assertTrue(p2.equals(new SPOPredicate(u, c3, c4)));
+        assertTrue(p2.equals(new SPOPredicate(relation, u, c3, c4)));
         
         assertFalse(p1.equals(p2));
 
@@ -132,25 +134,25 @@ public class TestPredicate extends TestCase2 {
         
     }
     
-    protected class P extends Predicate<Long> {
+    protected class P<E> extends Predicate<E> {
 
         /**
          * @param values
          */
-        public P(IVariableOrConstant[] values) {
+        public P(IRelation<E> relation,IVariableOrConstant[] values) {
 
-            super(values);
+            super(relation, values);
             
         }
-
+        
         @Override
-        public Predicate<Long> asBound(IBindingSet bindingSet) {
+        public Predicate<E> asBound(IBindingSet bindingSet) {
             // TODO Auto-generated method stub
             return null;
         }
 
         @Override
-        public void copyValues(Long e, IBindingSet bindingSet) {
+        public void copyValues(E e, IBindingSet bindingSet) {
             // TODO Auto-generated method stub
             
         }

@@ -32,7 +32,9 @@ import junit.framework.TestCase2;
 
 import com.bigdata.join.Constant;
 import com.bigdata.join.IBindingSet;
+import com.bigdata.join.IRelation;
 import com.bigdata.join.IVariableOrConstant;
+import com.bigdata.join.MockRelation;
 import com.bigdata.join.Predicate;
 import com.bigdata.join.Var;
 
@@ -56,6 +58,8 @@ public class TestSPOPredicate extends TestCase2 {
     public TestSPOPredicate(String name) {
         super(name);
     }
+    
+    final IRelation<ISPO> relation  = new MockRelation<ISPO>();
 
     final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
             1L);
@@ -75,7 +79,7 @@ public class TestSPOPredicate extends TestCase2 {
 
             final Var<Long> u = Var.var("u");
 
-            final SPOPredicate p1 = new SPOPredicate(u, rdfsSubClassOf,
+            final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf,
                     rdfsResource);
             
             log.info(p1.toString());
@@ -98,7 +102,7 @@ public class TestSPOPredicate extends TestCase2 {
 
             final Var<Long> v = Var.var("v");
 
-            final SPOPredicate p1 = new SPOPredicate(u, rdfsSubClassOf, v);
+            final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf, v);
 
             log.info(p1.toString());
 
@@ -123,17 +127,17 @@ public class TestSPOPredicate extends TestCase2 {
 
         final Var<Long> u = Var.var("u");
 
-        final SPOPredicate p1 = new SPOPredicate(u, rdfsSubClassOf, rdfsResource);
+        final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf, rdfsResource);
 
-        final SPOPredicate p2 = new SPOPredicate(u, rdfType, rdfsClass);
+        final SPOPredicate p2 = new SPOPredicate(relation,u, rdfType, rdfsClass);
 
         log.info(p1.toString());
 
         log.info(p2.toString());
 
-        assertTrue(p1.equals(new SPOPredicate(u, rdfsSubClassOf, rdfsResource)));
+        assertTrue(p1.equals(new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource)));
 
-        assertTrue(p2.equals(new SPOPredicate(u, rdfType, rdfsClass)));
+        assertTrue(p2.equals(new SPOPredicate(relation, u, rdfType, rdfsClass)));
         
         assertFalse(p1.equals(p2));
 
@@ -145,10 +149,10 @@ public class TestSPOPredicate extends TestCase2 {
         
         final Var<Long> u = Var.var("u");
 
-        final SPOPredicate p1 = new SPOPredicate(u, rdfType, rdfsClass);
+        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfType, rdfsClass);
 
-        final Predicate p2 = new Predicate(new IVariableOrConstant[] { u,
-                rdfType, rdfsClass }){
+        final Predicate p2 = new Predicate(relation, new IVariableOrConstant[] {
+                u, rdfType, rdfsClass }) {
 
                     @Override
                     public Predicate asBound(IBindingSet bindingSet) {
@@ -171,5 +175,5 @@ public class TestSPOPredicate extends TestCase2 {
         assertTrue(p2.equals(p1));
 
     }
-    
+
 }

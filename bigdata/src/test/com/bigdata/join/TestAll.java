@@ -26,6 +26,7 @@ package com.bigdata.join;
 
 import com.bigdata.join.rdf.TestKeyOrder;
 import com.bigdata.join.rdf.TestSPOPredicate;
+import com.bigdata.join.rdf.TestTruthMaintenanceRewrites;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -43,13 +44,16 @@ public class TestAll extends TestCase {
      * 
      */
     public TestAll() {
+        
     }
 
     /**
      * @param arg0
      */
     public TestAll(String arg0) {
+     
         super(arg0);
+        
     }
 
     /**
@@ -96,6 +100,12 @@ public class TestAll extends TestCase {
         
         // test suite for basic rule mechanisms.
         suite.addTestSuite( TestRule.class );
+       
+        // test suite for Program.
+        suite.addTestSuite( TestProgram.class );
+        
+        // test suite for rule re-writes for RDF DB truth maintenance.
+        suite.addTestSuite(TestTruthMaintenanceRewrites.class);
        
         // @todo write tests.
         suite.addTestSuite(TestRuleState.class);

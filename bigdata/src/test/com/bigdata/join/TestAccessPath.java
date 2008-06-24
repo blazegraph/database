@@ -28,15 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-import junit.framework.TestCase2;
-
 /**
  * Test suite for {@link AbstractAccessPath}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAccessPath extends TestCase2 {
+public class TestAccessPath extends AbstractRuleTestCase {
 
     /**
      * 

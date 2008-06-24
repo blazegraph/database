@@ -10,37 +10,9 @@ import org.apache.log4j.Logger;
 
 /**
  * State for a rule execution.
- * <p>
- * A variety of data is localized by this class in order to allow: (a) instances
- * of the same rule to execute concurrently, e.g., when evaluating different
- * subqueries; and (b) instances of a rule to be mapped across (new, new+db),
- * where "new" is a focusStore.
- * 
- * @see RuleUtil
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo factor out the focusStore stuff into a derived class specific to the
- *       RDF DB?
- *       <p>
- *       Another way to handle this is to associated each predicate with a
- *       relation and to have the focus store predicates belong to a different
- *       relation than the database predicates. For RDF DB only query, all JOINs
- *       are clearly self-joins since they are against the same relation but
- *       they often use different access paths (aka indices). When running a
- *       db+focusStore rule, the focusStore is a different relation having the
- *       same schema as the db (and typically having the same access paths
- *       declared).
- *       <p>
- *       This suggests that the focusStore + db stuff might be handled by an
- *       automatic rule re-write.
- * 
- * @todo I have pulled out the [justify] flag as it is not general purpose. It
- *       will need to be layered back into the {@link RuleState} for the RDF KB.
- *       It was also present in the {@link RuleUtil} classes since it is
- *       metadata that gets mapped across a set of rules that is being applied
- *       or brought to a fixed point.
  */
 public class RuleState {
 
@@ -49,47 +21,13 @@ public class RuleState {
     /**
      * The {@link Rule} being evaluated.
      */
-    final protected Rule rule;
+    final protected IRule rule;
     
-    /**
-     * Statistics for the rule evaluation.
-     */
-    final public RuleStats stats;
-
-    /**
-     * The index of the term that will read from the {@link #focusStore}
-     * (ignored when {@link #focusStore} is <code>null</code>).
-     */
-    final protected int focusIndex;
+//    /**
+//     * Statistics for the rule evaluation.
+//     */
+//    final public RuleStats stats;
     
-    /**
-     * The optional focus store used for truth maintenance.
-     */
-    final protected IAccessPathFactory focusStore;
-    
-    /**
-     * The persistent database.
-     */
-    final protected IAccessPathFactory database;
-    
-    /**
-     * Used to buffer solutions for better performance. The buffer will
-     * either write on the {@link #database} (if we are inserting, updating,
-     * or deleting data) or it will feed an iterator (if you are computing
-     * solutions without making them persistent).
-     */
-    final protected IBuffer<IBindingSet> buffer;
-    
-    /**
-     * Instance bindings.
-     * <p>
-     * Note: You MUST {@link #resetBindings()} each time you execute a rule. If
-     * the variable binding patterns are not restored (overwriting whatever
-     * constants were last in those positions) then the wrong access path will
-     * be selected and you will NOT get the expected entailments.
-     */
-    final private IBindingSet bindings;
-
     /**
      * The {@link IAccessPath} corresponding to each {@link IPredicate} in the
      * tail of the {@link Rule}.
@@ -118,118 +56,116 @@ public class RuleState {
     final protected Map<Var,Integer> depends;
     
     /**
-     * Variant when not using a focusStore.
      * 
-     * @param database
-     * @param buffer
-     * @return
+     * @param rule
      */
-    public RuleState(Rule rule, IAccessPathFactory database,
-            IBuffer<IBindingSet> buffer) {
-
-        this(rule, 0/* index */, null/* focusStore */, database,
-                buffer);
-
-    }
-    
-    /**
-     * 
-     * @param focusIndex
-     *            The index of the predicate in the tail of the {@link Rule}
-     *            that will read from the "focusStore" (ignored if "focusStore"
-     *            is <code>null</code>).
-     * @param focusStore
-     * @param database
-     *            The persistent database.
-     * @param buffer
-     */
-    public RuleState(Rule rule, int focusIndex, IAccessPathFactory focusStore,
-            IAccessPathFactory database, IBuffer<IBindingSet> buffer) {
+    public RuleState(IRule rule) {
 
         if (rule == null)
             throw new IllegalArgumentException();
         
         final int tailCount = rule.getTailCount();
         
-        if (focusIndex < 0 || focusIndex >= tailCount)
-            throw new IllegalArgumentException();
-        
-        if (database == null)
-            throw new IllegalArgumentException();
-        
-        if (buffer == null)
-            throw new IllegalArgumentException();
-        
         this.rule = rule;
-        
-        this.focusIndex = focusIndex;
-        
-        // MAY be null.
-        this.focusStore = focusStore;
-        
-        // always defined.
-        this.database = database;
-        
-        // always defined.
-        this.buffer = buffer;
-        
-        // Allocate bindings for the rule.
-        this.bindings = new ArrayBindingSet(rule.getVariableCount());
 
         // Allocate access path cache.
-        this.accessPath = new IAccessPath[rule.getTailCount()];
+        this.accessPath = new IAccessPath[tailCount];
 
-        /*
-         * @todo you can override this class to customize the evaluation order
-         * but the evaluation order determination could also be moved into its
-         * own interface.
-         * 
-         * @todo there is some stuff in here that might be specific to the RDF
-         * DB.
-         */
-        
         // The evaluation order.
         this.order = computeEvaluationOrder();
-        
-        if (focusStore != null && focusIndex > 0) {
-            
-            /*
-             * The rule of thumb is to always evaluate the predicate that
-             * will read from the focusStore 1st since we presume that any
-             * triple pattern reading on the [focusStore] will be
-             * significantly smaller than any other triple pattern reading
-             * on the fused view [focusStore + database].
-             * 
-             * However, there are counter examples. Loading schema and then
-             * data into a database is one, e.g., the wordnet ontology
-             * followed by the wordnet nouns data. Another is when the 2nd
-             * predicate in the body is none bound - you are often better
-             * off NOT running the all none bound predicate 1st.
-             * 
-             * Note: All of this logic is executed IFF the focusIndex is >
-             * 0. When the focusIndex is 0, the focusStore is already being
-             * read by the predicate that is first in the evaluation order.
-             */
 
-            /*
-             * In this alternative, we simply refuse to order a 3-unbound
-             * predicate to the 1st position in the evaluation order.
-             */
-            
-            if (false && rule.getTailPredicate(order[focusIndex])
-                    .getVariableCount() < 3) {
-
-                /*
-                 * Note: This does not work since we may have already done a
-                 * rangeCount (w/o bindings) when computing the evaluation
-                 * order so we can not undo that purely by considering the
-                 * variable bindings. An alternative is to mark as "pinned"
-                 * any part of the evaluation order that have already been
-                 * tested in the data, e.g., by retaining the rangeCounts if
-                 * computed by computeEvaluationOrder.  If we do that then
-                 * we could try this simpler test again.
-                 */
-                
+//        if (focusStore != null && focusIndex > 0) {
+//        /*
+//         * Note: This stuff is specific to the RDF DB, including the ROM
+//         * assumptions for the focusStore vs the DB. With the refactor the
+//         * focusStore and the fusedView are already encoded into the relation
+//         * associated with each tail and the order will therefore reflect the
+//         * actual (or approximate) range counts for each access path.
+//         */
+//            
+//            /*
+//             * The rule of thumb is to always evaluate the predicate that
+//             * will read from the focusStore 1st since we presume that any
+//             * triple pattern reading on the [focusStore] will be
+//             * significantly smaller than any other triple pattern reading
+//             * on the fused view [focusStore + database].
+//             * 
+//             * However, there are counter examples. Loading schema and then
+//             * data into a database is one, e.g., the wordnet ontology
+//             * followed by the wordnet nouns data. Another is when the 2nd
+//             * predicate in the body is none bound - you are often better
+//             * off NOT running the all none bound predicate 1st.
+//             * 
+//             * Note: All of this logic is executed IFF the focusIndex is >
+//             * 0. When the focusIndex is 0, the focusStore is already being
+//             * read by the predicate that is first in the evaluation order.
+//             */
+//
+//            /*
+//             * In this alternative, we simply refuse to order a 3-unbound
+//             * predicate to the 1st position in the evaluation order.
+//             */
+//            
+//            if (false && rule.getTailPredicate(order[focusIndex])
+//                    .getVariableCount() < 3) {
+//
+//                /*
+//                 * Note: This does not work since we may have already done a
+//                 * rangeCount (w/o bindings) when computing the evaluation
+//                 * order so we can not undo that purely by considering the
+//                 * variable bindings. An alternative is to mark as "pinned"
+//                 * any part of the evaluation order that have already been
+//                 * tested in the data, e.g., by retaining the rangeCounts if
+//                 * computed by computeEvaluationOrder.  If we do that then
+//                 * we could try this simpler test again.
+//                 */
+//                
+////                    /*
+////                     * Swap the places of those predicates in the evaluation
+////                     * order such that we will evaluate the predicate at the
+////                     * focusIndex 1st.
+////                     */
+////
+////                    int tmp = order[0];
+////
+////                    order[0] = order[focusIndex];
+////
+////                    order[focusIndex] = tmp;
+//
+//            } else {
+//
+//                /*
+//                 * In order to catch those counter examples we range count
+//                 * the predicate that is already 1st in the evaluate order
+//                 * against [focusStore+database] and then the predicate at
+//                 * the focusIndex against the [focusStore]. We then reorder
+//                 * the predicate at the focusIndex 1st iff it has a smaller
+//                 * range count that the predicate that is already first in
+//                 * the evaluation order.
+//                 * 
+//                 * @todo range counts here could be expensive when the index
+//                 * is remote or partitioned.
+//                 */
+//                
+//                /*
+//                 * Range count for the predicate that is 1st in the
+//                 * evaluation order. This will read against [focusStore +
+//                 * database].
+//                 */
+//
+//                final long rangeCount1 = getAccessPath(order[0], null/* bindingSet */)
+//                        .rangeCount();
+//
+//                /*
+//                 * Range count for the predicate at the focusIndex. This
+//                 * will read against [focusStore].
+//                 */
+//
+//                final long rangeCount2 = getAccessPath(order[focusIndex],
+//                        null/* bindingSet */).rangeCount();
+//
+//                if (rangeCount2 < rangeCount1) {
+//
 //                    /*
 //                     * Swap the places of those predicates in the evaluation
 //                     * order such that we will evaluate the predicate at the
@@ -241,59 +177,12 @@ public class RuleState {
 //                    order[0] = order[focusIndex];
 //
 //                    order[focusIndex] = tmp;
-
-            } else {
-
-                /*
-                 * In order to catch those counter examples we range count
-                 * the predicate that is already 1st in the evaluate order
-                 * against [focusStore+database] and then the predicate at
-                 * the focusIndex against the [focusStore]. We then reorder
-                 * the predicate at the focusIndex 1st iff it has a smaller
-                 * range count that the predicate that is already first in
-                 * the evaluation order.
-                 * 
-                 * @todo range counts here could be expensive when the index
-                 * is remote or partitioned.
-                 */
-                
-                /*
-                 * Range count for the predicate that is 1st in the
-                 * evaluation order. This will read against [focusStore +
-                 * database].
-                 */
-
-                final long rangeCount1 = getAccessPath(order[0], null/* bindingSet */)
-                        .rangeCount();
-
-                /*
-                 * Range count for the predicate at the focusIndex. This
-                 * will read against [focusStore].
-                 */
-
-                final long rangeCount2 = getAccessPath(order[focusIndex],
-                        null/* bindingSet */).rangeCount();
-
-                if (rangeCount2 < rangeCount1) {
-
-                    /*
-                     * Swap the places of those predicates in the evaluation
-                     * order such that we will evaluate the predicate at the
-                     * focusIndex 1st.
-                     */
-
-                    int tmp = order[0];
-
-                    order[0] = order[focusIndex];
-
-                    order[focusIndex] = tmp;
-
-                }
-
-            }
-            
-        }
-        
+//
+//                }
+//
+//            }
+//            
+//        }
 
         /*
          * The dependency graph for the variables in the tail based on the
@@ -305,94 +194,18 @@ public class RuleState {
 //        // initialize the bindings from the predicate declarations.
 //        resetBindings();
 
-        // collects statistics on the rule.
-        this.stats = new RuleStats(this);
+//        // collects statistics on the rule.
+//        this.stats = new RuleStats(this);
        
     }
 
     /**
      * The {@link Rule} that is being executed. 
      */
-    public Rule getRule() {
+    public IRule getRule() {
         
         return rule;
         
-    }
-    
-//    /**
-//     * Apply the rule.
-//     */
-//    public void apply() {
-//
-//        /*
-//         * @todo since we do this in this method we do not need to flush
-//         * elsewhere.
-//         * 
-//         * @todo This is responsible for computing the #of entailments added to
-//         * the focusStore or database as a side-effect of applying the rule.
-//         * That number is can be obtained either
-//         * {@link ISPOBuffer#flush(boolean)} or
-//         * {@link AbstractTripleStore#getBufferCount()} but it will only be
-//         * accurate when the buffer has been flushed before and after the rule.
-//         * While it is a bit more efficient if we do not always force the
-//         * buffers to be flushed since a few rules can be run in a sequence and
-//         * do not depend on each other, but that is very rare. Also note that
-//         * re-flushing an empty buffer is always a NOP.
-//         */
-//        
-////        buffer.flush(true);
-//        
-//////            final int nbefore = focusStore != null ? focusStore.getStatementCount()
-//////                    : database.getStatementCount();
-//        
-//        evaluator.apply(this);
-//       
-////        stats.numAdded = buffer.flush(true);
-//        
-//////            final int nafter = focusStore != null ? focusStore.getStatementCount()
-//////                    : database.getStatementCount();
-//        
-//////            stats.numAdded = nafter - nbefore;
-//        
-//    }
-    
-    /**
-     * Emits the selected bindings from the current {@link IBindingSet} onto the
-     * buffer.
-     * 
-     * @todo the justification needs to be an optional part of the emitted
-     *       tuple.
-     * 
-     * @todo the {explicit,inferred,axiom} marker should be a binding on the
-     *       emitted tuple.
-     * 
-     * @todo the buffer should know how to select the variables from the current
-     *       binding set. right now the "select" is described by the head.
-     */
-    protected void emit() {
-        
-//            SPO stmt = new SPO(get(head.s),get(head.p),get(head.o),StatementEnum.Inferred);
-        
-//            Justification jst = null;
-//            
-//            if(justify) {
-//                
-//                jst = new Justification(Rule.this, stmt, bindings.clone());
-//                
-//            }
-        
-        if(buffer.add(bindings)) {
-
-            /*
-             * @todo a counter here for the #of entailments that were
-             * accepted by the filter.
-             */
-            
-        }
-
-        // #of entailments computed.
-        stats.numComputed++;
-
     }
     
     /**
@@ -481,7 +294,7 @@ public class RuleState {
     public int[] computeEvaluationOrder() {
 
         // use private bindingSet to avoid side-effects.
-        final IBindingSet bindingSet = new ArrayBindingSet(rule.getVariableCount());
+        final IBindingSet bindingSet = newBindingSet();
 
         final int tailCount = rule.getTailCount();
 
@@ -681,7 +494,7 @@ public class RuleState {
      * variables are all bound to constants and the rule will NOT select the
      * correct data.
      */
-    protected void resetBindings() {
+    protected void resetBindings(IBindingSet bindings) {
 
         bindings.clearAll();
 
@@ -701,8 +514,8 @@ public class RuleState {
      * @param var
      *            The variable or constant.
      * 
-     * @return Its binding. The binding will be {@link #NULL} if a variable is
-     *         not currently bound.
+     * @return Its binding. The binding will be <code>null</code> if a
+     *         variable is not currently bound.
      * 
      * @throws NullPointerException
      *             if <i>var</i> is <code>null</code>.
@@ -714,9 +527,9 @@ public class RuleState {
      * @see #set(Var, Object)
      * @see #bind(int, SPO)
      */
-    public Object get(IVariableOrConstant var) {
+    public Object get(IBindingSet bindings,IVariableOrConstant var) {
     
-        return get(var, true);
+        return get(bindings,var, true);
         
     }
     
@@ -759,7 +572,7 @@ public class RuleState {
      * and to use that information when clearing setting, getting, or
      * clearing bindings in State.
      */
-    public Object get(IVariableOrConstant var, boolean required) {
+    public Object get(IBindingSet bindings,IVariableOrConstant var, boolean required) {
         
 //        if (var == null)
 //            throw new NullPointerException();
@@ -801,7 +614,7 @@ public class RuleState {
      */
 //    * @throws IllegalArgumentException
 //    *             if the variable does not appear in the rule.
-    public void set(IVariable var, Object val) {
+    public void set(IBindingSet bindings, IVariable var, Object val) {
 
 //        // verify variable declared by the rule.
 //        if(!rule.isDeclared(var)) throw new IllegalArgumentException();
@@ -840,23 +653,24 @@ public class RuleState {
      * constraints were not satisified.
      * 
      * @param index
-     *            The index of the predicate in the body of the rule.
-     * @param spo
-     *            A statement materialized by the triple pattern that predicate.
+     *            The index of the {@link IPredicate} in the body of the
+     *            {@link Rule}.
+     * @param e
+     *            An element materialized by the {@link IAccessPath} for that
+     *            {@link IPredicate}.
      * 
-     * @return <code>true</code> iff the binding is allowed (<code>false</code>
-     *         if it would violate any of the {@link IConstraint}s declared for
-     *         the {@link Rule}).
+     * @return <code>true</code> unless the new bindings would violate any of
+     *         the {@link IConstraint}s declared for the {@link Rule}).
      * 
      * @throws NullPointerException
-     *             if the statement is <code>null</code>.
+     *             if <i>e</i> is <code>null</code>.
      * @throws IndexOutOfBoundsException
-     *             if the index is out of bounds.
+     *             if the <i>index</i> is out of bounds.
      * 
-     * @see #clearDownstreamBindings(int index)
+     * @see #clearDownstreamBindings(IBindingSet bindingSet, int index)
      */
     @SuppressWarnings("unchecked")
-    public boolean bind(int index, Object e) {
+    public boolean bind(IBindingSet bindings,int index, Object e) {
        
         // propagate bindings.
         rule.getTailPredicate(index).copyValues(e, bindings);
@@ -873,16 +687,16 @@ public class RuleState {
      * <p>
      * Note: You MUST {@link #resetBindings()} before you evaluate a rule.
      * <p>
-     * Note: You MUST {@link #clearDownstreamBindings(int)} bindings before you
-     * (re-)evaluate a subquery. Failure to do so will leave stale bindings in
-     * place which will cause {@link #getAccessPath(int)} to identify the wrong
-     * access path, and hence select the wrong data.
+     * Note: You MUST {@link #clearDownstreamBindings(IBindingSet,int)} bindings
+     * before you (re-)evaluate a subquery. Failure to do so will leave stale
+     * bindings in place which will cause {@link #getAccessPath(int)} to
+     * identify the wrong access path, and hence select the wrong data.
      * 
      * @param index
      *            The index of the predicate whose values you intend to
-     *            {@link #bind(int, Object)}.
+     *            {@link #bind(IBindingSet,int, Object)}.
      */
-    protected void clearDownstreamBindings(int index) {
+    protected void clearDownstreamBindings(IBindingSet bindings,int index) {
 
         final int tailCount = rule.getTailCount();
         
@@ -902,7 +716,7 @@ public class RuleState {
 
                     if (k >= index) {
 
-                        set((Var) t, null);
+                        set(bindings, (Var) t, null);
 
                     }
 
@@ -919,7 +733,7 @@ public class RuleState {
      * selected tail {@link IPredicate}.
      * <p>
      * Note: a cache is maintained by the rule for the access paths. If the
-     * cache does not have an entry for the desired access path the one is
+     * cache does not have an entry for the desired access path then one is
      * obtained and placed into the cache before being returned to the caller.
      * The cache is invalidated by {@link #resetBindings()} and (on a selective
      * basis) by {@link #bind(int, Object)} and {@link #set(IVariable, Object)}.
@@ -931,15 +745,19 @@ public class RuleState {
      * 
      * @throws IndexOutOfBoundsException
      *             if index is out of bounds.
+     * 
+     * FIXME The side-effect on {@link #accessPath}[] means that this class is
+     * NOT thread-safe. A thread-local weak reference to an access path cache
+     * might fix that.
      */
-    public IAccessPath getAccessPath(int index) {
+    public IAccessPath getAccessPath(IBindingSet bindingSet, final int index) {
         
         // check the cache.
         IAccessPath accessPath = this.accessPath[index];
         
         if (accessPath == null) {
 
-            accessPath = getAccessPath(index, null/* bindingSet */);
+            accessPath = getAccessPath(index, bindingSet);
 
             // update the cache.
             this.accessPath[index] = accessPath;
@@ -963,9 +781,10 @@ public class RuleState {
      * @throws IndexOutOfBoundsException
      *             if index is out of bounds.
      */
-    public IChunkedIterator iterator(int index) {
+    public IChunkedOrderedIterator iterator(IBindingSet bindingSet,
+            final int index) {
 
-        return getAccessPath(index).iterator();
+        return getAccessPath(bindingSet, index).iterator();
         
     }
     
@@ -987,18 +806,13 @@ public class RuleState {
      * @throws IndexOutOfBoundsException
      *             if index is out of bounds.
      */
-    public IAccessPath getAccessPath(int index, IBindingSet bindingSet) {
+    public IAccessPath getAccessPath(final int index, final IBindingSet bindingSet) {
 
-        final IAccessPath accessPath;
         final IPredicate predicate;
 
         if (bindingSet != null) {
 
             // based on the current bindings.
-
-            //                final VarOrConstant s = bindings[index * N + 0];
-            //                final VarOrConstant p = bindings[index * N + 1];
-            //                final VarOrConstant o = bindings[index * N + 2];
 
             predicate = rule.getTailPredicate(index).asBound(bindingSet);
 
@@ -1010,33 +824,23 @@ public class RuleState {
 
         }
 
-        if (focusStore == null) {
-
-            accessPath = database.getAccessPath(predicate);
-
-        } else {
-
-            if (index == focusIndex) {
-
-                accessPath = focusStore.getAccessPath(predicate);
-
-            } else {
-
-                /*
-                 * Return a read-only access path for the fused view
-                 * [focusStore + database].
-                 */
-
-                return new AccessPathFusedView(focusStore
-                        .getAccessPath(predicate), database
-                        .getAccessPath(predicate));
-
-            }
-
-        }
-
+        final IAccessPath accessPath = predicate.getAccessPath();
+        
         return accessPath;
 
     }
 
+    /**
+     * Factory for {@link IBindingSet} implementations.
+     * 
+     * @return An empty binding set.
+     * 
+     * @todo where, if anywhere, does this method best belong?
+     */
+    public IBindingSet newBindingSet() {
+        
+        return new ArrayBindingSet(rule.getVariableCount());
+        
+    }
+    
 }

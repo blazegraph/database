@@ -28,9 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-import com.bigdata.join.rdf.ISPO;
-
-
 /**
  * A generic implementation.
  * 
@@ -44,34 +41,45 @@ abstract public class Predicate<E> implements IPredicate<E> {
     /** #of unbound variables. */
     private final int nvars;
 
+    private final IRelation<E> relation;
+    
     private final IVariableOrConstant[] values;
     
     private final IPredicateConstraint<E> constraint;
 
     /**
      * 
+     * @param relation
+     *            The relation that would be queried.
      * @param values
      *            The values (order is important!).
      */
-    public Predicate(IVariableOrConstant[] values) {
+    public Predicate(IRelation<E> relation, IVariableOrConstant[] values) {
         
-        this(null/* constraint */, values);
+        this(relation, values, null/* constraint */);
         
     }
 
     /**
      * 
-     * @param constraint
-     *            An optional constraint.
+     * @param relation
+     *            The relation that would be queried.
      * @param values
      *            The values (order is important!).
+     * @param constraint
+     *            An optional constraint.
      */
-    public Predicate(IPredicateConstraint<E> constraint,
-            IVariableOrConstant[] values) {
+    public Predicate(IRelation<E> relation, IVariableOrConstant[] values,
+            IPredicateConstraint<E> constraint) {
+
+        if (relation == null)
+            throw new IllegalArgumentException();
 
         if (values == null)
             throw new IllegalArgumentException();
 
+        this.relation = relation;
+        
         this.arity = values.length;
 
         int nvars = 0;
@@ -93,6 +101,18 @@ abstract public class Predicate<E> implements IPredicate<E> {
         this.values = values;
         
         this.constraint = constraint;
+        
+    }
+    
+    public IRelation<E> getRelation() {
+        
+        return relation;
+        
+    }
+
+    public IAccessPath<E> getAccessPath() {
+
+        return getRelation().getAccessPath(this);
         
     }
     

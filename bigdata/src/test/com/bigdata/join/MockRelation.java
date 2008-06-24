@@ -23,43 +23,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jan 24, 2008
+ * Created on Jun 23, 2008
  */
 
-package com.bigdata.btree;
+package com.bigdata.join;
 
-import java.util.concurrent.atomic.AtomicLong;
+public class MockRelation<E> implements IRelation<E> {
 
-import com.bigdata.service.Split;
+    public IAccessPath<E> getAccessPath(IPredicate<E> predicate) {
+        // TODO Auto-generated method stub
+        return null;
+    }
 
-/**
- * Aggregates the value of an {@link Long} result.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- */
-public class LongAggregator implements IResultHandler<Long, Long> {
-
-    private final AtomicLong counter = new AtomicLong(0);
-
-    public LongAggregator() {
-        
+    public long getElementCount(boolean exact) {
+        // TODO Auto-generated method stub
+        return 0;
     }
     
-    /**
-     * 
-     * @todo watch for overflow of {@link Long#MAX_VALUE}
-     */
-    public void aggregate(Long result, Split split) {
-
-        counter.addAndGet(result.longValue());
-
-    }
-
-    public Long getResult() {
-
-        return counter.get();
-
-    }
-
 }

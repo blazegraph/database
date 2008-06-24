@@ -32,37 +32,49 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.join.AbstractAccessPath;
 import com.bigdata.join.IAccessPath;
-import com.bigdata.join.IAccessPathFactory;
 import com.bigdata.join.IPredicate;
+import com.bigdata.join.IRelation;
 
 /**
- * Selects access paths for RDF triple patterns.
+ * A relation corresponding to the triples in a triple store.
+ * 
+ * @todo Re-factor and integrate the AbstractTripleStore.
+ * 
+ * @todo I have pulled out the [justify] flag as it is not general purpose. A
+ *       justification is comprised exactly from the tail bindings since they
+ *       are what justifies the head. Writing the justifications onto an index
+ *       is an optional action that is performed with the selected bindings, so
+ *       it really has to do with index maintenance for the {@link SPORelation}.
+ *       <p>
+ *       The {explicit,inferred,axiom} marker needs to be set to [inferred] when
+ *       the rule generated the bindings for the triple.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AccessPathFactory implements IAccessPathFactory<ISPO> {
+public class SPORelation implements IRelation<ISPO> {
 
     // @todo IRawTripleStore when re-factored back to the rdf module.
     private transient final long NULL = 0L;
     
+    /**
+     * @todo integrate with triple store impls to returns the appropriate
+     *       statement index. Add ctor accepting the IRawTripleStore and use
+     *       getStatementIndex(String name) to obtain the appropriate index.
+     *       This works if we assume that the triple store is fully indexed.
+     */
     public IIndex getIndex(String name) {
 
-        /*
-         * @todo integrate with triple store impls to returns the appropriate
-         * statement index. Add ctor accepting the IRawTripleStore and use
-         * getStatementIndex(String name) to obtain the appropriate index. This
-         * works if we assume that the triple store is fully indexed.
-         */
         throw new UnsupportedOperationException();
         
     }
     
-    public IAccessPath<ISPO> getAccessPath(KeyOrder keyOrder,IPredicate<ISPO> pred) {
-        
+    public IAccessPath<ISPO> getAccessPath(KeyOrder keyOrder,
+            IPredicate<ISPO> pred) {
+
         return new AbstractAccessPath<ISPO>(pred, keyOrder, getIndex(keyOrder
-                .getName()), IRangeQuery.KEYS | IRangeQuery.VALS/*flags*/) {
-            
+                .getName()), IRangeQuery.KEYS | IRangeQuery.VALS/* flags */) {
+
         };
         
     }
@@ -116,6 +128,22 @@ public class AccessPathFactory implements IAccessPathFactory<ISPO> {
 
         }
 
+    }
+
+    public long getElementCount(boolean exact) {
+
+        final IIndex ndx = getIndex(KeyOrder.SPO.getName());
+        
+        if (exact) {
+        
+            return ndx.rangeCountExact(null/* fromKey */, null/* toKey */);
+            
+        } else {
+            
+            return ndx.rangeCount(null/* fromKey */, null/* toKey */);
+            
+        }
+        
     }
 
 }

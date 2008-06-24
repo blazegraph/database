@@ -29,6 +29,8 @@ package com.bigdata.join;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.join.rdf.ISPO;
+import com.bigdata.join.rdf.SPOPredicate;
 import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataClient;
@@ -58,85 +60,78 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
         super(name);
     }
 
-//    /**
-//     * Applies the rule, copies the new entailments into the store and checks
-//     * the expected #of inferences computed and new statements copied into the
-//     * store.
-//     * <p>
-//     * Invoke as <code>applyRule( store.{rule}, ..., ... )</code>
-//     * 
-//     * @param rule
-//     *            The rule, which must be one of those found on {@link #store}
-//     *            or otherwise configured so as to run with the {@link #store}
-//     *            instance.
-//     * 
-//     * @param expectedComputed
-//     *            The #of entailments that should be computed by the rule.
-//     */
-//    protected RuleStats applyRule(IAccessPathFactory db, Rule rule, int expectedComputed) {
-//
-//        return applyRule(db, rule, null/*filter*/, false/*justified*/, expectedComputed);
-//        
-//    }
-//    
-//    /**
-//     * Applies the rule, copies the new entailments into the store and checks
-//     * the expected #of inferences computed and new statements copied into the
-//     * store.
-//     * <p>
-//     * Invoke as <code>applyRule( store.{rule}, ..., ... )</code>
-//     * 
-//     * @param rule
-//     *            The rule, which must be one of those found on {@link #store}
-//     *            or otherwise configured so as to run with the {@link #store}
-//     *            instance.
-//     * 
-//     * @param expectedComputed
-//     *            The #of entailments that should be computed by the rule.
-//     */
-//    protected RuleStats applyRule(IAccessPathFactory db, Rule rule,
-//            ISPOFilter filter, boolean justified, int expectedComputed) {
-//        
-//        /*
-//         * Note: Choose a capacity large enough that all entailments will still
-//         * be in the buffer until we explicitly flush them to the store. This
-//         * let's us dump the entailments to the console below.
-//         */
-//        
-//        final int capacity = Math.max(expectedComputed, 1000);
-//        
-//        SPOAssertionBuffer buffer = new SPOAssertionBuffer(db, db, filter,
-//                capacity, justified);
-//        
-//        // dump the database on the console.
-//        System.err.println("database::" + db.dumpStore());
-//        
-//        State state = rule.newState(justified, db, buffer);
-//        
-//        // apply the rule.
-//        rule.apply(state);
-//        
-//        // dump entailments on the console.
-//        System.err.println("entailments:: (may duplicate statements in the database)");
-//        buffer.dump(db/*used to resolve term identifiers*/);
-//
-//        // flush entailments to the database.
-////        final int nwritten = 
-//            buffer.flush();
-//        
-//        System.err.println("after write on the database: " + db.dumpStore());
-//
-//        /*
-//         * Verify the #of entailments computed. 
-//         */
-//        if(expectedComputed!=-1) {
-//    
-//            assertEquals("numComputed",expectedComputed,state.stats.numComputed);
-//            
-//        }
-//        
-//        return state.stats;
-//        
-//    }
+    protected final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
+            1L);
+    
+    protected final static Constant<Long> rdfsResource = new Constant<Long>(
+            2L);
+    
+    protected final static Constant<Long> rdfType = new Constant<Long>(
+            3L);
+    
+    protected final static Constant<Long> rdfsClass = new Constant<Long>(
+            4L);
+
+    protected final static Constant<Long> rdfProperty = new Constant<Long>(
+            5L);
+
+    /**
+     * this is rdfs9:
+     * 
+     * <pre>
+     * (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
+     * </pre>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    @SuppressWarnings("serial")
+    static protected class TestRuleRdfs9 extends Rule {
+        
+        public TestRuleRdfs9(IRelation<ISPO> relation) {
+            
+            super(  "rdfs9",//
+                    new SPOPredicate(relation,var("v"), rdfType, var("x")), //
+                    new SPOPredicate[] {//
+                            new SPOPredicate(relation, var("u"), rdfsSubClassOf, var("x")),//
+                            new SPOPredicate(relation, var("v"), rdfType, var("u")) //
+                    },//
+                    new IConstraint[] {
+                            new NE(var("u"),var("x"))
+                        }
+            );
+            
+        }
+
+    }
+    
+    /**
+     * rdfs4a:
+     * 
+     * <pre>
+     * (?u ?a ?x) -&gt; (?u rdf:type rdfs:Resource)
+     * </pre>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    @SuppressWarnings("serial")
+    static protected class TestRuleRdfs04a extends Rule {
+
+        public TestRuleRdfs04a(IRelation<ISPO> relation) {
+
+            super("rdfs4a",//
+                    new SPOPredicate(relation,//
+                            Var.var("u"), rdfType, rdfsResource), //
+                    new SPOPredicate[] { //
+                    new SPOPredicate(relation,//
+                            Var.var("u"), Var.var("a"), Var.var("x")) //
+                    },
+                    /* constraints */
+                    null);
+
+        }
+
+    }
 
 }

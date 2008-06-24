@@ -15,8 +15,8 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo variable canonicalization must be maintained during de-serialization.
- *       this matters when we start serializing predicates for remote execution.
+ * @todo variable canonicalization could be limited in scope to a rule or its
+ *       derived rules (via specialization or for truth maintenance).
  */
 final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>>, Serializable 
 {

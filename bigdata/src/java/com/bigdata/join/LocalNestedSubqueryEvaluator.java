@@ -45,9 +45,22 @@ import com.bigdata.service.IBigdataClient;
  * the {@link ConcurrencyManager} that obtains all necessary locks and then runs
  * with the local B+Tree objects.
  * 
- * FIXME write some rule execution tests before I refactor the evaluator for
- * parallelism, loop unrolling, etc. See {@link RuleUtil} which is how this gets
- * invoked for the moment.
+ * FIXME Write logic to extract the names of the indices that this task will
+ * access from the rule. Note that the focusStore indices are typically on a
+ * distinct temporary journal. Access to those indices needs to be handled quite
+ * distinctly from access to the normal indices - there is no concurrency
+ * control for those indices. (As an alternative, the temporary indices could be
+ * created in temporary resources managed by a transaction for the federation.
+ * This would impose concurrency control.) Regardless, the access should be to a
+ * consistent historical checkpoint.
+ * 
+ * FIXME There needs to be an interface for choosing the JOIN operator impl. For
+ * RDF with its perfect indices this is always going to use the same operator
+ * for a given deployment (e.g., LDS vs Jini Federation).
+ * 
+ * Note that index maintenance is highly specialized for the RDF DB because of
+ * its perfect indices. GOM is a more typical example where there may be a
+ * primary (clustered) index and then zero or more secondary indices.
  * 
  * @todo JOINs all use the same eval strategy for the RDF DB but that is because
  *       there is one relation (the triples) and multiple indices over that
@@ -59,22 +72,22 @@ import com.bigdata.service.IBigdataClient;
  *       and otherwise <code>null</code> since the solutions were {inserted
  *       into, updated on, or removed from} the database?
  * 
- * @todo The {@link RuleUtil} can map the N passes in parallel (or N rules in
+ * @todo The {@link Program} can map the N passes in parallel (or N rules in
  *       parallel), each chunk[] from the first access path can be reordered for
  *       the next access path and the {@link ClientIndexView} can split the
  *       chunk[] and map N splits in parallel. This presumes that the
- *       {@link DataService} can function as a full {@link IBigdataClient}.
- *       Otherwise we bring all data back to the client from each JOIN before
- *       sending out the next JOIN. The different also results in JOIN at once
- *       vs solution at once processing.
- * 
- * @todo make the {@link HashBindingSet} explicit. It will need to be explicit
- *       when unrolling the loop for remote index eval.
+ *       {@link DataService} can function as a full {@link IBigdataClient} (the
+ *       M/R architecture can also be layered on that assumption). Otherwise we
+ *       bring all data back to the client from each JOIN before sending out the
+ *       next JOIN. The different also results in JOIN at once vs solution at
+ *       once processing.
  * 
  * @todo do an variant of this evaluation that runs as a procedure on a LDS and
  *       which assumes that all indices required by the various access paths are
  *       local. this evaluation strategy does not need to unroll anything since
- *       local access to the indices will be quite fast.
+ *       local access to the indices will be quite fast. the chunk[]s will help
+ *       to maintain ordered reads on the indices which will futher improve
+ *       performance.
  * 
  * @todo do a variant of this evaluation that assumes that the indices for the
  *       access paths are remote and partitioned. This evaluation strategy needs
@@ -107,13 +120,33 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 //     */
 //    final boolean subqueryElimination = false;
    
+    private final RuleState state;
+    private final IBuffer buffer;
+    private final IBindingSet bindingSet;
+    private final RuleStats ruleStats;
+    
+    public LocalNestedSubqueryEvaluator(RuleState ruleState, IBuffer buffer) {
+
+        if (ruleState == null)
+            throw new IllegalArgumentException();
+
+        if (buffer == null)
+            throw new IllegalArgumentException();
+
+        this.state = ruleState;
+
+        this.buffer = buffer;
+        
+        this.bindingSet = ruleState.newBindingSet();
+
+        this.ruleStats = new RuleStats(ruleState);
+        
+    }
+    
     /**
      * Recursively evaluate the subqueries
-     * 
-     * @param state
-     *            The rule execution state.
      */
-    final public void apply( RuleState state ) {
+    final public Object call() {
         
         final long begin = System.currentTimeMillis();
 
@@ -127,7 +160,9 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
             
 //        }
         
-        state.stats.elapsed += System.currentTimeMillis() - begin;
+        ruleStats.elapsed += System.currentTimeMillis() - begin;
+        
+        return null;
         
     }
     
@@ -140,20 +175,27 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
      *            Note: You MUST indirect through order, e.g., order[index], to
      *            obtain the index of the corresponding predicate in the
      *            evaluation order.
+     * 
+     * @todo it would be nicer if the order was encapsulated by an iterator over
+     *       the predicates so that order[] was not directly used by the rule
+     *       impls. however that might just be a bias in favor of set-at-a-time
+     *       solution processing vs set a a time JOIN processing or some other
+     *       JOIN strategy.
      */
     final private void apply1(final int index, RuleState state) {
 
-        final Rule rule = state.getRule();
+        final IRule rule = state.getRule();
         
         final int tailCount = rule.getTailCount();
         
-        if (index < 0 || index > tailCount)
+        if (index < 0 || index >= tailCount)
             throw new IllegalArgumentException();
         
         /*
          * Subquery iterator.
          */
-        final IChunkedIterator itr = state.iterator(state.order[index]);
+        final IChunkedOrderedIterator itr = state.iterator(bindingSet,
+                state.order[index]);
         
         try {
 
@@ -166,15 +208,15 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 
                     // nexted subquery.
 
-                    for (Object stmt : chunk) {
+                    for (Object e : chunk) {
 
                         if (log.isDebugEnabled()) {
-                            log.debug("Considering: " + stmt.toString()
+                            log.debug("Considering: " + e.toString()
                                     + ", index=" + index + ", rule="
                                     + rule.getName());
                         }
 
-                        state.stats.nstmts[state.order[index]]++;
+                        ruleStats.nstmts[state.order[index]]++;
 
                         /*
                          * Then bind this statement, which propagates bindings
@@ -183,13 +225,13 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                          * JOIN).
                          */
 
-                        state.clearDownstreamBindings(index + 1);
+                        state.clearDownstreamBindings(bindingSet, index + 1);
                         
-                        if(state.bind(state.order[index], stmt)) {
+                        if (state.bind(bindingSet, state.order[index], e)) {
 
                             // run the subquery.
                             
-                            state.stats.nsubqueries[state.order[index]]++;
+                            ruleStats.nsubqueries[state.order[index]]++;
 
                             apply1(index + 1, state);
                             
@@ -201,21 +243,21 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 
                     // bottomed out.
 
-                    for (Object stmt : chunk) {
+                    for (Object e : chunk) {
 
                         if (log.isDebugEnabled()) {
-                            log.debug("Considering: " + stmt.toString()
+                            log.debug("Considering: " + e.toString()
                                     + ", index=" + index + ", rule="
                                     + rule.getName());
                         }
 
-                        state.stats.nstmts[state.order[index]]++;
+                        ruleStats.nstmts[state.order[index]]++;
 
-                        // bind this statement.
-                        if( state.bind(state.order[index], stmt) ) {
+                        // bind variables from the current element.
+                        if (state.bind(bindingSet, state.order[index], e)) {
 
                             // emit entailment.
-                            state.emit();
+                            buffer.add(bindingSet);
                             
                         }
 

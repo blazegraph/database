@@ -87,10 +87,18 @@ public class DelegateIndex implements IIndex {
         return delegate.lookup(key);
     }
 
+    public long rangeCount() {
+        return delegate.rangeCount();
+    }
+    
     public long rangeCount(byte[] fromKey, byte[] toKey) {
         return delegate.rangeCount(fromKey, toKey);
     }
 
+    public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+        return delegate.rangeCountExact(fromKey, toKey);
+    }
+    
     public ITupleIterator rangeIterator() {
         return rangeIterator(null,null);
     }

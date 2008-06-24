@@ -34,14 +34,6 @@ import com.bigdata.btree.ITuple;
 /**
  * Interface for an {@link IAccessPath} factory.
  * 
- * FIXME There needs to be an interface for choosing the JOIN operator impl. For
- * RDF with its perfect indices this is always going to use the same operator
- * for a given deployment (e.g., LDS vs Jini Federation).
- * 
- * Note that index maintenance is highly specialized for the RDF DB because of
- * its perfect indices. GOM is a more typical example where there may be a
- * primary (clustered) index and then zero or more secondary indices.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

@@ -371,10 +371,18 @@ abstract public class AbstractRemoteFederation extends AbstractFederation {
             
         }
 
+
+        public long rangeCount() {
+
+            return rangeCount(null,null);
+            
+        }
+
         // only used by unit tests.
         public long rangeCount(byte[] fromKey, byte[] toKey) {
 
-            final IIndexProcedure proc = new RangeCountProcedure(fromKey, toKey);
+            final IIndexProcedure proc = new RangeCountProcedure(
+                    false/* exact */, fromKey, toKey);
 
             final Long rangeCount;
             try {
@@ -392,6 +400,27 @@ abstract public class AbstractRemoteFederation extends AbstractFederation {
 
         }
 
+        public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+
+            final IIndexProcedure proc = new RangeCountProcedure(
+                    true/* exact */, fromKey, toKey);
+
+            final Long rangeCount;
+            try {
+
+                rangeCount = (Long) getMetadataService().submit(timestamp,
+                        MetadataService.getMetadataIndexName(name), proc);
+
+            } catch (Exception e) {
+
+                throw new RuntimeException(e);
+
+            }
+
+            return rangeCount.longValue();
+            
+        }
+        
         public ITupleIterator rangeIterator() {
             
             return rangeIterator(null,null);

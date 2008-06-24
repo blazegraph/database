@@ -592,7 +592,11 @@ abstract public class Rule {
 
         }
 
-        return (pred.magic ? new Magic(s, p, o) : new Triple(s, p, o));
+        // the optional filter on the source triples.
+        final ISPOFilter filter = (pred instanceof Triple ? ((Triple) pred).filter
+                : null);
+
+        return (pred.magic ? new Magic(s, p, o) : new Triple(s, p, o, filter));
         
     }
     

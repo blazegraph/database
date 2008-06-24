@@ -28,20 +28,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.util.concurrent.Callable;
+
 /**
- * Evaluation impl for a {@link Rule}.
+ * Interface for evaluation of a {@link Rule}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRuleEvaluator /*extends Callable<Iterator>*/ {
+public interface IRuleEvaluator extends Callable<Object> {
     
     /**
-     * Apply the rule.
-     * 
-     * @param state
-     *            The rule execution state.
+     * Evaluate the rule.
      */
-    public void apply(RuleState state);
+    public Object call();
     
 }

@@ -28,16 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-import junit.framework.TestCase2;
+import java.util.Comparator;
+
+import com.bigdata.join.rdf.ISPO;
 
 /**
- * FIXME write tests but {@link RuleState} is still up for a major refactor to
- * support scale-out joins and statistics collection.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRuleState extends TestCase2 {
+public class TestRuleState extends AbstractRuleTestCase {
 
     /**
      * 
@@ -55,20 +55,37 @@ public class TestRuleState extends TestCase2 {
         
     }
 
-//  public void test_ruleState() {
-    //
-//            final IAccessPathFactory accessPathFactory = new MockAccessPathFactory();
-//            
-//            final BlockingBuffer<IBindingSet> buffer = new BlockingBuffer<IBindingSet>(
-//                    100);
-//            
-//            final IRuleEvaluator evaluator = new MockRuleEvaluator();
-//            
-//            final State s = new State(r, false/* justify */, accessPathFactory,
-//                    buffer, evaluator);
-    //
-//            fail("write test");
-    //
-//        }
+    /**
+     * FIXME {@link RuleState} has become an evaluation order and some access
+     * path caching. In order to test this class we need to have either a mock
+     * access path or some real data.
+     */
+    public void test_ruleState() {
+
+        final IRelation<ISPO> relation = new MockRelation<ISPO>();
+        
+        final IRule r = new TestRuleRdfs9(relation);
+
+        final RuleState state = new RuleState(r);
+
+        fail("write test");
+
+    }
+    
+    static class MockAccessPathFactory<E> implements IAccessPathFactory<E> {
+        
+        public IAccessPath<E> getAccessPath(IPredicate<E> predicate) {
+
+            return new EmptyAccessPath<E>(predicate, new IKeyOrder<E>(){
+
+                public Comparator<E> getComparator() {
+                    
+                    throw new UnsupportedOperationException();
+                    
+                }});
+            
+        }
+        
+    }
 
 }

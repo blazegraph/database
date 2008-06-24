@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-import junit.framework.TestCase2;
 
 /**
  * Test suite for {@link AccessPathFusedView}. 
@@ -36,7 +35,7 @@ import junit.framework.TestCase2;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAccessPathFusedView extends TestCase2 {
+public class TestAccessPathFusedView extends AbstractRuleTestCase {
 
     /**
      * 
