@@ -32,6 +32,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.join.BlockingBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
@@ -63,7 +64,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
     /**
      * Used to coordinate the reader and the writer.
      */
-    private final ArrayBlockingQueue<SPO> buffer;
+    private final ArrayBlockingQueue<SPO> queue;
     
     /**
      * 
@@ -82,7 +83,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
         
         this.filter = filter;
         
-        this.buffer = new ArrayBlockingQueue<SPO>(capacity);
+        this.queue = new ArrayBlockingQueue<SPO>(capacity);
         
     }
 
@@ -107,13 +108,13 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
     
     public boolean isEmpty() {
 
-        return buffer.isEmpty();
+        return queue.isEmpty();
         
     }
 
     public int size() {
 
-        return buffer.size();
+        return queue.size();
         
     }
 
@@ -166,7 +167,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
 
             try {
                 
-                if(buffer.offer(spo,100,TimeUnit.MILLISECONDS)) {
+                if(queue.offer(spo,100,TimeUnit.MILLISECONDS)) {
 
                     // item now on the queue.
 
@@ -205,7 +206,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      */
     public int flush() {
         
-        return buffer.size();
+        return queue.size();
         
     }
 
@@ -318,14 +319,22 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
                 
             }
 
-            while (SPOBlockingBuffer.this.open || !buffer.isEmpty()) {
+            /*
+             * Note: hasNext must wait until the buffer is closed and all
+             * elements in the queue have been consumed before it can conclude
+             * that there will be nothing more that it can visit. This re-tests
+             * whether or not the buffer is open after a timeout and continues
+             * to loop until the buffer is closed AND there are no more elements
+             * in the queue.
+             */
+            while (SPOBlockingBuffer.this.open || !queue.isEmpty()) {
 
                 /*
                  * Use a set limit on wait and recheck whether or not the
                  * buffer has been closed asynchronously.
                  */
 
-                final SPO spo = buffer.peek();
+                final SPO spo = queue.peek();
 
                 if (spo == null) {
                     
@@ -348,7 +357,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
 
                     // consume the head of the queue.
                     try {
-                        buffer.take();
+                        queue.take();
                     } catch(InterruptedException ex) {
                         throw new RuntimeException(ex);
                     }
@@ -364,7 +373,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
             }
 
             if (log.isInfoEnabled())
-                log.info("Exhausted: bufferOpen="+SPOBlockingBuffer.this.open+", size="+buffer.size());
+                log.info("Exhausted: bufferOpen="+SPOBlockingBuffer.this.open+", size="+queue.size());
             
             return false;
 
@@ -378,13 +387,13 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
 
             }
 
-            assert !buffer.isEmpty();
+            assert !queue.isEmpty();
             
             final SPO spo;
 
             try {
 
-                spo = buffer.take();
+                spo = queue.take();
                 
             } catch(InterruptedException ex) {
                 
@@ -421,7 +430,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
              * asynchronously but will not shrink since we are the only class
              * that takes items from the buffer.
              */
-            final int chunkSize = buffer.size();
+            final int chunkSize = queue.size();
 
             final SPO[] chunk = new SPO[chunkSize];
 
