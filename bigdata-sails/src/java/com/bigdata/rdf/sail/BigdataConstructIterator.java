@@ -9,10 +9,12 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.sail.SailException;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ChunkedSPOIterator;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
+import com.bigdata.rdf.util.KeyOrder;
 
 public class BigdataConstructIterator implements
         CloseableIteration<Statement, QueryEvaluationException> {
@@ -59,12 +61,21 @@ public class BigdataConstructIterator implements
         }
     }
 
-    private class SPOConverter implements Iterator<SPO> {
+    private class SPOConverter implements ISPOIterator {
+        
         private final CloseableIteration<? extends BindingSet, QueryEvaluationException> src;
 
         public SPOConverter(
                 final CloseableIteration<? extends BindingSet, QueryEvaluationException> src) {
             this.src = src;
+        }
+        
+        public void close() {
+            try {
+                src.close();
+            } catch (QueryEvaluationException ex) {
+                throw new RuntimeException(ex);
+            }
         }
 
         public boolean hasNext() {
@@ -116,5 +127,27 @@ public class BigdataConstructIterator implements
             SPO spo = new SPO(s, p, o);
             return spo;
         }
+        
+        /**
+         * Don't really need chunking, but we do need to be closeable.
+         */
+        public SPO[] nextChunk() {
+            return nextChunk(null);
+        }
+
+        /**
+         * Don't really need chunking, but we do need to be closeable.
+         */
+        public KeyOrder getKeyOrder() {
+            return KeyOrder.SPO;
+        }
+
+        /**
+         * Don't really need chunking, but we do need to be closeable.
+         */
+        public SPO[] nextChunk(KeyOrder keyOrder) {
+            return new SPO[] { next() };
+        }
+        
     }
 }
