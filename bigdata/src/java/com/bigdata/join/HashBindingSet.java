@@ -28,9 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * {@link IBindingSet} backed by a {@link HashMap}.
@@ -38,12 +40,34 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo compact serialization for bindings for a relation.
+ * @todo compact serialization.
  */
 public class HashBindingSet implements IBindingSet {
 
-    private Map<IVariable,IConstant> map = new HashMap<IVariable, IConstant>();
+    private static final long serialVersionUID = -2989802566387532422L;
+    
+    private HashMap<IVariable, IConstant> map;
 
+    /**
+     * New empty binding set.
+     */
+    public HashBindingSet() {
+        
+        map = new HashMap<IVariable, IConstant>();
+        
+    }
+
+    /**
+     * Copy constructor.
+     * 
+     * @param src
+     */
+    protected HashBindingSet(HashBindingSet src) {
+        
+        map = new HashMap<IVariable, IConstant>(src.map);
+        
+    }
+    
     public boolean isBound(IVariable var) {
      
         if (var == null)
@@ -123,4 +147,25 @@ public class HashBindingSet implements IBindingSet {
 
     }
 
+    /**
+     * Iterator does not support removal, set, or concurrent modification.
+     */
+    public Iterator<Entry<IVariable, IConstant>> iterator() {
+
+        return Collections.unmodifiableMap(map).entrySet().iterator();
+        
+    }
+
+    public int size() {
+
+        return map.size();
+        
+    }
+
+    public HashBindingSet clone() {
+        
+        return new HashBindingSet( this );
+        
+    }
+    
 }

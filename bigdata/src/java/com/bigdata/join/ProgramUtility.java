@@ -54,9 +54,19 @@ public class ProgramUtility {
 
     }
 
-    public void execute(IProgram program, ExecutorService service)
-            throws InterruptedException, ExecutionException {
+    public void execute(IProgram program, IJoinNexus joinNexus,
+            ExecutorService service) throws InterruptedException,
+            ExecutionException {
 
+        if (program == null)
+            throw new IllegalArgumentException();
+        
+        if (joinNexus == null)
+            throw new IllegalArgumentException();
+        
+        if (service == null)
+            throw new IllegalArgumentException();
+        
         /*
          * FIXME Locate the distinct relations on which the rules will write and
          * create an appropriate buffer for each.
@@ -76,7 +86,7 @@ public class ProgramUtility {
         // FIXME This is only for reading solutions, not for writing on the relation.
         final IBuffer<ISolution> buffer = new BlockingBuffer<ISolution>();
         
-        final List<Callable<Object>> tasks = newTasks(program, buffer);
+        final List<Callable<Object>> tasks = newTasks(program, joinNexus, buffer);
 
         if (program.isParallel()) {
 
@@ -103,7 +113,8 @@ public class ProgramUtility {
      * 
      * @todo do we really want the buffer as a parameter here?
      */
-    protected List<Callable<Object>> newTasks(IProgram program, IBuffer<ISolution> buffer) {
+    protected List<Callable<Object>> newTasks(IProgram program,
+            IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
 
         final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(program.stepCount());
 
@@ -114,7 +125,7 @@ public class ProgramUtility {
             // @todo handle sub-programs.
             final Rule rule = (Rule) itr.next();
 
-            final RuleState ruleState = newRuleState(rule);
+            final RuleState ruleState = joinNexus.newRuleState(rule);
 
             final IRuleEvaluator task = new LocalNestedSubqueryEvaluator(
                     ruleState, buffer);
@@ -227,6 +238,7 @@ public class ProgramUtility {
     protected void //ClosureStats
     fixPoint(//ClosureStats closureStats,
             IProgram program,//
+            IJoinNexus joinNexus,//
             ExecutorService service,//
             IBuffer<IBindingSet> buffer//
             ) throws InterruptedException, ExecutionException {
@@ -241,11 +253,19 @@ public class ProgramUtility {
         /*
          * FIXME After each round we need to be reading from the post-update
          * state the relation(s) on which the rules are writing. (It is an error
-         * if the rules are not writing on at least one relation.)  This assumes
+         * if the rules are not writing on at least one relation.) This assumes
          * that all of the rules are writing on the relation specified for the
          * head of the first rule.
+         * 
+         * Note: This will work auto-magically if the entailments are written
+         * onto the using UNISOLATED while the rules use READ_COMMITTED reads.
          */
-        final IRelation sink = ((Rule)steps[0]).getHead().getRelation();
+        
+        final IRelationName sinkName = ((Rule) steps[0]).getHead()
+                .getRelation();
+
+        final IRelation sink = joinNexus.getRelationLocator().getRelation(
+                sinkName);
         
         /*
          * FIXME We need an exact count to detect the fixed point since it is
@@ -278,7 +298,7 @@ public class ProgramUtility {
             for (IProgram step : steps) {
 
 //                final RuleStats stats =
-                execute(step, service);
+                execute(step, joinNexus, service);
 //                    apply(rule, focusStore, database, buffer, service);
                 
 // closureStats.add(stats);
@@ -401,16 +421,4 @@ public class ProgramUtility {
 
     }
 
-    /**
-     * Factory for {@link RuleState} instances.
-     * 
-     * @param rule
-     *            The {@link Rule}.
-     */
-    public RuleState newRuleState(Rule rule) {
-        
-        return new RuleState( rule );
-        
-    }
-    
 }

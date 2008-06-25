@@ -28,10 +28,6 @@ public class DelegatePredicate<E> implements IPredicate<E> {
         return src.asBound(bindingSet);
     }
 
-    public void copyValues(E e, IBindingSet bindingSet) {
-        src.copyValues(e, bindingSet);
-    }
-
     public boolean equals(IPredicate<E> other) {
         return src.equals(other);
     }
@@ -44,20 +40,16 @@ public class DelegatePredicate<E> implements IPredicate<E> {
         return src.getConstraint();
     }
 
-    public IRelation<E> getRelation() {
+    public IRelationName<E> getRelation() {
         return src.getRelation();
     }
     
-    public IAccessPath<E> getAccessPath() {
-        return src.getAccessPath();
-    }
-
     public int getVariableCount() {
         return src.getVariableCount();
     }
 
-    public boolean isConstant() {
-        return src.isConstant();
+    public boolean isFullyBound() {
+        return src.isFullyBound();
     }
 
     public String toString() {

@@ -46,7 +46,7 @@ import com.bigdata.rawstore.Bytes;
  * Note: the encoded key for a statement is formed from the 64-bit
  * <code>long</code> term identifier for the subject, predicate, and object
  * positions of the statement. Each statement index uses a permutation of those
- * term identifiers, e.g., {s,p,o}, {o,s,p}, or {p,o,s}. The {@link KeyOrder}
+ * term identifiers, e.g., {s,p,o}, {o,s,p}, or {p,o,s}. The {@link SPOKeyOrder}
  * identifies the specific permutation for a given index. The keys are fully
  * decodable and are NOT stored redundently in the tuple's value.
  * <p>
@@ -67,7 +67,7 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
     /**
      * The natural order for the index.
      */
-    private KeyOrder keyOrder;
+    private SPOKeyOrder sPOKeyOrder;
     
     /**
      * Used to format the value.
@@ -79,12 +79,12 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
      */
     private final transient IKeyBuilder keyBuilder = new KeyBuilder(N*Bytes.SIZEOF_LONG);
     
-    public SPOTupleSerializer(KeyOrder keyOrder) {
+    public SPOTupleSerializer(SPOKeyOrder sPOKeyOrder) {
         
-        if (keyOrder == null)
+        if (sPOKeyOrder == null)
             throw new IllegalArgumentException();
         
-        this.keyOrder = keyOrder;
+        this.sPOKeyOrder = sPOKeyOrder;
         
     }
     
@@ -130,21 +130,21 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
         
         final long s, p, o;
         
-        switch (keyOrder.index()) {
+        switch (sPOKeyOrder.index()) {
 
-        case KeyOrder._SPO:
+        case SPOKeyOrder._SPO:
             s = _0;
             p = _1;
             o = _2;
             break;
             
-        case KeyOrder._POS:
+        case SPOKeyOrder._POS:
             p = _0;
             o = _1;
             s = _2;
             break;
             
-        case KeyOrder._OSP:
+        case SPOKeyOrder._OSP:
             o = _0;
             s = _1;
             p = _2;
@@ -213,31 +213,31 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
 
     public byte[] serializeKey(SPO spo) {
         
-        return statement2Key(keyOrder, spo);
+        return statement2Key(sPOKeyOrder, spo);
         
     }
 
     /**
      * Forms the statement key.
      * 
-     * @param keyOrder
+     * @param sPOKeyOrder
      *            The key order.
      * @param spo
      *            The statement.
      * 
      * @return The key.
      */
-    private byte[] statement2Key(KeyOrder keyOrder, SPO spo) {
+    private byte[] statement2Key(SPOKeyOrder sPOKeyOrder, SPO spo) {
         
-        switch (keyOrder.index()) {
-        case KeyOrder._SPO:
+        switch (sPOKeyOrder.index()) {
+        case SPOKeyOrder._SPO:
             return statement2Key(spo.s, spo.p, spo.o);
-        case KeyOrder._POS:
+        case SPOKeyOrder._POS:
             return statement2Key(spo.p, spo.o, spo.s);
-        case KeyOrder._OSP:
+        case SPOKeyOrder._OSP:
             return statement2Key(spo.o, spo.s, spo.p);
         default:
-            throw new UnsupportedOperationException("keyOrder=" + keyOrder);
+            throw new UnsupportedOperationException("keyOrder=" + sPOKeyOrder);
         }
         
     }
@@ -309,13 +309,13 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
-        keyOrder = KeyOrder.valueOf(in.readByte());
+        sPOKeyOrder = SPOKeyOrder.valueOf(in.readByte());
 
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        out.writeByte(keyOrder.index());
+        out.writeByte(sPOKeyOrder.index());
 
     }
 

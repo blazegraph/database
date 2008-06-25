@@ -23,32 +23,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 21, 2008
+ * Created on Jun 25, 2008
  */
 
-package com.bigdata.join.rdf;
+package com.bigdata.join;
 
-import junit.framework.TestCase2;
+import java.util.Iterator;
 
 /**
- * Test suite for {@link SPOKeyOrder}. 
- *
+ * An iterator that defines a {@link #close()} method - you MUST close instances
+ * of this interface. Many implementation depends on this in order to release
+ * resources, terminate tasks, etc.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestKeyOrder extends TestCase2 {
+public interface IClosableIterator<E> extends Iterator<E> {
 
     /**
-     * 
+     * Closes the iterator, releasing any associated resources. This method MAY
+     * be invoked safely if the iterator is already closed.
+     * <p>
+     * Note: Implementations that support {@link Iterator#remove()} MUST NOT
+     * eagerly close the iterator when it is exhausted since that would make it
+     * impossible to remove the last visited statement. Instead they MUST wait
+     * for an explicit {@link #close()} by the application.
      */
-    public TestKeyOrder() {
-    }
-
-    /**
-     * @param name
-     */
-    public TestKeyOrder(String name) {
-        super(name);
-    }
-
+    public void close();
+    
 }

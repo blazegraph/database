@@ -23,21 +23,33 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 23, 2008
+ * Created on Jun 25, 2008
  */
 
 package com.bigdata.join;
 
-public class MockRelation<E> implements IRelation<E> {
+/**
+ * An object that knows how to resolve an {@link IRelationName} to an
+ * {@link IRelation} instance.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ * @param <R>
+ *            The generic type of the [R]elation.
+ */
+public interface IRelationLocator<R> {
 
-    public IAccessPath<E> getAccessPath(IPredicate<E> predicate) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public long getElementCount(boolean exact) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+    /**
+     * Resolve the {@link IRelation}.
+     * 
+     * @param relationName
+     *            The identifier for that relation.
+     * 
+     * @return The {@link IRelation} and never <code>null</code>.
+     * 
+     * @throws RuntimeException
+     *             if there is an error when resolving the relation.
+     */
+    public IRelation<R> getRelation(IRelationName<R> relationName);
     
 }

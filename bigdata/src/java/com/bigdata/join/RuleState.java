@@ -23,6 +23,31 @@ public class RuleState {
      */
     final protected IRule rule;
     
+    /**
+     * Helper class for managing predicates, bindings, and solutions.
+     */
+    final private IJoinNexus joinNexus;
+
+    /**
+     * The {@link Rule} that is being executed. 
+     */
+    final public IRule getRule() {
+        
+        return rule;
+        
+    }
+
+    /**
+     * A helper class that provides interoperability for the {@link IPredicate}s,
+     * {@link IBindingSet}s, and {@link ISolution}s for the evaluation of the
+     * <i>rule</i>.
+     */
+    final public IJoinNexus getElementBinding() {
+        
+        return joinNexus;
+        
+    }
+
 //    /**
 //     * Statistics for the rule evaluation.
 //     */
@@ -58,16 +83,26 @@ public class RuleState {
     /**
      * 
      * @param rule
+     *            The rule.
+     * @param joinNexus
+     *            A helper class that provides interoperability for the
+     *            {@link IPredicate}s, {@link IBindingSet}s, and
+     *            {@link ISolution}s for the evaluation of the <i>rule</i>.
      */
-    public RuleState(IRule rule) {
+    public RuleState(IRule rule, IJoinNexus joinNexus) {
 
         if (rule == null)
             throw new IllegalArgumentException();
         
-        final int tailCount = rule.getTailCount();
+        if (joinNexus== null)
+            throw new IllegalArgumentException();
         
         this.rule = rule;
 
+        this.joinNexus = joinNexus;
+        
+        final int tailCount = rule.getTailCount();
+        
         // Allocate access path cache.
         this.accessPath = new IAccessPath[tailCount];
 
@@ -200,15 +235,6 @@ public class RuleState {
     }
 
     /**
-     * The {@link Rule} that is being executed. 
-     */
-    public IRule getRule() {
-        
-        return rule;
-        
-    }
-    
-    /**
      * Externalizes the rule and the evaluation order.
      */
     public String toString() {
@@ -294,7 +320,7 @@ public class RuleState {
     public int[] computeEvaluationOrder() {
 
         // use private bindingSet to avoid side-effects.
-        final IBindingSet bindingSet = newBindingSet();
+        final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
         final int tailCount = rule.getTailCount();
 
@@ -670,8 +696,8 @@ public class RuleState {
     @SuppressWarnings("unchecked")
     public boolean bind(IBindingSet bindings,int index, Object e) {
        
-        // propagate bindings.
-        rule.getTail(index).copyValues(e, bindings);
+        // propagate bindings from the visited object into the binding set.
+        joinNexus.copyValues(e, rule.getTail(index), bindings);
 
         // verify constraints.
         return rule.isLegal(bindings);
@@ -803,6 +829,9 @@ public class RuleState {
      * 
      * @throws IndexOutOfBoundsException
      *             if index is out of bounds.
+     * @throws RuntimeException
+     *             if the name of the relation can not be resolved by the
+     *             {@link IJoinNexus} to an {@link IRelation} instance.
      */
     public IAccessPath getAccessPath(final int index, final IBindingSet bindingSet) {
 
@@ -822,23 +851,23 @@ public class RuleState {
 
         }
 
-        final IAccessPath accessPath = predicate.getAccessPath();
+        // The name of the relation that the predicate will query.
+        final IRelationName relationName = predicate.getRelation();
         
+        // Resolve the relation name to the IRelation object.
+        final IRelation relation = joinNexus.getRelationLocator().getRelation(
+                relationName);
+        
+        assert relation != null;
+        
+        // find the best access path for the predicate for that relation.
+        final IAccessPath accessPath = relation.getAccessPath(predicate);
+        
+        assert accessPath != null;
+        
+        // return that access path.
         return accessPath;
 
-    }
-
-    /**
-     * Factory for {@link IBindingSet} implementations.
-     * 
-     * @return An empty binding set.
-     * 
-     * @todo where, if anywhere, does this method best belong?
-     */
-    public IBindingSet newBindingSet() {
-        
-        return new ArrayBindingSet(rule.getVariableCount());
-        
     }
     
 }

@@ -38,6 +38,14 @@ package com.bigdata.join;
  * justifications for the entailments. The RDF DB uses this for to maintain a
  * justifications index in support of truth maintenance.
  * 
+ * FIXME It may be easier to always clone and materalize the binding set rather
+ * than the element and let the client extract what they want, but we still want
+ * the rule available as metadata in either case.
+ * 
+ * FIXME JOINs need to share some bindings with sub-JOINS, but not the full
+ * binding set. Consider this when attending to efficient serialization. Will
+ * there be a JOIN operation on the data service itself?
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -57,11 +65,8 @@ public interface ISolution<E> {
      * Return the {@link IRule} that generated this solution (optional
      * operation).
      * 
-     * @return The {@link IRule}.
-     * 
-     * @throws UnsupportedOperationException
-     *             if {@link IBindingSet}s were not requested when the rule was
-     *             executed.
+     * @return The {@link IRule} -or- <code>null</code> if only the element
+     *         was requested when the rule was executed.
      */
     public IRule getRule();
     
@@ -70,9 +75,8 @@ public interface ISolution<E> {
      * 
      * @return The {@link IBindingSet}.
      * 
-     * @throws UnsupportedOperationException
-     *             if {@link IBindingSet}s were not requested when the rule was
-     *             executed.
+     * @return The {@link IBindingSet} -or- <code>null</code> if only the
+     *         element was requested when the rule was executed.
      */
     public IBindingSet getBindingSet();
     

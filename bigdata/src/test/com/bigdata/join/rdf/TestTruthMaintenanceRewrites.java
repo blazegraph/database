@@ -31,7 +31,8 @@ package com.bigdata.join.rdf;
 import java.util.List;
 
 import com.bigdata.join.AbstractRuleTestCase;
-import com.bigdata.join.IRelation;
+import com.bigdata.join.IRelationName;
+import com.bigdata.join.MockRelationName;
 import com.bigdata.join.RelationFusedView;
 import com.bigdata.join.Rule;
 
@@ -59,9 +60,9 @@ public class TestTruthMaintenanceRewrites extends AbstractRuleTestCase {
         
     }
 
-    final private IRelation<ISPO> database = new SPORelation();
+    final private IRelationName database = new MockRelationName("database");
 
-    final private IRelation<ISPO> focusStore = new SPORelation();
+    final private IRelationName focusStore = new MockRelationName("focusStore");
 
     /**
      * Test mapping of a rule with a single predicate in the tail across two
@@ -121,13 +122,13 @@ public class TestTruthMaintenanceRewrites extends AbstractRuleTestCase {
             assertTrue(r0.getTail(0).getRelation() == focusStore);
 
             // 2nd tail
-            assertTrue(r0.getTail(1).getRelation() instanceof RelationFusedView);
+            assertTrue(r0.getTail(1).getRelation() instanceof SPORelationView);
 
-            RelationFusedView fusedView = (RelationFusedView)r0.getTail(1).getRelation();
+            SPORelationView fusedView = (SPORelationView)r0.getTail(1).getRelation();
 
-            assertTrue(fusedView.getRelation1() == focusStore);
+            assertTrue(fusedView.getDatabase() == database);
 
-            assertTrue(fusedView.getRelation2() == database);
+            assertTrue(fusedView.getFocusStore() == focusStore);
             
         }
 
@@ -138,13 +139,13 @@ public class TestTruthMaintenanceRewrites extends AbstractRuleTestCase {
             log.info(r1.toString());
 
             // 1st tail.
-            assertTrue(r1.getTail(0).getRelation() instanceof RelationFusedView);
+            assertTrue(r1.getTail(0).getRelation() instanceof SPORelationView);
 
-            RelationFusedView fusedView = (RelationFusedView)r1.getTail(0).getRelation();
+            SPORelationView fusedView = (SPORelationView)r1.getTail(0).getRelation();
 
-            assertTrue(fusedView.getRelation1() == focusStore);
+            assertTrue(fusedView.getDatabase() == database);
 
-            assertTrue(fusedView.getRelation2() == database);
+            assertTrue(fusedView.getFocusStore() == focusStore);
             
             // 2nd tail
             assertTrue(r1.getTail(1).getRelation() == focusStore);

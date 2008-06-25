@@ -23,12 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.join.rdf;
 
-import com.bigdata.join.Constant;
-import com.bigdata.join.IAccessPath;
 import com.bigdata.join.IBindingSet;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.IPredicateConstraint;
-import com.bigdata.join.IRelation;
+import com.bigdata.join.IRelationName;
 import com.bigdata.join.IVariable;
 import com.bigdata.join.IVariableOrConstant;
 
@@ -42,7 +40,7 @@ import com.bigdata.join.IVariableOrConstant;
  */
 public class SPOPredicate implements IPredicate<ISPO> {
 
-    private final IRelation<ISPO> relation;
+    private final IRelationName<ISPO> relation;
     
     private final IVariableOrConstant<Long> s;
 
@@ -52,15 +50,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     private final IPredicateConstraint<ISPO> constraint;
 
-    public IRelation<ISPO> getRelation() {
+    public IRelationName<ISPO> getRelation() {
         
         return relation;
-        
-    }
-
-    public IAccessPath<ISPO> getAccessPath() {
-
-        return getRelation().getAccessPath(this);
         
     }
 
@@ -70,14 +62,14 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-    public SPOPredicate(IRelation<ISPO> relation, IVariableOrConstant<Long> s,
+    public SPOPredicate(IRelationName<ISPO> relation, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
         this(relation, s, p, o, null/* constraints */);
         
     }
     
-    public SPOPredicate(IRelation<ISPO> relation,
+    public SPOPredicate(IRelationName<ISPO> relation,
             IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
             IPredicateConstraint<ISPO> constraint) {
@@ -137,12 +129,30 @@ public class SPOPredicate implements IPredicate<ISPO> {
 //        return -1;
 //        
 //    }
+
+    public IVariableOrConstant<Long> s() {
+        
+        return s;
+        
+    }
+    
+    public IVariableOrConstant<Long> p() {
+        
+        return p;
+        
+    }
+
+    public IVariableOrConstant<Long> o() {
+        
+        return o;
+        
+    }
     
     /**
      * Return true iff all arguments of the predicate are bound (vs
      * variables).
      */
-    public boolean isConstant() {
+    public boolean isFullyBound() {
 
         return !s.isVar() && !p.isVar() && !o.isVar();
 
@@ -199,28 +209,6 @@ public class SPOPredicate implements IPredicate<ISPO> {
         }
         
         return new SPOPredicate(relation, s, p, o, constraint);
-        
-    }
-
-    public void copyValues(ISPO spo, IBindingSet bindingSet ) {
-
-        if (s.isVar()) {
-
-            bindingSet.set((IVariable) s, new Constant<Long>(spo.s()));
-
-        }
-
-        if (p.isVar()) {
-
-            bindingSet.set((IVariable) p, new Constant<Long>(spo.p()));
-
-        }
-
-        if (o.isVar()) {
-
-            bindingSet.set((IVariable) o, new Constant<Long>(spo.o()));
-            
-        }
         
     }
     

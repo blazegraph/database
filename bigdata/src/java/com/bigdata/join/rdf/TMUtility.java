@@ -36,7 +36,7 @@ import com.bigdata.join.DelegatePredicate;
 import com.bigdata.join.IConstraint;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.IRelation;
-import com.bigdata.join.RelationFusedView;
+import com.bigdata.join.IRelationName;
 import com.bigdata.join.Rule;
 
 /**
@@ -93,7 +93,7 @@ public class TMUtility {
      *         of the individual rules.
      */
     public List<Rule> mapRuleForTruthMaintenance(final Rule rule,
-            final IRelation focusStore) {
+            final IRelationName focusStore) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -108,16 +108,18 @@ public class TMUtility {
         /*
          * Setup the fused view (focusStore + database).
          */
-        final RelationFusedView fusedView;
-        if(tailCount==1) {
-            
+
+        final IRelationName<ISPO> fusedView;
+        
+        if (tailCount == 1) {
+
             /*
              * The fused view will not be used if there is only a single
              * predicate in the tail.
              */
-            
+
             fusedView = null;
-            
+
         } else {
 
             /*
@@ -126,8 +128,8 @@ public class TMUtility {
              * we use truth maintenance, but it is not true in the general case.
              */
 
-            fusedView = new RelationFusedView(focusStore, rule
-                    .getTail(0).getRelation());
+            fusedView = new SPORelationView(rule.getTail(0).getRelation(),
+                    focusStore);
 
         }
         
@@ -213,7 +215,7 @@ public class TMUtility {
 
                     p2 = new DelegatePredicate(p) {
 
-                        public IRelation getRelation() {
+                        public IRelationName getRelation() {
 
                             return focusStore;
 
@@ -230,7 +232,7 @@ public class TMUtility {
 
                     p2 = new DelegatePredicate(p) {
 
-                        public IRelation getRelation() {
+                        public IRelationName getRelation() {
 
                             return fusedView;
 
