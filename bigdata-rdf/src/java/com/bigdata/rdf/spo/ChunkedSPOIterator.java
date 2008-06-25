@@ -118,9 +118,9 @@ public class ChunkedSPOIterator implements ISPOIterator {
         
         open = false;
 
-        if(src instanceof ISPOIterator) {
+        if(src instanceof IChunkedIterator) {
             
-            ((ISPOIterator)src).close();
+            ((IChunkedIterator)src).close();
             
         }
 
