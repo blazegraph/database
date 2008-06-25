@@ -30,10 +30,10 @@ package com.bigdata.join;
 
 import java.util.Comparator;
 
-import com.bigdata.join.rdf.KeyOrder;
+import com.bigdata.join.rdf.SPOKeyOrder;
 
 /**
- * Wraps the {@link Comparator} obtained from a {@link KeyOrder} such that it
+ * Wraps the {@link Comparator} obtained from a {@link SPOKeyOrder} such that it
  * will ordered {@link ISolution}s by the elements reported by
  * {@link ISolution#get()}.
  * 

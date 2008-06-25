@@ -60,8 +60,12 @@ import com.bigdata.btree.ITupleIterator;
  * they should be placed into their own namespace, e.g., "#x" would be a
  * temporary index named "x" (could support scale-out) and "##x" would be a
  * data-service local temporary index named "x". "x" by itself is a normal
- * index.  Normally, such temporary indices should be scoped to something like
- * a transaction but transaction support is not yet finished.
+ * index. Normally, such temporary indices should be scoped to something like a
+ * transaction but transaction support is not yet finished.
+ * <p>
+ * There MUST be a way to name a view of two relations to support
+ * {@link RelationFusedView}. The view has to be described before we are able
+ * to resolve the relations to their functional objects.
  * 
  * FIXME Allow the head of a rule to return [null] for getRelation() so that
  * query via rules can work even when there is no specific relation that

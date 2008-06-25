@@ -36,6 +36,7 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.join.AbstractAccessPath;
 import com.bigdata.join.IAccessPath;
 import com.bigdata.join.IChunkedIterator;
+import com.bigdata.join.IKeyOrder;
 import com.bigdata.join.IMutableRelation;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.ISolution;
@@ -76,30 +77,42 @@ public class SPORelation implements IMutableRelation<ISPO> {
     // @todo IRawTripleStore when re-factored back to the rdf module.
     private transient final long NULL = 0L;
     
+    private final AbstractTripleStore tripleStore;
+    
+    public SPORelation(AbstractTripleStore tripleStore) {
+        
+        if (tripleStore == null)
+            throw new IllegalArgumentException();
+        
+        this.tripleStore = tripleStore;
+        
+    }
+    
     /**
      * @todo integrate with triple store impls to returns the appropriate
      *       statement index. Add ctor accepting the IRawTripleStore and use
      *       getStatementIndex(String name) to obtain the appropriate index.
      *       This works if we assume that the triple store is fully indexed.
      */
-    public IIndex getIndex(String name) {
+    public IIndex getIndex(SPOKeyOrder keyOrder) {
 
-        throw new UnsupportedOperationException();
+        return tripleStore.getStatementIndex(keyOrder);
         
     }
     
-    public IAccessPath<ISPO> getAccessPath(KeyOrder keyOrder,
+    public IAccessPath<ISPO> getAccessPath(SPOKeyOrder keyOrder,
             IPredicate<ISPO> pred) {
 
-        return new AbstractAccessPath<ISPO>(pred, keyOrder, getIndex(keyOrder
-                .getName()), IRangeQuery.KEYS | IRangeQuery.VALS/* flags */) {
+        final IIndex ndx = getIndex(keyOrder);
 
-        };
+        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
+        
+        return new SPOAccessPath(pred, keyOrder, ndx, flags);
         
     }
     
     /**
-     * Return the {@link KeyOrder} that will be used to read from the statement
+     * Return the {@link SPOKeyOrder} that will be used to read from the statement
      * index that is most efficient for the specified triple pattern.
      * 
      * @param s
@@ -115,35 +128,35 @@ public class SPORelation implements IMutableRelation<ISPO> {
 
         if (s != NULL && p != NULL && o != NULL) {
 
-            return getAccessPath(KeyOrder.SPO, pred);
+            return getAccessPath(SPOKeyOrder.SPO, pred);
 
         } else if (s != NULL && p != NULL) {
 
-            return getAccessPath(KeyOrder.SPO, pred);
+            return getAccessPath(SPOKeyOrder.SPO, pred);
 
         } else if (s != NULL && o != NULL) {
 
-            return getAccessPath(KeyOrder.OSP, pred);
+            return getAccessPath(SPOKeyOrder.OSP, pred);
 
         } else if (p != NULL && o != NULL) {
 
-            return getAccessPath(KeyOrder.POS, pred);
+            return getAccessPath(SPOKeyOrder.POS, pred);
 
         } else if (s != NULL) {
 
-            return getAccessPath(KeyOrder.SPO, pred);
+            return getAccessPath(SPOKeyOrder.SPO, pred);
 
         } else if (p != NULL) {
 
-            return getAccessPath(KeyOrder.POS, pred);
+            return getAccessPath(SPOKeyOrder.POS, pred);
 
         } else if (o != NULL) {
 
-            return getAccessPath(KeyOrder.OSP, pred);
+            return getAccessPath(SPOKeyOrder.OSP, pred);
 
         } else {
 
-            return getAccessPath(KeyOrder.SPO, pred);
+            return getAccessPath(SPOKeyOrder.SPO, pred);
 
         }
 
@@ -151,7 +164,7 @@ public class SPORelation implements IMutableRelation<ISPO> {
 
     public long getElementCount(boolean exact) {
 
-        final IIndex ndx = getIndex(KeyOrder.SPO.getName());
+        final IIndex ndx = getIndex(SPOKeyOrder.SPO);
         
         if (exact) {
         
@@ -188,9 +201,9 @@ public class SPORelation implements IMutableRelation<ISPO> {
         final ISolution<ISPO>[] chunk = itr.nextChunk();
         
         Arrays.sort(chunk, 0, chunk.length, new SolutionComparator<ISPO>(
-                KeyOrder.SPO));
+                SPOKeyOrder.SPO));
         
-        final IIndex ndx = getIndex(KeyOrder.SPO.getName());
+        final IIndex ndx = getIndex(SPOKeyOrder.SPO);
         
         final ITupleSerializer<ISPO,ISPO> tupleSer = ndx.getIndexMetadata().getTupleSerializer();
         
@@ -219,13 +232,35 @@ public class SPORelation implements IMutableRelation<ISPO> {
     }
 
     public long remove(IChunkedIterator<ISolution<ISPO>> itr) {
+        
         // TODO Auto-generated method stub
-        return 0;
+        throw new UnsupportedOperationException();
+        
     }
 
-    public long update(IChunkedIterator<ISolution<ISPO>> itr, com.bigdata.join.IMutableRelation.ITransform<ISPO> transform) {
+    public long update(IChunkedIterator<ISolution<ISPO>> itr,
+            ITransform<ISPO> transform) {
+        
         // TODO Auto-generated method stub
-        return 0;
+        throw new UnsupportedOperationException();
+        
+    }
+
+    private static class SPOAccessPath extends AbstractAccessPath<ISPO> {
+
+        /**
+         * @param predicate
+         * @param keyOrder
+         * @param ndx
+         * @param flags
+         */
+        public SPOAccessPath(IPredicate<ISPO> predicate,
+                IKeyOrder<ISPO> keyOrder, IIndex ndx, int flags) {
+
+            super(predicate, keyOrder, ndx, flags);
+
+        }
+
     }
 
 }

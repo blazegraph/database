@@ -54,18 +54,7 @@ import com.bigdata.btree.IRangeQuery;
  *            The generic type for the [E]lements visited by the
  *            {@link Iterator}.
  */
-public interface IChunkedIterator<E> extends Iterator<E> {
-
-    /**
-     * Closes the iterator, releasing any associated resources. This method MAY
-     * be invoked safely if the iterator is already closed.
-     * <p>
-     * Note: Implementations MUST NOT eagerly close the iterator when it is
-     * exhausted since that would make it impossible to remove the last visited
-     * statement. Instead they MUST wait for an explicit {@link #close()} by the
-     * application.
-     */
-    public void close();
+public interface IChunkedIterator<E> extends IClosableIterator<E> {
 
     /**
      * The next element available from the iterator.

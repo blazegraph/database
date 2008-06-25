@@ -53,7 +53,7 @@ public class TestPredicate extends TestCase2 {
         super(name);
     }
     
-    private final IRelation relation = new MockRelation();
+    private final IRelationName relation = new MockRelationName();
 
     private final static Constant<Long> c1 = new Constant<Long>(1L);
 
@@ -139,21 +139,9 @@ public class TestPredicate extends TestCase2 {
         /**
          * @param values
          */
-        public P(IRelation<E> relation,IVariableOrConstant[] values) {
+        public P(IRelationName relation,IVariableOrConstant[] values) {
 
             super(relation, values);
-            
-        }
-        
-        @Override
-        public Predicate<E> asBound(IBindingSet bindingSet) {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public void copyValues(E e, IBindingSet bindingSet) {
-            // TODO Auto-generated method stub
             
         }
         

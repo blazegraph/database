@@ -28,25 +28,47 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+
 /**
- * An {@link IBindingSet} backed by an array. This implementation is more
- * efficient for fixed or small N (N LTE ~20). It simples scans the array
- * looking for the variable using references tests for equality. Since the #of
- * variables is generally known in advance this can be faster and lighter than
- * {@link HashBindingSet} for most applications.
+ * An {@link IBindingSet} backed by an dense array (no gaps). This
+ * implementation is more efficient for fixed or small N (N LTE ~20). It simples
+ * scans the array looking for the variable using references tests for equality.
+ * Since the #of variables is generally known in advance this can be faster and
+ * lighter than {@link HashBindingSet} for most applications.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo compact serialization for bindings for a relation.
+ * @todo compact serialization.
  */
 public class ArrayBindingSet implements IBindingSet {
+
+    private static final long serialVersionUID = -6468905602211956490L;
     
     private final IVariable[] vars;
     private final IConstant[] vals;
 
     private int nbound = 0;
 
+    /**
+     * Copy constructor.
+     */
+    protected ArrayBindingSet(ArrayBindingSet bindingSet) {
+        
+        if (bindingSet == null)
+            throw new IllegalArgumentException();
+        
+        nbound = bindingSet.nbound;
+        
+        vars = bindingSet.vars.clone();
+
+        vals = bindingSet.vals.clone();
+        
+    }
+    
     /**
      * Initialized with the given bindings (assumes for efficiency that all
      * elements of bound arrays are non-<code>null</code> and that no
@@ -103,6 +125,76 @@ public class ArrayBindingSet implements IBindingSet {
         vals = new IConstant[capacity];
 
     }
+
+    /**
+     * Iterator does not support either removal or concurrent modification of 
+     * the binding set.
+     */
+    public Iterator<Map.Entry<IVariable,IConstant>> iterator() {
+       
+        return new BindingSetIterator();
+        
+    }
+    
+    private class BindingSetIterator implements Iterator<Map.Entry<IVariable,IConstant>> {
+
+        private int i = 0;
+        
+        public boolean hasNext() {
+
+            return i < nbound;
+            
+        }
+
+        public Entry<IVariable, IConstant> next() {
+
+            // the index whose bindings are being returned.
+            final int index = i++;
+
+            return new Map.Entry<IVariable, IConstant>() {
+
+                public IVariable getKey() {
+                    
+                    return vars[index];
+                    
+                }
+
+                public IConstant getValue() {
+
+                    return vals[index];
+                    
+                }
+
+                public IConstant setValue(IConstant value) {
+
+                    if (value == null)
+                        throw new IllegalArgumentException();
+                    
+                    final IConstant t = vals[index];
+                    
+                    vals[index] = value;
+                    
+                    return t;
+                    
+                }
+
+            };
+
+        }
+
+        public void remove() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+    
+    public int size() {
+        
+        return nbound;
+        
+    }
     
     public void clearAll() {
 
@@ -118,6 +210,10 @@ public class ArrayBindingSet implements IBindingSet {
         
     }
 
+    /**
+     * Since the array is dense (no gaps), {@link #clear(IVariable)} requires
+     * that we copy down any remaining elements in the array by one position.
+     */
     public void clear(IVariable var) {
 
         if (var == null)
@@ -127,10 +223,25 @@ public class ArrayBindingSet implements IBindingSet {
 
             if (vars[i] == var) {
 
-                vars[i] = null;
+                final int nremaining = nbound-(i+1);
+                
+                if (nremaining >= 0) {
+                    
+                    // Copy down to close up the gap!
+                    System.arraycopy(vars, i+1, vars, i, nremaining);
 
-                vals[i] = null;
+                    System.arraycopy(vals, i+1, vals, i, nremaining);
+                    
+                } else {
 
+                    // Just clear the reference.
+                    
+                    vars[i] = null;
+
+                    vals[i] = null;
+
+                }
+                
                 nbound--;
 
                 break;
@@ -213,6 +324,12 @@ public class ArrayBindingSet implements IBindingSet {
         sb.append(" }");
         
         return sb.toString();
+        
+    }
+    
+    public ArrayBindingSet clone() {
+
+        return new ArrayBindingSet(this);
         
     }
     

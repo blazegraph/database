@@ -29,7 +29,6 @@ package com.bigdata.join;
 
 import java.util.Set;
 
-import com.bigdata.join.rdf.ISPO;
 import com.bigdata.join.rdf.SPOPredicate;
 
 /**
@@ -54,7 +53,7 @@ public class TestRule extends AbstractRuleTestCase {
         super(name);
     }
     
-    private final IRelation<ISPO> relation = new MockRelation<ISPO>();
+    private final IRelationName relation = new MockRelationName();
 
     /**
      * Verify constructor of a simple rule.

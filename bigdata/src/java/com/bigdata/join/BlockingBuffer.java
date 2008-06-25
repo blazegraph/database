@@ -55,7 +55,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     /**
      * Used to coordinate the reader and the writer.
      */
-    private final ArrayBlockingQueue<E> buffer;
+    private final ArrayBlockingQueue<E> queue;
 
     /**
      * The singleton for the iterator used to read from this buffer.
@@ -161,7 +161,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
         if (chunkTimeout < 0)
             throw new IllegalArgumentException();
 
-        this.buffer = new ArrayBlockingQueue<E>(capacity);
+        this.queue = new ArrayBlockingQueue<E>(capacity);
         
         this.iterator = new BlockingIterator();
 
@@ -194,13 +194,13 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     
     public boolean isEmpty() {
 
-        return buffer.isEmpty();
+        return queue.isEmpty();
         
     }
 
     public int size() {
 
-        return buffer.size();
+        return queue.size();
         
     }
 
@@ -255,7 +255,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
 
             try {
 
-                if (buffer.offer(spo, 100, TimeUnit.MILLISECONDS)) {
+                if (queue.offer(spo, 100, TimeUnit.MILLISECONDS)) {
 
                     // item now on the queue.
 
@@ -290,7 +290,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
 
     public void reset() {
         
-        buffer.clear();
+        queue.clear();
         
     }
     
@@ -371,14 +371,22 @@ public class BlockingBuffer<E> implements IBuffer<E> {
                 
             }
 
-            while (BlockingBuffer.this.open || !buffer.isEmpty()) {
+            /*
+             * Note: hasNext must wait until the buffer is closed and all
+             * elements in the queue have been consumed before it can conclude
+             * that there will be nothing more that it can visit. This re-tests
+             * whether or not the buffer is open after a timeout and continues
+             * to loop until the buffer is closed AND there are no more elements
+             * in the queue.
+             */
+            while (BlockingBuffer.this.open || !queue.isEmpty()) {
 
                 /*
                  * Use a set limit on wait and recheck whether or not the
                  * buffer has been closed asynchronously.
                  */
 
-                final E spo = buffer.peek();
+                final E spo = queue.peek();
 
                 if (spo == null) {
                     
@@ -419,7 +427,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
 
             if (log.isInfoEnabled())
                 log.info("Exhausted: bufferOpen=" + BlockingBuffer.this.open
-                        + ", size=" + buffer.size());
+                        + ", size=" + queue.size());
             
             return false;
 
@@ -433,13 +441,13 @@ public class BlockingBuffer<E> implements IBuffer<E> {
 
             }
 
-            assert !buffer.isEmpty();
+            assert !queue.isEmpty();
             
             final E spo;
 
             try {
 
-                spo = buffer.take();
+                spo = queue.take();
                 
             } catch(InterruptedException ex) {
                 
@@ -475,7 +483,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
              * will give the buffer a chance to build up some data and make the
              * chunk-at-a-time processing more efficient.
              */
-            final int chunkSize = buffer.size();
+            final int chunkSize = queue.size();
 
             E[] chunk = null;
 

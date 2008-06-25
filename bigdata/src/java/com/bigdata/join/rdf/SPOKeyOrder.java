@@ -39,7 +39,7 @@ import com.bigdata.join.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class KeyOrder implements IKeyOrder<ISPO>, Serializable {
+public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
     /**
      * 
@@ -56,23 +56,23 @@ public class KeyOrder implements IKeyOrder<ISPO>, Serializable {
     /**
      * The index whose keys are formed with the {s,p,o} ordering of the triple.
      */
-    public static final transient KeyOrder SPO = new KeyOrder(_SPO,"SPO");
+    public static final transient SPOKeyOrder SPO = new SPOKeyOrder(_SPO,"SPO");
 
     /**
      * The index whose keys are formed with the {p,o,s} ordering of the triple.
      */
-    public static final transient KeyOrder POS = new KeyOrder(_POS,"POS");
+    public static final transient SPOKeyOrder POS = new SPOKeyOrder(_POS,"POS");
 
     /**
      * The index whose keys are formed with the {o,s,p} ordering of the triple.
      */
-    public static final transient KeyOrder OSP = new KeyOrder(_OSP,"OSP");
+    public static final transient SPOKeyOrder OSP = new SPOKeyOrder(_OSP,"OSP");
 
     private final int index;
 
     private final String name;
 
-    private KeyOrder(final int index, final String name) {
+    private SPOKeyOrder(final int index, final String name) {
 
         this.index = index;
         
@@ -86,12 +86,12 @@ public class KeyOrder implements IKeyOrder<ISPO>, Serializable {
      * @param index
      *            The index.
      * 
-     * @return The singleton {@link KeyOrder} having that index.
+     * @return The singleton {@link SPOKeyOrder} having that index.
      * 
      * @throws IllegalArgumentException
      *             if the index is not valid.
      */
-    static public KeyOrder valueOf(int index) {
+    static public SPOKeyOrder valueOf(int index) {
         
         switch(index) {
         case _SPO:
@@ -116,7 +116,7 @@ public class KeyOrder implements IKeyOrder<ISPO>, Serializable {
     }
     
     /**
-     * The integer used to represent the {@link KeyOrder} which will be one of
+     * The integer used to represent the {@link SPOKeyOrder} which will be one of
      * the following symbolic constants: {@link #_SPO}, {@link #POS}, or
      * {@link #OSP}.
      */
@@ -150,7 +150,7 @@ public class KeyOrder implements IKeyOrder<ISPO>, Serializable {
      */
     private Object readResolve() throws ObjectStreamException {
 
-        return KeyOrder.valueOf(index);
+        return SPOKeyOrder.valueOf(index);
 
     }
     

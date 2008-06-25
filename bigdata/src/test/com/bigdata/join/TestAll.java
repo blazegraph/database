@@ -24,13 +24,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.join;
 
 
-import com.bigdata.join.rdf.TestKeyOrder;
-import com.bigdata.join.rdf.TestSPOPredicate;
-import com.bigdata.join.rdf.TestTruthMaintenanceRewrites;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.join.rdf.TestKeyOrder;
+import com.bigdata.join.rdf.TestSPOPredicate;
+import com.bigdata.join.rdf.TestTruthMaintenanceRewrites;
 
 /**
  * Aggregates test suites into increasing dependency order.

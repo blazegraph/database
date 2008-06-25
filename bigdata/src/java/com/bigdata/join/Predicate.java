@@ -34,27 +34,75 @@ package com.bigdata.join;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class Predicate<E> implements IPredicate<E> {
+public class Predicate<E> implements IPredicate<E> {
 
     private final int arity;
     
     /** #of unbound variables. */
     private final int nvars;
 
-    private final IRelation<E> relation;
+    private final IRelationName<E> relation;
     
     private final IVariableOrConstant[] values;
     
     private final IPredicateConstraint<E> constraint;
 
     /**
+     * Copy constructor creates a new instance of this class with any unbound
+     * variables overriden by their bindings from the given binding set (if
+     * any).
+     * 
+     * @param src
+     *            The source predicate.
+     * @param bindingSet
+     *            Additional bindings.
+     */
+    protected Predicate(Predicate<E> src, IBindingSet bindingSet) {
+
+        this.arity = src.arity;
+
+        this.relation = src.relation;
+
+        this.values = src.values.clone();
+
+        this.constraint = src.constraint;
+
+        /*
+         * Now override any unbound variables for which we were giving bindings.
+         */
+
+        int nvars = src.nvars;
+        
+        for(int i=0; i<values.length && nvars>0; i++) {
+            
+            if(values[i].isConstant()) continue;
+            
+            final IVariable var = (IVariable) values[i];
+            
+            final IConstant val = bindingSet.get(var);
+            
+            if(val != null) {
+                
+                values[i] = val;
+                
+                nvars--;
+                
+            }
+            
+        }
+
+        this.nvars = nvars;
+        
+    }
+    
+    /**
      * 
      * @param relation
-     *            The relation that would be queried.
+     *            Identifies the relation to be queried.
      * @param values
      *            The values (order is important!).
      */
-    public Predicate(IRelation<E> relation, IVariableOrConstant[] values) {
+    public Predicate(IRelationName<E> relation, IVariableOrConstant[] values) {
         
         this(relation, values, null/* constraint */);
         
@@ -63,13 +111,13 @@ abstract public class Predicate<E> implements IPredicate<E> {
     /**
      * 
      * @param relation
-     *            The relation that would be queried.
+     *            Identifies the relation to be queried.
      * @param values
      *            The values (order is important!).
      * @param constraint
      *            An optional constraint.
      */
-    public Predicate(IRelation<E> relation, IVariableOrConstant[] values,
+    public Predicate(IRelationName<E> relation, IVariableOrConstant[] values,
             IPredicateConstraint<E> constraint) {
 
         if (relation == null)
@@ -86,7 +134,7 @@ abstract public class Predicate<E> implements IPredicate<E> {
 
         for (int i = 0; i < arity; i++) {
 
-            final IVariableOrConstant<E> value = values[i];
+            final IVariableOrConstant value = values[i];
 
             if (value == null)
                 throw new IllegalArgumentException();
@@ -104,15 +152,9 @@ abstract public class Predicate<E> implements IPredicate<E> {
         
     }
     
-    public IRelation<E> getRelation() {
+    public IRelationName<E> getRelation() {
         
         return relation;
-        
-    }
-
-    public IAccessPath<E> getAccessPath() {
-
-        return getRelation().getAccessPath(this);
         
     }
     
@@ -140,7 +182,7 @@ abstract public class Predicate<E> implements IPredicate<E> {
         
     }
 
-    final public boolean isConstant() {
+    final public boolean isFullyBound() {
 
         return false;
         
@@ -183,10 +225,12 @@ abstract public class Predicate<E> implements IPredicate<E> {
     /**
      * Note: easily implemented using {@link #toArray(IBindingSet)}.
      */
-    abstract public Predicate<E> asBound(IBindingSet bindingSet);
+    public Predicate<E> asBound(IBindingSet bindingSet) {
 
-    abstract public void copyValues(E e, IBindingSet bindingSet );
-    
+        return new Predicate<E>(this, bindingSet);
+        
+    }
+
     public String toString() {
         
         return toString(null/* bindingSet */);
@@ -204,7 +248,7 @@ abstract public class Predicate<E> implements IPredicate<E> {
             if (i >= 0)
                 sb.append(", ");
 
-            final IVariableOrConstant<E> v = values[i];
+            final IVariableOrConstant v = values[i];
 
             sb.append(v.isConstant() || bindingSet == null
                     || !bindingSet.isBound((IVariable) v) ? v.toString()

@@ -30,8 +30,6 @@ package com.bigdata.join;
 
 import java.util.Iterator;
 
-import com.bigdata.join.rdf.ISPO;
-
 /**
  * Test suite for {@link Program} and common rule/program re-writes.
  * 
@@ -114,7 +112,7 @@ public class TestProgram extends AbstractRuleTestCase {
         
         final Program program = new Program("p1", false/* parallel */, false/* closure */);
         
-        final IRelation<ISPO> relation = new MockRelation<ISPO>();
+        final IRelationName relation = new MockRelationName();
         
         final IRule rule = new TestRuleRdfs04a(relation);
         

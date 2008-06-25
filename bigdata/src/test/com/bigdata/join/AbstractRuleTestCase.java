@@ -29,7 +29,6 @@ package com.bigdata.join;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.join.rdf.ISPO;
 import com.bigdata.join.rdf.SPOPredicate;
 import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.service.EmbeddedFederation;
@@ -88,7 +87,7 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
     @SuppressWarnings("serial")
     static protected class TestRuleRdfs9 extends Rule {
         
-        public TestRuleRdfs9(IRelation<ISPO> relation) {
+        public TestRuleRdfs9(IRelationName relation) {
             
             super(  "rdfs9",//
                     new SPOPredicate(relation,var("v"), rdfType, var("x")), //
@@ -118,7 +117,7 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
     @SuppressWarnings("serial")
     static protected class TestRuleRdfs04a extends Rule {
 
-        public TestRuleRdfs04a(IRelation<ISPO> relation) {
+        public TestRuleRdfs04a(IRelationName relation) {
 
             super("rdfs4a",//
                     new SPOPredicate(relation,//

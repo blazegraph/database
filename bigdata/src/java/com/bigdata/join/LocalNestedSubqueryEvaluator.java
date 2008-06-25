@@ -120,7 +120,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 //     */
 //    final boolean subqueryElimination = false;
    
-    private final RuleState state;
+    private final RuleState ruleState;
     private final IBuffer<ISolution> buffer;
     private final IBindingSet bindingSet;
     private final RuleStats ruleStats;
@@ -133,11 +133,12 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
         if (buffer == null)
             throw new IllegalArgumentException();
 
-        this.state = ruleState;
+        this.ruleState = ruleState;
 
         this.buffer = buffer;
-        
-        this.bindingSet = ruleState.newBindingSet();
+
+        this.bindingSet = ruleState.getElementBinding().newBindingSet(
+                ruleState.rule);
 
         this.ruleStats = new RuleStats(ruleState);
         
@@ -156,7 +157,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 //            
 //        } else {
             
-            apply1( 0, state );
+            apply1( 0, ruleState );
             
 //        }
         
@@ -258,15 +259,13 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 
                             /*
                              * emit entailment
-                             * 
-                             * FIXME Compute the bindings on the head.
-                             * 
-                             * FIXME make bindingSet and rule optional. The rule
-                             * reference could be safely attached but not
-                             * serialized, but the bindingSet needs to be CLONED
-                             * so keeping that is relatively costly.
                              */
-                            buffer.add(null/*FIXME*/);//new Solution(null/*FIXME e*/,bindingSet,rule));
+
+                            final ISolution solution = state
+                                    .getElementBinding().newSolution(rule,
+                                            bindingSet);
+                            
+                            buffer.add( solution );
                             
                         }
 

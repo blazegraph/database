@@ -1,8 +1,10 @@
 package com.bigdata.join;
 
 /**
- * A factory for fused views reading from both of the source
- * {@link IRelation}s.
+ * A factory for fused views reading from both of the source {@link IRelation}s.
+ * 
+ * FIXME re-factor into an {@link IRelationName} view and the fused view of the
+ * resolved relations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

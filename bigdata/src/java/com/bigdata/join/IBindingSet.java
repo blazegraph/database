@@ -28,6 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.io.Serializable;
+import java.util.Iterator;
+import java.util.Map;
+
 /**
  * Interface for a set of bindings. The set of variables values is extensible
  * and the bound values are loosely typed.
@@ -56,7 +60,7 @@ package com.bigdata.join;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBindingSet {
+public interface IBindingSet extends Cloneable, Serializable {
 
     /**
      * Return <code>true</code> iff the variable is bound.
@@ -115,5 +119,20 @@ public interface IBindingSet {
      * Clear all bindings.
      */
     public void clearAll();
+
+    /**
+     * The #of bound variables.
+     */
+    public int size();
+    
+    /**
+     * Visits the bindings.
+     */
+    public Iterator<Map.Entry<IVariable,IConstant>> iterator();
+    
+    /**
+     * Return a shallow copy of the binding set.
+     */
+    public IBindingSet clone();
     
 }

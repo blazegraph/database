@@ -31,10 +31,9 @@ package com.bigdata.join.rdf;
 import junit.framework.TestCase2;
 
 import com.bigdata.join.Constant;
-import com.bigdata.join.IBindingSet;
-import com.bigdata.join.IRelation;
+import com.bigdata.join.IRelationName;
 import com.bigdata.join.IVariableOrConstant;
-import com.bigdata.join.MockRelation;
+import com.bigdata.join.MockRelationName;
 import com.bigdata.join.Predicate;
 import com.bigdata.join.Var;
 
@@ -59,7 +58,7 @@ public class TestSPOPredicate extends TestCase2 {
         super(name);
     }
     
-    final IRelation<ISPO> relation  = new MockRelation<ISPO>();
+    final IRelationName relation  = new MockRelationName();
 
     final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
             1L);
@@ -152,19 +151,7 @@ public class TestSPOPredicate extends TestCase2 {
         final SPOPredicate p1 = new SPOPredicate(relation, u, rdfType, rdfsClass);
 
         final Predicate p2 = new Predicate(relation, new IVariableOrConstant[] {
-                u, rdfType, rdfsClass }) {
-
-                    @Override
-                    public Predicate asBound(IBindingSet bindingSet) {
-                        // TODO Auto-generated method stub
-                        return null;
-                    }
-
-                    @Override
-                    public void copyValues(Object e, IBindingSet bindingSet) {
-                        // TODO Auto-generated method stub
-                        
-                    }};
+                u, rdfType, rdfsClass });
 
         log.info(p1.toString());
 

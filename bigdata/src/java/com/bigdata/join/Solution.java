@@ -41,31 +41,81 @@ import com.bigdata.btree.ITupleSerializer;
  */
 public class Solution<E> implements ISolution<E> /*, FIXME Serializable*/ {
 
-    // FIXME ctor for just the [e] and for all three.
+    private final E e;
+    private final IRule rule;
+    private final IBindingSet bindingSet;
     
-//    private final E e;
-//    private final IRule r;
-//    private final IBindingSet bindingSet;
-//    
-//    public Solution(E e) {
-//        
-//        this.e = e;
-//        
-//    }
-    
-    public E get() {
-        // TODO Auto-generated method stub
-        return null;
+    /**
+     * ctor variant when only the element was requested.
+     * 
+     * @param e
+     *            The element.
+     * 
+     * @throws IllegalArgumentException
+     *             if any parameter is <code>null</code>.
+     */
+    public Solution(E e) {
+        
+        if (e == null)
+            throw new IllegalArgumentException();
+
+        this.e = e;
+        
+        this.rule = null;
+        
+        this.bindingSet = null;
+        
     }
 
-    public IBindingSet getBindingSet() {
-        // TODO Auto-generated method stub
-        return null;
+    /**
+     * ctor variant when the rule and binding set metadata were requested.
+     * 
+     * @param e
+     *            The element.
+     * @param rule
+     *            The rule.
+     * @param bindingSet
+     *            A <strong>copy</strong> of the binding set that will not be
+     *            modified by further execution of the rule.
+     * 
+     * @throws IllegalArgumentException
+     *             if any parameter is <code>null</code>.
+     */
+    public Solution(E e, IRule rule, IBindingSet bindingSet) {
+        
+        if (e == null)
+            throw new IllegalArgumentException();
+        
+        if (rule == null)
+            throw new IllegalArgumentException();
+        
+        if (bindingSet == null)
+            throw new IllegalArgumentException();
+        
+        this.e = e;
+        
+        this.rule = rule;
+        
+        this.bindingSet = bindingSet;
+        
+    }
+    
+    public E get() {
+        
+        return e;
+        
     }
 
     public IRule getRule() {
-        // TODO Auto-generated method stub
-        return null;
+
+        return rule;
+        
+    }
+
+    public IBindingSet getBindingSet() {
+
+        return bindingSet;
+        
     }
 
 }

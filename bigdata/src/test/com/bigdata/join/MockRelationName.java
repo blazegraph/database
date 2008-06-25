@@ -23,32 +23,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 21, 2008
+ * Created on Jun 23, 2008
  */
 
-package com.bigdata.join.rdf;
+package com.bigdata.join;
 
-import junit.framework.TestCase2;
-
-/**
- * Test suite for {@link SPOKeyOrder}. 
- *
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- */
-public class TestKeyOrder extends TestCase2 {
+public class MockRelationName implements IRelationName {
 
     /**
      * 
      */
-    public TestKeyOrder() {
-    }
+    private static final long serialVersionUID = 1L;
 
-    /**
-     * @param name
-     */
-    public TestKeyOrder(String name) {
-        super(name);
-    }
+    private final String name;
 
+    public MockRelationName() {
+        
+        this("");
+        
+    }
+    
+    public MockRelationName(String name) {
+        
+        this.name = name;
+        
+    }
+    
+    public String toString() {
+        
+        return name;
+        
+    }
+    
 }

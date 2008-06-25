@@ -28,14 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-import com.bigdata.journal.Journal;
-import com.bigdata.service.IBigdataClient;
-
 /**
  * An immutable constraint on the elements visited using an {@link IAccessPath}.
  * The slots in the predicate corresponding to variables are named and those
  * names establish binding patterns access {@link IPredicate}s in the context
- * of a {@link Rule}. Access is provided to slots by ordinal index regardless
+ * of a {@link IRule}. Access is provided to slots by ordinal index regardless
  * of whether or not they are named variables.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -44,24 +41,11 @@ import com.bigdata.service.IBigdataClient;
 public interface IPredicate<E> extends Cloneable {
 
     /**
-     * The {@link IRelation} that is queried by this {@link IPredicate}.
-     * 
-     * FIXME This must be an object that can be passed by value which means that
-     * it can not contain a hard reference to the database, the
-     * {@link IBigdataClient}, a {@link Journal}, etc. Yet, we must be able to
-     * resolve the appropriate database / persistence layer for the
-     * {@link IRelation} to function....
-     */
-    public IRelation<E> getRelation();
-    
-    /**
-     * Return the best {@link IAccessPath} for reading the data selected by this
+     * The name of the {@link IRelation} that is queried by this
      * {@link IPredicate}.
-     * 
-     * @return The best access path.
      */
-    public IAccessPath<E> getAccessPath();
-
+    public IRelationName<E> getRelation();
+    
     /**
      * An optional constraint on the visitable elements.
      */
@@ -71,7 +55,7 @@ public interface IPredicate<E> extends Cloneable {
      * Return true iff all arguments of the predicate are bound (vs
      * variables).
      */
-    public boolean isConstant();
+    public boolean isFullyBound();
     
     /**
      * The #of arguments in the predicate that are variables (vs constants).
@@ -102,22 +86,6 @@ public interface IPredicate<E> extends Cloneable {
     public IPredicate<E> asBound(IBindingSet bindingSet);
 
     /**
-     * Copy values from the visited element into the binding set.
-     * 
-     * @param e
-     *            An element visited for this {@link IPredicate} using some
-     *            {@link IAccessPath}.
-     * @param bindingSet
-     *            A set of bindings.
-     * 
-     * @todo perhaps make [E] extend an interface that defines this method. We
-     *       might pass in the predicate since we only want to copy those
-     *       bindings that are of interest. (In SQL you can select any bindings
-     *       on the relations that participate in the JOIN).
-     */
-    public void copyValues(E e, IBindingSet bindingSet);
-    
-    /**
      * Representation of the predicate without variable bindings.
      */
     public String toString();
@@ -135,6 +103,7 @@ public interface IPredicate<E> extends Cloneable {
      * 
      * @param other
      *            Another predicate.
+     *            
      * @return true iff the predicate have the same arity and their ordered
      *         bindings are the same. when both predicates have a variable at a
      *         given index, the names of the variables must be the same.
