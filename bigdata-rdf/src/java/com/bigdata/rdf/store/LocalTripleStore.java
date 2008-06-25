@@ -720,7 +720,9 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     private class BindingSetIterator implements Iterator<Map<String,Value>> {
 
         private final BigdataStatementIterator src;
-        
+
+        private boolean open = true;
+
         public BindingSetIterator(BigdataStatementIterator src) {
             
             if (src == null)
@@ -734,7 +736,17 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
             try {
 
-                return src.hasNext();
+                final boolean hasNext = src.hasNext();
+                
+                if(!hasNext && open) {
+                    
+                    open = false;
+                    
+                    src.close();
+                    
+                }
+                
+                return hasNext;
                 
             } catch (SailException e) {
                 
