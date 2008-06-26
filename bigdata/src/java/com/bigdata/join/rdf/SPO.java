@@ -118,7 +118,7 @@ public class SPO implements ISPO,Comparable<SPO> {
      * Statement identifier (optional). Statement identifiers are a unique
      * per-triple identifier assigned when a statement is first asserted against
      * the database and are are defined iff
-     * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} was specified.
+     * {@link TestTripleStore.Options#STATEMENT_IDENTIFIERS} was specified.
      * 
      * @throws IllegalStateException
      *             if the statement identifier was not assigned.

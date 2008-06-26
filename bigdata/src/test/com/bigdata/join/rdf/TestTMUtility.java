@@ -33,28 +33,29 @@ import java.util.List;
 import com.bigdata.join.AbstractRuleTestCase;
 import com.bigdata.join.IRelationName;
 import com.bigdata.join.MockRelationName;
-import com.bigdata.join.RelationFusedView;
 import com.bigdata.join.Rule;
 
 /**
- * Test suite for rule rewrites supporting truth maintenance for the RDF DB.
+ * Test suite for rule re-writes supporting truth maintenance for the RDF DB.
+ * This does NOT test the execution of those rules or their role in truth
+ * maintenance.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTruthMaintenanceRewrites extends AbstractRuleTestCase {
+public class TestTMUtility extends AbstractRuleTestCase {
 
     /**
      * 
      */
-    public TestTruthMaintenanceRewrites() {
+    public TestTMUtility() {
 
     }
 
     /**
      * @param name
      */
-    public TestTruthMaintenanceRewrites(String name) {
+    public TestTMUtility(String name) {
 
         super(name);
         

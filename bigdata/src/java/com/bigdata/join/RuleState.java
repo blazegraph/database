@@ -255,7 +255,9 @@ public class RuleState {
      * @todo There should be a way to resolve the bindings against a dictionary.
      *       perhaps for {@link Rule} but definately for {@link RuleState}.
      *       This makes it MUCH easier to figure out what is going on when the
-     *       data are keys in a dictionary, which is the case for the RDF DB.
+     *       data are keys in a dictionary, which is the case for the RDF DB. Of
+     *       course, doing that efficiently is a JOIN :-) but it can be done
+     *       with a cache in front of a point lookup as well.
      */
     public String toString(IBindingSet bindingSet) {
 
@@ -567,34 +569,33 @@ public class RuleState {
      * @param required
      *            When <code>true</code> an exception is reported if the
      *            variable is not used in the rule. Note that specializing a
-     *            rule often results in variables being replaced by
-     *            constants such that an {@link IConstraint} might no longer
-     *            be evaluable for the rule in terms of that variable.
+     *            rule often results in variables being replaced by constants
+     *            such that an {@link IConstraint} might no longer be evaluable
+     *            for the rule in terms of that variable.
      * 
      * @return Its binding. The binding will be <code>null</code> if a
-     *         variable is not currently bound or if the variable is not
-     *         used in the rule and <code>required := false</code>.
+     *         variable is not currently bound or if the variable is not used in
+     *         the rule and <code>required := false</code>.
      * 
      * @throws NullPointerException
      *             if <i>var</i> is <code>null</code>.
      * @throws IllegalArgumentException
-     *             if <code>required := true</code> and the variable is
-     *             not used in the rule.
+     *             if <code>required := true</code> and the variable is not
+     *             used in the rule.
      * @throws IllegalArgumentException
      *             if var is a constant.
      * 
      * @see #set(Var, Object)
      * @see #bind(int, SPO)
      * 
-     * FIXME it is not entirely satisfactory to have variable names
-     * disappear from rules as they are specialized. It might be better to
-     * define a BoundVar (extends Var) whose id was the bound value and
-     * which reported true for both isVariable() and isConstant(). However
-     * this would mean that var(x) != var(x,id) where the latter is bound to
-     * a constant. Yet another alternative is to store a map of the bound
-     * variables on the Rule (not the State) when the rule is specialized
-     * and to use that information when clearing setting, getting, or
-     * clearing bindings in State.
+     * FIXME it is not entirely satisfactory to have variable names disappear
+     * from rules as they are specialized. It might be better to define a
+     * BoundVar (extends Var) whose id was the bound value and which reported
+     * true for both isVariable() and isConstant(). However this would mean that
+     * var(x) != var(x,id) where the latter is bound to a constant. Or if
+     * {@link Var} is rule-local (or rule execution thread local) then it could
+     * define set(Object) and get():Object to access its binding. A rule that
+     * was specialized would then flag bound variables as immutable.
      */
     public Object get(IBindingSet bindings,IVariableOrConstant var, boolean required) {
         
@@ -772,7 +773,7 @@ public class RuleState {
      * 
      * FIXME The side-effect on {@link #accessPath}[] means that this class is
      * NOT thread-safe. A thread-local weak reference to an access path cache
-     * might fix that.
+     * might fix that. However, I am not yet sure if this is a problem.
      */
     public IAccessPath getAccessPath(IBindingSet bindingSet, final int index) {
         

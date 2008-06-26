@@ -109,8 +109,17 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     /**
      * The base name for the index.
      */
-    public String getName() {
+    public String getIndexName() {
 
+        return name;
+        
+    }
+    
+    /**
+     * Return {@link #getIndexName()}'s value.
+     */
+    public String toString() {
+        
         return name;
         
     }

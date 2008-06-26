@@ -40,11 +40,12 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Integration provides a view of a local {@link DataService} as if it were a
- * federation.
+ * federation. The {@link LocalDataServiceFederation} runs its own embedded
+ * {@link TimestampService} and {@link LoadBalancerService} to support its
+ * embedded {@link DataService}.
  * 
  * @see LocalDataServiceClient
  * 
@@ -56,7 +57,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
     private TimestampService timestampService;
     private LoadBalancerService loadBalancerService;
     private DataService dataService;
-    private AbstractHTTPD httpd;
+//    private AbstractHTTPD httpd;
     
     /**
      * 
@@ -150,16 +151,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
         assertOpen();
         
-//        try {
-        
-            return new UUID[]{dataService.getServiceUUID()};
-            
-//        } catch (IOException ex) {
-//            
-//            // Note: Should never be thrown since this is a local method call.
-//            throw new RuntimeException(ex);
-//            
-//        }
+        return new UUID[]{dataService.getServiceUUID()};
         
     }
     
@@ -192,17 +184,8 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         assertOpen();
         
-//        try {
-            
-            return dataService.getServiceUUID();
-            
-//        } catch (IOException ex) {
-//            
-//            // Note: Should never be thrown since this is a local method call.
-//            throw new RuntimeException(ex);
-//            
-//        }
-
+        return dataService.getServiceUUID();
+        
     }
     
     /**
@@ -387,58 +370,99 @@ public class LocalDataServiceFederation extends AbstractFederation {
     }
     
     /**
-     * Extended to shutdown the embedded {@link DataService}.
+     * Extended to shutdown the embedded services.
      */
     synchronized public void shutdown() {
         
         super.shutdown();
         
-        dataService.shutdown();
+        if (dataService != null) {
 
-        dataService = null;
-        
-        loadBalancerService.shutdown();
+            dataService.shutdown();
 
-        loadBalancerService = null;
-        
-        timestampService.shutdown();
+            dataService = null;
 
-        timestampService = null;
-        
-        if (httpd != null)
-            httpd.shutdown();
+        }
+
+        if (loadBalancerService != null) {
+
+            loadBalancerService.shutdown();
+
+            loadBalancerService = null;
+
+        }
+
+        if (timestampService != null) {
+
+            timestampService.shutdown();
+
+            timestampService = null;
+
+        }
+
+//        if (httpd != null) {
+//
+//            httpd.shutdown();
+//         
+//            httpd = null;
+//            
+//        }
         
     }
     
     /**
-     * Extended to shutdown the embedded {@link DataService}.
+     * Extended to shutdown the embedded services.
      */
     synchronized public void shutdownNow() {
 
         super.shutdownNow();
-        
-        dataService.shutdownNow();
 
-        dataService = null;
-        
-        loadBalancerService.shutdownNow();
+        if (dataService != null) {
 
-        loadBalancerService = null;
+            dataService.shutdownNow();
 
-        timestampService.shutdownNow();
+            dataService = null;
 
-        timestampService = null;
-        
-        if (httpd != null)
-            httpd.shutdownNow();
+        }
+
+        if (loadBalancerService != null) {
+
+            loadBalancerService.shutdownNow();
+
+            loadBalancerService = null;
+
+        }
+
+        if (timestampService != null) {
+
+            timestampService.shutdownNow();
+
+            timestampService = null;
+
+        }
+
+//        if (httpd != null) {
+//
+//            httpd.shutdownNow();
+//         
+//            httpd = null;
+//            
+//        }
 
     }
-    
+
+    /**
+     * Destroys the embedded services and disconnects from the federation.
+     */
     public void destroy() {
+
+        assertOpen();
 
         try {
             
             dataService.destroy();
+
+            dataService = null;
             
         } catch (IOException e) {
 
@@ -446,18 +470,29 @@ public class LocalDataServiceFederation extends AbstractFederation {
             
         }
         
-        dataService = null;
+        if (loadBalancerService != null) {
+
+            loadBalancerService.shutdownNow();
+
+            loadBalancerService = null;
+
+        }
+
+        if(timestampService!=null) {
+
+            timestampService.shutdownNow();
         
-        loadBalancerService.shutdownNow();
+            timestampService = null;
+            
+        }
         
-        loadBalancerService = null;
-     
-        timestampService.shutdownNow();
-        
-        timestampService = null;
-        
-        if (httpd != null)
-            httpd.shutdownNow();
+//        if (httpd != null) {
+//
+//            httpd.shutdownNow();
+//         
+//            httpd = null;
+//            
+//        }
      
     }
     

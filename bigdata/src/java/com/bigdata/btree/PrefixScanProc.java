@@ -155,7 +155,7 @@ public class PrefixScanProc extends AbstractKeyArrayIndexProcedure implements
      * <p>
      * Note: In order to recover the terms you have to look them up against the
      * id2term index using
-     * {@link AbstractTripleStore#getTerms(java.util.Collection)}.
+     * {@link TestTripleStore#getTerms(java.util.Collection)}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

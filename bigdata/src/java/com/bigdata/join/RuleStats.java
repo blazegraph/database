@@ -38,11 +38,16 @@ import com.bigdata.service.ILoadBalancerService;
  * Statistics about what the Rule did.
  * 
  * FIXME re-factor this as counters that are reportable by the
- * {@link IDataService} and aggregated by the {@link ILoadBalancerService}.
+ * {@link IDataService} and aggregated by the {@link ILoadBalancerService}?
+ * <p>
  * This will mean that the counters are not directly available on a rule-by-rule
  * evaluation basis, but they can't be if the rules are executed remotely and in
  * parallel (or perhaps they could be if the aggregated statistics were reported
  * back to the master that submitted the rule for execution).
+ * <p>
+ * Maybe the rules can also report their statistics directly (together with the
+ * {@link IChunkedIterator} of the solutions when querying and otherwise by
+ * themselves)?
  * 
  * @todo it would be nice to report the #of new entailments and not just the #of
  *       computed entailments. The {@link SPOAssertionBuffer} knows how many new
@@ -165,7 +170,7 @@ public class RuleStats {
     /**
      * The #of entailments that were actually added to the statement indices
      * (that is to say, the entailments were new to the database). This is
-     * computed using {@link AbstractTripleStore#getBufferCount()} before and
+     * computed using {@link TestTripleStore#getBufferCount()} before and
      * after the rule is applied.
      */
     public int numAdded;

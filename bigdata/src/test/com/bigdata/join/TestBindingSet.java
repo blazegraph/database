@@ -33,6 +33,8 @@ import junit.framework.TestCase2;
 /**
  * FIXME test both {@link HashBindingSet} and {@link ArrayBindingSet}
  * 
+ * @todo especially, test {@link ArrayBindingSet#clear(IVariable)}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

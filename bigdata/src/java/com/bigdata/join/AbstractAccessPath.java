@@ -33,7 +33,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.SuccessorUtil;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -49,20 +48,71 @@ import cutthecrap.utils.striterators.Striterator;
  */
 abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
-    private final IPredicate<R> predicate;
-    private final IKeyOrder<R> keyOrder;
-    private final IIndex ndx;
-    private final int flags;
+    protected final IPredicate<R> predicate;
+    protected final IKeyOrder<R> keyOrder;
+    protected final IIndex ndx;
+    protected final int flags;
 
     /**
      * The filter derived from the {@link IPredicateConstraint}.
      */
     final private ITupleFilter filter;
 
+    /**
+     * Used to detect failure to call {@link #init()}.
+     */
     private boolean didInit = false;
+
     private byte[] fromKey;
+    
     private byte[] toKey;
 
+    /**
+     * The key corresponding to the inclusive lower bound for the
+     * {@link IAccessPath} <code>null</code> if there is no lower bound.
+     * <p>
+     * <strong>This MUST be set by the concrete subclass using
+     * {@link #setFromKey(byte[])} BEFORE calling
+     * {@link AbstractAccessPath#init()} - it MAY be set to a <code>null</code>
+     * value</strong>.
+     */
+    public byte[] getFromKey() {
+
+        return fromKey;
+
+    }
+
+    /**
+     * The key corresponding to the exclusive upper bound for the
+     * {@link IAccessPath} -or- <code>null</code> if there is no upper bound.
+     * <p>
+     * <strong>This MUST be set by the concrete subclass using
+     * {@link #setFromKey(byte[])} BEFORE calling
+     * {@link AbstractAccessPath#init()} - it MAY be set to a <code>null</code>
+     * value.</strong>
+     */
+    public byte[] getToKey() {
+        
+        return toKey;
+        
+    }
+    
+    protected void setFromKey(byte[] fromKey) {
+        
+        assertNotInitialized();
+        
+        this.fromKey = fromKey;
+        
+    }
+    
+    protected void setToKey(byte[] toKey) {
+        
+        assertNotInitialized();
+        
+        this.toKey = toKey;
+        
+    }
+    
     public IKeyOrder<R> getKeyOrder() {
         
         return keyOrder;
@@ -147,19 +197,46 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     }
 
     /**
-     * Required post-ctor initialization.
+     * @throws IllegalStateException
+     *             unless {@link #init()} has been invoked.
      */
-    protected void init() {
+    final private void assertNotInitialized() {
+
+        if (didInit)
+            throw new IllegalStateException();
         
-        this.fromKey = getFromKey();
+    }
+    
+    /**
+     * @throws IllegalStateException
+     *             unless {@link #init()} has been invoked.
+     */
+    final protected void assertInitialized() {
 
-        this.toKey = getToKey();
+        if (!didInit)
+            throw new IllegalStateException();
+        
+    }
+    
+    /**
+     * Required post-ctor initialization.
+     * 
+     * @return <i>this</i>
+     */
+    public AbstractAccessPath<R> init() {
+        
+        if (didInit)
+            throw new IllegalStateException();
 
+        didInit = true;
+        
+        return this;
+        
     }
     
     public IPredicate<R> getPredicate() {
         
-        assertInitialized();
+//        assertInitialized();
         
         return predicate;
         
@@ -208,66 +285,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             
     }
 
-    /**
-     * @throws IllegalStateException
-     *             unless {@link #init()} has been invoked.
-     */
-    final protected void assertInitialized() {
-
-        if (!didInit)
-            throw new IllegalStateException();
-        
-    }
-    
-    /**
-     * Return the key corresponding to the inclusive lower bound for the
-     * {@link IAccessPath}.
-     * 
-     * @return The inclusive lower bound -or- <code>null</code> if there is no
-     *         lower bound.
-     * 
-     * @todo does this work as a default impl? if so then improve the javadoc.
-     */
-    protected byte[] getFromKey() {
-
-        if (fromKey == null) {
-
-            fromKey = ndx.getIndexMetadata().getTupleSerializer().serializeKey(
-                    predicate);
-
-        }
-
-        return fromKey;
-        
-    }
-    
-    /**
-     * Return the key corresponding to the exclusive upper bound for the
-     * {@link IAccessPath}.
-     * 
-     * @return The exclusive upper bound -or- <code>null</code> if there is no
-     *         upper bound.
-     * 
-     * @todo does this work as a default impl? if so then improve the javadoc.
-     */
-    protected byte[] getToKey() {
-
-        final byte[] fromKey = getFromKey();
-        
-        if (fromKey == null)
-            
-            toKey = null;
-        
-        else {
-        
-            toKey = SuccessorUtil.successor(fromKey);
-            
-        }
-
-        return toKey;
-
-    }
-    
     public long rangeCount() {
 
         assertInitialized();

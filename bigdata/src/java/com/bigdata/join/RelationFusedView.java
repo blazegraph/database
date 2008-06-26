@@ -2,10 +2,7 @@ package com.bigdata.join;
 
 /**
  * A factory for fused views reading from both of the source {@link IRelation}s.
- * 
- * FIXME re-factor into an {@link IRelationName} view and the fused view of the
- * resolved relations.
- * 
+ *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <E>
@@ -49,15 +46,12 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
     
-    /**
-     * @todo it may be necessary to override predicate#getrelation() in
-     *       order to have the predicate directed to each of the source
-     *       relations specify that relation in its getRelation() method.
-     */
     public IAccessPath<E> getAccessPath(IPredicate<E> predicate) {
 
-        return new AccessPathFusedView<E>(relation1.getAccessPath(predicate), relation2
-                .getAccessPath(predicate));
+        return new AccessPathFusedView<E>(//
+                relation1.getAccessPath(predicate),//
+                relation2.getAccessPath(predicate)//
+        );
         
     }
 

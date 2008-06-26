@@ -43,10 +43,6 @@ import org.apache.log4j.Logger;
  * so that needs to be a program control parameter in addition to sequential vs
  * parallel execution).
  * 
- * FIXME Make sure that there is an option to run a {@link Program} without
- * including the {@link IRule} and {@link IBindingSet} in the solution for
- * efficient IO on scale-out runs.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

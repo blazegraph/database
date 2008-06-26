@@ -26,28 +26,119 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 19, 2008
  */
 
-package com.bigdata.join;
+package com.bigdata.join.rdf;
 
+import java.io.File;
+import java.util.Properties;
+
+import com.bigdata.join.AbstractRuleTestCase;
+import com.bigdata.join.IRelationName;
+import com.bigdata.join.IRule;
+import com.bigdata.join.MockRelationName;
+import com.bigdata.join.RuleState;
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.LocalDataServiceClient;
+import com.bigdata.service.LocalDataServiceClient.Options;
 
 /**
+ * Test ability to insert, update, or remove elements from a relation and the
+ * ability to select the right access path given a predicate for that relation
+ * and query for those elements (we have to test all this stuff together since
+ * testing query requires us to have some data in the relation).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAccessPathFactory extends AbstractRuleTestCase {
+public class TestSPORelation extends AbstractRuleTestCase {
 
     /**
      * 
      */
-    public TestAccessPathFactory() {
+    public TestSPORelation() {
     }
 
     /**
      * @param name
      */
-    public TestAccessPathFactory(String name) {
-        super(name);
-    }
+    public TestSPORelation(String name) {
         
+        super(name);
+        
+    }
+
+    File dataDir;
+    IBigdataClient client;
+    TestTripleStore kb;
+
+    protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        Properties properties = new Properties(getProperties());
+
+        dataDir = File.createTempFile(getName(), ".tmp");
+        
+        dataDir.delete();
+        
+        dataDir.mkdirs();
+        
+        properties.setProperty(Options.DATA_DIR, dataDir.toString());
+        
+        // use a temporary store.
+//        properties.setProperty(Options.BUFFER_MODE,BufferMode.Temporary.toString());
+
+        client = new LocalDataServiceClient(properties);
+        
+        client.connect();
+
+        kb = new TestTripleStore(client, "test", ITx.UNISOLATED);
+
+        kb.create();
+        
+    }
+
+    protected void tearDown() throws Exception {
+
+        client.getFederation().destroy();
+        
+        client.disconnect(true/*immediateShutdown*/);
+        
+        super.tearDown();
+        
+    }
+
+    /**
+     * Basic test of the ability insert data into a relation and pull back that
+     * data using an unbound query. The use of an unbound query lets the
+     * relation select whatever index it pleases and should normally select the
+     * "clustered" index for that relation.
+     */
+    public void test_insertQuery() {
+        
+    }
+    
+    /**
+     * FIXME {@link RuleState} has become an evaluation order and some access
+     * path caching. In order to test this class we need to have either a mock
+     * access path or some real data.
+     */
+    public void test_ruleState() {
+
+        final IRelationName relationName = new MockRelationName();
+        
+//        final IRelation<ISPO> relation = new SPORelation( );
+        
+        final IRule r = new TestRuleRdfs9(relationName);
+
+        final RuleState state = new RuleState(r, new SPOJoinNexus(
+                false/* elementOnly */, new SPORelationLocator(kb)));
+        
+        fail("write test");
+
+    }
+    
 //        /**
 //         * Test the ability to obtain the access path given the {@link Pred}.
 //         */
