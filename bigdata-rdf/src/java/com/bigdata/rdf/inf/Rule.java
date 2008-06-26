@@ -1226,7 +1226,7 @@ abstract public class Rule {
                          * pattern.
                          */
                         
-                        if(minRangeCount == Integer.MAX_VALUE) {
+                        if(minRangeCount == Long.MAX_VALUE) {
                             
                             // range count of the current best choice (computed lazily).
                             minRangeCount = getAccessPath(index,false/*asBound*/).rangeCount();
