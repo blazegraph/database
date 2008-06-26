@@ -27,6 +27,7 @@ import java.util.Arrays;
 
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.join.IConstant;
 
 /**
  * Represents a triple.
@@ -34,7 +35,7 @@ import com.bigdata.io.ByteArrayBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPO implements ISPO,Comparable<SPO> {
+public class SPO implements ISPO, Comparable<SPO> {
     
     //@todo update reference when refactoring back into rdf module.
     private transient static final long NULL = 0L;//IRawTripleStore.NULL;
@@ -154,6 +155,11 @@ public class SPO implements ISPO,Comparable<SPO> {
 
     /**
      * Construct a statement whose type is NOT known.
+     * <p>
+     * Note: This is primarily used when you want to discover the
+     * type of the statement.
+     * 
+     * @see AbstractTripleStore#bulkCompleteStatements(ISPOIterator)
      */
     public SPO(long s, long p, long o) {
         
@@ -162,6 +168,21 @@ public class SPO implements ISPO,Comparable<SPO> {
         this.o = o;
         this.type = null;
         
+    }
+
+    /**
+     * Variant to create an {@link SPO} from constants (used by the unit tests).
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param type
+     */
+    SPO(IConstant<Long> s, IConstant<Long> p, IConstant<Long> o,
+            StatementEnum type) {
+
+        this(s.get(), p.get(), o.get(), type);
+
     }
     
     /**

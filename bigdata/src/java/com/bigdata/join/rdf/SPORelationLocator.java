@@ -45,7 +45,7 @@ import com.bigdata.join.RelationFusedView;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPORelationLocator implements IRelationLocator<ISPO> {
+public class SPORelationLocator implements IRelationLocator<SPO> {
 
     private final SPORelation database;
     
@@ -74,11 +74,11 @@ public class SPORelationLocator implements IRelationLocator<ISPO> {
      *       view then it returns a [database+focusStore] view. Otherwise it
      *       returns the [database].
      */
-    public IRelation<ISPO> getRelation(IRelationName<ISPO> relationName) {
+    public IRelation<SPO> getRelation(IRelationName<SPO> relationName) {
 
         if (relationName instanceof SPORelationView) {
 
-            return new RelationFusedView<ISPO>(database,focusStore);
+            return new RelationFusedView<SPO>(database,focusStore);
             
         } else {
 

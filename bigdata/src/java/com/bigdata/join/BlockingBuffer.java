@@ -234,41 +234,41 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     /**
      * Adds the elements to the buffer.
      */
-    public boolean add(E spo) {
+    public boolean add(E e) {
 
         assertOpen();
 
-        if (!isValid(spo)) {
+        if (!isValid(e)) {
 
             if (log.isInfoEnabled())
-                log.info("reject: " + spo.toString());
+                log.info("reject: " + e.toString());
 
             return false;
 
         }
 
         if (log.isInfoEnabled())
-            log.info("add: " + spo.toString());
+            log.info("add: " + e.toString());
 
         // wait if the queue is full.
         while (true) {
 
             try {
 
-                if (queue.offer(spo, 100, TimeUnit.MILLISECONDS)) {
+                if (queue.offer(e, 100, TimeUnit.MILLISECONDS)) {
 
                     // item now on the queue.
 
                     if (log.isInfoEnabled())
-                        log.info("added: " + spo.toString());
+                        log.info("added: " + e.toString());
                     
                     return true;
                     
                 }
                 
-            } catch (InterruptedException e) {
+            } catch (InterruptedException ex) {
                 
-                throw new RuntimeException(e);
+                throw new RuntimeException(ex);
                 
             }
             

@@ -62,7 +62,7 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     /**
      * Always returns ZERO(0).
      */
-    public long rangeCount() {
+    public long rangeCount(boolean exact) {
 
         return 0;
 

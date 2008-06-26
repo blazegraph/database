@@ -486,7 +486,7 @@ abstract public class LoadBalancerService extends AbstractService
     /**
      * The optional httpd service.
      */
-    private final AbstractHTTPD httpd;
+    private AbstractHTTPD httpd;
 
     /**
      * The delay between writes of the {@link CounterSet} on a log file.
@@ -703,8 +703,13 @@ abstract public class LoadBalancerService extends AbstractService
         
         updateService.shutdown();
         
-        if (httpd != null)
+        if (httpd != null) {
+            
             httpd.shutdown();
+         
+            httpd = null;
+            
+        }
 
         // log the final state of the counters.
         logCounters("final");
@@ -721,8 +726,13 @@ abstract public class LoadBalancerService extends AbstractService
         
         updateService.shutdownNow();
         
-        if (httpd != null)
+        if (httpd != null) {
+
             httpd.shutdownNow();
+         
+            httpd = null;
+            
+        }
 
         // log the final state of the counters.
         logCounters("final");

@@ -137,7 +137,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
 
         this.buffer = buffer;
 
-        this.bindingSet = ruleState.getElementBinding().newBindingSet(
+        this.bindingSet = ruleState.getJoinNexus().newBindingSet(
                 ruleState.rule);
 
         this.ruleStats = new RuleStats(ruleState);
@@ -195,8 +195,8 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
         /*
          * Subquery iterator.
          */
-        final IChunkedOrderedIterator itr = state.iterator(bindingSet,
-                state.order[index]);
+        final IChunkedOrderedIterator itr = state.iterator(state.order[index],
+                bindingSet);
         
         try {
 
@@ -262,7 +262,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                              */
 
                             final ISolution solution = state
-                                    .getElementBinding().newSolution(rule,
+                                    .getJoinNexus().newSolution(rule,
                                             bindingSet);
                             
                             buffer.add( solution );

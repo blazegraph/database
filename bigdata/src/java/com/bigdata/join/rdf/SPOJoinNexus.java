@@ -30,8 +30,10 @@ package com.bigdata.join.rdf;
 
 import com.bigdata.join.ArrayBindingSet;
 import com.bigdata.join.Constant;
+import com.bigdata.join.DefaultEvaluationPlan;
 import com.bigdata.join.IBindingSet;
 import com.bigdata.join.IConstant;
+import com.bigdata.join.IEvaluationPlan;
 import com.bigdata.join.IJoinNexus;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.IRelationLocator;
@@ -49,7 +51,7 @@ public class SPOJoinNexus implements IJoinNexus {
 
     private final boolean elementOnly;
     
-    private final IRelationLocator<ISPO> relationLocator;
+    private final IRelationLocator<SPO> relationLocator;
     
     public final boolean isElementOnly() {
         
@@ -62,7 +64,7 @@ public class SPOJoinNexus implements IJoinNexus {
      * @param elementOnly
      */
     public SPOJoinNexus(boolean elementOnly,
-            IRelationLocator<ISPO> relationLocator) {
+            IRelationLocator<SPO> relationLocator) {
 
         if (relationLocator == null)
             throw new IllegalArgumentException();
@@ -183,6 +185,12 @@ public class SPOJoinNexus implements IJoinNexus {
     public IRelationLocator getRelationLocator() {
         
         return relationLocator;
+        
+    }
+
+    public IEvaluationPlan newEvaluationPlan(IRule rule) {
+        
+        return new DefaultEvaluationPlan(this, rule);
         
     }
     

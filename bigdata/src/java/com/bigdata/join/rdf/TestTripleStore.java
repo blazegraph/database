@@ -1,11 +1,13 @@
 package com.bigdata.join.rdf;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.join.IChunkedOrderedIterator;
 import com.bigdata.service.IBigdataClient;
 
 /** FIXME integrate with RDF module. */
@@ -48,17 +50,41 @@ public class TestTripleStore {
 
     /**
      * Return the fully qualified index name.
-     * @param name The basename of the index.
+     * 
+     * @param name
+     *            The basename of the index.
+     *            
      * @return The actual index name.
      */
     protected String getFQN(String name) {
+
+        return namespace + name;
         
-        return namespace + "." + name;
+    }
+
+    /**
+     * The namespace for the indices used by this instance.
+     */
+    public String getNamespace() {
+        
+        return namespace;
+        
+    }
+    
+    /**
+     * Return the client's thread pool. This is used for running iterators,
+     * index writes, and rules in parallel.
+     */
+    public ExecutorService getThreadPool() {
+        
+        return client.getFederation().getThreadPool();
         
     }
     
     /**
      * Return the statement index for the given {@link SPOKeyOrder}.
+     * 
+     * @todo move to {@link SPORelation}?
      */
     public IIndex getStatementIndex(SPOKeyOrder keyOrder) {
         
@@ -66,6 +92,19 @@ public class TestTripleStore {
 
     }
 
+    synchronized public SPORelation getSPORelation() {
+    
+        if (spoRelation == null) {
+
+            spoRelation = new SPORelation(this);
+
+        }
+
+        return spoRelation;
+
+    }
+    private SPORelation spoRelation;
+    
     protected IndexMetadata newStatementIndexMetadata(SPOKeyOrder keyOrder) {
         
         IndexMetadata md = new IndexMetadata(getFQN(keyOrder.getIndexName()),
@@ -100,6 +139,38 @@ public class TestTripleStore {
 
         client.getFederation()
                 .dropIndex(getFQN(SPOKeyOrder.OSP.getIndexName()));
+
+    }
+
+    public StringBuilder dump() {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        // dump the SPO relation.
+        {
+        
+            final IChunkedOrderedIterator<SPO> itr = getSPORelation()
+                    .getAccessPath(0L, 0L, 0L).iterator();
+
+            try {
+
+                while (itr.hasNext()) {
+
+                    sb.append(itr.next());
+
+                    sb.append("\n");
+
+                }
+                
+            } finally {
+
+                itr.close();
+
+            }
+
+        }
+
+        return sb;
 
     }
 

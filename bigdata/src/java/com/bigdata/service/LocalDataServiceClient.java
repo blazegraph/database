@@ -136,7 +136,7 @@ public class LocalDataServiceClient extends AbstractClient {
 
     }
 
-    synchronized public IBigdataFederation connect() {
+    synchronized public LocalDataServiceFederation connect() {
 
         if (fed == null) {
 

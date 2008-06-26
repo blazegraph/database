@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-
 /**
  * A thread-safe buffer backed by a fixed capacity array. Concrete
  * implementations must empty the buffer in {@link #flush(int, Object[])}.

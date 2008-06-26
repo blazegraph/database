@@ -32,6 +32,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.log4j.Logger;
+
 /**
  * An {@link IBindingSet} backed by an dense array (no gaps). This
  * implementation is more efficient for fixed or small N (N LTE ~20). It simples
@@ -47,6 +49,8 @@ import java.util.Map.Entry;
 public class ArrayBindingSet implements IBindingSet {
 
     private static final long serialVersionUID = -6468905602211956490L;
+    
+    protected static final Logger log = Logger.getLogger(ArrayBindingSet.class);
     
     private final IVariable[] vars;
     private final IConstant[] vals;
@@ -285,11 +289,19 @@ public class ArrayBindingSet implements IBindingSet {
         if (val == null)
             throw new IllegalArgumentException();
 
+        if(log.isDebugEnabled()) {
+            
+            log.debug("var=" + var + ", val=" + val + ", nbound=" + nbound);
+            
+        }
+        
         for (int i = 0; i < nbound; i++) {
 
             if (vars[i] == var) {
         
                 vals[i] = val;
+        
+                return;
                 
             }
             
@@ -307,7 +319,7 @@ public class ArrayBindingSet implements IBindingSet {
         
         StringBuilder sb = new StringBuilder();
         
-        sb.append("{ ");
+        sb.append("{");
 
         for(int i=0; i<nbound; i++) {
             
@@ -321,7 +333,7 @@ public class ArrayBindingSet implements IBindingSet {
             
         }
         
-        sb.append(" }");
+        sb.append("}");
         
         return sb.toString();
         

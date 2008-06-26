@@ -30,6 +30,7 @@ package com.bigdata.join;
 
 import javax.swing.SpringLayout.Constraints;
 
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 
 /**
@@ -64,26 +65,22 @@ public interface IAccessPath<R> extends Iterable<R> {
     public boolean isEmpty();
     
     /**
-     * The maximum #of elements that could be returned for the
-     * {@link IPredicate}.
-     * <p>
-     * Note: This is an upper bound since scale-out indices use delete markers
-     * and therefore will report entries that have been deleted but not yet
-     * purged from the index in the range count. If the index does not support
-     * delete markers then this will be an exact count.
+     * Return the maximum #of elements spanned by the {@link IPredicate}.
      * 
-     * @todo add boolean parameter for exact range counts? Note that these can
-     *       be quite expensive since you must do a full key-range scan when the
-     *       index supports delete markers.
+     * @param exact
+     *            When <code>true</code>, the result will be an exact count
+     *            and may require a key-range scan. When <code>false</code>,
+     *            the result will be an upper bound IFF delete markers are
+     *            provisioned for the backing index (delete markers are required
+     *            for transactions and for scale-out indices).
+     * 
+     * @see IRangeQuery
      */
-    public long rangeCount();
+    public long rangeCount(boolean exact);
 
     /**
      * The raw iterator for traversing the selected index within the key range
      * implied by {@link IPredicate}.
-     * 
-     * @todo for scale-out version, the optional {@link ISPOFilter} should be
-     *       sent to the data service.
      */
     public ITupleIterator<R> rangeIterator();
     
@@ -107,8 +104,8 @@ public interface IAccessPath<R> extends Iterable<R> {
      * selected for the {@link IPredicate}.
      * 
      * @param limit
-     *            The maximum #of {@link SPO}s that will be visited -or- ZERO
-     *            (0) if there is no limit.
+     *            The maximum #of elements that will be visited -or- ZERO (0) if
+     *            there is no limit.
      * 
      * @param capacity
      *            The maximum capacity for the buffer used by the iterator. When

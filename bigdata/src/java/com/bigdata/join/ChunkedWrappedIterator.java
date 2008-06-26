@@ -192,7 +192,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
 
-    public IKeyOrder getKeyOrder() {
+    public IKeyOrder<E> getKeyOrder() {
 
         return keyOrder;
         
