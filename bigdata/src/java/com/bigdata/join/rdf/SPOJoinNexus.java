@@ -44,6 +44,7 @@ import com.bigdata.join.RuleState;
 import com.bigdata.join.Solution;
 
 /**
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -156,17 +157,17 @@ public class SPOJoinNexus implements IJoinNexus {
         
     }
 
-    public ISolution<ISPO> newSolution(IRule rule, IBindingSet bindingSet) {
+    public ISolution<SPO> newSolution(IRule rule, IBindingSet bindingSet) {
 
         final SPO spo = newElement(rule.getHead(), bindingSet);
 
         if (elementOnly) {
 
-            return new Solution<ISPO>(spo);
+            return new Solution<SPO>(spo);
 
         }
 
-        return new Solution<ISPO>(spo, rule, bindingSet);
+        return new Solution<SPO>(spo, rule, bindingSet.clone());
 
     }
 

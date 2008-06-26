@@ -38,6 +38,10 @@ import java.util.Set;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo support joins across RDF and non-RDF data. This will require some
+ *       relaxing of assumptions concerning the type of relations in the RDF
+ *       rule execution.
  */
 public interface IRule extends IProgram {
 

@@ -168,4 +168,34 @@ public class HashBindingSet implements IBindingSet {
         
     }
     
+    public boolean equals(IBindingSet o) {
+        
+        if (o == this)
+            return true;
+        
+        if (size() != o.size())
+            return false;
+        
+        final Iterator<Map.Entry<IVariable,IConstant>> itr = map.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+
+            final Map.Entry<IVariable,IConstant> entry = itr.next();
+            
+            final IVariable var = entry.getKey();
+            
+            final IConstant val = entry.getValue();
+            
+//            if (!o.isBound(vars[i]))
+//                return false;
+
+            if (!val.equals(o.get(var)))
+                return false;
+            
+        }
+        
+        return true;
+        
+    }
+
 }

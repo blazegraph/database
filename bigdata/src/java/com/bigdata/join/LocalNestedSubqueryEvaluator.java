@@ -226,9 +226,9 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                          * JOIN).
                          */
 
-                        state.clearDownstreamBindings(bindingSet, index + 1);
+                        state.clearDownstreamBindings(index + 1,bindingSet);
                         
-                        if (state.bind(bindingSet, state.order[index], e)) {
+                        if (state.bind(state.order[index], e, bindingSet)) {
 
                             // run the subquery.
                             
@@ -255,7 +255,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                         ruleStats.nstmts[state.order[index]]++;
 
                         // bind variables from the current element.
-                        if (state.bind(bindingSet, state.order[index], e)) {
+                        if (state.bind(state.order[index], e, bindingSet)) {
 
                             /*
                              * emit entailment

@@ -344,5 +344,27 @@ public class ArrayBindingSet implements IBindingSet {
         return new ArrayBindingSet(this);
         
     }
-    
+
+    public boolean equals(IBindingSet o) {
+        
+        if (o == this)
+            return true;
+        
+        if (nbound != o.size())
+            return false;
+        
+        for(int i=0; i<nbound; i++) {
+            
+//            if (!o.isBound(vars[i]))
+//                return false;
+
+            if (!vals[i].equals(o.get(vars[i])))
+                return false;
+            
+        }
+        
+        return true;
+        
+    }
+
 }

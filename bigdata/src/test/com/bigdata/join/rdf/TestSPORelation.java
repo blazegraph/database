@@ -43,6 +43,7 @@ import com.bigdata.join.IJoinNexus;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.IRelationName;
 import com.bigdata.join.IRule;
+import com.bigdata.join.ISolution;
 import com.bigdata.join.Rule;
 import com.bigdata.join.RuleState;
 import com.bigdata.join.Var;
@@ -265,7 +266,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
         // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
         final Rule rule = new TestRuleRdfs9(relationName);
 
-        final IJoinNexus joinNexus = new SPOJoinNexus(false/* elementOnly */,
+        final SPOJoinNexus joinNexus = new SPOJoinNexus(false/* elementOnly */,
                 new SPORelationLocator(kb));
 
         /*
@@ -379,45 +380,49 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
         }
 
-//        /*
-//         * bind variables for (u rdf:subClassOf x) to known values from the
-//         * statement in the database that matches the predicate.
-//         */
-//
-//        assertNotSame(NULL, store.getTermId(U1));
-//        ruleState.set(Rule.var("u"), store.getTermId(U1));
-//
-//        assertNotSame(NULL, store.getTermId(X1));
-//        ruleState.set(Rule.var("x"), store.getTermId(X1));
-//
-//        assertTrue(ruleState.isFullyBound(0));
-//
-//        // (v rdf:type u)
-//        assertEquals(1, ruleState.getMostSelectiveAccessPathByRangeCount());
-//
-//        // bind the last variable.
-//        assertNotSame(NULL, store.getTermId(V1));
-//        ruleState.set(Rule.var("v"), store.getTermId(V1));
-//
-//        assertTrue(ruleState.isFullyBound(1));
-//
-//        // verify no access path is recommended since the rule is fully bound.
-//        assertEquals(-1, ruleState.getMostSelectiveAccessPathByRangeCount());
-//
-//        // emit the entailment
-//        ruleState.emit();
-//
-//        assertEquals(1, ruleState.buffer.size());
-//        assertEquals(justify ? 1 : 0, ruleState.buffer.getJustificationCount());
-//
-//        // verify bindings on the emitted entailment.
-//        SPO entailment = ruleState.buffer.get(0);
-//        assertEquals(entailment.s, store.getTermId(V1));
-//        assertEquals(entailment.p, store.getTermId(URIImpl.RDF_TYPE));
-//        assertEquals(entailment.o, store.getTermId(X1));
-//
-//        // @todo verify the full bindings, not just the entailed SPOs.
+        /*
+         * Incrementally binding the variables in the rule.
+         * 
+         * First bind variables for (u rdf:subClassOf x) to known values from
+         * the statement in the database that matches the predicate.
+         */
+        {
+            
+            final IBindingSet bindings = joinNexus.newBindingSet(rule);
 
+            final RuleState ruleState = new RuleState(rule, joinNexus);
+
+            ruleState.set(Var.var("u"), U1, bindings);
+
+            ruleState.set(Var.var("x"), X1, bindings);
+
+            assertTrue(rule.isFullyBound(0, bindings));
+
+            /*
+             * Now bind the last variable.
+             */
+            ruleState.set(Var.var("v"), V1, bindings);
+
+            assertTrue(rule.isFullyBound(1, bindings));
+
+            // emit the entailment
+            final ISolution<SPO> solution = joinNexus.newSolution(rule, bindings);
+
+            // verify the entailed statement.
+            assertEquals(V1.get().longValue(), solution.get().s);
+            assertEquals(rdfType.get().longValue(), solution.get().p);
+            assertEquals(X1.get().longValue(), solution.get().o);
+
+            // verify rule is reported.
+            assertTrue(rule == solution.getRule());
+            
+            // verify correct bindings are reported.
+            assertTrue(bindings.equals(solution.getBindingSet()));
+            
+            // verify that a copy was made of the bindings.
+            assertTrue(bindings!=solution.getBindingSet());
+        }
+        
     }
     
 }
