@@ -48,12 +48,12 @@ Modifications:
 package com.bigdata.rdf.store;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -355,9 +355,11 @@ public class AccessPath implements IAccessPath {
      */
     public String toString() {
         
-        return super.toString() + ": " + keyOrder + ", {" + s + "," + p
-                + "," + o + "}, fromKey=" + (fromKey==null?"n/a":Arrays.toString(fromKey))
-                + ", toKey=" + (toKey==null?"n/a":Arrays.toString(toKey));
+        return super.toString() + ": " + keyOrder + ", {" + s + "," + p + ","
+                + o + "}, fromKey="
+                + (fromKey == null ? "n/a" : BytesUtil.toString(fromKey))
+                + ", toKey="
+                + (toKey == null ? "n/a" : BytesUtil.toString(toKey));
         
     }
     

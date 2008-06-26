@@ -149,6 +149,11 @@ public class SPO implements Comparable {
 
     /**
      * Construct a statement whose type is NOT known.
+     * <p>
+     * Note: This is primarily used when you want to discover the
+     * type of the statement.
+     * 
+     * @see AbstractTripleStore#bulkCompleteStatements(ISPOIterator)
      */
     public SPO(long s, long p, long o) {
         
