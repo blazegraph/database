@@ -75,8 +75,8 @@ public class Solution<E> implements ISolution<E> /*, FIXME Serializable*/ {
      * @param rule
      *            The rule.
      * @param bindingSet
-     *            A <strong>copy</strong> of the binding set that will not be
-     *            modified by further execution of the rule.
+     *            This MUST be a <strong>copy</strong> of the binding set that
+     *            will NOT be modified by further execution of the rule.
      * 
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.

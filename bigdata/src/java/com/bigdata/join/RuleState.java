@@ -278,92 +278,83 @@ public class RuleState {
 
     }
     
-    /**
-     * <p>
-     * Return the current binding for the variable or constant.
-     * </p>
-     * 
-     * @param var
-     *            The variable or constant.
-     * 
-     * @return Its binding. The binding will be <code>null</code> if a
-     *         variable is not currently bound.
-     * 
-     * @throws NullPointerException
-     *             if <i>var</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if the variable is not used in the rule.
-     * @throws IllegalArgumentException
-     *             if var is a constant.
-     * 
-     * @see #set(Var, Object)
-     * @see #bind(int, SPO)
-     */
-    public Object get(IBindingSet bindings,IVariableOrConstant var) {
-    
-        return get(bindings,var, true);
-        
-    }
-    
-    /**
-     * <p>
-     * Return the current binding for the variable or constant.
-     * </p>
-     * 
-     * @param var
-     *            The variable or constant.
-     * @param required
-     *            When <code>true</code> an exception is reported if the
-     *            variable is not used in the rule. Note that specializing a
-     *            rule often results in variables being replaced by constants
-     *            such that an {@link IConstraint} might no longer be evaluable
-     *            for the rule in terms of that variable.
-     * 
-     * @return Its binding. The binding will be <code>null</code> if a
-     *         variable is not currently bound or if the variable is not used in
-     *         the rule and <code>required := false</code>.
-     * 
-     * @throws NullPointerException
-     *             if <i>var</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if <code>required := true</code> and the variable is not
-     *             used in the rule.
-     * @throws IllegalArgumentException
-     *             if var is a constant.
-     * 
-     * @see #set(Var, Object)
-     * @see #bind(int, SPO)
-     * 
-     * FIXME it is not entirely satisfactory to have variable names disappear
-     * from rules as they are specialized. It might be better to define a
-     * BoundVar (extends Var) whose id was the bound value and which reported
-     * true for both isVariable() and isConstant(). However this would mean that
-     * var(x) != var(x,id) where the latter is bound to a constant. Or if
-     * {@link Var} is rule-local (or rule execution thread local) then it could
-     * define set(Object) and get():Object to access its binding. A rule that
-     * was specialized would then flag bound variables as immutable.
-     */
-    public Object get(IBindingSet bindings,IVariableOrConstant var, boolean required) {
-        
-//        if (var == null)
-//            throw new NullPointerException();
-
-        if (var.isConstant()) {
-
-            return var.get();
-            
-        }
-
-        if (required && !rule.isDeclared((IVariable)var)) {
-
-            throw new IllegalArgumentException("Not declared: " + var + " by "
-                    + rule);
-            
-        }
-        
-        return bindings.get((IVariable) var);
-                
-    }
+//    /**
+//     * <p>
+//     * Return the current binding for the variable or constant.
+//     * </p>
+//     * 
+//     * @param var
+//     *            The variable or constant.
+//     * 
+//     * @return Its binding. The binding will be <code>null</code> if a
+//     *         variable is not currently bound.
+//     * 
+//     * @throws NullPointerException
+//     *             if <i>var</i> is <code>null</code>.
+//     * @throws IllegalArgumentException
+//     *             if the variable is not used in the rule.
+//     * @throws IllegalArgumentException
+//     *             if var is a constant.
+//     * 
+//     * @see #set(Var, Object)
+//     * @see #bind(int, SPO)
+//     */
+//    public Object get(IBindingSet bindings,IVariableOrConstant var) {
+//    
+//        return get(bindings,var, true);
+//        
+//    }
+//    
+//    /**
+//     * <p>
+//     * Return the current binding for the variable or constant.
+//     * </p>
+//     * 
+//     * @param var
+//     *            The variable or constant.
+//     * @param required
+//     *            When <code>true</code> an exception is reported if the
+//     *            variable is not used in the rule. Note that specializing a
+//     *            rule often results in variables being replaced by constants
+//     *            such that an {@link IConstraint} might no longer be evaluable
+//     *            for the rule in terms of that variable.
+//     * 
+//     * @return Its binding. The binding will be <code>null</code> if a
+//     *         variable is not currently bound or if the variable is not used in
+//     *         the rule and <code>required := false</code>.
+//     * 
+//     * @throws NullPointerException
+//     *             if <i>var</i> is <code>null</code>.
+//     * @throws IllegalArgumentException
+//     *             if <code>required := true</code> and the variable is not
+//     *             used in the rule.
+//     * @throws IllegalArgumentException
+//     *             if var is a constant.
+//     * 
+//     * @see #set(Var, Object)
+//     * @see #bind(int, SPO)
+//     */
+//    public Object get(IBindingSet bindings,IVariableOrConstant var, boolean required) {
+//        
+////        if (var == null)
+////            throw new NullPointerException();
+//
+//        if (var.isConstant()) {
+//
+//            return var.get();
+//            
+//        }
+//
+//        if (required && !rule.isDeclared((IVariable)var)) {
+//
+//            throw new IllegalArgumentException("Not declared: " + var + " by "
+//                    + rule);
+//            
+//        }
+//        
+//        return bindings.get((IVariable) var);
+//                
+//    }
     
     /**
      * Binds the variable.
@@ -374,7 +365,8 @@ public class RuleState {
      * @param var
      *            A variable that appears in that predicate.
      * @param val
-     *            The value to be bound on the variable.
+     *            The value to be bound on the variable -or- <code>null</code>
+     *            to clear the binding for the variable.
      * 
      * @throws NullPointerException
      *             if the variable is null.
@@ -385,13 +377,21 @@ public class RuleState {
      */
 //    * @throws IllegalArgumentException
 //    *             if the variable does not appear in the rule.
-    public void set(IBindingSet bindings, IVariable var, Object val) {
+    public void set(IVariable var, IConstant val, IBindingSet bindings) {
 
 //        // verify variable declared by the rule.
 //        if(!rule.isDeclared(var)) throw new IllegalArgumentException();
 
         // bind the variable.
-        bindings.set(var, new Constant(val));
+        if(val==null) {
+            
+            bindings.clear(var);
+            
+        } else {
+            
+            bindings.set(var, val);
+            
+        }
 
         final int tailCount = rule.getTailCount();
         
@@ -441,8 +441,8 @@ public class RuleState {
      * @see #clearDownstreamBindings(IBindingSet bindingSet, int index)
      */
     @SuppressWarnings("unchecked")
-    public boolean bind(IBindingSet bindings,int index, Object e) {
-       
+    public boolean bind(int index, Object e, IBindingSet bindings) {
+
         // propagate bindings from the visited object into the binding set.
         joinNexus.copyValues(e, rule.getTail(index), bindings);
 
@@ -467,7 +467,7 @@ public class RuleState {
      *            The index of the predicate whose values you intend to
      *            {@link #bind(IBindingSet,int, Object)}.
      */
-    protected void clearDownstreamBindings(IBindingSet bindingSet, int index) {
+    protected void clearDownstreamBindings(int index, IBindingSet bindingSet) {
 
         if (log.isDebugEnabled()) {
 
@@ -493,7 +493,7 @@ public class RuleState {
 
                     if (k >= index) {
 
-                        set(bindingSet, (Var) t, null);
+                        set((Var) t, null, bindingSet);
 
                     }
 

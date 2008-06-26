@@ -15,6 +15,15 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo it is not entirely satisfactory to have variable names disappear from
+ *       rules as they are specialized. It might be better to define a BoundVar
+ *       (extends Var) whose id was the bound value and which reported true for
+ *       both isVariable() and isConstant(). However this would mean that var(x) !=
+ *       var(x,id) where the latter is bound to a constant. Or if {@link Var} is
+ *       rule-local (or rule execution thread local) then it could define
+ *       set(Object) and get():Object to access its binding. A rule that was
+ *       specialized would then flag bound variables as immutable.
+ * 
  * @todo Variable canonicalization could be limited in scope to a rule or its
  *       derived rules (via specialization or for truth maintenance). This would
  *       make it easier to place constraints directly on the variable so that it
