@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.join;
 
 import com.bigdata.btree.FusedEntryIterator;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleFilter;
@@ -103,13 +104,28 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
         
     }
 
-    public long rangeCount() {
+    /**
+     * Note: You can not get an exact range count for a view.
+     * 
+     * @throws UnsupportedOperationException
+     *             if <code>exact == true</code>.
+     * 
+     * @todo an exact range count for a view could be written. It would have to
+     *       use two iterators (like a {@link FusedView}) that progressed in
+     *       sync so that duplicates could be detected. This means a full key
+     *       range scan for both source access paths.
+     */
+    public long rangeCount(boolean exact) {
 
-        // Note: this is the upper bound.
+        if(exact) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
         
         // @todo check for overflow on Long#Max_value
         
-        return path1.rangeCount() + path2.rangeCount();
+        return path1.rangeCount(exact) + path2.rangeCount(exact);
         
     }
 

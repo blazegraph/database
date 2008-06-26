@@ -28,11 +28,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.util.Iterator;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
+import org.apache.log4j.Logger;
+
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.service.IBigdataFederation;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -48,6 +57,9 @@ import cutthecrap.utils.striterators.Striterator;
  */
 abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
+    protected static final Logger log = Logger.getLogger(IAccessPath.class);
+    
+    protected final ExecutorService service;
     protected final IPredicate<R> predicate;
     protected final IKeyOrder<R> keyOrder;
     protected final IIndex ndx;
@@ -121,6 +133,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     
     /**
      * 
+     * @param service
+     *            The executor service used for asynchronous iterators (this is
+     *            typically {@link IBigdataFederation#getThreadPool()}).
      * @param predicate
      *            The constraints on the access path.
      * @param keyOrder
@@ -133,26 +148,33 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * 
      * @todo This needs to be more generalized so that you can use a index that
      *       is best without being optimal by specifying a low-level filter to
-     *       be applied to the index. When the predicate also specifies a filter
-     *       constraint then that must be layer on top of this lower-level
-     *       constaint.
+     *       be applied to the index.
+     * 
+     * @todo When the predicate also specifies a filter constraint then that
+     *       must be layer on top of this lower-level constaint.
      */
-    protected AbstractAccessPath(IPredicate<R> predicate,
-            IKeyOrder<R> keyOrder, IIndex ndx, int flags) {
+    protected AbstractAccessPath(final ExecutorService service,
+            final IPredicate<R> predicate, final IKeyOrder<R> keyOrder,
+            final IIndex ndx, final int flags) {
 
+        if (service == null)
+            throw new IllegalArgumentException();
+        
         if (predicate == null)
             throw new IllegalArgumentException();
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
-        
+
         if (ndx == null)
             throw new IllegalArgumentException();
+
+        this.service = service;
         
         this.predicate = predicate;
 
         this.keyOrder = keyOrder;
-        
+
         this.ndx = ndx;
 
         this.flags = flags;
@@ -196,6 +218,16 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
+    public String toString() {
+
+        return getClass().getName() + "{predicate=" + predicate + ", keyOrder="
+                + keyOrder + ", flags=" + flags + ", fromKey="
+                + (fromKey == null ? "n/a" : BytesUtil.toString(fromKey))
+                + ", toKey="
+                + (toKey == null ? "n/a" : BytesUtil.toString(toKey) + "}");
+
+    }
+    
     /**
      * @throws IllegalStateException
      *             unless {@link #init()} has been invoked.
@@ -230,6 +262,12 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         didInit = true;
         
+        if(log.isDebugEnabled()) {
+            
+            log.debug(toString());
+            
+        }
+        
         return this;
         
     }
@@ -242,8 +280,29 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
+//    /**
+//     * Convert an {@link IPredicate} into the equivalent element.
+//     * <p>
+//     * Note: Both constants and unbound variables need to be converted in a
+//     * type-specific manner
+//     * 
+//     * @param predicate
+//     *            The predicate.
+//     * 
+//     * @return The equivalent element.
+//     */
+//    abstract protected R toElement(IPredicate<R> predicate);
+    
     public boolean isEmpty() {
 
+        assertInitialized();
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug(this.toString());
+            
+        }
+        
         final IChunkedIterator<R> itr = iterator(1,1);
         
         try {
@@ -258,43 +317,307 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
-    public IChunkedOrderedIterator<R> iterator() {
+    final public IChunkedOrderedIterator<R> iterator() {
         
         return iterator(0,0);
         
     }
 
+    /**
+     * This is the threshold for [limit] - if the [limit] is LTE this threshold
+     * then we will do a fully buffered (synchronous) read. Otherwise we will do
+     * an asynchronous read.
+     */
+    private final int FULLY_BUFFERED_READ_THRESHOLD = 1000;
+    
     @SuppressWarnings("unchecked")
     public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
 
-        // @todo optimizations for point tests and small limits.
-        return new ChunkedWrappedIterator<R>(new Striterator(rangeIterator(capacity,
-                flags, filter)).addFilter(new Resolver() {
+        if(log.isDebugEnabled()) {
 
-                    private static final long serialVersionUID = 0L;
+            log.debug(this + " : limit=" + limit + ", capacity=" + capacity);
+            
+        }
 
-                    @Override
-                    protected Object resolve(Object arg0) {
+        final boolean fullyBufferedRead;
+        
+        if(predicate.isFullyBound()) {
 
-                        final ITuple tuple = (ITuple) arg0;
+            /*
+             * If the predicate is fully bound then there can be at most one
+             * element matched so we constrain the limit and capacity
+             * accordingly.
+             */
+            
+            capacity = limit = 1;
+            
+            fullyBufferedRead = true;
+            
+            log.debug("Predicate is fully bound.");
+            
+        } else if (limit > 0) {
 
-                        return tuple.getObject();
+            /*
+             * A [limit] was specified.
+             * 
+             * NOTE: When the [limit] is specified (GT ZERO) we MUST NOT let the
+             * DataService layer iterator read more than [limit] elements at a
+             * time.
+             * 
+             * This is part of the contract for REMOVEALL - when you set the
+             * [limit] and specify REMOVEALL you are only removing the 1st
+             * [limit] elements in the traversal order.
+             * 
+             * This is also part of the atomic queue operations contract - the
+             * head and tail queue operations function by specifying [limit :=
+             * 1] (tail also specifies the REVERSE traversal option).
+             */
+            
+            capacity = limit;
 
+            /*
+             * Note: When the [limit] is specified we always do a fully buffered
+             * (aka synchronous) read. This simplifies the behavior of the
+             * iterator and limits are generally quite small.
+             */
+            
+            fullyBufferedRead = true;
+                
+        } else {
+
+            /*
+             * No limit was specified.
+             * 
+             * Range count the access path and use a synchronous read if the
+             * rangeCount is LTE the threshold.
+             */
+            
+            final long rangeCount = rangeCount(false/* exact */);
+            
+            if (log.isDebugEnabled()) {
+
+                log.debug("rangeCount=" + rangeCount);
+
+            }
+                
+            if(rangeCount == 0) {
+                
+                /*
+                 * Since the range count is an upper bound we KNOW that the
+                 * iterator would not visit anything.
+                 */
+
+                log.debug("No elements based on range count.");
+                
+                return new EmptyChunkedIterator<R>(keyOrder);
+                
+            }
+            
+            if(rangeCount < FULLY_BUFFERED_READ_THRESHOLD) {
+            
+                limit = capacity = (int)rangeCount;
+                
+                fullyBufferedRead = true;
+                
+            } else {
+                
+                fullyBufferedRead = false;
+                
+            }
+
+        }
+        
+        /*
+         * Note: The [capacity] gets passed through to the DataService layer.
+         */
+        final Iterator<R> src = new Striterator(rangeIterator(capacity, flags,
+                filter)).addFilter(new Resolver() {
+
+            private static final long serialVersionUID = 0L;
+
+            /*
+             * Resolve tuple to element type.
+             */
+            @Override
+            protected Object resolve(Object arg0) {
+
+                final ITuple tuple = (ITuple) arg0;
+
+                return tuple.getObject();
+
+            }
+        });
+
+        if (fullyBufferedRead) {
+
+            /*
+             * Synchronous fully buffered read of no more than [limit] elements.
+             */
+
+            return synchronousIterator(limit, src);
+
+        } else {
+
+            /*
+             * Asynchronous read (no limit).
+             */
+
+            assert limit == 0;
+            
+            return asynchronousIterator(src);
+
+        }
+
+    }
+    
+    /**
+     * Fully buffers all elements that would be visited by the
+     * {@link IAccessPath} iterator.
+     * 
+     * @param accessPath
+     *            The access path (including the triple pattern).
+     * 
+     * @param limit
+     *            The maximum #of elements that will be read -or- ZERO (0) if
+     *            all elements should be read.
+     */
+    protected IChunkedOrderedIterator<R> synchronousIterator(final int limit,
+            final Iterator<R> src) {
+
+        if (limit <= 0)
+            throw new IllegalArgumentException();
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("limit="+limit);
+            
+        }
+        
+        int nread = 0;
+
+        R[] buffer = null;
+
+        while (src.hasNext() && nread < limit) {
+
+            final R e = src.next();
+
+            if (buffer == null) {
+
+                buffer = (R[]) java.lang.reflect.Array.newInstance(
+                        e.getClass(), limit);
+
+            }
+
+            buffer[nread++] = e;
+
+        }
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Fully buffered: read " + nread + " elements, limit="
+                            + limit);
+
+        }
+        
+        return new ChunkedArrayIterator<R>(nread, buffer, keyOrder);
+            
+    }
+    
+    /**
+     * Asynchronous read using a {@link BlockingBuffer}.
+     * 
+     * @param src The source iterator.
+     * 
+     * @return
+     */
+    protected IChunkedOrderedIterator<R> asynchronousIterator(
+            final Iterator<R> src) {
+        
+        if (src == null)
+            throw new IllegalArgumentException();
+        
+        log.debug("");
+        
+        final BlockingBuffer<R> buffer = new BlockingBuffer<R>(
+                BlockingBuffer.DEFAULT_CAPACITY, keyOrder);
+        
+        final Future<Void> future = service.submit(new Callable<Void>(){
+        
+            public Void call() {
+                
+                try {
+                    
+                    while(src.hasNext()) {
+                     
+                        final R e = src.next();
+                        
+                        buffer.add( e );
+                        
                     }
-                }));
+                    
+                } finally {
+        
+                    if (log.isDebugEnabled())
+                        log.debug("Closing buffer: " + AbstractAccessPath.this);
+                    
+                    buffer.close();
+                    
+                }
+                
+                return null;
+                
+            }
+            
+        });
+
+        return new DelegateChunkedIterator<R>(buffer.iterator()) {
+            
+            /**
+             * Extended to cancel the Future that is reading on the index if the
+             * caller closes the iterator.
+             */
+            public void close() {
+
+                if (log.isDebugEnabled())
+                    log.debug("Cancelling task: " + AbstractAccessPath.this);
+
+                future.cancel(true/* mayInterruptIfRunning */);
+                
+                super.close();
+                
+            }
+            
+        };
             
     }
 
-    public long rangeCount() {
+    final public long rangeCount(boolean exact) {
 
         assertInitialized();
+
+        final long n;
         
-        // Note: for an exact count you must also apply the optional [filter] to the range iterator.
-        return ndx.rangeCount(fromKey, toKey);
+        if(exact) {
+        
+            n = ndx.rangeCountExact(fromKey, toKey);
+            
+        } else {
+            
+            n = ndx.rangeCount(fromKey, toKey);
+            
+        }
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("n=" + n + " : " + toString());
+            
+        }
+
+        return n;
         
     }
 
-    public ITupleIterator<R> rangeIterator() {
+    final public ITupleIterator<R> rangeIterator() {
 
         return rangeIterator(0/* capacity */, flags, filter);
         
@@ -305,6 +628,12 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         assertInitialized();
         
+        if (log.isDebugEnabled()) {
+
+            log.debug(this+" : capacity="+capacity+", flags="+flags+", filter="+filter);
+            
+        }
+
         return ndx.rangeIterator(fromKey, toKey, capacity, flags, filter);
         
     }
@@ -316,6 +645,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * of those indices.
      */
     public long removeAll() {
+
+        assertInitialized();
+
+        if (log.isDebugEnabled()) {
+
+            log.debug(this.toString());
+            
+        }
 
         /*
          * Remove everything in the key range. Do not materialize keys or

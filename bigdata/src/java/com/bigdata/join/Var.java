@@ -15,8 +15,12 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo variable canonicalization could be limited in scope to a rule or its
- *       derived rules (via specialization or for truth maintenance).
+ * @todo Variable canonicalization could be limited in scope to a rule or its
+ *       derived rules (via specialization or for truth maintenance). This would
+ *       make it easier to place constraints directly on the variable so that it
+ *       can limit the types of binding that it will accept. Constraints on
+ *       {@link IPredicate}s limit the matched tuples. Constraints on rules
+ *       limit the binding patterns across the rule.
  */
 final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>>, Serializable 
 {

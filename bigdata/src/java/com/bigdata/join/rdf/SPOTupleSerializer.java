@@ -217,7 +217,7 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
             throw new IllegalArgumentException();
         
         if (obj instanceof SPO)
-            return serializeVal((SPO) obj);
+            return serializeKey((SPO) obj);
 
         //@todo could allow long[3].
         throw new UnsupportedOperationException();
@@ -240,17 +240,25 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
      * 
      * @return The key.
      */
-    private byte[] statement2Key(SPOKeyOrder keyOrder, SPO spo) {
+    public byte[] statement2Key(SPOKeyOrder keyOrder, SPO spo) {
         
         switch (keyOrder.index()) {
+
         case SPOKeyOrder._SPO:
+        
             return statement2Key(spo.s, spo.p, spo.o);
+            
         case SPOKeyOrder._POS:
+            
             return statement2Key(spo.p, spo.o, spo.s);
+            
         case SPOKeyOrder._OSP:
+            
             return statement2Key(spo.o, spo.s, spo.p);
+            
         default:
             throw new UnsupportedOperationException("keyOrder=" + keyOrder);
+        
         }
         
     }
@@ -282,7 +290,7 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
      * 
      * @return The sort key for the statement with those values.
      */
-    private byte[] statement2Key(long id1, long id2, long id3) {
+    public byte[] statement2Key(long id1, long id2, long id3) {
 
         return keyBuilder.reset().append(id1).append(id2).append(id3).getKey();
 

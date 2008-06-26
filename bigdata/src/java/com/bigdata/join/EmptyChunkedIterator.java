@@ -23,59 +23,73 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 25, 2008
+ * Created on Jun 26, 2008
  */
 
-package com.bigdata.join.rdf;
+package com.bigdata.join;
 
-import com.bigdata.join.IRelationName;
+import java.util.NoSuchElementException;
 
 /**
- * Describes a read-only view of two SPO relations.
+ * An empty iterator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPORelationView implements IRelationName<SPO> {
+public class EmptyChunkedIterator<E> implements IChunkedOrderedIterator<E> {
 
-    private static final long serialVersionUID = 5083166024993505026L;
+    private final IKeyOrder<E> keyOrder;
     
-    private final IRelationName<SPO> database;
-    private final IRelationName<SPO> focusStore;
-    
-    public IRelationName<SPO> getDatabase() {
+    /**
+     * 
+     * @param keyOrder
+     *            The natural sort order (MAY be <code>null</code>).
+     */
+    public EmptyChunkedIterator(IKeyOrder<E> keyOrder) {
         
-        return database;
+        this.keyOrder = keyOrder;
         
     }
 
-    public IRelationName<SPO> getFocusStore() {
-        
-        return focusStore;
+    public IKeyOrder<E> getKeyOrder() {
+
+        return keyOrder;
         
     }
+
+    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+        
+        throw new NoSuchElementException();
+        
+    }
+
+    public E next() {
     
-    public SPORelationView(IRelationName<SPO> database,
-            IRelationName<SPO> focusStore) {
-
-        if (database == null)
-            throw new IllegalArgumentException();
-        
-        if (focusStore == null)
-            throw new IllegalArgumentException();
-        
-        if (database == focusStore)
-            throw new IllegalArgumentException();
-        
-        this.database = database;
-        
-        this.focusStore = focusStore;
+        throw new NoSuchElementException();
         
     }
 
-    public String toString() {
+    public E[] nextChunk() {
+
+        throw new NoSuchElementException();
+
+    }
+
+    public void remove() {
         
-        return "{" + database + "," + focusStore + "}";
+        throw new UnsupportedOperationException();
+        
+    }
+
+    public void close() {
+        
+        // NOP
+        
+    }
+
+    public boolean hasNext() {
+        
+        return false;
         
     }
     

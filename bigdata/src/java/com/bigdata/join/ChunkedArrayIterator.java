@@ -82,7 +82,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      *            The order of the elements in the buffer or <code>null</code>
      *            iff not known.
      */
-    public ChunkedArrayIterator(E[] a, int n, IKeyOrder<E> keyOrder) {
+    public ChunkedArrayIterator(int n, E[] a, IKeyOrder<E> keyOrder) {
 
         if (a == null)
             throw new IllegalArgumentException();
@@ -98,77 +98,6 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
 
     }
 
-    /**
-     * Fully buffers all elements that would be visited by the
-     * {@link IAccessPath} iterator.
-     * 
-     * @param accessPath
-     *            The access path (including the triple pattern).
-     * 
-     * @param limit
-     *            When non-zero, this is the maximum #of elements that will be
-     *            read. When zero(0), all elements for that access path will be
-     *            read and buffered. It is a runtime error if the #of elements
-     *            would exceed a large constant (10M).
-     */
-    public ChunkedArrayIterator(IAccessPath<E> accessPath, int limit) {
-
-        if (accessPath == null)
-            throw new IllegalArgumentException();
-
-        if (limit < 0)
-            throw new IllegalArgumentException();
-        
-        final long rangeCount = accessPath.rangeCount();
-
-        this.keyOrder = accessPath.getKeyOrder();
-        
-        if (rangeCount > 10000000) {
-            
-            /*
-             * Note: This is a relatively high limit (10M statements). You are
-             * much better off processing smaller chunks!
-             */
-            
-            throw new RuntimeException("Too many statements to read into memory: "+rangeCount);
-            
-        }
-        
-        final int n = (int) (limit > 0 ? Math.min(rangeCount, limit)
-                : rangeCount);
-        
-        /*
-         * Materialize the matching statements.
-         */
-        
-        final ITupleIterator<E> itr = accessPath.rangeIterator();
-
-        int i = 0;
-
-        while (itr.hasNext() && i < n) {
-
-            final E e = itr.next().getObject();
-            
-            if (buffer == null) {
-             
-                buffer = (E[]) java.lang.reflect.Array.newInstance(e.getClass(), n);
-                
-            }
-
-//            if (filter != null && !filter.isMatch(spo)) {
-//
-//                continue;
-//                
-//            }
-            
-            buffer[i++] = e;
-
-        }
-        
-        this.bufferCount = i;
-        
-    }
-    
     public boolean hasNext() {
 
         if(!open) return false;

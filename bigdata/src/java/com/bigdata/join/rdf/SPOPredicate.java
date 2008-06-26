@@ -38,9 +38,9 @@ import com.bigdata.join.IVariableOrConstant;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOPredicate implements IPredicate<ISPO> {
+public class SPOPredicate implements IPredicate<SPO> {
 
-    private final IRelationName<ISPO> relation;
+    private final IRelationName<SPO> relation;
     
     private final IVariableOrConstant<Long> s;
 
@@ -48,9 +48,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     private final IVariableOrConstant<Long> o;
 
-    private final IPredicateConstraint<ISPO> constraint;
+    private final IPredicateConstraint<SPO> constraint;
 
-    public IRelationName<ISPO> getRelation() {
+    public IRelationName<SPO> getRelation() {
         
         return relation;
         
@@ -62,17 +62,17 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-    public SPOPredicate(IRelationName<ISPO> relation, IVariableOrConstant<Long> s,
+    public SPOPredicate(IRelationName<SPO> relation, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
         this(relation, s, p, o, null/* constraints */);
         
     }
     
-    public SPOPredicate(IRelationName<ISPO> relation,
+    public SPOPredicate(IRelationName<SPO> relation,
             IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
-            IPredicateConstraint<ISPO> constraint) {
+            IPredicateConstraint<SPO> constraint) {
         
         assert relation != null;
         
@@ -246,15 +246,16 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     }
 
-    public IPredicateConstraint<ISPO> getConstraint() {
+    public IPredicateConstraint<SPO> getConstraint() {
 
         return constraint;
         
     }
 
-    public boolean equals(IPredicate<ISPO> other) {
+    public boolean equals(IPredicate<SPO> other) {
         
-        if(this==other) return true;
+        if (this == other)
+            return true;
         
         final int arity = 3;
         

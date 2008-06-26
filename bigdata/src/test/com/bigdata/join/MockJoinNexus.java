@@ -76,4 +76,9 @@ public class MockJoinNexus implements IJoinNexus {
         return null;
     }
 
+    public IEvaluationPlan newEvaluationPlan(IRule rule) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
 }

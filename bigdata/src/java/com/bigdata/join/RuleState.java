@@ -1,12 +1,13 @@
 package com.bigdata.join;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.join.rdf.SPO;
 
 /**
  * State for a rule execution.
@@ -42,7 +43,7 @@ public class RuleState {
      * {@link IBindingSet}s, and {@link ISolution}s for the evaluation of the
      * <i>rule</i>.
      */
-    final public IJoinNexus getElementBinding() {
+    final public IJoinNexus getJoinNexus() {
         
         return joinNexus;
         
@@ -107,117 +108,7 @@ public class RuleState {
         this.accessPath = new IAccessPath[tailCount];
 
         // The evaluation order.
-        this.order = computeEvaluationOrder();
-
-//        if (focusStore != null && focusIndex > 0) {
-//        /*
-//         * Note: This stuff is specific to the RDF DB, including the ROM
-//         * assumptions for the focusStore vs the DB. With the refactor the
-//         * focusStore and the fusedView are already encoded into the relation
-//         * associated with each tail and the order will therefore reflect the
-//         * actual (or approximate) range counts for each access path.
-//         */
-//            
-//            /*
-//             * The rule of thumb is to always evaluate the predicate that
-//             * will read from the focusStore 1st since we presume that any
-//             * triple pattern reading on the [focusStore] will be
-//             * significantly smaller than any other triple pattern reading
-//             * on the fused view [focusStore + database].
-//             * 
-//             * However, there are counter examples. Loading schema and then
-//             * data into a database is one, e.g., the wordnet ontology
-//             * followed by the wordnet nouns data. Another is when the 2nd
-//             * predicate in the body is none bound - you are often better
-//             * off NOT running the all none bound predicate 1st.
-//             * 
-//             * Note: All of this logic is executed IFF the focusIndex is >
-//             * 0. When the focusIndex is 0, the focusStore is already being
-//             * read by the predicate that is first in the evaluation order.
-//             */
-//
-//            /*
-//             * In this alternative, we simply refuse to order a 3-unbound
-//             * predicate to the 1st position in the evaluation order.
-//             */
-//            
-//            if (false && rule.getTailPredicate(order[focusIndex])
-//                    .getVariableCount() < 3) {
-//
-//                /*
-//                 * Note: This does not work since we may have already done a
-//                 * rangeCount (w/o bindings) when computing the evaluation
-//                 * order so we can not undo that purely by considering the
-//                 * variable bindings. An alternative is to mark as "pinned"
-//                 * any part of the evaluation order that have already been
-//                 * tested in the data, e.g., by retaining the rangeCounts if
-//                 * computed by computeEvaluationOrder.  If we do that then
-//                 * we could try this simpler test again.
-//                 */
-//                
-////                    /*
-////                     * Swap the places of those predicates in the evaluation
-////                     * order such that we will evaluate the predicate at the
-////                     * focusIndex 1st.
-////                     */
-////
-////                    int tmp = order[0];
-////
-////                    order[0] = order[focusIndex];
-////
-////                    order[focusIndex] = tmp;
-//
-//            } else {
-//
-//                /*
-//                 * In order to catch those counter examples we range count
-//                 * the predicate that is already 1st in the evaluate order
-//                 * against [focusStore+database] and then the predicate at
-//                 * the focusIndex against the [focusStore]. We then reorder
-//                 * the predicate at the focusIndex 1st iff it has a smaller
-//                 * range count that the predicate that is already first in
-//                 * the evaluation order.
-//                 * 
-//                 * Note: range counts here could be expensive when the index
-//                 * is remote or partitioned.
-//                 */
-//                
-//                /*
-//                 * Range count for the predicate that is 1st in the
-//                 * evaluation order. This will read against [focusStore +
-//                 * database].
-//                 */
-//
-//                final long rangeCount1 = getAccessPath(order[0], null/* bindingSet */)
-//                        .rangeCount();
-//
-//                /*
-//                 * Range count for the predicate at the focusIndex. This
-//                 * will read against [focusStore].
-//                 */
-//
-//                final long rangeCount2 = getAccessPath(order[focusIndex],
-//                        null/* bindingSet */).rangeCount();
-//
-//                if (rangeCount2 < rangeCount1) {
-//
-//                    /*
-//                     * Swap the places of those predicates in the evaluation
-//                     * order such that we will evaluate the predicate at the
-//                     * focusIndex 1st.
-//                     */
-//
-//                    int tmp = order[0];
-//
-//                    order[0] = order[focusIndex];
-//
-//                    order[focusIndex] = tmp;
-//
-//                }
-//
-//            }
-//            
-//        }
+        this.order = joinNexus.newEvaluationPlan(rule).getOrder();
 
         /*
          * The dependency graph for the variables in the tail based on the
@@ -306,171 +197,20 @@ public class RuleState {
 
     }
 
-    /**
-     * Computes and returns the evaluation order (no side-effects).
-     * <p>
-     * The evaluation {@link #order}[] is determined by analysis of the
-     * propagation of bindings. The most selective predicate is choosen first
-     * (having the fewest unbound variables with ties broken by a range count on
-     * the data) and "fake" bindings are propagated to the other predicates in
-     * the tail. This process is repeated until all variables are bound and an
-     * evaluation order has been determined.
-     * 
-     * @return The evaluation order. The indices in this array are correlated
-     *         1:1 with the predicates in tail of the {@link Rule}.
-     */
-    public int[] computeEvaluationOrder() {
-
-        // use private bindingSet to avoid side-effects.
-        final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
-
-        final int tailCount = rule.getTailCount();
-
-        final int[] order = new int[tailCount];
-
-        final boolean[] used = new boolean[tailCount];
-
-        // clear array. -1 is used to detect logic errors.
-        for (int i = 0; i < order.length; i++)
-            order[i] = -1;
-
-        for (int i = 0; i < tailCount; i++) {
-
-            int index = -1;
-            int minVarCount = Integer.MAX_VALUE;
-            long minRangeCount = Long.MAX_VALUE;
-            
-            for( int j=0; j<tailCount; j++) {
-                
-                if(used[j]) continue; // already in the evaluation order. 
-                
-                final int varCount = rule.getTail(j)
-                        .getVariableCount();
-
-                if (varCount < minVarCount) {
-
-                    index = j;
-
-                    minVarCount = varCount;
-
-                } else if (true && varCount == minVarCount) {
-
-                    /*
-                     * Tweaks the evaluation order for predicates where the #of
-                     * variable bindings is the same by examining the range
-                     * counts.
-                     * 
-                     * Note: In doing this, we disregard the bindings that were
-                     * propagated since they are -1 and will NOT match anything
-                     * anywhere!
-                     * 
-                     * Note: In the case where some other predicate is already
-                     * first in the evaluation order by the virtue of having
-                     * more variables bound this tweak is purely heuristic
-                     * regardless of the fact that it considers the data. The
-                     * reason is that the actual bindings that are propagated
-                     * during the execution of the rule will determine which of
-                     * the two predicates under consideration is, in fact, more
-                     * selective in the data. However, in the special case where
-                     * the two predicates are competing for the 1st position in
-                     * the evaluation order, this "tweak" is exact.
-                     * 
-                     * @todo Some tails use the same constant pattern in both
-                     * predicates. E.g., rdfs11 (u subClassOf v) (v subClassOf
-                     * x). In these cases comparing range counts is pointless
-                     * and could be avoided by testing for this pattern.
-                     */
-                    
-                    if(minRangeCount == Integer.MAX_VALUE) {
-                        
-                        // range count of the current best choice (computed
-                        // lazily).
-                        minRangeCount = getAccessPath(index, null/* bindingSet */)
-                                .rangeCount();
-
-                    }
-
-                    // range count of the current predicate under
-                    // examination.
-                    final long rangeCount = getAccessPath(j, null/* bindingSet */)
-                            .rangeCount();
-                    
-                    if (rangeCount < minRangeCount) {
-
-                        /*
-                         * choose the predicate that is more selective given
-                         * the variable bindings.
-                         */
-                        
-                        index = j;
-                        
-                        minVarCount = varCount;
-                        
-                        minRangeCount = rangeCount;
-                        
-                    }
-                    
-                }
-                
-            }
-
-            if (index == -1)
-                throw new AssertionError();
-            
-            if (used[index])
-                throw new AssertionError("Attempting to reuse predicate: index="+i+"\n"+this);
-            
-            order[i] = index;
-            
-            used[index] = true;
-            
-            // set fake bindings for this predicate.
-            {
-                
-                final IPredicate pred = rule.getTail(index);
-
-                final int arity = pred.arity();
-
-                for (int z = 0; z < arity; z++) {
-
-                    final IVariableOrConstant v = pred.get(z);
-
-                    if (v.isVar()) {
-
-                        bindingSet.set((IVariable) v, FAKE);
-
-                    }
-
-                }
-                
-            }
-            
-        }
-
-        if (log.isInfoEnabled())
-            log.info(rule.getName() + ": order=" + Arrays.toString(order));
-        
-        return order;
-        
-    }
-    /**
-     * Used to mark fake bindings by {@link #computeEvaluationOrder()}.
-     */
-    private static final transient IConstant<String> FAKE = new Constant<String>(
-            "Fake Binding");
     
     /**
      * Given an evaluation <i>order</i>, construct the dependency graph for the
-     * variables in the tail of the rule.
+     * variables in the tail of the rule. The dependency graph is a map from
+     * each variable to the index of the first predicate in evaluation order
+     * where that variable becomes bound. The values of this map are used as
+     * indices into <i>order</i>.
      * 
      * @param order
      *            The evaluation order.
      * 
-     * @return The map from variable to the 1st predicate in evaluation order
-     *         where it is bound. The values of this map are indices into
-     *         <i>order</i>.
+     * @return The dependency graph.
      */
-    public Map<Var,Integer> computeVariableDependencyMap(int[] order) {
+    public Map<Var,Integer> computeVariableDependencyMap(final int[] order) {
         
         if (order == null)
             throw new IllegalArgumentException();
@@ -508,6 +248,12 @@ public class RuleState {
                             
         }
         
+        if (log.isDebugEnabled()) {
+
+            log.debug("dependenyGraph=" + depends);
+            
+        }
+
         return depends;
         
     }
@@ -721,8 +467,14 @@ public class RuleState {
      *            The index of the predicate whose values you intend to
      *            {@link #bind(IBindingSet,int, Object)}.
      */
-    protected void clearDownstreamBindings(IBindingSet bindings,int index) {
+    protected void clearDownstreamBindings(IBindingSet bindingSet, int index) {
 
+        if (log.isDebugEnabled()) {
+
+            log.debug("index=" + index + ", bindingSet=" + bindingSet);
+            
+        }
+        
         final int tailCount = rule.getTailCount();
         
         for (int i = index; i < tailCount; i++) {
@@ -741,7 +493,7 @@ public class RuleState {
 
                     if (k >= index) {
 
-                        set(bindings, (Var) t, null);
+                        set(bindingSet, (Var) t, null);
 
                     }
 
@@ -771,18 +523,24 @@ public class RuleState {
      * @throws IndexOutOfBoundsException
      *             if index is out of bounds.
      * 
+     * @throws IllegalArgumentException
+     *             if <i>bindingSet</i> is <code>null</code>.
+     * 
      * FIXME The side-effect on {@link #accessPath}[] means that this class is
      * NOT thread-safe. A thread-local weak reference to an access path cache
      * might fix that. However, I am not yet sure if this is a problem.
      */
-    public IAccessPath getAccessPath(IBindingSet bindingSet, final int index) {
+    public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
+       
+        if (bindingSet == null)
+            throw new IllegalArgumentException();
         
         // check the cache.
         IAccessPath accessPath = this.accessPath[index];
         
         if (accessPath == null) {
 
-            accessPath = getAccessPath(index, bindingSet);
+            accessPath = getAccessPathNoCache(index, bindingSet);
 
             // update the cache.
             this.accessPath[index] = accessPath;
@@ -806,10 +564,10 @@ public class RuleState {
      * @throws IndexOutOfBoundsException
      *             if index is out of bounds.
      */
-    public IChunkedOrderedIterator iterator(IBindingSet bindingSet,
-            final int index) {
+    public IChunkedOrderedIterator iterator(final int index,
+            final IBindingSet bindingSet) {
 
-        return getAccessPath(bindingSet, index).iterator();
+        return getAccessPath(index, bindingSet).iterator();
         
     }
     
@@ -834,7 +592,7 @@ public class RuleState {
      *             if the name of the relation can not be resolved by the
      *             {@link IJoinNexus} to an {@link IRelation} instance.
      */
-    public IAccessPath getAccessPath(final int index, final IBindingSet bindingSet) {
+    protected IAccessPath getAccessPathNoCache(final int index, final IBindingSet bindingSet) {
 
         final IPredicate predicate;
 
@@ -859,12 +617,8 @@ public class RuleState {
         final IRelation relation = joinNexus.getRelationLocator().getRelation(
                 relationName);
         
-        assert relation != null;
-        
         // find the best access path for the predicate for that relation.
         final IAccessPath accessPath = relation.getAccessPath(predicate);
-        
-        assert accessPath != null;
         
         // return that access path.
         return accessPath;

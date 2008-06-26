@@ -134,4 +134,14 @@ public interface IJoinNexus {
      */
     IRelationLocator getRelationLocator();
     
+    /**
+     * Return the evaluation plan for a rule.
+     * 
+     * @param rule
+     *            The rule.
+     *            
+     * @return The evaluation plan.
+     */
+    IEvaluationPlan newEvaluationPlan(IRule rule);
+    
 }

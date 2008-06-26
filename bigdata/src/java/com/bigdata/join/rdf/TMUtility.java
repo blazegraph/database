@@ -93,7 +93,7 @@ public class TMUtility {
      *         of the individual rules.
      */
     public List<Rule> mapRuleForTruthMaintenance(final Rule rule,
-            final IRelationName focusStore) {
+            final IRelationName<SPO> focusStore) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -109,7 +109,7 @@ public class TMUtility {
          * Setup the fused view (focusStore + database).
          */
 
-        final IRelationName<ISPO> fusedView;
+        final IRelationName<SPO> fusedView;
         
         if (tailCount == 1) {
 
@@ -200,8 +200,8 @@ public class TMUtility {
             
             for (int j = 0; j < tailCount; j++) {
 
-                final IPredicate p = tail[j];
-                final IPredicate p2;
+                final IPredicate<SPO> p = tail[j];
+                final IPredicate<SPO> p2;
 
                 if (i == j || tailCount == 1) {
 
@@ -213,9 +213,9 @@ public class TMUtility {
                      * the tail.
                      */
 
-                    p2 = new DelegatePredicate(p) {
+                    p2 = new DelegatePredicate<SPO>(p) {
 
-                        public IRelationName getRelation() {
+                        public IRelationName<SPO> getRelation() {
 
                             return focusStore;
 
@@ -230,9 +230,9 @@ public class TMUtility {
                      * view of the focusStore and the database.
                      */
 
-                    p2 = new DelegatePredicate(p) {
+                    p2 = new DelegatePredicate<SPO>(p) {
 
-                        public IRelationName getRelation() {
+                        public IRelationName<SPO> getRelation() {
 
                             return fusedView;
 

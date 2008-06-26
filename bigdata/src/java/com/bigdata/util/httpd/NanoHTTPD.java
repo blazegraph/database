@@ -10,7 +10,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
-import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
@@ -102,6 +101,12 @@ public class NanoHTTPD implements IServiceShutdown
      */
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
+
+    /** The server socket. */
+    private final ServerSocket ss;
+    
+    /** True once opened and until closed. */
+    private volatile boolean open = false;
 
 	// ==================================================
 	// API parts
@@ -255,8 +260,6 @@ public class NanoHTTPD implements IServiceShutdown
 	public NanoHTTPD( int port ) throws IOException
 	{
         
-        // The server socket.
-        final ServerSocket ss;
         if(port != 0 ) {
 
             /*
@@ -277,7 +280,8 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
         
-        log.info("Running on port=" + port);
+        if (log.isInfoEnabled())
+            log.info("Running on port=" + port);
 
         // @todo parameter and configuration of same.
         final int requestServicePoolSize = 0;
@@ -300,18 +304,39 @@ public class NanoHTTPD implements IServiceShutdown
          * Begin accepting connections.
          */
         acceptService.submit(new Runnable() {
+            
             public void run() {
+            
+                open = true;
+                
                 try {
-                    while (true) {
+                
+                    while (open) {
+            
                         /*
                          * Hand off request to a pool of worker threads.
                          */
+                        
                         requestService.submit(new HTTPSession(ss.accept()));
+                        
                     }
+
                 } catch (IOException ioe) {
+                    
+                    if (!open) {
+
+                        log.info("closed.");
+
+                        return;
+
+                    }
+
                     log.error(ioe);
+                    
                 }
+                
             }
+            
         });
 
     }
@@ -329,12 +354,21 @@ public class NanoHTTPD implements IServiceShutdown
 
     public boolean isOpen() {
 
-        return !acceptService.isShutdown() && !requestService.isShutdown();
+        return open;
+        //        return !acceptService.isShutdown() && !requestService.isShutdown() && !ss.isClosed();
 
     }
 
-    public void shutdown() {
+    synchronized public void shutdown() {
     
+        if(!isOpen()) {
+            
+            log.warn("Not running");
+            
+        }
+        
+        log.info("");
+        
         // time when shutdown begins.
         final long begin = System.currentTimeMillis();
 
@@ -390,13 +424,47 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
         
+        // Note: Runnable will terminate when open == false.
+        open = false;
+        
+        try {
+            
+            ss.close();
+            
+        } catch (IOException e) {
+            
+            log.warn(e);
+            
+        }
+        
     }
 
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
+
+        if(!isOpen()) {
+            
+            log.warn("Not running");
+            
+        }
+
+        log.info("");
 
         acceptService.shutdownNow();
 
         requestService.shutdownNow();
+        
+        // Note: Runnable will terminate when open == false.
+        open = false;
+
+        try {
+            
+            ss.close();
+            
+        } catch (IOException e) {
+            
+            log.warn(e);
+            
+        }
         
     }
 
