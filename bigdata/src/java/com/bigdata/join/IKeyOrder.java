@@ -31,7 +31,7 @@ import java.util.Comparator;
 
 /**
  * An interface representing the natural traversal orders for the different
- * indices for some class of relation.
+ * indices for some class of relation.<p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -99,6 +99,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       that you have to explicitly clean up after a unit test using a
  *       {@link ResourceManager} or it will leave its files around.
  * 
+ * @todo {@link BufferMode#Temporary} is not supported (verify whether the
+ *       Transient mode is supported).
+ * 
  * @todo If we approach the limit on free space for the {@link #dataDir} then we
  *       need to shed index partitions to other data services or potentially
  *       become more aggressive in releasing old resources. See

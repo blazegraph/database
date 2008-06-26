@@ -21,7 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.join;
+package com.bigdata.join.rdf;
+
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -58,46 +59,29 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("JOINs");
+        TestSuite suite = new TestSuite("RDF JOINs");
 
-        // test variable and constant impls.
-        suite.addTestSuite(TestVar.class);
-        suite.addTestSuite(TestConstant.class);
-        
         // test predicate impls.
-        suite.addTestSuite(TestPredicate.class);
+        suite.addTestSuite(TestSPOPredicate.class);
         
-        // @todo test binding set impls.
-        suite.addTestSuite(TestBindingSet.class);
-        
-        // test suite for basic rule mechanisms.
-        suite.addTestSuite( TestRule.class );
-       
-        // test suite for IProgram, but not program evaluation.
-        suite.addTestSuite( TestProgram.class );
-
-        // @todo chunked iterator tests.
-        // TestChunkedWrappedIterator
-        // TestChunkedArrayIterator (fully buffered)
-        // TestChunkedIterator (async reader)
-
-        // @todo test blocking buffer with iterator to drain solutions.
-        // TestBlockingBuffer
-        // @todo test array backed buffer flushing through to a database.
-        // TestArrayBuffer
-
+        // @todo test IKeyOrder impl (comparators).
+        suite.addTestSuite(TestSPOKeyOrder.class);
+  
         /*
-         * @todo test basic access path mechanisms and the access path fused
-         * view (right now these are tested in the rdf package since they have
-         * to be run against some data).
-         * 
-         * @todo rule execution is also being tested in the context of the RDF
-         * DB.
+         * @todo test ability to insert, update, or remove elements from a
+         * relation and the ability to select the right access path given a
+         * predicate for that relation and query for those elements (we have
+         * to test all this stuff together since testing query requires us 
+         * to have some data in the relation).
          */
+        suite.addTestSuite(TestSPORelation.class);
 
-        // test RDF JOINs
-        suite.addTest(com.bigdata.join.rdf.TestAll.suite());
+        // @todo test some simple rules (evaluate them).
+        // suite.addTestSuite( TestRuleRdf01.class );
         
+        // test suite for rule re-writes for RDF DB truth maintenance.
+        suite.addTestSuite(TestTMUtility.class);
+       
         return suite;
         
     }

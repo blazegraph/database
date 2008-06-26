@@ -33,7 +33,6 @@ import java.util.Properties;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.service.LoadBalancerService.UpdateTask;
 
 /**
  * Client for a local (embedded) {@link DataService} exposed as an

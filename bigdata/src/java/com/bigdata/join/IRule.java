@@ -74,6 +74,8 @@ public interface IRule extends IProgram {
      *            The index.
      *            
      * @return The predicate at that index.
+     * 
+     * @throws IndexOutOfBoundsException 
      */
     public IPredicate getTail(int index);
 
@@ -88,6 +90,18 @@ public interface IRule extends IProgram {
      */
     public Iterator<IConstraint> getConstraints();
 
+    /**
+     * Return the constraint at the given index.
+     * 
+     * @param index
+     *            The index.
+     * 
+     * @return The constraint.
+     * 
+     * @throws IndexOutOfBoundsException
+     */
+    public IConstraint getConstraint(int index);
+    
     /**
      * The name of the rule.
      */

@@ -51,14 +51,14 @@ public class SPORelationLocator implements IRelationLocator<ISPO> {
     
     private final SPORelation focusStore;
     
-    public SPORelationLocator(AbstractTripleStore database) {
+    public SPORelationLocator(TestTripleStore database) {
         
         this(database, null);
         
     }
     
-    public SPORelationLocator(AbstractTripleStore database,
-            AbstractTripleStore focusStore) {
+    public SPORelationLocator(TestTripleStore database,
+            TestTripleStore focusStore) {
      
         if (database == null)
             throw new IllegalArgumentException();

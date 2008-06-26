@@ -318,7 +318,7 @@ public interface IBigdataFederation extends IIndexManager {
 
     /**
      * Destroys all discovered services belonging to the federation and their
-     * persistent data.
+     * persistent data and disconnects from the federation.
      * 
      * @todo create()?
      */

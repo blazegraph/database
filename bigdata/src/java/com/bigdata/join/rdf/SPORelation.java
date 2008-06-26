@@ -33,6 +33,7 @@ import java.util.Arrays;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.SuccessorUtil;
 import com.bigdata.join.AbstractAccessPath;
 import com.bigdata.join.IAccessPath;
 import com.bigdata.join.IChunkedIterator;
@@ -40,6 +41,7 @@ import com.bigdata.join.IKeyOrder;
 import com.bigdata.join.IMutableRelation;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.ISolution;
+import com.bigdata.join.IVariableOrConstant;
 import com.bigdata.join.SolutionComparator;
 
 /**
@@ -69,6 +71,10 @@ import com.bigdata.join.SolutionComparator;
  *       The {explicit,inferred,axiom} marker needs to be set to [inferred] when
  *       the rule generated the bindings for the triple.
  * 
+ * @todo integration with package providing magic set rewrites of rules in order
+ *       to test whether or not a statement is still provable when it is
+ *       retracted during TM.
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -77,9 +83,9 @@ public class SPORelation implements IMutableRelation<ISPO> {
     // @todo IRawTripleStore when re-factored back to the rdf module.
     private transient final long NULL = 0L;
     
-    private final AbstractTripleStore tripleStore;
+    private final TestTripleStore tripleStore;
     
-    public SPORelation(AbstractTripleStore tripleStore) {
+    public SPORelation(TestTripleStore tripleStore) {
         
         if (tripleStore == null)
             throw new IllegalArgumentException();
@@ -107,7 +113,7 @@ public class SPORelation implements IMutableRelation<ISPO> {
 
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
-        return new SPOAccessPath(pred, keyOrder, ndx, flags);
+        return new SPOAccessPath(pred, keyOrder, ndx, flags).init();
         
     }
     
@@ -246,7 +252,15 @@ public class SPORelation implements IMutableRelation<ISPO> {
         
     }
 
-    private static class SPOAccessPath extends AbstractAccessPath<ISPO> {
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class SPOAccessPath extends AbstractAccessPath<ISPO> {
+
+        // @todo IRawTripleStore when re-factored back to the rdf module.
+        private transient final long NULL = 0L;
 
         /**
          * @param predicate
@@ -260,7 +274,56 @@ public class SPORelation implements IMutableRelation<ISPO> {
             super(predicate, keyOrder, ndx, flags);
 
         }
+        
+        public SPOAccessPath init() {
+            
+            final IPredicate<ISPO> pred = getPredicate();
+            
+            final long s;
+            {
+                final IVariableOrConstant<Long> t = pred.get(0);
+                s = t.isVar() ? NULL : t.get();
+            }
 
+            final long p;
+            {
+                final IVariableOrConstant<Long> t = pred.get(1);
+                p = t.isVar() ? NULL : t.get();
+            }
+
+            final long o;
+            {
+                final IVariableOrConstant<Long> t = pred.get(2);
+                o = t.isVar() ? NULL : t.get();
+            }
+
+            final SPOTupleSerializer tupleSer = (SPOTupleSerializer) ndx
+                    .getIndexMetadata().getTupleSerializer();
+            
+            final byte[] fromKey;
+            {
+                final SPO spo = new SPO(s, p, o);
+
+                fromKey = tupleSer.serializeKey(spo);
+            }
+
+            final byte[] toKey;
+            {
+                final SPO spo = new SPO(s, p, o + 1);
+
+                toKey = tupleSer.serializeKey(spo);
+            }
+
+            setFromKey(fromKey);
+
+            setToKey(toKey);
+
+            super.init();
+        
+            return this;
+            
+        }
+        
     }
 
 }
