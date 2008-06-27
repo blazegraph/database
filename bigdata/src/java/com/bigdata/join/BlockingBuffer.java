@@ -208,7 +208,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     }
 
     public void close() {
-        
+    
         this.open = false;
 
         log.info("closed.");
@@ -219,10 +219,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         if (cause == null)
             throw new IllegalArgumentException();
-        
-        this.cause = cause;
-        
-        this.open = false;
+
+        log.warn("cause=" + cause, cause);
+
+        synchronized (this) {
+
+            if (this.cause != null) {
+
+                log.warn("Already aborted with cause=" + this.cause);
+
+                return;
+
+            }
+
+            this.cause = cause;
+
+            this.open = false;
+            
+        }
         
     }
     
@@ -361,7 +375,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         public void close() {
 
-            assertNotAborted();
+            log.debug("");
             
             if (!open)
                 return;
@@ -381,6 +395,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         public boolean hasNext() {
 
+            log.debug("");
+
             assertNotAborted();
 
             if(!open) {
@@ -399,6 +415,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
              * to loop until the buffer is closed AND there are no more elements
              * in the queue.
              */
+            
+            final long begin = System.currentTimeMillis();
+            
             while (BlockingBuffer.this.open || !queue.isEmpty()) {
 
                 assertNotAborted();
@@ -416,6 +435,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                         Thread.sleep(100/*millis*/);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
+                    }
+                    
+                    final long now = System.currentTimeMillis();
+                    
+                    final long elapsed = now - begin;
+
+                    if (elapsed > 2000) {
+
+                        // @todo use a movable threshold to avoid too frequent retriggering
+                        log.warn("Iterator is not progressing...");
+                        
                     }
                     
                     continue;
@@ -444,6 +474,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 throw new NoSuchElementException();
 
             }
+
+            log.debug("");
 
             assert !queue.isEmpty();
             

@@ -28,12 +28,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join.rdf;
 
+import java.util.concurrent.Future;
+
+import org.apache.log4j.Logger;
+
 import com.bigdata.join.AbstractSolutionBuffer;
 import com.bigdata.join.ActionEnum;
 import com.bigdata.join.ArrayBindingSet;
 import com.bigdata.join.BlockingBuffer;
 import com.bigdata.join.Constant;
 import com.bigdata.join.DefaultEvaluationPlan;
+import com.bigdata.join.EmptyProgramTask;
 import com.bigdata.join.IBindingSet;
 import com.bigdata.join.IBlockingBuffer;
 import com.bigdata.join.IBuffer;
@@ -49,22 +54,36 @@ import com.bigdata.join.IRule;
 import com.bigdata.join.ISolution;
 import com.bigdata.join.IVariable;
 import com.bigdata.join.IVariableOrConstant;
-import com.bigdata.join.LocalRuleExecutionTask;
+import com.bigdata.join.LocalProgramTask;
 import com.bigdata.join.RuleState;
 import com.bigdata.join.Solution;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.LocalDataServiceFederation;
 
 /**
+ * Encasulates everything required to execute JOINs for the {@link SPORelation}
+ * when running with a single embedded {@link DataService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class SPOJoinNexus implements IJoinNexus {
 
+    protected static Logger log = Logger.getLogger(SPOJoinNexus.class);
+    
     /**
      * 
      */
     private static final long serialVersionUID = 1151635508669768925L;
 
+    private final IBigdataClient client;
+    
     private final boolean elementOnly;
     
     private final IRelationLocator<SPO> relationLocator;
@@ -79,12 +98,17 @@ public class SPOJoinNexus implements IJoinNexus {
      * 
      * @param elementOnly
      */
-    public SPOJoinNexus(boolean elementOnly,
+    public SPOJoinNexus(IBigdataClient client, boolean elementOnly,
             IRelationLocator<SPO> relationLocator) {
+
+        if (client == null)
+            throw new IllegalArgumentException();
 
         if (relationLocator == null)
             throw new IllegalArgumentException();
 
+        this.client = client;
+        
         this.elementOnly = elementOnly;
 
         this.relationLocator = relationLocator;
@@ -162,7 +186,15 @@ public class SPOJoinNexus implements IJoinNexus {
 
         final long o = asBound(pred, 2, bindingSet);
 
-        return new SPO(s, p, o);
+        final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug(spo.toString());
+            
+        }
+        
+        return spo;
         
     }
 
@@ -202,13 +234,25 @@ public class SPOJoinNexus implements IJoinNexus {
 
         final SPO spo = newElement(rule.getHead(), bindingSet);
 
+        final Solution<SPO> solution;
+        
         if (elementOnly) {
 
-            return new Solution<SPO>(spo);
+            solution = new Solution<SPO>(spo);
 
+        } else {
+
+            solution = new Solution<SPO>(spo, rule, bindingSet.clone());
+            
         }
-
-        return new Solution<SPO>(spo, rule, bindingSet.clone());
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug(solution.toString());
+            
+        }
+        
+        return solution;
 
     }
 
@@ -263,10 +307,155 @@ public class SPOJoinNexus implements IJoinNexus {
 
     }
 
-    public IProgramTask newProgramTask(ActionEnum action, IProgram program) {
+    /**
+     * @deprecated by {@link #runProgram(ActionEnum, IProgram)}
+     */
+    public IProgramTask newProgramTask(final ActionEnum action,
+            final IProgram program) {
+
+        if (!program.isRule() && program.stepCount() == 0) {
+
+            log.warn("Empty program");
+
+            return new EmptyProgramTask(action, program);
+
+        }
+
+        final IProgramTask task = new LocalProgramTask(action, program, this);
         
-        return new LocalRuleExecutionTask(action, program, this);
-        
+        return task;
+
     }
 
+    /**
+     * FIXME create two variants : one for query and one for insert/update .
+     * That will make the API cleaner for the caller.
+     */
+    public Object runProgram(ActionEnum action, IProgram program) throws Exception {
+
+        if (!program.isRule() && program.stepCount() == 0) {
+
+            log.warn("Empty program");
+
+            return new EmptyProgramTask(action, program).call();
+
+        }
+
+        //      final IProgramTask innerTask = newProgramTask(action, program);
+
+        final IBigdataFederation fed = client.getFederation();
+        
+        final IProgramTask innerTask;
+
+        /*
+         * FIXME Can't run yet on the data service. both a bug and need access
+         * to IBigdataClient there!
+         */
+        if (false && fed instanceof LocalDataServiceFederation) {
+            
+            /*
+             * This variant is submitted and executes on the DataService (fast).
+             * This can only be done if all indices for the relation(s) are
+             * located on the SAME data service.
+             * 
+             * This is always true for LDS.
+             * 
+             * It MAY be true for other federations. It will certainly be true
+             * for an EDS with only one DataService.
+             * 
+             * @todo improve decision making here (cover more cases).
+             * 
+             * @todo handle a purely local Journal.
+             */
+            
+            final DataService dataService = ((LocalDataServiceFederation)fed).getDataService();
+
+            innerTask = new LocalProgramTask(action, program, this);
+                        
+            log.info("Will run on data service.");
+            
+            final IConcurrencyManager concurrencyManager = dataService.getConcurrencyManager();
+            
+            /*
+             * Note: The index names must be gathered from each relation on
+             * which the task will write so that they can be declared. We can't
+             * just pick and choose using the access paths since we do not know
+             * how the propagation of bindings will effect access path selection
+             * so we need a lock on all of the indices before the task can run
+             * (at least, before it can run if it is a writer - no locks are
+             * required for query).
+             */
+            
+            final String[] resource;
+            final long timestamp;
+            if(action.isMutation()) {
+
+                timestamp = ITx.UNISOLATED;
+
+                /*
+                 * FIXME This is going to require an API to disclose the index
+                 * names for the IRelation.
+                 * 
+                 * FIXME This should not be an unisolated task. The writing the
+                 * mutations on the relation needs to be unisolated, but
+                 * computing the solutions can be a historical read.
+                 * 
+                 * FIXME For a fixed point computation, we need to advance the
+                 * commit time after each round.
+                 */
+                resource = new String[]{"test.SPO","test.POS","test.OSP"};
+
+                log.info("Will submit unisolated task");
+                
+            } else {
+                
+                // FIXME negative timestamp @issue
+                timestamp = - dataService.getResourceManager().getLiveJournal()
+                        .getCommitRecord().getTimestamp();
+
+                resource = new String[] {};
+
+                log.info("Will submit read-only task");
+
+            }
+            
+            final AbstractTask task = new AbstractTask(concurrencyManager, timestamp,
+                    resource) {
+
+                @Override
+                protected Object doTask() throws Exception {
+                    
+                    log.info("Execution the inner task");
+                    
+                    return innerTask.call();
+                    
+                }
+                
+            };
+
+            log.info("Submitting task to the data service.");
+
+            final Future<Object> future = concurrencyManager.submit( task );
+            
+            return future.get();
+            
+        } else {
+            
+            /*
+             * This variant will execute using IClientIndex (slow). It needs to
+             * be used if the federation is distributed since we can't assume
+             * that all indices are on the same data service.
+             */
+
+            log.info("Running inner task in caller's thread.");
+
+            innerTask = new LocalProgramTask(action, program, this, client
+                    .getFederation().getThreadPool());
+            
+            return innerTask.call();
+
+        }
+
+    }
+    
 }

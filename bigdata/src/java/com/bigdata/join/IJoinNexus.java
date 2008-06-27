@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.join;
 
 import java.io.Serializable;
-import java.util.concurrent.Callable;
 
 /**
  * Interface provides an interoperability nexus for the {@link IPredicate}s,
@@ -148,12 +147,8 @@ public interface IJoinNexus extends Serializable {
      * 
      * @return The evaluation plan.
      * 
-     * @todo Make the plan extend {@link Callable} and just run it? When local
-     *       and no concurrency control it will directly execute the joins. When
-     *       local w/ concurrency control, it will submit the tasks that execute
-     *       the joins. When remote, it will handle the proxies communicating
-     *       with the remote execution of the task. When distributed, it will
-     *       map the joins across the data.
+     * @todo might be moved inside of the
+     *       {@link #newProgramTask(ActionEnum, IProgram)}
      */
     IEvaluationPlan newEvaluationPlan(IRule rule);
 

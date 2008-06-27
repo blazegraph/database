@@ -39,7 +39,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
@@ -47,25 +46,30 @@ import org.apache.log4j.Logger;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.LocalDataServiceFederation;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.DataService.IDataServiceAwareProcedure;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * Utility class for evaluating {@link IProgram}s.
+ * Task for executing a program when all of the indices for the relation are
+ * co-located on the same {@link DataService}.
+ * 
+ * FIXME Interrupts generated when the iterator is closed/aborted are causing
+ * problems for group commit. The Query task should not be running as
+ * UNISOLATED, but this is happening when the {@link LocalProgramTask} is run by
+ * the client and the client is issuing remote requests to the data service.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalRuleExecutionTask implements IProgramTask,
-        IDataServiceAwareProcedure, Serializable {
+public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedure,Serializable {
 
     /**
      * 
      */
-    private static final long serialVersionUID = -5664880975111304566L;
+    private static final long serialVersionUID = -7047397038429305180L;
 
-    protected static final Logger log = Logger.getLogger(LocalRuleExecutionTask.class);
+    protected static final Logger log = Logger.getLogger(LocalProgramTask.class);
     
     private ActionEnum action;
     
@@ -73,29 +77,62 @@ public class LocalRuleExecutionTask implements IProgramTask,
     
     private IJoinNexus joinNexus;
     
-    private transient DataService dataService;
+    /**
+     * Note: NOT serialized!
+     */
+    private transient ExecutorService service;
     
+    /**
+     * Note: NOT serialized!
+     */
+    private transient DataService dataService;
+
     public void setDataService(DataService dataService) {
 
-        this.dataService = dataService;
+        log.info("Running on data service!");
         
+        this.dataService = dataService;
+
     }
-    
+
     /**
      * De-serialization ctor.
      */
-    public LocalRuleExecutionTask() {
+    public LocalProgramTask() {
 
     }
 
     /**
+     * Variant when the task will be submitted using
+     * {@link IDataService#submit(Callable)} (efficient).
      * 
      * @param action
      * @param program
      * @param joinNexus
      */
-    public LocalRuleExecutionTask(ActionEnum action, IProgram program,
+    public LocalProgramTask(ActionEnum action, IProgram program,
             IJoinNexus joinNexus) {
+
+        this(action, program, joinNexus, null);
+
+    }
+
+    /**
+     * Variant when the task will be executed directly by the caller (not
+     * efficient).
+     * 
+     * @param action
+     * @param program
+     * @param joinNexus
+     * @param service
+     *            The service that will be used to parallelize the task
+     *            execution. If <code>null</code>, then the caller MUST be
+     *            submit using {@link IDataService#submit(Callable)}.
+     * 
+     * @see IBigdataFederation#getThreadPool()
+     */
+    public LocalProgramTask(ActionEnum action, IProgram program,
+            IJoinNexus joinNexus, ExecutorService service) {
 
         if (action == null)
             throw new IllegalArgumentException();
@@ -111,36 +148,14 @@ public class LocalRuleExecutionTask implements IProgramTask,
         this.program = program;
 
         this.joinNexus = joinNexus;
-
-    }
-
-    /**
-     * @todo obtain the executor service from the {@link IBigdataClient} on
-     * the {@link DataService} (make the dataservice run a full client
-     * rather than just some restricted facets of a client).
-     * 
-     * @todo The {@link LocalDataServiceFederation} should reuse the thread
-     * pool for the client, the data service, etc.?
-     * 
-     * @todo Is there any problem introduced by having multiple threads
-     * access a read-only index once the task has been granted the right to
-     * run?
-     */
-    protected ExecutorService getService() {
         
-//        if(dataService!=null) {
-//
-//            return dataService.getConcurrencyManager()....dataService;
-//            
-//        } else {
-
-            return Executors.newCachedThreadPool(DaemonThreadFactory
-                    .defaultThreadFactory());
-
-//        }
-
+        /*
+         * If null, then the caller MUST be submit using DataService#submit().
+         */
+        this.service = service; 
+        
     }
-    
+
     /**
      * Execute the program.
      * <p>
@@ -152,6 +167,7 @@ public class LocalRuleExecutionTask implements IProgramTask,
      * If we are writing on a relation (insert or delete) then we use an
      * {@link AbstractArrayBuffer} that flushes onto the appropriate method on
      * the {@link IMutableRelation}.
+     * @throws Exception 
      * 
      * @todo it should be possible to have a different action associated with
      *       each rule in the program, and to have a different target relation
@@ -192,69 +208,82 @@ public class LocalRuleExecutionTask implements IProgramTask,
      * easy to describe the execution state of the iterator, but it may be
      * possible to describe the JOIN execution state in a similar manner.
      * 
-     * @todo the data service submit() method should not have index names or
-     *       timestamps. All of that should be in the callable itself. The
-     *       callable will need to implement IDataServiceAwareProcedure to get
-     *       the IBigdataClient and IDataService references. It can then use the
-     *       client's thread pool to submit a task to the data service for
-     *       execution. Map/reduce can be handled in the same manner. (Note that
-     *       we have excellent locators for the best data service when the
-     *       map/reduce input is the scale-out repository since the task should
-     *       run on the data service that hosts the file block(s). When failover
-     *       is supported, the task can run on the service instance with the
-     *       least load. When the input is a networked file system, then
-     *       additional network topology smarts would be required to make good
-     *       choices.)
-     * 
      * @todo it should be possible to handle different relation classes in the
      *       same rules, e.g., RDF and non-RDF relations. Or even the SPO and
      *       lexicon relation for the RDF DB -- the latter will be useful for
      *       materializing extenalized statements efficiently.
-     * 
-     * @todo handle sub-programs (vs just rules).
-     * 
-     * FIXME handle closure using
-     * {@link #fixPoint(IProgram, ExecutorService, IBuffer)}. This requires
-     * that the buffer is setup to flush() on an {@link IMutableRelation} rather
-     * than for QUERY. We are at a fixed point when the buffer(s) are flushed at
-     * the end of a round and nothing was changed in the target relation(s).
      */
-    public Object call() throws InterruptedException, ExecutionException {
+    public Object call() throws Exception {
+
+        if(log.isDebugEnabled()) {
+
+            log.debug("begin: program="+program.getName()+", action="+action);
+            
+        }
 
         final ExecutorService service = getService();
-        
+
         try {
 
             if (action.isMutation()) {
 
+                if (program.isClosure()) {
+
+                    return fixPoint(program, joinNexus, service);
+
+                }
+
                 return executeMutation(program, service).mutationCount.get();
-                
+
             } else {
-                
+
                 return executeQuery(program, service);
+
+            }
+
+        } finally {
+
+            log.debug("bye");
+
+        }
+
+    }
+
+    /**
+     * Uses the supplied service. If running on a {@link DataService} then uses
+     * the {@link IBigdataClient}'s thread pool for that {@link DataService}.
+     * 
+     * @todo Is there any problem introduced by having multiple threads access a
+     *       read-only index once the task has been granted the right to run?
+     * 
+     * @throws IllegalStateException
+     *             if <i>service</i> was not specified to the ctor and/or the
+     *             task is not executing on a {@link DataService}.
+     * 
+     * @see IDataService#submit(Callable)
+     * @see DataService#getClient()
+     */
+    protected ExecutorService getService() {
+        
+        if (service == null) {
+
+            if (dataService == null) {
+
+                throw new IllegalStateException("Not executing on "
+                        + DataService.class.getName());
                 
             }
             
-        } finally {
-        
-//            if (dataService == null) {
-//
-//                /*
-//                 * Note: If we are using a temporary service to execute the program then
-//                 * shut it down now.
-//                 * 
-//                 * Note: If we use the data service's thread pool when running inside of
-//                 * a data service then MUST NOT shutdown that thread pool.
-//                 */
-                
-                service.shutdownNow();
-                
-//            }
+            return dataService.getClient().getFederation().getThreadPool();
             
-        }
-        
-    }
+        } else {
 
+            return service;
+
+        }
+
+    }
+    
     /**
      * The set of distinct relations identified by the various rules.
      */
@@ -263,9 +292,14 @@ public class LocalRuleExecutionTask implements IProgramTask,
         Set<IRelationName> c = new HashSet<IRelationName>();
         
         getRelationNames(program, c);
-        
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Found "+c.size()+" relations, program="+program.getName());
+            
+        }
+
         return c;
-        
         
     }
     
@@ -298,6 +332,11 @@ public class LocalRuleExecutionTask implements IProgramTask,
      *             if any relation can not be resolved.
      * @throws RuntimeException
      *             if any relation is not local.
+     * 
+     * @todo verify that all the relations are local.
+     * 
+     * @todo use this to get the set of index names on which we might need a
+     *       lock.
      */
     protected Map<IRelationName,IRelation> getRelations(IProgram program) {
         
@@ -305,8 +344,13 @@ public class LocalRuleExecutionTask implements IProgramTask,
         
         getRelations(program, c);
         
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Located "+c.size()+" relations, program="+program.getName());
+            
+        }
+
         return c;
-        
         
     }
     
@@ -361,7 +405,13 @@ public class LocalRuleExecutionTask implements IProgramTask,
             throw new IllegalStateException();
             
         }
-        
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("");
+            
+        }
+
         final Map<IRelationName, IBuffer<ISolution>> c = new HashMap<IRelationName, IBuffer<ISolution>>(
                 relations.size());
 
@@ -401,7 +451,13 @@ public class LocalRuleExecutionTask implements IProgramTask,
             c.put(relationName, buffer);
             
         }
-        
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Created "+c.size()+" mutation buffers: action="+action);
+            
+        }
+
         return c;
         
     }
@@ -433,59 +489,76 @@ public class LocalRuleExecutionTask implements IProgramTask,
         if (service == null)
             throw new IllegalArgumentException();
         
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName());
+        
         final IBlockingBuffer<ISolution> buffer = joinNexus.newQueryBuffer();
 
         final List<Callable<RuleStats>> tasks = newQueryTasks(program, joinNexus,
                 buffer);
 
-        final Future<Void> future = service.submit(new Callable<Void>() {
-
-            public Void call() throws Exception {
-
-                try {
-
-                    final RuleStats totals;
-
-                    if (program.isParallel()) {
-
-                        totals = runParallel(service, program, tasks);
-
-                    } else {
-
-                        totals = runSequential(service, program, tasks);
-
-                    }
-
-                    if(log.isInfoEnabled()) {
-                        
-                        log.info(totals);
-                        
-                    }
-                    
-                } catch (Throwable t) {
-                    
-                    buffer.abort(t);
-                
-                    throw new RuntimeException(t);
-                    
-                }
-                
-                return null;
-                
-            }
-            
-        });
+        assert tasks != null;
+        assert !tasks.isEmpty();
+        
+        /*
+         * Note: We do NOT get() this Future. This task will run asynchronously.
+         * 
+         * The Future is cancelled IF (hopefully WHEN) the iterator is closed.
+         * 
+         * If the task itself throws an error, then it will use
+         * buffer#abort(cause) to notify the buffer of the cause (it will be
+         * passed along to the iterator) and to close the buffer (the iterator
+         * will notice that the buffer has been closed as well as that the cause
+         * was set on the buffer).
+         */
+        
+        final Future<RuleStats> future = service.submit(new QueryTask(service,
+                tasks, buffer));
+        
+        /*
+         * @todo if the #of results is small and they are available with little
+         * latency then return the results inline using a fully buffered
+         * iterator.
+         */
+        
+        if (log.isDebugEnabled())
+            log.debug("Returning iterator reading on async query task");
         
         return new DelegateChunkedIterator<ISolution>(buffer.iterator()) {
             
             /**
              * If the iterator is closed then cancel the Future that is running
              * the program.
+             * 
+             * @todo refactor this into a helper class?
              */
             public void close() {
-                
-                // cancel the program execution.
-                future.cancel(true/*mayInterruptIfRunning*/);
+
+                if(!future.isDone()) {
+
+                    /*
+                     * If the query is still running and we close the iterator
+                     * then the query will block once the iterator fills up and
+                     * it will fail to progress. To avoid this, and to have the
+                     * query terminate eagerly if the client closes the
+                     * iterator, we cancel the future if it is not yet done.
+                     */
+                    
+                    if(log.isDebugEnabled()) {
+                        
+                        log.debug("will cancel future: "+future);
+                        
+                    }
+                    
+                    future.cancel(true/*mayInterruptIfRunning*/);
+                    
+                    if(log.isDebugEnabled()) {
+                        
+                        log.debug("did cancel future: "+future);
+                        
+                    }
+
+                }
 
                 // pass close() onto the delegate.
                 super.close();
@@ -494,6 +567,81 @@ public class LocalRuleExecutionTask implements IProgramTask,
             
         };
 
+    }
+
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class QueryTask implements Callable<RuleStats> {
+        
+        private final ExecutorService service;
+        private final List<Callable<RuleStats>>tasks;
+        private final IBlockingBuffer<ISolution> buffer;
+
+        public QueryTask(ExecutorService service,
+                List<Callable<RuleStats>> tasks, IBlockingBuffer<ISolution> buffer) {
+
+            if (service == null)
+                throw new IllegalArgumentException();
+
+            if (tasks == null)
+                throw new IllegalArgumentException();
+
+            if (buffer == null)
+                throw new IllegalArgumentException();
+            
+            this.service = service;
+            
+            this.tasks = tasks;
+            
+            this.buffer = buffer;
+            
+        }
+        
+        public RuleStats call() throws Exception {
+
+            try {
+
+                final RuleStats totals;
+
+                if (program.isParallel()) {
+
+                    totals = runParallel(service, program, tasks);
+
+                } else {
+
+                    totals = runSequential(service, program, tasks);
+
+                }
+
+                if(log.isInfoEnabled()) {
+                    
+                    log.info(totals);
+                    
+                }
+                
+                return totals;
+
+            } catch (Throwable t) {
+                
+                log.error("Problem running query: "+t, t);
+
+                /*
+                 * Note: This will close the buffer. It will also cause the
+                 * iterator to throw the [cause] from hasNext() (or next(),
+                 * which invokes hasNext()).
+                 */
+                
+                buffer.abort(t/*cause*/);
+            
+                throw new RuntimeException(t);
+                
+            }
+            
+        }
+        
     }
     
     protected RuleStats executeMutation(final IProgram program, final ExecutorService service)
@@ -505,6 +653,9 @@ public class LocalRuleExecutionTask implements IProgramTask,
         if (service == null)
             throw new IllegalArgumentException();
 
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName());
+        
         final Map<IRelationName, IRelation> relations = getRelations(program);
 
         assert !relations.isEmpty();
@@ -563,8 +714,14 @@ public class LocalRuleExecutionTask implements IProgramTask,
 
         final int n = buffers.size();
 
-        if (n == 0)
+        if (n == 0) {
+
+            if (log.isInfoEnabled())
+                log.info("No buffers.");
+
             return;
+            
+        }
         
         if (n == 1) {
 
@@ -626,15 +783,17 @@ public class LocalRuleExecutionTask implements IProgramTask,
     protected List<Callable<RuleStats>> newQueryTasks(IProgram program,
             IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
 
-        final List<Callable<RuleStats>> tasks = new ArrayList<Callable<RuleStats>>(program.stepCount());
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName());
 
-        final Iterator<IProgram> itr = program.steps();
+        final List<Callable<RuleStats>> tasks;
 
-        while (itr.hasNext()) {
+        if (program.isRule()) {
 
-            // @todo handle sub-programs.
-            final Rule rule = (Rule) itr.next();
+            tasks = new ArrayList<Callable<RuleStats>>(1);
 
+            final IRule rule = (IRule) program;
+            
             final RuleState ruleState = joinNexus.newRuleState(rule);
 
             final IRuleTask<RuleStats> task = new LocalNestedSubqueryEvaluator(
@@ -642,8 +801,34 @@ public class LocalRuleExecutionTask implements IProgramTask,
 
             tasks.add(task);
 
+        } else {
+
+            tasks = new ArrayList<Callable<RuleStats>>(program.stepCount());
+
+            final Iterator<IProgram> itr = program.steps();
+
+            while (itr.hasNext()) {
+
+                // @todo handle sub-programs.
+                final IRule rule = (IRule) itr.next();
+
+                final RuleState ruleState = joinNexus.newRuleState(rule);
+
+                final IRuleTask<RuleStats> task = new LocalNestedSubqueryEvaluator(
+                        ruleState, buffer);
+
+                tasks.add(task);
+
+            }
+
         }
 
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Created "+tasks.size()+" query tasks");
+            
+        }
+        
         return tasks;
 
     }
@@ -658,14 +843,16 @@ public class LocalRuleExecutionTask implements IProgramTask,
     protected List<Callable<RuleStats>> newMutationTasks(IProgram program,
             IJoinNexus joinNexus, Map<IRelationName, IBuffer<ISolution>> buffers) {
 
-        final List<Callable<RuleStats>> tasks = new ArrayList<Callable<RuleStats>>(program.stepCount());
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName());
 
-        final Iterator<IProgram> itr = program.steps();
+        final List<Callable<RuleStats>> tasks;
 
-        while (itr.hasNext()) {
+        if (program.isRule()) {
 
-            // @todo handle sub-programs.
-            final Rule rule = (Rule) itr.next();
+            tasks = new ArrayList<Callable<RuleStats>>(1);
+
+            final IRule rule = (IRule) program;
 
             final RuleState ruleState = joinNexus.newRuleState(rule);
 
@@ -673,6 +860,34 @@ public class LocalRuleExecutionTask implements IProgramTask,
                     ruleState, buffers.get(rule.getHead().getRelationName()));
 
             tasks.add(task);
+
+        } else {
+
+            tasks = new ArrayList<Callable<RuleStats>>(program.stepCount());
+
+            final Iterator<IProgram> itr = program.steps();
+
+            while (itr.hasNext()) {
+
+                // @todo handle sub-programs.
+                final IRule rule = (IRule) itr.next();
+
+                final RuleState ruleState = joinNexus.newRuleState(rule);
+
+                final IRuleTask<RuleStats> task = new LocalNestedSubqueryEvaluator(
+                        ruleState, buffers
+                                .get(rule.getHead().getRelationName()));
+
+                tasks.add(task);
+
+            }
+
+        }
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("Created " + tasks.size() + " mutation tasks: action="
+                    + action);
 
         }
 
@@ -703,6 +918,9 @@ public class LocalRuleExecutionTask implements IProgramTask,
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
 
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName()+", #tasks="+tasks.size());
+        
         final RuleStats totals = new RuleStats(program);
         
         // submit tasks and await their completion.
@@ -716,7 +934,10 @@ public class LocalRuleExecutionTask implements IProgramTask,
             totals.add(tmp);
 
         }
-        
+
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName()+", #tasks="+tasks.size()+" - done");
+
         return totals;
 
     }
@@ -736,6 +957,9 @@ public class LocalRuleExecutionTask implements IProgramTask,
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
 
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName()+", #tasks="+tasks.size());
+
         final RuleStats totals = new RuleStats(program);
         
         final Iterator<Callable<RuleStats>> itr = tasks.iterator();
@@ -750,6 +974,9 @@ public class LocalRuleExecutionTask implements IProgramTask,
             totals.add( tmp );
 
         }
+
+        if (log.isDebugEnabled())
+            log.debug("program=" + program.getName()+", #tasks="+tasks.size()+" - done");
 
         return totals;
 
@@ -781,22 +1008,8 @@ public class LocalRuleExecutionTask implements IProgramTask,
      * or at least you must not report such "do nothing" overwrites in the
      * mutation count!!!
      * 
-     * @param closureStats
-     *            Used to aggregate statistics across the fixed point for a
-     *            series of rule rules (the fast closure method does this).
      * @param program
      *            The program to be executed.
-     * @param buffer
-     *            Used to buffer generated entailments so that we can do
-     *            efficient ordered writes on the statement indices. The buffer
-     *            MUST write which ever of the optional <i>focusStore</i> or
-     *            the <i>database</i> you want to fix point. The buffer is
-     *            flushed periodically during processing and will be empty when
-     *            this method returns. All entailments will be in whichever
-     *            store the buffer was configured to write upon.
-     * @param resultSetSize
-     *            An object that is used to decide when the result set (whatever
-     *            the buffer writes on) has reached a fixed point.
      * @param service
      *            The service that will be used to execute the rules.
      * 
@@ -804,20 +1017,12 @@ public class LocalRuleExecutionTask implements IProgramTask,
      *       allow closure or should they be required to be a simple set of
      *       rules to be executed it parallel?
      * 
-     * @todo Should the rule execution should report the #of elements written on
-     *       the buffer. If the buffer used to write on the relation, then
-     *       should it report the #of elements inserted or removed from the
-     *       relation? If we do that, then the fixed point can be determined
-     *       when no more elements are written on (any of the) head relation(s).
-     * 
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    protected RuleStats fixPoint(IProgram program,//
-            IJoinNexus joinNexus,//
-            ExecutorService service,//
-            IBuffer<IBindingSet> buffer// @todo buffer map.
-    ) throws InterruptedException, ExecutionException {
+    protected RuleStats fixPoint(IProgram program, IJoinNexus joinNexus,
+            ExecutorService service) throws InterruptedException,
+            ExecutionException {
 
         if(!action.isMutation()) {
             
@@ -829,7 +1034,7 @@ public class LocalRuleExecutionTask implements IProgramTask,
         final long begin = System.currentTimeMillis();
 
         /*
-         * FIXME After each round we need to be reading from the post-update
+         * @todo After each round we need to be reading from the post-update
          * state the relation(s) on which the rules are writing. (It is an error
          * if the rules are not writing on at least one relation.) This assumes
          * that all of the rules are writing on the relation specified for the
@@ -837,9 +1042,11 @@ public class LocalRuleExecutionTask implements IProgramTask,
          * 
          * @todo While this will work auto-magically if the entailments are
          * written onto the using UNISOLATED while the rules use READ_COMMITTED
-         * reads, we will get better performance if we use a fixed read-behind
-         * commit timestamp for each round since the same index instances will
-         * be reused (the read-committed view is always read from the disk!)
+         * reads (and they will because the data service always using
+         * READ_COMMITTED for an UNISOLATED task that is READ_ONLY), we will get
+         * better performance if we use a fixed read-behind commit timestamp for
+         * each round since the same index instances will be reused (the
+         * read-committed view is always read from the disk!)
          */
         final RuleStats totals = new RuleStats(program);
         
