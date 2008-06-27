@@ -30,16 +30,19 @@ package com.bigdata.join.rdf;
 
 import java.io.File;
 import java.util.Properties;
+import java.util.concurrent.Callable;
 
 import com.bigdata.join.AbstractRuleTestCase;
+import com.bigdata.join.ActionEnum;
+import com.bigdata.join.ArrayBindingSet;
 import com.bigdata.join.ChunkedArrayIterator;
 import com.bigdata.join.Constant;
 import com.bigdata.join.IAccessPath;
 import com.bigdata.join.IBindingSet;
+import com.bigdata.join.IChunkedOrderedIterator;
 import com.bigdata.join.IConstant;
 import com.bigdata.join.IConstraint;
 import com.bigdata.join.IEvaluationPlan;
-import com.bigdata.join.IJoinNexus;
 import com.bigdata.join.IPredicate;
 import com.bigdata.join.IRelationName;
 import com.bigdata.join.IRule;
@@ -155,7 +158,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
         
             final IRule rule = new TestRuleRdfs9(relationName);
 
-            final RuleState ruleState = new RuleState(rule, new SPOJoinNexus(
+            final RuleState ruleState = new RuleState(rule, new SPOJoinNexus(client,
                     false/* elementOnly */, new SPORelationLocator(kb)));
 
             final IBindingSet bindingSet = ruleState.getJoinNexus()
@@ -187,7 +190,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
                     // constraints
                     new IConstraint[] {});
 
-            final RuleState ruleState = new RuleState(rule, new SPOJoinNexus(
+            final RuleState ruleState = new RuleState(rule, new SPOJoinNexus(client,
                     false/* elementOnly */, new SPORelationLocator(kb)));
 
             final IBindingSet bindingSet = ruleState.getJoinNexus()
@@ -219,7 +222,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
                     // constraints
                     new IConstraint[] {});
 
-            final RuleState ruleState = new RuleState(rule, new SPOJoinNexus(
+            final RuleState ruleState = new RuleState(rule, new SPOJoinNexus(client,
                     false/* elementOnly */, new SPORelationLocator(kb)));
 
             final IBindingSet bindingSet = ruleState.getJoinNexus()
@@ -237,21 +240,13 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
     }
 
-//    /**
-//     * Basic test of the ability insert data into a relation and pull back that
-//     * data using an unbound query. The use of an unbound query lets the
-//     * relation select whatever index it pleases and should normally select the
-//     * "clustered" index for that relation. @todo write test.
-//     */
-//    public void test_insertQuery() {
-//        
-//    }
-//    
-
     /**
-     * Test the ability to choose the more selective access path, that the
-     * selected path changes as predicates become bound, and that the resulting
-     * entailment reflects the current variable bindings.
+     * Test the ability insert data into a relation and pull back that data
+     * using a variety of access paths. The test also checks the the correct
+     * evaluation orders are computed based on the data actually in the relation
+     * and that those evaluation orders change as we add data to the relation.
+     * Finally, the test simulates how an {@link ISolution} would be computed
+     * based on incremental binding of variables.
      */
     public void test_insertQuery() {
 
@@ -266,7 +261,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
         // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
         final Rule rule = new TestRuleRdfs9(relationName);
 
-        final SPOJoinNexus joinNexus = new SPOJoinNexus(false/* elementOnly */,
+        final SPOJoinNexus joinNexus = new SPOJoinNexus(client,false/* elementOnly */,
                 new SPORelationLocator(kb));
 
         /*
@@ -337,15 +332,15 @@ public class TestSPORelation extends AbstractRuleTestCase {
                     .insert(new ChunkedArrayIterator<SPO>(
                             a.length, a, null/* keyOrder */)));
             
+            if (log.isInfoEnabled()) {
+
+                log.info("KB Dump:\n"+kb.dump());
+                
+            }
+
+            assertEquals(3, spoRelation.getElementCount(true/*exact*/));
+
         }
-
-        if (log.isInfoEnabled()) {
-
-            log.info("KB Dump:\n"+kb.dump());
-            
-        }
-
-        assertEquals(3, spoRelation.getElementCount(true/*exact*/));
 
         /*
          * Verify range counts for the access paths for each predicate in the
@@ -421,6 +416,162 @@ public class TestSPORelation extends AbstractRuleTestCase {
             
             // verify that a copy was made of the bindings.
             assertTrue(bindings!=solution.getBindingSet());
+        }
+        
+    }
+
+    /**
+     * A simple test of rule execution.
+     * 
+     * @throws Exception
+     * 
+     * @todo test insert. it would be especially nice if I could get some
+     *       entailments from the rule and then insert them into the relation
+     *       and read them back out.
+     * 
+     * @todo delete is not implemented for SPORelation so update the test when I
+     *       re-integrate with the RDF KB module.
+     * 
+     */
+    public void test_runRule() throws Exception {
+
+        // define some vocabulary.
+        final IConstant<Long> U1 = new Constant<Long>(11L);
+        final IConstant<Long> U2 = new Constant<Long>(12L);
+        final IConstant<Long> V1 = new Constant<Long>(21L);
+        final IConstant<Long> V2 = new Constant<Long>(22L);
+        final IConstant<Long> X1 = new Constant<Long>(31L);
+        // final IConstant<Long> X2 = new Constant<Long>(32L);
+
+        // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
+        final Rule rule = new TestRuleRdfs9(relationName);
+
+        final SPOJoinNexus joinNexus = new SPOJoinNexus(client,
+                false/* elementOnly */, new SPORelationLocator(kb));
+
+        /*
+         * Verify Query with no data in the KB. 
+         */
+        {
+
+//            final Callable task = joinNexus.newProgramTask(ActionEnum.Query,
+//                    rule);
+
+            final IChunkedOrderedIterator<ISolution<SPO>> itr = (IChunkedOrderedIterator<ISolution<SPO>>) joinNexus
+                    .runProgram(ActionEnum.Query, rule);
+            
+            try {
+
+                assertFalse(itr.hasNext());
+
+            } finally {
+
+                itr.close();
+
+            }
+
+        }
+
+        // FIXME run the rest of this test.
+        if(true) return;
+        
+        /*
+         * Add some data into the store where it is visible to the access paths
+         * in use by the rule and notice the change in the range count.
+         * 
+         * Note: Given the rule and the data that we add into the KB.
+         * 
+         * (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
+         * 
+         * there should be one solution:
+         * 
+         * (U1,rdfs:subClassOf,X1), (V1,rdf:type,U1) -> (V1,rdf:type,X1)
+         * 
+         * This is checked below.
+         */
+        final SPORelation spoRelation = kb.getSPORelation();
+        {
+
+            final SPO[] a = new SPO[] {
+
+                    // (u rdf:subClassOf x)
+                    new SPO(U1, rdfsSubClassOf, X1, StatementEnum.Explicit),
+            
+                    // (v rdf:type u)
+                    new SPO(V1, rdfType, U1, StatementEnum.Explicit),
+                    new SPO(V2, rdfType, U2, StatementEnum.Explicit)
+
+            };
+            
+            assertEquals(3,spoRelation
+                    .insert(new ChunkedArrayIterator<SPO>(
+                            a.length, a, null/* keyOrder */)));
+            
+            if (log.isInfoEnabled()) {
+
+                log.info("KB Dump:\n"+kb.dump());
+                
+            }
+
+            assertEquals(3, spoRelation.getElementCount(true/*exact*/));
+            
+        }
+
+        /*
+         * Verify range counts for the access paths for each predicate in the
+         * tail. These counts reflect the data that we just wrote onto the
+         * relation.
+         */
+        {
+
+            // (u rdf:subClassOf x)
+            assertEquals(1, spoRelation.getAccessPath(rule.getTail(0))
+                    .rangeCount(false/* exact */));
+
+            // (v rdf:type u)
+            assertEquals(2, spoRelation.getAccessPath(rule.getTail(1))
+                    .rangeCount(false/* exact */));
+            
+        }
+
+        /*
+         * Execute the rule again (Query) and see what we get.
+         */
+        {
+
+//            final Callable task = joinNexus.newProgramTask(ActionEnum.Query,
+//                    rule);
+
+            final IChunkedOrderedIterator<ISolution<SPO>> itr = (IChunkedOrderedIterator<ISolution<SPO>>) joinNexus
+                    .runProgram(ActionEnum.Query, rule);
+            
+            // (U1,rdfs:subClassOf,X1), (V1,rdf:type,U1) -> (V1,rdf:type,X1)
+            
+            final SPO expectedSPO = new SPO(V1, rdfType, X1, StatementEnum.Inferred);
+            
+            final IBindingSet expectedBindingSet = new ArrayBindingSet(rule.getVariableCount());
+            expectedBindingSet.set(Var.var("u"), U1);
+            expectedBindingSet.set(Var.var("v"), V1);
+            expectedBindingSet.set(Var.var("x"), X1);
+
+            try {
+
+                assertTrue(itr.hasNext());
+
+                final ISolution solution = itr.next();
+                
+                assertTrue(solution.get().equals(expectedSPO));
+
+                assertTrue(solution.getRule() == rule);
+
+                assertTrue(solution.getBindingSet().equals(expectedBindingSet));
+
+            } finally {
+
+                itr.close();
+
+            }
+
         }
         
     }

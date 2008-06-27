@@ -29,11 +29,9 @@ package com.bigdata.join;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 
 /**
@@ -356,15 +354,22 @@ public class RuleStats {
      */
     synchronized public void add(RuleStats o) {
     
+        if (o == null)
+            throw new IllegalArgumentException();
+        
         detailStats.add(o);
         
-        for(int i=0; i<elementCount.length; i++) {
+        if (elementCount != null && o.elementCount != null) {
 
-            elementCount[i] += o.elementCount[i];
-            
-            nsubqueries[i] += o.nsubqueries[i];
+            for (int i = 0; i < elementCount.length; i++) {
 
-            // Note: order[] is NOT aggregated.
+                elementCount[i] += o.elementCount[i];
+
+                nsubqueries[i] += o.nsubqueries[i];
+
+                // Note: order[] is NOT aggregated.
+
+            }
             
         }
         

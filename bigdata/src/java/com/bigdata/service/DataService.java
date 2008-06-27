@@ -80,7 +80,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
@@ -393,7 +392,7 @@ abstract public class DataService extends AbstractService
     /**
      * Return the client used by the {@link DataService}.
      */
-    protected IBigdataClient getClient() {
+    public IBigdataClient getClient() {
         throw new UnsupportedOperationException();
     }
         
@@ -1671,6 +1670,21 @@ abstract public class DataService extends AbstractService
 
     /**
      * The task will be run on the {@link IBigdataFederation#getThreadPool()}.
+     * <p>
+     * The {@link Callable} MAY implement {@link IDataServiceAwareProcedure} to
+     * obtain the {@link DataService} reference, which can be used to obtain a
+     * local {@link IBigdataClient} reference or to submit additional tasks to
+     * the {@link ConcurrencyManager}.
+     * 
+     * @todo Map/reduce can be handled in the this manner.
+     *       <p>
+     *       Note that we have excellent locators for the best data service when
+     *       the map/reduce input is the scale-out repository since the task
+     *       should run on the data service that hosts the file block(s). When
+     *       failover is supported, the task can run on the service instance
+     *       with the least load. When the input is a networked file system,
+     *       then additional network topology smarts would be required to make
+     *       good choices.
      */
     public Future submit(Callable task)
             throws InterruptedException, ExecutionException {
@@ -1729,7 +1743,16 @@ abstract public class DataService extends AbstractService
             if (name == null)
                 throw new IllegalArgumentException();
             
-            // Choose READ_COMMITTED iff itr is read-only and UNISOLATED was requested.
+            /*
+             * Choose READ_COMMITTED iff itr is read-only and UNISOLATED was
+             * requested.
+             * 
+             * FIXME There are new capabilities for concurrent mutation with the
+             * TupleCursor so the criteria here will have to be changed. Perhaps
+             * a READONLY flag could be introduced to make it explicit when
+             * using a tuple cursor that writes will not be perform (and hence
+             * will not be allowed)?
+             */
             final long startTime = (tx == ITx.UNISOLATED
                         && ((flags & IRangeQuery.REMOVEALL)==0)? ITx.READ_COMMITTED
                         : tx);

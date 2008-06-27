@@ -167,9 +167,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
     }
 
     /**
-     * Return the local {@link IDataService}.
+     * Return the local {@link DataService}.
      */
-    public IDataService getDataService() {
+    public DataService getDataService() {
         
         assertOpen();
         

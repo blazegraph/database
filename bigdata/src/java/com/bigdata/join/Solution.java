@@ -118,4 +118,22 @@ public class Solution<E> implements ISolution<E> /*, FIXME Serializable*/ {
         
     }
 
+    public String toString() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("Solution{");
+        
+        sb.append("element="+e);
+        
+        sb.append("rule="+rule);
+        
+        sb.append("bindingSet="+bindingSet);
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+    
 }

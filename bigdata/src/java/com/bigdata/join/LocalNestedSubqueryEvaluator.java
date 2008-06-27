@@ -113,7 +113,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleTask<RuleStats> {
         
         ruleStats.elapsed += System.currentTimeMillis() - begin;
         
-        return null;
+        return ruleStats;
         
     }
     
