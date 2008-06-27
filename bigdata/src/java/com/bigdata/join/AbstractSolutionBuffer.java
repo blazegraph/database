@@ -1,6 +1,5 @@
 package com.bigdata.join;
 
-import com.bigdata.join.IMutableRelation.ITransform;
 
 /**
  * Base class for {@link IBuffer} whose target is a mutation (insert, delete, or
@@ -79,13 +78,13 @@ abstract public class AbstractSolutionBuffer<R> extends
      * @version $Id$
      * @param <E>
      */
-    public static class InsertBuffer<E> extends AbstractSolutionBuffer<E> {
+    public static class InsertSolutionBuffer<E> extends AbstractSolutionBuffer<E> {
 
         /**
          * @param capacity
          * @param relation
          */
-        protected InsertBuffer(int capacity, IMutableRelation<E> relation) {
+        public InsertSolutionBuffer(int capacity, IMutableRelation<E> relation) {
 
             super(capacity,relation);
 
@@ -117,20 +116,20 @@ abstract public class AbstractSolutionBuffer<R> extends
     }
     
     /**
-     * Buffer writes on {@link IMutableRelation#remove(IChunkedOrderedIterator)} when it is
+     * Buffer writes on {@link IMutableRelation#delete(IChunkedOrderedIterator)} when it is
      * {@link #flush() flushed}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * @param <E>
      */
-    public static class RemoveBuffer<E> extends AbstractSolutionBuffer<E> {
+    public static class DeleteSolutionBuffer<E> extends AbstractSolutionBuffer<E> {
 
         /**
          * @param capacity
          * @param relation
          */
-        protected RemoveBuffer(int capacity, IMutableRelation<E> relation) {
+        public DeleteSolutionBuffer(int capacity, IMutableRelation<E> relation) {
 
             super(capacity,relation);
 
@@ -151,59 +150,61 @@ abstract public class AbstractSolutionBuffer<R> extends
 
             };
             
-            return getRelation().remove( itr2 );
+            return getRelation().delete( itr2 );
             
         }
         
     }
     
-    /**
-     * Buffer writes on
-     * {@link IMutableRelation#update(IChunkedOrderedIterator, ITransform)} when it is
-     * {@link #flush() flushed}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <E>
-     */
-    public static class UpdateBuffer<E> extends AbstractSolutionBuffer<E> {
-
-        private final ITransform<E> transform;
-        
-        /**
-         * @param capacity
-         * @param relation
-         */
-        protected UpdateBuffer(int capacity, IMutableRelation<E> relation, ITransform<E> transform) {
-
-            super(capacity, relation);
-
-            if (transform == null)
-                throw new IllegalArgumentException();
-
-            this.transform = transform;
-            
-        }
-
-        @Override
-        protected long flush(IChunkedOrderedIterator<ISolution<E>> itr) {
-
-            final IChunkedOrderedIterator<E> itr2 = new ChunkedResolvingIterator<E, ISolution<E>>(
-                    itr) {
-
-                @Override
-                protected E resolve(ISolution<E> e) {
-
-                    return e.get();
-
-                }
-
-            };
-            
-            return getRelation().update(itr2, transform);
-
-        }
-
-    }
+//    /**
+//     * Buffer writes on
+//     * {@link IMutableRelation#update(IChunkedOrderedIterator, ITransform)} when it is
+//     * {@link #flush() flushed}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * @param <E>
+//     */
+//    public static class UpdateSolutionBuffer<E> extends
+//            AbstractSolutionBuffer<E> {
+//
+//        private final ITransform<E> transform;
+//
+//        /**
+//         * @param capacity
+//         * @param relation
+//         */
+//        public UpdateSolutionBuffer(int capacity, IMutableRelation<E> relation,
+//                ITransform<E> transform) {
+//
+//            super(capacity, relation);
+//
+//            if (transform == null)
+//                throw new IllegalArgumentException();
+//
+//            this.transform = transform;
+//
+//        }
+//
+//        @Override
+//        protected long flush(IChunkedOrderedIterator<ISolution<E>> itr) {
+//
+//            final IChunkedOrderedIterator<E> itr2 = new ChunkedResolvingIterator<E, ISolution<E>>(
+//                    itr) {
+//
+//                @Override
+//                protected E resolve(ISolution<E> e) {
+//
+//                    return e.get();
+//
+//                }
+//
+//            };
+//
+//            return getRelation().update(itr2, transform);
+//
+//        }
+//
+//    }
 
 }

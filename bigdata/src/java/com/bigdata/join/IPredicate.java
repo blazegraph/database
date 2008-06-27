@@ -41,10 +41,14 @@ package com.bigdata.join;
 public interface IPredicate<E> extends Cloneable {
 
     /**
-     * The name of the {@link IRelation} that is queried by this
-     * {@link IPredicate}.
+     * Identifies the {@link IRelation} associated with this {@link IPredicate}.
+     * This is ignored if the {@link IRule} is executed as a query. However,
+     * when the {@link IRule} is executed as an {@link ActionEnum#Insert} or
+     * {@link ActionEnum#Delete} then this identifies the target
+     * {@link IMutableRelation} on which the computed {@link ISolution}s will
+     * be written.
      */
-    public IRelationName<E> getRelation();
+    public IRelationName<E> getRelationName();
     
     /**
      * An optional constraint on the visitable elements.

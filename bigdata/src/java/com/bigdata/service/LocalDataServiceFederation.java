@@ -90,7 +90,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
         properties.setProperty(Options.OVERFLOW_ENABLED,"false");
         
         // create the embedded data service.
-        dataService = new EmbeddedDataServiceImpl(properties);
+        dataService = new LocalDataServiceImpl(properties);
 
         // notify join.
         loadBalancerService.join(dataService.getServiceUUID(),
@@ -98,9 +98,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
     
-    protected class EmbeddedDataServiceImpl extends EmbeddedDataService {
+    protected class LocalDataServiceImpl extends EmbeddedDataService {
         
-        EmbeddedDataServiceImpl(Properties properties) {
+        LocalDataServiceImpl(Properties properties) {
             
             super(UUID.randomUUID(), properties);
             

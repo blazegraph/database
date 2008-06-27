@@ -30,8 +30,6 @@ package com.bigdata.join;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.ITupleIterator;
-
 /**
  * Fully buffered iterator.
  * 

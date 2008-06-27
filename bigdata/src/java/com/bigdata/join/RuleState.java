@@ -7,8 +7,6 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.join.rdf.SPO;
-
 /**
  * State for a rule execution.
  * 
@@ -116,12 +114,6 @@ public class RuleState {
          */
         this.depends = Collections
                 .unmodifiableMap(computeVariableDependencyMap(order));
-
-//        // initialize the bindings from the predicate declarations.
-//        resetBindings();
-
-//        // collects statistics on the rule.
-//        this.stats = new RuleStats(this);
        
     }
 
@@ -529,6 +521,20 @@ public class RuleState {
      * FIXME The side-effect on {@link #accessPath}[] means that this class is
      * NOT thread-safe. A thread-local weak reference to an access path cache
      * might fix that. However, I am not yet sure if this is a problem.
+     * 
+     * @todo A more generalized access path cache might be located on the
+     *       {@link IRelation} impl. it could either scan an LRU of predicates
+     *       for recently returned access paths or it could use the hash of the
+     *       predicate to test a weak reference map backed by an LRU. However,
+     *       measure the cost of obtaining an access path. It is done without IO
+     *       so it can't be too much! (Note that if the cache is specific to the
+     *       bindings on the predicate then there are no side-effects from the
+     *       propagation of bindings and we can simplify how we set, clear, and
+     *       reset the bindings!)
+     *       <p>
+     *       It might also be worth while to cache the {@link IRelationName} to
+     *       {@link IRelation} map. That should be done in the
+     *       {@link IRelationLocator} impl.
      */
     public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
        
@@ -552,26 +558,6 @@ public class RuleState {
     }
 
     /**
-     * Return the iterator that should be used to read from the selected
-     * {@link IPredicate}.
-     * 
-     * @param index
-     *            The index of the {@link IPredicate} in the tail of the
-     *            {@link Rule}.
-     * 
-     * @return The iterator.
-     * 
-     * @throws IndexOutOfBoundsException
-     *             if index is out of bounds.
-     */
-    public IChunkedOrderedIterator iterator(final int index,
-            final IBindingSet bindingSet) {
-
-        return getAccessPath(index, bindingSet).iterator();
-        
-    }
-    
-    /**
      * Return the {@link IAccessPath} that would be used to read from the
      * selected {@link IPredicate} (no caching).
      * 
@@ -579,39 +565,25 @@ public class RuleState {
      *            The index of the {@link IPredicate} in the tail of the
      *            {@link Rule}.
      * @param bindingSet
-     *            When non-<code>null</code>, the bindings will be used to
-     *            generate the {@link IAccessPath}. When <code>null</code>
-     *            the {@link IAccessPath} will use wildcards in every position
-     *            where the predicate declares a variable.
+     *            The bindings used to generate the {@link IAccessPath}.
      * 
      * @return The {@link IAccessPath}.
      * 
      * @throws IndexOutOfBoundsException
      *             if index is out of bounds.
+     * @throws IllegalArgumentException
+     *             if <i>bindingSet</i> is <code>null</code>.
      * @throws RuntimeException
      *             if the name of the relation can not be resolved by the
      *             {@link IJoinNexus} to an {@link IRelation} instance.
      */
     protected IAccessPath getAccessPathNoCache(final int index, final IBindingSet bindingSet) {
 
-        final IPredicate predicate;
-
-        if (bindingSet != null) {
-
-            // based on the current bindings.
-
-            predicate = rule.getTail(index).asBound(bindingSet);
-
-        } else {
-
-            // as declared by the predicate (no bindings).
-
-            predicate = rule.getTail(index);
-
-        }
+        // based on the given bindings.
+        final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
 
         // The name of the relation that the predicate will query.
-        final IRelationName relationName = predicate.getRelation();
+        final IRelationName relationName = predicate.getRelationName();
         
         // Resolve the relation name to the IRelation object.
         final IRelation relation = joinNexus.getRelationLocator().getRelation(

@@ -136,7 +136,8 @@ public interface IBindingSet extends Cloneable, Serializable {
     public IBindingSet clone();
     
     /**
-     * True iff the variables and their bound values are the same.
+     * True iff the variables and their bound values are the same
+     * for the two binding sets.
      * 
      * @param o
      *            Another binding set.

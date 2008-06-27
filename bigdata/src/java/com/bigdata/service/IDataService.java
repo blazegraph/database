@@ -25,7 +25,9 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
@@ -45,6 +47,7 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -321,21 +324,6 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
     public IndexMetadata getIndexMetadata(String name, long timestamp)
             throws IOException, InterruptedException, ExecutionException;
 
-//    /**
-//     * Return various statistics about the named index.
-//     * 
-//     * @param name
-//     *            The index name.
-//     * 
-//     * @return Statistics about the named index.
-//     * 
-//     * @throws IOException
-//     * 
-//     * @todo xml serialization of counters?  allow filter?
-//     */
-//    public String getStatistics(String name)
-//            throws IOException, InterruptedException, ExecutionException;
-        
     /**
      * Drops the named index.
      * <p>
@@ -436,7 +424,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      *            The name of the scale-out index.
      * @param proc
      *            The procedure to be executed. This MUST be a serializable
-     *            object with downloadable code since it will be executed on the
+     *            object with downloadable code if it will be executed on a
      *            remote {@link DataService}.
      * 
      * @return The result, which is entirely defined by the procedure
@@ -451,6 +439,22 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
     public Object submit(long tx, String name, IIndexProcedure proc)
             throws InterruptedException, ExecutionException, IOException;
 
+    /**
+     * Execute an arbitrary {@link Callable} on the {@link IDataService}.
+     * <p>
+     * The task can implement {@link IDataServiceAwareProcedure} in order to
+     * gain access to the {@link IDataService} instance. It can use that access
+     * in order to submit tasks to the {@link IConcurrencyManager}, etc.
+     * 
+     * @return The {@link Future} for that task.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * @throws IOException
+     */
+    public Future submit(Callable proc)
+            throws InterruptedException, ExecutionException, IOException;
+    
     /**
      * Read a low-level record from the described {@link IRawStore} described by
      * the {@link IResourceMetadata}.

@@ -32,6 +32,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.service.IBigdataClient;
 
 /**
  * An abstraction corresponding to a set of elements using some schema.

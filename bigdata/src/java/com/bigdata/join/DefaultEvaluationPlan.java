@@ -321,7 +321,7 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
         }
 
         // The name of the relation that the predicate will query.
-        final IRelationName relationName = predicate.getRelation();
+        final IRelationName relationName = predicate.getRelationName();
         
         // Resolve the relation name to the IRelation object.
         final IRelation relation = joinNexus.getRelationLocator().getRelation(

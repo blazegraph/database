@@ -31,7 +31,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
@@ -120,6 +122,18 @@ abstract public class MetadataService extends DataService implements
 
     }
 
+    /**
+     * Disallowed. You should not be running arbitrary tasks on a
+     * {@link MetadataService}. They are specialized for the index partition
+     * locator information and should not be overloaded for other purposes.
+     */
+    @Override
+    public Future submit(Callable proc) {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
     public int nextPartitionId(String name) throws IOException, InterruptedException, ExecutionException {
        
         setupLoggingContext();

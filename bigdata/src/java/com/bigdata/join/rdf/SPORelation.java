@@ -32,7 +32,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.join.Constant;
 import com.bigdata.join.IAccessPath;
 import com.bigdata.join.IChunkedOrderedIterator;
@@ -116,6 +115,7 @@ public class SPORelation implements IMutableRelation<SPO> {
      * @param p
      * @param o
      */
+    @SuppressWarnings("unchecked")
     public IAccessPath<SPO> getAccessPath(final long s, final long p, final long o) {
 
         final IVariableOrConstant<Long> S = (s == NULL ? Var.var("s")
@@ -304,19 +304,19 @@ public class SPORelation implements IMutableRelation<SPO> {
         
     }
     
-    public long remove(IChunkedOrderedIterator<SPO> itr) {
+    public long delete(IChunkedOrderedIterator<SPO> itr) {
         
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException();
         
     }
 
-    public long update(IChunkedOrderedIterator<SPO> itr,
-            ITransform<SPO> transform) {
-        
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
-        
-    }
+//    public long update(IChunkedOrderedIterator<SPO> itr,
+//            ITransform<SPO> transform) {
+//        
+//        // TODO Auto-generated method stub
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
 }

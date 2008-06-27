@@ -37,6 +37,11 @@ public class MockJoinNexus implements IJoinNexus {
     /**
      * 
      */
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 
+     */
     public MockJoinNexus() {
         // TODO Auto-generated constructor stub
     }
@@ -77,6 +82,26 @@ public class MockJoinNexus implements IJoinNexus {
     }
 
     public IEvaluationPlan newEvaluationPlan(IRule rule) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public IBlockingBuffer<ISolution> newQueryBuffer() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public IProgramTask newProgramTask(ActionEnum action, IProgram program) {
         // TODO Auto-generated method stub
         return null;
     }

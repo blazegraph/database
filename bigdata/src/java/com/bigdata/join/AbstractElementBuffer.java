@@ -1,6 +1,5 @@
 package com.bigdata.join;
 
-import com.bigdata.join.IMutableRelation.ITransform;
 
 /**
  * Base class for {@link IBuffer} of {@link IRelation} elements whose target is
@@ -135,14 +134,14 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
     }
     
     /**
-     * Buffer writes on {@link IMutableRelation#remove(IChunkedOrderedIterator)}
+     * Buffer writes on {@link IMutableRelation#delete(IChunkedOrderedIterator)}
      * when it is {@link #flush() flushed}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * @param <R>
      */
-    public static class RemoveBuffer<R> extends AbstractElementBuffer<R> {
+    public static class DeleteBuffer<R> extends AbstractElementBuffer<R> {
 
         /**
          * Ctor variant when the element will be written into the buffer in an
@@ -151,7 +150,7 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
          * @param capacity
          * @param relation
          */
-        protected RemoveBuffer(int capacity, IMutableRelation<R> relation) {
+        protected DeleteBuffer(int capacity, IMutableRelation<R> relation) {
 
             this(capacity,relation,null/*keyOrder*/);
 
@@ -165,7 +164,7 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
          * @param relation
          * @param keyOrder
          */
-        protected RemoveBuffer(int capacity, IMutableRelation<R> relation,IKeyOrder<R> keyOrder) {
+        protected DeleteBuffer(int capacity, IMutableRelation<R> relation,IKeyOrder<R> keyOrder) {
 
             super(capacity,relation,keyOrder);
 
@@ -174,67 +173,67 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
         @Override
         protected long flush(IChunkedOrderedIterator<R> itr) {
             
-            return getRelation().remove(itr);
+            return getRelation().delete(itr);
             
         }
         
     }
     
-    /**
-     * Buffer writes on
-     * {@link IMutableRelation#update(IChunkedIterator, ITransform)} when it is
-     * {@link #flush() flushed}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <R>
-     */
-    public static class UpdateBuffer<R> extends AbstractElementBuffer<R> {
-
-        private final ITransform<R> transform;
-        
-        /**
-         * Ctor variant when the element will be written into the buffer in an
-         * unknown order.
-         * 
-         * @param capacity
-         * @param relation
-         * @param transform
-         */
-        protected UpdateBuffer(int capacity, IMutableRelation<R> relation, ITransform<R> transform) {
-
-            this(capacity, relation, transform, null/*keyOrder*/);
-            
-        }
-
-        /**
-         * Ctor variant used when you have a <em>strong</em> guarantee of the
-         * order in which the elements will be written into the buffer.
-         * 
-         * @param capacity
-         * @param relation
-         * @param transform
-         * @parma keyOrder
-         */
-        protected UpdateBuffer(int capacity, IMutableRelation<R> relation,
-                ITransform<R> transform, IKeyOrder<R> keyOrder) {
-
-            super(capacity, relation, keyOrder);
-
-            if (transform == null)
-                throw new IllegalArgumentException();
-
-            this.transform = transform;
-            
-        }
-
-        @Override
-        protected long flush(IChunkedOrderedIterator<R> itr) {
-
-            return getRelation().update(itr, transform);
-
-        }
-
-    }
+//    /**
+//     * Buffer writes on
+//     * {@link IMutableRelation#update(IChunkedIterator, ITransform)} when it is
+//     * {@link #flush() flushed}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * @param <R>
+//     */
+//    public static class UpdateBuffer<R> extends AbstractElementBuffer<R> {
+//
+//        private final ITransform<R> transform;
+//        
+//        /**
+//         * Ctor variant when the element will be written into the buffer in an
+//         * unknown order.
+//         * 
+//         * @param capacity
+//         * @param relation
+//         * @param transform
+//         */
+//        protected UpdateBuffer(int capacity, IMutableRelation<R> relation, ITransform<R> transform) {
+//
+//            this(capacity, relation, transform, null/*keyOrder*/);
+//            
+//        }
+//
+//        /**
+//         * Ctor variant used when you have a <em>strong</em> guarantee of the
+//         * order in which the elements will be written into the buffer.
+//         * 
+//         * @param capacity
+//         * @param relation
+//         * @param transform
+//         * @parma keyOrder
+//         */
+//        protected UpdateBuffer(int capacity, IMutableRelation<R> relation,
+//                ITransform<R> transform, IKeyOrder<R> keyOrder) {
+//
+//            super(capacity, relation, keyOrder);
+//
+//            if (transform == null)
+//                throw new IllegalArgumentException();
+//
+//            this.transform = transform;
+//            
+//        }
+//
+//        @Override
+//        protected long flush(IChunkedOrderedIterator<R> itr) {
+//
+//            return getRelation().update(itr, transform);
+//
+//        }
+//
+//    }
 
 }
