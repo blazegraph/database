@@ -561,6 +561,12 @@ public class Rule implements IRule {
      * IProgram.
      */
 
+    final public boolean isRule() {
+        
+        return true;
+        
+    }
+    
     /**
      * Returns <code>false</code> (the return value does not matter since a
      * single step can not be parallelized).

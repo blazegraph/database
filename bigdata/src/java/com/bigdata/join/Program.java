@@ -89,6 +89,12 @@ public class Program implements IProgram {
         
     }
 
+    final public boolean isRule() {
+        
+        return false;
+        
+    }
+    
     public boolean isParallel() {
 
         return parallel;

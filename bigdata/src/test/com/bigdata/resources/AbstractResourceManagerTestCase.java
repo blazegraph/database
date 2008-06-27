@@ -34,7 +34,9 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.IIndexProcedure;
@@ -387,6 +389,11 @@ public class AbstractResourceManagerTestCase extends
 
             throw new UnsupportedOperationException();
 
+        }
+
+        public Future submit(Callable proc) throws InterruptedException, ExecutionException, IOException {
+            // TODO Auto-generated method stub
+            return null;
         }
 
     }

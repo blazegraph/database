@@ -29,35 +29,17 @@ package com.bigdata.join;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 
 /**
- * Statistics about what the Rule did.
+ * Statistics about what the {@link IProgram} did.
  * 
- * FIXME re-factor this as counters that are reportable by the
- * {@link IDataService} and aggregated by the {@link ILoadBalancerService}?
- * <p>
- * This will mean that the counters are not directly available on a rule-by-rule
- * evaluation basis, but they can't be if the rules are executed remotely and in
- * parallel (or perhaps they could be if the aggregated statistics were reported
- * back to the master that submitted the rule for execution).
- * <p>
- * Maybe the rules can also report their statistics directly (together with the
- * {@link IChunkedIterator} of the solutions when querying and otherwise by
- * themselves)?
- * 
- * @todo it would be nice to report the #of new entailments and not just the #of
- *       computed entailments. The {@link SPOAssertionBuffer} knows how many new
- *       entailments are written each time the buffer is
- *       {@link SPOAssertionBuffer#flush()}ed. However, the buffer can be
- *       flushed more than once during the execution of the rule, so we need to
- *       aggregate those counts across flushes and then reset once the rule is
- *       done. Also note that we sometimes defer a flush across rules if only a
- *       few entailments were generated, so correct reporting would mean
- *       modifying that practice.
+ * @todo Report as counters aggregated by the {@link ILoadBalancerService}?
  * 
  * @author mikep
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -68,27 +50,48 @@ public class RuleStats {
     /**
      * Initilizes statistics for a {@link Rule}.
      * <p>
-     * Note: This form is used when statistics will be aggregated across
-     * multiple execution {@link RuleState}s for the same rule.
+     * Note: This form is used when statistics will be aggregated across the
+     * execution of multiple steps in a program, including computing the closure
+     * (fix point) of the program.
      * 
-     * @param rule The rule.
+     * @param program
+     *            The program.
+     * 
+     * @todo when aggregating for a rule, we need to identify all rules that are
+     *       derived from the same rule whether by a re-write (for truth
+     *       maintenance) or specialization. Those should all get rolled up
+     *       under the same base rule, but probably not crossing a fixed point
+     *       closure. The total should get rolled up under the top-level
+     *       program.
      */
-    RuleStats(IRule rule) {
+    RuleStats(IProgram program) {
        
-        this.rule = rule;
-        
-        this.name = rule.getName();
-        
-        final int tailCount = rule.getTailCount();
-        
-        this.nstmts = new int[tailCount];
+        this.rule = program;
 
-        this.nsubqueries = new int[tailCount];
-        
-        this.order = new int[tailCount];
-        
-        this.nexecutions = 0;
-        
+        this.name = program.getName();
+
+        if (program.isRule()) {
+
+            final int tailCount = ((IRule) program).getTailCount();
+
+            this.elementCount = new long[tailCount];
+
+            this.nsubqueries = new int[tailCount];
+
+            this.order = new int[tailCount];
+
+        } else {
+
+            this.elementCount = null;
+
+            this.nsubqueries = null;
+
+            this.order = null;
+
+        }
+
+//        this.nexecutions = 0;
+
         this.aggregate = true;
         
     }
@@ -108,7 +111,7 @@ public class RuleStats {
         
         System.arraycopy(ruleState.order, 0, order, 0, ruleState.order.length);
 
-        this.nexecutions = 1;
+//        this.nexecutions = 1;
         
         this.aggregate = false;
         
@@ -127,21 +130,14 @@ public class RuleStats {
     /**
      * The rule itself.
      */
-    public final IRule rule;
+    public final IProgram rule;
     
     /**
-     * The #of times that the rule has been executed (ONE(1) if executed once;
-     * N if executed N times when evaluating an N predicate rule during truth
-     * maintenance).
-     */
-    public int nexecutions;
-
-    /**
-     * The #of statement considered for the each predicate in the body of the
+     * The #of elements considered for the each predicate in the body of the
      * rule (in the order in which they were declared, not the order in which
      * they were evaluated).
      */
-    public final int[] nstmts;
+    public final long[] elementCount;
 
     /**
      * The #of subqueries examined for each predicate in the rule. The indices
@@ -161,19 +157,25 @@ public class RuleStats {
     public final int[] order;
     
     /**
-     * #of entailments computed by the rule (does not consider whether or not
-     * the entailments were pre-existing in the database nor whether or not the
-     * entailments filtered out such that they did not enter the database).
+     * #of {@link ISolution}s computed by the rule regardless of whether or not
+     * they are written onto an {@link IMutableRelation} and regardless of
+     * whether or not they duplicate a solution already computed.
      */
-    public int numComputed;
+    public long solutionCount;
     
     /**
-     * The #of entailments that were actually added to the statement indices
-     * (that is to say, the entailments were new to the database). This is
-     * computed using {@link TestTripleStore#getBufferCount()} before and
-     * after the rule is applied.
+     * The #of elements that were actually added to (or removed from) the
+     * relation indices. This is updated based on the {@link IMutableRelation}
+     * API. Correct reporting by that API and correct aggregation here are
+     * critical to the correct termination of the fix point of some rule set.
+     * <p>
+     * Note: This value is ONLY incremented when the {@link IBuffer} is flushed.
+     * Since evaluation can multiple the rules writing on a buffer and since
+     * more than one rule may be run (in parallel or in sequence) before the
+     * {@link IBuffer} is flushed, the mutation count will often be non-zero
+     * except for the top-level {@link IProgram} that is being executed.
      */
-    public int numAdded;
+    public AtomicLong mutationCount = new AtomicLong();
     
     /**
      * Time to compute the entailments (ms).
@@ -181,15 +183,16 @@ public class RuleStats {
     public long elapsed;
 
     /**
-     * The #of statements considered by the rule (total over {@link #nstmts}).
+     * The #of elements considered by the program (total over
+     * {@link #elementCount}).
      */
-    public int getStatementCount() {
+    public int getElementCount() {
         
         int n = 0;
         
-        for(int i=0; i<nstmts.length; i++) {
+        for(int i=0; i<elementCount.length; i++) {
             
-            n += nstmts[i];
+            n += elementCount[i];
             
         }
         
@@ -199,7 +202,7 @@ public class RuleStats {
     
     public String getEntailmentsPerMillisecond() {
 
-        return (elapsed == 0 ? "N/A" : "" + numComputed / elapsed);
+        return (elapsed == 0 ? "N/A" : "" + solutionCount / elapsed);
         
     }
     
@@ -207,28 +210,28 @@ public class RuleStats {
      * Reports only the aggregate.
      */
     public String toStringSimple() {
-
-//        int n = getStatementCount();
         
-        String computedPerSec = (numComputed == 0 ? "N/A"
+        final String computedPerSec = (solutionCount == 0 ? "N/A"
                 : (elapsed == 0L ? "0" : ""
-                        + (long) (numComputed * 1000d / elapsed)));
+                        + (long) (solutionCount * 1000d / elapsed)));
 
-        String newPerSec = (numAdded == 0 ? "N/A" : (elapsed == 0L ? "0" : ""
-                + (long) (numAdded * 1000d / elapsed)));
+        final long mutationCount = this.mutationCount.get();
+        
+        final String newPerSec = (mutationCount == 0 ? "N/A" : (elapsed == 0L ? "0" : ""
+                + (long) (mutationCount * 1000d / elapsed)));
 
         return name //
              + (!aggregate
                      ?(", #order="+Arrays.toString(order)//
                        )
-                     :(", #exec="+nexecutions//
+                     :(""//", #exec="+nexecutions//
                      ))
              + ", #subqueries="+Arrays.toString(nsubqueries)//
-             + ", #stmts=" + Arrays.toString(nstmts) //
+             + ", #stmts=" + Arrays.toString(elementCount) //
              + ", elapsed=" + elapsed//
-             + ", #computed=" + numComputed//
+             + ", #computed=" + solutionCount//
              + ", computed/sec="+computedPerSec//
-             + ", #new=" + numAdded//
+             + ", #new=" + mutationCount//
              + ", new/sec="+newPerSec//
              ;
 
@@ -241,9 +244,10 @@ public class RuleStats {
         
         if(detailStats.isEmpty()) return toStringSimple();
         
-        Object[] a = detailStats.toArray();
+        // Note: uses Vector.toArray() to avoid concurrent modification issues.
+        final RuleStats[] a = detailStats.toArray(new RuleStats[] {});
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         // aggregate level.
         sb.append("total : "+toStringSimple());
@@ -263,22 +267,79 @@ public class RuleStats {
         
     }
     
-//    /**
-//     * Resets all of the counters.
-//     */
-//    public void reset() {
+    /*
+     * FIXME restore code that examines the cost to summarize by rule.
+     */
+//    public String toString() {
+//
+//        if(rules.isEmpty()) return "No rules were run.\n";
 //        
-//        for(int i=0; i<nstmts.length; i++) {
+//        StringBuilder sb = new StringBuilder();
+//        
+//        // summary
+//        
+//        sb.append("rule    \tms\t#entms\tentms/ms\n");
 //
-//            nstmts[i] = nsubqueries[i] = order[i] = 0;
+//        long elapsed = 0;
+//        long numComputed = 0;
+//        
+//        for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
+//            
+//            RuleStats stats = entry.getValue();
+//            
+//            // note: hides low cost rules (elapsed<=10)
+//            
+//            if(stats.elapsed>=10) {
+//            
+//                sb.append(stats.name + "\t" + stats.elapsed + "\t"
+//                        + stats.solutionCount + "\t"
+//                        + stats.getEntailmentsPerMillisecond());
 //
+//                sb.append("\n");
+//                
+//            }
+//            
+//            elapsed += stats.elapsed;
+//            
+//            numComputed += stats.solutionCount;
+//            
 //        }
 //
-//        nexecutions = 0;
+//        sb.append("totals: elapsed="
+//                + elapsed
+//                + ", nadded="
+//                + nentailments
+//                + ", numComputed="
+//                + numComputed
+//                + ", added/sec="
+//                + (elapsed == 0 ? "N/A"
+//                        : (long) (nentailments * 1000d / elapsed))
+//                + ", computed/sec="
+//                + (elapsed == 0 ? "N/A"
+//                        : (long) (numComputed * 1000d / elapsed)) + "\n");
 //        
-//        numComputed = 0;
+//        /* details.
+//         * 
+//         * Note: showing details each time for high cost rules.
+//         */
 //        
-//        elapsed = 0L;
+////        if(InferenceEngine.DEBUG) {
+//
+//            for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
+//
+//                RuleStats stats = entry.getValue();
+//
+//                if(stats.elapsed>100) {
+//
+//                    sb.append(stats+"\n");
+//                    
+//                }
+//            
+//            }
+//            
+////        }
+//        
+//        return sb.toString();
 //        
 //    }
 
@@ -297,9 +358,9 @@ public class RuleStats {
     
         detailStats.add(o);
         
-        for(int i=0; i<nstmts.length; i++) {
+        for(int i=0; i<elementCount.length; i++) {
 
-            nstmts[i] += o.nstmts[i];
+            elementCount[i] += o.elementCount[i];
             
             nsubqueries[i] += o.nsubqueries[i];
 
@@ -307,9 +368,9 @@ public class RuleStats {
             
         }
         
-        nexecutions += o.nexecutions;
+        solutionCount += o.solutionCount;
         
-        numComputed += o.numComputed;
+        mutationCount.addAndGet(o.mutationCount.get());
     
         elapsed += o.elapsed;
     

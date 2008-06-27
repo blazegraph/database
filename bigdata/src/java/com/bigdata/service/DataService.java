@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -79,6 +80,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.WriteExecutorService;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
@@ -346,6 +348,14 @@ abstract public class DataService extends AbstractService
         
     }
 
+    /*
+     * FIXME Refactor these abstract methods to invoke getClient().method() and
+     * then have each concrete DataService implementation supply a getClient()
+     * method backed by an appropriate client/federation combo.  We can implement
+     * most of the methods here via these various abstract methods, but it is
+     * backasswards.
+     */
+    
     /**
      * Lookup an {@link IDataService} by its service {@link UUID}.
      * 
@@ -381,6 +391,106 @@ abstract public class DataService extends AbstractService
     abstract public ILoadBalancerService getLoadBalancerService();
     
     /**
+     * Return the client used by the {@link DataService}.
+     */
+    protected IBigdataClient getClient() {
+        throw new UnsupportedOperationException();
+    }
+        
+//    protected IBigdataClient getClient() {
+//        
+//        return client;
+//        
+//    }
+//    private final IBigdataClient client;
+//
+//    private class FakeClient extends AbstractClient {
+//
+//        protected FakeClient(Properties properties) {
+//            super(properties);
+//            fed = new FakeFederation(this);
+//        }
+//
+//        private final IBigdataFederation fed;
+//        
+//        public IBigdataFederation connect() {
+//            return fed;
+//        }
+//
+//        public void disconnect(boolean immediateShutdown) {
+//            throw new UnsupportedOperationException();
+//        }
+//
+//        public IBigdataFederation getFederation() {
+//            return fed;
+//        }
+//
+//        public boolean isConnected() {
+//            return true;
+//        }
+//        
+//    }
+//
+//    private class FakeFederation extends AbstractFederation {
+//
+//        /**
+//         * @param client
+//         */
+//        protected FakeFederation(IBigdataClient client) {
+//            super(client);
+//        }
+//
+//        public void destroy() {
+//            throw new UnsupportedOperationException();
+//        }
+//
+//        public boolean isScaleOut() {
+//            try {
+//                /*
+//                 * Note: will be null if not discovered yet, but that still
+//                 * means a scale-out solution.
+//                 */
+//                getMetadataService();
+//                return true;
+//            } catch(UnsupportedOperationException ex) {
+//                return false;
+//            }
+//        }
+//        
+//        public IDataService getAnyDataService() {
+//            return DataService.this;
+//        }
+//
+//        public IDataService getDataService(UUID serviceUUID) {
+//            return DataService.this.getDataService(serviceUUID);
+//        }
+//
+//        public UUID[] getDataServiceUUIDs(int maxCount) {
+//            // TODO Auto-generated method stub
+////            return getLoadBalancerService().getUnderUtilizedDataServices(0/*minCount*/, maxCount, null/*exclude*/);
+//            return null;
+//        }
+//
+//        public IMetadataIndex getMetadataIndex(String name, long timestamp) {
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+//
+//        public ILoadBalancerService getLoadBalancerService() {
+//            return DataService.this.getLoadBalancerService();
+//        }
+//
+//        public IMetadataService getMetadataService() {
+//            return DataService.this.getMetadataService();
+//        }
+//
+//        public ITimestampService getTimestampService() {
+//            return DataService.this.getTimestampService();
+//        }
+//        
+//    }
+
+    /**
      * Returns the {@link IResourceManager}.
      * 
      * @param properties
@@ -412,15 +522,7 @@ abstract public class DataService extends AbstractService
             
             public UUID getDataServiceUUID() {
 
-//                try {
-                    
-                    return DataService.this.getServiceUUID();
-                
-//                } catch (IOException e) {
-//                    
-//                    throw new RuntimeException(e);
-//                    
-//                }
+                return DataService.this.getServiceUUID();
                 
             }
             
@@ -451,6 +553,8 @@ abstract public class DataService extends AbstractService
         Banner.banner();
 
         this.properties = (Properties) properties.clone();
+        
+//        getClient().connect();
         
         resourceManager = (ResourceManager) newResourceManager(properties);
 
@@ -522,33 +626,6 @@ abstract public class DataService extends AbstractService
 
         }
         
-//        // setup scheduled runnable for periodic status messages.
-//        {
-//
-//            final long initialDelay = 100;
-//            
-//            final long delay = Long.parseLong(properties.getProperty(
-//                    Options.STATUS_DELAY,
-//                    Options.DEFAULT_STATUS_DELAY));
-//
-//            log.info(Options.STATUS_DELAY + "=" + delay);
-//           
-//            final String regex = properties.getProperty(Options.STATUS_FILTER,
-//                    Options.DEFAULT_STATUS_FILTER);
-//           
-//            log.info(Options.STATUS_FILTER + "=" + regex);
-//            
-//            final TimeUnit unit = TimeUnit.MILLISECONDS;
-//
-//            statusService = Executors
-//            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-//                    .defaultThreadFactory());
-//            
-//            statusService.scheduleWithFixedDelay(new StatusTask(regex),
-//                    initialDelay, delay, unit);
-//
-//        }
-
     }
 
     /**
@@ -669,19 +746,9 @@ abstract public class DataService extends AbstractService
 
         if (loadBalancerService != null) {
             
-            // Note: this is a local method call.
-            final UUID serviceUUID;
-//            try {
-                
-                serviceUUID = getServiceUUID();
-                
-//            } catch(IOException ex) {
-//                
-//                throw new AssertionError();
-//                
-//            }
+            final UUID serviceUUID = getServiceUUID();
             
-            String msg = "Goodbye: class=" + getClass().getName()
+            final String msg = "Goodbye: class=" + getClass().getName()
                     + ", immediateShutdown=" + immediateShutdown;
             
             try {
@@ -1580,17 +1647,18 @@ abstract public class DataService extends AbstractService
                         && proc instanceof IReadOnlyOperation ? ITx.READ_COMMITTED
                         : tx);
 
-            // submit the procedure.
+            // wrap the caller's task.
             final AbstractTask task = new IndexProcedureTask(
                     concurrencyManager, startTime, name, proc);
             
-            if(proc instanceof AbstractDataServiceIndexProcedure) {
+            if(proc instanceof IDataServiceAwareProcedure) {
                 
-                ((AbstractDataServiceIndexProcedure)proc).setDataService( this );
+                // set the data service on the task.
+                ((IDataServiceAwareProcedure)proc).setDataService( this );
                 
             }
             
-            // await its completion.
+            // submit the procedure and await its completion.
             return concurrencyManager.submit(task).get();
         
         } finally {
@@ -1601,6 +1669,55 @@ abstract public class DataService extends AbstractService
 
     }
 
+    /**
+     * The task will be run on the {@link IBigdataFederation#getThreadPool()}.
+     */
+    public Future submit(Callable task)
+            throws InterruptedException, ExecutionException {
+     
+        setupLoggingContext();
+
+        try {
+    
+            if(task instanceof IDataServiceAwareProcedure) {
+                
+                // set the data service on the task.
+                ((IDataServiceAwareProcedure)task).setDataService( this );
+                
+            }
+            
+            // submit the task and await its completion.
+            return getClient().getFederation().getThreadPool().submit(task);
+        
+        } finally {
+            
+            clearLoggingContext();
+            
+        }
+        
+    }
+    
+    /**
+     * Encapsulate the {@link Future} within a proxy that may be marshalled by
+     * RMI and sent to a remote client. The client will interact with the
+     * unmarshalled {@link Future}, which in turn will use RMI to control the
+     * original {@link Future} within the {@link DataService}.
+     * <p>
+     * The default implementation simply returns the <i>future</i> and MUST be
+     * overriden when remote clients will use RMI to execute methods on the
+     * {@link DataService}.
+     * 
+     * @param future
+     *            The future.
+     * 
+     * @return The encapsulated future.
+     */
+    protected Future wrapFuture(Future future) {
+        
+        return future;
+        
+    }
+    
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
             byte[] toKey, int capacity, int flags, ITupleFilter filter)
             throws InterruptedException, ExecutionException {
@@ -1841,8 +1958,8 @@ abstract public class DataService extends AbstractService
     }
     
     /**
-     * Abstract base class for index procedures that require access to the
-     * {@link IDataService} and or the federation.
+     * Interface for procedures that require access to the {@link IDataService}
+     * and or the federation.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1855,39 +1972,13 @@ abstract public class DataService extends AbstractService
      *       extend {@link AbstractTask} - that class does not implement
      *       {@link IIndexProcedure} and can not be sent across the wire.
      */
-    public static abstract class AbstractDataServiceIndexProcedure implements IIndexProcedure {
-        
-        private transient DataService dataService;
+    public static interface IDataServiceAwareProcedure {
 
         /**
          * Invoked before the task is executed to given the procedure a
          * reference to the {@link IDataService} on which it is executing.
          */
-        final public void setDataService(DataService dataService) {
-
-            if (dataService == null)
-                throw new IllegalArgumentException();
-
-            if (this.dataService != null)
-                throw new IllegalStateException();
-
-            log.info("Set dataService: " + dataService);
-
-            this.dataService = dataService;
-
-        }
-
-        /**
-         * The {@link DataService} on which the procedure is executing.
-         */
-        final public DataService getDataService() {
-
-            if (dataService == null)
-                throw new IllegalStateException();
-
-            return dataService;
-            
-        }
+        void setDataService(DataService dataService);
         
     }
     

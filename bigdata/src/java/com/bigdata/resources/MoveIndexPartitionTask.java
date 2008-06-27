@@ -51,7 +51,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.RawDataServiceRangeIterator;
-import com.bigdata.service.DataService.AbstractDataServiceIndexProcedure;
+import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 
 /**
  * Historical read task is used to copy a view of an index partition as of the
@@ -267,7 +267,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class CopyIndexPartitionProcedure extends AbstractDataServiceIndexProcedure {
+    public static class CopyIndexPartitionProcedure implements IDataServiceAwareProcedure, IIndexProcedure {
 
         /**
          * 
@@ -278,6 +278,35 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         private String sourceIndexName;
         private long lastCommitTime;
 
+        
+        private transient DataService dataService;
+        
+        public void setDataService(DataService dataService) {
+
+            if (dataService == null)
+                throw new IllegalArgumentException();
+
+            if (this.dataService != null)
+                throw new IllegalStateException();
+
+            log.info("Set dataService: " + dataService);
+
+            this.dataService = dataService;
+
+        }
+
+        /**
+         * The {@link DataService} on which the procedure is executing.
+         */
+        final protected DataService getDataService() {
+
+            if (dataService == null)
+                throw new IllegalStateException();
+
+            return dataService;
+            
+        }
+        
         /**
          * De-serialization ctor.
          */

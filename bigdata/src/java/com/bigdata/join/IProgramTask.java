@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 20, 2008
+ * Created on Jun 27, 2008
  */
 
 package com.bigdata.join;
@@ -31,16 +31,22 @@ package com.bigdata.join;
 import java.util.concurrent.Callable;
 
 /**
- * Interface for evaluation of a {@link Rule}.
+ * Interface for a task that executes a (complex) program (vs a single rule).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRuleEvaluator extends Callable<Object> {
-    
+public interface IProgramTask extends Callable<Object> {
+
     /**
-     * Evaluate the rule.
+     * The return will be either an {@link IChunkedOrderedIterator} (for
+     * {@link ActionEnum#Query}) or a {@link Long} element mutation count (for
+     * {@link ActionEnum#Insert} or {@link ActionEnum#Delete}).
+     * 
+     * @return
+     * 
+     * @throws Exception
      */
-    public Object call();
+    public Object call() throws Exception;
     
 }

@@ -27,16 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
-import java.util.Iterator;
-import java.util.concurrent.Callable;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.service.ClientIndexView;
-import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataClient;
 
 /**
  * Evaluation uses nested subquery and is optimized under the assumption that
@@ -44,50 +38,6 @@ import com.bigdata.service.IBigdataClient;
  * {@link AbstractJournal}). Under these assumptions we can submit a task to
  * the {@link ConcurrencyManager} that obtains all necessary locks and then runs
  * with the local B+Tree objects.
- * 
- * FIXME Write logic to extract the names of the indices that this task will
- * access from the rule. Note that the focusStore indices are typically on a
- * distinct temporary journal. Access to those indices needs to be handled quite
- * distinctly from access to the normal indices - there is no concurrency
- * control for those indices. (As an alternative, the temporary indices could be
- * created in temporary resources managed by a transaction for the federation.
- * This would impose concurrency control.) Regardless, the access should be to a
- * consistent historical checkpoint.
- * 
- * FIXME There needs to be an interface for choosing the JOIN operator impl. For
- * RDF with its perfect indices this is always going to use the same operator
- * for a given deployment (e.g., LDS vs Jini Federation).
- * 
- * Note that index maintenance is highly specialized for the RDF DB because of
- * its perfect indices. GOM is a more typical example where there may be a
- * primary (clustered) index and then zero or more secondary indices.
- * 
- * @todo JOINs all use the same eval strategy for the RDF DB but that is because
- *       there is one relation (the triples) and multiple indices over that
- *       relation (the access paths) (of course, in fact we only store the data
- *       in the indices and all data from the relation is replicated into each
- *       index so the relation is virtual - an abstraction only for RDF).
- * 
- * @todo make {@link Callable} and return {@link Iterator} if we are querying
- *       and otherwise <code>null</code> since the solutions were {inserted
- *       into, updated on, or removed from} the database?
- * 
- * @todo The {@link Program} can map the N passes in parallel (or N rules in
- *       parallel), each chunk[] from the first access path can be reordered for
- *       the next access path and the {@link ClientIndexView} can split the
- *       chunk[] and map N splits in parallel. This presumes that the
- *       {@link DataService} can function as a full {@link IBigdataClient} (the
- *       M/R architecture can also be layered on that assumption). Otherwise we
- *       bring all data back to the client from each JOIN before sending out the
- *       next JOIN. The different also results in JOIN at once vs solution at
- *       once processing.
- * 
- * @todo do an variant of this evaluation that runs as a procedure on a LDS and
- *       which assumes that all indices required by the various access paths are
- *       local. this evaluation strategy does not need to unroll anything since
- *       local access to the indices will be quite fast. the chunk[]s will help
- *       to maintain ordered reads on the indices which will futher improve
- *       performance.
  * 
  * @todo do a variant of this evaluation that assumes that the indices for the
  *       access paths are remote and partitioned. This evaluation strategy needs
@@ -101,7 +51,7 @@ import com.bigdata.service.IBigdataClient;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
+public class LocalNestedSubqueryEvaluator implements IRuleTask<RuleStats> {
 
     protected static final Logger log = Logger.getLogger(LocalNestedSubqueryEvaluator.class);
     
@@ -123,7 +73,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
     private final RuleState ruleState;
     private final IBuffer<ISolution> buffer;
     private final IBindingSet bindingSet;
-    private final RuleStats ruleStats;
+    /*private*/ final RuleStats ruleStats;
     
     public LocalNestedSubqueryEvaluator(RuleState ruleState, IBuffer<ISolution> buffer) {
 
@@ -147,7 +97,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
     /**
      * Recursively evaluate the subqueries
      */
-    final public Object call() {
+    final public RuleStats call() {
         
         final long begin = System.currentTimeMillis();
 
@@ -195,8 +145,8 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
         /*
          * Subquery iterator.
          */
-        final IChunkedOrderedIterator itr = state.iterator(state.order[index],
-                bindingSet);
+        final IChunkedOrderedIterator itr = state.getAccessPath(
+                state.order[index], bindingSet).iterator();
         
         try {
 
@@ -217,7 +167,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                                     + rule.getName());
                         }
 
-                        ruleStats.nstmts[state.order[index]]++;
+                        ruleStats.elementCount[state.order[index]]++;
 
                         /*
                          * Then bind this statement, which propagates bindings
@@ -252,7 +202,7 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                                     + rule.getName());
                         }
 
-                        ruleStats.nstmts[state.order[index]]++;
+                        ruleStats.elementCount[state.order[index]]++;
 
                         // bind variables from the current element.
                         if (state.bind(state.order[index], e, bindingSet)) {
@@ -264,6 +214,8 @@ public class LocalNestedSubqueryEvaluator implements IRuleEvaluator {
                             final ISolution solution = state
                                     .getJoinNexus().newSolution(rule,
                                             bindingSet);
+            
+                            ruleStats.solutionCount++;
                             
                             buffer.add( solution );
                             

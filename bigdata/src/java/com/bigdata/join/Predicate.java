@@ -152,7 +152,7 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
     
-    public IRelationName<E> getRelation() {
+    public IRelationName<E> getRelationName() {
         
         return relation;
         

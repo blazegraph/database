@@ -70,6 +70,12 @@ public interface IProgram extends Serializable {
     boolean isClosure();
     
     /**
+     * If the program is an {@link IRule} (rules are directly executable and do
+     * not have {@link #steps()}.
+     */
+    boolean isRule();
+    
+    /**
      * The sequence of sub-program steps. When {@link #isParallel()} is
      * <code>true</code> those steps MAY be executed in parallel.
      */

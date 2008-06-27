@@ -28,18 +28,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join.rdf;
 
+import com.bigdata.join.AbstractSolutionBuffer;
+import com.bigdata.join.ActionEnum;
 import com.bigdata.join.ArrayBindingSet;
+import com.bigdata.join.BlockingBuffer;
 import com.bigdata.join.Constant;
 import com.bigdata.join.DefaultEvaluationPlan;
 import com.bigdata.join.IBindingSet;
+import com.bigdata.join.IBlockingBuffer;
+import com.bigdata.join.IBuffer;
 import com.bigdata.join.IConstant;
 import com.bigdata.join.IEvaluationPlan;
 import com.bigdata.join.IJoinNexus;
+import com.bigdata.join.IMutableRelation;
 import com.bigdata.join.IPredicate;
+import com.bigdata.join.IProgram;
+import com.bigdata.join.IProgramTask;
 import com.bigdata.join.IRelationLocator;
 import com.bigdata.join.IRule;
 import com.bigdata.join.ISolution;
 import com.bigdata.join.IVariable;
+import com.bigdata.join.IVariableOrConstant;
+import com.bigdata.join.LocalRuleExecutionTask;
 import com.bigdata.join.RuleState;
 import com.bigdata.join.Solution;
 
@@ -49,6 +59,11 @@ import com.bigdata.join.Solution;
  * @version $Id$
  */
 public class SPOJoinNexus implements IJoinNexus {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1151635508669768925L;
 
     private final boolean elementOnly;
     
@@ -76,6 +91,7 @@ public class SPOJoinNexus implements IJoinNexus {
         
     }
     
+    @SuppressWarnings("unchecked")
     public void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet ) {
 
         if (e == null)
@@ -87,30 +103,49 @@ public class SPOJoinNexus implements IJoinNexus {
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final ISPO spo = (ISPO) e;
+        final SPO spo = (SPO) e;
         
-        final SPOPredicate pred = (SPOPredicate)predicate;
+        final IPredicate<ISPO> pred = (IPredicate<ISPO>)predicate;
         
-        if (pred.s().isVar()) {
+        {
 
-            bindingSet.set((IVariable) pred.s(), new Constant<Long>(spo.s()));
-
-        }
-
-        if (pred.p().isVar()) {
-
-            bindingSet.set((IVariable) pred.p(), new Constant<Long>(spo.p()));
-
-        }
-
-        if (pred.o().isVar()) {
-
-            bindingSet.set((IVariable) pred.o(), new Constant<Long>(spo.o()));
+            final IVariableOrConstant<Long> t = pred.get(0);
             
+            if(t.isVar()) {
+
+                bindingSet.set((IVariable<Long>) t, new Constant<Long>(spo.s));
+                
+            }
+
+        }
+
+        {
+
+            final IVariableOrConstant<Long> t = pred.get(1);
+            
+            if(t.isVar()) {
+
+                bindingSet.set((IVariable<Long>) t, new Constant<Long>(spo.p));
+                
+            }
+
+        }
+
+        {
+
+            final IVariableOrConstant<Long> t = pred.get(2);
+            
+            if(t.isVar()) {
+
+                bindingSet.set((IVariable<Long>) t, new Constant<Long>(spo.o));
+                
+            }
+
         }
         
     }
 
+    @SuppressWarnings("unchecked")
     public SPO newElement(IPredicate predicate, IBindingSet bindingSet) {
 
         if (predicate == null)
@@ -119,44 +154,50 @@ public class SPOJoinNexus implements IJoinNexus {
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final SPOPredicate pred = (SPOPredicate)predicate;
-        
-        final long s, p, o;
-        
-        if (pred.s().isVar()) {
+        final IPredicate<ISPO> pred = (IPredicate<ISPO>) predicate;
 
-            s = ((IConstant<Long>)bindingSet.get((IVariable) pred.s())).get().longValue();
+        final long s = asBound(pred, 0, bindingSet);
 
-        } else {
-            
-            s = ((IConstant<Long>)pred.s()).get();
-            
-        }
-        
-        if (pred.p().isVar()) {
+        final long p = asBound(pred, 1, bindingSet);
 
-            p = ((IConstant<Long>)bindingSet.get((IVariable) pred.p())).get().longValue();
+        final long o = asBound(pred, 2, bindingSet);
 
-        } else {
-            
-            p = ((IConstant<Long>)pred.p()).get();
-            
-        }
-
-        if (pred.o().isVar()) {
-
-            o = ((IConstant<Long>)bindingSet.get((IVariable) pred.o())).get().longValue();
-
-        } else {
-            
-            o = ((IConstant<Long>)pred.o()).get();
-            
-        }
-        
-        return new SPO(s,p,o);
+        return new SPO(s, p, o);
         
     }
 
+    /**
+     * Extract the bound value from the predicate. When the predicate is not
+     * bound at that index, then extract its binding from the binding set.
+     * 
+     * @param pred
+     *            The predicate.
+     * @param index
+     *            The index into that predicate.
+     * @param bindingSet
+     *            The binding set.
+     *            
+     * @return The bound value.
+     */
+    private long asBound(IPredicate<ISPO> pred, int index, IBindingSet bindingSet) {
+
+        final IVariableOrConstant<Long> t = pred.get(index);
+
+        final IConstant<Long> c;
+        if(t.isVar()) {
+            
+            c = bindingSet.get((IVariable) t);
+            
+        } else {
+            
+            c = (IConstant<Long>)t;
+            
+        }
+
+        return c.get().longValue();
+
+    }
+    
     public ISolution<SPO> newSolution(IRule rule, IBindingSet bindingSet) {
 
         final SPO spo = newElement(rule.getHead(), bindingSet);
@@ -183,7 +224,7 @@ public class SPOJoinNexus implements IJoinNexus {
         
     }
 
-    public IRelationLocator getRelationLocator() {
+    public IRelationLocator<SPO> getRelationLocator() {
         
         return relationLocator;
         
@@ -194,5 +235,38 @@ public class SPOJoinNexus implements IJoinNexus {
         return new DefaultEvaluationPlan(this, rule);
         
     }
+
+    public IBlockingBuffer<ISolution> newQueryBuffer() {
+
+        return new BlockingBuffer<ISolution>();
+        
+    }
     
+    /**
+     * The default buffer capacity.
+     */
+    private final int DEFAULT_BUFFER_CAPACITY = 10000;
+    
+    @SuppressWarnings("unchecked")
+    public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
+
+        return new AbstractSolutionBuffer.InsertSolutionBuffer(
+                DEFAULT_BUFFER_CAPACITY, relation);
+
+    }
+    
+    @SuppressWarnings("unchecked")
+    public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
+
+        return new AbstractSolutionBuffer.DeleteSolutionBuffer(
+                DEFAULT_BUFFER_CAPACITY, relation);
+
+    }
+
+    public IProgramTask newProgramTask(ActionEnum action, IProgram program) {
+        
+        return new LocalRuleExecutionTask(action, program, this);
+        
+    }
+
 }

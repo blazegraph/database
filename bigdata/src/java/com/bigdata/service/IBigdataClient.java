@@ -86,6 +86,9 @@ public interface IBigdataClient {
      * the existing connection is returned.
      * 
      * @return The object used to access the federation services.
+     * 
+     * @throws RuntimeException
+     *             if the connection can not be established.
      */
     public IBigdataFederation connect();
 

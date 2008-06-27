@@ -40,8 +40,8 @@ public class DelegatePredicate<E> implements IPredicate<E> {
         return src.getConstraint();
     }
 
-    public IRelationName<E> getRelation() {
-        return src.getRelation();
+    public IRelationName<E> getRelationName() {
+        return src.getRelationName();
     }
     
     public int getVariableCount() {

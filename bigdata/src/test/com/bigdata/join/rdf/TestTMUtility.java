@@ -87,7 +87,7 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
             log.info(r0.toString());
 
-            assertTrue(r0.getTail(0).getRelation() == focusStore);
+            assertTrue(r0.getTail(0).getRelationName() == focusStore);
             
         }
         
@@ -120,12 +120,12 @@ public class TestTMUtility extends AbstractRuleTestCase {
             log.info(r0.toString());
 
             // 1st tail.
-            assertTrue(r0.getTail(0).getRelation() == focusStore);
+            assertTrue(r0.getTail(0).getRelationName() == focusStore);
 
             // 2nd tail
-            assertTrue(r0.getTail(1).getRelation() instanceof SPORelationView);
+            assertTrue(r0.getTail(1).getRelationName() instanceof SPORelationView);
 
-            SPORelationView fusedView = (SPORelationView)r0.getTail(1).getRelation();
+            SPORelationView fusedView = (SPORelationView)r0.getTail(1).getRelationName();
 
             assertTrue(fusedView.getDatabase() == database);
 
@@ -140,16 +140,16 @@ public class TestTMUtility extends AbstractRuleTestCase {
             log.info(r1.toString());
 
             // 1st tail.
-            assertTrue(r1.getTail(0).getRelation() instanceof SPORelationView);
+            assertTrue(r1.getTail(0).getRelationName() instanceof SPORelationView);
 
-            SPORelationView fusedView = (SPORelationView)r1.getTail(0).getRelation();
+            SPORelationView fusedView = (SPORelationView)r1.getTail(0).getRelationName();
 
             assertTrue(fusedView.getDatabase() == database);
 
             assertTrue(fusedView.getFocusStore() == focusStore);
             
             // 2nd tail
-            assertTrue(r1.getTail(1).getRelation() == focusStore);
+            assertTrue(r1.getTail(1).getRelationName() == focusStore);
 
         }
 

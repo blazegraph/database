@@ -128,7 +128,7 @@ public class TMUtility {
              * we use truth maintenance, but it is not true in the general case.
              */
 
-            fusedView = new SPORelationView(rule.getTail(0).getRelation(),
+            fusedView = new SPORelationView(rule.getTail(0).getRelationName(),
                     focusStore);
 
         }
@@ -215,7 +215,7 @@ public class TMUtility {
 
                     p2 = new DelegatePredicate<SPO>(p) {
 
-                        public IRelationName<SPO> getRelation() {
+                        public IRelationName<SPO> getRelationName() {
 
                             return focusStore;
 
@@ -232,7 +232,7 @@ public class TMUtility {
 
                     p2 = new DelegatePredicate<SPO>(p) {
 
-                        public IRelationName<SPO> getRelation() {
+                        public IRelationName<SPO> getRelationName() {
 
                             return fusedView;
 

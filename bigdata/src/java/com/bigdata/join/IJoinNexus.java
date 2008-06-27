@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import java.io.Serializable;
+import java.util.concurrent.Callable;
+
 /**
  * Interface provides an interoperability nexus for the {@link IPredicate}s,
  * {@link IBindingSet}s, and {@link ISolution}s for the evaluation of an
@@ -44,7 +47,7 @@ package com.bigdata.join;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJoinNexus {
+public interface IJoinNexus extends Serializable {
 
     /**
      * Copy values the values from the visited element corresponding to the
@@ -131,6 +134,9 @@ public interface IJoinNexus {
     /**
      * The object that knows how to resolve an {@link IRelationName} to an
      * {@link IRelation}.
+     * 
+     * @todo add parameter(s) for timestamp? to request a mutable relation? or
+     *       are those ctor parameters to an impl of this interface?
      */
     IRelationLocator getRelationLocator();
     
@@ -139,9 +145,60 @@ public interface IJoinNexus {
      * 
      * @param rule
      *            The rule.
-     *            
+     * 
      * @return The evaluation plan.
+     * 
+     * @todo Make the plan extend {@link Callable} and just run it? When local
+     *       and no concurrency control it will directly execute the joins. When
+     *       local w/ concurrency control, it will submit the tasks that execute
+     *       the joins. When remote, it will handle the proxies communicating
+     *       with the remote execution of the task. When distributed, it will
+     *       map the joins across the data.
      */
     IEvaluationPlan newEvaluationPlan(IRule rule);
+
+    /**
+     * Return a task that will execute an {@link IProgram}.
+     * 
+     * @param action
+     *            Whether the {@link IProgram} will run as a query, insert or
+     *            delete.
+     * @param program
+     *            The {@link IProgram}.
+     * 
+     * @return The task.
+     */
+    IProgramTask newProgramTask(ActionEnum action, IProgram program);
     
+    /**
+     * Return a thread-safe buffer onto which the computed {@link ISolution}s
+     * will be written. The client will drain {@link ISolution}s from buffer
+     * using {@link IBlockingBuffer#iterator()}.
+     */
+    IBlockingBuffer<ISolution> newQueryBuffer();
+
+    /**
+     * Return a thread-safe buffer onto which the computed {@link ISolution}s
+     * will be written. When the buffer is {@link IBuffer#flush() flushed} the
+     * {@link ISolution}s will be inserted into the {@link IMutableRelation}.
+     * 
+     * @param relation
+     *            The relation.
+     * 
+     * @return The buffer.
+     */
+    IBuffer<ISolution> newInsertBuffer(IMutableRelation relation);
+
+    /**
+     * Return a thread-safe buffer onto which the computed {@link ISolution}s
+     * will be written. When the buffer is {@link IBuffer#flush() flushed} the
+     * {@link ISolution}s will be deleted from the {@link IMutableRelation}.
+     * 
+     * @param relation
+     *            The relation.
+     * 
+     * @return The buffer.
+     */
+    IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation);
+
 }

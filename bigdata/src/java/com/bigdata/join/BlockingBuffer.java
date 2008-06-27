@@ -43,7 +43,7 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BlockingBuffer<E> implements IBuffer<E> {
+public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
     protected static Logger log = Logger.getLogger(BlockingBuffer.class);
     
@@ -52,6 +52,8 @@ public class BlockingBuffer<E> implements IBuffer<E> {
      */
     private volatile boolean open = true;
 
+    private volatile Throwable cause = null;
+    
     /**
      * Used to coordinate the reader and the writer.
      */
@@ -174,17 +176,18 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     }
 
     /**
-     * Always returns ZERO (0).
+     * @throws IllegalStateException
+     *             if the buffer is not open.
      */
-    public int getJustificationCount() {
-        
-        return 0;
-        
-    }
-
     private void assertOpen() {
         
         if(!open) {
+        
+            if (cause != null) {
+
+                throw new IllegalStateException(cause);
+                
+            }
             
             throw new IllegalStateException();
             
@@ -204,16 +207,22 @@ public class BlockingBuffer<E> implements IBuffer<E> {
         
     }
 
-    /**
-     * Signal that no more data will be written on this buffer (this is required
-     * in order for the {@link #iterator()} to know when no more data will be
-     * made available).
-     */
     public void close() {
         
         this.open = false;
 
         log.info("closed.");
+        
+    }
+    
+    public void abort(Throwable cause) {
+
+        if (cause == null)
+            throw new IllegalArgumentException();
+        
+        this.cause = cause;
+        
+        this.open = false;
         
     }
     
@@ -223,6 +232,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
      * 
      * @param e
      *            A element.
+     *            
      * @return true if the element is allowed into the buffer.
      */
     protected boolean isValid(E e) {
@@ -231,9 +241,6 @@ public class BlockingBuffer<E> implements IBuffer<E> {
         
     }
     
-    /**
-     * Adds the elements to the buffer.
-     */
     public boolean add(E e) {
 
         assertOpen();
@@ -267,8 +274,10 @@ public class BlockingBuffer<E> implements IBuffer<E> {
                 }
                 
             } catch (InterruptedException ex) {
-                
-                throw new RuntimeException(ex);
+
+                close();
+
+                throw new RuntimeException("Buffer closed by interrupt", ex);
                 
             }
             
@@ -276,12 +285,6 @@ public class BlockingBuffer<E> implements IBuffer<E> {
         
     }
 
-    /**
-     * This is a NOP since the {@link #iterator()} is the only way to consume
-     * data written on the buffer.
-     * 
-     * @return ZERO (0L)
-     */
     public long flush() {
 
         return 0L;
@@ -295,9 +298,7 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     }
     
     /**
-     * Return an iterator reading from the buffer. The elements will be visited
-     * in the order in which they were written on the buffer. The returned
-     * iterator is NOT thread-safe and does NOT support remove().
+     * The returned iterator is NOT thread-safe and does NOT support remove().
      * 
      * @return The iterator (this is a singleton).
      */
@@ -308,9 +309,9 @@ public class BlockingBuffer<E> implements IBuffer<E> {
     }
 
     /**
-     * An inner class that reads from the buffer. This is not thread-safe
-     * because it makes to attempt to be atomic in its operations in
-     * {@link #next()} or {@link #nextChunk()}.
+     * An inner class that reads from the buffer. This is not thread-safe - it
+     * makes no attempt to be atomic in its operations in {@link #next()} or
+     * {@link #nextChunk()}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -339,12 +340,29 @@ public class BlockingBuffer<E> implements IBuffer<E> {
             log.info("Starting iterator.");
             
         }
+       
+        /**
+         * @throws IllegalStateException
+         *             if the {@link BlockingBuffer#abort(Throwable)} was
+         *             invoked asynchronously.
+         */
+        private void assertNotAborted() {
+
+            if (cause != null) {
+
+                throw new IllegalStateException(cause);
+
+            }
+                
+        }
 
         /**
          * Notes that the iterator is closed and hence may no longer be read.
          */
         public void close() {
 
+            assertNotAborted();
+            
             if (!open)
                 return;
 
@@ -362,6 +380,8 @@ public class BlockingBuffer<E> implements IBuffer<E> {
          *             the buffer to be {@link BlockingBuffer#flush()}ed.
          */
         public boolean hasNext() {
+
+            assertNotAborted();
 
             if(!open) {
                 
@@ -381,6 +401,8 @@ public class BlockingBuffer<E> implements IBuffer<E> {
              */
             while (BlockingBuffer.this.open || !queue.isEmpty()) {
 
+                assertNotAborted();
+
                 /*
                  * Use a set limit on wait and recheck whether or not the
                  * buffer has been closed asynchronously.
@@ -399,24 +421,6 @@ public class BlockingBuffer<E> implements IBuffer<E> {
                     continue;
                     
                 }
-                
-//                if (filter != null && filter.isMatch(spo)) {
-//
-//                    // rejected by the filter.
-//
-//                    if (log.isInfoEnabled())
-//                        log.info("reject: " + spo.toString(store));
-//
-//                    // consume the head of the queue.
-//                    try {
-//                        buffer.take();
-//                    } catch(InterruptedException ex) {
-//                        throw new RuntimeException(ex);
-//                    }
-//                    
-//                    continue;
-//                    
-//                }
                 
                 if (log.isDebugEnabled())
                     log.debug("next: " + spo.toString());
@@ -451,7 +455,9 @@ public class BlockingBuffer<E> implements IBuffer<E> {
                 
             } catch(InterruptedException ex) {
                 
-                throw new RuntimeException(ex);
+                close();
+                
+                throw new RuntimeException("Closed by interrupt", ex);
                 
             }
             

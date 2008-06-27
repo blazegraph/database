@@ -50,7 +50,7 @@ public class SPOPredicate implements IPredicate<SPO> {
 
     private final IPredicateConstraint<SPO> constraint;
 
-    public IRelationName<SPO> getRelation() {
+    public IRelationName<SPO> getRelationName() {
         
         return relation;
         
