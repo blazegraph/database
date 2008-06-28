@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join.rdf;
 
-
 /**
  * A predicate representing an RDF triple where the slots are 64-bit
  * <code>long</code> term identifiers assigned by a lexicon.
@@ -46,5 +45,8 @@ public interface ISPO {
 
     /** The term identifier for the object position. */
     public long o();
+
+    /** Explicit, Inferred, or Axiom. */
+    public StatementEnum getType();
 
 }

@@ -147,23 +147,37 @@ public interface IJoinNexus extends Serializable {
      * 
      * @return The evaluation plan.
      * 
-     * @todo might be moved inside of the
-     *       {@link #newProgramTask(ActionEnum, IProgram)}
+     * @deprecated move inside of {@link #runQuery(IProgram)} and
+     *             {@link #runProgram(ActionEnum, IProgram)}
      */
     IEvaluationPlan newEvaluationPlan(IRule rule);
 
     /**
-     * Return a task that will execute an {@link IProgram}.
+     * Run the program as a query.
      * 
-     * @param action
-     *            Whether the {@link IProgram} will run as a query, insert or
-     *            delete.
      * @param program
      *            The {@link IProgram}.
      * 
-     * @return The task.
+     * @return An iterator from which you can read the solutions for the iprogram.
      */
-    IProgramTask newProgramTask(ActionEnum action, IProgram program);
+    IChunkedOrderedIterator<ISolution> runQuery(IProgram program) throws Exception;
+
+    /**
+     * Execute the {@link IProgram} as a mutation (it will write any solutions
+     * on one or more relations).
+     * 
+     * @param action
+     *            The action.
+     * @param program
+     *            The {@link IProgram}.
+     * 
+     * @return The mutation count (#of distinct elements modified in the
+     *         relation(s)).
+     * 
+     * @throws IllegalArgumentException
+     *             unless <i>action</i> is a mutation (insert or delete).
+     */
+    long runMutation(ActionEnum action, IProgram program) throws Exception;
     
     /**
      * Return a thread-safe buffer onto which the computed {@link ISolution}s

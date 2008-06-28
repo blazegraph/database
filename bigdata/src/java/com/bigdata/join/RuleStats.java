@@ -225,11 +225,11 @@ public class RuleStats {
                      :(""//", #exec="+nexecutions//
                      ))
              + ", #subqueries="+Arrays.toString(nsubqueries)//
-             + ", #stmts=" + Arrays.toString(elementCount) //
+             + ", elementCount=" + Arrays.toString(elementCount) //
              + ", elapsed=" + elapsed//
-             + ", #computed=" + solutionCount//
+             + ", solutionCount=" + solutionCount//
              + ", computed/sec="+computedPerSec//
-             + ", #new=" + mutationCount//
+             + ", mutationCount=" + mutationCount//
              + ", new/sec="+newPerSec//
              ;
 
@@ -248,7 +248,7 @@ public class RuleStats {
         final StringBuilder sb = new StringBuilder();
         
         // aggregate level.
-        sb.append("total : "+toStringSimple());
+        sb.append("\ntotal : "+toStringSimple());
         
         // detail level.
         for( int i = 0; i<a.length; i++ ) {

@@ -571,6 +571,30 @@ public class SPO implements ISPO, Comparable<SPO> {
     }
 
     /**
+     * 
+     */
+    public boolean equals(Object other) {
+
+        if (this == other)
+            return true;
+
+        if (other instanceof SPO) {
+
+            return equals((SPO) other);
+
+        } else if (other instanceof ISPO) {
+
+            final ISPO t = (ISPO) other;
+
+            return s == t.s() && p == t.p() && o == t.o() && type==t.getType();
+
+        }
+
+        return false;
+        
+    }
+    
+    /**
      * Return a representation of the statement using the term identifiers (the
      * identifers are NOT resolved to terms).
      * 
@@ -583,7 +607,7 @@ public class SPO implements ISPO, Comparable<SPO> {
                         + (sid == NULL ? "" : ", sid=" + sid)) + " >";
 
     }
-
+    
     /**
      * Represents the term identifier together with its type (literal, bnode, uri,
      * or statement identifier).

@@ -63,7 +63,8 @@ public interface IBuffer<E> {
     
     /**
      * Flush the buffer and return the #of elements written on the backing
-     * {@link IRelation} since the counter was last {@link #reset()}.
+     * {@link IRelation} since the counter was last {@link #reset()} (the
+     * <i>mutationCount</i>).
      * <p>
      * Note: If the buffer does not write on an {@link IRelation} then it SHOULD
      * return ZERO(0).

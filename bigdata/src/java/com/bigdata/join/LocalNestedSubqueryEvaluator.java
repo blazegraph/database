@@ -98,6 +98,12 @@ public class LocalNestedSubqueryEvaluator implements IRuleTask<RuleStats> {
      * Recursively evaluate the subqueries
      */
     final public RuleStats call() {
+       
+        if(log.isDebugEnabled()) {
+            
+            log.debug("begin: ruleState="+ruleState);
+            
+        }
         
         final long begin = System.currentTimeMillis();
 
@@ -112,6 +118,12 @@ public class LocalNestedSubqueryEvaluator implements IRuleTask<RuleStats> {
 //        }
         
         ruleStats.elapsed += System.currentTimeMillis() - begin;
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug("done: ruleState="+ruleState+", ruleStats="+ruleStats);
+            
+        }
         
         return ruleStats;
         

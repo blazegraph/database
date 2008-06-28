@@ -54,6 +54,11 @@ import com.bigdata.service.DataService.IDataServiceAwareProcedure;
  * Task for executing a program when all of the indices for the relation are
  * co-located on the same {@link DataService}.
  * 
+ * @todo Add an option to force sequential execution and flush the buffer after
+ *       rule so that the mutation and solution counts are exact rule by rule?
+ *       This will presumably be much slower, but it might be interesting for
+ *       seeing how many solutions were being computed by each rule.
+ * 
  * FIXME Interrupts generated when the iterator is closed/aborted are causing
  * problems for group commit. The Query task should not be running as
  * UNISOLATED, but this is happening when the {@link LocalProgramTask} is run by
@@ -570,6 +575,16 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
     }
 
     /**
+     * Asynchronous tasks writes {@link ISolution}s on an
+     * {@link IBlockingBuffer}. The client will be given an iterator that
+     * drains from the buffer. When there are no more solutions, the buffer will
+     * be {@link IBlockingBuffer#close()}ed and the iterator will report that
+     * is has been exhausted once it finishes draining the buffer's queue.
+     * <p>
+     * Note: If the client closes the iterator, then the iterator will cause the
+     * backing buffer to also be closed. This is handled by
+     * {@link LocalProgramTask#executeQuery(IProgram, ExecutorService)} which
+     * wraps the iterator before returning it to the client.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -616,6 +631,20 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
 
                 }
 
+                /*
+                 * Nothing more will be written on the buffer so we close it.
+                 * The iterator will drain anything in the queue from the buffer
+                 * and then hasNext() will report false.
+                 */
+                
+                if(log.isDebugEnabled()) {
+                    
+                    log.debug("done - closing the blocking buffer");
+                    
+                }
+                
+                buffer.close();
+                
                 if(log.isInfoEnabled()) {
                     
                     log.info(totals);
@@ -654,7 +683,7 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
             throw new IllegalArgumentException();
 
         if (log.isDebugEnabled())
-            log.debug("program=" + program.getName());
+            log.debug("begin: program=" + program.getName());
         
         final Map<IRelationName, IRelation> relations = getRelations(program);
 
@@ -681,14 +710,11 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
 
         }
         
-        flushBuffers(totals,service,buffers);
-        
-        if(log.isInfoEnabled()) {
-            
-            log.info(totals);
-            
-        }
-        
+        flushBuffers(totals, service, buffers);
+
+        if (log.isDebugEnabled())
+            log.debug("done: program=" + program.getName());
+
         return totals;
         
     }
@@ -731,10 +757,10 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
             
             log.info("Flushing one buffer");
             
-            final long solutionCount = buffers.values().iterator().next()
+            final long mutationCount = buffers.values().iterator().next()
                     .flush();
 
-            totals.mutationCount.addAndGet(solutionCount);
+            totals.mutationCount.addAndGet(mutationCount);
 
         } else {
 
@@ -763,14 +789,20 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
             
             for( Future<Long> f : futures ) {
                 
-                final long solutionCount = f.get(); 
+                final long mutationCount = f.get(); 
                 
-                totals.mutationCount.addAndGet(solutionCount);
+                totals.mutationCount.addAndGet(mutationCount);
                 
             }
             
         }
 
+        if(log.isInfoEnabled()) {
+            
+            log.info(totals);
+            
+        }
+        
     }
     
     /**
@@ -957,13 +989,17 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
 
+        final int ntasks = tasks.size();
+        
         if (log.isDebugEnabled())
-            log.debug("program=" + program.getName()+", #tasks="+tasks.size());
+            log.debug("program=" + program.getName()+", #tasks="+ntasks);
 
         final RuleStats totals = new RuleStats(program);
         
         final Iterator<Callable<RuleStats>> itr = tasks.iterator();
 
+        int n = 0;
+        
         while (itr.hasNext()) {
 
             final Callable<RuleStats> task = itr.next();
@@ -973,10 +1009,18 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
 
             totals.add( tmp );
 
+            n++;
+            
+            if(log.isDebugEnabled()) {
+                
+                log.debug("program="+program.getName()+", finished "+n+" of "+ntasks+" seqential tasks.");
+                
+            }
+            
         }
 
         if (log.isDebugEnabled())
-            log.debug("program=" + program.getName()+", #tasks="+tasks.size()+" - done");
+            log.debug("program=" + program.getName()+", #tasks="+ntasks+" - done");
 
         return totals;
 

@@ -122,13 +122,13 @@ public class Solution<E> implements ISolution<E> /*, FIXME Serializable*/ {
         
         StringBuilder sb = new StringBuilder();
         
-        sb.append("Solution{");
+        sb.append("Solution");
         
-        sb.append("element="+e);
+        sb.append("{ element="+e);
         
-        sb.append("rule="+rule);
+        sb.append(", rule="+rule);
         
-        sb.append("bindingSet="+bindingSet);
+        sb.append(", bindingSet="+bindingSet);
         
         sb.append("}");
         

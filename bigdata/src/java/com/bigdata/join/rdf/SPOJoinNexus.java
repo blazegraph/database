@@ -42,6 +42,7 @@ import com.bigdata.join.EmptyProgramTask;
 import com.bigdata.join.IBindingSet;
 import com.bigdata.join.IBlockingBuffer;
 import com.bigdata.join.IBuffer;
+import com.bigdata.join.IChunkedOrderedIterator;
 import com.bigdata.join.IConstant;
 import com.bigdata.join.IEvaluationPlan;
 import com.bigdata.join.IJoinNexus;
@@ -63,7 +64,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
 import com.bigdata.service.LocalDataServiceFederation;
 
 /**
@@ -307,31 +307,40 @@ public class SPOJoinNexus implements IJoinNexus {
 
     }
 
-    /**
-     * @deprecated by {@link #runProgram(ActionEnum, IProgram)}
-     */
-    public IProgramTask newProgramTask(final ActionEnum action,
-            final IProgram program) {
+    public IChunkedOrderedIterator<ISolution> runQuery(IProgram program)
+            throws Exception {
 
-        if (!program.isRule() && program.stepCount() == 0) {
+        return (IChunkedOrderedIterator<ISolution>) runProgram(
+                ActionEnum.Query, program);
 
-            log.warn("Empty program");
+    }
 
-            return new EmptyProgramTask(action, program);
+    public long runMutation(ActionEnum action, IProgram program)
+            throws Exception {
 
-        }
-
-        final IProgramTask task = new LocalProgramTask(action, program, this);
+        if (action == null)
+            throw new IllegalArgumentException();
         
-        return task;
+        if (!action.isMutation())
+            throw new IllegalArgumentException();
+        
+        return (Long) runProgram(action, program);
 
     }
 
     /**
-     * FIXME create two variants : one for query and one for insert/update .
-     * That will make the API cleaner for the caller.
+     * Core impl.
+     * 
+     * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
+     *         (mutation count).
      */
-    public Object runProgram(ActionEnum action, IProgram program) throws Exception {
+    protected Object runProgram(ActionEnum action, IProgram program) throws Exception {
+
+        if (action == null)
+            throw new IllegalArgumentException();
+        
+        if (program == null)
+            throw new IllegalArgumentException();
 
         if (!program.isRule() && program.stepCount() == 0) {
 
@@ -340,8 +349,6 @@ public class SPOJoinNexus implements IJoinNexus {
             return new EmptyProgramTask(action, program).call();
 
         }
-
-        //      final IProgramTask innerTask = newProgramTask(action, program);
 
         final IBigdataFederation fed = client.getFederation();
         

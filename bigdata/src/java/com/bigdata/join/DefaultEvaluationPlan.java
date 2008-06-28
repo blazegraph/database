@@ -65,6 +65,30 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
         
     }
 
+    /*
+     * FIXME Cache the range counts if they are obtained (use -1L if not
+     * computed) and compute [empty] based on the range counts. Then use
+     * isEmpty() to avoid rule execution when there will be no solutions.
+     */
+//    /**
+//     * True iff a range count on the tails finds finds that there is at least
+//     * one tail that does not match anything in the data and, hence, that there
+//     * must be no solutions for the rule in the data.
+//     * <p>
+//     * This determination, like the evaluation order itself, is only good for
+//     * the commit time when it is evaluated. If the rule will be executed at a
+//     * later point then its evaluation order SHOULD be re-computed.
+//     * 
+//     * @return
+//     */
+//    public boolean isEmpty() {
+//        
+//        return empty;
+//        
+//    }
+//    private final boolean empty;
+//    private final long[] rangeCount;
+    
     /**
      * Some interesting metadata about the plan.
      */
