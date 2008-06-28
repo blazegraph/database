@@ -43,9 +43,12 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.DataService.IDataServiceAwareProcedure;
@@ -94,7 +97,10 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
 
     public void setDataService(DataService dataService) {
 
-        log.info("Running on data service!");
+        if (dataService == null)
+            throw new IllegalArgumentException();
+        
+        log.info("Running on data service: dataService="+dataService);
         
         this.dataService = dataService;
 
@@ -226,6 +232,25 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
             
         }
 
+        if (dataService != null && service == null) {
+
+            /*
+             * Note: The [dataService] reference is set by the DataService
+             * itself when it executes this Callable and notices the
+             * IDataServiceAwareProcedure interface. However, the [service]
+             * field is NOT serializable and MUST NOT be set if this task is to
+             * execute on the DataService. When those conditions are recognized
+             * we set the [service] and wrap up this Callable as an AbstractTask
+             * that is submitted to the ConcurrencyManager so that it can
+             * executed with all necessary concurrency controls.
+             */
+            
+            log.info("Will run on data service's concurrency manager.");
+            
+            return submitToConcurrencyManager().get();
+            
+        }
+        
         final ExecutorService service = getService();
 
         try {
@@ -255,37 +280,119 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
     }
 
     /**
-     * Uses the supplied service. If running on a {@link DataService} then uses
-     * the {@link IBigdataClient}'s thread pool for that {@link DataService}.
-     * 
-     * @todo Is there any problem introduced by having multiple threads access a
-     *       read-only index once the task has been granted the right to run?
+     * Wrap up this {@link Callable} as an {@link AbstractTask} that is
+     * submitted to the {@link ConcurrencyManager} so that it can executed with
+     * all necessary concurrency controls.
      * 
      * @throws IllegalStateException
-     *             if <i>service</i> was not specified to the ctor and/or the
-     *             task is not executing on a {@link DataService}.
+     *             if {@link #dataService} is <code>null</code>
+     * @throws IllegalStateException
+     *             if {@link #service} is <code>non-null</code>
      * 
-     * @see IDataService#submit(Callable)
-     * @see DataService#getClient()
+     * @todo fixed point computations on the data service will need to be
+     *       handled by sub-tasks so that we can update the commit point from
+     *       which we are reading.
+     */
+    protected Future<Object> submitToConcurrencyManager() {
+
+        if (dataService == null)
+            throw new IllegalStateException();
+        
+        if (service != null)
+            throw new IllegalStateException();
+        
+        final IConcurrencyManager concurrencyManager = dataService.getConcurrencyManager();
+        
+        /*
+         * Note: The index names must be gathered from each relation on
+         * which the task will write so that they can be declared. We can't
+         * just pick and choose using the access paths since we do not know
+         * how the propagation of bindings will effect access path selection
+         * so we need a lock on all of the indices before the task can run
+         * (at least, before it can run if it is a writer - no locks are
+         * required for query).
+         */
+        
+        final String[] resource;
+        final long timestamp;
+        if(action.isMutation()) {
+
+            timestamp = ITx.UNISOLATED;
+
+            /*
+             * FIXME This is going to require an API to disclose the index
+             * names for the IRelation.
+             * 
+             * FIXME This should not be an unisolated task. The writing the
+             * mutations on the relation needs to be unisolated, but
+             * computing the solutions can be a historical read.
+             * 
+             * FIXME For a fixed point computation, we need to advance the
+             * commit time after each round.
+             */
+            resource = new String[]{"test.SPO","test.POS","test.OSP"};
+
+            log.info("Will submit unisolated task");
+            
+        } else {
+            
+            // FIXME negative timestamp @issue
+            timestamp = - dataService.getResourceManager().getLiveJournal()
+                    .getCommitRecord().getTimestamp();
+
+            resource = new String[] {};
+
+            log.info("Will submit read-only task");
+
+        }
+        
+        final AbstractTask task = new AbstractTask(concurrencyManager, timestamp,
+                resource) {
+
+            @Override
+            protected Object doTask() throws Exception {
+                
+                log.info("Execution the inner task");
+
+                /*
+                 * Recursive, but [service] is now set so it will not be
+                 * infinately recursive.
+                 */
+                
+                return LocalProgramTask.this.call();
+                
+            }
+            
+        };
+
+        /*
+         * Set the service (breaks recursion).
+         */
+        this.service = dataService.getClient().getFederation().getThreadPool();
+
+        log.info("Submitting task to the data service.");
+
+        final Future<Object> future = concurrencyManager.submit( task );
+        
+        return future;
+
+    }
+    
+    /**
+     * Return the {@link ExecutorService}.
+     * 
+     * @throws IllegalStateException
+     *             if <i>service</i> is not set
      */
     protected ExecutorService getService() {
         
         if (service == null) {
 
-            if (dataService == null) {
-
-                throw new IllegalStateException("Not executing on "
-                        + DataService.class.getName());
-                
-            }
+            throw new IllegalStateException();
             
-            return dataService.getClient().getFederation().getThreadPool();
-            
-        } else {
-
-            return service;
-
         }
+
+        return service;
 
     }
     
