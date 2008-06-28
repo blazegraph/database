@@ -101,7 +101,12 @@ public class MockJoinNexus implements IJoinNexus {
         return null;
     }
 
-    public IProgramTask newProgramTask(ActionEnum action, IProgram program) {
+    public long runMutation(ActionEnum action, IProgram program) throws Exception {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public IChunkedOrderedIterator<ISolution> runQuery(IProgram program) throws Exception {
         // TODO Auto-generated method stub
         return null;
     }

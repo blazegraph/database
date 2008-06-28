@@ -21,6 +21,9 @@ public class FlushBufferTask implements Callable<Long> {
         
     }
     
+    /**
+     * @return The mutation count from {@link IBuffer#flush()}.
+     */
     public Long call() {
         
         return buffer.flush();

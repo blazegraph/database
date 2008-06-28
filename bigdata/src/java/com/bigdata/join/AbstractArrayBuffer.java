@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.join;
 
+import org.apache.log4j.Logger;
+
 /**
  * A thread-safe buffer backed by a fixed capacity array. Concrete
  * implementations must empty the buffer in {@link #flush(int, Object[])}.
@@ -37,6 +39,8 @@ package com.bigdata.join;
  */
 abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
+    protected static final Logger log = Logger.getLogger(AbstractArrayBuffer.class);
+    
     private final int capacity;
     private int n;
     private E[] buffer;
@@ -102,9 +106,22 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         if (e == null)
             throw new IllegalArgumentException();
 
+        if(log.isDebugEnabled()) {
+            
+            log.debug("element="+e);
+            
+        }
+        
         if (!isValid(e)) {
 
             // rejected by the filter.
+            
+            if(log.isDebugEnabled()) {
+                
+                log.debug("rejected by filter: "+e);
+                
+            }
+            
             return false;
             
         }
@@ -138,7 +155,22 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
         if (n > 0) {
 
-            counter += flush(n, buffer);
+            if (log.isInfoEnabled()) {
+
+                log.info("flushing buffer with " + n + " elements");
+                
+            }
+            
+            final long nwritten = flush(n, buffer);
+            
+            counter += nwritten;
+            
+            if (log.isInfoEnabled()) {
+
+                log.info("wrote " + nwritten + " elements, cumulative total="
+                        + counter);
+                
+            }
             
             clearBuffer();
             
@@ -151,6 +183,12 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     private long counter = 0L;
     
     synchronized public void reset() {
+        
+        if(log.isInfoEnabled()) {
+            
+            log.info("Resetting buffer state and counter.");
+            
+        }
         
         clearBuffer();
         

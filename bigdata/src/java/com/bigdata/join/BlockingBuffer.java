@@ -395,7 +395,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         public boolean hasNext() {
 
-            log.debug("");
+            log.debug("begin");
 
             assertNotAborted();
 

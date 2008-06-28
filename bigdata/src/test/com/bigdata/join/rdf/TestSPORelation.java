@@ -30,7 +30,6 @@ package com.bigdata.join.rdf;
 
 import java.io.File;
 import java.util.Properties;
-import java.util.concurrent.Callable;
 
 import com.bigdata.join.AbstractRuleTestCase;
 import com.bigdata.join.ActionEnum;
@@ -454,12 +453,9 @@ public class TestSPORelation extends AbstractRuleTestCase {
          */
         {
 
-//            final Callable task = joinNexus.newProgramTask(ActionEnum.Query,
-//                    rule);
-
-            final IChunkedOrderedIterator<ISolution<SPO>> itr = (IChunkedOrderedIterator<ISolution<SPO>>) joinNexus
-                    .runProgram(ActionEnum.Query, rule);
-            
+            final IChunkedOrderedIterator<ISolution> itr = joinNexus
+                    .runQuery(rule);
+    
             try {
 
                 assertFalse(itr.hasNext());
@@ -471,9 +467,6 @@ public class TestSPORelation extends AbstractRuleTestCase {
             }
 
         }
-
-        // FIXME run the rest of this test.
-        if(true) return;
         
         /*
          * Add some data into the store where it is visible to the access paths
@@ -539,11 +532,8 @@ public class TestSPORelation extends AbstractRuleTestCase {
          */
         {
 
-//            final Callable task = joinNexus.newProgramTask(ActionEnum.Query,
-//                    rule);
-
-            final IChunkedOrderedIterator<ISolution<SPO>> itr = (IChunkedOrderedIterator<ISolution<SPO>>) joinNexus
-                    .runProgram(ActionEnum.Query, rule);
+            final IChunkedOrderedIterator<ISolution> itr = joinNexus
+                    .runQuery(rule);
             
             // (U1,rdfs:subClassOf,X1), (V1,rdf:type,U1) -> (V1,rdf:type,X1)
             
@@ -560,11 +550,19 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
                 final ISolution solution = itr.next();
                 
-                assertTrue(solution.get().equals(expectedSPO));
+                if(!solution.get().equals(expectedSPO)) {
+                    
+                    fail("expected: "+expectedSPO+", actual="+solution.get());
+                    
+                }
 
                 assertTrue(solution.getRule() == rule);
 
-                assertTrue(solution.getBindingSet().equals(expectedBindingSet));
+                if(!solution.getBindingSet().equals(expectedBindingSet)) {
+                    
+                    fail("expected="+expectedBindingSet+", actual="+solution.getBindingSet());
+                    
+                }
 
             } finally {
 
@@ -572,6 +570,24 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
             }
 
+        }
+        
+        /*
+         * Execute the rule as a mutation (insert) and then verify the mutation
+         * count (1L) and the data actually written on the relation (the SPO
+         * from the solution that we verified above).
+         * 
+         * @todo test delete.
+         * 
+         * @todo test fixed point.
+         */
+        {
+
+            final long mutationCount = joinNexus.runMutation(ActionEnum.Insert,
+                    rule);
+            
+            assertEquals("mutationCount", 1L, mutationCount);
+            
         }
         
     }
