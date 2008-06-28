@@ -64,6 +64,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IClientIndex;
 import com.bigdata.service.LocalDataServiceFederation;
 
 /**
@@ -329,7 +330,10 @@ public class SPOJoinNexus implements IJoinNexus {
     }
 
     /**
-     * Core impl.
+     * Core impl. This handles the logic required to execute the program either
+     * on a target {@link DataService} (highly efficient) or within the client
+     * using the {@link IClientIndex} to submit operations to the appropriate
+     * {@link DataService}(s) (not very efficient, even w/o RMI).
      * 
      * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
      *         (mutation count).
@@ -352,13 +356,11 @@ public class SPOJoinNexus implements IJoinNexus {
 
         final IBigdataFederation fed = client.getFederation();
         
-        final IProgramTask innerTask;
-
         /*
          * FIXME Can't run yet on the data service. both a bug and need access
          * to IBigdataClient there!
          */
-        if (false && fed instanceof LocalDataServiceFederation) {
+        if (fed instanceof LocalDataServiceFederation) {
             
             /*
              * This variant is submitted and executes on the DataService (fast).
@@ -377,74 +379,11 @@ public class SPOJoinNexus implements IJoinNexus {
             
             final DataService dataService = ((LocalDataServiceFederation)fed).getDataService();
 
-            innerTask = new LocalProgramTask(action, program, this);
-                        
-            log.info("Will run on data service.");
+            final IProgramTask innerTask = new LocalProgramTask(action, program, this);
             
-            final IConcurrencyManager concurrencyManager = dataService.getConcurrencyManager();
-            
-            /*
-             * Note: The index names must be gathered from each relation on
-             * which the task will write so that they can be declared. We can't
-             * just pick and choose using the access paths since we do not know
-             * how the propagation of bindings will effect access path selection
-             * so we need a lock on all of the indices before the task can run
-             * (at least, before it can run if it is a writer - no locks are
-             * required for query).
-             */
-            
-            final String[] resource;
-            final long timestamp;
-            if(action.isMutation()) {
+            log.info("Submitting to data service.");
 
-                timestamp = ITx.UNISOLATED;
-
-                /*
-                 * FIXME This is going to require an API to disclose the index
-                 * names for the IRelation.
-                 * 
-                 * FIXME This should not be an unisolated task. The writing the
-                 * mutations on the relation needs to be unisolated, but
-                 * computing the solutions can be a historical read.
-                 * 
-                 * FIXME For a fixed point computation, we need to advance the
-                 * commit time after each round.
-                 */
-                resource = new String[]{"test.SPO","test.POS","test.OSP"};
-
-                log.info("Will submit unisolated task");
-                
-            } else {
-                
-                // FIXME negative timestamp @issue
-                timestamp = - dataService.getResourceManager().getLiveJournal()
-                        .getCommitRecord().getTimestamp();
-
-                resource = new String[] {};
-
-                log.info("Will submit read-only task");
-
-            }
-            
-            final AbstractTask task = new AbstractTask(concurrencyManager, timestamp,
-                    resource) {
-
-                @Override
-                protected Object doTask() throws Exception {
-                    
-                    log.info("Execution the inner task");
-                    
-                    return innerTask.call();
-                    
-                }
-                
-            };
-
-            log.info("Submitting task to the data service.");
-
-            final Future<Object> future = concurrencyManager.submit( task );
-            
-            return future.get();
+            return dataService.submit(innerTask).get();
             
         } else {
             
@@ -456,8 +395,8 @@ public class SPOJoinNexus implements IJoinNexus {
 
             log.info("Running inner task in caller's thread.");
 
-            innerTask = new LocalProgramTask(action, program, this, client
-                    .getFederation().getThreadPool());
+            final IProgramTask innerTask = new LocalProgramTask(action,
+                    program, this, client.getFederation().getThreadPool());
             
             return innerTask.call();
 
