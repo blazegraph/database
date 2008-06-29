@@ -118,7 +118,7 @@ public class EmbeddedFederation extends AbstractFederation {
     
     public EmbeddedClient getClient() {
         
-        return (EmbeddedClient)super.getClient();
+        return (EmbeddedClient) super.getClient();
         
     }
 
@@ -418,7 +418,7 @@ public class EmbeddedFederation extends AbstractFederation {
                          * metadata service.
                          */
                         metadataService = new EmbeddedMetadataService(this,
-                                serviceUUID, p);
+                                serviceUUID, p).start();
                         
                         nmetadataServices++;
                         
@@ -435,8 +435,8 @@ public class EmbeddedFederation extends AbstractFederation {
                          * data service.
                          */
                         
-                        final DataService dataService = new EmbeddedMetadataService(
-                                this, serviceUUID, p);
+                        final DataService dataService = new EmbeddedDataServiceImpl(
+                                serviceUUID, p).start();
 
                         if (ndataServices == this.dataService.length) {
 
@@ -570,7 +570,7 @@ public class EmbeddedFederation extends AbstractFederation {
 
             }
             
-            metadataService = new EmbeddedMetadataService(this, serviceUUID, p);
+            metadataService = new EmbeddedMetadataService(this, serviceUUID, p).start();
             
         }
         
@@ -598,7 +598,7 @@ public class EmbeddedFederation extends AbstractFederation {
                     
                 }
 
-                dataService[i] = new EmbeddedDataServiceImpl(serviceUUID, p);
+                dataService[i] = new EmbeddedDataServiceImpl(serviceUUID, p).start();
 
                 dataServiceByUUID.put(serviceUUID, dataService[i]);
 
@@ -616,7 +616,7 @@ public class EmbeddedFederation extends AbstractFederation {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class EmbeddedDataServiceImpl extends EmbeddedDataService {
+    protected class EmbeddedDataServiceImpl extends AbstractEmbeddedDataService {
 
         /**
          * @param serviceUUID
@@ -628,28 +628,11 @@ public class EmbeddedFederation extends AbstractFederation {
             
         }
 
-        public IMetadataService getMetadataService() {
+        @Override
+        public EmbeddedFederation getFederation() {
 
-            return metadataService;
-
-        }
-
-        public ITimestampService getTimestampService() {
-
-            return timestampService;
-
-        }
-
-        public ILoadBalancerService getLoadBalancerService() {
-
-            return loadBalancerService;
-
-        }
-
-        public IDataService getDataService(UUID serviceUUID) {
-
-            return dataServiceByUUID.get(serviceUUID);
-
+            return EmbeddedFederation.this;
+            
         }
         
     }

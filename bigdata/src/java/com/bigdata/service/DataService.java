@@ -80,6 +80,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.WriteExecutorService;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
@@ -279,17 +280,17 @@ abstract public class DataService extends AbstractService
     /**
      * Counters for the block read API.
      */
-    final protected ReadBlockCounters readBlockApiCounters = new ReadBlockCounters();
+    final private ReadBlockCounters readBlockApiCounters = new ReadBlockCounters();
 
-    final protected ResourceManager resourceManager;
-    final protected ConcurrencyManager concurrencyManager;
-    final protected AbstractLocalTransactionManager localTransactionManager;
+    private ResourceManager resourceManager;
+    private ConcurrencyManager concurrencyManager;
+    private AbstractLocalTransactionManager localTransactionManager;
     
     /**
      * Local httpd service exposing the live {@link CounterSet} for the
      * {@link DataService}.
      */
-    protected AbstractHTTPD httpd;
+    private AbstractHTTPD httpd;
     
     /**
      * Note: this value is not bound until the {@link #getServiceUUID()} reports
@@ -298,7 +299,7 @@ abstract public class DataService extends AbstractService
      * @see StartPerformanceCounterCollectionTask
      * @see ReportTask
      */
-    protected AbstractStatisticsCollector statisticsCollector;
+    private AbstractStatisticsCollector statisticsCollector;
 
     /**
      * true if we will collect O/S statistics.
@@ -307,22 +308,16 @@ abstract public class DataService extends AbstractService
      */
     final boolean collectPlatformStatistics;
     
-//    /**
-//     * Runs a {@link StatusTask} printing out periodic service status
-//     * information (counters).
-//     */
-//    final protected ScheduledExecutorService statusService;
-    
     /**
      * Runs a {@link ReportTask} communicating performance counters on a
      * periodic basis to the {@link ILoadBalancerService}.
      */
-    final protected ScheduledExecutorService reportService;
+    private ScheduledExecutorService reportService;
     
     /**
      * The object used to manage the local resources.
      */
-    public IResourceManager getResourceManager() {
+    public ResourceManager getResourceManager() {
         
         return resourceManager;
         
@@ -331,7 +326,7 @@ abstract public class DataService extends AbstractService
     /**
      * The object used to control access to the local resources.
      */
-    public IConcurrencyManager getConcurrencyManager() {
+    public ConcurrencyManager getConcurrencyManager() {
         
         return concurrencyManager;
         
@@ -346,148 +341,21 @@ abstract public class DataService extends AbstractService
         return localTransactionManager; 
         
     }
-
-    /*
-     * FIXME Refactor these abstract methods to invoke getClient().method() and
-     * then have each concrete DataService implementation supply a getClient()
-     * method backed by an appropriate client/federation combo.  We can implement
-     * most of the methods here via these various abstract methods, but it is
-     * backasswards.
-     */
     
     /**
-     * Lookup an {@link IDataService} by its service {@link UUID}.
+     * Return the proxy used to access other services in the federation.
      * 
-     * @param serviceUUID
-     *            The service {@link UUID}.
-     * 
-     * @return The {@link IDataService} -or- <code>null</code> if the service
-     *         {@link UUID} does not identify a known service.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>serviceUUID</i> is <code>null</code>.
-     * @throws RuntimeException
-     *             if <i>serviceUUID</i> identifies a service that is not an
-     *             {@link IDataService} (including when it identifies an
-     *             {@link IMetadataService} - this method MAY NOT be used to
-     *             lookup metadata services by their service UUID).
+     * @todo access to the {@link ITimestampService}, {@link IMetadataService}
+     *       and the {@link ILoadBalancerService} now goes through this method.
+     *       The code making those requests needs to be modified since it used
+     *       to except a <code>null</code> return for the individual services
+     *       if they were not available and it can not see an exception if the
+     *       federation itself is not available (I believe that this can only
+     *       happen for the JiniFederation since the various embedded
+     *       federations wind up returning a closely held reference whereas the
+     *       JiniFederation is obtained from the JiniClient#getClient().
      */
-    abstract public IDataService getDataService(UUID serviceUUID);
-    
-    /**
-     * Return the {@link ITimestampService}.
-     */
-    abstract public ITimestampService getTimestampService();
-    
-    /**
-     * The {@link IMetadataService}.
-     */
-    abstract public IMetadataService getMetadataService();
-
-    /**
-     * The {@link ILoadBalancerService}. 
-     */
-    abstract public ILoadBalancerService getLoadBalancerService();
-    
-    /**
-     * Return the client used by the {@link DataService}.
-     */
-    public IBigdataClient getClient() {
-        throw new UnsupportedOperationException();
-    }
-        
-//    protected IBigdataClient getClient() {
-//        
-//        return client;
-//        
-//    }
-//    private final IBigdataClient client;
-//
-//    private class FakeClient extends AbstractClient {
-//
-//        protected FakeClient(Properties properties) {
-//            super(properties);
-//            fed = new FakeFederation(this);
-//        }
-//
-//        private final IBigdataFederation fed;
-//        
-//        public IBigdataFederation connect() {
-//            return fed;
-//        }
-//
-//        public void disconnect(boolean immediateShutdown) {
-//            throw new UnsupportedOperationException();
-//        }
-//
-//        public IBigdataFederation getFederation() {
-//            return fed;
-//        }
-//
-//        public boolean isConnected() {
-//            return true;
-//        }
-//        
-//    }
-//
-//    private class FakeFederation extends AbstractFederation {
-//
-//        /**
-//         * @param client
-//         */
-//        protected FakeFederation(IBigdataClient client) {
-//            super(client);
-//        }
-//
-//        public void destroy() {
-//            throw new UnsupportedOperationException();
-//        }
-//
-//        public boolean isScaleOut() {
-//            try {
-//                /*
-//                 * Note: will be null if not discovered yet, but that still
-//                 * means a scale-out solution.
-//                 */
-//                getMetadataService();
-//                return true;
-//            } catch(UnsupportedOperationException ex) {
-//                return false;
-//            }
-//        }
-//        
-//        public IDataService getAnyDataService() {
-//            return DataService.this;
-//        }
-//
-//        public IDataService getDataService(UUID serviceUUID) {
-//            return DataService.this.getDataService(serviceUUID);
-//        }
-//
-//        public UUID[] getDataServiceUUIDs(int maxCount) {
-//            // TODO Auto-generated method stub
-////            return getLoadBalancerService().getUnderUtilizedDataServices(0/*minCount*/, maxCount, null/*exclude*/);
-//            return null;
-//        }
-//
-//        public IMetadataIndex getMetadataIndex(String name, long timestamp) {
-//            // TODO Auto-generated method stub
-//            return null;
-//        }
-//
-//        public ILoadBalancerService getLoadBalancerService() {
-//            return DataService.this.getLoadBalancerService();
-//        }
-//
-//        public IMetadataService getMetadataService() {
-//            return DataService.this.getMetadataService();
-//        }
-//
-//        public ITimestampService getTimestampService() {
-//            return DataService.this.getTimestampService();
-//        }
-//        
-//    }
+    abstract public IBigdataFederation getFederation();
 
     /**
      * Returns the {@link IResourceManager}.
@@ -503,19 +371,19 @@ abstract public class DataService extends AbstractService
             
             public IMetadataService getMetadataService() {
                 
-                return DataService.this.getMetadataService();
+                return DataService.this.getFederation().getMetadataService();
                                 
             }
             
             public ILoadBalancerService getLoadBalancerService() {
 
-                return DataService.this.getLoadBalancerService();
+                return DataService.this.getFederation().getLoadBalancerService();
                 
             }
 
             public IDataService getDataService(UUID serviceUUID) {
                 
-                return DataService.this.getDataService(serviceUUID);
+                return DataService.this.getFederation().getDataService(serviceUUID);
                 
             }
             
@@ -541,20 +409,93 @@ abstract public class DataService extends AbstractService
         };
 
     }
+
+    /**
+     * A clone of properties specified to the ctor.
+     */
+    private final Properties properties;
+
+    /**
+     * An object wrapping the properties specified to the ctor.
+     */
+    public Properties getProperties() {
+
+        return new Properties(properties);
+        
+    }
     
     /**
+     * Core constructor - you MUST {@link #start()} the {@link DataService}
+     * before it can be used.
      * 
      * @param properties
+     *            The configuration properties.
+     * 
+     * @see Options
+     * 
+     * @see #start()
      */
-    public DataService(Properties properties) {
+    protected DataService(Properties properties) {
         
         // show the copyright banner during statup.
         Banner.banner();
 
         this.properties = (Properties) properties.clone();
+
+        {
+
+            collectPlatformStatistics = Boolean.parseBoolean(properties
+                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+
+            log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+                    + collectPlatformStatistics);
+
+        }
+
+    }
+    
+    /**
+     * Note: "open" is judged by the {@link ConcurrencyManager#isOpen()} but the
+     * {@link DataService} is not usable until {@link StoreManager#isStarting()}
+     * returns <code>false</code> (there is asynchronous processing involved
+     * in reading the existing store files or creating the first store file and
+     * you can not use the {@link DataService} until that processing has been
+     * completed). The {@link ConcurrencyManager} will block for a while waiting
+     * for the {@link StoreManager} startup to complete and will reject tasks if
+     * startup processing does not complete within a timeout.
+     */
+    public boolean isOpen() {
         
-//        getClient().connect();
+        final ConcurrencyManager tmp = this.concurrencyManager;
+
+        return tmp != null && tmp.isOpen();
         
+    }
+    
+    /**
+     * Starts the {@link DataService}.
+     * <p>
+     * Note: A {@link #start()} is required in order to give subclasses an
+     * opportunity to be fully initialized before they are required to begin
+     * operations. It is impossible to encapsulate the startup logic cleanly
+     * without this ctor() + start() pattern. Those familiar with Objective-C
+     * will recognized this.
+     * 
+     * @return <i>this</i> (the return type should be strengthened by the
+     *         concrete implementation to return the actual type).
+     * 
+     * @todo it would be nice if {@link #start()} could restart after
+     *       {@link #shutdown()} but that is hardly necessary.
+     */
+    synchronized public DataService start() {
+        
+        if(isOpen()) {
+            
+            throw new IllegalStateException(); 
+            
+        }
+
         resourceManager = (ResourceManager) newResourceManager(properties);
 
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
@@ -563,7 +504,7 @@ abstract public class DataService extends AbstractService
 
                 // resolve the timestamp service.
                 final ITimestampService timestampService = DataService.this
-                        .getTimestampService();
+                        .getFederation().getTimestampService();
 
                 if (timestampService == null)
                     throw new NullPointerException(
@@ -592,17 +533,6 @@ abstract public class DataService extends AbstractService
 
         }
 
-        {
-
-            collectPlatformStatistics = Boolean.parseBoolean(properties
-                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
-                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
-
-            log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
-                    + collectPlatformStatistics);
-            
-        }
-
         /*
          * Setup to collect statistics and report about this host.
          * 
@@ -616,7 +546,7 @@ abstract public class DataService extends AbstractService
             reportService = Executors
                     .newSingleThreadScheduledExecutor(DaemonThreadFactory
                             .defaultThreadFactory());
-            
+
             reportService.scheduleWithFixedDelay(new StartPerformanceCounterCollectionTask(),
                     150, // initialDelay (ms)
                     150, // delay
@@ -625,35 +555,7 @@ abstract public class DataService extends AbstractService
 
         }
         
-    }
-
-    /**
-     * A clone of properties specified to the ctor.
-     */
-    private final Properties properties;
-
-    /**
-     * An object wrapping the properties specified to the ctor.
-     */
-    public Properties getProperties() {
-
-        return new Properties(properties);
-        
-    }
-    
-    /**
-     * Note: "open" is judged by the {@link ConcurrencyManager#isOpen()} but the
-     * {@link DataService} is not usable until {@link StoreManager#isStarting()}
-     * returns <code>false</code> (there is asynchronous processing involved
-     * in reading the existing store files or creating the first store file and
-     * you can not use the {@link DataService} until that processing has been
-     * completed). The {@link ConcurrencyManager} will block for a while waiting
-     * for the {@link StoreManager} startup to complete and will reject tasks if
-     * startup processing does not complete within a timeout.
-     */
-    public boolean isOpen() {
-        
-        return concurrencyManager.isOpen();
+        return this;
         
     }
     
@@ -667,15 +569,25 @@ abstract public class DataService extends AbstractService
         
         notifyLeave(false/*immediateShutdown*/);
         
-        concurrencyManager.shutdown();
+        if (concurrencyManager != null) {
+            concurrencyManager.shutdown();
+            concurrencyManager = null;
+        }
         
-        localTransactionManager.shutdown();
+        if(localTransactionManager!=null) {
+            localTransactionManager.shutdown();
+            localTransactionManager = null;
+        }
 
-        resourceManager.shutdown();
-        
-//        statusService.shutdown();
+        if(resourceManager!=null) {
+            resourceManager.shutdown();
+            resourceManager = null;
+        }
 
-        reportService.shutdown();
+        if(reportService!=null) {
+            reportService.shutdown();
+            reportService = null;
+        }
 
         if (statisticsCollector != null) {
 
@@ -707,22 +619,46 @@ abstract public class DataService extends AbstractService
         if(!isOpen()) return;
 
         notifyLeave(true/*immediateShutdown*/);
+
+        if (concurrencyManager != null) {
         
-        concurrencyManager.shutdownNow();
+            concurrencyManager.shutdownNow();
 
-        localTransactionManager.shutdownNow();
+            concurrencyManager = null;
+            
+        }
 
-        resourceManager.shutdownNow();
+        if (localTransactionManager != null) {
 
-//        statusService.shutdownNow();
+            localTransactionManager.shutdownNow();
 
-        reportService.shutdownNow();
+            localTransactionManager = null;
 
+        }
+
+        if (resourceManager != null) {
+
+            resourceManager.shutdownNow();
+
+            resourceManager = null;
+
+        }
+
+        if (reportService != null) {
+        
+            reportService.shutdownNow();
+
+            reportService = null;
+
+        }
+        
         if (statisticsCollector != null) {
 
             // Note: value is not bound until after the service UUID is bound.
             
             statisticsCollector.stop();
+            
+            statisticsCollector = null;
             
         }
 
@@ -740,8 +676,14 @@ abstract public class DataService extends AbstractService
     }
     
     private void notifyLeave(boolean immediateShutdown) {
-        
-        final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+
+        final ILoadBalancerService loadBalancerService;
+        try {
+            loadBalancerService = getFederation().getLoadBalancerService();
+        } catch(IllegalStateException ex) {
+            log.warn("Could not notify load balancer: "+ex);
+            return;
+        }
 
         if (loadBalancerService != null) {
             
@@ -1455,7 +1397,7 @@ abstract public class DataService extends AbstractService
 
             }
 
-            final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+            final ILoadBalancerService loadBalancerService = getFederation().getLoadBalancerService();
 
             if (loadBalancerService == null) {
 
@@ -1641,6 +1583,12 @@ abstract public class DataService extends AbstractService
 
         try {
     
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            if (proc == null)
+                throw new IllegalArgumentException();
+            
             // Choose READ_COMMITTED iff proc is read-only and UNISOLATED was requested.
             final long startTime = (tx == ITx.UNISOLATED
                         && proc instanceof IReadOnlyOperation ? ITx.READ_COMMITTED
@@ -1651,7 +1599,13 @@ abstract public class DataService extends AbstractService
                     concurrencyManager, startTime, name, proc);
             
             if(proc instanceof IDataServiceAwareProcedure) {
-                
+
+                if(log.isInfoEnabled()) {
+                    
+                    log.info("Data service aware procedure: "+proc.getClass().getName());
+                    
+                }
+
                 // set the data service on the task.
                 ((IDataServiceAwareProcedure)proc).setDataService( this );
                 
@@ -1693,7 +1647,16 @@ abstract public class DataService extends AbstractService
 
         try {
     
+            if (task == null)
+                throw new IllegalArgumentException();
+            
             if(task instanceof IDataServiceAwareProcedure) {
+         
+                if(log.isInfoEnabled()) {
+                    
+                    log.info("Data service aware procedure: "+task.getClass().getName());
+                    
+                }
                 
                 // set the data service on the task.
                 ((IDataServiceAwareProcedure)task).setDataService( this );
@@ -1701,7 +1664,7 @@ abstract public class DataService extends AbstractService
             }
             
             // submit the task and await its completion.
-            return getClient().getFederation().getThreadPool().submit(task);
+            return getFederation().getThreadPool().submit(task);
         
         } finally {
             

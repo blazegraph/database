@@ -5,7 +5,6 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.journal.IResourceManager;
-import com.bigdata.journal.ITimestampService;
 
 /**
  * A local (in process) metadata service.
@@ -15,7 +14,6 @@ import com.bigdata.journal.ITimestampService;
  */
 public class EmbeddedMetadataService extends MetadataService {
 
-//    final private UUID serviceUUID;
     private EmbeddedFederation federation;
     
     public EmbeddedMetadataService(EmbeddedFederation federation,
@@ -35,31 +33,37 @@ public class EmbeddedMetadataService extends MetadataService {
         
     }
 
+//    @Override
+//    public IDataService getDataService(UUID dataService) {
+//
+//        return federation.getDataService(dataService);
+//        
+//    }
+//
+//    @Override
+//    public IMetadataService getMetadataService() {
+//
+//        return this;
+//        
+//    }
+//    
+//    public ITimestampService getTimestampService() {
+//        
+//        return federation.getTimestampService();
+//        
+//    }
+//    
+//    @Override
+//    public ILoadBalancerService getLoadBalancerService() {
+//        
+//        return federation.getLoadBalancerService();
+//        
+//    }
 
     @Override
-    public IDataService getDataService(UUID dataService) {
+    public EmbeddedFederation getFederation() {
 
-        return federation.getDataService(dataService);
-        
-    }
-
-    @Override
-    public IMetadataService getMetadataService() {
-
-        return this;
-        
-    }
-    
-    public ITimestampService getTimestampService() {
-        
-        return federation.getTimestampService();
-        
-    }
-    
-    @Override
-    public ILoadBalancerService getLoadBalancerService() {
-        
-        return federation.getLoadBalancerService();
+        return federation;
         
     }
 

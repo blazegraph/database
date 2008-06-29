@@ -87,60 +87,6 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
     }
 
     /**
-     * Unit test verifies that a fromKey and toKey which are out of order will
-     * be rejected.
-     */
-    public void test_keyRange_correctRejection() {
-
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
-                UUID.randomUUID()));
-
-        /*
-         * These are Ok.
-         */
-        
-        newCursor(btree, IRangeQuery.DEFAULT, null/* fromKey */, null/* toKey */);
-
-        newCursor(btree, IRangeQuery.DEFAULT, new byte[] {}, null/* toKey */);
-        
-        newCursor(btree, IRangeQuery.DEFAULT, new byte[] {2}, new byte[]{3});
-
-        /*
-         * Edge case where [toKey == fromKey] is allowed.
-         */
-
-        newCursor(btree, IRangeQuery.DEFAULT, new byte[] {}, new byte[]{});
-
-        newCursor(btree, IRangeQuery.DEFAULT, new byte[] {5}, new byte[]{5});
-
-        /*
-         * These are illegal.
-         */
-
-        // toKey LT from key
-        try {
-            newCursor(btree, IRangeQuery.DEFAULT, new byte[] {5}, new byte[]{});
-            fail("Expecting: "+IllegalArgumentException.class);
-        } catch(IllegalArgumentException ex) {
-            log.info("Ignoring expected exception: "+ex);
-        }
-
-        // toKey LT from key
-        try {
-            newCursor(btree, IRangeQuery.DEFAULT, new byte[] {5}, new byte[]{3});
-            fail("Expecting: "+IllegalArgumentException.class);
-        } catch(IllegalArgumentException ex) {
-            log.info("Ignoring expected exception: "+ex);
-        }
-
-        /*
-         * @todo variant that tests when the key range is not legal for the
-         * underlying index partition.
-         */
-        
-    }
-    
-    /**
      * Return a B+Tree populated with data for
      * {@link #doBaseCaseTest(IndexSegment)}
      */

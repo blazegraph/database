@@ -122,6 +122,12 @@ abstract public class MetadataService extends DataService implements
 
     }
 
+    public MetadataService start() {
+        
+        return (MetadataService) super.start();
+        
+    }
+    
     /**
      * Disallowed. You should not be running arbitrary tasks on a
      * {@link MetadataService}. They are specialized for the index partition
@@ -141,9 +147,9 @@ abstract public class MetadataService extends DataService implements
         try {
 
             final AbstractTask task = new NextPartitionIdTask(
-                    concurrencyManager, getMetadataIndexName(name));
+                    getConcurrencyManager(), getMetadataIndexName(name));
             
-            final Integer partitionId = (Integer) concurrencyManager.submit(
+            final Integer partitionId = (Integer) getConcurrencyManager().submit(
                     task).get();
         
             log.info("Assigned partitionId="+partitionId+", name="+name);
@@ -176,10 +182,10 @@ abstract public class MetadataService extends DataService implements
 
             }
 
-            final AbstractTask task = new GetTask(concurrencyManager,
+            final AbstractTask task = new GetTask(getConcurrencyManager(),
                     timestamp, getMetadataIndexName(name), key);
             
-            return (PartitionLocator) concurrencyManager.submit(task).get();
+            return (PartitionLocator) getConcurrencyManager().submit(task).get();
             
         } finally {
             
@@ -237,10 +243,10 @@ abstract public class MetadataService extends DataService implements
 
             }
             
-            final AbstractTask task = new FindTask(concurrencyManager,
+            final AbstractTask task = new FindTask(getConcurrencyManager(),
                     timestamp, getMetadataIndexName(name), key);
             
-            return (PartitionLocator) concurrencyManager.submit(task).get();
+            return (PartitionLocator) getConcurrencyManager().submit(task).get();
 
         } finally {
 
@@ -289,10 +295,10 @@ abstract public class MetadataService extends DataService implements
         try {
 
             final AbstractTask task = new SplitIndexPartitionTask(
-                    concurrencyManager, getMetadataIndexName(name),
+                    getConcurrencyManager(), getMetadataIndexName(name),
                     oldLocator, newLocators);
             
-            concurrencyManager.submit(task).get();
+            getConcurrencyManager().submit(task).get();
             
         } finally {
             
@@ -311,10 +317,10 @@ abstract public class MetadataService extends DataService implements
         try {
 
             final AbstractTask task = new JoinIndexPartitionTask(
-                    concurrencyManager, getMetadataIndexName(name),
+                    getConcurrencyManager(), getMetadataIndexName(name),
                     oldLocators, newLocator);
             
-            concurrencyManager.submit(task).get();
+            getConcurrencyManager().submit(task).get();
             
         } finally {
             
@@ -333,10 +339,10 @@ abstract public class MetadataService extends DataService implements
         try {
 
             final AbstractTask task = new MoveIndexPartitionTask(
-                    concurrencyManager, getMetadataIndexName(name),
+                    getConcurrencyManager(), getMetadataIndexName(name),
                     oldLocator, newLocator);
             
-            concurrencyManager.submit(task).get();
+            getConcurrencyManager().submit(task).get();
             
         } finally {
             
@@ -389,10 +395,10 @@ abstract public class MetadataService extends DataService implements
                     .getMetadataIndexName(scaleOutIndexName);
      
             final AbstractTask task = new RegisterScaleOutIndexTask(
-                    concurrencyManager, resourceManager, metadataIndexName,
+                    getConcurrencyManager(), getResourceManager(), metadataIndexName,
                     metadata, separatorKeys, dataServices);
             
-            final UUID managedIndexUUID = (UUID) concurrencyManager
+            final UUID managedIndexUUID = (UUID) getConcurrencyManager()
                     .submit(task).get();
 
             return managedIndexUUID;
@@ -413,9 +419,9 @@ abstract public class MetadataService extends DataService implements
         try {
 
             final AbstractTask task = new DropScaleOutIndexTask(
-                    concurrencyManager, getMetadataIndexName(name));
+                    getConcurrencyManager(), getMetadataIndexName(name));
             
-            concurrencyManager.submit(task).get();
+            getConcurrencyManager().submit(task).get();
         
         } finally {
             
@@ -939,7 +945,7 @@ abstract public class MetadataService extends DataService implements
                 try {
 
                     // discover under-utilized data service UUIDs.
-                    dataServiceUUIDs = getLoadBalancerService().getUnderUtilizedDataServices(
+                    dataServiceUUIDs = getFederation().getLoadBalancerService().getUnderUtilizedDataServices(
                             separatorKeys.length, // minCount
                             separatorKeys.length, // maxCount
                             null// exclude
@@ -1001,7 +1007,7 @@ abstract public class MetadataService extends DataService implements
 
                 }
 
-                IDataService dataService = getDataService(uuid);
+                IDataService dataService = getFederation().getDataService(uuid);
 
                 if (dataService == null) {
 
@@ -1233,7 +1239,7 @@ abstract public class MetadataService extends DataService implements
                     
                     final UUID serviceUUID = pmd.getDataServices()[0];
                     
-                    final IDataService dataService = getDataService(serviceUUID);
+                    final IDataService dataService = getFederation().getDataService(serviceUUID);
                     
                     log.info("Dropping index partition: partitionId="+partitionId+", dataService="+dataService);
                     

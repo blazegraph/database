@@ -368,7 +368,7 @@ public class LocalProgramTask implements IProgramTask, IDataServiceAwareProcedur
         /*
          * Set the service (breaks recursion).
          */
-        this.service = dataService.getClient().getFederation().getThreadPool();
+        this.service = dataService.getFederation().getThreadPool();
 
         log.info("Submitting task to the data service.");
 
