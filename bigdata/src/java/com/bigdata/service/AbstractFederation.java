@@ -67,7 +67,6 @@ import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TaskCounters;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.service.DataService.Options;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.SparseRowStore;
@@ -80,6 +79,11 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo implement {@link IServiceShutdown}. When it is declared here it messes
+ *       up the Options interface hierarchy. What appears to be happening is
+ *       that the IServiceShutdown.Options interface is flattened into
+ *       IServiceShutdown and it shadows the Options that are being used.
  */
 abstract public class AbstractFederation implements IBigdataFederation {
 
@@ -93,6 +97,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
     }
     
+    public boolean isOpen() {
+        
+        return client != null;
+        
+    }
+    
     /**
      * Normal shutdown allows any existing client requests to federation
      * services to complete but does not schedule new requests, disconnects from
@@ -101,13 +111,15 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * <p>
      * Note: concrete implementations MUST extend this method.
      * <p>
-     * Note: Clients use {@link IBigdataClient#disconnect(boolean)} to disconnect
-     * from a federation.  The federation implements that disconnect using either
-     * {@link #shutdown()} or {@link #shutdownNow()}.
+     * Note: Clients use {@link IBigdataClient#disconnect(boolean)} to
+     * disconnect from a federation. The federation implements that disconnect
+     * using either {@link #shutdown()} or {@link #shutdownNow()}.
+     * <p>
+     * The implementation must be a NOP if the federation is already shutdown.
      */
     synchronized public void shutdown() {
 
-        assertOpen();
+        if(!isOpen()) return;
 
         final long begin = System.currentTimeMillis();
 
@@ -171,10 +183,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * Note: Clients use {@link IBigdataClient#disconnect(boolean)} to disconnect
      * from a federation.  The federation implements that disconnect using either
      * {@link #shutdown()} or {@link #shutdownNow()}.
+     * <p>
+     * The implementation must be a NOP if the federation is already shutdown.
      */
     synchronized public void shutdownNow() {
         
-        assertOpen();
+        if(!isOpen()) return;
         
         final long begin = System.currentTimeMillis();
         
@@ -521,12 +535,14 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             final Properties p = client.getProperties();
             
-            final boolean collectPlatformStatistics = Boolean.parseBoolean(p
-                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
-                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+            final boolean collectPlatformStatistics = Boolean
+                    .parseBoolean(p
+                            .getProperty(
+                                    com.bigdata.service.IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS,
+                                    com.bigdata.service.IBigdataClient.Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
 
-            log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
-                    + collectPlatformStatistics);
+            log.info(com.bigdata.service.IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS
+                            + "=" + collectPlatformStatistics);
 
             if (collectPlatformStatistics) {
                 

@@ -47,6 +47,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
@@ -378,10 +379,10 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             final BTree dst = (BTree)ndx;
             
             // @todo handle failover / read from secondaries.
-            final IMetadataService metadataService = getDataService().getMetadataService();
+            final IBigdataFederation fed = getDataService().getFederation();
+            final IMetadataService metadataService = fed.getMetadataService();
             assert metadataService != null;
-            final IDataService sourceDataService = getDataService()
-                    .getDataService(sourceDataServiceUUIDs[0]);
+            final IDataService sourceDataService = fed.getDataService(sourceDataServiceUUIDs[0]);
             assert sourceDataService != null;
             
             // iterator reading from the source index partition.

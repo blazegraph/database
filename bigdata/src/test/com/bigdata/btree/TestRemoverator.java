@@ -30,8 +30,7 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import junit.framework.TestCase2;
-
+import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractTupleFilterator.Removerator;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -69,7 +68,7 @@ public class TestRemoverator extends AbstractTupleCursorTestCase {
         btree.insert(20, "Mike");
         btree.insert(30, "James");
 
-        ITupleIterator<String> itr = new Removerator(btree.rangeIterator());
+        ITupleIterator<String> itr = new Removerator<String>(newCursor(btree));
         
         assertTrue(itr.hasNext());
 
@@ -103,8 +102,10 @@ public class TestRemoverator extends AbstractTupleCursorTestCase {
 
     @Override
     protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags, byte[] fromKey, byte[] toKey) {
-        // TODO Auto-generated method stub
-        return null;
+    
+        return new MutableBTreeTupleCursor<String>((BTree) btree,
+                new Tuple<String>(btree, flags), fromKey, toKey);
+
     }
     
 }

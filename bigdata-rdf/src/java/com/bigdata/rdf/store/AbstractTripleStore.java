@@ -135,7 +135,7 @@ import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 import com.bigdata.search.TokenBuffer;
 import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedDataService;
+import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceFederation;
@@ -583,7 +583,7 @@ abstract public class AbstractTripleStore implements ITripleStore,
      * and writers. This property depends on primarily on the concurrency
      * control mechanisms (if any) that are used to prevent concurrent access to
      * an unisolated index while a thread is writing on that index. Stores based
-     * on the {@link IBigdataFederation} or an {@link EmbeddedDataService}
+     * on the {@link IBigdataFederation} or an {@link AbstractEmbeddedDataService}
      * automatically inherent the appropriate concurrency controls as would a
      * store whose index access was intermediated by the executor service of an
      * {@link IConcurrencyManager}.

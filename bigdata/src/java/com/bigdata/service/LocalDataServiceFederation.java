@@ -90,7 +90,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
         properties.setProperty(Options.OVERFLOW_ENABLED,"false");
         
         // create the embedded data service.
-        dataService = new LocalDataServiceImpl(properties);
+        dataService = new LocalDataServiceImpl(properties).start();
 
         // notify join.
         loadBalancerService.join(dataService.getServiceUUID(),
@@ -98,40 +98,47 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
     
-    protected class LocalDataServiceImpl extends EmbeddedDataService {
+    protected class LocalDataServiceImpl extends AbstractEmbeddedDataService {
         
         LocalDataServiceImpl(Properties properties) {
             
             super(UUID.randomUUID(), properties);
             
         }
-        
-        @Override
-        public IDataService getDataService(UUID serviceUUID) {
-            
-            return LocalDataServiceFederation.this.getDataService(serviceUUID);
-            
-        }
 
         @Override
-        public IMetadataService getMetadataService() {
+        public LocalDataServiceFederation getFederation() {
 
-            throw new UnsupportedOperationException();
-            
-        }
-
-        @Override
-        public ILoadBalancerService getLoadBalancerService() {
-
-            return loadBalancerService;
+            return LocalDataServiceFederation.this;
             
         }
         
-        public ITimestampService getTimestampService() {
-            
-            return timestampService;
-            
-        }
+//        @Override
+//        public IDataService getDataService(UUID serviceUUID) {
+//            
+//            return LocalDataServiceFederation.this.getDataService(serviceUUID);
+//            
+//        }
+//
+//        @Override
+//        public IMetadataService getMetadataService() {
+//
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//
+//        @Override
+//        public ILoadBalancerService getLoadBalancerService() {
+//
+//            return loadBalancerService;
+//            
+//        }
+//        
+//        public ITimestampService getTimestampService() {
+//            
+//            return timestampService;
+//            
+//        }
 
     }
 

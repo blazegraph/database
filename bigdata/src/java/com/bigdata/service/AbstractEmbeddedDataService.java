@@ -12,9 +12,9 @@ import com.bigdata.journal.IResourceManager;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class EmbeddedDataService extends DataService {
+abstract public class AbstractEmbeddedDataService extends DataService {
     
-    public EmbeddedDataService(UUID serviceUUID, Properties properties) {
+    public AbstractEmbeddedDataService(UUID serviceUUID, Properties properties) {
         
         super(properties);
 
