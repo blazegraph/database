@@ -271,6 +271,12 @@ public interface IBigdataFederation extends IIndexManager {
     public boolean isScaleOut();
     
     /**
+     * Return <code>true</code> iff the federation is distributed (uses RMI and
+     * is running, at least in principle, across more than one host/JVM).
+     */
+    public boolean isDistributed();
+    
+    /**
      * Return the global {@link SparseRowStore} used to store named property
      * sets in the federation.
      * 

@@ -71,6 +71,7 @@ import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.NT;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
@@ -735,63 +736,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     }
 
-    /**
-     * An index name and a timestamp.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected static class NT {
-        
-        public final String name;
-        public final long timestamp;
-        private final int hashCode;
-       
-        public NT(String name, long timestamp) {
-            
-            if (name == null)
-                throw new IllegalArgumentException();
-            
-            this.name = name;
-            
-            this.timestamp = timestamp;
-            
-            this.hashCode = name.hashCode()<<32 + (Long.valueOf(timestamp).hashCode()>>>32);
-            
-        }
-        
-        public int hashCode() {
-            
-            return hashCode;
-            
-        }
-        
-        public boolean equals(Object o) {
-
-            return equals((NT)o);
-            
-        }
-        
-        public boolean equals(NT o) {
-            
-            if(this==o) return true;
-            
-            if(!this.name.equals(o.name)) return false;
-
-            if(this.timestamp != o.timestamp) return false;
-            
-            return true;
-            
-        }
-
-        public String toString() {
-            
-            return "NT{name=" + name + ",timestamp=" + timestamp + "}";
-            
-        }
-        
-    }
-    
     /**
      * A canonicalizing cache for the client's {@link IIndex} proxy objects. The
      * keys are {@link NT} objects which represent both the name of the index

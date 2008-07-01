@@ -40,6 +40,7 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.NT;
 
 /**
  * Integration provides a view of a local {@link DataService} as if it were a
@@ -56,8 +57,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
     private TimestampService timestampService;
     private LoadBalancerService loadBalancerService;
-    private DataService dataService;
-//    private AbstractHTTPD httpd;
+    private LocalDataServiceImpl dataService;
     
     /**
      * 
@@ -98,7 +98,13 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
     
-    protected class LocalDataServiceImpl extends AbstractEmbeddedDataService {
+    /**
+     * The embedded {@link DataService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class LocalDataServiceImpl extends AbstractEmbeddedDataService {
         
         LocalDataServiceImpl(Properties properties) {
             
@@ -113,33 +119,13 @@ public class LocalDataServiceFederation extends AbstractFederation {
             
         }
         
-//        @Override
-//        public IDataService getDataService(UUID serviceUUID) {
-//            
-//            return LocalDataServiceFederation.this.getDataService(serviceUUID);
-//            
-//        }
-//
-//        @Override
-//        public IMetadataService getMetadataService() {
-//
-//            throw new UnsupportedOperationException();
-//            
-//        }
-//
-//        @Override
-//        public ILoadBalancerService getLoadBalancerService() {
-//
-//            return loadBalancerService;
-//            
-//        }
-//        
-//        public ITimestampService getTimestampService() {
-//            
-//            return timestampService;
-//            
-//        }
-
+        @Override
+        public LocalDataServiceImpl start() {
+            
+            return (LocalDataServiceImpl) super.start();
+            
+        }
+        
     }
 
     /**
@@ -152,7 +138,8 @@ public class LocalDataServiceFederation extends AbstractFederation {
     }
     
     /**
-     * Returns an array containing the {@link UUID} of the local {@link IDataService}.
+     * Returns an array containing one element - the {@link UUID} of the local
+     * {@link IDataService}.
      */
     public UUID[] getDataServiceUUIDs(int maxCount) {
         
@@ -165,7 +152,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
     /**
      * Returns the local {@link IDataService}.
      */
-    public IDataService getAnyDataService() {
+    public LocalDataServiceImpl getAnyDataService() {
 
         assertOpen();
         
@@ -176,7 +163,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
     /**
      * Return the local {@link DataService}.
      */
-    public DataService getDataService() {
+    public LocalDataServiceImpl getDataService() {
         
         assertOpen();
         
@@ -377,6 +364,15 @@ public class LocalDataServiceFederation extends AbstractFederation {
     }
     
     /**
+     * Return <code>false</code>.
+     */
+    public boolean isDistributed() {
+        
+        return false;
+        
+    }
+    
+    /**
      * Extended to shutdown the embedded services.
      */
     synchronized public void shutdown() {
@@ -407,14 +403,6 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         }
 
-//        if (httpd != null) {
-//
-//            httpd.shutdown();
-//         
-//            httpd = null;
-//            
-//        }
-        
     }
     
     /**
@@ -447,14 +435,6 @@ public class LocalDataServiceFederation extends AbstractFederation {
             timestampService = null;
 
         }
-
-//        if (httpd != null) {
-//
-//            httpd.shutdownNow();
-//         
-//            httpd = null;
-//            
-//        }
 
     }
 
@@ -492,14 +472,6 @@ public class LocalDataServiceFederation extends AbstractFederation {
             timestampService = null;
             
         }
-        
-//        if (httpd != null) {
-//
-//            httpd.shutdownNow();
-//         
-//            httpd = null;
-//            
-//        }
      
     }
     

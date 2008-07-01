@@ -808,4 +808,13 @@ public class EmbeddedFederation extends AbstractFederation {
         
     }
 
+    /**
+     * Return <code>false</code>.
+     */
+    public boolean isDistributed() {
+        
+        return false;
+        
+    }
+    
 }
