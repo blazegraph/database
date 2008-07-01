@@ -145,7 +145,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         if (journal == null) {
 
-            journal = resourceManager.getJournal(Math.abs(timestamp));
+            journal = resourceManager.getJournal(timestamp);
 
             if (journal == null) {
 
@@ -1182,6 +1182,17 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
     }
 
+    /**
+     * The timestamp specified to the ctor. This effects which index checkpoints
+     * are available to the task and whether the index(s) are read-only or
+     * mutable.
+     */
+    public long getTimestamp() {
+        
+        return timestamp;
+        
+    }
+    
     /**
      * Returns a copy of the array of resources declared to the constructor.
      */
@@ -2229,20 +2240,27 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         }
         
         public void dropIndex(String name) {
+
             throw new UnsupportedOperationException();
+            
         }
 
-
         public void registerIndex(IndexMetadata indexMetadata) {
+            
             throw new UnsupportedOperationException();
+            
         }
 
         public IIndex registerIndex(String name, BTree btree) {
+            
             throw new UnsupportedOperationException();
+            
         }
 
         public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
+            
             throw new UnsupportedOperationException();
+            
         }
 
         /*

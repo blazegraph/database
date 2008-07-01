@@ -48,7 +48,7 @@ import com.bigdata.rawstore.IBlock;
  * joins.
  * <p>
  * Note: This class supports caching of the remote metadata index, which does
- * not use index partitions, by the {@link AbstractRemoteFederation} and also
+ * not use index partitions, by the {@link AbstractDistributedFederation} and also
  * supports the {@link LocalDataServiceFederation}.
  * 
  * @todo write tests for read-consistent.
