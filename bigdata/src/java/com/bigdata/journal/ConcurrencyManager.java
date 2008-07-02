@@ -900,7 +900,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception NullPointerException
      *                if task null
      */
-    public Future<Object> submit(AbstractTask task) {
+    public Future<? extends Object> submit(AbstractTask task) {
 
         assertOpen();
         
@@ -975,7 +975,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @return The {@link Future}.
      */
-    private Future<Object> submitWithDynamicLatency(AbstractTask task,
+    private Future<? extends Object> submitWithDynamicLatency(AbstractTask task,
             ExecutorService service, TaskCounters taskCounters) {
 
         taskCounters.taskSubmitCount.incrementAndGet();
@@ -1065,12 +1065,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks)
+    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks)
             throws InterruptedException {
 
         assertOpen();
         
-        List<Future<Object>> futures = new LinkedList<Future<Object>>();
+        List<Future<? extends Object>> futures = new LinkedList<Future<? extends Object>>();
 
         boolean done = false;
 
@@ -1086,7 +1086,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // await all futures.
             
-            for (Future<Object> f : futures) {
+            for (Future<? extends Object> f : futures) {
 
                 if (!f.isDone()) {
 
@@ -1118,7 +1118,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 // At least one future did not complete.
                 
-                for (Future<Object> f : futures) {
+                for (Future<? extends Object> f : futures) {
 
                     if(!f.isDone()) {
 
@@ -1161,12 +1161,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
      */
-    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks,
+    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks,
             long timeout, TimeUnit unit) throws InterruptedException {
 
         assertOpen();
         
-        List<Future<Object>> futures = new LinkedList<Future<Object>>();
+        final List<Future<? extends Object>> futures = new LinkedList<Future<? extends Object>>();
 
         boolean done = false;
         
@@ -1200,7 +1200,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // await all futures.
             
-            for (Future<Object> f : futures) {
+            for (Future<? extends Object> f : futures) {
 
                 if (!f.isDone()) {
 
@@ -1250,7 +1250,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 // At least one future did not complete.
 
-                for (Future<Object> f : futures) {
+                for (Future<? extends Object> f : futures) {
 
                     if (!f.isDone()) {
 

@@ -84,6 +84,16 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
         return relationName;
         
     }
+
+    /**
+     * The class name, timestamp and namespace for the relation view.
+     */
+    public String toString(){
+        
+        return getClass().getSimpleName() + "{timestamp=" + timestamp
+                + ", namespace=" + relationName + "}";
+        
+    }
     
     /**
      * 

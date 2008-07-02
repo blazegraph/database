@@ -2,6 +2,7 @@ package com.bigdata.relation.rule.eval;
 
 import com.bigdata.relation.accesspath.EmptyChunkedIterator;
 import com.bigdata.relation.rule.IProgram;
+import com.bigdata.relation.rule.IStep;
 
 
 /**
@@ -14,17 +15,27 @@ public class EmptyProgramTask implements IProgramTask {
 
     final ActionEnum action;
 
-    final IProgram program;
+    final IStep program;
 
-    public EmptyProgramTask(ActionEnum action, IProgram program) {
+    /**
+     * 
+     * @param action
+     * @param step
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             unless the <i>step</i> is an empty {@link IProgram}.
+     */
+    public EmptyProgramTask(ActionEnum action, IStep step) {
 
         if (action == null)
             throw new IllegalArgumentException();
 
-        if (program == null)
+        if (step == null)
             throw new IllegalArgumentException();
 
-        if (program.isRule() || program.stepCount() != 0) {
+        if (step.isRule() || ((IProgram)step).stepCount() != 0) {
 
             throw new IllegalArgumentException();
 
@@ -32,7 +43,7 @@ public class EmptyProgramTask implements IProgramTask {
 
         this.action = action;
 
-        this.program = program;
+        this.program = step;
 
     }
 

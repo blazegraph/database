@@ -30,17 +30,12 @@ package com.bigdata.relation.rule;
 
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationLocator;
-import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IProgram;
-import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -98,17 +93,12 @@ public class MockJoinNexus implements IJoinNexus {
         return null;
     }
 
-    public long runMutation(ActionEnum action, IProgram program) throws Exception {
+    public long runMutation(ActionEnum action, IStep step) throws Exception {
         // TODO Auto-generated method stub
         return 0;
     }
 
-    public IChunkedOrderedIterator<ISolution> runQuery(IProgram program) throws Exception {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public IRelation getRelation(IRelationName relationName) {
+    public IChunkedOrderedIterator<ISolution> runQuery(IStep step) throws Exception {
         // TODO Auto-generated method stub
         return null;
     }
@@ -123,9 +113,14 @@ public class MockJoinNexus implements IJoinNexus {
         return null;
     }
 
-    public long getTimestamp() {
+    public long getReadTimestamp() {
         // TODO Auto-generated method stub
-        return 0;
+        return ITx.READ_COMMITTED;
+    }
+
+    public long getWriteTimestamp() {
+        // TODO Auto-generated method stub
+        return ITx.UNISOLATED;
     }
 
 }

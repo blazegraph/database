@@ -30,19 +30,19 @@ package com.bigdata.relation.rule.eval;
 
 import java.util.concurrent.Callable;
 
-import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.IStep;
 
 /**
- * Interface for evaluation of a {@link Rule}.
+ * Interface for evaluation of an {@link IStep}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRuleTask extends Callable<RuleStats> {
+public interface IStepTask extends Callable<RuleStats> {
     
     /**
      * Evaluate the rule.
      */
-    public RuleStats call();
+    public RuleStats call() throws Exception;
     
 }

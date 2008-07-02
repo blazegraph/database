@@ -38,6 +38,7 @@ import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.DelegatePredicate;
@@ -59,12 +60,28 @@ import com.bigdata.relation.rule.eval.DelegatePredicate;
  */
 public class TMUtility {
 
-    public static final transient TMUtility INSTANCE = new TMUtility();
+    /**
+     * Default instance constructs programs with parallel steps.
+     */
+    public static final transient TMUtility INSTANCE = new TMUtility(true/*parallel*/);
     
     /**
-     * 
+     * Alternative instance constructs programs with sequential steps for easier
+     * debugging.
      */
-    private TMUtility() {
+    public static final transient TMUtility DEBUG = new TMUtility(false/*parallel*/);
+    
+    private final boolean parallel;
+    
+    /**
+     * @param parallel
+     *            When <code>true</code>, the new {@link IRule}s will be
+     *            added to a program that executes its steps in parallel.
+     */
+    public TMUtility(boolean parallel) {
+    
+        this.parallel = parallel;
+        
     }
 
     /**
@@ -90,12 +107,12 @@ public class TMUtility {
      *            The temporary database containing the statements to be added
      *            to (or removed from) the database during truth maintenance.
      * 
-     * @return A list of rules constructed as specified above. When they are
+     * @return An {@link IProgram} constructed as specified above. When they are
      *         executed, all of the resulting rules should write on the same
      *         buffer. This has the same effect as a UNION over the entailments
      *         of the individual rules.
      */
-    public List<IRule> mapRuleForTruthMaintenance(final IRule rule,
+    public Program mapRuleForTruthMaintenance(final IRule rule,
             final IRelationName<SPO> focusStore) {
 
         if (rule == null)
@@ -257,7 +274,11 @@ public class TMUtility {
 
         }
 
-        return rules;
+        final Program program = new Program(rule.getName(), parallel, false/* closure */);
+
+        program.addSteps(rules.iterator());
+        
+        return program;
 
     }
 
@@ -273,7 +294,8 @@ public class TMUtility {
      * 
      * @todo unit tests.
      */
-    public Program mapProgramForTruthMaintenance(IProgram program,IRelationName<SPO> focusStore) {
+    public Program mapProgramForTruthMaintenance(IProgram program,
+            IRelationName<SPO> focusStore) {
 
         if (program == null)
             throw new IllegalArgumentException();
@@ -282,29 +304,32 @@ public class TMUtility {
             throw new IllegalArgumentException();
 
         final Program tmp = new Program(program.getName(),
-                program.isParallel(), program.isClosure());
+                    program.isParallel(), program.isClosure());
 
-        if (program.isRule()) {
-
-            tmp.addSteps(mapRuleForTruthMaintenance((IRule) program,
-                    focusStore).iterator() );
-
-            return tmp;
-            
-        }
-            
-        final Iterator<? extends IProgram> itr = program.steps();
+        final Iterator<? extends IStep> itr = program.steps();
         
         while(itr.hasNext()) {
             
-            final IProgram step = itr.next();
-            
-            tmp.addSteps(mapProgramForTruthMaintenance(step, focusStore)
-                    .steps());
+            tmp.addSteps(mapForTruthMaintenance(itr.next(), focusStore)
+                            .steps());
         
         }
         
         return tmp;
+        
+    }
+
+    public Program mapForTruthMaintenance(IStep step, IRelationName<SPO> focusStore) {
+        
+        if(step.isRule()) {
+            
+            return mapRuleForTruthMaintenance((IRule)step, focusStore);
+            
+        } else {
+            
+            return mapProgramForTruthMaintenance((IProgram)step, focusStore);
+            
+        }
         
     }
     

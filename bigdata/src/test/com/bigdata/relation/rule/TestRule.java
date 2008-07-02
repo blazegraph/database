@@ -325,7 +325,7 @@ public class TestRule extends AbstractRuleTestCase {
 
         public MyRule( SPOPredicate head, SPOPredicate[] body) {
 
-            super(null/* name */, head, body, null/* constraints */);
+            super(MyRule.class.getName(), head, body, null/* constraints */);
 
         }
 

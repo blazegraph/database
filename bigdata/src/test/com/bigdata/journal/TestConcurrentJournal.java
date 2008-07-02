@@ -133,7 +133,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     ITx.READ_COMMITTED, resource) {
 
                 /**
@@ -196,7 +196,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     ITx.UNISOLATED, resource) {
 
                 /**
@@ -264,7 +264,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             assertNotSame(ITx.UNISOLATED, tx);
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     tx, resource) {
 
                 /**
@@ -337,7 +337,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             // final long tx = journal.newTx(IsolationEnum.ReadCommitted);
             // assertNotSame(ITx.UNISOLATED, tx);
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     tx, resource) {
 
                 /**
@@ -416,7 +416,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             assertNotSame(ITx.UNISOLATED, tx);
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     tx, resource) {
 
                 /**
@@ -491,7 +491,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     ITx.UNISOLATED, resource) {
 
                 /**
@@ -621,7 +621,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     ITx.UNISOLATED, resource) {
 
                 /**
@@ -1065,7 +1065,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final long committedTaskCount0 = writeService.getTaskCommittedCount();
             
             // submit the tasks and await their completion.
-            final List<Future<Object>> futures = journal.invokeAll( tasks );
+            final List<Future<? extends Object>> futures = journal.invokeAll( tasks );
 
             /*
              * verify the #of commits on the journal is unchanged since nothing
@@ -1295,9 +1295,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
             // Note: set by one of the tasks below.
             final AtomicLong checkpointAddr2 = new AtomicLong(0L);
 
-            final AtomicReference<Future<Object>> futureB = new AtomicReference<Future<Object>>();
-            final AtomicReference<Future<Object>> futureC = new AtomicReference<Future<Object>>();
-            final AtomicReference<Future<Object>> futureD = new AtomicReference<Future<Object>>();
+            final AtomicReference<Future<? extends Object>> futureB = new AtomicReference<Future<? extends Object>>();
+            final AtomicReference<Future<? extends Object>> futureC = new AtomicReference<Future<? extends Object>>();
+            final AtomicReference<Future<? extends Object>> futureD = new AtomicReference<Future<? extends Object>>();
             
             /*
              * Note: the setup for this test is a PITA. In order to exert full
@@ -1410,7 +1410,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 //            
 //            final List<Future<Object>> futures = journal.invokeAll( tasks );
 
-            Future<Object> futureA = journal.submit( a );
+            final Future<? extends Object> futureA = journal.submit( a );
             
             /*
              * wait for (a). if all tasks are in the same commit group then all
@@ -1774,14 +1774,19 @@ public class TestConcurrentJournal extends ProxyTestCase {
                             % resource.length]));
                     
                 }
+                
                 // await futures.
-                List<Future<Object>> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);
-                for(Future<Object> f : futures) {
+                final List<Future<? extends Object>> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);
+                
+                for(Future<? extends Object> f : futures) {
+                
                     if(f.isDone()) {
                         // all tasks that complete should have done so without error.
                         f.get();
                     }
+                    
                 }
+                
             }
             
             writerService.shutdownNow();

@@ -173,7 +173,8 @@ public class TestSPORelation extends AbstractRuleTestCase {
             final IRule rule = new TestRuleRdfs9(relationName);
 
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
-                    relationLocator, ITx.UNISOLATED, false/* elementOnly */);
+                    relationLocator, ITx.READ_COMMITTED/* writeTime */,
+                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
             
             final RuleState ruleState = new RuleState(rule, joinNexus);
 
@@ -206,8 +207,9 @@ public class TestSPORelation extends AbstractRuleTestCase {
                     // constraints
                     new IConstraint[] {});
 
-            final IJoinNexus joinNexus = new RDFJoinNexus(service, relationLocator,
-                    ITx.UNISOLATED, false/* elementOnly */);
+            final IJoinNexus joinNexus = new RDFJoinNexus(service,
+                    relationLocator, ITx.READ_COMMITTED/* writeTime */,
+                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
             
             final RuleState ruleState = new RuleState(rule, joinNexus);
 
@@ -241,7 +243,8 @@ public class TestSPORelation extends AbstractRuleTestCase {
                     new IConstraint[] {});
 
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
-                    relationLocator, ITx.UNISOLATED, false/* elementOnly */);
+                    relationLocator, ITx.UNISOLATED/* writeTime */,
+                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
             
             final RuleState ruleState = new RuleState(rule, joinNexus);
 
@@ -282,7 +285,8 @@ public class TestSPORelation extends AbstractRuleTestCase {
         final Rule rule = new TestRuleRdfs9(relationName);
 
         final IJoinNexus joinNexus = new RDFJoinNexus(service, relationLocator,
-                ITx.UNISOLATED, false/* elementOnly */);
+                ITx.UNISOLATED/* writeTime */,
+                ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
 
         /*
          * Note: This is the original evaluation order based on NO data in the
@@ -472,8 +476,11 @@ public class TestSPORelation extends AbstractRuleTestCase {
          */
         {
 
+            log.info("\n\nQuery w/o data in KB\n");
+            
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
-                    relationLocator, ITx.READ_COMMITTED, false/* elementOnly */);
+                    relationLocator, ITx.READ_COMMITTED/* writeTime */,
+                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
 
             final IChunkedOrderedIterator<ISolution> itr = joinNexus
                     .runQuery(rule);
@@ -554,8 +561,11 @@ public class TestSPORelation extends AbstractRuleTestCase {
          */
         {
 
+            log.info("\n\nQuery with data in KB\n");
+
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
-                    relationLocator, ITx.READ_COMMITTED, false/* elementOnly */);
+                    relationLocator, ITx.READ_COMMITTED/* writeTime */,
+                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
 
 
             final IChunkedOrderedIterator<ISolution> itr = joinNexus
@@ -609,8 +619,11 @@ public class TestSPORelation extends AbstractRuleTestCase {
          */
         {
 
+            log.info("\n\nRun rules as insert operations\n");
+
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
-                    relationLocator, ITx.UNISOLATED, false/* elementOnly */);
+                    relationLocator, ITx.UNISOLATED/* writeTime */,
+                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
 
             final long mutationCount = joinNexus.runMutation(ActionEnum.Insert,
                     rule);

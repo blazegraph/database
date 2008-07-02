@@ -38,21 +38,29 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationLocator;
 import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 
 /**
+ * Support for determining how and where a program should be executed.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -61,37 +69,39 @@ public class ProgramUtility {
     protected static Logger log = Logger.getLogger(ProgramUtility.class);
 
     private final IRelationLocator relationLocator;
-    private final long timestamp;
+//    private final long readTimestamp;
 
     public ProgramUtility(IJoinNexus joinNexus) {
         
-        this(joinNexus.getRelationLocator(), joinNexus.getTimestamp());
+        this(joinNexus.getRelationLocator());//, joinNexus.getReadTimestamp());
         
     }
 
-    public ProgramUtility(IRelationLocator relationLocator, long timestamp) {
+    /**
+     * 
+     * @param relationLocator
+     */
+    public ProgramUtility(IRelationLocator relationLocator) {
         
         if (relationLocator == null)
             throw new IllegalArgumentException();
         
         this.relationLocator = relationLocator;
-
-        this.timestamp = timestamp;
         
     }
     
     /**
      * The set of distinct relations identified by the various rules.
      */
-    public Set<IRelationName> getRelationNames(IProgram program) {
+    public Set<IRelationName> getRelationNames(IStep step) {
 
         Set<IRelationName> c = new HashSet<IRelationName>();
         
-        getRelationNames(program, c);
+        getRelationNames(step, c);
 
         if(log.isDebugEnabled()) {
             
-            log.debug("Found "+c.size()+" relations, program="+program.getName());
+            log.debug("Found "+c.size()+" relations, program="+step.getName());
             
         }
 
@@ -99,17 +109,17 @@ public class ProgramUtility {
         
     }
     
-    private void getRelationNames(IProgram p, Set<IRelationName> c) {
+    private void getRelationNames(IStep p, Set<IRelationName> c) {
 
         if (p.isRule()) {
 
-            IRule r = (IRule) p;
+            final IRule r = (IRule) p;
 
             c.add(r.getHead().getRelationName());
 
         } else {
             
-            final Iterator<IProgram> itr = p.steps();
+            final Iterator<IStep> itr = ((IProgram)p).steps();
 
             while (itr.hasNext()) {
 
@@ -123,25 +133,34 @@ public class ProgramUtility {
     
     /**
      * Locate all relation identifers and resolve them to their relations.
+     * <p>
+     * Note: Distinct relation views are often used for reading from the
+     * relation and writing on the relation. This allows greater concurrency
+     * since the {@link BTree} that absorbs writes does not support concurrent
+     * writers. See {@link IJoinNexus#getWriteTimestamp()} and
+     * {@link IJoinNexus#getReadTimestamp()}.
+     * 
+     * @param timestamp
+     *            The timestamp for the relation views.
      * 
      * @throws RuntimeException
      *             if any relation can not be resolved.
      * @throws RuntimeException
      *             if any relation is not local.
      */
-    public Map<IRelationName, IRelation> getRelations(IProgram program) {
+    public Map<IRelationName, IRelation> getRelations(IStep step, long timestamp) {
 
-        if (program == null)
+        if (step == null)
             throw new IllegalArgumentException();
 
         final Map<IRelationName, IRelation> c = new HashMap<IRelationName, IRelation>();
 
-        getRelations(program, c);
+        getRelations(step, c, timestamp );
 
         if (log.isDebugEnabled()) {
 
             log.debug("Located " + c.size() + " relations, program="
-                    + program.getName());
+                    + step.getName());
 
         }
 
@@ -150,7 +169,7 @@ public class ProgramUtility {
     }
 
     @SuppressWarnings("unchecked")
-    private void getRelations(IProgram p, Map<IRelationName, IRelation> c) {
+    private void getRelations(IStep p, Map<IRelationName, IRelation> c, long timestamp) {
 
         if (p.isRule()) {
 
@@ -167,11 +186,11 @@ public class ProgramUtility {
 
         } else {
             
-            final Iterator<IProgram> itr = p.steps();
+            final Iterator<IStep> itr = ((IProgram)p).steps();
 
             while (itr.hasNext()) {
 
-                getRelations(itr.next(), c);
+                getRelations(itr.next(), c, timestamp);
 
             }
 
@@ -235,8 +254,12 @@ public class ProgramUtility {
      * {@link LocalDataServiceImpl}, including the case where there is access
      * to local resources.
      * 
-     * @param program
+     * @param step
      *            The program.
+     * @param timestamp
+     *            The timestamp is relatively arbitrary. We do not actually use
+     *            the relation objects that are being created other than to
+     *            inquire after the names of their indices.
      * 
      * @return The {@link IBigdataFederation} -or- <code>null</code> if the
      *         indices are all hosted by <strong>local</strong> resources
@@ -261,16 +284,19 @@ public class ProgramUtility {
      *             if there are relations belonging to different
      *             {@link IBigdataFederation}s.
      */
-    public IBigdataFederation getFederation(IProgram program) {
+    public IBigdataFederation getFederation(IStep step, long timestamp) {
 
-        if (program == null)
+        if (step == null)
             throw new IllegalArgumentException();
 
-        if(!program.isRule() && program.stepCount()==0)
-            throw new IllegalArgumentException();
+        if(!step.isRule() && ((IProgram)step).stepCount()==0)
+            throw new IllegalArgumentException("empty program");
 
-        // set of distinct relations.
-        final Map<IRelationName,IRelation> relations = getRelations(program);
+        /*
+         * The set of distinct relations.
+         */
+        final Map<IRelationName, IRelation> relations = getRelations(step,
+                timestamp);
 
         if(relations.isEmpty()) {
             
@@ -345,4 +371,119 @@ public class ProgramUtility {
         
     }
 
+    /**
+     * <code>true</code> iff the program either is the fix point closure of a
+     * rule or contains a step (recursively) that is the fix point closure of
+     * one or more rules.
+     * 
+     * @param step
+     *            The program.
+     * 
+     * @return
+     */
+    public boolean isClosureProgram(IStep step) {
+
+        if (step == null)
+            throw new IllegalArgumentException();
+
+        if(step.isRule()) return false;
+        
+        final IProgram program = (IProgram)step;
+        
+        if (program.isClosure())
+            return true;
+
+        final Iterator<IStep> itr = program.steps();
+
+        while (itr.hasNext()) {
+
+            if (isClosureProgram(itr.next()))
+                return true;
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Create the appropriate buffers to absorb writes by the rules in the
+     * program that target an {@link IMutableRelation}.
+     * 
+     * @return the map from relation identifier to the corresponding buffer.
+     * 
+     * @throws IllegalStateException
+     *             if the program is being executed as an
+     *             {@link ActionEnum#Query}.
+     * @throws RuntimeException
+     *             If a rule requires mutation for a relation (it will write on
+     *             the relation) and the corresponding entry in the map does not
+     *             implement {@link IMutableRelation}.
+     */
+    protected Map<IRelationName, IBuffer<ISolution>> getMutationBuffers(
+            ActionEnum action, IJoinNexus joinNexus,
+            Map<IRelationName, IRelation> relations) {
+
+        if (action == ActionEnum.Query) {
+
+            throw new IllegalStateException();
+            
+        }
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("");
+            
+        }
+
+        final Map<IRelationName, IBuffer<ISolution>> c = new HashMap<IRelationName, IBuffer<ISolution>>(
+                relations.size());
+
+        final Iterator<Map.Entry<IRelationName, IRelation>> itr = relations
+                .entrySet().iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<IRelationName, IRelation> entry = itr.next();
+
+            final IRelationName relationName = entry.getKey();
+
+            final IRelation relation = entry.getValue();
+
+            final IBuffer<ISolution> buffer;
+
+            switch (action) {
+            
+            case Insert:
+                
+                buffer = joinNexus.newInsertBuffer((IMutableRelation)relation);
+                
+                break;
+                
+            case Delete:
+                
+                buffer = joinNexus.newDeleteBuffer((IMutableRelation)relation);
+                
+                break;
+                
+            default:
+                
+                throw new AssertionError("action=" + action);
+            
+            }
+
+            c.put(relationName, buffer);
+            
+        }
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Created "+c.size()+" mutation buffers: action="+action);
+            
+        }
+
+        return c;
+        
+    }
+    
 }

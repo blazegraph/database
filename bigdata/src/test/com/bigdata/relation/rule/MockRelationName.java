@@ -30,7 +30,7 @@ package com.bigdata.relation.rule;
 
 import com.bigdata.relation.IRelationName;
 
-public class MockRelationName implements IRelationName {
+public class MockRelationName<R> implements IRelationName<R> {
 
     /**
      * 

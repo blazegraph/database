@@ -28,11 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rdf;
 
-import java.util.Arrays;
-
 import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.rule.IProgram;
-import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Program;
 
 /**
@@ -51,14 +48,14 @@ public class MappedProgram extends Program {
     
     private IRelationName<SPO> focusStore;
     
-    /**
-     * De-serialization ctor.
-     */
-    public MappedProgram() {
-        
-        super();
-        
-    }
+//    /**
+//     * De-serialization ctor.
+//     */
+//    public MappedProgram() {
+//        
+//        super();
+//        
+//    }
     
     /**
      * @param name
@@ -92,51 +89,6 @@ public class MappedProgram extends Program {
             addSteps( TMUtility.INSTANCE.mapProgramForTruthMaintenance(step, focusStore).steps() );
             
         }
-        
-    }
-
-    /**
-     * Adds a sub-program consisting of the fixed point closure of the given
-     * rules.
-     * 
-     * @param rules The rules.
-     */
-    public void addClosureOf(IRule[] rules) {
-        
-        if (rules == null)
-            throw new IllegalArgumentException();
-
-        if (rules.length == 0)
-            throw new IllegalArgumentException();
-        
-        final Program subProgram = new Program("closure", true/* parallel */,
-                true/* true */);
-
-        // add the rules whose closure will be computed into the sub-program.
-        subProgram.addSteps(Arrays.asList(rules).iterator());
-
-        /*
-         * Add the sub-program to this program.
-         * 
-         * Note: it will be mapped for truth maintenance if a focus store was
-         * specified.
-         */
-        addStep(subProgram);
-        
-    }
-
-    /**
-     * Adds a sub-program consisting of the fixed point closure of the given
-     * rule.
-     * 
-     * @param rule The rule.
-     */
-    public void addClosureOf(IRule rule) {
-        
-        if (rule == null)
-            throw new IllegalArgumentException();
-        
-        addClosureOf(new IRule[] { rule });
         
     }
     

@@ -83,7 +83,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
          
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-            Future<Object> future = journal.submit(new RegisterIndexTask( journal,
+            final Future<? extends Object> future = journal.submit(new RegisterIndexTask( journal,
                     name, new IndexMetadata(name, indexUUID)));
 
             try {
@@ -138,7 +138,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            Future<Object> future = journal.submit(new AbstractTask( journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask( journal,
                     ITx.READ_COMMITTED, name) {
 
                 protected Object doTask() throws Exception {
@@ -191,7 +191,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-            Future<Object> future = journal.submit(new DropIndexTask(journal,
+            final Future<? extends Object> future = journal.submit(new DropIndexTask(journal,
                     name));
             
             try {
@@ -240,7 +240,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-            Future<Object> future = journal.submit(new AbstractTask(journal,
+            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                     ITx.READ_COMMITTED, name) {
 
                 protected Object doTask() throws Exception {
@@ -334,7 +334,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            Future<Object> future = journal.submit(new RegisterIndexTask(
+            final Future<? extends Object> future = journal.submit(new RegisterIndexTask(
                     journal, name, new IndexMetadata(name, indexUUID)));
 
             assertEquals("indexUUID", indexUUID, (UUID) future.get());
@@ -364,7 +364,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            Future<Object> future = journal.submit(new RegisterIndexTask(
+            final Future<? extends Object> future = journal.submit(new RegisterIndexTask(
                     journal, name, new IndexMetadata(name, indexUUID)));
 
             // Note: the UUID for the pre-existing index is returned.
@@ -388,7 +388,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            Future<Object> future = journal.submit(new DropIndexTask(journal,
+            final Future<? extends Object> future = journal.submit(new DropIndexTask(journal,
                     name));
 
             // should return true if the index was dropped.
@@ -411,7 +411,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            Future<Object> future = journal.submit(new DropIndexTask(journal,
+            final Future<? extends Object> future = journal.submit(new DropIndexTask(journal,
                     name));
 
             // should return false since the index does not exist.
@@ -447,11 +447,13 @@ public class TestAddDropIndexTask extends ProxyTestCase {
         
         Properties properties = getProperties();
         
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
+        
+        try {
         
         final String name = "abc";
 
-        Future<Object> future = journal.submit(new AbstractTask(journal,
+        final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
                 ITx.READ_COMMITTED, name) {
 
             protected Object doTask() throws Exception {
@@ -481,10 +483,14 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             }
 
         }
+
+        } finally {
+
+            journal.shutdown();
         
-        journal.shutdown();
-        
-        journal.deleteResources();
+            journal.deleteResources();
+            
+        }
 
     }
     

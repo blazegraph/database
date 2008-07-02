@@ -28,12 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rdf;
 
-import java.util.List;
+import java.util.Iterator;
 
 import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.rule.AbstractRuleTestCase;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.MockRelationName;
+import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 
 /**
@@ -62,9 +64,9 @@ public class TestTMUtility extends AbstractRuleTestCase {
         
     }
 
-    final private IRelationName database = new MockRelationName("database");
+    final private IRelationName<SPO> database = new MockRelationName<SPO>("database");
 
-    final private IRelationName focusStore = new MockRelationName("focusStore");
+    final private IRelationName<SPO> focusStore = new MockRelationName<SPO>("focusStore");
 
     /**
      * Test mapping of a rule with a single predicate in the tail across two
@@ -77,14 +79,14 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
         log.info(r.toString());
 
-        final List<IRule> rules = TMUtility.INSTANCE.mapRuleForTruthMaintenance(
+        final Program program = TMUtility.INSTANCE.mapRuleForTruthMaintenance(
                 r, focusStore);
 
-        assertEquals(1, rules.size());
+        assertEquals(1, program.stepCount());
 
         {
 
-            IRule r0 = rules.get(0);
+            final IRule r0 = (IRule) program.steps().next();
 
             log.info(r0.toString());
 
@@ -110,13 +112,17 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
         log.info(r.toString());
 
-        final List<IRule> rules = TMUtility.INSTANCE.mapRuleForTruthMaintenance(
+        final Program program = TMUtility.INSTANCE.mapRuleForTruthMaintenance(
                 r, focusStore);
 
-        assertEquals(2, rules.size());
+        assertEquals(2, program.stepCount());
+
+        final Iterator<? extends IStep> itr = program.steps();
 
         {
-            IRule r0 = rules.get(0);
+           
+            
+            final IRule r0 = (IRule) itr.next();
 
             log.info(r0.toString());
 
@@ -136,7 +142,7 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
         {
 
-            IRule r1 = rules.get(1);
+            IRule r1 = (IRule)itr.next();
 
             log.info(r1.toString());
 
@@ -153,6 +159,8 @@ public class TestTMUtility extends AbstractRuleTestCase {
             assertTrue(r1.getTail(1).getRelationName() == focusStore);
 
         }
+        
+        assertFalse(itr.hasNext());
 
     }
 
