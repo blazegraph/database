@@ -474,15 +474,6 @@ public class LocalProgramTask implements IProgramTask,
      * 
      * @throws InterruptedException
      * @throws ExecutionException
-     * 
-     * FIXME Use {@link ITx#UNISOLATED} WRITEs for the buffers when they are
-     * flushed but use an historical read corresponding to the timestamp for the
-     * last commit time of the database for the access path READS. This avoids
-     * problems with concurrent writes on the indices. The read historical
-     * indices are also faster than the read-committed indices since they are
-     * not updated after every commit (this latter only matters when we are
-     * doing remote writes since read-committed views will have the same
-     * semantics for local writes).
      */
     protected RuleStats executeMutation(final ActionEnum action,
             final IStep step) throws InterruptedException, ExecutionException {

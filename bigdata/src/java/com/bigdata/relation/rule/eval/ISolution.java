@@ -42,14 +42,6 @@ import com.bigdata.relation.rule.IRule;
  * justifications for the entailments. The RDF DB uses this for to maintain a
  * justifications index in support of truth maintenance.
  * 
- * FIXME It may be easier to always clone and materalize the binding set rather
- * than the element and let the client extract what they want, but we still want
- * the rule available as metadata in either case.
- * 
- * FIXME JOINs need to share some bindings with sub-JOINS, but not the full
- * binding set. Consider this when attending to efficient serialization. Will
- * there be a JOIN operation on the data service itself?
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

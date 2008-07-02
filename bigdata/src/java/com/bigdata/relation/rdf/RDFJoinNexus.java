@@ -62,6 +62,7 @@ import com.bigdata.relation.rule.eval.EmptyProgramTask;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IProgramTask;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.LocalNestedSubqueryEvaluator;
 import com.bigdata.relation.rule.eval.LocalProgramTask;
 import com.bigdata.relation.rule.eval.ProgramUtility;
 import com.bigdata.relation.rule.eval.Solution;
@@ -480,16 +481,6 @@ public class RDFJoinNexus implements IJoinNexus {
 
         } else if (fed instanceof LocalDataServiceFederation) {
 
-            /*
-             * FIXME Get running on the LDS case! There is a problem with how
-             * the task is setup (how the locators are setup). The locators need
-             * to use the AbstractTask#getJournal() as the index manager for
-             * resolving the relations. That will give them the indices on which
-             * a lock is being held. (It runs queries fine since there are no
-             * locks, but it is actually using IClientIndex views for those
-             * queries!!!!)
-             */
-            
             final DataService dataService = ((LocalDataServiceFederation) fed)
                     .getDataService();
 
@@ -510,9 +501,11 @@ public class RDFJoinNexus implements IJoinNexus {
      * {@link Journal} WITHOUT concurrency controls.
      * 
      * @todo restrict the {@link ExecutorService} so that only allowable
-     *       parallelism is used. Concurrent reads are fine as long as there are
-     *       no concurrent writers. Perhaps use a lock when we have to flush a
-     *       buffer to the {@link IMutableRelation} for insert or delete.
+     *       parallelism is used (or force programs to be sequential and also
+     *       {@link LocalNestedSubqueryEvaluator} does not do parallel
+     *       processing of chunks). Concurrent reads are fine as long as there
+     *       are no concurrent writers. Perhaps use a lock when we have to flush
+     *       a buffer to the {@link IMutableRelation} for insert or delete.
      */
     protected Object runLocalProgram(ActionEnum action, IStep step) throws Exception {
 
