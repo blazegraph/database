@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
+import java.io.Serializable;
+
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
@@ -41,8 +43,12 @@ import com.bigdata.relation.rule.IRule;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Solution<E> implements ISolution<E> /*, FIXME Serializable*/ {
+public class Solution<E> implements ISolution<E>, Serializable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 5477431033714540993L;
     private final E e;
     private final IRule rule;
     private final IBindingSet bindingSet;

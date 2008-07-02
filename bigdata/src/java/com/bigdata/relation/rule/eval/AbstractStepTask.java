@@ -511,7 +511,6 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @see RunRuleAndFlushBufferTaskFactory
      * @see RunRuleAndFlushBufferTask
      */
-    // FIXME probably needs to be a TaskFactoryFactory (one more indirection) here.
     protected IRuleTaskFactory getTaskFactory(boolean parallel, IRule rule) {
         
         if (rule == null)
