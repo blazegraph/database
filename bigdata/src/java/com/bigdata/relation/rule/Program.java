@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,12 +37,6 @@ import org.apache.log4j.Logger;
 
 /**
  * Mutable program may be used to create a variety of rule executions.
- * 
- * FIXME Make sure that we can handle the "fast" closure method - that is a
- * specific sequence of both custom and standard rules than runs once rather
- * than to fixed point (some of the rules in the program are run to fixed point
- * so that needs to be a program control parameter in addition to sequential vs
- * parallel execution).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -52,20 +47,20 @@ public class Program implements IProgram {
 
     protected static final transient Logger log = Logger.getLogger(Program.class);
 
-    private String name;
+    private final String name;
     
-    private boolean parallel;
+    private final boolean parallel;
     
-    private boolean closure;
+    private final boolean closure;
     
-    private List<IProgram> steps = new LinkedList<IProgram>();
+    private final List<IStep> steps = new LinkedList<IStep>();
     
-    /**
-     * De-serialization ctor.
-     */
-    public Program() {
-        
-    }
+//    /**
+//     * De-serialization ctor.
+//     */
+//    public Program() {
+//        
+//    }
     
     /**
      * An empty program.
@@ -120,14 +115,14 @@ public class Program implements IProgram {
         
     }
     
-    public Iterator<IProgram> steps() {
+    public Iterator<IStep> steps() {
 
         return steps.iterator();
     }
 
-    public IProgram[] toArray() {
+    public IStep[] toArray() {
         
-        return steps.toArray(new IProgram[stepCount()]);
+        return steps.toArray(new IStep[stepCount()]);
         
     }
     
@@ -137,7 +132,7 @@ public class Program implements IProgram {
      * @param step
      *            The step.
      */
-    public void addStep(final IProgram step) {
+    public void addStep(final IStep step) {
 
         if (step == null)
             throw new IllegalArgumentException();
@@ -155,7 +150,7 @@ public class Program implements IProgram {
      * @param steps
      *            The steps.
      */
-    public void addSteps(final Iterator<? extends IProgram> steps) {
+    public void addSteps(final Iterator<? extends IStep> steps) {
         
         if (steps == null)
             throw new IllegalArgumentException();
@@ -166,6 +161,67 @@ public class Program implements IProgram {
             
         }
         
+    }
+
+    /**
+     * Adds a sub-program consisting of the fixed point closure of the given
+     * rules.
+     * 
+     * @param rules
+     *            The rules.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>rules</i> or any element of <i>rules</i> is
+     *             <code>null</code>.
+     * @throws IllegalStateException
+     *             if <i>this</i> program is parallel.
+     */
+    public void addClosureOf(IRule[] rules) {
+        
+        if(isParallel())
+            throw new IllegalStateException("parallel program can not embed closure operations.");
+        
+        if (rules == null)
+            throw new IllegalArgumentException();
+
+        if (rules.length == 0)
+            throw new IllegalArgumentException();
+        
+        final Program subProgram = new Program("closure", true/* parallel */,
+                true/* closure */);
+
+        // add the rules whose closure will be computed into the sub-program.
+        subProgram.addSteps(Arrays.asList(rules).iterator());
+
+        /*
+         * Add the sub-program to this program.
+         * 
+         * Note: it will be mapped for truth maintenance if a focus store was
+         * specified.
+         */
+        addStep(subProgram);
+        
+    }
+
+    /**
+     * Adds a sub-program consisting of the fixed point closure of the given
+     * rule.
+     * 
+     * @param rule
+     *            The rule.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>rule</i> is <code>null</code>.
+     * @throws IllegalStateException
+     *             if <i>this</i> program is parallel.
+     */
+    public void addClosureOf(IRule rule) {
+
+        if (rule == null)
+            throw new IllegalArgumentException();
+
+        addClosureOf(new IRule[] { rule });
+
     }
 
 }

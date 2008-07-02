@@ -1534,7 +1534,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * moves of a hot index partition since there could be a lot of buffered
                  * writes.
                  */
-                final List<Future<Object>> futures = resourceManager
+                final List<Future<? extends Object>> futures = resourceManager
                         .getConcurrencyManager().invokeAll(tasks,
                                 resourceManager.overflowTimeout,
                                 TimeUnit.MILLISECONDS);
@@ -1545,7 +1545,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final Iterator<AbstractTask> titr = tasks.iterator();
                 
                 // verify that all tasks completed successfully.
-                for (Future<Object> f : futures) {
+                for (Future<? extends Object> f : futures) {
 
                     // the task for that future.
                     final AbstractTask task = titr.next();

@@ -4,7 +4,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
 
 import com.bigdata.btree.AbstractBTree;
@@ -372,13 +371,13 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
         }
         
         // submit and await completion. @todo timeout config?
-        final List<Future<Object>> futures = resourceManager.getConcurrencyManager().invokeAll(tasks);
+        final List<Future<? extends Object>> futures = resourceManager.getConcurrencyManager().invokeAll(tasks);
         
         // copy the individual build results into an array.
         final BuildResult[] buildResults = new BuildResult[nsplits];
         {
             int i = 0;
-            for (Future<Object> f : futures) {
+            for (Future<? extends Object> f : futures) {
 
                 // @todo error handling?
                 buildResults[i++] = (BuildResult) f.get();

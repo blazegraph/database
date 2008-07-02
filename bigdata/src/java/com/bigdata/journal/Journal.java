@@ -553,19 +553,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    public Future<Object> submit(AbstractTask task) {
+    public Future<? extends Object> submit(AbstractTask task) {
 
         return concurrencyManager.submit(task);
         
     }
 
-    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks, long timeout, TimeUnit unit) throws InterruptedException {
+    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks, long timeout, TimeUnit unit) throws InterruptedException {
         
         return concurrencyManager.invokeAll(tasks, timeout, unit);
         
     }
 
-    public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks) throws InterruptedException {
+    public List<Future<? extends Object>> invokeAll(Collection<AbstractTask> tasks) throws InterruptedException {
         
         return concurrencyManager.invokeAll(tasks);
         

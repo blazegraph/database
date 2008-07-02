@@ -37,6 +37,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.service.ILoadBalancerService;
 
@@ -72,7 +73,7 @@ public class RuleStats {
      *       closure. The total should get rolled up under the top-level
      *       program.
      */
-    public RuleStats(IProgram program) {
+    public RuleStats(IStep program) {
        
         this.rule = program;
 
@@ -138,7 +139,7 @@ public class RuleStats {
     /**
      * The rule itself.
      */
-    public final IProgram rule;
+    public final IStep rule;
     
     /**
      * The #of elements considered for the each predicate in the body of the

@@ -53,6 +53,7 @@ import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
@@ -99,9 +100,12 @@ import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
  * serialization. At that point the name is nearly a locator for a specific
  * relation in itself.
  * <p>
- * The {@link RDFJoinNexusFactory} needs to install the appropriate locators
- * when creating a new instance, e.g., after sending a {@link LocalProgramTask}
- * to a remote host.
+ * The most general way to handle this is to store the metadata about the
+ * relation under the primary key for the relation's namespace in the global
+ * sparse row store for the federation. This makes caching of the relation
+ * objects important since IO and perhaps RMI will be required to determine the
+ * class of the relation and its implementation Class before an IRelation object
+ * can be instantiated!
  * 
  * @todo store the {@link IRelationFactory} in the {@link IndexMetadata}? This
  *       makes it possible to inspect an index and then apply the factory to
@@ -117,7 +121,9 @@ public class RDFJoinNexus implements IJoinNexus {
         
     private final IRelationLocator relationLocator;
     
-    private final long timestamp;
+    private final long writeTimestamp;
+    
+    private final long readTimestamp;
     
     private final boolean elementOnly;
 
@@ -127,8 +133,13 @@ public class RDFJoinNexus implements IJoinNexus {
      *            The service used to executor tasks.
      * @param relationLocator
      *            The object used to resolve {@link IRelation}.
-     * @param timestamp
-     *            The timestamp of the relation view(s).
+     * @param writeTimestamp
+     *            The timestamp of the relation view(s) using to write on the
+     *            {@link IMutableRelation}s (ignored if you are not execution
+     *            mutation programs).
+     * @param readTimestamp
+     *            The timestamp of the relation view(s) used to read from the
+     *            access paths.
      * @param elementOnly
      *            <code>true</code> if only the entailed element should be
      *            materialized in the computed {@link ISolution}s when the
@@ -137,8 +148,8 @@ public class RDFJoinNexus implements IJoinNexus {
      *            as well.
      */
     public RDFJoinNexus(ExecutorService service,
-            IRelationLocator relationLocator, long timestamp,
-            boolean elementOnly) {
+            IRelationLocator relationLocator, long writeTimestamp,
+            long readTimestamp, boolean elementOnly) {
 
         if (relationLocator == null)
             throw new IllegalArgumentException();
@@ -150,15 +161,23 @@ public class RDFJoinNexus implements IJoinNexus {
         
         this.service = service;
         
-        this.timestamp = timestamp;
+        this.writeTimestamp = writeTimestamp;
+
+        this.readTimestamp = readTimestamp;
 
         this.elementOnly = elementOnly;
         
     }
 
-    public long getTimestamp() {
+    public long getWriteTimestamp() {
         
-        return timestamp;
+        return writeTimestamp;
+        
+    }
+
+    public long getReadTimestamp() {
+        
+        return readTimestamp;
         
     }
     
@@ -336,6 +355,12 @@ public class RDFJoinNexus implements IJoinNexus {
     @SuppressWarnings("unchecked")
     public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
 
+        if(log.isDebugEnabled()) {
+            
+            log.debug("relation="+relation);
+            
+        }
+        
         return new AbstractSolutionBuffer.InsertSolutionBuffer(
                 DEFAULT_BUFFER_CAPACITY, relation);
 
@@ -344,6 +369,12 @@ public class RDFJoinNexus implements IJoinNexus {
     @SuppressWarnings("unchecked")
     public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
 
+        if(log.isDebugEnabled()) {
+            
+            log.debug("relation="+relation);
+            
+        }
+
         return new AbstractSolutionBuffer.DeleteSolutionBuffer(
                 DEFAULT_BUFFER_CAPACITY, relation);
 
@@ -351,65 +382,65 @@ public class RDFJoinNexus implements IJoinNexus {
 
 
     @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<ISolution> runQuery(IProgram program)
+    public IChunkedOrderedIterator<ISolution> runQuery(IStep step)
             throws Exception {
 
-        if (program == null)
+        if (step == null)
             throw new IllegalArgumentException();
 
         if(log.isInfoEnabled())
-            log.info("program="+program.getName());
+            log.info("program="+step.getName());
 
-        if(isEmptyProgram(program)) {
+        if(isEmptyProgram(step)) {
 
             log.warn("Empty program");
 
             return (IChunkedOrderedIterator<ISolution>) new EmptyProgramTask(
-                    ActionEnum.Query, program).call();
+                    ActionEnum.Query, step).call();
 
         }
 
         return (IChunkedOrderedIterator<ISolution>) runProgram(
-                ActionEnum.Query, program);
+                ActionEnum.Query, step);
 
     }
 
-    public long runMutation(ActionEnum action, IProgram program)
+    public long runMutation(ActionEnum action, IStep step)
             throws Exception {
 
         if (action == null)
             throw new IllegalArgumentException();
         
-        if (program == null)
+        if (step == null)
             throw new IllegalArgumentException();
         
         if (!action.isMutation())
             throw new IllegalArgumentException();
         
         if(log.isInfoEnabled())
-            log.info("action="+action+", program="+program.getName());
+            log.info("action="+action+", program="+step.getName());
         
-        if(isEmptyProgram(program)) {
+        if(isEmptyProgram(step)) {
 
             log.warn("Empty program");
 
-            return (Long) new EmptyProgramTask(action, program).call();
+            return (Long) new EmptyProgramTask(action, step).call();
 
         }
         
-        return (Long) runProgram(action, program);
+        return (Long) runProgram(action, step);
 
     }
     
     /**
-     * Return true iff the <i>program</i> is empty.
+     * Return true iff the <i>step</i> is an empty {@link IProgram}.
      * 
-     * @param program
-     *            The program.
+     * @param step
+     *            The step.
      */
-    protected boolean isEmptyProgram(IProgram program) {
+    protected boolean isEmptyProgram(IStep step) {
 
-        if (!program.isRule() && program.stepCount() == 0) {
+        if (!step.isRule() && ((IProgram)step).stepCount() == 0) {
 
             return true;
 
@@ -428,23 +459,24 @@ public class RDFJoinNexus implements IJoinNexus {
      * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
      *         (mutation count).
      */
-    protected Object runProgram(ActionEnum action, IProgram program)
+    protected Object runProgram(ActionEnum action, IStep step)
             throws Exception {
 
         if (action == null)
             throw new IllegalArgumentException();
 
-        if (program == null)
+        if (step == null)
             throw new IllegalArgumentException();
 
         final ProgramUtility util = new ProgramUtility(this);
         
-        final IBigdataFederation fed = util.getFederation(program);
+        final IBigdataFederation fed = util.getFederation(step,
+                getReadTimestamp());
 
         if (fed == null) {
 
             // local Journal or TemporaryStore execution.
-            return runLocalProgram(action, program);
+            return runLocalProgram(action, step);
 
         } else if (fed instanceof LocalDataServiceFederation) {
 
@@ -462,12 +494,12 @@ public class RDFJoinNexus implements IJoinNexus {
                     .getDataService();
 
             // single data service program execution.
-            return runDataServiceProgram(dataService, action, program);
+            return runDataServiceProgram(dataService, action, step);
 
         } else {
 
             // distributed program execution.
-            return runDistributedProgram(fed, action, program);
+            return runDistributedProgram(fed, action, step);
 
         }
 
@@ -482,14 +514,14 @@ public class RDFJoinNexus implements IJoinNexus {
      *       no concurrent writers. Perhaps use a lock when we have to flush a
      *       buffer to the {@link IMutableRelation} for insert or delete.
      */
-    protected Object runLocalProgram(ActionEnum action, IProgram program) throws Exception {
+    protected Object runLocalProgram(ActionEnum action, IStep step) throws Exception {
 
         if (log.isInfoEnabled())
             log.info("Running local program: action=" + action + ", program="
-                    + program.getName());
+                    + step.getName());
 
         final IProgramTask innerTask = new LocalProgramTask(action,
-                program, this, getExecutorService());
+                step, this, getExecutorService(), null/*dataService*/);
 
         return innerTask.call();
 
@@ -506,17 +538,17 @@ public class RDFJoinNexus implements IJoinNexus {
      * NOT efficient!!!
      */
     protected Object runDistributedProgram(IBigdataFederation fed,
-            ActionEnum action, IProgram program) throws Exception {
+            ActionEnum action, IStep step) throws Exception {
 
         if (log.isInfoEnabled()) {
 
             log.info("Running distributed program: action=" + action
-                    + ", program=" + program.getName());
+                    + ", program=" + step.getName());
 
         }
 
-        final IProgramTask innerTask = new LocalProgramTask(action, program,
-                this, getExecutorService());
+        final IProgramTask innerTask = new LocalProgramTask(action, step, this,
+                getExecutorService(), null/* dataService */);
 
         return innerTask.call();
 
@@ -533,16 +565,15 @@ public class RDFJoinNexus implements IJoinNexus {
      * partitioned indices).
      */
     protected Object runDataServiceProgram(DataService dataService,
-            ActionEnum action, IProgram program) throws InterruptedException,
+            ActionEnum action, IStep step) throws InterruptedException,
             ExecutionException {
 
-        final IProgramTask innerTask = new LocalProgramTask(action, program,
-                this);
+        final IProgramTask innerTask = new LocalProgramTask(action, step, this);
 
         if (log.isInfoEnabled()) {
 
             log.info("Submitting program to data service: action=" + action
-                    + ", program=" + program.getName() + ", dataService="
+                    + ", program=" + step.getName() + ", dataService="
                     + dataService);
 
         }

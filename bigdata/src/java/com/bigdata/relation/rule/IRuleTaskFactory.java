@@ -30,11 +30,11 @@ package com.bigdata.relation.rule;
 
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IRuleTask;
+import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.ISolution;
 
 /**
- * An interface providing a factory for {@link IRuleTask}s.
+ * A factory for objects that handle the execution of an {@link IRule}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -42,8 +42,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 public interface IRuleTaskFactory {
 
     /**
-     * An optional {@link IRuleTask} that will be used to evaluate the rule for
-     * the {@link IRule} in place of the default evaluation strategy (optional)
+     * The object will be used to evaluate the rule for the {@link IRule}.
      * 
      * @param rule
      *            The rule (MAY have been specialized since it was declared).
@@ -56,6 +55,6 @@ public interface IRuleTaskFactory {
      * 
      * @return <code>null</code> unless custom evaluation is desired.
      */
-    public IRuleTask newTask(IRule rule, IJoinNexus joinNexus, IBuffer<ISolution> buffer);
+    public IStepTask newTask(IRule rule, IJoinNexus joinNexus, IBuffer<ISolution> buffer);
 
 }

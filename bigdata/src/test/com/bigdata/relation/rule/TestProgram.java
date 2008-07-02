@@ -125,7 +125,7 @@ public class TestProgram extends AbstractRuleTestCase {
 
         {
 
-            Iterator<IProgram> itr = program.steps(); 
+            Iterator<? extends IStep> itr = program.steps(); 
             
             assertTrue(itr.hasNext());
             

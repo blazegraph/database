@@ -145,20 +145,17 @@ public class Rule implements IRule {
         
     }
     
-    /**
-     * By default the simple name of the class.
-     */
     public String getName() {
 
-        if (name == null) {
-
-            return getClass().getSimpleName();
+//        if (name == null) {
+//
+//            return getClass().getSimpleName();
+//            
+//        } else {
             
-        } else {
+        return name;
             
-            return name;
-            
-        }
+//        }
 
     }
     
@@ -207,7 +204,7 @@ public class Rule implements IRule {
      * Rule ctor.
      * 
      * @param name
-     *            A label for the rule (optional).
+     *            A label for the rule.
      * @param head
      *            The subset of bindings that are selected by the rule.
      * @param tail
@@ -216,6 +213,8 @@ public class Rule implements IRule {
      *            An array of constaints on the legal states of the bindings
      *            materialized for the rule.
      * 
+     * @throws IllegalArgumentException
+     *             if the <i>name</i> is <code>null</code>.
      * @throws IllegalArgumentException
      *             if the <i>head</i> is <code>null</code>.
      * @throws IllegalArgumentException
@@ -251,18 +250,21 @@ public class Rule implements IRule {
     protected Rule(String name, IPredicate head, IPredicate[] tail,
             IConstraint[] constraints, IRuleTaskFactory taskFactory) {
 
-        this.name = name;
-
+        if (name == null)
+            throw new IllegalArgumentException();
+        
         if (head == null)
             throw new IllegalArgumentException();
 
         if (tail == null)
             throw new IllegalArgumentException();
 
-        final Set<IVariable> vars = new HashSet<IVariable>();
-        
+        this.name = name;
+
         // the predicate declarations for the body.
         this.tail = tail;
+
+        final Set<IVariable> vars = new HashSet<IVariable>();
 
         for (int i = 0; i < tail.length; i++) {
 
@@ -563,8 +565,14 @@ public class Rule implements IRule {
         
     }
 
+    public IRuleTaskFactory getTaskFactory() {
+        
+        return taskFactory;
+        
+    }
+    
     /*
-     * IProgram.
+     * IStep.
      */
 
     final public boolean isRule() {
@@ -572,53 +580,5 @@ public class Rule implements IRule {
         return true;
         
     }
-    
-    /**
-     * Returns <code>false</code> (the return value does not matter since a
-     * single step can not be parallelized).
-     */
-    public boolean isParallel() {
-        
-        return false;
-        
-    }
 
-    /**
-     * Returns <code>false</code>. If you want the closure of a single rule
-     * then add it to a suitable {@link Program} instance.
-     */
-    public boolean isClosure() {
-        
-        return false;
-        
-    }
-    
-    /**
-     * Always returns an empty iterator.
-     */
-    @SuppressWarnings("unchecked")
-    public Iterator<IProgram> steps() {
-
-        return Collections.EMPTY_LIST.iterator();
-        
-    }
-    
-    public int stepCount() {
-        
-        return 0;
-        
-    }
-    
-    public IProgram[] toArray() {
-        
-        return new Rule[] {};
-        
-    }
-
-    public IRuleTaskFactory getTaskFactory() {
-        
-        return taskFactory;
-        
-    }
-    
 }

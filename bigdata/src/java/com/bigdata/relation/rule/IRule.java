@@ -31,15 +31,8 @@ package com.bigdata.relation.rule;
 import java.util.Iterator;
 import java.util.Set;
 
-import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IRuleTask;
-import com.bigdata.relation.rule.eval.ISolution;
-
 /**
  * Conjunctive query of N {@link IPredicate}s with optional {@link IConstraint}s.
- * <p>
- * Note: A rule is a directly evaluable program without sub-steps.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -48,7 +41,7 @@ import com.bigdata.relation.rule.eval.ISolution;
  *       relaxing of assumptions concerning the type of relations in the RDF
  *       rule execution.
  */
-public interface IRule extends IProgram {
+public interface IRule extends IStep {
 
     /**
      * The #of distinct variables declared by the rule.

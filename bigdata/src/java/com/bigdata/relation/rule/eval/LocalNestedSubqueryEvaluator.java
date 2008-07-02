@@ -60,7 +60,7 @@ import com.bigdata.relation.rule.IRule;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalNestedSubqueryEvaluator implements IRuleTask {
+public class LocalNestedSubqueryEvaluator implements IStepTask {
 
     protected static final Logger log = Logger.getLogger(LocalNestedSubqueryEvaluator.class);
     

@@ -31,16 +31,14 @@ package com.bigdata.relation.rule.eval;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationLocator;
-import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
 
 /**
  * Delgation pattern.
@@ -92,12 +90,12 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.newSolution(rule, bindingSet);
     }
 
-    public long runMutation(ActionEnum action, IProgram program) throws Exception {
-        return delegate.runMutation(action, program);
+    public long runMutation(ActionEnum action, IStep step) throws Exception {
+        return delegate.runMutation(action, step);
     }
 
-    public IChunkedOrderedIterator<ISolution> runQuery(IProgram program) throws Exception {
-        return delegate.runQuery(program);
+    public IChunkedOrderedIterator<ISolution> runQuery(IStep step) throws Exception {
+        return delegate.runQuery(step);
     }
 
     public ExecutorService getExecutorService() {
@@ -108,8 +106,12 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getRelationLocator();
     }
 
-    public long getTimestamp() {
-        return delegate.getTimestamp();
+    public long getWriteTimestamp() {
+        return delegate.getWriteTimestamp();
+    }
+
+    public long getReadTimestamp() {
+        return delegate.getReadTimestamp();
     }
 
 }

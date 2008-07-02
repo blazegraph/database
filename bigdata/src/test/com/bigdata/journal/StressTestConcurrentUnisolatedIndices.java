@@ -238,14 +238,14 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         final long begin = System.currentTimeMillis();
 
-        final List<Future<Object>> results = journal.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+        final List<Future<? extends Object>> results = journal.invokeAll(tasks, timeout, TimeUnit.SECONDS);
 
         final long elapsed = System.currentTimeMillis() - begin;
 
         /*
          * Examine the futures to see how things went.
          */
-        final Iterator<Future<Object>> itr = results.iterator();
+        final Iterator<Future<? extends Object>> itr = results.iterator();
         
         int nfailed = 0; // #of tasks that failed.
 //        int nretry = 0; // #of tasks that threw RetryException
@@ -255,7 +255,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         while(itr.hasNext()) {
 
-            Future<Object> future = itr.next();
+            final Future<? extends Object> future = itr.next();
             
             if(future.isCancelled()) {
                 
