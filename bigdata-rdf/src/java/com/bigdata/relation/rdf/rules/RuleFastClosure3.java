@@ -27,8 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rdf.rules;
 
+import java.util.Set;
+
 import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rdf.SPO;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IRuleTaskFactory;
+import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.IStepTask;
 
 public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
 
@@ -36,10 +44,43 @@ public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
      * @param inf
      * @param P
      */
-    public RuleFastClosure3(IRelationName<SPO>relationName,RDFSVocabulary inf) {//, Set<Long> P) {
+    public RuleFastClosure3(
+            final IRelationName<SPO> database,
+            final IRelationName<SPO> focusStore,
+            final RDFSVocabulary inf) {
+        //, Set<Long> P) {
         
-        super("fastClosure3", relationName, inf.rdfsSubPropertyOf, inf.rdfsSubPropertyOf);// , P);
-        
+        super("fastClosure3",
+                database,
+                inf.rdfsSubPropertyOf,
+                inf.rdfsSubPropertyOf,
+                /*
+                 * Custom rule executor factory.
+                 */
+                new IRuleTaskFactory() {
+
+                    public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
+                            IBuffer<ISolution> buffer) {
+
+                        return new FastClosureRuleTask(database, focusStore,
+                                rule, joinNexus, buffer, /* P, */
+                                inf.rdfsSubPropertyOf, inf.rdfsSubPropertyOf) {
+
+                            /**
+                             * Note: This is the set {P} in the fast closure program.
+                             */
+                            public Set<Long> getSet() {
+
+                                return getSubProperties();
+
+                            }
+
+                        };
+
+                    }
+
+                });// , P);
+
     }
-    
+
 }

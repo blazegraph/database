@@ -30,12 +30,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.bigdata.rdf.inf.InferenceEngine;
-import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.ConcurrentDataLoader.ITaskFactory;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.IRelationLocator;
 import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -43,15 +42,17 @@ import com.bigdata.relation.rdf.SPO;
 import com.bigdata.relation.rdf.SPOKeyOrder;
 import com.bigdata.relation.rdf.SPOPredicate;
 import com.bigdata.relation.rdf.SPORelation;
-import com.bigdata.relation.rdf.rules.AbstractRuleDistinctTermScan.DistinctTermScan;
+import com.bigdata.relation.rdf.SPORelationName;
+import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IRuleTask;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 
 /**
@@ -88,21 +89,18 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
     // private final Var x, y, SetP;
     
-    private final IRuleTaskFactory taskFactory;
-
     /**
-     * @param focusStore
-     *            Optional name of the focusStore relation (may be null). This
-     *            is used to query the fusedView of the [db+focusStore] when
      * @param propertyId
-     * @param P
+     * @param taskFactory
+     *            An implementation returning a concrete instance of
+     *            {@link FastClosureRuleTask}.
      */
     public AbstractRuleFastClosure_3_5_6_7_9(//
             String name,
             IRelationName<SPO> relationName,
-//          IRelationName<SPO> focusStore,
             final IConstant<Long> rdfsSubPropertyOf,
-            final IConstant<Long> propertyId
+            final IConstant<Long> propertyId,
+            IRuleTaskFactory taskFactory
     // , Set<Long> P
     ) {
 
@@ -111,7 +109,8 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 new SPOPredicate[] {//
                 new SPOPredicate(relationName, var("x"), var("{P}"), var("y")) //
                 },//
-                null // constraints
+                null, // constraints
+                taskFactory
         );
 
         if (rdfsSubPropertyOf == null)
@@ -130,45 +129,25 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
         // this.y = var("y");
         // this.SetP = var("{P}");
 
-        /*
-         * FIXME Both the db and the optional focusStore relation names MUST be
-         * declared for these rules. While the rule only declares a single tail
-         * predicate, there is a "hidden" query based on the [db+focusStore]
-         * fused view that populates the P,D,C,R, or T Set which is an input to
-         * the custom evaluation of the rule.
-         * 
-         * FIXME The TaskFactory needs to know which of the P,D,C,R, or T sets
-         * to materialize (as a chunked iterator) and it needs to handle the P
-         * collection differently: getSubProperties() vs getSubPropertiesOf().
-         */
-        // @todo may serialize to much state?
-        taskFactory = new IRuleTaskFactory() {
-
-            public IRuleTask newTask(IRule rule, IJoinNexus joinNexus,
-                    IBuffer<ISolution> buffer) {
-
-                return new FastClosureRuleTask(rule, joinNexus, buffer, /* P, */
-                        rdfsSubPropertyOf, propertyId);
-
-            }
-            
-        };
-        
     }
 
-    public IRuleTaskFactory getTaskFactory() {
-        
-        return taskFactory;
-        
-    }
-    
-    static class FastClosureRuleTask implements IRuleTask, Serializable {
+    /**
+     * Custom rule execution task. You must implement {@link #getSet()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    abstract protected static class FastClosureRuleTask implements IStepTask, Serializable {
 
         /**
          * 
          */
         private static final long serialVersionUID = -328288052972086420L;
 
+        private final IRelationName<SPO> database;
+        
+        private final IRelationName<SPO> focusStore;
+        
         private final IRule rule;
 
         private final IJoinNexus joinNexus;
@@ -181,24 +160,52 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
         private final IConstant<Long> propertyId;
 
+        /**
+         * Set by {@link #call()}, used by {@link #getSetView()}.
+         */
+        private IRelation<SPO> setView = null;
+        
         private final static transient long NULL = IRawTripleStore.NULL;
 
         /**
          * <code>(?x, {P}, ?y) -> (?x, propertyId, ?y)</code>
          * 
+         * Note: Both the database and the (optional) focusStore relation names
+         * MUST be declared for these rules. While the rule only declares a
+         * single tail predicate, there is a "hidden" query based on the
+         * [database + focusStore] fused view that populates the P,D,C,R, or T
+         * Set which is an input to the custom evaluation of the rule.
+         * 
+         * @param database
+         *            Name of the database relation (required).
+         * @param focusStore
+         *            Optional name of the focusStore relation (may be null).
+         *            When non-<code>null</code>, this is used to query the
+         *            fused view of the [database + focusStore] in
+         *            {@link FastClosureRuleTask#getSetView()}.
+         * @param rule
+         *            The rule.
          * @param joinNexus
          * @param buffer
          *            A buffer used to accumulate entailments.
-         * @param P
-         *            A set of term identifiers.
+         * @param rdfsSubPropertyOf
+         *            The {@link Constant} corresponding to the term identifier
+         *            for <code>rdfs:subPropertyOf</code>.
          * @param propertyId
          *            The propertyId to be used in the assertions.
          */
-        public FastClosureRuleTask(IRule rule, IJoinNexus joinNexus,
+        public FastClosureRuleTask(//
+                IRelationName<SPO> database,
+                IRelationName<SPO> focusStore,
+                IRule rule,
+                IJoinNexus joinNexus,
                 IBuffer<ISolution> buffer,
                 // Set<Long> P,
                 IConstant<Long> rdfsSubPropertyOf,
                 IConstant<Long> propertyId) {
+
+            if (database == null)
+                throw new IllegalArgumentException();
 
             if (rule == null)
                 throw new IllegalArgumentException();
@@ -218,6 +225,10 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
             if (propertyId == null)
                 throw new IllegalArgumentException();
 
+            this.database = database;
+            
+            this.focusStore = focusStore; // MAY be null.
+            
             this.rule = rule;
 
             this.joinNexus = joinNexus;
@@ -238,8 +249,38 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
             final long begin = System.currentTimeMillis();
 
-            final long timestamp = joinNexus.getTimestamp();
+            final long timestamp = joinNexus.getReadTimestamp();
 
+            final IRelationLocator<SPO> relationLocator = joinNexus.getRelationLocator();
+            {
+                
+                /*
+                 * Setup the [database] or [database + focusStore] view used to
+                 * read the set {P}.
+                 */
+                
+                if(focusStore == null) {
+                    
+                    setView = relationLocator.getRelation(database, timestamp);
+                    
+                } else {
+
+                    setView = new RelationFusedView<SPO>(//
+                            relationLocator.getRelation(database, timestamp),
+                            relationLocator.getRelation(focusStore, timestamp)
+                            );
+                    
+                }
+                    //          final IAccessPath accessPath = (focusStore == null //
+//          ? database.getAccessPath(NULL, p, NULL)//
+//                  : new AccessPathFusedView(focusStore
+//                          .getAccessPath(NULL, p, NULL), //
+//                          database.getAccessPath(NULL, p, NULL)//
+//                  ));
+
+
+            }
+            
             /*
              * Note: Since this task is always applied to a single tail rule,
              * the {@link TMUtility} rewrite of the rule will always read from
@@ -247,27 +288,29 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
              * which to read easy - just read on whichever relation is specified
              * for tail[0].
              */
-            final SPORelation relation = (SPORelation) joinNexus
-                    .getRelationLocator().getRelation(
-                            rule.getHead().getRelationName(), timestamp);
+            final SPORelation relation = (SPORelation) relationLocator
+                    .getRelation(rule.getHead().getRelationName(), timestamp);
 
             /*
-             * FIXME query for {P} rather than requiring it as an input!
+             * Query for the set {P} rather than requiring it as an input.
              * 
-             * This will let us run the fast closure program declaratively.
+             * Note: This is really aligning relations with different
+             * arity/shape (long[1] vs SPO)
              * 
-             * If {P} is a chunked ordered iterator, then we could put it into
-             * ascending Long[] order by chunk and proceed that way. This is
-             * really aligning relations with different arity/shape (long[1] vs
-             * long[3])
+             * @todo Make {P} a chunked iterator, proceed by chunk, and put each
+             * chunk into ascending Long[] order. However the methods that
+             * compute {P} are a custom closure operator and they fix point {P}
+             * in memory. To generalize with a chunked iterator there would need
+             * to be a backing BigdataLongSet and that will be less efficient
+             * unless the property hierarchy scale is very large.
              */
-            // @todo Long[]?
-            final long[] a = getSortedArray(null/*P*/);
+            final long[] a = getSortedArray(getSet());
 
             /*
+             * For each p in the chunk.
+             * 
              * @todo execute subqueries in parallel against shared thread pool.
              */
-
             for (long p : a) {
 
                 if (p == propertyId.get()) {
@@ -350,7 +393,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                 }
 
-            } // next p in P
+            } // next p in {P}
 
             stats.elapsed += System.currentTimeMillis() - begin;
 
@@ -367,7 +410,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          * 
          * @return The sorted term identifiers.
          */
-        public long[] getSortedArray(Set<Long> ids) {
+        protected long[] getSortedArray(Set<Long> ids) {
 
             int n = ids.size();
 
@@ -388,16 +431,23 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
         }
 
         /**
+         * Return the {@link IRelation} (or {@link RelationFusedView}) used by
+         * the {@link #getSet()} impls for their {@link IAccessPath}s.
+         */
+        protected IRelation<SPO> getSetView() {
+
+            return setView;
+            
+        }        
+
+        /**
          * Computes the set of possible sub properties of rdfs:subPropertyOf (<code>P</code>).
-         * This is used by steps 2-4 in {@link #fastForwardClosure()}.
-         * 
-         * @param focusStore
-         * @param database
+         * This is used by step <code>2</code> in
+         * {@link RDFSVocabulary#fastForwardClosure()}.
          * 
          * @return A set containing the term identifiers for the members of P.
          */
-        public Set<Long> getSubProperties(AbstractTripleStore focusStore,
-                AbstractTripleStore database) {
+        public Set<Long> getSubProperties() {
 
             final Set<Long> P = new HashSet<Long>();
 
@@ -413,7 +463,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 int nafter = 0;
                 int nrounds = 0;
 
-                Set<Long> tmp = new HashSet<Long>();
+                final Set<Long> tmp = new HashSet<Long>();
 
                 do {
 
@@ -428,7 +478,14 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                     for (Long p : P) {
 
-                        final IAccessPath<SPO> accessPath = null;// FIXME handle view!
+                        final SPOPredicate pred = new SPOPredicate(//
+                                new SPORelationName("view"),//
+                                Var.var("x"), new Constant<Long>(p), Var.var("y")//
+                                );
+                        
+                        final IAccessPath<SPO> accessPath = getSetView()
+                                .getAccessPath(pred);
+                        
 //                        final IAccessPath accessPath = (focusStore == null //
 //                        ? database.getAccessPath(NULL, p, NULL)//
 //                                : new AccessPathFusedView(focusStore
@@ -473,19 +530,19 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
             }
 
-            if (log.isDebugEnabled()) {
-
-                Set<String> terms = new HashSet<String>();
-
-                for (Long id : P) {
-
-                    terms.add(database.toString(id));
-
-                }
-
-                log.debug("P: " + terms);
-
-            }
+//            if (log.isDebugEnabled()) {
+//
+//                Set<String> terms = new HashSet<String>();
+//
+//                for (Long id : P) {
+//
+//                    terms.add(database.toString(id));
+//
+//                }
+//
+//                log.debug("P: " + terms);
+//
+//            }
 
             return P;
 
@@ -498,19 +555,24 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          * Pre-condition: The closure of <code>rdfs:subPropertyOf</code> has
          * been asserted on the database.
          * 
-         * @param focusStore
-         * @param database
          * @param p
-         *            The term identifier for the property whose sub-properties
-         *            will be obtain.
+         *            The constant corresponding to the term identifier for the
+         *            property whose sub-properties will be obtain.
          * 
          * @return A set containing the term identifiers for the sub properties
          *         of <i>p</i>.
          */
-        public Set<Long> getSubPropertiesOf(AbstractTripleStore focusStore,
-                AbstractTripleStore database, final long p) {
+        public Set<Long> getSubPropertiesOf(IConstant<Long> p) {
 
-            final IAccessPath<SPO> accessPath = null;// FIXME handle view!
+            final IRelation<SPO> setView = getSetView();
+            
+            final SPOPredicate pred = new SPOPredicate(//
+                    new SPORelationName( "view"), //
+                    Var.var("x"), rdfsSubPropertyOf, p//
+            );
+            
+            final IAccessPath<SPO> accessPath = setView.getAccessPath(pred);
+            
 //            final IAccessPath accessPath = //
 //            (focusStore == null //
 //            ? database.getAccessPath(NULL/* x */, rdfsSubPropertyOf.get(), p)//
@@ -521,11 +583,11 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 //                                    rdfsSubPropertyOf.get(), p)//
 //                    ));
 
-            if (log.isDebugEnabled()) {
-
-                log.debug("p=" + database.toString(p));
-
-            }
+//            if (log.isDebugEnabled()) {
+//
+//                log.debug("p=" + database.toString(p));
+//
+//            }
 
             final Set<Long> tmp = new HashSet<Long>();
 
@@ -565,24 +627,37 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 itr.close();
             }
 
-            if (log.isDebugEnabled()) {
-
-                Set<String> terms = new HashSet<String>();
-
-                for (Long id : tmp) {
-
-                    terms.add(database.toString(id));
-
-                }
-
-                log.debug("sub properties: " + terms);
-
-            }
+//            if (log.isDebugEnabled()) {
+//
+//                Set<String> terms = new HashSet<String>();
+//
+//                for (Long id : tmp) {
+//
+//                    terms.add(database.toString(id));
+//
+//                }
+//
+//                log.debug("sub properties: " + terms);
+//
+//            }
 
             return tmp;
 
         }
 
+        /**
+         * Return the set of term identifiers that will be processed by the
+         * rule. When the closure is being computed for truth maintenance the
+         * implementation MUST read from the [database+focusStore] fused view.
+         * Otherwise it reads from the database.
+         * <p>
+         * Note: The subclass need only invoke {@link #getSubProperties()} or
+         * {@link #getSubPropertiesOf(long)} as appropriate for the rule.
+         * 
+         * @return The set.
+         */
+        abstract protected Set<Long> getSet();
+        
     } // FastClosureRuleTask
 
 }
