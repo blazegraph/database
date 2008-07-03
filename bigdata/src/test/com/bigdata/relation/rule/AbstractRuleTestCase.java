@@ -29,23 +29,9 @@ package com.bigdata.relation.rule;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.relation.IRelationName;
-import com.bigdata.relation.rdf.SPOPredicate;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.NE;
-import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Var;
-import com.bigdata.service.EmbeddedFederation;
-import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.LocalDataServiceFederation;
 
 /**
- * 
- * @todo make this a {@link ProxyTestCase} and run against a
- *       {@link LocalDataServiceFederation}, an {@link EmbeddedFederation},
- *       and a jini federation (the abstraction is the {@link IBigdataClient}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -96,10 +82,10 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
         public TestRuleRdfs9(IRelationName relation) {
             
             super(  "rdfs9",//
-                    new SPOPredicate(relation,var("v"), rdfType, var("x")), //
-                    new SPOPredicate[] {//
-                            new SPOPredicate(relation, var("u"), rdfsSubClassOf, var("x")),//
-                            new SPOPredicate(relation, var("v"), rdfType, var("u")) //
+                    new P(relation,var("v"), rdfType, var("x")), //
+                    new IPredicate[] {//
+                            new P(relation, var("u"), rdfsSubClassOf, var("x")),//
+                            new P(relation, var("v"), rdfType, var("u")) //
                     },//
                     new IConstraint[] {
                             new NE(var("u"),var("x"))
@@ -126,14 +112,41 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
         public TestRuleRdfs04a(IRelationName relation) {
 
             super("rdfs4a",//
-                    new SPOPredicate(relation,//
+                    new P(relation,//
                             Var.var("u"), rdfType, rdfsResource), //
-                    new SPOPredicate[] { //
-                    new SPOPredicate(relation,//
+                    new IPredicate[] { //
+                    new P(relation,//
                             Var.var("u"), Var.var("a"), Var.var("x")) //
                     },
                     /* constraints */
                     null);
+
+        }
+
+    }
+
+    protected static class P<E> extends Predicate<E> {
+
+        /**
+         * @param relation
+         * @param s
+         * @param p
+         * @param o
+         */
+        public P(IRelationName<E> relation, IVariableOrConstant<Long> s,
+                IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
+
+            super(relation, new IVariableOrConstant[] { s, p, o });
+            
+        }
+        
+    }
+    
+    protected static class MyRule extends Rule {
+
+        public MyRule( IPredicate head, IPredicate[] body) {
+
+            super(MyRule.class.getName(), head, body, null/* constraints */);
 
         }
 

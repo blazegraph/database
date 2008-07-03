@@ -63,8 +63,8 @@ import com.bigdata.btree.KeyBuilder;
  * 
  * @see Schema#fromKey(IKeyBuilder, Object)
  * @see KeyType#getKeyType(byte)
- * @see AtomicWriteRead
- * @see AtomicRead
+ * @see AtomicRowWriteRead
+ * @see AtomicRowRead
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

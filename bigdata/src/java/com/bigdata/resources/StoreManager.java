@@ -62,6 +62,7 @@ import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -86,6 +87,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -1740,12 +1742,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
     public abstract void setConcurrencyManager(IConcurrencyManager concurrencyManager);
     
-    /**
-     * Declaration allows access to the {@link IMetadataService}.  The method is also
-     * declared by {@link IResourceManager} and is implemented by concrete instances of
-     * the {@link ResourceManager} class. 
-     */
-    public abstract IMetadataService getMetadataService();
+//    /**
+//     * Declaration allows access to the {@link IMetadataService}.  The method is also
+//     * declared by {@link IResourceManager} and is implemented by concrete instances of
+//     * the {@link ResourceManager} class. 
+//     */
+//    public abstract IMetadataService getMetadataService();
     
     /**
      * Implementation designed to use a shared {@link ConcurrencyManager}.
@@ -1782,7 +1784,13 @@ abstract public class StoreManager extends ResourceEvents implements
 
         public IMetadataService getMetadataService() {
             
-            return getMetadataService();
+            return getFederation().getMetadataService();
+            
+        }
+
+        public SparseRowStore getGlobalRowStore() {
+            
+            return getFederation().getGlobalRowStore();
             
         }
         
@@ -1899,7 +1907,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @throws RuntimeException
      *             if something goes wrong.
      * 
-     * FIXME per-store lock to reduce latency.
+     * FIXME per-store lock to reduce latency using {@link NamedLock}.
      * <p>
      * Since these operations can have modest latency, especially if we open an
      * fully buffered index segment, it would be nice to use a per-store (or

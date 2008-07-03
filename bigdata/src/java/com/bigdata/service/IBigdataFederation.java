@@ -33,6 +33,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IKeyBuilderFactory;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
@@ -41,6 +42,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -49,7 +51,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBigdataFederation extends IIndexManager {
+public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
 
     public Logger log = Logger.getLogger(IBigdataFederation.class);
 
@@ -253,6 +255,8 @@ public interface IBigdataFederation extends IIndexManager {
     /**
      * Return a thread-local {@link IKeyBuilder} configured using the properties
      * specified for the {@link IBigdataClient}.
+     * 
+     * @see IndexMetadata#getKeyBuilder()
      */
     public IKeyBuilder getKeyBuilder();
     
@@ -281,46 +285,44 @@ public interface IBigdataFederation extends IIndexManager {
      * sets in the federation.
      * 
      * @see GlobalRowStoreSchema
-     * @see #getNamedRecord(String)
-     * @see #putNamedRecord(String, Object)
      */
     public SparseRowStore getGlobalRowStore();
     
-    /**
-     * Return a named object stored in the global namespace for the federation.
-     * 
-     * @param name
-     *            The name under which the object is stored.
-     * 
-     * @return The named record together -or- <code>null</code> iff there was
-     *         no record recorded under that name.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>name</i> is <code>null</code>.
-     */
-    public Object getNamedRecord(String name);
-    
-    /**
-     * Store or update a named object in the global namespace for the
-     * federation.
-     * 
-     * @param name
-     *            The name under which the object is to be stored.
-     * @param value
-     *            The value to be stored under that name -or- <code>null</code>
-     *            to clear any value associated with that name.
-     * 
-     * @return The old value -or- <code>null</code> if there was no value
-     *         stored under that name.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>name</i> is <code>null</code>.
-     * 
-     * @todo Consider replacing with <code>getGlobalRowStore()</code> since we
-     *       can use that directly to store property sets, serialized objects,
-     *       etc.
-     */
-    public Object putNamedRecord(String name, Object value);
+//    /**
+//     * Return a named object stored in the global namespace for the federation.
+//     * 
+//     * @param name
+//     *            The name under which the object is stored.
+//     * 
+//     * @return The named record together -or- <code>null</code> iff there was
+//     *         no record recorded under that name.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if <i>name</i> is <code>null</code>.
+//     */
+//    public Object getNamedRecord(String name);
+//    
+//    /**
+//     * Store or update a named object in the global namespace for the
+//     * federation.
+//     * 
+//     * @param name
+//     *            The name under which the object is to be stored.
+//     * @param value
+//     *            The value to be stored under that name -or- <code>null</code>
+//     *            to clear any value associated with that name.
+//     * 
+//     * @return The old value -or- <code>null</code> if there was no value
+//     *         stored under that name.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if <i>name</i> is <code>null</code>.
+//     * 
+//     * @todo Consider replacing with <code>getGlobalRowStore()</code> since we
+//     *       can use that directly to store property sets, serialized objects,
+//     *       etc.
+//     */
+//    public Object putNamedRecord(String name, Object value);
 
     /**
      * Destroys all discovered services belonging to the federation and their
@@ -329,5 +331,16 @@ public interface IBigdataFederation extends IIndexManager {
      * @todo create()?
      */
     public void destroy();
+
+    /**
+     * Return the last commit time for the federation (the timestamp of the most
+     * recent <em>completed</em> commit).
+     * <p>
+     * This is useful for {@link ITx#READ_COMMITTED} operations that need to use
+     * a consistent timestamp across a series of {@link DataService}s or a
+     * series of requests against a single {@link DataService} that must use a
+     * consistent view.
+     */
+    public long lastCommitTime();
     
 }

@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
+import java.util.concurrent.Future;
+
 /**
  * An interface that provides an iterator to drain the {@link IBuffer}. This
  * interface is useful where one (or more) processes will write asynchronously
@@ -71,5 +73,19 @@ public interface IBlockingBuffer<E> extends IBuffer<E> {
      * @return ZERO (0L)
      */
     public long flush();
+    
+    /**
+     * Set the {@link Future} for the source processing writing on the
+     * {@link IBlockingBuffer}.
+     * 
+     * @param future
+     *            The {@link Future}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the future has already been set.
+     */
+    public void setFuture(Future future);
     
 }

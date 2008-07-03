@@ -42,12 +42,14 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.DefaultKeyBuilderFactory;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IKeyBuilderFactory;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.ReadOnlyIndex;
+import com.bigdata.btree.ThreadLocalKeyBuilderFactory;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -67,6 +69,8 @@ import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
+import com.bigdata.sparse.GlobalRowStoreSchema;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -307,7 +311,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
     final private WeakValueCache<Long, ICommitter> historicalIndexCache;
-    
+
     /**
      * The "live" BTree mapping index names to the last metadata record
      * committed for the named index. The keys are index names (unicode
@@ -446,32 +450,40 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      * @deprecated by the use of {@link IndexMetadata} 
      */
     private final int defaultBranchingFactor;
-    
+
     /**
-     * A {@link ThreadLocal} variable providing access to thread-specific
-     * instances of a configured {@link IKeyBuilder}.
-     * <p>
-     * Note: this {@link ThreadLocal} is not static since we need configuration
-     * properties from the constructor - those properties can be different for
-     * different {@link Journal}s on the same machine.
+     * A thread-local key builder factory configured with the properties
+     * specified to the ctor.
      */
-    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
+    private final IKeyBuilderFactory keyBuilderFactory;
 
-        protected synchronized IKeyBuilder initialValue() {
-
-            return KeyBuilder.newUnicodeInstance(properties);
-
-        }
-
-    };
+//    /**
+//     * A {@link ThreadLocal} variable providing access to thread-specific
+//     * instances of a configured {@link IKeyBuilder}.
+//     * <p>
+//     * Note: this {@link ThreadLocal} is not static since we need configuration
+//     * properties from the constructor - those properties can be different for
+//     * different {@link Journal}s on the same machine.
+//     */
+//    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
+//
+//        protected synchronized IKeyBuilder initialValue() {
+//
+//            return KeyBuilder.newUnicodeInstance(properties);
+//
+//        }
+//
+//    };
 
     /**
      * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
      * using the properties specified to the journal constructor.
+     * 
+     * @see IndexMetadata#getKeyBuilder()
      */
     public IKeyBuilder getKeyBuilder() {
         
-        return threadLocalKeyBuilder.get();
+        return keyBuilderFactory.getKeyBuilder();
         
     }
     
@@ -604,6 +616,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         this.properties = properties = (Properties) properties.clone();
 
+        // a thread-local key builder factory configured with the caller's properties.
+        this.keyBuilderFactory = new ThreadLocalKeyBuilderFactory(new DefaultKeyBuilderFactory(properties));
+        
         /*
          * "bufferMode" mode.
          * 
@@ -1985,7 +2000,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         // discard.
         name2Addr = null;
-
+        
     }
 
     /**

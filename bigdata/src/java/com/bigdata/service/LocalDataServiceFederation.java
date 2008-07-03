@@ -474,5 +474,14 @@ public class LocalDataServiceFederation extends AbstractFederation {
         }
      
     }
+
+    public long lastCommitTime() {
+
+        assertOpen();
+        
+        return dataService.getResourceManager().getLiveJournal()
+                .getRootBlockView().getLastCommitTime();
+
+    }
     
 }

@@ -23,44 +23,46 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 25, 2008
+ * Created on Jul 3, 2008
  */
 
-package com.bigdata.relation.rdf;
-
-import com.bigdata.relation.IRelationName;
+package com.bigdata.relation;
 
 /**
- * This is a implementation that identifies a triple store using the namespace
- * for the triple store.
- * 
- * FIXME How will we identify a TempTripleStore? Note that remote data services
- * can not access a local temporary journal. The temporary store will have to be
- * incorporated into either a transaction (automatically managed life cycle) or
- * an explicitly managed _temporary_ index facility for the federation. I like
- * the idea of using the namespace prefix to identify such indices.
+ * Default implementation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPORelationName implements IRelationName {
+public class RelationName implements IRelationName {
 
-    private static final long serialVersionUID = -1392983406541791187L;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -7997526094461682433L;
+    
+    private final String namespace;
 
-    private final String name;
-
-    public SPORelationName(String name) {
-
-        if (name == null)
+    /**
+     * 
+     * @param namespace
+     *            The namespace for the relation.
+     */
+    public RelationName(String namespace) {
+        
+        if (namespace == null)
             throw new IllegalArgumentException();
-
-        this.name = name;
+        
+        this.namespace = namespace;
         
     }
 
+    /**
+     * The namespace for the relation.
+     */
     public String toString() {
         
-        return name;
+        return namespace;
         
     }
     

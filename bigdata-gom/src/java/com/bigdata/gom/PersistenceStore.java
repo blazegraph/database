@@ -314,7 +314,7 @@ public class PersistenceStore implements IPersistentStore
 
     final protected IKeyBuilder getKeyBuilder() {
         
-        return m_journal.getKeyBuilder();
+        return m_journal.getKeyBuilder(); //@todo for the specific index.
         
     }
     

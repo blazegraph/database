@@ -366,24 +366,30 @@ abstract public class DataService extends AbstractService
     protected IResourceManager newResourceManager(Properties properties) {
 
         return new ResourceManager(properties) {
-            
-            public IMetadataService getMetadataService() {
+
+            public IBigdataFederation getFederation() {
                 
-                return DataService.this.getFederation().getMetadataService();
+                return DataService.this.getFederation();
                                 
             }
-            
-            public ILoadBalancerService getLoadBalancerService() {
 
-                return DataService.this.getFederation().getLoadBalancerService();
-                
-            }
-
-            public IDataService getDataService(UUID serviceUUID) {
-                
-                return DataService.this.getFederation().getDataService(serviceUUID);
-                
-            }
+//            public IMetadataService getMetadataService() {
+//                
+//                return getFederation().getMetadataService();
+//                                
+//            }
+//            
+//            public ILoadBalancerService getLoadBalancerService() {
+//
+//                return getFederation().getLoadBalancerService();
+//                
+//            }
+//
+//            public IDataService getDataService(UUID serviceUUID) {
+//                
+//                return getFederation().getDataService(serviceUUID);
+//                
+//            }
             
             public UUID getDataServiceUUID() {
 

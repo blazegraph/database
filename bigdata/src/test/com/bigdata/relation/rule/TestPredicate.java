@@ -31,15 +31,9 @@ package com.bigdata.relation.rule;
 import junit.framework.TestCase2;
 
 import com.bigdata.relation.IRelationName;
-import com.bigdata.relation.rdf.SPOPredicate;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.Predicate;
-import com.bigdata.relation.rule.Var;
 
 /**
- * Test suite for {@link SPOPredicate}.
+ * Test suite for {@link Predicate}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -130,27 +124,23 @@ public class TestPredicate extends TestCase2 {
 
         log.info(p2.toString());
 
-        assertTrue(p1.equals(new SPOPredicate(relation, u, c1, c2)));
-
-        assertTrue(p2.equals(new SPOPredicate(relation, u, c3, c4)));
-        
         assertFalse(p1.equals(p2));
 
         assertFalse(p2.equals(p1));
-        
+
     }
-    
+
     protected class P<E> extends Predicate<E> {
 
         /**
          * @param values
          */
-        public P(IRelationName relation,IVariableOrConstant[] values) {
+        public P(IRelationName relation, IVariableOrConstant[] values) {
 
             super(relation, values);
-            
+
         }
-        
+
     }
-    
+
 }

@@ -41,6 +41,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
@@ -817,4 +818,36 @@ public class EmbeddedFederation extends AbstractFederation {
         
     }
     
+    /**
+     * @todo this scans the {@link DataService}s and reports the most recent
+     *       value. The data service initialization should be changed so that
+     *       the embedded data services are using a shared
+     *       {@link AbstractLocalTransactionManager} and that class should note
+     *       the most recent commit time (it will have to query the data
+     *       services during start, much like we are doing here). This approach
+     *       generalizes towards the distributed systems approach.
+     */
+    public long lastCommitTime() {
+
+        assertOpen();
+        
+        long maxValue = 0;
+        
+        for(int i=0; i<dataService.length; i++) {
+
+            final long commitTime = dataService[i].getResourceManager()
+                    .getLiveJournal().getRootBlockView().getLastCommitTime();
+            
+            if(commitTime>maxValue) {
+                
+                maxValue = commitTime;
+                
+            }
+            
+        }
+        
+        return maxValue;
+        
+    }
+
 }

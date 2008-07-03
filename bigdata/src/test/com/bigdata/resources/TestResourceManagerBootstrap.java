@@ -52,6 +52,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -751,23 +752,23 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         }
 
-        public ILoadBalancerService getLoadBalancerService() {
-
-            throw new UnsupportedOperationException();
-            
-        }
-
-        public IMetadataService getMetadataService() {
-
-            throw new UnsupportedOperationException();
-
-        }
-
-        public IDataService getDataService(UUID serviceUUID) {
-
-            throw new UnsupportedOperationException();
-
-        }
+//        public ILoadBalancerService getLoadBalancerService() {
+//
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//
+//        public IMetadataService getMetadataService() {
+//
+//            throw new UnsupportedOperationException();
+//
+//        }
+//
+//        public IDataService getDataService(UUID serviceUUID) {
+//
+//            throw new UnsupportedOperationException();
+//
+//        }
 
         public UUID getDataServiceUUID() {
 
@@ -779,6 +780,12 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             throw new UnsupportedOperationException();
             
+        }
+
+        public IBigdataFederation getFederation() {
+
+            throw new UnsupportedOperationException();
+
         }
 
     }

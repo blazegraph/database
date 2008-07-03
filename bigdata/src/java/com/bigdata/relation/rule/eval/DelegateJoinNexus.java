@@ -114,4 +114,8 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getReadTimestamp();
     }
 
+    public int solutionFlags() {
+        return delegate.solutionFlags();
+    }
+
 }

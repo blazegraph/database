@@ -198,7 +198,7 @@ public class TestSparseRowStore extends TestCase2 {
                  */
                 
                 // write on the sparse row store.
-                srs.write(keyBuilder, schema, row, timestamp, null/*filter*/ );
+                srs.write(schema, row, timestamp, null/*filter*/ );
 
                 /*
                  * Verify read back of the row that we just wrote.
@@ -209,8 +209,8 @@ public class TestSparseRowStore extends TestCase2 {
                     Object primaryKey = row.get(schema.getPrimaryKeyName());
 
                     // read the row from the store.
-                    ITPS tps = srs.read(keyBuilder, schema, primaryKey,
-                            timestamp, null/* filter */);
+                    ITPS tps = srs
+                            .read(schema, primaryKey, timestamp, null/* filter */);
 
                     assertNotNull("No such row: " + primaryKey, tps);
 
@@ -277,8 +277,8 @@ public class TestSparseRowStore extends TestCase2 {
                 long timestamp = ((Date)expected.get(timestampColumn)).getTime();
 
                 // read the row from the store.
-                ITPS tps = srs.read(keyBuilder, schema, primaryKey, timestamp,
-                        null/*filter*/);
+                ITPS tps = srs
+                        .read(schema, primaryKey, timestamp, null/* filter */);
                 
                 assertNotNull("No such row: "+primaryKey,tps);
                 
@@ -305,7 +305,7 @@ public class TestSparseRowStore extends TestCase2 {
         
         SparseRowStore srs = new SparseRowStore(btree);
         
-        assertNull(srs.read(keyBuilder,schema,Long.valueOf(0L)));
+        assertNull(srs.read(schema,Long.valueOf(0L)));
         
     }
 
@@ -326,7 +326,7 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Bryan");
             propertySet.put("State", "NC");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
@@ -338,13 +338,13 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Mike");
             propertySet.put("State", "UT");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
         {
             
-            final Map<String,Object> row = srs.read(keyBuilder, schema, 1L);
+            final Map<String,Object> row = srs.read(schema, 1L);
 
             assertTrue( row != null );
             
@@ -356,7 +356,7 @@ public class TestSparseRowStore extends TestCase2 {
         
         {
             
-            final Map<String,Object> row = srs.read(keyBuilder, schema, 2L);
+            final Map<String,Object> row = srs.read(schema, 2L);
          
             assertTrue( row != null );
             
@@ -389,7 +389,7 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Bryan");
             propertySet.put("State", "NC");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
@@ -401,11 +401,11 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Mike");
             propertySet.put("State", "UT");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
-        Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+        Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
                 null/* fromKey */, null/* toKey */);
         
         {
@@ -457,7 +457,7 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Bryan");
             propertySet.put("State", "NC");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
@@ -469,13 +469,13 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Mike");
             propertySet.put("State", "UT");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
         {
             
-            Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+            Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
                     1L, 2L);
             
             assertTrue(itr.hasNext());
@@ -494,7 +494,7 @@ public class TestSparseRowStore extends TestCase2 {
         
         {
 
-            Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+            Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
                     2L, null/* toKey */);
             
             assertTrue(itr.hasNext());
@@ -534,7 +534,7 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Bryan");
             propertySet.put("State", "NC");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
@@ -546,11 +546,11 @@ public class TestSparseRowStore extends TestCase2 {
             propertySet.put("Name", "Mike");
             propertySet.put("State", "UT");
 
-            srs.write(keyBuilder, schema, propertySet);
+            srs.write(schema, propertySet);
 
         }
 
-        Iterator<? extends ITPS> itr = srs.rangeQuery(keyBuilder, schema,
+        Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
                 null/* fromKey */, null/* toKey */, 1/* capacity */,
                 SparseRowStore.MAX_TIMESTAMP, null/*filter*/);
         

@@ -30,6 +30,8 @@ package com.bigdata.relation.accesspath;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
@@ -39,6 +41,13 @@ import org.apache.log4j.Logger;
  * and they can be read using {@link #iterator()}. This class is safe for
  * concurrent writes (multiple threads can use {@link #add(Object)}) but the
  * {@link #iterator()} is not thread-safe (it assumes a single reader).
+ * 
+ * <p>
+ * <strong>Make sure that the thread that sets up the {@link BlockingBuffer} and
+ * submits a task that writes on the buffer sets the {@link Future} on the
+ * {@link BlockingBuffer} so that the iterator can monitor the future, detect if
+ * it has been cancelled, and throw out the exception from the future back to
+ * the client. Failure to do this can lead to the iterator not terminating!</strong>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -93,6 +102,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     protected static transient final int DEFAULT_CHUNK_TIMEOUT = 1000/*ms*/;
 
+    private volatile Future future;
+    
+    public void setFuture(Future future) {
+    
+        synchronized (this) {
+        
+            if (future == null)
+                throw new IllegalArgumentException();
+
+            if (this.future != null)
+                throw new IllegalStateException();
+
+            this.future = future;
+
+        }
+        
+    }
+    
     /**
      *
      */
@@ -382,7 +409,35 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             open = false;
 
+            if (future != null && !future.isDone()) {
+
+                /*
+                 * If the source is still running and we close the iterator then
+                 * the source will block once the iterator fills up and it will
+                 * fail to progress. To avoid this, and to have the source
+                 * process terminate eagerly if the client closes the iterator,
+                 * we cancel the future if it is not yet done.
+                 */
+                
+                if(log.isDebugEnabled()) {
+                    
+                    log.debug("will cancel future: "+future);
+                    
+                }
+                
+                future.cancel(true/* mayInterruptIfRunning */);
+                
+                if(log.isDebugEnabled()) {
+                    
+                    log.debug("did cancel future: "+future);
+                    
+                }
+
+            }
+
         }
+
+        private volatile boolean didCheckFuture = false;
 
         /**
          * Return <code>true</code> if there are elements in the buffer that
@@ -420,6 +475,44 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
             while (BlockingBuffer.this.open || !queue.isEmpty()) {
 
+                if (!didCheckFuture && future != null && future.isDone()) {
+
+                    log.info("Future is done");
+
+                    // don't re-execute this code.
+                    didCheckFuture = true;
+                    
+                    /*
+                     * Make sure the buffer is closed. In fact, the caller
+                     * probably does not need to close the buffer since we do it
+                     * here when their task completes.
+                     */
+                    BlockingBuffer.this.close();
+
+                    try {
+
+                        // look for an error from the Future.
+                        future.get();
+                        
+                    } catch (InterruptedException e) {
+                        
+                        log.info("Interrupted");
+                        
+                    } catch (ExecutionException e) {
+
+                        log.error(e,e);
+                        
+                        throw new RuntimeException(e);
+                        
+                    }
+
+                    /*
+                     * Fall through. If there is anything in the queue then we
+                     * still need to drain it!
+                     */
+                    
+                }
+
                 assertNotAborted();
 
                 /*
@@ -441,10 +534,37 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                     final long elapsed = now - begin;
 
+                    // @todo use a movable threshold to avoid too frequent retriggering
                     if (elapsed > 2000) {
 
-                        // @todo use a movable threshold to avoid too frequent retriggering
-                        log.warn("Iterator is not progressing...");
+                        if (future == null) {
+
+                            /*
+                             * This can arise if you fail to set the future on
+                             * the buffer such that the iterator can not monitor
+                             * it. If the future completes (esp. with an error)
+                             * then the iterator can keep looking for another
+                             * element but the source is no longer writing on
+                             * the buffer and nothing will show up.
+                             */
+                            
+                            log.error("Future not set on buffer");
+                            
+                        } else {
+                            
+                            /*
+                             * This could be a variety of things such as waiting
+                             * on a mutex that is already held, e.g., an index
+                             * lock, that results in a deadlock between the
+                             * process writing on the buffer and the process
+                             * reading from the buffer. If you are careful with
+                             * who gets the unisolated view then this should not
+                             * be a problem.
+                             */
+                            
+                            log.warn("Iterator is not progressing...");
+
+                        }
                         
                     }
                     

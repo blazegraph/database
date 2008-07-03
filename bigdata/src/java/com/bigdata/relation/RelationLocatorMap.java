@@ -82,7 +82,6 @@ public class RelationLocatorMap<R> implements IRelationLocator<R> {
         
         if (relationLocator == null) {
 
-//            relationLocator = defaultRelationLocator;
             throw new IllegalArgumentException("Unknown relation: "+relationName);
 
         }

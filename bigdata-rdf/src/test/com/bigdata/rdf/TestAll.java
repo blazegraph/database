@@ -90,6 +90,12 @@ public class TestAll extends TestCase {
         // test low-level statement model using long term identifiers.
         suite.addTest( com.bigdata.rdf.spo.TestAll.suite() );
 
+        /* test IRelation, IMutableRelation, and rule execution.
+         * 
+         * FIXME refactor and run against each of the store impls!
+         */
+        suite.addTest(com.bigdata.relation.rdf.TestAll.suite());
+        
         // test various RDF database implementations.
         suite.addTest( com.bigdata.rdf.store.TestAll.suite() );
 

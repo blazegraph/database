@@ -44,8 +44,6 @@ abstract public class AbstractCachingRelationLocator<R> implements IRelationLoca
 
     private int capacity;
     
-    private IRelationFactory<R> relationFactory;
-    
     protected static transient final int DEFAULT_CACHE_CAPACITY = 10;
 
     /**
@@ -57,31 +55,13 @@ abstract public class AbstractCachingRelationLocator<R> implements IRelationLoca
         
     }
 
-    public IRelationFactory<R> getRelationFactory() {
-        
-        return relationFactory;
-        
-    }
-    
-    /**
-     * De-serialization ctor.
-     */
     protected AbstractCachingRelationLocator() {
-        
-    }
-    
-    public AbstractCachingRelationLocator(IRelationFactory<R> relationFactory) {
 
-        this(relationFactory, DEFAULT_CACHE_CAPACITY);
+        this(DEFAULT_CACHE_CAPACITY);
 
     }
 
-    public AbstractCachingRelationLocator(IRelationFactory<R> relationFactory, int capacity) {
-
-        if (relationFactory == null)
-            throw new IllegalArgumentException();
-
-        this.relationFactory = relationFactory;
+    protected AbstractCachingRelationLocator(int capacity) {
 
         this.capacity = capacity;
         
@@ -102,12 +82,10 @@ abstract public class AbstractCachingRelationLocator<R> implements IRelationLoca
      * 
      * @return The relation -or- <code>null</code> iff it is not in the cache.
      */
-    protected IRelation<R> get(IRelationName<R> relationName, long timestamp) {
+    protected IRelation<R> get(String namespace, long timestamp) {
 
-        if (relationName == null)
+        if (namespace == null)
             throw new IllegalArgumentException();
-
-        final String namespace = relationName.toString();
 
         final IRelation<R> r = cache.get(new NT(namespace, timestamp));
         
@@ -129,8 +107,7 @@ abstract public class AbstractCachingRelationLocator<R> implements IRelationLoca
         if (relation == null)
             throw new IllegalArgumentException();
         
-        // @todo IRelation#getNamespace()
-        final String namespace = relation.getRelationName().toString();
+        final String namespace = relation.getNamespace();
 
         final long timestamp = relation.getTimestamp();
         
@@ -138,24 +115,4 @@ abstract public class AbstractCachingRelationLocator<R> implements IRelationLoca
         
     }
 
-//    @SuppressWarnings("unchecked")
-//    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-//
-//        this.relationFactory = (IRelationFactory<R>)in.readObject();
-//
-//        this.capacity = in.readInt();
-//        
-//        this.cache = new WeakValueCache<NT, IRelation<R>>(
-//                new LRUCache<NT, IRelation<R>>(capacity));
-//        
-//    }
-//
-//    public void writeExternal(ObjectOutput out) throws IOException {
-//
-//        out.writeObject(relationFactory);
-//        
-//        out.writeInt(capacity);
-//        
-//    }
-    
 }

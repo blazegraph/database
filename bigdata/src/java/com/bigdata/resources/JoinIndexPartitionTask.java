@@ -199,7 +199,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
         
         final String scaleOutIndexName = newMetadata.getName();
         
-        final int partitionId = resourceManager.getMetadataService().nextPartitionId(scaleOutIndexName);
+        final int partitionId = resourceManager.getFederation().getMetadataService().nextPartitionId(scaleOutIndexName);
 
         newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                 partitionId,//
@@ -432,7 +432,7 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
                     pmd.getRightSeparatorKey()
                     );
             
-            resourceManager.getMetadataService().joinIndexPartition(scaleOutIndexName, oldLocators, newLocator);
+            resourceManager.getFederation().getMetadataService().joinIndexPartition(scaleOutIndexName, oldLocators, newLocator);
 
             for(String name : result.oldnames) {
                 

@@ -36,7 +36,7 @@ import com.bigdata.btree.KeyBuilder;
 /**
  * Test suite for round trip of keys as encoded by
  * {@link Schema#fromKey(com.bigdata.btree.IKeyBuilder, Object)}, by
- * {@link AtomicWriteRead}, and as decoded by the {@link KeyDecoder}.
+ * {@link AtomicRowWriteRead}, and as decoded by the {@link KeyDecoder}.
  * <p>
  * Note: Not all information can be fully decoded. In particular, the exact
  * schema name and the value of the primary key for Unicode {@link KeyType}s

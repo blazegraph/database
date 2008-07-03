@@ -114,13 +114,15 @@ public class MockJoinNexus implements IJoinNexus {
     }
 
     public long getReadTimestamp() {
-        // TODO Auto-generated method stub
         return ITx.READ_COMMITTED;
     }
 
     public long getWriteTimestamp() {
-        // TODO Auto-generated method stub
         return ITx.UNISOLATED;
+    }
+
+    public int solutionFlags() {
+        return IJoinNexus.ELEMENT | IJoinNexus.BINDINGS | IJoinNexus.RULE;
     }
 
 }

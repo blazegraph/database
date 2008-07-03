@@ -57,6 +57,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -163,24 +164,30 @@ public class AbstractResourceManagerTestCase extends
 
             final private UUID dataServiceUUID = UUID.randomUUID();
             
-            public ILoadBalancerService getLoadBalancerService() {
+//            public ILoadBalancerService getLoadBalancerService() {
+//
+//                throw new UnsupportedOperationException();
+//                
+//            }
+//            
+//            public IMetadataService getMetadataService() {
+//
+//                return metadataService;
+//
+//            }
+//
+//            public IDataService getDataService(UUID dataService) {
+//
+//                throw new UnsupportedOperationException();
+//
+//            }
 
+            public IBigdataFederation getFederation() {
+                
                 throw new UnsupportedOperationException();
                 
             }
             
-            public IMetadataService getMetadataService() {
-
-                return metadataService;
-
-            }
-
-            public IDataService getDataService(UUID dataService) {
-
-                throw new UnsupportedOperationException();
-
-            }
-
             public UUID getDataServiceUUID() {
                 
                 return dataServiceUUID;

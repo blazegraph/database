@@ -33,7 +33,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.relation.FederationRelationLocator;
+import com.bigdata.relation.DefaultRelationLocator;
 import com.bigdata.relation.IRelationLocator;
 import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.accesspath.ChunkedArrayIterator;
@@ -93,8 +93,8 @@ public class TestSPORelation extends AbstractRuleTestCase {
     ExecutorService service;
     TestTripleStore kb;
     final String namespace = "test.";
-    IRelationName relationName;
-    IRelationLocator relationLocator;
+    IRelationName<SPO> relationName;
+    IRelationLocator<SPO> relationLocator;
 
     /**
      * FIXME Also do setup using simple Journal without concurrency control
@@ -108,7 +108,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
         super.setUp();
         
-        Properties properties = new Properties(getProperties());
+        Properties properties = new Properties(/*getProperties()*/);
 
         dataDir = File.createTempFile(getName(), ".tmp");
         
@@ -127,14 +127,13 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
         service = fed.getThreadPool();
         
-        kb = new TestTripleStore(fed, namespace, ITx.UNISOLATED);
+        kb = new TestTripleStore(fed, namespace, ITx.UNISOLATED, properties);
 
         kb.create();
         
         relationName = new SPORelationName(namespace);
         
-        relationLocator = new FederationRelationLocator(
-                fed, new SPORelationFactory()); 
+        relationLocator = new DefaultRelationLocator<SPO>(fed); 
         
         
     }
@@ -174,7 +173,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
                     relationLocator, ITx.READ_COMMITTED/* writeTime */,
-                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
+                    ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags*/);
             
             final RuleState ruleState = new RuleState(rule, joinNexus);
 
@@ -209,7 +208,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
                     relationLocator, ITx.READ_COMMITTED/* writeTime */,
-                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
+                    ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags*/);
             
             final RuleState ruleState = new RuleState(rule, joinNexus);
 
@@ -244,7 +243,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
                     relationLocator, ITx.UNISOLATED/* writeTime */,
-                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
+                    ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags*/);
             
             final RuleState ruleState = new RuleState(rule, joinNexus);
 
@@ -286,7 +285,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
         final IJoinNexus joinNexus = new RDFJoinNexus(service, relationLocator,
                 ITx.UNISOLATED/* writeTime */,
-                ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
+                ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags*/);
 
         /*
          * Note: This is the original evaluation order based on NO data in the
@@ -446,17 +445,18 @@ public class TestSPORelation extends AbstractRuleTestCase {
     }
 
     /**
-     * A simple test of rule execution.
+     * A simple test of rule execution, including query against an empty kb,
+     * insert of some elements into the kb, query to verify that the data is in
+     * the kb, insert driven by a rule set, and query to verify that insert.
      * 
      * @throws Exception
      * 
-     * @todo test insert. it would be especially nice if I could get some
-     *       entailments from the rule and then insert them into the relation
-     *       and read them back out.
+     * @todo the test is only verifying insert by range counts on access paths
+     *       corresponding to the predicates in the tail of the rule. it should
+     *       go futher and verify the specific elements.
      * 
      * @todo delete is not implemented for SPORelation so update the test when I
      *       re-integrate with the RDF KB module.
-     * 
      */
     public void test_runRule() throws Exception {
 
@@ -480,7 +480,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
             
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
                     relationLocator, ITx.READ_COMMITTED/* writeTime */,
-                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
+                    ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags */);
 
             final IChunkedOrderedIterator<ISolution> itr = joinNexus
                     .runQuery(rule);
@@ -565,7 +565,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
                     relationLocator, ITx.READ_COMMITTED/* writeTime */,
-                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
+                    ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags*/);
 
 
             final IChunkedOrderedIterator<ISolution> itr = joinNexus
@@ -615,7 +615,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
          * 
          * @todo test delete.
          * 
-         * @todo test fixed point.
+         * FIXME test fixed point.
          */
         {
 
@@ -623,7 +623,7 @@ public class TestSPORelation extends AbstractRuleTestCase {
 
             final IJoinNexus joinNexus = new RDFJoinNexus(service,
                     relationLocator, ITx.UNISOLATED/* writeTime */,
-                    ITx.READ_COMMITTED/* readTime */, false/* elementOnly */);
+                    ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags*/);
 
             final long mutationCount = joinNexus.runMutation(ActionEnum.Insert,
                     rule);
@@ -632,6 +632,23 @@ public class TestSPORelation extends AbstractRuleTestCase {
             
         }
         
+        /*
+         * Verify range counts for the access paths for each predicate in the
+         * tail. These counts reflect the data that we just wrote onto the
+         * relation.
+         */
+        {
+
+            // (u rdf:subClassOf x)
+            assertEquals(1, spoRelation.getAccessPath(rule.getTail(0))
+                    .rangeCount(false/* exact */));
+
+            // (v rdf:type u)
+            assertEquals(3, spoRelation.getAccessPath(rule.getTail(1))
+                    .rangeCount(false/* exact */));
+            
+        }
+
     }
     
 }

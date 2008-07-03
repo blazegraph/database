@@ -573,24 +573,38 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             
         });
 
-        return new DelegateChunkedIterator<R>(buffer.iterator()) {
-            
-            /**
-             * Extended to cancel the Future that is reading on the index if the
-             * caller closes the iterator.
-             */
-            public void close() {
-
-                if (log.isDebugEnabled())
-                    log.debug("Cancelling task: " + AbstractAccessPath.this);
-
-                future.cancel(true/* mayInterruptIfRunning */);
-                
-                super.close();
-                
-            }
-            
-        };
+        buffer.setFuture(future);
+        
+        return buffer.iterator();
+        
+//        return new DelegateChunkedIterator<R>(buffer.iterator()) {
+//            
+//            /**
+//             * Extended to cancel the Future that is reading on the index if the
+//             * caller closes the iterator.
+//             */
+//            public void close() {
+//                
+//                try {
+//                
+//                    super.close();
+//                    
+//                } finally {
+//
+//                    if (log.isDebugEnabled()) {
+//
+//                        log.debug("Cancelling task: "
+//                                        + AbstractAccessPath.this);
+//                        
+//                    }
+//
+//                    future.cancel(true/* mayInterruptIfRunning */);
+//                    
+//                }
+//                
+//            }
+//            
+//        };
             
     }
 
