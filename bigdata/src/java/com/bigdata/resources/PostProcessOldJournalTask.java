@@ -764,7 +764,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final ResultBuffer resultBuffer;
                 try {
                     resultBuffer = (ResultBuffer) resourceManager
-                            .getMetadataService()
+                            .getFederation().getMetadataService()
                             .submit(
                                     -lastCommitTime,
                                     MetadataService
@@ -909,7 +909,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         try {
 
-            loadBalancerService = resourceManager.getLoadBalancerService();
+            loadBalancerService = resourceManager.getFederation().getLoadBalancerService();
 
         } catch (Exception ex) {
 
@@ -985,7 +985,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final UUID excludeUUID = resourceManager.getDataServiceUUID();
             
             underUtilizedDataServiceUUIDs = resourceManager
-                    .getLoadBalancerService()
+                    .getFederation().getLoadBalancerService()
                     .getUnderUtilizedDataServices(//
                             0, // minCount - no lower bound.
                             0, // maxCount - no upper bound.

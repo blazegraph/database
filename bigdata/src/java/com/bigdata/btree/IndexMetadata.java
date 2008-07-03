@@ -30,6 +30,7 @@ import java.io.ObjectOutput;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -40,10 +41,12 @@ import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
 import com.bigdata.btree.IDataSerializer.SimplePrefixSerializer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -213,7 +216,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexMetadata implements Serializable, Externalizable, Cloneable {
+public class IndexMetadata implements Serializable, Externalizable, Cloneable, IKeyBuilderFactory {
 
     private static final long serialVersionUID = 4370669592664382720L;
 
@@ -265,6 +268,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
 //    private Object historyPolicy;
+    private IKeyBuilderFactory keyBuilderFactory;
+    private transient IKeyBuilderFactory threadLocalKeyBuilderFactory;
 
     /**
      * The unique identifier for the index whose data is stored in this B+Tree
@@ -752,9 +757,52 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
                 .75, // underCapacityMultiplier
                 20   // sampleRate
                 );
+
+        // the default factory.
+        this.keyBuilderFactory = new DefaultKeyBuilderFactory();
+        
+        // and wrap it up for thread-local instances.
+        this.threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(keyBuilderFactory);
         
     }
 
+    /**
+     * Sets the {@link IKeyBuilderFactory} object. The default is a
+     * {@link DefaultKeyBuilderFactory} which supports Unicode using the
+     * configured {@link Locale} for the JVM. This can be safely overriden until
+     * you begin to write on the index. Once tuples have been written onto the
+     * index there may be a critical dependency on the factory and the
+     * {@link IKeyBuilder} instances that it generates in order to reproduce
+     * exactly the same variable length <em>unsigned</em> byte[] keys from the
+     * given application keys.
+     * 
+     * @param keyBuilderFactory
+     *            The desired implementation, which will be automatically
+     *            wrapped up in a {@link ThreadLocalKeyBuilderFactory}. The
+     *            specified implementation MUST be {@link Serializable}.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>keyBuilderFactory</i> is <code>null</code>.
+     * 
+     * @see #getKeyBuilder()
+     */
+    public void setKeyBuilderFactory(IKeyBuilderFactory keyBuilderFactory) {
+
+        if (keyBuilderFactory == null) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        // the caller's object.
+        this.keyBuilderFactory = keyBuilderFactory;
+
+        // and wrap it up for thread-local instances.
+        this.threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(
+                keyBuilderFactory);
+        
+    }
+    
     /**
      * Write out the metadata record for the btree on the store and return the
      * address.
@@ -852,6 +900,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         sb.append(", splitHandler="
                 + (splitHandler == null ? "N/A" : splitHandler.getClass()
                         .getName()));
+        sb.append(", keyBuilderFactory="
+                + keyBuilderFactory.getClass().getName());
 
         return sb.toString();
         
@@ -915,7 +965,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         overflowHandler = (IOverflowHandler)in.readObject();
 
         splitHandler = (ISplitHandler)in.readObject();
-           
+
+        keyBuilderFactory = (IKeyBuilderFactory)in.readObject();
+
+        // wrap up in thread-local factory.
+        threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(keyBuilderFactory);
+        
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
@@ -969,6 +1024,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         out.writeObject(overflowHandler);
 
         out.writeObject(splitHandler);
+
+        out.writeObject(keyBuilderFactory);
 
     }
 
@@ -1144,6 +1201,28 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
             throw new RuntimeException(ex);
             
         }
+        
+    }
+
+    /**
+     * Return a thread-local key builder that SHOULD be used for operations on
+     * <i>this</i> {@link IIndex}.
+     * <p>
+     * Note: This {@link IKeyBuilder} is configured by
+     * {@link #setKeyBuilderFactory(IKeyBuilderFactory)} and SHOULD to form keys
+     * for <i>this</i> index. This is critical for indices that have Unicode
+     * data in their application keys as the formation of Unicode sort keys from
+     * Unicode data depends on the {@link IKeyBuilderFactory}. If you use the
+     * locally configured {@link IKeyBuilder} available from
+     * {@link AbstractJournal} or {@link IBigdataFederation} then your Unicode
+     * keys will be encoded based on the {@link Locale} configured for the JVM
+     * NOT the factory specified for <i>this</i> index.
+     * 
+     * @see #setKeyBuilderFactory(IKeyBuilderFactory)
+     */
+    public IKeyBuilder getKeyBuilder() {
+
+        return threadLocalKeyBuilderFactory.getKeyBuilder();
         
     }
         

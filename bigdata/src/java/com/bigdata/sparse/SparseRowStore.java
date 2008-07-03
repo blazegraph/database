@@ -26,21 +26,18 @@ package com.bigdata.sparse;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Properties;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.AbstractTupleFilterator.AtomicRowIterator2;
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
+import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.sparse.AtomicRowScan.TPSList;
-import com.bigdata.sparse.TPS.TPV;
 
 /**
  * A client-side class that knows how to use an {@link IIndex} to provide an
@@ -146,8 +143,18 @@ import com.bigdata.sparse.TPS.TPV;
  * FIXME write a REST service using Json to interchange data with the
  * {@link SparseRowStore}
  * 
- * @todo add an atomic delete for all current property values as of a called
- *       given timestamp?
+ * FIXME Add atomic "get and create if not defined" operation. It will accept a
+ * property set that gets written iff there is no property set for the schema
+ * and primary key. If there is a row for the key, then it is returned and
+ * nothing is written. Unlike a normal read, this operation will be UNISOLATED
+ * in order to have an atomic guarentee.
+ * 
+ * @todo consider a caching layer using a {@link NamedLock} based on the schema
+ *       and primary key and a {@link WeakValueCache} backed by an
+ *       {@link LRUCache}. This would allow a remote client to read data that
+ *       might be stale from the cache. This would be useful for hotspots but
+ *       should be part of an application layer for the row store, not in the
+ *       core impl.
  * 
  * @todo I am not sure that the timestamp filtering mechanism is of much use.
  *       You can't really filter out the low end for a property value since a
@@ -248,7 +255,7 @@ public class SparseRowStore {
 //     *       {@link SparseRowStore} (much like an extSer integration). The
 //     *       schema can be resolved using its encoded bytes as the key and the
 //     *       Unicode text of the schema name can be persisted in the
-//     *       {@link Schema}'s data.
+//     *       {@link Schema}'s data.  See the TPSTupleSerializer also.
 //     * 
 //     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
 //     * @version $Id$
@@ -319,9 +326,6 @@ public class SparseRowStore {
     /**
      * Read the most recent logical row from the index.
      * 
-     * @param keyBuilder
-     *            An object used to construct keys for the index.
-     * 
      * @param schema
      *            The {@link Schema} governing the logical row.
      * 
@@ -331,13 +335,13 @@ public class SparseRowStore {
      * @return The data in that row -or- <code>null</code> if there was no row
      *         for that primary key.
      */
-    public Map<String,Object> read(IKeyBuilder keyBuilder, Schema schema, Object primaryKey) {
+    public Map<String,Object> read(Schema schema, Object primaryKey) {
 
         final long timestamp = Long.MAX_VALUE;
         
         final INameFilter filter = null;
         
-        TPS tps = (TPS) read(keyBuilder, schema, primaryKey, timestamp, filter );
+        TPS tps = (TPS) read(schema, primaryKey, timestamp, filter );
 
         if (tps == null) {
 
@@ -351,9 +355,6 @@ public class SparseRowStore {
     
     /**
      * Read a logical row from the index.
-     * 
-     * @param keyBuilder
-     *            An object used to construct keys for the index.
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
@@ -383,13 +384,14 @@ public class SparseRowStore {
      *       current row. The filtering should be applied on the server side to
      *       reduce the network traffic.
      */
-    public ITPS read(IKeyBuilder keyBuilder, Schema schema,
-            Object primaryKey, long timestamp, INameFilter filter) {
+    public ITPS read(Schema schema, Object primaryKey, long timestamp,
+            INameFilter filter) {
         
-        final AtomicRead proc = new AtomicRead(schema, primaryKey, timestamp,
+        final AtomicRowRead proc = new AtomicRowRead(schema, primaryKey, timestamp,
                 filter);
         
-        final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+        final byte[] key = schema.fromKey(
+                ndx.getIndexMetadata().getKeyBuilder(), primaryKey).getKey();
 
         // Submit the atomic read operation.
         return (TPS) ndx.submit(key, proc);
@@ -407,9 +409,6 @@ public class SparseRowStore {
      * logical row is updated and timestamp associate with the value for the
      * <i>primaryKey</i> property tells you the timestamp of each row revision.
      * 
-     * @param keyBuilder
-     *            An object used to construct keys for the index.
-     * 
      * @param schema
      *            The {@link Schema} governing the logical row.
      * 
@@ -420,11 +419,11 @@ public class SparseRowStore {
      *         logical row.  Only the most current bindings will be present
      *         for each property.
      */
-    public Map<String,Object> write(IKeyBuilder keyBuilder, Schema schema,
+    public Map<String,Object> write(Schema schema,
             Map<String, Object> propertySet) {
 
-        return write(keyBuilder, schema, propertySet,
-                Long.MAX_VALUE/* timestamp */, null/* filter */).asMap();
+        return write(schema, propertySet, Long.MAX_VALUE/* timestamp */, null/* filter */)
+                .asMap();
         
     }
 
@@ -442,9 +441,6 @@ public class SparseRowStore {
      * Note: If the caller specified a <i>timestamp</i>, then that timestamp is
      * used by the atomic read. If the timestamp was assigned by the server,
      * then the server assigned timestamp is used by the atomic read.
-     * 
-     * @param keyBuilder
-     *            An object used to construct keys for the index.
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
@@ -491,27 +487,80 @@ public class SparseRowStore {
      *       by the {@link Schema} and therefore factored out of this method
      *       signature.
      */
-    public ITPS write(IKeyBuilder keyBuilder, Schema schema,
-            Map<String, Object> propertySet, long timestamp, INameFilter filter) {
+    public ITPS write(Schema schema, Map<String, Object> propertySet,
+            long timestamp, INameFilter filter) {
 
-        final AtomicWriteRead proc = new AtomicWriteRead(schema, propertySet,
-                timestamp, filter);
-        
+        final AtomicRowWriteRead proc = new AtomicRowWriteRead(schema,
+                propertySet, timestamp, filter);
+
         final Object primaryKey = propertySet.get(schema.getPrimaryKeyName());
 
-        final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+        final byte[] key = schema.fromKey(
+                ndx.getIndexMetadata().getKeyBuilder(), primaryKey).getKey();
 
         return (TPS) ndx.submit(key, proc);
 
     }
 
     /**
+     * Atomic delete of all property values for the logical row.
+     * 
+     * @param schema
+     *            The schema.
+     * @param primaryKey
+     *            The primary key for the logical row.
+     * 
+     * @return The deleted property values.
+     */
+    public ITPS delete(Schema schema, Object primaryKey) {
+        
+        return delete(schema,primaryKey,AUTO_TIMESTAMP,null/*filter*/);
+        
+    }
+    
+    /**
+     * Atomic delete of all property values for the logical row.
+     * 
+     * @param schema
+     *            The schema.
+     * @param primaryKey
+     *            The primary key for the logical row.
+     * @param timestamp
+     *            The timestamp that will be written into the "deleted" entries
+     *            for the row -or- <code>#AUTO_TIMESTAMP</code> if the
+     *            timestamp will be auto-generated by the data service.
+     * @param filter
+     *            An optional filter used to select the property values that
+     *            will be deleted.
+     * 
+     * @return The deleted property values.
+     * 
+     * @todo unit tests.
+     */
+    public ITPS delete(Schema schema, Object primaryKey, long timestamp,
+            INameFilter filter) {
+
+        if (schema == null)
+            throw new IllegalArgumentException();
+        
+        if (primaryKey == null)
+            throw new IllegalArgumentException();
+        
+        final AtomicRowDelete proc = new AtomicRowDelete(schema, primaryKey,
+                timestamp, filter);
+        
+        final byte[] key = schema.fromKey(
+                ndx.getIndexMetadata().getKeyBuilder(), primaryKey).getKey();
+
+        return (TPS) ndx.submit(key, proc);
+
+    }
+    
+    /**
      * A logical row scan. Each logical row will be read atomically. More than
      * one logical row MAY be read in a single atomic operation but that is not
      * guarenteed.
      * 
-     * @param keyBuilder
-     *            An object used to build keys for the backing index.
      * @param schema
      *            The {@link Schema} governing the logical row.
      * @param fromKey
@@ -537,12 +586,11 @@ public class SparseRowStore {
      * 
      * @return An iterator visiting each logical row in the specified key range.
      */
-    public Iterator<? extends ITPS> rangeQuery(IKeyBuilder keyBuilder, Schema schema,
+    public Iterator<? extends ITPS> rangeQuery(Schema schema,
             Object fromKey, Object toKey, int capacity, long timestamp,
             INameFilter filter) {
         
-        if (keyBuilder == null)
-            throw new IllegalArgumentException();
+        final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
 
         if (fromKey != null) {
 
@@ -581,8 +629,6 @@ public class SparseRowStore {
      * one logical row MAY be read in a single atomic operation but that is not
      * guarenteed.
      * 
-     * @param keyBuilder
-     *            An object used to build keys for the backing index.
      * @param schema
      *            The {@link Schema} governing the logical row.
      * @param fromKey
@@ -596,11 +642,11 @@ public class SparseRowStore {
      * 
      * @return An iterator visiting each logical row in the specified key range.
      */
-    public Iterator<? extends ITPS> rangeQuery(IKeyBuilder keyBuilder, Schema schema,
-            Object fromKey, Object toKey) {
+    public Iterator<? extends ITPS> rangeQuery(Schema schema, Object fromKey,
+            Object toKey) {
 
-        return rangeQuery(keyBuilder, schema, fromKey, toKey, 0/* capacity */,
-                MAX_TIMESTAMP, null/*filter*/);
+        return rangeQuery(schema, fromKey, toKey, 0/* capacity */,
+                MAX_TIMESTAMP, null/* filter */);
 
     }
 

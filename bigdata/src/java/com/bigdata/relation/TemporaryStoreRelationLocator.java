@@ -29,61 +29,69 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation;
 
 import java.io.Serializable;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
-import com.bigdata.journal.Journal;
-import com.bigdata.service.LocalDataServiceFederation;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TemporaryStore;
 
 /**
- * Knows how to locate an {@link IRelation} on a local {@link Journal} using
- * indices WITHOUT concurrency control.
- * <p>
- * Note: If you want to use concurrency control and an embedded database then
- * you should probably be using a {@link LocalDataServiceFederation} and the
- * {@link FederationRelationLocator}.
+ * Knows how to locate a specific {@link IRelation} on a local {@link TemporaryStore}.
  * <p>
  * Note: This class is NOT {@link Serializable}. You CAN NOT access a local
- * store from a remote location.
+ * {@link TemporaryStore} from a remote location.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalRelationLocator<R> extends AbstractCachingRelationLocator<R> {
+public class TemporaryStoreRelationLocator<R> extends DefaultRelationLocator<R> {
 
-    private final ExecutorService service;
+    private final Class<? extends IRelation<R>> cls;
+    private final Properties properties;
+    
+    public TemporaryStoreRelationLocator(ExecutorService service,
+            TemporaryStore tempStore, Class<? extends IRelation<R>> cls,
+            Properties properties) {
 
-    private final Journal journal;
+        super(service, tempStore);
 
-    public LocalRelationLocator(ExecutorService service, Journal journal,
-            IRelationFactory<R> relationFactory) {
-
-        super(relationFactory);
-
-        if (service == null)
+        if (cls == null)
             throw new IllegalArgumentException();
 
-        if (journal == null)
+        if (properties == null)
             throw new IllegalArgumentException();
 
-        this.service = service;
+        this.cls = cls;
         
-        this.journal = journal;
+        this.properties = properties;
         
     }
 
+    /**
+     * 
+     * @param relationName
+     * @param timestampIsIgnored
+     *            The {@link TemporaryStore} does not support timestamps for
+     *            index views. All indices views are "unisolated" and the
+     *            timestamp parameter is ignored.
+     * @return
+     */
     synchronized public IRelation<R> getRelation(IRelationName<R> relationName,
-            long timestamp) {
+            long timestampIsIgnored) {
 
         if (relationName == null)
             throw new IllegalArgumentException();
         
-        IRelation<R> relation = get(relationName, timestamp);
+        final long timestamp = ITx.UNISOLATED;
+        
+        final String namespace = relationName.toString();
+        
+        IRelation<R> relation = get(namespace, timestamp);
 
         if (relation == null) {
-
-            final String namespace = relationName.toString();
             
-            relation = getRelationFactory().newRelation(service, journal, namespace, timestamp);
+            relation = newInstance(cls, service, indexManager, namespace,
+                    timestamp, properties);
 
             put(relation);
             

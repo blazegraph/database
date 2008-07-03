@@ -144,8 +144,9 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
     public RepositoryDocumentImpl(BigdataRepository repo,String id)
     {
         
-        this(repo, id, repo.getMetadataIndex().read(repo.getKeyBuilder(),
-                BigdataRepository.metadataSchema, id, Long.MAX_VALUE, null/* filter */));
+        this(repo, id, repo.getMetadataIndex()
+                .read(BigdataRepository.metadataSchema, id, Long.MAX_VALUE,
+                        null/* filter */));
         
     }
 

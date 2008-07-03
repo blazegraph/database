@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.journal.AbstractJournal;
-
 /**
  * Base class has some utility methods.
  * 
@@ -39,18 +37,21 @@ import com.bigdata.journal.AbstractJournal;
 public class AbstractIndexProcedure {
 
     /**
-     * Return the thread-local key builder configured for the data service on
-     * which this procedure is being run.
+     * Return the thread-local key builder configured for the {@link IIndex}
      * 
      * @param ndx
      *            The index.
      * 
      * @return The {@link IKeyBuilder}.
+     * 
+     * @see IndexMetadata#getKeyBuilder()
      */
     protected IKeyBuilder getKeyBuilder(final IIndex ndx) {
 
-        return ((AbstractJournal) ((AbstractBTree) ndx).getStore())
-                .getKeyBuilder();
+        return ndx.getIndexMetadata().getKeyBuilder();
+        
+//        return ((AbstractJournal) ((AbstractBTree) ndx).getStore())
+//                .getKeyBuilder();
 
     }
 

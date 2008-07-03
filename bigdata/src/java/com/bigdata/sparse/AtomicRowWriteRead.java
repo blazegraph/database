@@ -25,7 +25,7 @@ import com.bigdata.sparse.ValueType.AutoIncLongCounter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AtomicWriteRead extends AtomicRead {
+public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
 
     /**
      * 
@@ -37,7 +37,7 @@ public class AtomicWriteRead extends AtomicRead {
     /**
      * De-serialization ctor.
      */
-    public AtomicWriteRead() {
+    public AtomicRowWriteRead() {
         
     }
     
@@ -60,7 +60,7 @@ public class AtomicWriteRead extends AtomicRead {
      *            An optional filter used to restrict the property values
      *            that will be returned.
      */
-    public AtomicWriteRead(Schema schema, Map<String, Object> propertySet,
+    public AtomicRowWriteRead(Schema schema, Map<String, Object> propertySet,
             long timestamp, INameFilter filter) {
         
         super(schema, propertySet.get(schema.getPrimaryKeyName()), timestamp,
@@ -201,7 +201,12 @@ public class AtomicWriteRead extends AtomicRead {
             // encode the value.
             final byte[] val = ValueType.encode( value );
 
-            // insert into the index.
+            /*
+             * Insert into the index.
+             * 
+             * Note: storing a null under the key causes the property value to
+             * be interpreted as "deleted" on a subsequent read.
+             */
             ndx.insert(key, val);
 
             if(log.isDebugEnabled()) {

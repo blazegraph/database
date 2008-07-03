@@ -47,7 +47,6 @@ import com.bigdata.relation.DefaultRelationLocator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationLocator;
 import com.bigdata.relation.IRelationName;
-import com.bigdata.relation.rdf.SPORelationFactory;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
@@ -416,25 +415,19 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
                 final IJoinNexus tmp = innerTask.joinNexus;
 
                 /*
-                 * FIXME hardwired to SPORelationFactory. This should use the
-                 * relation factory for the source relation locator. E.g., it
-                 * can resolve the relation(s) locally, figure out their factory
-                 * objects (if IRelation can report that) and then build up a
-                 * new IRelationFactory using the appropriate factory objects
-                 * for each named relation.
-                 * 
-                 * We lack any metadata to tell us how to interpret a relation's
-                 * namespace as the Class of the relation implementation. We
-                 * need that relation Class in order to know what indices to
-                 * fetch. This issue is trivially resolved as long as the
-                 * relations are homogenous, e.g., SPORelation. But it is NOT
-                 * resolvable without additional information once those
-                 * relations are heterogeneous, e.g., SPORelation plus
-                 * RDFLexicon or SPORelation + SparseRowStore, etc. In fact, the
-                 * SPORelation and the RDFLexicon have the _same_ [namespace].
+                 * FIXME This will loose any local resources, e.g., on a
+                 * TemporaryStore. Those resources need to be explicitly
+                 * declared. They are available for LDS (only) when running in
+                 * the DataService. Resolve this with
+                 * IJoinNexus#addLocalResource() and
+                 * IJoinNexus#getLocalResources(). Those need to be searched
+                 * before the DefaultRelationLocator. When we override that
+                 * locator here to use the isolation level of the task, we again
+                 * need to setup those resources so that they are searched
+                 * before the DefaultRelationLocator.
                  */
                 final IRelationLocator relationLocator = new DefaultRelationLocator(
-                        executorService, getJournal(), new SPORelationFactory());
+                        executorService, getJournal());
 
                 innerTask.joinNexus = new DelegateJoinNexus(tmp) {
 

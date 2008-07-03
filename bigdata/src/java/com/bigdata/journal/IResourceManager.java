@@ -44,9 +44,8 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IServiceShutdown;
 
 /**
@@ -281,31 +280,37 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public File getIndexSegmentFile(IndexMetadata indexMetadata);
 
-    /**
-     * Return the {@link ILoadBalancerService} that is used to identify under-utilized
-     * {@link IDataService}s (move targets) and over-utilized
-     * {@link IDataService}s (move sources).
-     */
-    public ILoadBalancerService getLoadBalancerService();
-    
-    /**
-     * Return the {@link IMetadataService} that will be used to assign partition
-     * identifiers and which will be notified when index partitions are splits,
-     * moved, etc.
-     */
-    public IMetadataService getMetadataService();
-    
-    /**
-     * Return the {@link IDataService} identified by the given service
-     * {@link UUID}.
-     * 
-     * @param serviceUUID
-     *            The service {@link UUID}.
-     *            
-     * @return That {@link IDataService} -or- <code>null</code> if the
-     *         {@link UUID} does not identify an {@link IDataService}.
-     */
-    public IDataService getDataService(UUID serviceUUID);
+//    /**
+//     * Return the {@link ILoadBalancerService} that is used to identify under-utilized
+//     * {@link IDataService}s (move targets) and over-utilized
+//     * {@link IDataService}s (move sources).
+//     * 
+//     * @deprecated by {@link #getFederation()}
+//     */
+//    public ILoadBalancerService getLoadBalancerService();
+//    
+//    /**
+//     * Return the {@link IMetadataService} that will be used to assign partition
+//     * identifiers and which will be notified when index partitions are splits,
+//     * moved, etc.
+//     * 
+//     * @deprecated by {@link #getFederation()}
+//     */
+//    public IMetadataService getMetadataService();
+//    
+//    /**
+//     * Return the {@link IDataService} identified by the given service
+//     * {@link UUID}.
+//     * 
+//     * @param serviceUUID
+//     *            The service {@link UUID}.
+//     * 
+//     * @return That {@link IDataService} -or- <code>null</code> if the
+//     *         {@link UUID} does not identify an {@link IDataService}.
+//     * 
+//     * @deprecated by {@link #getFederation()}
+//     */
+//    public IDataService getDataService(UUID serviceUUID);
     
     /**
      * Return the {@link UUID} of the {@link IDataService} whose resources are
@@ -313,6 +318,15 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public UUID getDataServiceUUID();
 
+    /**
+     * The federation whose resources are being managed.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the {@link ResourceManager} is not part of an
+     *             {@link IBigdataFederation}.
+     */
+    public IBigdataFederation getFederation();
+    
     /**
      * Return the {@link UUID}[] of the {@link IDataService} failover chain for
      * the {@link IDataService} resources are being managed.

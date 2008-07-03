@@ -29,18 +29,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 
 /**
- * A solution bundles together the materialized element corresponding to the
- * bindings on the head of an {@link IRule} with the {@link IBindingSet} used to
- * generate that solution. For efficiency, the {@link IBindingSet} is often not
- * included. This is an {@link IProgram} option.
+ * A solution bundles together any of (a) the materialized element corresponding
+ * to the bindings on the head of an {@link IRule}; (b) the {@link IBindingSet}
+ * used to generate that solution; and (c) the {@link IRule} from which those
+ * bindings were computed. All data are optional. Which data are included
+ * depends on a set of bit flags known to the {@link IJoinNexus} implementation
+ * and the behavior of its {@link IJoinNexus#newSolution(IRule, IBindingSet)}
+ * implementation.
  * <p>
- * Note: One use for the {@link IBindingSet}s is to materialize the
- * justifications for the entailments. The RDF DB uses this for to maintain a
- * justifications index in support of truth maintenance.
+ * Note: The {@link IBindingSet} is useful both for high-level query and to
+ * materialize the justifications for the entailments. The RDF DB uses this for
+ * to maintain a justifications index in support of truth maintenance.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -49,11 +51,10 @@ public interface ISolution<E> {
 
     /**
      * Return the element materialized from the head of the rule given a set of
-     * {@link IBindingSet bindings} for that rule. The rule MAY be available
-     * from {@link #getRule()}. The bindings MAY be available from
-     * {@link #getBindingSet()}.
+     * {@link IBindingSet bindings} for that rule (optional operation).
      * 
-     * @return The element.
+     * @return The element -or- <code>null</code> if the element was not
+     *         requested.
      */
     public E get();
     
@@ -61,8 +62,8 @@ public interface ISolution<E> {
      * Return the {@link IRule} that generated this solution (optional
      * operation).
      * 
-     * @return The {@link IRule} -or- <code>null</code> if only the element
-     *         was requested when the rule was executed.
+     * @return The {@link IRule} -or- <code>null</code> if the rule was not
+     *         requested.
      */
     public IRule getRule();
     
@@ -71,8 +72,8 @@ public interface ISolution<E> {
      * 
      * @return The {@link IBindingSet}.
      * 
-     * @return The {@link IBindingSet} -or- <code>null</code> if only the
-     *         element was requested when the rule was executed.
+     * @return The {@link IBindingSet} -or- <code>null</code> if the binding
+     *         set was not requested.
      */
     public IBindingSet getBindingSet();
     

@@ -28,6 +28,10 @@
 
 package com.bigdata.relation;
 
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
@@ -35,7 +39,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IKeyOrder;
-import com.bigdata.relation.rdf.SPORelationName;
+import com.bigdata.sparse.ITPS;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -53,7 +57,7 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
 
     private final long timestamp;
     
-    private final SPORelationName relationName;
+    private final Properties properties;
 
     public IIndexManager getIndexManager() {
         
@@ -79,27 +83,31 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
         
     }
 
-    public SPORelationName getRelationName() {
+    /**
+     * Return an object wrapping the properties specified to the ctor.
+     */
+    public Properties getProperties() {
         
-        return relationName;
+        return new Properties(properties);
         
     }
-
+    
     /**
      * The class name, timestamp and namespace for the relation view.
      */
     public String toString(){
         
         return getClass().getSimpleName() + "{timestamp=" + timestamp
-                + ", namespace=" + relationName + "}";
-        
+                + ", namespace=" + namespace + "}";
+
     }
-    
+
     /**
      * 
      */
     protected AbstractRelation(ExecutorService service,
-            IIndexManager indexManager, String namespace, long timestamp) {
+            IIndexManager indexManager, String namespace, long timestamp,
+            Properties properties) {
 
         if (service == null)
             throw new IllegalArgumentException();
@@ -110,16 +118,23 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
         if (namespace == null)
             throw new IllegalArgumentException();
 
+        if (properties == null)
+            throw new IllegalArgumentException();
+
         this.service = service;
-        
+
         this.indexManager = indexManager;
-        
+
         this.namespace = namespace;
-        
+
         this.timestamp = timestamp;
 
-        this.relationName = new SPORelationName(namespace);
+        this.properties = properties;
+        
+        properties.setProperty(RelationSchema.NAMESPACE, namespace);
 
+        properties.setProperty(RelationSchema.CLASS, getClass().getName());
+        
     }
 
     /**
@@ -127,7 +142,7 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
      * 
      * @param keyOrder
      *            The natural index order.
-     *            
+     * 
      * @return The index name.
      */
     abstract public String getFQN(IKeyOrder<? extends R> keyOrder);
@@ -146,4 +161,53 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
         
     }
 
+    public void create() {
+        
+        log.info(toString());
+
+        /*
+         * Convert the Properties to a Map.
+         */
+        final Map<String,Object> map = new HashMap<String, Object>();
+        
+        Enumeration<? extends Object> e = properties.propertyNames();
+
+        while (e.hasMoreElements()) {
+
+            final Object key = e.nextElement();
+
+            if (!(key instanceof String)) {
+
+                log.warn("Will not store non-String key: "+key);
+                
+                continue;
+                
+            }
+
+            final String name = (String) key;
+
+            map.put(name, properties.getProperty(name));
+
+        }
+
+        // Write the map on the row store.
+        final Map afterMap = indexManager.getGlobalRowStore().write(RelationSchema.INSTANCE, map);
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Properties after write: "+afterMap);
+            
+        }
+        
+    }
+    
+    public void destroy() {
+
+        log.info(toString());
+
+        // Delete the entry for this relation from the row store.
+        indexManager.getGlobalRowStore().delete(RelationSchema.INSTANCE, namespace);
+        
+    }
+    
 }

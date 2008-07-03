@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.sparse.GlobalRowStoreSchema;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Interface accessing named indices.
@@ -46,4 +48,12 @@ public interface IIndexStore {
      */
     public IIndex getIndex(String name, long timestamp);
 
+    /**
+     * Return the global {@link SparseRowStore} used to store named property
+     * sets.
+     * 
+     * @see GlobalRowStoreSchema
+     */
+    public SparseRowStore getGlobalRowStore();
+    
 }

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rdf;
 
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +40,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -88,17 +90,23 @@ public class SPORelation extends AbstractRelation<SPO> implements IMutableRelati
 
     protected static final Logger log = Logger.getLogger(SPORelation.class);
     
-    // @todo IRawTripleStore when re-factored back to the rdf module.
-    private transient final long NULL = 0L;
+    private transient final long NULL = IRawTripleStore.NULL;
+    
+    private final SPORelationName relationName;
     
     public SPORelation(ExecutorService service, IIndexManager indexManager,
-            String namespace, Long timestamp) {
+            String namespace, Long timestamp, Properties properties) {
 
-        super(service, indexManager, namespace, timestamp);
+        super(service, indexManager, namespace, timestamp, properties);
+        
+        this.relationName = new SPORelationName(namespace);
 
     }
     
     public void create() {
+
+        // create the relation declaration metadata.
+        super.create();
         
         final IIndexManager indexManager = getIndexManager();
         
@@ -115,6 +123,9 @@ public class SPORelation extends AbstractRelation<SPO> implements IMutableRelati
     
     public void destroy() {
 
+        // destroy the relation declaration metadata.
+        super.destroy();
+        
         final IIndexManager indexManager = getIndexManager();
 
         indexManager.dropIndex(getFQN(SPOKeyOrder.SPO));
@@ -122,9 +133,15 @@ public class SPORelation extends AbstractRelation<SPO> implements IMutableRelati
         indexManager.dropIndex(getFQN(SPOKeyOrder.POS));
 
         indexManager.dropIndex(getFQN(SPOKeyOrder.OSP));
-
+        
     }
-    
+
+    public SPORelationName getRelationName() {
+
+        return relationName;
+        
+    }
+
     public String getFQN(IKeyOrder<? extends SPO> keyOrder) {
         
         return getNamespace() + ((SPOKeyOrder)keyOrder).getIndexName();

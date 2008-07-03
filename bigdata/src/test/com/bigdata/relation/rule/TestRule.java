@@ -30,18 +30,6 @@ package com.bigdata.relation.rule;
 import java.util.Set;
 
 import com.bigdata.relation.IRelationName;
-import com.bigdata.relation.rdf.SPOPredicate;
-import com.bigdata.relation.rule.ArrayBindingSet;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.HashBindingSet;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Var;
-import com.bigdata.relation.rule.eval.RuleState;
 
 /**
  * Test suite for basic {@link Rule} mechanisms.
@@ -76,10 +64,10 @@ public class TestRule extends AbstractRuleTestCase {
 
         final IRule r = new MyRule(
                 // head
-                new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource),
+                new P(relation, u, rdfsSubClassOf, rdfsResource),
                 // tail
-                new SPOPredicate[] {//
-                    new SPOPredicate(relation, u, rdfType, rdfsClass) //
+                new IPredicate[] {//
+                    new P(relation, u, rdfType, rdfsClass) //
                 }
                 );
 
@@ -88,10 +76,10 @@ public class TestRule extends AbstractRuleTestCase {
 
         assertEquals("variableCount", 1, r.getVariableCount());
 
-        assertTrue("head", new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource)
+        assertTrue("head", new P(relation, u, rdfsSubClassOf, rdfsResource)
                 .equals(r.getHead()));
 
-        assertTrue("tail[0]", new SPOPredicate(relation, u, rdfType, rdfsClass).equals(r
+        assertTrue("tail[0]", new P(relation, u, rdfType, rdfsClass).equals(r
                 .getTail(0)));
 
         assertSameIteratorAnyOrder(new Comparable[] { u }, r.getVariables());
@@ -107,10 +95,10 @@ public class TestRule extends AbstractRuleTestCase {
      */
     public void test_getSharedVars() {
 
-        SPOPredicate p1 = new SPOPredicate(relation,//
+        final IPredicate p1 = new P(relation,//
                 Var.var("u"), rdfsSubClassOf, rdfsResource);
 
-        SPOPredicate p2 = new SPOPredicate(relation,//
+        final IPredicate p2 = new P(relation,//
                 Var.var("x"), rdfType, Var.var("u"));
 
         Set<IVariable> actual = Rule.getSharedVars(p1, p2);
@@ -146,11 +134,11 @@ public class TestRule extends AbstractRuleTestCase {
 
         final Var<Long> u = Var.var("u");
 
-        final SPOPredicate head = new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource);
+        final IPredicate head = new P(relation, u, rdfsSubClassOf, rdfsResource);
 
-        final SPOPredicate[] body = new SPOPredicate[] {//
+        final IPredicate[] body = new IPredicate[] {//
 
-                new SPOPredicate(relation, u, rdfType, rdfsClass)//
+                new P(relation, u, rdfType, rdfsClass)//
                 
         };
 
@@ -317,22 +305,6 @@ public class TestRule extends AbstractRuleTestCase {
             
             assertTrue(rdfProperty == r2.getTail(0).get(2));
 
-        }
-
-    }
-    
-    private static class MyRule extends Rule {
-
-        public MyRule( SPOPredicate head, SPOPredicate[] body) {
-
-            super(MyRule.class.getName(), head, body, null/* constraints */);
-
-        }
-
-        public void apply(RuleState state) {
-            
-            // NOP.
-            
         }
 
     }

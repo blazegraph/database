@@ -39,7 +39,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
 import com.bigdata.btree.IDataSerializer.SimplePrefixSerializer;
 import com.bigdata.btree.KeyBuilder.StrengthEnum;
-import com.bigdata.sparse.AtomicRead;
+import com.bigdata.sparse.AtomicRowRead;
 import com.bigdata.sparse.AtomicRowScan;
 import com.bigdata.sparse.INameFilter;
 import com.bigdata.sparse.ITPS;
@@ -274,7 +274,7 @@ abstract public class AbstractTupleFilterator<E> implements ITupleIterator<E> {
      * {@link IIndex} backing a {@link SparseRowStore} into an
      * {@link ITupleIterator} visiting logical {@link ITPS} rows.
      * 
-     * @todo You could replace the {@link AtomicRead} with this iterator by
+     * @todo You could replace the {@link AtomicRowRead} with this iterator by
      *       setting the capacity to ONE (1). However, that will do more work
      *       when we are only trying to read a single row on a local index since
      *       we will have to serialize and then de-serialize the {@link TPS} for

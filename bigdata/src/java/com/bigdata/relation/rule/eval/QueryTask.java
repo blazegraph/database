@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IClosableIterator;
 import com.bigdata.relation.rule.IProgram;
@@ -23,7 +24,8 @@ import com.bigdata.service.DataService;
  * <p>
  * Note: If the iterator is {@link IClosableIterator#close()}ed then it MUST
  * cause the backing {@link IBlockingBuffer} to also be closed (you have to wrap
- * up the iterator before returning it to the client).
+ * up the iterator before returning it to the client).  {@link BlockingBuffer}
+ * handles this automatically.
  * <p>
  * Note: This task can not be submitted to a remote service since the
  * {@link IBlockingBuffer} is a purely local object. Instead, an instance of
@@ -31,7 +33,7 @@ import com.bigdata.service.DataService;
  * for the iterator returned by the {@link IBlockingBuffer}. That proxy is then
  * returned to the client.
  * 
- * @see ClosableIteratorFuture
+ * @see BlockingBuffer
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

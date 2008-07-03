@@ -1,8 +1,5 @@
-package com.bigdata.service;
+package com.bigdata.sparse;
 
-import com.bigdata.sparse.KeyType;
-import com.bigdata.sparse.Schema;
-import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Schema for the {@link SparseRowStore} used as a global row store for named

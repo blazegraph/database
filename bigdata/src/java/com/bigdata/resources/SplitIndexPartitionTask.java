@@ -826,7 +826,7 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
              * ignore that field when validating the oldLocator that we form
              * below.
              */
-            resourceManager.getMetadataService().splitIndexPartition(
+            resourceManager.getFederation().getMetadataService().splitIndexPartition(
                     src.getIndexMetadata().getName(),//
                     new PartitionLocator(//
                             oldpmd.getPartitionId(), //

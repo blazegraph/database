@@ -272,13 +272,13 @@ public class TPS implements ITPS, Externalizable {
 
     public Map<String, Object> asMap(long timestamp, INameFilter filter) {
 
-        Map<String, Object> m = new HashMap<String, Object>();
+        final Map<String, Object> m = new HashMap<String, Object>();
 
-        Iterator<ITPV> itr = iterator();
+        final Iterator<ITPV> itr = iterator();
         
         while (itr.hasNext()) {
 
-            TPV tpv = (TPV)itr.next();
+            final TPV tpv = (TPV)itr.next();
 
             if (tpv.timestamp > timestamp) {
 

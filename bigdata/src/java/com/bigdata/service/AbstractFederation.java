@@ -31,9 +31,7 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -67,8 +65,7 @@ import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TaskCounters;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.sparse.ITPS;
-import com.bigdata.sparse.ITPV;
+import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.NT;
@@ -953,105 +950,113 @@ abstract public class AbstractFederation implements IBigdataFederation {
     /*
      * named records
      */
+
+    private final GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this);
     
-    private final String GLOBAL_ROW_STORE_INDEX = "__global_namespace_index";
-
-    synchronized public SparseRowStore getGlobalRowStore() {
+    public SparseRowStore getGlobalRowStore() {
         
-        log.info("");
-
-        if (globalRowStore == null) {
-
-            IIndex ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
-
-            if (ndx == null) {
-
-                log.info("Global row store does not exist - will try to register now");
-                
-                try {
-
-                    registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,
-                            UUID.randomUUID()));
-
-                } catch (Exception ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-                ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
-
-                if (ndx == null) {
-
-                    throw new RuntimeException("Could not find index?");
-
-                }
-
-            }
-
-            globalRowStore = new SparseRowStore(ndx);
-
-        }
+        return globalRowStoreHelper.getGlobalRowStore();
         
-        return globalRowStore;
-
     }
-    private SparseRowStore globalRowStore;
     
-    public Object getNamedRecord(final String primaryKey) {
-
-        if (primaryKey == null)
-            throw new IllegalArgumentException();
-
-        final ITPS tps = getGlobalRowStore().read(getKeyBuilder(),//
-                GlobalRowStoreSchema.INSTANCE, //
-                primaryKey,//
-                Long.MAX_VALUE, // most recent value only
-                null // filter
-                );
-        
-        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
-
-        if (tpv.getValue() == null) {
-
-            // No value for that name.
-            return null;        
-            
-        }
-        
-        return tpv;
-        
-    }
-
-    public Object putNamedRecord(String primaryKey, Object value) {
-
-        if (primaryKey == null)
-            throw new IllegalArgumentException();
-
-        final Map<String,Object> row = new HashMap<String,Object>();
-        
-        row.put(primaryKey,value);
-        
-        final ITPS tps = getGlobalRowStore().write(//
-                getKeyBuilder(), //
-                GlobalRowStoreSchema.INSTANCE, //
-                row,//
-                SparseRowStore.AUTO_TIMESTAMP_UNIQUE,//
-                null // filter
-                );
-
-        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
-
-        if (tpv.getValue() == null) {
-
-            // No value for that name.
-            return null;
-
-        }
-
-        return tpv;
-
-    }
+//    private final String GLOBAL_ROW_STORE_INDEX = "__global_namespace_index";
+//
+//    synchronized public SparseRowStore getGlobalRowStore() {
+//        
+//        log.info("");
+//
+//        if (globalRowStore == null) {
+//
+//            IIndex ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+//
+//            if (ndx == null) {
+//
+//                log.info("Global row store does not exist - will try to register now");
+//                
+//                try {
+//
+//                    registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,
+//                            UUID.randomUUID()));
+//
+//                } catch (Exception ex) {
+//
+//                    throw new RuntimeException(ex);
+//
+//                }
+//
+//                ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+//
+//                if (ndx == null) {
+//
+//                    throw new RuntimeException("Could not find index?");
+//
+//                }
+//
+//            }
+//
+//            globalRowStore = new SparseRowStore(ndx);
+//
+//        }
+//        
+//        return globalRowStore;
+//
+//    }
+//    private SparseRowStore globalRowStore;
+    
+//    public Object getNamedRecord(final String primaryKey) {
+//
+//        if (primaryKey == null)
+//            throw new IllegalArgumentException();
+//
+//        final ITPS tps = getGlobalRowStore().read(getKeyBuilder(),//
+//                GlobalRowStoreSchema.INSTANCE, //
+//                primaryKey,//
+//                Long.MAX_VALUE, // most recent value only
+//                null // filter
+//                );
+//        
+//        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
+//
+//        if (tpv.getValue() == null) {
+//
+//            // No value for that name.
+//            return null;        
+//            
+//        }
+//        
+//        return tpv;
+//        
+//    }
+//
+//    public Object putNamedRecord(String primaryKey, Object value) {
+//
+//        if (primaryKey == null)
+//            throw new IllegalArgumentException();
+//
+//        final Map<String,Object> row = new HashMap<String,Object>();
+//        
+//        row.put(primaryKey,value);
+//        
+//        final ITPS tps = getGlobalRowStore().write(//
+//                getKeyBuilder(), //
+//                GlobalRowStoreSchema.INSTANCE, //
+//                row,//
+//                SparseRowStore.AUTO_TIMESTAMP_UNIQUE,//
+//                null // filter
+//                );
+//
+//        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
+//
+//        if (tpv.getValue() == null) {
+//
+//            // No value for that name.
+//            return null;
+//
+//        }
+//
+//        return tpv;
+//
+//    }
 
     /**
      * Periodically send performance counter data to the

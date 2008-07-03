@@ -25,7 +25,7 @@ package com.bigdata.journal;
 
 import java.util.Properties;
 
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilderFactory;
 import com.bigdata.rawstore.IMRMW;
 
 /**
@@ -38,7 +38,7 @@ import com.bigdata.rawstore.IMRMW;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager {
+public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager, IKeyBuilderFactory {
 
     /**
      * A copy of the properties used to initialize this journal.

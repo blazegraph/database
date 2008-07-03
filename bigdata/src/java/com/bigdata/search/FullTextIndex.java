@@ -68,13 +68,13 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IKeyBuilderFactory;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.KeyBuilder.StrengthEnum;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.service.IBigdataClient;
@@ -490,6 +490,10 @@ public class FullTextIndex {
              * text (they can not be decoded) from key and how to extract the
              * document and field identifiers from the key. It should also
              * encapsulate the use of PRIMARY strength for the key builder.
+             * 
+             * FIXME put the IKeyBuilderFactory on the index.
+             * 
+             * FIXME register as relation with the globalRowStore.
              */
             
             indexManager.registerIndex(indexMetadata);
@@ -830,6 +834,8 @@ public class FullTextIndex {
      * Note: this {@link ThreadLocal} is not static since we need configuration
      * properties from the constructor - those properties can be different for
      * different {@link IBigdataClient}s on the same machine.
+     * 
+     * FIXME Configure as {@link IKeyBuilderFactory} on the backing index.
      */
     private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
 

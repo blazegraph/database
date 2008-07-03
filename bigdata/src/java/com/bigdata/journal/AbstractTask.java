@@ -54,12 +54,15 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.sparse.GlobalRowStoreHelper;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -2030,6 +2033,27 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
 
+        /**
+         * Returns an {@link ITx#READ_COMMITTED} view if the index exists -or-
+         * an {@link ITx#UNISOLATED} view IFF the {@link AbstractTask} declared
+         * the name of the backing index as one of the resources for which it
+         * acquired a lock.
+         */
+        public SparseRowStore getGlobalRowStore() {
+            
+            // did the task declare the resource name?
+            if(isResource(GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX)) {
+                
+                // unisolated view - will create if it does not exist.
+                return new GlobalRowStoreHelper(this).getGlobalRowStore();
+                
+            }
+            
+            // read committed view IFF it exists otherwise [null]
+            return new GlobalRowStoreHelper(this).getReadCommitted();
+            
+        }
+        
         /*
          * Disallowed methods (commit protocol and shutdown protocol).
          */
@@ -2069,6 +2093,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         /*
          * Methods which delegate directly to the live journal.
          */
+
+        public IKeyBuilder getKeyBuilder() {
+            return delegate.getKeyBuilder();
+        }
         
         public Object deserialize(byte[] b, int off, int len) {
             return delegate.deserialize(b, off, len);
@@ -2263,6 +2291,38 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
 
+        /**
+         * Returns an {@link ITx#READ_COMMITTED} view the index exists and
+         * <code>null</code> otherwise.
+         */
+        public SparseRowStore getGlobalRowStore() {
+
+            /*
+             * Note: This goes around getIndex(name,timestamp) on this method
+             * and uses that method on the delegate. This is because of the
+             * restriction on access to declared indices. It's Ok to go around
+             * like this since you do not need a lock for a read-only view.
+             */
+            
+//            return new GlobalRowStoreHelper(this).getReadCommitted();
+
+            // last commit time.
+            final long timestamp = delegate.getRootBlockView().getLastCommitTime();
+            
+            final IIndex ndx = delegate.getIndex(
+                    GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX,
+                    timestamp);
+
+            if (ndx != null) {
+
+                return new SparseRowStore(ndx);
+
+            }
+            
+            return null;
+            
+        }
+
         /*
          * Disallowed methods (commit and shutdown protocols).
          */
@@ -2314,6 +2374,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         /*
          * Methods that delegate directly to the backing journal.
          */
+        
+        public IKeyBuilder getKeyBuilder() {
+            return delegate.getKeyBuilder();
+        }
         
         public Object deserialize(byte[] b, int off, int len) {
             return delegate.deserialize(b, off, len);

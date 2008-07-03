@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-
-
 /**
  * A read-only view of an {@link ICommitRecord}.
  * 
@@ -49,7 +47,8 @@ public class CommitRecord implements ICommitRecord {
      */
     public CommitRecord() {
 
-        this(0L,0L,new long[ICommitRecord.MAX_ROOT_ADDRS]);
+        this(0L/* timestamp */, 0L/* commitCounter */,
+                new long[ICommitRecord.MAX_ROOT_ADDRS]);
         
     }
 

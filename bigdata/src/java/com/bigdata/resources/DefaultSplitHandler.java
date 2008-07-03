@@ -685,7 +685,7 @@ public class DefaultSplitHandler implements ISplitHandler {
             }
 
             // Get the next partition identifier for the named scale-out index.
-            final IMetadataService mds = resourceManager.getMetadataService();
+            final IMetadataService mds = resourceManager.getFederation().getMetadataService();
             final int partitionId;
             try {
 

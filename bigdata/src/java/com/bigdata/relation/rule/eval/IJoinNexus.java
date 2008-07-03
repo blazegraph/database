@@ -101,7 +101,14 @@ public interface IJoinNexus {
     Object newElement(IPredicate predicate, IBindingSet bindingSet);
 
     /**
-     * Create a new {@link ISolution}.
+     * Create a new {@link ISolution}. The behavior of this method generally
+     * depends on bit flags specified when the {@link IJoinNexus} was created.
+     * <p>
+     * Note: For many purposes, it is only the computed {@link #ELEMENT}s that
+     * are of interest. For high-level query, you will generally specify only
+     * the {@link #BINDINGS}. The {@link #BINDINGS} are also useful for some
+     * truth maintenance applications. The {@link #RULE} is generally only of
+     * interest for inspecting the behavior of some rule set.
      * 
      * @param rule
      *            The rule.
@@ -113,9 +120,46 @@ public interface IJoinNexus {
      * 
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
+     * 
+     * @see #ELEMENT
+     * @see #BINDINGS
+     * @see #RULE
+     * @see #solutionFlags()
+     * @see Solution
      */
     ISolution newSolution(IRule rule, IBindingSet bindingSet);
 
+    /**
+     * The flags that effect the behavior of {@link #newSolution(IRule, IBindingSet)}.
+     */
+    public int solutionFlags();
+    
+    /**
+     * Bit flag indicating that {@link #newSolution(IRule, IBindingSet)} should
+     * materialize an element from the {@link IRule} and {@link IBindingSet} and
+     * make it available via {@link ISolution#get()}.
+     */
+    final int ELEMENT = 1 << 0;
+
+    /**
+     * Bit flag indicating that {@link #newSolution(IRule, IBindingSet)} should
+     * clone the {@link IBindingSet} and make it available via
+     * {@link ISolution#getBindingSet()}.
+     */
+    final int BINDINGS = 1 << 1;
+
+    /**
+     * Bit flag indicating that {@link #newSolution(IRule, IBindingSet)} make
+     * the {@link IRule} that generated the {@link ISolution} available via
+     * {@link ISolution#getRule()}.
+     */
+    final int RULE = 1 << 2;
+
+    /**
+     * {@link #ELEMENT} and {@link #BINDINGS} and {@link #RULE}.
+     */
+    final int ALL = ELEMENT|BINDINGS|RULE;
+    
     /**
      * Factory for {@link IBindingSet} implementations.
      * 

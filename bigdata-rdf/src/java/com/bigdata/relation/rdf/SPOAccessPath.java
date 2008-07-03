@@ -1,6 +1,8 @@
 package com.bigdata.relation.rdf;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -221,52 +223,83 @@ public class SPOAccessPath extends AbstractAccessPath<SPO> {
 
         final int capacity = 10000;
         
-        byte[] fromKey = null;
-        
-        final byte[] toKey = null;
-        
-        ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
-                IRangeQuery.KEYS, null/* filter */);
-        
-        final SPOTupleSerializer tupleSer = getTupleSerializer();
-        
-        final IBlockingBuffer<Long> buffer = new BlockingBuffer<Long>(10000,
-                null/*keyOrder*/);
-        
-        long nterms = 0L;
-        
-        while(itr.hasNext()) {
-            
-            ITuple tuple = itr.next();
-            
-            final long id = KeyBuilder.decodeLong( tuple.getKeyBuffer().array(), 0);
-            
-            // add to the buffer.
-            buffer.add(id);
+        final IBlockingBuffer<Long> buffer = new BlockingBuffer<Long>(capacity,
+                null/* keyOrder */);
 
-//            log.debug(ids.size() + " : " + id + " : "+ toString(id));
-            
-            // restart scan at the next possible term id.
-            final long nextId = id + 1;
-            
-            fromKey = tupleSer.statement2Key(nextId, NULL, NULL);
-            
-            // new iterator.
-            itr = ndx.rangeIterator(fromKey, toKey, capacity,
-                    IRangeQuery.KEYS, null/* filter */);
-         
-            nterms++;
-            
-        }
-      
-        if (log.isDebugEnabled()) {
+        final Future future = service.submit(new DistinctTermScanTask(capacity,
+                buffer));
 
-            log.debug("Distinct key scan: KeyOrder=" + keyOrder + ", #terms="
-                    + nterms);
-
-        }
-
+        buffer.setFuture(future);
+        
         return buffer.iterator();
+
+    }
+
+    private class DistinctTermScanTask implements Callable<Long> {
+
+        private final int capacity;
+
+        private final IBlockingBuffer<Long> buffer;
+
+        public DistinctTermScanTask(int capacity, IBlockingBuffer<Long> buffer) {
+
+            if (buffer == null)
+                throw new IllegalArgumentException();
+
+            this.capacity = capacity;
+
+            this.buffer = buffer;
+
+        }
+
+        public Long call() {
+
+            byte[] fromKey = null;
+
+            final byte[] toKey = null;
+
+            ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
+                    IRangeQuery.KEYS, null/* filter */);
+
+            final SPOTupleSerializer tupleSer = getTupleSerializer();
+
+            long nterms = 0L;
+
+            while (itr.hasNext()) {
+
+                ITuple tuple = itr.next();
+
+                final long id = KeyBuilder.decodeLong(tuple.getKeyBuffer()
+                        .array(), 0);
+
+                // add to the buffer.
+                buffer.add(id);
+
+                // log.debug(ids.size() + " : " + id + " : "+ toString(id));
+
+                // restart scan at the next possible term id.
+                final long nextId = id + 1;
+
+                fromKey = tupleSer.statement2Key(nextId, NULL, NULL);
+
+                // new iterator.
+                itr = ndx.rangeIterator(fromKey, toKey, capacity,
+                        IRangeQuery.KEYS, null/* filter */);
+
+                nterms++;
+
+            } // while
+
+            if (log.isDebugEnabled()) {
+
+                log.debug("Distinct key scan: KeyOrder=" + keyOrder
+                        + ", #terms=" + nterms);
+
+            }
+
+            return nterms;
+
+        } // call()
 
     }
 

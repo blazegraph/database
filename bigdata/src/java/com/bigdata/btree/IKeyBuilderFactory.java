@@ -23,37 +23,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 24, 2008
+ * Created on Jul 3, 2008
  */
 
-package com.bigdata.relation.rule.eval;
-
-import java.util.Comparator;
-
-import com.bigdata.relation.accesspath.IKeyOrder;
+package com.bigdata.btree;
 
 /**
- * Wraps the {@link Comparator} obtained from a {@link IKeyOrder} such that it
- * will ordered {@link ISolution}s by the elements reported by
- * {@link ISolution#get()}.
+ * A factory for pre-configured {@link IKeyBuilder} instances.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SolutionComparator<E> implements Comparator<ISolution<E>> {
+public interface IKeyBuilderFactory {
 
-    private final Comparator<E> comparator;
-
-    public SolutionComparator(IKeyOrder<E> keyOrder) {
-
-        this.comparator = keyOrder.getComparator();
-
-    }
-
-    public int compare(ISolution<E> arg0, ISolution<E> arg1) {
-
-        return comparator.compare(arg0.get(), arg1.get());
-
-    }
-
+    /**
+     * Return an instance of the configured {@link IKeyBuilder}.
+     */
+    public IKeyBuilder getKeyBuilder();
+    
 }

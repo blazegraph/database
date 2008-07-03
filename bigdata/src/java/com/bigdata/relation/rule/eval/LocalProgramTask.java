@@ -400,7 +400,7 @@ public class LocalProgramTask implements IProgramTask,
      * @throws ExecutionException
      */
     protected IChunkedOrderedIterator<ISolution> executeQuery(final IStep step)
-            throws InterruptedException, ExecutionException {
+            throws Exception {
 
         if (step == null)
             throw new IllegalArgumentException();
@@ -410,54 +410,83 @@ public class LocalProgramTask implements IProgramTask,
         
         // buffer shared by all rules run in this query.
         final IBlockingBuffer<ISolution> buffer = joinNexus.newQueryBuffer();
-
-        /*
-         * Note: We do NOT get() this Future. This task will run asynchronously.
-         * 
-         * The Future is cancelled IF (hopefully WHEN) the iterator is closed.
-         * 
-         * If the task itself throws an error, then it will use
-         * buffer#abort(cause) to notify the buffer of the cause (it will be
-         * passed along to the iterator) and to close the buffer (the iterator
-         * will notice that the buffer has been closed as well as that the cause
-         * was set on the buffer).
-         * 
-         * @todo if the #of results is small and they are available with little
-         * latency then return the results inline using a fully buffered
-         * iterator.
-         */
         
-        final QueryTask queryTask = new QueryTask(step, joinNexus,
-                defaultTaskFactory, buffer, executorService, dataService);
+        Future<RuleStats> future = null;
         
-        final Future<RuleStats> future = queryTask.submit();
-        
-        if (log.isDebugEnabled())
-            log.debug("Returning iterator reading on async query task");
+        try {
 
-        /*
-         * FIXME The distributed federation (JDS) requires a proxy object.
-         * 
-         * When using RMI the return iterator for a QUERY needs be a proxy for
-         * the remote iterator running on the data service that is actually
-         * executing that proxy (this is only true for remote data services).
-         * 
-         * When the proxy iterator is closed by the client the close needs to
-         * make it back to the data service where it must cancel the Future(s)
-         * writing on the buffer.
-         * 
-         * @todo add factory to IJoinNexus so that this can be overriden for the
-         * JDS
-         * 
-         * @todo when returning a proxy for a Future whose get() returns the
-         * iterator reading from the query buffer, the proxy should note whether
-         * or not the iterator is exhausted each time it fetches the next chunk
-         * and should only fetch chunks - if the caller want to use the element
-         * at a time aspect of the iterator it should still fetch a chunk and
-         * then step through the elements until the next chunk is required.
-         */
+            /*
+             * Note: We do NOT get() this Future. This task will run
+             * asynchronously.
+             * 
+             * The Future is cancelled IF (hopefully WHEN) the iterator is
+             * closed.
+             * 
+             * If the task itself throws an error, then it will use
+             * buffer#abort(cause) to notify the buffer of the cause (it will be
+             * passed along to the iterator) and to close the buffer (the
+             * iterator will notice that the buffer has been closed as well as
+             * that the cause was set on the buffer).
+             * 
+             * @todo if the #of results is small and they are available with
+             * little latency then return the results inline using a fully
+             * buffered iterator.
+             */
 
-        return new ClosableIteratorFuture<ISolution, RuleStats>(buffer, future);
+            final QueryTask queryTask = new QueryTask(step, joinNexus,
+                    defaultTaskFactory, buffer, executorService, dataService);
+
+            future = queryTask.submit();
+            
+            buffer.setFuture(future);
+
+            if (log.isDebugEnabled())
+                log.debug("Returning iterator reading on async query task");
+
+            /*
+             * FIXME The distributed federation (JDS) requires a proxy object.
+             * 
+             * When using RMI the return iterator for a QUERY needs be a proxy
+             * for the remote iterator running on the data service that is
+             * actually executing that proxy (this is only true for remote data
+             * services).
+             * 
+             * When the proxy iterator is closed by the client the close needs
+             * to make it back to the data service where it must cancel the
+             * Future(s) writing on the buffer.
+             * 
+             * @todo add factory to IJoinNexus so that this can be overriden for
+             * the JDS
+             * 
+             * @todo when returning a proxy for a Future whose get() returns the
+             * iterator reading from the query buffer, the proxy should note
+             * whether or not the iterator is exhausted each time it fetches the
+             * next chunk and should only fetch chunks - if the caller want to
+             * use the element at a time aspect of the iterator it should still
+             * fetch a chunk and then step through the elements until the next
+             * chunk is required.
+             */
+
+//            return new ClosableIteratorFuture<ISolution, RuleStats>(buffer,
+//                    future);
+            
+            return buffer.iterator();
+
+        } catch (Exception ex) {
+
+            log.error(ex, ex);
+
+            buffer.close();
+            
+            if (future != null) {
+
+                future.cancel(true/* mayInterruptIfRunning */);
+
+            }
+
+            throw ex;
+            
+        }
     
     }
 

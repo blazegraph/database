@@ -66,8 +66,11 @@ public class TestAll extends TestCase {
         // test suite for access paths.
         suite.addTest(com.bigdata.relation.accesspath.TestAll.suite());
         
-        // tests IRelation, IMutableRelation, and rule execution in the context of an RDF DB.
-        suite.addTest(com.bigdata.relation.rdf.TestAll.suite());
+        /* @todo test suites for IRelation, IMutableRelation, and rule execution.
+         * 
+         * Note: These are currently tested in the context of the RDF DB.
+         */
+//        suite.addTest(com.bigdata.relation.rdf.TestAll.suite());
         
         return suite;
         

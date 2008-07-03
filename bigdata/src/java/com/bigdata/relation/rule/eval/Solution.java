@@ -49,34 +49,17 @@ public class Solution<E> implements ISolution<E>, Serializable {
      * 
      */
     private static final long serialVersionUID = 5477431033714540993L;
+    
     private final E e;
     private final IRule rule;
     private final IBindingSet bindingSet;
     
     /**
-     * ctor variant when only the element was requested.
-     * 
-     * @param e
-     *            The element.
-     * 
-     * @throws IllegalArgumentException
-     *             if any parameter is <code>null</code>.
-     */
-    public Solution(E e) {
-        
-        if (e == null)
-            throw new IllegalArgumentException();
-
-        this.e = e;
-        
-        this.rule = null;
-        
-        this.bindingSet = null;
-        
-    }
-
-    /**
-     * ctor variant when the rule and binding set metadata were requested.
+     * Constructs the element iff requested, saves the rule reference iff
+     * requested, and clones and saves the bindingSet iff requested. The
+     * requested behavior depends on {@link IJoinNexus#solutionFlags()}. When
+     * requested, the element is created using
+     * {@link IJoinNexus#newElement(com.bigdata.relation.rule.IPredicate, IBindingSet)}.
      * 
      * @param e
      *            The element.
@@ -89,9 +72,10 @@ public class Solution<E> implements ISolution<E>, Serializable {
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
      */
-    public Solution(E e, IRule rule, IBindingSet bindingSet) {
+    @SuppressWarnings("unchecked")
+    public Solution(IJoinNexus joinNexus, IRule rule, IBindingSet bindingSet) {
         
-        if (e == null)
+        if (joinNexus == null)
             throw new IllegalArgumentException();
         
         if (rule == null)
@@ -99,13 +83,39 @@ public class Solution<E> implements ISolution<E>, Serializable {
         
         if (bindingSet == null)
             throw new IllegalArgumentException();
-        
-        this.e = e;
-        
-        this.rule = rule;
-        
-        this.bindingSet = bindingSet;
-        
+
+        final int flags = joinNexus.solutionFlags();
+
+        if ((flags & IJoinNexus.ELEMENT) != 0) {
+
+            this.e = (E) joinNexus.newElement(rule.getHead(), bindingSet);
+
+        } else {
+
+            this.e = null;
+
+        }
+
+        if ((flags & IJoinNexus.BINDINGS) != 0) {
+
+            this.bindingSet = bindingSet.clone();
+
+        } else {
+
+            this.bindingSet = null;
+
+        }
+
+        if ((flags & IJoinNexus.RULE) != 0) {
+
+            this.rule = rule;
+
+        } else {
+
+            this.rule = null;
+
+        }
+
     }
     
     public E get() {

@@ -224,7 +224,7 @@ public class AtomicRowScan extends AbstractKeyRangeIndexProcedure implements Ext
             }
 
             // read the logical row from the index.
-            final TPS tps = AtomicRead.atomicRead(ndx, fromKey, schema,
+            final TPS tps = AtomicRowRead.atomicRead(ndx, fromKey, schema,
                     timestamp, filter);
 
             /*

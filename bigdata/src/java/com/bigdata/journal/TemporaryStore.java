@@ -32,6 +32,8 @@ import java.util.Properties;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.sparse.GlobalRowStoreHelper;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * A temporary store that supports named indices.
@@ -179,4 +181,11 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
 
+    public SparseRowStore getGlobalRowStore() {
+
+        return globalRowStoreHelper.getGlobalRowStore();
+        
+    }
+    private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
+    
 }

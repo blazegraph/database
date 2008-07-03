@@ -1,5 +1,6 @@
 package com.bigdata.relation.rdf;
 
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
@@ -17,21 +18,23 @@ public class TestTripleStore {
     final private long timestamp;
     private final SPORelation spoRelation;
     
-    public TestTripleStore(IBigdataFederation fed, String namespace, long timestamp) {
+    public TestTripleStore(IBigdataFederation fed, String namespace,
+            long timestamp, Properties properties) {
 
         if (fed == null)
             throw new IllegalArgumentException();
-        
+
         if (namespace == null)
             throw new IllegalArgumentException();
-        
+
         this.fed = fed;
 
         this.namespace = namespace;
-        
+
         this.timestamp = timestamp;
-        
-        this.spoRelation = new SPORelationFactory().newRelation(fed, namespace, timestamp);
+
+        this.spoRelation = new SPORelation(fed.getThreadPool(), fed, namespace,
+                timestamp, properties);
 
     }
 

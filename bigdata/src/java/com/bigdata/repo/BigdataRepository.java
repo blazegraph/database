@@ -309,6 +309,10 @@ public class BigdataRepository implements ContentRepository {
     /**
      * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
      * using the properties specified for the {@link IBigdataClient}.
+     * 
+     * @deprecated by {@link IndexMetadata#getKeyBuilder()}, at least for the
+     *             {@link SparseRowStore}. It is still valid for operations
+     *             that do not have dependencies on Unicode encoding behavior.
      */
     public IKeyBuilder getKeyBuilder() {
         
@@ -521,8 +525,8 @@ public class BigdataRepository implements ContentRepository {
         metadata.put(MetadataSchema.VERSION, AutoIncIntegerCounter.INSTANCE);
         
         // write the metadata (atomic operation).
-        final ITPS tps = getMetadataIndex().write(getKeyBuilder(),
-                metadataSchema, metadata, AUTO_TIMESTAMP, null/* filter */);
+        final ITPS tps = getMetadataIndex().write(metadataSchema, metadata,
+                AUTO_TIMESTAMP, null/* filter */);
 
         final int version = (Integer) tps.get(MetadataSchema.VERSION).getValue();
 
@@ -608,12 +612,12 @@ public class BigdataRepository implements ContentRepository {
      *         of that timestamp.
      * 
      * @see ITPS
-     * @see SparseRowStore#read(IKeyBuilder, Schema, Object, long, com.bigdata.sparse.INameFilter)
+     * @see SparseRowStore#read(Schema, Object, long, com.bigdata.sparse.INameFilter)
      */
     public ITPS readMetadata(String id, long timestamp) {
 
-        return getMetadataIndex().read(getKeyBuilder(), metadataSchema, id,
-                timestamp, null/* filter */);
+        return getMetadataIndex()
+                .read(metadataSchema, id, timestamp, null/* filter */);
 
     }
     
@@ -642,8 +646,8 @@ public class BigdataRepository implements ContentRepository {
         // remove the version identifier if any - we do not want this modified!
         metadata.remove(MetadataSchema.VERSION);
         
-        return getMetadataIndex().write(getKeyBuilder(), metadataSchema,
-                metadata, AUTO_TIMESTAMP, null/* filter */).asMap();
+        return getMetadataIndex().write(metadataSchema, metadata,
+                AUTO_TIMESTAMP, null/* filter */).asMap();
         
     }
     
@@ -716,8 +720,8 @@ public class BigdataRepository implements ContentRepository {
             // delete marker.
             metadata.put(MetadataSchema.VERSION, null);
 
-            getMetadataIndex().write(getKeyBuilder(), metadataSchema, metadata,
-                    AUTO_TIMESTAMP, null/* filter */);
+            getMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP,
+                    null/* filter */);
             
         }
 
@@ -868,7 +872,7 @@ public class BigdataRepository implements ContentRepository {
     public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId,
             String toId) {
 
-        return new Striterator(getMetadataIndex().rangeQuery(getKeyBuilder(),
+        return new Striterator(getMetadataIndex().rangeQuery(
                 metadataSchema, fromId, toId, 0/* capacity */,
                 Long.MAX_VALUE/* timestamp */, null/* filter */))
                 .addFilter(new Resolver() {

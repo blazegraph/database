@@ -33,15 +33,11 @@ import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationFactory;
 import com.bigdata.relation.IRelationLocator;
-import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -82,35 +78,6 @@ import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
  * @version $Id$
  * 
  * @todo handle the lexicon as well.
- * 
- * FIXME Additional metadata is required in order to know what kind of relation
- * to instantiate given the namespace of the relation. For RDF we will have at
- * least two relations (the lexicon and the triples, and possible the full text
- * index - unless that is understood as a secondary index for the lexicon for
- * maintained from the lexicon by triggers).
- * <p>
- * It seems best to explicitly declare the {@link IRelationName} to
- * {@link IRelationLocator} mapping for now and to have the
- * {@link IRelationLocator} know how to create the relation instance. However,
- * that makes it difficult to locate relations that are part of the federation.
- * Maybe an {@link IRelationName} hierarchy would help here with types
- * corresponding to {@link TemporaryStore}, local {@link Journal},
- * {@link IBigdataFederation}, {@link AbstractTask}, and fused view names. A
- * match is then routed based on the type of the name. For local {@link Journal}
- * and {@link TemporaryStore} it would succeed iff there is such a resource w/o
- * serialization. At that point the name is nearly a locator for a specific
- * relation in itself.
- * <p>
- * The most general way to handle this is to store the metadata about the
- * relation under the primary key for the relation's namespace in the global
- * sparse row store for the federation. This makes caching of the relation
- * objects important since IO and perhaps RMI will be required to determine the
- * class of the relation and its implementation Class before an IRelation object
- * can be instantiated!
- * 
- * @todo store the {@link IRelationFactory} in the {@link IndexMetadata}? This
- *       makes it possible to inspect an index and then apply the factory to
- *       consitute the appropriate {@link IRelation} class.
  */
 public class RDFJoinNexus implements IJoinNexus {
 
@@ -118,15 +85,13 @@ public class RDFJoinNexus implements IJoinNexus {
     
     private final ExecutorService service;
     
-//    private final IIndexManager indexManager;
-        
     private final IRelationLocator relationLocator;
     
     private final long writeTimestamp;
     
     private final long readTimestamp;
     
-    private final boolean elementOnly;
+    private final int solutionFlags;
 
     /**
      * 
@@ -141,16 +106,13 @@ public class RDFJoinNexus implements IJoinNexus {
      * @param readTimestamp
      *            The timestamp of the relation view(s) used to read from the
      *            access paths.
-     * @param elementOnly
-     *            <code>true</code> if only the entailed element should be
-     *            materialized in the computed {@link ISolution}s when the
-     *            program is executed and <code>false</code> if the
-     *            {@link IRule} and {@link IBindingSet} should be materialized
-     *            as well.
+     * @param solutionFlags
+     *            Flags controlling the behavior of
+     *            {@link #newSolution(IRule, IBindingSet)}.
      */
     public RDFJoinNexus(ExecutorService service,
             IRelationLocator relationLocator, long writeTimestamp,
-            long readTimestamp, boolean elementOnly) {
+            long readTimestamp, int solutionFlags) {
 
         if (relationLocator == null)
             throw new IllegalArgumentException();
@@ -166,7 +128,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.readTimestamp = readTimestamp;
 
-        this.elementOnly = elementOnly;
+        this.solutionFlags = solutionFlags;
         
     }
 
@@ -304,30 +266,28 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
     
+    /*
+     * @todo the element type should probably be unspecified <? extends Object>
+     * since we can also materialize stuff from the lexicon relation.
+     */
     public ISolution<SPO> newSolution(IRule rule, IBindingSet bindingSet) {
 
-        final SPO spo = newElement(rule.getHead(), bindingSet);
-
-        final Solution<SPO> solution;
-        
-        if (elementOnly) {
-
-            solution = new Solution<SPO>(spo);
-
-        } else {
-
-            solution = new Solution<SPO>(spo, rule, bindingSet.clone());
-            
-        }
+        final Solution<SPO> solution = new Solution<SPO>(this,rule,bindingSet);
         
         if(log.isDebugEnabled()) {
             
             log.debug(solution.toString());
             
         }
-        
+
         return solution;
 
+    }
+    
+    public int solutionFlags() {
+        
+        return solutionFlags;
+        
     }
 
     public IBindingSet newBindingSet(IRule rule) {

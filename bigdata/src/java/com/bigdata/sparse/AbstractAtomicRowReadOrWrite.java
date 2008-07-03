@@ -1,3 +1,31 @@
+/*
+
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+ */
+/*
+ * Created on Jul 3, 2008
+ */
+
 package com.bigdata.sparse;
 
 import java.io.Externalizable;
@@ -12,49 +40,49 @@ import com.bigdata.btree.AbstractIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.SuccessorUtil;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 
 /**
- * Atomic read of the logical row associated with some {@link Schema} and
- * primary key.
+ * Abstract class implements the atomic read operation. However, it does NOT
+ * declare itself to be an {@link IReadOnlyOperation} since this class is
+ * extended by both {@link AtomicRowRead} and {@link AtomicRowWriteRead}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AtomicRead extends AbstractIndexProcedure implements
+abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedure implements
         ISimpleIndexProcedure, Externalizable {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 7240920229720302721L;
-
-    protected static final Logger log = Logger.getLogger(SparseRowStore.class);
-
+    protected static final Logger log = Logger.getLogger(AbstractAtomicRowReadOrWrite.class);
+    
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
+    protected final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+    
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
+    protected final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+                .toInt();
+    
     protected Schema schema;
     protected Object primaryKey;
     protected long timestamp;
     protected INameFilter filter;
-    
+
+
     /**
      * De-serialization ctor.
      */
-    public AtomicRead() {
+    protected AbstractAtomicRowReadOrWrite() {
+
+        super();
         
     }
     
@@ -75,7 +103,7 @@ public class AtomicRead extends AbstractIndexProcedure implements
      *            An optional filter used to restrict the property values
      *            that will be returned.
      */
-    public AtomicRead(Schema schema, Object primaryKey, long timestamp,
+    protected AbstractAtomicRowReadOrWrite(Schema schema, Object primaryKey, long timestamp,
             INameFilter filter) {
         
         if (schema == null)
@@ -93,22 +121,7 @@ public class AtomicRead extends AbstractIndexProcedure implements
         this.filter = filter;
         
     }
-
-    /**
-     * Atomic read.
-     * 
-     * @return A {@link TPS} instance containing the selected data from the
-     *         logical row identified by the {@link #primaryKey} -or-
-     *         <code>null</code> iff the primary key was NOT FOUND in the
-     *         index. I.e., iff there are NO entries for that primary key
-     *         regardless of whether or not they were selected.
-     */
-    public Object apply(IIndex ndx) {
-
-        return atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey, timestamp, filter);
-        
-    }
-            
+    
     /**
      * Atomic read on the index.
      * 
@@ -129,13 +142,13 @@ public class AtomicRead extends AbstractIndexProcedure implements
      * 
      * @return The logical row for that primary key.
      */
-    static protected TPS atomicRead(IKeyBuilder keyBuilder, IIndex ndx,
+    protected static TPS atomicRead(IKeyBuilder keyBuilder, IIndex ndx,
             Schema schema, Object primaryKey, long timestamp, INameFilter filter) {
 
-        final byte[] fromKey = schema.getPrefix(keyBuilder, primaryKey); 
+        final byte[] fromKey = schema.getPrefix(keyBuilder, primaryKey);
 
-//        final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
-        
+        // final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
+
         final TPS tps = atomicRead(ndx, fromKey, schema, timestamp, filter);
 
         if (tps == null) {
@@ -144,9 +157,24 @@ public class AtomicRead extends AbstractIndexProcedure implements
                 log.info("No data for primaryKey: " + primaryKey);
 
         }
-
+    
         return tps;
+    
+    }
 
+    /**
+     * Atomic read.
+     * 
+     * @return A {@link TPS} instance containing the selected data from the
+     *         logical row identified by the {@link #primaryKey} -or-
+     *         <code>null</code> iff the primary key was NOT FOUND in the
+     *         index. I.e., iff there are NO entries for that primary key
+     *         regardless of whether or not they were selected.
+     */
+    public Object apply(IIndex ndx) {
+    
+        return atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey, timestamp, filter);
+        
     }
 
     /**
@@ -162,26 +190,25 @@ public class AtomicRead extends AbstractIndexProcedure implements
      * 
      * @return {@link TPS}
      */
-    static protected TPS atomicRead(IIndex ndx, final byte[] fromKey,
-            final Schema schema, final long timestamp, final INameFilter filter) {
-
+    protected static TPS atomicRead(IIndex ndx, final byte[] fromKey, final Schema schema, final long timestamp, final INameFilter filter) {
+    
         /*
          * Scan all entries within the fromKey/toKey range populating [tps] as
          * we go.
          */
-
+    
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
-
+    
         if (log.isInfoEnabled()) {
             log.info("read: fromKey=" + BytesUtil.toString(fromKey));
             log.info("read:   toKey=" + BytesUtil.toString(toKey));
         }
-
+    
         final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
-
+    
         // Result set object.
         final TPS tps = new TPS(schema, timestamp);
-
+    
         // #of entries scanned for that primary key.
         int nscanned = 0;
         
@@ -190,7 +217,7 @@ public class AtomicRead extends AbstractIndexProcedure implements
             final ITuple tuple = itr.next();
             
             final byte[] key = tuple.getKey();
-
+    
             final byte[] val = tuple.getValue();
             
             nscanned++;
@@ -201,46 +228,46 @@ public class AtomicRead extends AbstractIndexProcedure implements
              * fromKey was formed as [schema][primaryKey], the length of the
              * fromKey is the index of the 1st byte in the column name.
              */
-
+    
             final KeyDecoder keyDecoder = new KeyDecoder(key);
-
+    
             // The column name.
             final String col = keyDecoder.getColumnName();
-
+    
             if (filter != null && !filter.accept(col)) {
-
+    
                 // Skip property names that have been filtered out.
-
+    
                 if (log.isDebugEnabled()) {
-
+    
                     log.debug("Skipping property: name=" + col);
                     
                 }
-
+    
                 continue;
-
+    
             }
-
+    
             /*
              * Skip column values having a timestamp strictly greater than the
              * given value.
              */
             final long columnValueTimestamp = keyDecoder.getTimestamp();
             {
-
+    
                 if (columnValueTimestamp > timestamp) {
-
+    
                     if (log.isDebugEnabled()) {
-
+    
                         log.debug("Ignoring newer revision: col=" + col
                                 + ", timestamp=" + columnValueTimestamp);
                         
                     }
                     
                     continue;
-
+    
                 }
-
+    
             }
             
             /*
@@ -253,15 +280,15 @@ public class AtomicRead extends AbstractIndexProcedure implements
             /*
              * Add to the representation of the row.
              */
-
+    
             tps.set(col, columnValueTimestamp, v);
-
+    
             if (log.isInfoEnabled())
                 log.info("Read: name=" + col + ", timestamp="
                         + columnValueTimestamp + ", value=" + v);
-
+    
         }
-
+    
         if (nscanned == 0) {
             
             /*
@@ -271,13 +298,15 @@ public class AtomicRead extends AbstractIndexProcedure implements
              */
             
             return null;
-
+    
         }
-
+    
         return tps;
         
     }
-    
+
+    private static final transient short VERSION0 = 0x0;
+
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
         final short version = in.readShort();
@@ -287,7 +316,7 @@ public class AtomicRead extends AbstractIndexProcedure implements
             throw new IOException("Unknown version="+version);
             
         }
-
+    
         schema = (Schema) in.readObject();
         
         primaryKey = in.readObject();
@@ -300,7 +329,7 @@ public class AtomicRead extends AbstractIndexProcedure implements
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
-
+    
         out.writeShort(VERSION0);
         
         out.writeObject(schema);
@@ -313,6 +342,4 @@ public class AtomicRead extends AbstractIndexProcedure implements
         
     }
 
-    private final static transient short VERSION0 = 0x0;
-    
 }

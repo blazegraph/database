@@ -138,7 +138,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         final String scaleOutIndexName = newMetadata.getName();
                 
         // obtain new partition identifier from the metadata service (RMI)
-        final int newPartitionId = resourceManager.getMetadataService()
+        final int newPartitionId = resourceManager.getFederation().getMetadataService()
                 .nextPartitionId(scaleOutIndexName);
 
         // the partition metadata for the source index partition.
@@ -171,7 +171,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         
         // the data service on which we will register the new index partition.
         final IDataService targetDataService = resourceManager
-                .getDataService(targetDataServiceUUID);
+                .getFederation().getDataService(targetDataServiceUUID);
 
         final String sourceIndexName = getOnlyResource();
 
@@ -505,7 +505,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 throw new IllegalStateException();
 
             final IDataService targetDataService = resourceManager
-                    .getDataService(moveResult.targetDataServiceUUID);
+                    .getFederation().getDataService(moveResult.targetDataServiceUUID);
             
             final int capacity = 10000;
             
@@ -595,7 +595,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                     + ", oldLocator=" + oldLocator + ", newLocator=" + newLocator);
 
             // atomic update on the metadata server.
-            resourceManager.getMetadataService().moveIndexPartition(
+            resourceManager.getFederation().getMetadataService().moveIndexPartition(
                     scaleOutIndexName, oldLocator, newLocator);
             
             // will notify tasks that index partition has moved.

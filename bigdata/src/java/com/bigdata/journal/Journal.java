@@ -40,9 +40,9 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.IMetadataService;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.sparse.GlobalRowStoreHelper;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
@@ -633,35 +633,35 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+//    /**
+//     * @throws UnsupportedOperationException
+//     *             always.
+//     */
+//    public ILoadBalancerService getLoadBalancerService() {
+//
+//        throw new UnsupportedOperationException();
+//        
+//    }
+
     /**
      * @throws UnsupportedOperationException
      *             always.
      */
-    public ILoadBalancerService getLoadBalancerService() {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
-    /**
-     * @throws UnsupportedOperationException
-     *             always.
-     */
-    public IMetadataService getMetadataService() {
+    public IBigdataFederation getFederation() {
 
         throw new UnsupportedOperationException();
         
     }
     
-    /**
-     * @throws UnsupportedOperationException
-     *             always.
-     */
-    public IDataService getDataService(UUID uuid) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * @throws UnsupportedOperationException
+//     *             always.
+//     */
+//    public IDataService getDataService(UUID uuid) {
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
     
     /**
      * @throws UnsupportedOperationException
@@ -691,6 +691,31 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         return null;
         
+    }
+
+    /*
+     * global row store.
+     */
+    synchronized public SparseRowStore getGlobalRowStore() {
+
+        if (globalRowStoreHelper == null) {
+
+            globalRowStoreHelper = new GlobalRowStoreHelper(this);
+
+        }
+
+        return globalRowStoreHelper.getGlobalRowStore();
+
+    }
+
+    private GlobalRowStoreHelper globalRowStoreHelper;
+
+    protected void discardCommitters() {
+
+        super.discardCommitters();
+
+        globalRowStoreHelper = null;
+
     }
 
 }

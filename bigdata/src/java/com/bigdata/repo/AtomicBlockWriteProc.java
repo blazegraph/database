@@ -100,7 +100,7 @@ public class AtomicBlockWriteProc implements ISimpleIndexProcedure,
         final AbstractJournal journal = (AbstractJournal)((AbstractBTree)ndx).getStore();
         
         // obtain the thread-local key builder for that journal.
-        final IKeyBuilder keyBuilder = journal.getKeyBuilder();
+        final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
 
         /*
          * Write the block on the journal, obtaining the address at which it

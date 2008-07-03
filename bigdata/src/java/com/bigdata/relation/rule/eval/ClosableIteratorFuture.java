@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.DelegateChunkedIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -44,6 +46,9 @@ import com.bigdata.relation.accesspath.IClosableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by changes to {@link BlockingBuffer}, especially
+ *             {@link BlockingBuffer#setFuture(Future)}
  */
 public class ClosableIteratorFuture<E,F> extends DelegateChunkedIterator<E> {
 
@@ -62,6 +67,36 @@ public class ClosableIteratorFuture<E,F> extends DelegateChunkedIterator<E> {
         
     }
 
+    public boolean hasNext() {
+        
+        if (future.isDone()) {
+            
+            // make sure the buffer is closed.
+            super.close();
+
+            try {
+
+                // look for an error from the Future.
+                future.get();
+                
+            } catch (InterruptedException e) {
+                
+                log.info("Interrupted");
+                
+            } catch (ExecutionException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+
+            return false;
+            
+        }
+        
+        return super.hasNext();
+        
+    }
+    
     /**
      * Extended to cancel the {@link Future} that is writing on the
      * {@link IBlockingBuffer} when the iterator is {@link #close()}ed.

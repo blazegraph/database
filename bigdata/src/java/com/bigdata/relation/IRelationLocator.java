@@ -40,13 +40,15 @@ import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 /**
  * An object that knows how to resolve an {@link IRelationName} to an
  * {@link IRelation} instance.
- * <p>
+ * 
+ * FIXME Javadoc update:
+ * 
  * There are several ways to locate a relation, which generally means locating
  * its indices and perhaps some metadata that tells you which indices it is
  * using:
  * <ol>
  * 
- * <li>{@link LocalRelationLocator} and {@link TemporaryRelationLocator} are
+ * <li>{@link JournalRelationLocator} and {@link TemporaryStoreRelationLocator} are
  * useful for locating an {@link IRelation} on a local temporary store, an in
  * memory store, etc. Such relations can only be located on the host and JVM
  * where they reside.</li>
@@ -89,7 +91,7 @@ public interface IRelationLocator<R> {
      * @param timestamp
      *            The timestamp for the view of that relation.
      * 
-     * @return The {@link IRelation} and never <code>null</code>.
+     * @return The {@link IRelation} iff it exists and never <code>null</code>.
      * 
      * @throws RuntimeException
      *             if there is an error when resolving the relation.
