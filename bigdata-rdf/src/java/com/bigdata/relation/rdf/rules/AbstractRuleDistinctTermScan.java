@@ -45,7 +45,7 @@ import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IRuleTask;
+import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.RuleStats;
 
@@ -137,7 +137,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
         // @todo may serialize to much state?
         taskFactory = new IRuleTaskFactory() {
 
-            public IRuleTask newTask(IRule rule, IJoinNexus joinNexus,
+            public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
                     IBuffer<ISolution> buffer) {
 
                 return new DistinctTermScan(rule, joinNexus, buffer, h,
@@ -159,7 +159,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
      * Selects the distinct term identifiers, substituting their binding in the
      * sole unbound variable in the head of the rule.
      */
-    protected static class DistinctTermScan implements IRuleTask, Serializable {
+    protected static class DistinctTermScan implements IStepTask, Serializable {
 
         /**
          * 
@@ -235,7 +235,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
              * find the distinct predicates in the KB (efficient op).
              */
 
-            final long timestamp = joinNexus.getTimestamp();
+            final long timestamp = joinNexus.getReadTimestamp();
 
             /*
              * Note: Since this task is always applied to a single tail rule,

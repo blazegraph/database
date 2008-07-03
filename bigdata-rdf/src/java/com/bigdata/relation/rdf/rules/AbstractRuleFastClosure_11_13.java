@@ -35,11 +35,6 @@ import com.bigdata.relation.rule.Rule;
 /**
  * Rule for steps 11 and 13 of {@link InferenceEngine#fastForwardClosure()}.
  * <p>
- * Note: As long as the binding patterns (the positions in which correlated
- * variables appear) in the tails are the same the rules can have different
- * binding patterns in the head and use the same logic for their execution.
- * Differences in which constants are used do not matter.
- * <p>
  * Note: this rule is not very selective and does not produce new entailments
  * unless your ontology and your application both rely on domain/range to confer
  * type information. If you explicitly type your instances then this will not
@@ -78,27 +73,27 @@ abstract public class AbstractRuleFastClosure_11_13 extends Rule {
      * @param body
      * @param constraints
      */
-    public AbstractRuleFastClosure_11_13(String name, SPOPredicate head, SPOPredicate[] body,
-            IConstraint[] constraints) {
+    public AbstractRuleFastClosure_11_13(String name, SPOPredicate head,
+            SPOPredicate[] body, IConstraint[] constraints) {
 
-        super( name, head, body, constraints );
+        super(name, head, body, constraints);
 
         // validate the binding pattern for the tail of this rule.
         assert body.length == 3;
-        
+
         // (x,y,z)
-        x = (IVariable<Long>)body[0].s();
-        y = (IVariable<Long>)body[0].p();
-        z = (IVariable<Long>)body[0].o();
+        x = (IVariable<Long>) body[0].s();
+        y = (IVariable<Long>) body[0].p();
+        z = (IVariable<Long>) body[0].o();
 
         // (y,C1,a)
-        assert y == (IVariable<Long>)body[1].s();
-        C1 = (IConstant<Long>)body[1].p();
-        a = (IVariable<Long>)body[1].o();
+        assert y == (IVariable<Long>) body[1].s();
+        C1 = (IConstant<Long>) body[1].p();
+        a = (IVariable<Long>) body[1].o();
 
         // (a,C2,b)
-        assert a == (IVariable<Long>)body[2].s();
-        C2 = (IConstant<Long>)body[2].p();
+        assert a == (IVariable<Long>) body[2].s();
+        C2 = (IConstant<Long>) body[2].p();
         b = (IVariable<Long>)body[2].o();
 
         this.propertyId = C2.get();

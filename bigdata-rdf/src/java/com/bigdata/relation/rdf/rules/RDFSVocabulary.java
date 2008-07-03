@@ -38,6 +38,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.rdf.MappedProgram;
+import com.bigdata.relation.rdf.SPO;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -45,6 +46,7 @@ import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.Rule;
@@ -175,12 +177,12 @@ public class RDFSVocabulary {
      * 
      * @return
      * 
-     * @todo this can be cached for a given database and focusStore (or for the
-     *       database if no focusStore is used).
+     * @todo the returned program can be cached for a given database and
+     *       focusStore (or for the database if no focusStore is used).
      */
-    public IProgram getRDFSClosureProgram(//
-            IRelationName<com.bigdata.relation.rdf.SPO> db,//
-            IRelationName<com.bigdata.relation.rdf.SPO> focusStore,//
+    public IStep getRDFSClosureProgram(//
+            IRelationName<SPO> db,//
+            IRelationName<SPO> focusStore,//
             boolean forwardChainRdfTypeRdfsResource,//
             boolean rdfsOnly,//
             boolean forwardChainOwlSameAsClosure,//
@@ -307,9 +309,9 @@ public class RDFSVocabulary {
      *       sub-programs; and (c) for mapping the rules across truth
      *       maintenance.
      */
-    protected IProgram getFastForwardClosureProgram(//
-            IRelationName<com.bigdata.relation.rdf.SPO> db,//
-            IRelationName<com.bigdata.relation.rdf.SPO> focusStore,//
+    protected IStep getFastForwardClosureProgram(//
+            IRelationName<SPO> db,//
+            IRelationName<SPO> focusStore,//
             boolean forwardChainRdfTypeRdfsResource,//
             boolean rdfsOnly,//
             boolean forwardChainOwlSameAsClosure,//
@@ -341,31 +343,16 @@ public class RDFSVocabulary {
         }
 
         /*
-         * FIXME There must be a means available to run a called specified
-         * IRuleTask and cache the result for further evaluation.
-         * 
-         * The P,D,R,C, and T collections MIGHT be utilized to generate
+         * @todo The P,D,R,C, and T collections could be utilized to generate
          * sub-programs appearing in their respective places in the overall
-         * sequential execution of the fast closure program. Alternative, a
-         * Callable (IRuleTask) can be written that directly utilizes the
-         * P,D,R,C or T set.
-         * 
-         * @todo when the sets are large then they may need a backing store,
-         * e.g., BigdataSet<Long> (specialized so that it does not store
-         * anything under the key since we can decode the Long from the key - do
-         * utility versions BigdataLongSet(), but the same code can serve float,
-         * double, and int as well. Avoid override for duplicate keys to reduce
-         * IO.
-         * 
-         * @todo the backing store should be a temporary resource. for scale-out
-         * it needs to be visible to the federation (since the rule executing
-         * against that data may be distributed across the federation based on
-         * the access path for the SPORelation) so it would have to be
-         * registered on some data service (any) in the federation and dropped
-         * in a finally {} clause.
-         * 
-         * @todo another way to approach this is via temporary named result
-         * sets. that would be a nice generalization for the ideas above.
+         * sequential execution of the fast closure program and those
+         * sub-programs could generate [NAMED RESULT SETS] that were then
+         * accessed by later steps in the program and auto-magically dropped
+         * when the program was finished. (Currently, a Callable exists that
+         * directly generates the P,D,R,C or T set and then consumes that set
+         * producing the appropriate entailments - this is effecient because
+         * each result is used only by a single set vs being reused by multiple
+         * steps).
          */
         
         {
@@ -373,7 +360,7 @@ public class RDFSVocabulary {
 //            final Set<Long> P = getSubProperties(focusStore, database);
 
             // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
-            program.addStep(new RuleFastClosure3(db,this));//, P));
+            program.addStep(new RuleFastClosure3(db,focusStore,this));//, P));
             
         }
 
@@ -392,15 +379,15 @@ public class RDFSVocabulary {
              * mutual dependency.
              */
 
-            final MappedProgram subProgram = new MappedProgram("steps 5,6",
+            final MappedProgram subProgram = new MappedProgram("fastClosure{5,6}",
                     focusStore, true/* parallel */, false/* closure */);
 
             // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
-            subProgram.addStep(new RuleFastClosure5(db,this));//, D));
+            subProgram.addStep(new RuleFastClosure5(db,focusStore,this));//, D));
 
             // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
 
-            subProgram.addStep(new RuleFastClosure6(db,this));//, R));
+            subProgram.addStep(new RuleFastClosure6(db,focusStore,this));//, R));
 
             if (!rdfsOnly) {
 
@@ -420,7 +407,7 @@ public class RDFSVocabulary {
 
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
         {
-            program.addStep(new RuleFastClosure7(db,this));//, C));
+            program.addStep(new RuleFastClosure7(db,focusStore,this));//, C));
         }
 
         // 8. RuleRdfs11 until fix point (rdfs:subClassOf closure).
@@ -428,7 +415,7 @@ public class RDFSVocabulary {
 
         // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
         {
-            program.addStep(new RuleFastClosure9(db,this));//, T));
+            program.addStep(new RuleFastClosure9(db,focusStore,this));//, T));
         }
 
         // 10. RuleRdfs02

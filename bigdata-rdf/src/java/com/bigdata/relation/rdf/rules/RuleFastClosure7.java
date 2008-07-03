@@ -30,16 +30,19 @@ package com.bigdata.relation.rdf.rules;
 import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.rdf.SPO;
 
-public class RuleFastClosure7 extends AbstractRuleFastClosure_3_5_6_7_9 {
+public class RuleFastClosure7 extends AbstractRuleFastClosure_5_6_7_9 {
 
     /**
      * @param inf
      * @param C
      */
-    public RuleFastClosure7(IRelationName<SPO>relationName,RDFSVocabulary inf) {//, Set<Long> C) {
+    public RuleFastClosure7(IRelationName<SPO>database,IRelationName<SPO> focusStore,RDFSVocabulary inf) {// ,
+                                                                                                            // Set<Long>
+                                                                                                            // C) {
         
-        super("fastClosure7",relationName,inf.rdfsSubPropertyOf, inf.rdfsSubClassOf);//, C);
-        
+        super("fastClosure7", database, focusStore, inf.rdfsSubPropertyOf,
+                inf.rdfsSubClassOf);// , C);
+
     }
     
 }
