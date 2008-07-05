@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutorService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.AccessPathFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 
 /**
@@ -129,6 +130,12 @@ public class RelationFusedView<E> implements IRelation<E> {
     public String getNamespace() {
         
         throw new UnsupportedOperationException();
+        
+    }
+
+    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+    
+        return relation1.newElement(predicate, bindingSet);
         
     }
     

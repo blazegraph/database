@@ -51,6 +51,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.NV;
 
 /**
  * Stress tests for concurrent processing of operations on named unisolated indices.
@@ -723,17 +724,17 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                     conditions,
                     new NV[][] { //
                             new NV[] { new NV(Options.BUFFER_MODE,
-                                    BufferMode.Transient), }, //
+                                    BufferMode.Transient.toString()), }, //
                             new NV[] { new NV(Options.BUFFER_MODE,
-                                    BufferMode.Direct), }, //
+                                    BufferMode.Direct.toString()), }, //
                             new NV[] {
-                                    new NV(Options.BUFFER_MODE, BufferMode.Direct),
+                                    new NV(Options.BUFFER_MODE, BufferMode.Direct.toString()),
                                     new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
                                             .toString()), }, //
-                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped), }, //
-                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped.toString()), }, //
+                            new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk.toString()), }, //
                             new NV[] {
-                                    new NV(Options.BUFFER_MODE, BufferMode.Disk),
+                                    new NV(Options.BUFFER_MODE, BufferMode.Disk.toString()),
                                     new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
                                             .toString()), }, //
                     });

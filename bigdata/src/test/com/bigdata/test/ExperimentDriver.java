@@ -67,6 +67,7 @@ import org.xml.sax.ext.DefaultHandler2;
 import org.xml.sax.ext.EntityResolver2;
 
 import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.util.NV;
 
 /**
  * A harness for running comparison of different configurations.
@@ -274,27 +275,6 @@ public class ExperimentDriver {
     }
     
     /**
-     * A name-value pair used to override {@link Properties} for a {@link Condition}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class NV {
-        public final String name;
-        public final String value;
-        public NV(String name,Object value) {
-            this.name = name;
-            this.value = value.toString();
-        }
-        public int hashCode() {
-            return name.hashCode();
-        }
-        public boolean equals(NV o) {
-            return name.equals(o.name) && value.equals(o.value);
-        }
-    }
-    
-    /**
      * An experimental condition.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -355,7 +335,7 @@ public class ExperimentDriver {
                 
                 Properties properties = new Properties(c.properties);
                 
-                properties.put(a[i].name,a[i].value);
+                properties.put(a[i].getName(),a[i].getValue());
                 
                 ret.add(new Condition(properties));
                 
@@ -391,7 +371,7 @@ public class ExperimentDriver {
         
                 for(int j=0; j<a[i].length; j++) {
                 
-                    properties.put(a[i][j].name,a[i][j].value);
+                    properties.put(a[i][j].getName(),a[i][j].getValue());
                     
                 }
                 
@@ -1249,7 +1229,7 @@ public class ExperimentDriver {
 
         for(int i=0; i<params.length; i++) {
             
-            properties.put(params[i].name,params[i].value);
+            properties.put(params[i].getName(),params[i].getValue());
             
         }
 

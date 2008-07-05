@@ -37,7 +37,7 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Rule implements IRule {
+public class Rule<E> implements IRule<E> {
 
     /**
      * 
@@ -335,13 +335,13 @@ public class Rule implements IRule {
 
     }
 
-    public IRule specialize(IBindingSet bindingSet, IConstraint[] constraints) {
+    public IRule<E> specialize(IBindingSet bindingSet, IConstraint[] constraints) {
 
         return specialize(getName() + "'", bindingSet, constraints);
 
     }
     
-    public IRule specialize(String name, IBindingSet bindingSet,
+    public IRule<E> specialize(String name, IBindingSet bindingSet,
             IConstraint[] constraints) {
 
         if (name == null)
@@ -399,7 +399,7 @@ public class Rule implements IRule {
         
         final IRuleTaskFactory taskFactory = getTaskFactory();
 
-        final IRule newRule = new Rule(name, newHead, newTail, newConstraint,
+        final IRule<E> newRule = new Rule<E>(name, newHead, newTail, newConstraint,
                 taskFactory);
 
         return newRule;

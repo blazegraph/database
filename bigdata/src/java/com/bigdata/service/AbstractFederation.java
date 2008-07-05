@@ -65,6 +65,8 @@ import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TaskCounters;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.relation.DefaultRelationLocator;
+import com.bigdata.relation.IRelationLocator;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -251,6 +253,17 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * the federation.
      */
     private AbstractHTTPD httpd;
+    
+    /**
+     * Locator for relations.
+     */
+    private final IRelationLocator relationLocator;
+    
+    public IRelationLocator getRelationLocator() {
+        
+        return relationLocator;
+    
+    }
     
     /**
      * Counters that aggregate across all tasks submitted by the client against
@@ -648,6 +661,12 @@ abstract public class AbstractFederation implements IBigdataFederation {
             
         }
 
+        /*
+         * Setup locator for relations. The default resolves relations using the
+         * global row store.
+         */
+        relationLocator = new DefaultRelationLocator(getThreadPool(), this);
+        
     }
     
     public void registerIndex(IndexMetadata metadata) {
@@ -1151,5 +1170,5 @@ abstract public class AbstractFederation implements IBigdataFederation {
         new ReportTask().run();
         
     }
-    
+
 }

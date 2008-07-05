@@ -44,6 +44,7 @@ import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 
 /**
@@ -81,24 +82,6 @@ public interface IJoinNexus {
      *             if any parameter is <code>null</code>.
      */
     void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet);
-
-    /**
-     * Create a new element. The element is constructed from the bindings for
-     * the head of a rule.
-     * 
-     * @param predicate
-     *            The predicate that is the head of some {@link IRule}.
-     * @param bindingSet
-     *            A set of bindings for that {@link IRule}.
-     * 
-     * @return The new element.
-     * 
-     * @throws IllegalArgumentException
-     *             if any parameter is <code>null</code>.
-     * @throws IllegalStateException
-     *             if the predicate is not fully bound given those bindings.
-     */
-    Object newElement(IPredicate predicate, IBindingSet bindingSet);
 
     /**
      * Create a new {@link ISolution}. The behavior of this method generally
@@ -170,6 +153,29 @@ public interface IJoinNexus {
      */
     public IBindingSet newBindingSet(IRule rule);
    
+    /**
+     * Return the effective {@link IRuleTaskFactory} for the rule. When the rule
+     * is a step of a sequential program, then the returned {@link IStepTask}
+     * must automatically flush the buffer after the rule executes.
+     * 
+     * @param parallel
+     *            <code>true</code> unless the rule is a step is a sequential
+     *            {@link IProgram}. Note that a sequential step MUST flush its
+     *            buffer since steps are run in sequence precisely because they
+     *            have a dependency!
+     * @param rule
+     *            A rule that is a step in some program. If the program is just
+     *            a rule then the value of <i>parallel</i> does not matter. The
+     *            buffer will is cleared when it flushed so a re-flushed is
+     *            always a NOP.
+     * 
+     * @return The {@link IStepTask} to execute for that rule.
+     * 
+     * @see RunRuleAndFlushBufferTaskFactory
+     * @see RunRuleAndFlushBufferTask
+     */
+    public IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule);
+    
     /**
      * The timestamp used when an {@link IBuffer} is flushed against an
      * {@link IMutableRelation}.

@@ -64,13 +64,13 @@ public class MutationTask extends AbstractStepTask {
      *            rules from which the tasks were created.
      */
     protected MutationTask(ActionEnum action, IJoinNexus joinNexus, IStep step,
-            IRuleTaskFactory defaultTaskFactory,
+//            IRuleTaskFactory defaultTaskFactory,
 //            List<Callable<RuleStats>> tasks,
 //            Map<IRelationName, IBuffer<ISolution>> buffers,
             ExecutorService executorService,DataService dataService
             ) {
 
-        super(action, joinNexus, step, defaultTaskFactory, executorService,dataService);
+        super(action, joinNexus, step, executorService,dataService);
 
 //        if (buffers == null)
 //            throw new IllegalArgumentException();
@@ -246,7 +246,7 @@ public class MutationTask extends AbstractStepTask {
 
             final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getRelationName());
             
-            final Callable<RuleStats> task = getTaskFactory(false/*parallel*/,
+            final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(false/*parallel*/,
                     rule).newTask(rule, joinNexus, buffer);
    
             tasks.add(task);
@@ -268,7 +268,7 @@ public class MutationTask extends AbstractStepTask {
 
                 final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getRelationName());
                 
-                final Callable<RuleStats> task = getTaskFactory(parallel, rule)
+                final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(parallel, rule)
                         .newTask(rule, joinNexus, buffer);
 
                 tasks.add(task);

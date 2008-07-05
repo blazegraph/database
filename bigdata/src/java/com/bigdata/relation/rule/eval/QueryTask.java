@@ -52,11 +52,11 @@ public class QueryTask extends AbstractStepTask {
      */
     public QueryTask(IStep step, IJoinNexus joinNexus,
 //            List<Callable<RuleStats>> tasks,
-            IRuleTaskFactory defaultTaskFactory,
+//            IRuleTaskFactory defaultTaskFactory,
             IBlockingBuffer<ISolution> buffer,
             ExecutorService executorService, DataService dataService) {
 
-        super(ActionEnum.Query, joinNexus, step, defaultTaskFactory, executorService, dataService);
+        super(ActionEnum.Query, joinNexus, step, executorService, dataService);
         
         if (buffer == null)
             throw new IllegalArgumentException();
@@ -164,7 +164,7 @@ public class QueryTask extends AbstractStepTask {
 
             final IRule rule = (IRule) step;
 
-            final Callable<RuleStats> task = getTaskFactory(false/* parallel */,
+            final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(false/* parallel */,
                     rule).newTask(rule, joinNexus, buffer);
             
             tasks.add(task);
@@ -184,7 +184,7 @@ public class QueryTask extends AbstractStepTask {
                 // @todo handle sub-programs.
                 final IRule rule = (IRule) itr.next();
 
-                final Callable<RuleStats> task = getTaskFactory(parallel, rule)
+                final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(parallel, rule)
                         .newTask(rule, joinNexus, buffer);
 
                 tasks.add(task);

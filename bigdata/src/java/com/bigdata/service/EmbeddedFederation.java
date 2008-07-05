@@ -818,6 +818,12 @@ public class EmbeddedFederation extends AbstractFederation {
         
     }
     
+    public boolean isStable() {
+
+        return !isTransient;
+
+    }
+    
     /**
      * @todo this scans the {@link DataService}s and reports the most recent
      *       value. The data service initialization should be changed so that

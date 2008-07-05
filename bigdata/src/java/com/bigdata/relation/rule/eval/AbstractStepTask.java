@@ -47,9 +47,6 @@ import com.bigdata.relation.DefaultRelationLocator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationLocator;
 import com.bigdata.relation.IRelationName;
-import com.bigdata.relation.rule.IProgram;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
@@ -66,7 +63,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     protected final ActionEnum action;
     protected /*final*/ IJoinNexus joinNexus;
     protected final IStep step;
-    protected final IRuleTaskFactory defaultTaskFactory;
+//    protected final IRuleTaskFactory defaultTaskFactory;
 //    protected final List<Callable<RuleStats>> tasks;
     protected/* final */ExecutorService executorService;
     protected DataService dataService;
@@ -118,7 +115,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      */
     protected AbstractStepTask(ActionEnum action, IJoinNexus joinNexus,
             IStep step, 
-            IRuleTaskFactory defaultTaskFactory,
+//            IRuleTaskFactory defaultTaskFactory,
             //List<Callable<RuleStats>> tasks,
             ExecutorService executorService,DataService dataService) {
 
@@ -131,8 +128,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         if (step == null)
             throw new IllegalArgumentException();
 
-        if (defaultTaskFactory == null)
-            throw new IllegalArgumentException();
+//        if (defaultTaskFactory == null)
+//            throw new IllegalArgumentException();
         
 //        if (tasks == null)
 //            throw new IllegalArgumentException();
@@ -143,7 +140,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         
         this.step = step;
         
-        this.defaultTaskFactory = defaultTaskFactory;
+//        this.defaultTaskFactory = defaultTaskFactory;
         
 //        this.tasks = tasks;
         
@@ -482,55 +479,5 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
     }
 
-    
-    /**
-     * Return the effective {@link IRuleTaskFactory} for the rule. When the rule
-     * is a step of a sequential program, then the returned {@link IStepTask}
-     * will automatically flush the buffer after the rule executes.
-     * 
-     * @param parallel
-     *            <code>true</code> unless the rule is a step is a sequential
-     *            {@link IProgram}. Note that a sequential step MUST flush its
-     *            buffer since steps are run in sequence precisely because they
-     *            have a dependency!
-     * @param rule
-     *            A rule that is a step in some program. If the program is just
-     *            a rule then the value of <i>parallel</i> does not matter. The
-     *            buffer will is cleared when it flushed so a re-flushed is
-     *            always a NOP.
-     * 
-     * @return The {@link IStepTask} to execute for that rule.
-     * 
-     * @see RunRuleAndFlushBufferTaskFactory
-     * @see RunRuleAndFlushBufferTask
-     */
-    protected IRuleTaskFactory getTaskFactory(boolean parallel, IRule rule) {
-        
-        if (rule == null)
-            throw new IllegalArgumentException();
-        
-        // is there a task factory override?
-        IRuleTaskFactory taskFactory = rule.getTaskFactory();
-
-        if (taskFactory == null) {
-
-            // no, use the default factory.
-            taskFactory = defaultTaskFactory;
-
-        }
-
-        if (!parallel) {
-
-            /*
-             * Tasks for sequential steps are always wrapped to ensure that the
-             * buffer is flushed when the task completes.
-             */
-            taskFactory = new RunRuleAndFlushBufferTaskFactory(taskFactory);
-
-        }
-        
-        return taskFactory;
-        
-    }
 
 }

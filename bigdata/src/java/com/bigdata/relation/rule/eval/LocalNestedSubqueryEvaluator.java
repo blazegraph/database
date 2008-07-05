@@ -31,6 +31,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -83,7 +84,7 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
      * from the ctor.
      */
 //    private final IRule rule;
-//    private final IJoinNexus joinNexus;
+    private final IJoinNexus joinNexus;
     private final IBuffer<ISolution> buffer;
     private final IBindingSet bindingSet;
     private RuleState ruleState;
@@ -101,8 +102,8 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
             throw new IllegalArgumentException();
 
 //        this.rule = rule;
-//
-//        this.joinNexus = joinNexus;
+
+        this.joinNexus = joinNexus;
         
         this.buffer = buffer;
 
@@ -171,14 +172,17 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
         
         final int tailCount = rule.getTailCount();
         
+        // note: evaluation order is fixed by now.
+        final int order = state.order[index];
+        
         if (index < 0 || index >= tailCount)
             throw new IllegalArgumentException();
         
         /*
          * Subquery iterator.
          */
-        final IChunkedOrderedIterator itr = state.getAccessPath(
-                state.order[index], bindingSet).iterator();
+        final IChunkedOrderedIterator itr = state.getAccessPath(order,
+                bindingSet).iterator();
         
         try {
 
@@ -186,6 +190,8 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
 
                 // next chunk of results from that access path.
                 final Object[] chunk = itr.nextChunk();
+
+                ruleStats.chunkCount[order]++;
 
                 if (index + 1 < tailCount) {
 
@@ -199,7 +205,7 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
                                     + rule.getName());
                         }
 
-                        ruleStats.elementCount[state.order[index]]++;
+                        ruleStats.elementCount[order]++;
 
                         /*
                          * Then bind this statement, which propagates bindings
@@ -210,11 +216,11 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
 
                         state.clearDownstreamBindings(index + 1,bindingSet);
                         
-                        if (state.bind(state.order[index], e, bindingSet)) {
+                        if (state.bind(order, e, bindingSet)) {
 
                             // run the subquery.
                             
-                            ruleStats.nsubqueries[state.order[index]]++;
+                            ruleStats.nsubqueries[order]++;
 
                             apply1(index + 1, state);
                             
@@ -234,18 +240,17 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
                                     + rule.getName());
                         }
 
-                        ruleStats.elementCount[state.order[index]]++;
+                        ruleStats.elementCount[order]++;
 
                         // bind variables from the current element.
-                        if (state.bind(state.order[index], e, bindingSet)) {
+                        if (state.bind(order, e, bindingSet)) {
 
                             /*
                              * emit entailment
                              */
 
-                            final ISolution solution = state
-                                    .getJoinNexus().newSolution(rule,
-                                            bindingSet);
+                            final ISolution solution = joinNexus.newSolution(
+                                    rule, bindingSet);
             
                             ruleStats.solutionCount++;
                             

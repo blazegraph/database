@@ -372,6 +372,14 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
     
+    public boolean isStable() {
+        
+        assertOpen();
+        
+        return dataService.getResourceManager().getLiveJournal().isStable();
+
+    }
+    
     /**
      * Extended to shutdown the embedded services.
      */

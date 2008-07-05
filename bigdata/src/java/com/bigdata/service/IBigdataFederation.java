@@ -42,6 +42,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.relation.IRelationLocator;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -257,6 +258,11 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      * specified for the {@link IBigdataClient}.
      * 
      * @see IndexMetadata#getKeyBuilder()
+     * 
+     * @deprecated by {@link IndexMetadata#getKeyBuilder()} which provides index
+     *             specific {@link IKeyBuilder} configurations making indices
+     *             more portable across machines in a federation (there is no
+     *             dependency on the machine locale configuration).
      */
     public IKeyBuilder getKeyBuilder();
     
@@ -279,6 +285,16 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      * is running, at least in principle, across more than one host/JVM).
      */
     public boolean isDistributed();
+
+    /**
+     * Return <code>true</code> iff the federation is backed by "stable" (vs
+     * transient) storage. Most federation deployments are stable in this sense,
+     * but it is possible to create federation instances backed solely by
+     * transient storage and those instances will report <code>false</code>
+     * here. This is most typically done for testing purposes using a
+     * {@link LocalDataServiceFederation} or an {@link EmbeddedFederation}.
+     */
+    public boolean isStable();
     
     /**
      * Return the global {@link SparseRowStore} used to store named property
@@ -342,5 +358,10 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      * consistent view.
      */
     public long lastCommitTime();
-    
+
+    /**
+     * Return the default {@link IRelationLocator}.
+     */
+    public IRelationLocator getRelationLocator();
+
 }

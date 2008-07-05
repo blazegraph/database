@@ -31,6 +31,9 @@ package com.bigdata.relation.rule;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.IRelationName;
+
 /**
  * Conjunctive query of N {@link IPredicate}s with optional {@link IConstraint}s.
  * 
@@ -40,8 +43,15 @@ import java.util.Set;
  * @todo support joins across RDF and non-RDF data. This will require some
  *       relaxing of assumptions concerning the type of relations in the RDF
  *       rule execution.
+ * 
+ * @param E
+ *            The generic type of the [E]lements materialized by the head of the
+ *            rule. This should be the same as the generic type of the
+ *            {@link IRelation} that can be materialized from the
+ *            {@link IRelationName} associated with the {@link IPredicate} that
+ *            is the head of the rule.
  */
-public interface IRule extends IStep {
+public interface IRule<E> extends IStep {
 
     /**
      * The #of distinct variables declared by the rule.
@@ -144,7 +154,7 @@ public interface IRule extends IStep {
      * @throws IllegalArgumentException
      *             if <i>bindingSet</i> is <code>null</code>.
      */
-    public IRule specialize(IBindingSet bindingSet, IConstraint[] constraints);
+    public IRule<E> specialize(IBindingSet bindingSet, IConstraint[] constraints);
 
     /**
      * Specialize a rule by binding zero or more variables and adding zero or
@@ -166,7 +176,7 @@ public interface IRule extends IStep {
      * @exception IllegalArgumentException
      *                if <i>bindingSet</i> is <code>null</code>.
      */
-    public IRule specialize(String name, IBindingSet bindingSet,
+    public IRule<E> specialize(String name, IBindingSet bindingSet,
             IConstraint[] constraints);
 
     /**
@@ -254,5 +264,5 @@ public interface IRule extends IStep {
      * @return <code>null</code> unless custom evaluation is desired.
      */
     public IRuleTaskFactory getTaskFactory();
-
+    
 }
