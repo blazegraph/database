@@ -41,6 +41,7 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.LookupDiscovery;
 
 import com.bigdata.service.AbstractClient;
+import com.bigdata.util.NV;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -112,12 +113,6 @@ public class JiniClient extends AbstractClient {
     }
 
     /**
-     * The label in the {@link Configuration} file for the client configuration
-     * data.
-     */
-    protected final static transient String CLIENT_LABEL = "ClientDescription";
-
-    /**
      * The jini configuration which will be used to connect to the federation.
      */
     private final JiniConfig jiniConfig;
@@ -169,6 +164,7 @@ public class JiniClient extends AbstractClient {
                     + ",locators="
                     + (lookupLocators == null ? "N/A" : ""
                             + Arrays.toString(lookupLocators))//
+                    + ",properties="+properties
                     + "}";
             
         }
@@ -261,8 +257,9 @@ public class JiniClient extends AbstractClient {
              * Extract how the client will discover services from the
              * Configuration.
              */
-            groups = (String[]) config.getEntry(CLIENT_LABEL, "groups",
-                    String[].class, LookupDiscovery.ALL_GROUPS/* default */);
+            groups = (String[]) config
+                    .getEntry(AbstractServer.ADVERT_LABEL, "groups",
+                            String[].class, LookupDiscovery.ALL_GROUPS/* default */);
 
             /*
              * Note: multicast discovery is used regardless if
@@ -272,20 +269,63 @@ public class JiniClient extends AbstractClient {
              */
 
             lookupLocators = (LookupLocator[]) config
-                    .getEntry(CLIENT_LABEL, "unicastLocators",
-                            LookupLocator[].class, null/* default */);
+                    .getEntry(
+                    AbstractServer.ADVERT_LABEL, "unicastLocators",
+                    LookupLocator[].class, null/* default */);
 
-            /*
-             * Extract the name of the properties file used to configure the
-             * bigdata client.
-             */
-            final File propertyFile = (File) config.getEntry(CLIENT_LABEL,
-                    "propertyFile", File.class);
+            {
+                
+                /*
+                 * Extract the name of the optional properties file.
+                 */
+                
+                final File propertyFile = (File) config.getEntry(
+                        AbstractServer.SERVICE_LABEL, "propertyFile",
+                        File.class, null/* defaultValue */);
 
-            /*
-             * Read the properties file.
-             */
-            properties = getProperties(propertyFile);
+                if (propertyFile != null) {
+
+                    /*
+                     * Read the properties file.
+                     */
+
+                    properties = getProperties(propertyFile);
+
+                } else {
+
+                    /*
+                     * Start with an empty properties map.
+                     */
+                    
+                    properties = new Properties();
+
+                }
+
+            }
+            
+            {
+                
+                /*
+                 * Read the optional [properties] array.
+                 */
+                
+                final NV[] tmp = (NV[]) config
+                        .getEntry(AbstractServer.SERVICE_LABEL, "properties",
+                                NV[].class, new NV[] {}/* defaultValue */);
+                
+                for(NV nv : tmp) {
+
+                    if(log.isInfoEnabled()) {
+                        
+                        log.info(nv.toString());
+                        
+                    }
+                    
+                    properties.setProperty(nv.getName(), nv.getValue());
+                    
+                }
+            
+            }
 
             return new JiniConfig(config, groups, lookupLocators, properties);
             
@@ -313,6 +353,12 @@ public class JiniClient extends AbstractClient {
     static protected Properties getProperties(File propertyFile)
             throws IOException {
 
+        if(log.isInfoEnabled()) {
+            
+            log.info("Reading properties: file="+propertyFile);
+            
+        }
+        
         final Properties properties = new Properties();
 
         InputStream is = null;
@@ -323,6 +369,12 @@ public class JiniClient extends AbstractClient {
 
             properties.load(is);
 
+            if(log.isInfoEnabled()) {
+                
+                log.info("Read properties: " + properties);
+                
+            }
+            
             return properties;
 
         } finally {

@@ -37,7 +37,8 @@ import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.service.AbstractRemoteFederation;
+import com.bigdata.journal.TimestampServiceUtil;
+import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -50,7 +51,7 @@ import com.sun.jini.admin.DestroyAdmin;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniFederation extends AbstractRemoteFederation {
+public class JiniFederation extends AbstractDistributedFederation {
 
     protected DataServicesClient dataServicesClient;
 
@@ -410,7 +411,7 @@ public class JiniFederation extends AbstractRemoteFederation {
         // destroy timestamp service(s)
         if(timestampServiceClient!=null) {
             
-            final ITimestampService timestampService= timestampServiceClient.getTimestampService(); 
+            final ITimestampService timestampService = timestampServiceClient.getTimestampService(); 
 
             if (timestampService != null) {
 
@@ -440,5 +441,36 @@ public class JiniFederation extends AbstractRemoteFederation {
         }
 
     }
+
+    /**
+     * 
+     * FIXME This is returning the next possible timestamp rather than the
+     * timestamp of the last competed commit.
+     * <p>
+     * The {@link ITimestampService} must be extended to have explicit knowledge
+     * of commits (as part of its eventual role as a transaction manager
+     * service) and this method should query the {@link ITimestampService} for
+     * the timestamp of the last _completed_ commit (rather than the last
+     * timestamp assigned by the service). The notification of the commit
+     * protocol to the timestamp service can be asynchronous unless the commit
+     * is part of a transaction, in which case it needs to be synchronous.
+     * (There could be another method for the last transaction commit time. This
+     * method reflects commits by unisolated operations).
+     */
+    public long lastCommitTime() {
+
+        final ITimestampService timestampService = getTimestampService();
+
+        if (timestampService != null) {
+
+            lastKnownCommitTime = TimestampServiceUtil.nextTimestamp(timestampService);
+
+        }
+
+        return lastKnownCommitTime;
+
+    }
+
+    private long lastKnownCommitTime;
 
 }

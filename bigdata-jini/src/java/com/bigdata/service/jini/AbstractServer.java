@@ -39,7 +39,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
-import java.util.Arrays;
 import java.util.Properties;
 
 import net.jini.admin.Administrable;
@@ -47,13 +46,9 @@ import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationProvider;
-import net.jini.core.discovery.LookupLocator;
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.discovery.DiscoveryManagement;
-import net.jini.discovery.LookupDiscovery;
-import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
 import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
@@ -67,6 +62,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
 import com.bigdata.service.AbstractService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.admin.StorageLocationAdmin;
@@ -151,19 +147,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             .toInt();
 
     /**
-     * The label in the {@link Configuration} file for the service
-     * description.
+     * The label in the {@link Configuration} file for the service description
+     * (also used by {@link JiniClient}).
      */
-    protected final static transient String SERVICE_LABEL = "ServiceDescription";
+    public final static transient String SERVICE_LABEL = "ServiceDescription";
 
     /**
      * The label in the {@link Configuration} file for the service advertisment
-     * data.
+     * data (also used by {@link JiniClient}).
      */
-    protected final static transient String ADVERT_LABEL = "AdvertDescription";
+    public final static transient String ADVERT_LABEL = "AdvertDescription";
 
     private ServiceID serviceID;
-    private DiscoveryManagement discoveryManager;
+    private JiniClient client;
+//    private DiscoveryManagement discoveryManager;
     private JoinManager joinManager;
     private Configuration config;
     /**
@@ -226,14 +223,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         
     }
 
-    protected DiscoveryManagement getDiscoveryManagement() {
-        
-        if (discoveryManager == null)
-            throw new IllegalStateException();
-        
-        return discoveryManager;
-        
-    }
+//    protected DiscoveryManagement getDiscoveryManagement() {
+//        
+//        if (discoveryManager == null)
+//            throw new IllegalStateException();
+//        
+//        return discoveryManager;
+//        
+//    }
     
     protected JoinManager getJoinManager() {
         
@@ -241,6 +238,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         
     }
 
+    /**
+     * The object used to connect to and access the other services in the
+     * {@link IBigdataFederation}.
+     */
+    protected JiniClient getClient() {
+        
+        return client;
+        
+    }
+    
     /**
      * Conditionally install a suitable security manager if there is none in
      * place. This is required before the server can download code. The code
@@ -353,9 +360,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
          */
         
         Entry[] entries = null;
-        LookupLocator[] unicastLocators = null;
-        String[] groups = null;
-        Properties properties = null;
+//        LookupLocator[] unicastLocators = null;
+//        String[] groups = null;
+//        Properties properties = null;
         boolean readServiceIDFromFile = false;
         
         try {
@@ -370,14 +377,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
                     Entry[].class, null/* default */);
 
-            groups = (String[]) config.getEntry(ADVERT_LABEL, "groups",
-                    String[].class, LookupDiscovery.ALL_GROUPS/* default */);
-
-            log.info("groups="+Arrays.toString(groups));
+//            groups = (String[]) config.getEntry(ADVERT_LABEL, "groups",
+//                    String[].class, LookupDiscovery.ALL_GROUPS/* default */);
+//
+//            log.info("groups="+Arrays.toString(groups));
             
-            unicastLocators = (LookupLocator[]) config.getEntry(
-                    ADVERT_LABEL, "unicastLocators",
-                    LookupLocator[].class, null/* default */);
+//            unicastLocators = (LookupLocator[]) config.getEntry(
+//                    ADVERT_LABEL, "unicastLocators",
+//                    LookupLocator[].class, null/* default */);
 
             /*
              * Extract how the service will provision itself from the
@@ -438,21 +445,21 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 
             }
 
-            /*
-             * Read the properties file used to configure the service.
-             */
-            final File propertyFile = (File) config.getEntry(SERVICE_LABEL,
-                    "propertyFile", File.class);
-
-            try {
-                
-                properties = getProperties(propertyFile);
-                
-            } catch(IOException ex) {
-                
-                fatal("Problem reading properties: " + propertyFile, ex);
-                
-            }
+//            /*
+//             * Read the properties file used to configure the service.
+//             */
+//            final File propertyFile = (File) config.getEntry(SERVICE_LABEL,
+//                    "propertyFile", File.class);
+//
+//            try {
+//                
+//                properties = getProperties(propertyFile);
+//                
+//            } catch(IOException ex) {
+//                
+//                fatal("Problem reading properties: " + propertyFile, ex);
+//                
+//            }
 
         } catch(ConfigurationException ex) {
             
@@ -469,27 +476,44 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
          */
         Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
 
+//        /*
+//         * Start service discovery.
+//         */
+//        try {
+//            /*
+//             * Note: This class will perform multicast discovery if ALL_GROUPS
+//             * is specified and otherwise requires you to specify one or more
+//             * unicast locators (URIs of hosts running discovery services). As
+//             * an alternative, you can use LookupDiscovery, which always does
+//             * multicast discovery.
+//             */
+//            discoveryManager = new LookupDiscoveryManager(
+//                    groups, unicastLocators, null /*DiscoveryListener*/
+//            );
+//
+////          DiscoveryManagement discoveryManager = new LookupDiscovery(
+////                  groups);
+//            
+//        } catch (IOException e) {
+//            
+//            fatal("Could not start service discovery: "+e, e);
+//            
+//        }
+        
         /*
-         * Start service discovery.
+         * Start the client - this provides a means to connect to the other
+         * services running in the federation (it runs a DiscoveryManager to do
+         * that).
          */
         try {
-            /*
-             * Note: This class will perform multicast discovery if ALL_GROUPS
-             * is specified and otherwise requires you to specify one or more
-             * unicast locators (URIs of hosts running discovery services). As
-             * an alternative, you can use LookupDiscovery, which always does
-             * multicast discovery.
-             */
-            discoveryManager = new LookupDiscoveryManager(
-                    groups, unicastLocators, null /*DiscoveryListener*/
-            );
 
-//          DiscoveryManagement discoveryManager = new LookupDiscovery(
-//                  groups);
+            client = JiniClient.newInstance(args);
+        
+            client.connect();
             
-        } catch (IOException e) {
+        } catch(Throwable t) {
             
-            fatal("Could not start service discovery: "+e, e);
+            fatal("Could not start client for federation: " + t, t);
             
         }
         
@@ -499,29 +523,31 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         try {
             
             /*
-             * Allow the server to configure various helper "clients".
-             * 
              * Note: By creating the service object here rather than outside of
              * the constructor we potentially create problems for subclasses of
              * AbstractServer since their own constructor will not have been
              * executed yet.
              * 
-             * Some of those problems are worked around using setupClients().
-             * 
-             * FIXME If you explicitly assign values to those clients when the
-             * fields are declared, e.g., [timestampServiceClient=null] then the
-             * ctor will overwrite the values set by [newService] since it is
-             * running before those initializations are performed. This is
-             * really crufty, may be JVM dependent, and needs to be refactored
-             * to avoid this subclass ctor init problem.
+//             * Some of those problems are worked around using setupClients() to
+//             * allow the server to configure various helper "clients".
+//             * 
+//             * FIXME If you explicitly assign values to those clients when the
+//             * fields are declared, e.g., [timestampServiceClient=null] then the
+//             * ctor will overwrite the values set by [newService] since it is
+//             * running before those initializations are performed. This is
+//             * really crufty, may be JVM dependent, and needs to be refactored
+//             * to avoid this subclass ctor init problem.
              */
-            assert discoveryManager != null;
+//            assert discoveryManager != null;
+//
+//            setupClients(discoveryManager);
 
-            setupClients(discoveryManager);
+            log.info("Creating service impl...");
             
-            impl = newService(properties);
+            // init w/ client's properties.
+            impl = newService(client.getProperties());
 
-            log.info("Impl is "+impl);
+            log.info("Service impl is "+impl);
             
         } catch(Exception ex) {
         
@@ -561,7 +587,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 joinManager = new JoinManager(proxy, // service proxy
                         entries, // attr sets
                         serviceID, // ServiceID
-                        discoveryManager, // DiscoveryManager
+                        client.getFederation().discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
             } else {
                 /*
@@ -570,7 +596,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 joinManager = new JoinManager(proxy, // service proxy
                         entries, // attr sets
                         this, // ServiceIDListener
-                        discoveryManager, // DiscoveryManager
+                        client.getFederation().discoveryManager, // DiscoveryManager
                         new LeaseRenewalManager());
             }
             
@@ -952,23 +978,35 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
         }
         
-        if(discoveryManager != null) {
+        if (client != null) {
 
-            try {
-
-                discoveryManager.terminate();
-
-            } catch (Exception ex) {
-
-                log.error("Could not terminate the discovery manager: "+ex, ex);
-                
-            } finally {
-                
-                discoveryManager = null;
+            if(client.isConnected()) {
+            
+                client.disconnect(true/* immediateShutdown */);
                 
             }
+
+            client = null;
             
         }
+        
+//        if(discoveryManager != null) {
+//
+//            try {
+//
+//                discoveryManager.terminate();
+//
+//            } catch (Exception ex) {
+//
+//                log.error("Could not terminate the discovery manager: "+ex, ex);
+//                
+//            } finally {
+//                
+//                discoveryManager = null;
+//                
+//            }
+//            
+//        }
 
     }
     
@@ -1184,14 +1222,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 //        
 //    }
 
-    /**
-     * Invoked before {@link #newService(Properties)} in order to give a subclass
-     * of {@link AbstractServer} a chance to setup any service discover clients
-     * on which it depends, e.g., a {@li 
-     * @param discoveryManager
-     * @return
-     */
-    abstract protected void setupClients(DiscoveryManagement discoveryManager ) throws Exception;
+//    /**
+//     * Invoked before {@link #newService(Properties)} in order to give a subclass
+//     * of {@link AbstractServer} a chance to setup any service discover clients
+//     * on which it depends, e.g., a {@li 
+//     * @param discoveryManager
+//     * @return
+//     */
+//    abstract protected void setupClients(DiscoveryManagement discoveryManager ) throws Exception;
 
     /**
      * This method is responsible for creating the remote service implementation

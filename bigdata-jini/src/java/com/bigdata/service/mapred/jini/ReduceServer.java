@@ -103,10 +103,10 @@ public class ReduceServer extends AbstractServer {
         
     }
    
-    @Override
-    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
-        
-    }
+//    @Override
+//    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
+//        
+//    }
 
     protected Remote newService(Properties properties) {
         

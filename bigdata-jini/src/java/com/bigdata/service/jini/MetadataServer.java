@@ -42,6 +42,7 @@ import net.jini.io.context.ClientSubject;
 import org.apache.log4j.MDC;
 
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -123,7 +124,7 @@ public class MetadataServer extends DataServer {
     
     protected Remote newService(Properties properties) {
 
-        return new AdministrableMetadataService(this,properties);
+        return new AdministrableMetadataService(this,properties).start();
         
     }
     
@@ -143,7 +144,6 @@ public class MetadataServer extends DataServer {
             implements Remote, RemoteAdministrable, RemoteDestroyAdmin {
         
         protected MetadataServer server;
-//        private UUID serviceUUID;
 
         /**
          * @param properties
@@ -218,36 +218,31 @@ public class MetadataServer extends DataServer {
             super.clearLoggingContext();
             
         }
-        
-//        public UUID getServiceUUID() {
-//
-//            if (serviceUUID == null) {
-//
-//                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-//
-//            }
+
+        @Override
+        public JiniFederation getFederation() {
+
+            return server.getClient().getFederation();
+            
+        }
+
+//        public ILoadBalancerService getLoadBalancerService() {
 //            
-//            return serviceUUID;
+//            return server.loadBalancerClient.getLoadBalancerService();
 //            
 //        }
-
-        public ILoadBalancerService getLoadBalancerService() {
-            
-            return server.loadBalancerClient.getLoadBalancerService();
-            
-        }
-
-        public IDataService getDataService(UUID serviceUUID) {
-
-            return server.dataServicesClient.getDataService(serviceUUID);
-            
-        }
-        
-        public ITimestampService getTimestampService() {
-            
-            return server.timestampServiceClient.getTimestampService();
-            
-        }
+//
+//        public IDataService getDataService(UUID serviceUUID) {
+//
+//            return server.dataServicesClient.getDataService(serviceUUID);
+//            
+//        }
+//        
+//        public ITimestampService getTimestampService() {
+//            
+//            return server.timestampServiceClient.getTimestampService();
+//            
+//        }
 
         /*
          * DestroyAdmin

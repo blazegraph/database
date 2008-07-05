@@ -37,11 +37,11 @@ import com.bigdata.service.MetadataService;
  */
 public class LoadBalancerServer extends AbstractServer {
 
-    /**
-     * Handles discovery of the {@link DataService}s and
-     * {@link MetadataService}s.
-     */
-    protected DataServicesClient dataServicesClient;
+//    /**
+//     * Handles discovery of the {@link DataService}s and
+//     * {@link MetadataService}s.
+//     */
+//    protected DataServicesClient dataServicesClient;
     
     /**
      * Creates a new {@link DataServer}.
@@ -104,12 +104,12 @@ public class LoadBalancerServer extends AbstractServer {
         
     }
     
-    @Override
-    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
-        
-        dataServicesClient = new DataServicesClient(getDiscoveryManagement());
-        
-    }
+//    @Override
+//    protected void setupClients(DiscoveryManagement discoveryManager) throws Exception {
+//        
+//        dataServicesClient = new DataServicesClient(getDiscoveryManagement());
+//        
+//    }
 
     @Override
     protected Remote newService(Properties properties) {
@@ -118,29 +118,29 @@ public class LoadBalancerServer extends AbstractServer {
         
     }
     
-    protected void terminate() {
-
-        if (dataServicesClient != null) {
-
-            try {
-
-                dataServicesClient.terminate();
-                
-            } catch(Exception ex) {
-                
-                log.error("Could not terminate the data services client: "+ex, ex);
-                
-            } finally {
-                
-                dataServicesClient = null;
-                
-            }
-
-        }
-        
-        super.terminate();
-
-    }
+//    protected void terminate() {
+//
+//        if (dataServicesClient != null) {
+//
+//            try {
+//
+//                dataServicesClient.terminate();
+//                
+//            } catch(Exception ex) {
+//                
+//                log.error("Could not terminate the data services client: "+ex, ex);
+//                
+//            } finally {
+//                
+//                dataServicesClient = null;
+//                
+//            }
+//
+//        }
+//        
+//        super.terminate();
+//
+//    }
     
     /**
      * Adds jini administration interfaces to the basic {@link LoadBalancerService}.
@@ -152,7 +152,6 @@ public class LoadBalancerServer extends AbstractServer {
             RemoteAdministrable, RemoteDestroyAdmin {
         
         protected LoadBalancerServer server;
-//        private UUID serviceUUID;
         
         public AdministrableLoadBalancer(LoadBalancerServer server,Properties properties) {
             
@@ -279,18 +278,6 @@ public class LoadBalancerServer extends AbstractServer {
             server.shutdownNow();
             
         }
-
-//        public UUID getServiceUUID() {
-//
-//            if (serviceUUID == null) {
-//
-//                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-//
-//            }
-//
-//            return serviceUUID;
-//            
-//        }
         
         /**
         * Note: {@link InetAddress#getHostName()} is used. This method makes a

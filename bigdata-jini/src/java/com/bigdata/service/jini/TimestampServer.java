@@ -106,10 +106,10 @@ public class TimestampServer extends AbstractServer {
 
     }
 
-    @Override
-    protected void setupClients(DiscoveryManagement discoveryManager) {
-        
-    }
+//    @Override
+//    protected void setupClients(DiscoveryManagement discoveryManager) {
+//        
+//    }
     
     @Override
     protected Remote newService(Properties properties) {

@@ -45,6 +45,7 @@ import org.apache.log4j.MDC;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -69,21 +70,21 @@ import com.bigdata.service.MetadataService;
  */
 public class DataServer extends AbstractServer {
 
-    /**
-     * Handles discovery of the {@link DataService}s and
-     * {@link MetadataService}s.
-     */
-    protected DataServicesClient dataServicesClient;
-
-    /**
-     * Handles discovery of the {@link ILoadBalancerService}.
-     */
-    protected LoadBalancerClient loadBalancerClient;
-    
-    /**
-     * Handles discovery of the {@link ITimestampService}.
-     */
-    protected TimestampServiceClient timestampServiceClient;
+//    /**
+//     * Handles discovery of the {@link DataService}s and
+//     * {@link MetadataService}s.
+//     */
+//    protected DataServicesClient dataServicesClient;
+//
+//    /**
+//     * Handles discovery of the {@link ILoadBalancerService}.
+//     */
+//    protected LoadBalancerClient loadBalancerClient;
+//    
+//    /**
+//     * Handles discovery of the {@link ITimestampService}.
+//     */
+//    protected TimestampServiceClient timestampServiceClient;
     
     /**
      * Creates a new {@link DataServer}.
@@ -144,91 +145,91 @@ public class DataServer extends AbstractServer {
         
     }
     
-    /**
-     * Initialize the {@link #timestampServiceClient},
-     * {@link #dataServicesClient}, and {@link #loadBalancerClient}. This is a
-     * pre-condition for actually instantiating the
-     * {@link #newService(Properties)}.
-     */
-    protected void setupClients(DiscoveryManagement discoveryManager)
-            throws Exception {
-
-        assert discoveryManager != null;
-
-        timestampServiceClient = new TimestampServiceClient(discoveryManager);
-
-        dataServicesClient = new DataServicesClient(discoveryManager);
-
-        loadBalancerClient = new LoadBalancerClient(discoveryManager);
-
-    }
+//    /**
+//     * Initialize the {@link #timestampServiceClient},
+//     * {@link #dataServicesClient}, and {@link #loadBalancerClient}. This is a
+//     * pre-condition for actually instantiating the
+//     * {@link #newService(Properties)}.
+//     */
+//    protected void setupClients(DiscoveryManagement discoveryManager)
+//            throws Exception {
+//        
+//        assert discoveryManager != null;
+//
+//        timestampServiceClient = new TimestampServiceClient(discoveryManager);
+//
+//        dataServicesClient = new DataServicesClient(discoveryManager);
+//
+//        loadBalancerClient = new LoadBalancerClient(discoveryManager);
+//
+//    }
     
     protected Remote newService(Properties properties) {
 
-        return new AdministrableDataService(this,properties);
+        return new AdministrableDataService(this,properties).start();
         
     }
     
-    synchronized protected void terminate() {
-
-        if (dataServicesClient != null) {
-
-            try {
-
-                dataServicesClient.terminate();
-                
-            } catch(Exception ex) {
-                
-                log.error("Could not terminate the data services client: "+ex, ex);
-                
-            } finally {
-                
-                dataServicesClient = null;
-                
-            }
-
-        }
-        
-        if (loadBalancerClient != null) {
-
-            try {
-
-                loadBalancerClient.terminate();
-
-            } catch(Exception ex) {
-                
-                log.error("Could not terminate the load balancer client: "+ex, ex);
-                
-            } finally {
-                
-                loadBalancerClient = null;
-                
-            }
-
-        }
-        
-        if (timestampServiceClient != null) {
-
-            try {
-
-                timestampServiceClient.terminate();
-
-            } catch (Exception ex) {
-
-                log.error("Could not terminate the timestamp service client: "
-                        + ex, ex);
-
-            } finally {
-
-                timestampServiceClient = null;
-
-            }
-            
-        }
-        
-        super.terminate();
-
-    }
+//    synchronized protected void terminate() {
+//
+//        if (dataServicesClient != null) {
+//
+//            try {
+//
+//                dataServicesClient.terminate();
+//                
+//            } catch(Exception ex) {
+//                
+//                log.error("Could not terminate the data services client: "+ex, ex);
+//                
+//            } finally {
+//                
+//                dataServicesClient = null;
+//                
+//            }
+//
+//        }
+//        
+//        if (loadBalancerClient != null) {
+//
+//            try {
+//
+//                loadBalancerClient.terminate();
+//
+//            } catch(Exception ex) {
+//                
+//                log.error("Could not terminate the load balancer client: "+ex, ex);
+//                
+//            } finally {
+//                
+//                loadBalancerClient = null;
+//                
+//            }
+//
+//        }
+//        
+//        if (timestampServiceClient != null) {
+//
+//            try {
+//
+//                timestampServiceClient.terminate();
+//
+//            } catch (Exception ex) {
+//
+//                log.error("Could not terminate the timestamp service client: "
+//                        + ex, ex);
+//
+//            } finally {
+//
+//                timestampServiceClient = null;
+//
+//            }
+//            
+//        }
+//        
+//        super.terminate();
+//
+//    }
     
     /**
      * Extends the behavior to close and delete the journal in use by the data
@@ -257,7 +258,6 @@ public class DataServer extends AbstractServer {
             RemoteAdministrable, RemoteDestroyAdmin {
         
         protected DataServer server;
-//        private UUID serviceUUID;
         
         public AdministrableDataService(DataServer server,Properties properties) {
             
@@ -360,18 +360,6 @@ public class DataServer extends AbstractServer {
 
         }
 
-//        public UUID getServiceUUID() {
-//
-//            if (serviceUUID == null) {
-//
-//                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-//
-//            }
-//
-//            return serviceUUID;
-//            
-//        }
-
         synchronized public void shutdown() {
             
             // normal service shutdown.
@@ -391,62 +379,69 @@ public class DataServer extends AbstractServer {
             server.shutdownNow();
             
         }
+
+        @Override
+        public JiniFederation getFederation() {
+
+            return server.getClient().getFederation();
+            
+        }
         
-        public IDataService getDataService(UUID serviceUUID) {
-
-            if (server.dataServicesClient == null) {
-
-                log.warn("dataServicesClient is not initialized.");
-
-                return null;
-
-            }
-
-            return server.dataServicesClient.getDataService(serviceUUID);
-
-        }
-
-        public IMetadataService getMetadataService() {
-
-            if (server.dataServicesClient == null) {
-
-                log.warn("dataServicesClient is not initialized.");
-
-                return null;
-
-            }
-
-            return server.dataServicesClient.getMetadataService();
-
-        }
-
-        public ILoadBalancerService getLoadBalancerService() {
-
-            if (server.loadBalancerClient == null) {
-
-                log.warn("loadBalancerClient is not initialized.");
-
-                return null;
-
-            }
-            
-            return server.loadBalancerClient.getLoadBalancerService();
-
-        }
-
-        public ITimestampService getTimestampService() {
-
-            if (server.timestampServiceClient == null) {
-
-                log.warn("timestampServiceClient is not initialized.");
-
-                return null;
-
-            }
-
-            return server.timestampServiceClient.getTimestampService();
-            
-        }
+//        public IDataService getDataService(UUID serviceUUID) {
+//
+//            if (server.dataServicesClient == null) {
+//
+//                log.warn("dataServicesClient is not initialized.");
+//
+//                return null;
+//
+//            }
+//
+//            return server.dataServicesClient.getDataService(serviceUUID);
+//
+//        }
+//
+//        public IMetadataService getMetadataService() {
+//
+//            if (server.dataServicesClient == null) {
+//
+//                log.warn("dataServicesClient is not initialized.");
+//
+//                return null;
+//
+//            }
+//
+//            return server.dataServicesClient.getMetadataService();
+//
+//        }
+//
+//        public ILoadBalancerService getLoadBalancerService() {
+//
+//            if (server.loadBalancerClient == null) {
+//
+//                log.warn("loadBalancerClient is not initialized.");
+//
+//                return null;
+//
+//            }
+//            
+//            return server.loadBalancerClient.getLoadBalancerService();
+//
+//        }
+//
+//        public ITimestampService getTimestampService() {
+//
+//            if (server.timestampServiceClient == null) {
+//
+//                log.warn("timestampServiceClient is not initialized.");
+//
+//                return null;
+//
+//            }
+//
+//            return server.timestampServiceClient.getTimestampService();
+//            
+//        }
         
 // /*
 // * JoinAdmin
