@@ -38,6 +38,7 @@ import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 
 /**
@@ -72,10 +73,6 @@ public class DelegateJoinNexus implements IJoinNexus {
 
     public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
         return delegate.newDeleteBuffer(relation);
-    }
-
-    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
-        return delegate.newElement(predicate, bindingSet);
     }
 
     public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
@@ -116,6 +113,10 @@ public class DelegateJoinNexus implements IJoinNexus {
 
     public int solutionFlags() {
         return delegate.solutionFlags();
+    }
+
+    public IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule) {
+        return delegate.getRuleTaskFactory(parallel, rule);
     }
 
 }

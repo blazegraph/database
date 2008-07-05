@@ -85,6 +85,8 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
         setupName2AddrBTree();
 
+//        relationLocator = new DefaultRelationLocator(executorService,this);
+        
     }
     
     /**
@@ -187,5 +189,12 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
     private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
+
+//    public IRelationLocator getRelationLocator() {
+//        
+//        return relationLocator;
+//    
+//    }
+//    private final IRelationLocator relationLocator;
     
 }

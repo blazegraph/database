@@ -111,24 +111,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
     
     /**
      * Options for the {@link ConcurrentManager}.
-     * <p>
-     * Note: The main factors that influence the throughput of group commit are
-     * {@link #WRITE_SERVICE_CORE_POOL_SIZE} and
-     * {@link #WRITE_SERVICE_QUEUE_CAPACITY}. So far, more is better (at least
-     * up to 1000 each) and you always want the queue capacity to be at least as
-     * large as the core pool size. Pre-starting the core pool threads appears
-     * to offer a minor advantage on startup. Note that there is also a strong
-     * effect as the JVM performs optimizations on the running code, so
-     * randomize your tests.
-     * <p>
-     * See {@link StressTestGroupCommit} for performance tuning.
      * 
      * @todo add option for retryCount, timeout (from submission until the group
      *       commit).
-     * 
-     * @todo add options: (a) to prestart all core threads; (b) set the maximum
-     *       #of threads; and (c) set the maximum queue capacity for the read
-     *       and tx thread pools.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -146,11 +131,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
         /**
          * The default #of threads in the transaction service thread pool.
          */
-        public final static String DEFAULT_TX_SERVICE_CORE_POOL_SIZE = "50";
+        public final static String DEFAULT_TX_SERVICE_CORE_POOL_SIZE = "0";
     
         /**
          * <code>readServicePoolSize</code> - The #of threads in the pool
-         * handling concurrent unisolated read requests on named indices.
+         * handling concurrent unisolated read requests on named indices -or-
+         * ZERO (0) if the size of the thread pool is not fixed (default is
+         * <code>0</code>).
          * 
          * @see #DEFAULT_READ_SERVICE_CORE_POOL_SIZE
          */
@@ -161,39 +148,52 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * 
          * @see #READ_SERVICE_CORE_POOL_SIZE
          */
-        public final static String DEFAULT_READ_SERVICE_CORE_POOL_SIZE = "50";
+        public final static String DEFAULT_READ_SERVICE_CORE_POOL_SIZE = "0";
     
         /**
-         * The target for the #of threads in the pool handling concurrent
-         * unisolated write on named indices.
+         * The minimum #of threads in the pool handling concurrent unisolated
+         * write on named indices (default is
+         * {@value #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE}). The size of the
+         * thread pool will automatically grow to meet the possible concurrency
+         * of the submitted tasks up to the configured
+         * {@link #WRITE_SERVICE_MAXIMUM_POOL_SIZE}.
+         * <p>
+         * The main factor that influences the throughput of group commit is the
+         * <em>potential</em> concurrency of the submitted
+         * {@link ITx#UNISOLATED} tasks (both how many can be submitted in
+         * parallel by the application and how many can run concurrency - tasks
+         * writing on the same index have a shared dependency and can not run
+         * concurrently).
+         * <p>
+         * Each {@link ITx#UNISOLATED} task that completes processing will block
+         * until the next commit, thereby absorbing a worker thread. For this
+         * reason, it can improve performance if you set the core pool size and
+         * the maximum pool size for the write service <em>higher</em> that
+         * the potential concurrency with which the submitted tasks could be
+         * processed.
+         * <p>
+         * There is also a strong effect as the JVM performs optimizations on
+         * the running code, so randomize your tests. See
+         * {@link StressTestGroupCommit} for performance tuning.
          * 
          * @see #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE
          */
         public final static String WRITE_SERVICE_CORE_POOL_SIZE = "writeServiceCorePoolSize";
     
         /**
-         * The default #of threads in the write service thread pool (200).
-         * 
-         * @todo This SHOULD automatically increase up to
-         *       {@link #WRITE_SERVICE_MAXIMUM_POOL_SIZE} under demand but I
-         *       have not been observing that. If it does, then drop the default
-         *       value down to something much smaller, e.g., 10-50.
-         * 
-         * @todo revisit this value after I modify the
-         *       {@link WriteExecutorService} to checkpoint indices (which has
-         *       been done) so that it does not need to wait for nrunning to
-         *       reach zero and so that it can abort individual tasks rather
-         *       than discarding entire commit groups. Use
-         *       {@link StressTestConcurrentUnisolatedIndices} to examine the
-         *       behavior for just the writeService, but choose the default in
-         *       terms of a more complete test that loads all three queues
-         *       (read, write, and tx).
+         * The default minimum #of threads in the write service thread pool.
          */
-        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "200";
+        public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "5";
         
         /**
          * The maximum #of threads allowed in the pool handling concurrent
-         * unisolated write on named indices.
+         * unisolated write on named indices (default is
+         * {@value #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE}). Since each task
+         * that completes processing will block until the next group commit,
+         * this value places an absolute upper bound on the number of tasks in a
+         * commit group. However, many other factors (client concurrency, index
+         * locks, task latency, CPU and IO utilization, etc.) can reduce the
+         * actual group commit size.
          * 
          * @see #DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE
          */
@@ -203,11 +203,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * The default for the maximum #of threads in the write service thread
          * pool.
          */
-        public final static String DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE = "1000";
+        public final static String DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE = "50";
         
         /**
          * When true, the write service will be prestart all of its worker
-         * threads (default false).
+         * threads (default
+         * {@value #DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS}).
          * 
          * @see #DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS
          */
@@ -537,11 +538,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             txServicePoolSize = Integer.parseInt(val);
 
-            if (txServicePoolSize < 1) {
+            if (txServicePoolSize < 0) {
 
                 throw new RuntimeException("The '"
                         + ConcurrencyManager.Options.TX_SERVICE_CORE_POOL_SIZE
-                        + "' must be at least one.");
+                        + "' must be non-negative.");
 
             }
 
@@ -557,11 +558,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             readServicePoolSize = Integer.parseInt(val);
 
-            if (readServicePoolSize < 1) {
+            if (readServicePoolSize < 0) {
 
                 throw new RuntimeException("The '"
                         + ConcurrencyManager.Options.READ_SERVICE_CORE_POOL_SIZE
-                        + "' must be at least one.");
+                        + "' must be non-negative.");
 
             }
 
@@ -591,13 +592,30 @@ public class ConcurrencyManager implements IConcurrencyManager {
         }
 
         // setup thread pool for concurrent transactions.
-        txWriteService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                txServicePoolSize, DaemonThreadFactory.defaultThreadFactory());
+        if (txServicePoolSize == 0) {
+            // cached thread pool.
+            txWriteService = (ThreadPoolExecutor) Executors
+                    .newCachedThreadPool(DaemonThreadFactory
+                            .defaultThreadFactory());
+        } else {
+            // fixed thread pool.
+            txWriteService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                    txServicePoolSize, DaemonThreadFactory
+                            .defaultThreadFactory());
+        }
 
         // setup thread pool for unisolated read operations.
-        readService = (ThreadPoolExecutor) Executors
-                .newFixedThreadPool(readServicePoolSize, DaemonThreadFactory
-                        .defaultThreadFactory());
+        if (readServicePoolSize == 0) {
+            // cached thread pool.
+            readService = (ThreadPoolExecutor) Executors
+                    .newCachedThreadPool(DaemonThreadFactory
+                            .defaultThreadFactory());
+        } else {
+            // fixed thread pool.
+            readService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                    readServicePoolSize, DaemonThreadFactory
+                            .defaultThreadFactory());
+        }
 
         // setup thread pool for unisolated write operations.
         {
@@ -614,11 +632,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE,
                         ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE));
 
-                if (writeServiceCorePoolSize < 1) {
+                if (writeServiceCorePoolSize < 0) {
 
                     throw new RuntimeException("The '"
                             + ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE
-                            + "' must be at least one.");
+                            + "' must be non-negative.");
 
                 }
 
@@ -662,7 +680,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                if (writeServiceQueueCapacity<writeServiceCorePoolSize) {
+                if (writeServiceQueueCapacity < writeServiceCorePoolSize) {
 
                     throw new RuntimeException("The '"
                             + ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY

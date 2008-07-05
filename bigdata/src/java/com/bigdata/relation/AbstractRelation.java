@@ -39,13 +39,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IKeyOrder;
-import com.bigdata.sparse.ITPS;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <E>
+ *            The generic type of the [E]lements of the relation.
  */
-abstract public class AbstractRelation<R> implements IMutableRelation<R> {
+abstract public class AbstractRelation<E> implements IMutableRelation<E> {
 
     protected static Logger log = Logger.getLogger(AbstractRelation.class);
     
@@ -54,6 +55,8 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
     private final ExecutorService service;
     
     private final String namespace;
+
+    private final IRelationName<E> relationName;
 
     private final long timestamp;
     
@@ -77,6 +80,12 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
         
     }
     
+    public IRelationName getRelationName() {
+
+        return relationName;
+        
+    }
+
     public long getTimestamp() {
         
         return timestamp;
@@ -127,6 +136,8 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
 
         this.namespace = namespace;
 
+        this.relationName = new RelationName<E>(namespace);
+
         this.timestamp = timestamp;
 
         this.properties = properties;
@@ -145,7 +156,7 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
      * 
      * @return The index name.
      */
-    abstract public String getFQN(IKeyOrder<? extends R> keyOrder);
+    abstract public String getFQN(IKeyOrder<? extends E> keyOrder);
     
     /**
      * The index.
@@ -155,13 +166,37 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
      *            
      * @return The index.
      */
-    public IIndex getIndex(IKeyOrder<? extends R> keyOrder) {
+    public IIndex getIndex(IKeyOrder<? extends E> keyOrder) {
 
         return indexManager.getIndex(getFQN(keyOrder), timestamp);
         
     }
 
-    public void create() {
+    /**
+     * 
+     * @todo race conditions in index registration could be handled by having a
+     *       property that indicated whether or not the indices were in the
+     *       process of being registered. The value of the property could be a
+     *       UUID identifying the client. The property would be cleared once the
+     *       indices were registered. Other clients observing the property would
+     *       wait until it had been cleared. If not cleared within a timeout
+     *       (say 10 seconds) then the waiting client should assume that the
+     *       client attempting to register the indices had died. In that case
+     *       the client should itself assert the property and then attempt to
+     *       register the indices itself - dropping existing indices is Ok IFF
+     *       they are empty, otherwise we need a thrown exception and a flag to
+     *       allow override.
+     *       <p>
+     *       To avoid a race condition when the client attemps to take a
+     *       compensating action we need a means to update a property iff some
+     *       pre-condition is satisified.
+     *       <p>
+     *       A similar approach could be used when taking a triple store offline
+     *       and dropping its indices.
+     *       <p>
+     *       Add ctor flag to create iff not found?
+     */
+    public AbstractRelation<E> create() {
         
         log.info(toString());
 
@@ -199,6 +234,8 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
             
         }
         
+        return this;
+        
     }
     
     public void destroy() {
@@ -209,5 +246,24 @@ abstract public class AbstractRelation<R> implements IMutableRelation<R> {
         indexManager.getGlobalRowStore().delete(RelationSchema.INSTANCE, namespace);
         
     }
+    
+//    /**
+//     * @todo javadoc, move to database class?
+//     *
+//     * @todo problem is access to the relationLocator.  we really want to
+//     * reuse the same instance whenever possible to improve caching, but
+//     * we also need to be able to run on any of the various platforms.
+//     * There is no issue for IBigdataFederation, just TemporaryStore and
+//     * Journal.  When used with a federation they SHOULD use the same
+//     * locator.  The main issue is when they are used by themselves.  This
+//     * may require either raising the locator into a parameter to the ctor
+//     * for this class or passing it in explicitly to a method such as this
+//     * one.
+//     * 
+//     * @param solutionFlags
+//     * 
+//     * @return
+//     */
+//    abstract public IJoinNexus newJoinNexus(int solutionFlags);
     
 }

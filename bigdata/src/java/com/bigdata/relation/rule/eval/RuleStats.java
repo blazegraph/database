@@ -83,6 +83,8 @@ public class RuleStats {
 
             final int tailCount = ((IRule) program).getTailCount();
 
+            this.chunkCount = new long[tailCount];
+
             this.elementCount = new long[tailCount];
 
             this.nsubqueries = new int[tailCount];
@@ -91,6 +93,8 @@ public class RuleStats {
 
         } else {
 
+            this.chunkCount = null;
+            
             this.elementCount = null;
 
             this.nsubqueries = null;
@@ -140,6 +144,13 @@ public class RuleStats {
      * The rule itself.
      */
     public final IStep rule;
+    
+    /**
+     * The #of chunks materialized for each predicate in the both of the rule
+     * (in the order in which they were declared, not the order in which they
+     * were evaluated).
+     */
+    public final long[] chunkCount;
     
     /**
      * The #of elements considered for the each predicate in the body of the
@@ -209,7 +220,7 @@ public class RuleStats {
         
     }
     
-    public String getEntailmentsPerMillisecond() {
+    public String getSolutionsPerMillisecond() {
 
         return (elapsed == 0 ? "N/A" : "" + solutionCount / elapsed);
         
@@ -236,6 +247,7 @@ public class RuleStats {
                      :(""//", #exec="+nexecutions//
                      ))
              + ", #subqueries="+Arrays.toString(nsubqueries)//
+             + ", chunkCount=" + Arrays.toString(chunkCount) //
              + ", elementCount=" + Arrays.toString(elementCount) //
              + ", elapsed=" + elapsed//
              + ", solutionCount=" + solutionCount//
@@ -373,6 +385,8 @@ public class RuleStats {
         if (elementCount != null && o.elementCount != null) {
 
             for (int i = 0; i < elementCount.length; i++) {
+
+                chunkCount[i] += o.chunkCount[i];
 
                 elementCount[i] += o.elementCount[i];
 

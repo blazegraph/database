@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.bigdata.test.ExperimentDriver;
+import com.bigdata.util.NV;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -56,17 +57,17 @@ public class BasicExperimentConditions extends ExperimentDriver {
                 conditions,
                 new NV[][] { //
                         new NV[] { new NV(Options.BUFFER_MODE,
-                                BufferMode.Transient), }, //
+                                BufferMode.Transient.toString()), }, //
                         new NV[] { new NV(Options.BUFFER_MODE,
-                                BufferMode.Direct), }, //
+                                BufferMode.Direct.toString()), }, //
                         new NV[] {
-                                new NV(Options.BUFFER_MODE, BufferMode.Direct),
+                                new NV(Options.BUFFER_MODE, BufferMode.Direct.toString()),
                                 new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
                                         .toString()), }, //
-                        new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped), }, //
-                        new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk), }, //
+                        new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Mapped.toString()), }, //
+                        new NV[] { new NV(Options.BUFFER_MODE, BufferMode.Disk.toString()), }, //
                         new NV[] {
-                                new NV(Options.BUFFER_MODE, BufferMode.Disk),
+                                new NV(Options.BUFFER_MODE, BufferMode.Disk.toString()),
                                 new NV(Options.FORCE_ON_COMMIT, ForceEnum.No
                                         .toString()), }, //
                 });

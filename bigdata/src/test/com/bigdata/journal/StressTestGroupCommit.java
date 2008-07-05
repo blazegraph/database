@@ -53,6 +53,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.NV;
 
 /**
  * Stress test of the group commit mechanism. This class may be used to tune the

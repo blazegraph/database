@@ -125,4 +125,9 @@ public class MockJoinNexus implements IJoinNexus {
         return IJoinNexus.ELEMENT | IJoinNexus.BINDINGS | IJoinNexus.RULE;
     }
 
+    public IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
 }

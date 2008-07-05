@@ -34,7 +34,7 @@ package com.bigdata.relation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RelationName implements IRelationName {
+public class RelationName<R> implements IRelationName<R> {
 
     /**
      * 

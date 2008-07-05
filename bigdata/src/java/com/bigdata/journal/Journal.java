@@ -98,6 +98,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         localTransactionManager.setConcurrencyManager(concurrencyManager);
         
+//        /*
+//         * Note: This reuses the read service for executing oddball tasks. While
+//         * this is a bit odd, there is no real reason not to do this. However
+//         * those tasks will show up on the queue statistics for the read
+//         * service.
+//         */
+//        relationLocator = new DefaultRelationLocator(
+//                concurrencyManager.readService, this);
+        
     }
     
 //    public long commit() {
@@ -717,5 +726,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         globalRowStoreHelper = null;
 
     }
+    
+//    public IRelationLocator getRelationLocator() {
+//        
+//        return relationLocator;
+//        
+//    }
+//    
+//    private final IRelationLocator relationLocator;
 
 }

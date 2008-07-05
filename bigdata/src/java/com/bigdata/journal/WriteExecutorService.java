@@ -188,8 +188,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             int corePoolSize, int maximumPoolSize,
             BlockingQueue<Runnable> queue, ThreadFactory threadFactory) {
 
-        super(corePoolSize, maximumPoolSize, Integer.MAX_VALUE,
-                TimeUnit.NANOSECONDS, queue, threadFactory);
+        super(  corePoolSize, //
+                maximumPoolSize,//
+                5 /* keepAliveTime */, TimeUnit.SECONDS,//
+                queue,//
+                threadFactory//
+                );
 
         if (resourceManager == null)
             throw new IllegalArgumentException();

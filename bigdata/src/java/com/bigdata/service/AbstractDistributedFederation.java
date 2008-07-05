@@ -477,4 +477,14 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
         
     }
     
+    /**
+     * Assumes that the federation is stable through failover services if
+     * nothing else.
+     */
+    public boolean isStable() {
+
+        return true;
+        
+    }
+
 }

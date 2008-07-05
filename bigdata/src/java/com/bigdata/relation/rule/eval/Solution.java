@@ -31,7 +31,9 @@ package com.bigdata.relation.rule.eval;
 import java.io.Serializable;
 
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 
 /**
@@ -59,7 +61,8 @@ public class Solution<E> implements ISolution<E>, Serializable {
      * requested, and clones and saves the bindingSet iff requested. The
      * requested behavior depends on {@link IJoinNexus#solutionFlags()}. When
      * requested, the element is created using
-     * {@link IJoinNexus#newElement(com.bigdata.relation.rule.IPredicate, IBindingSet)}.
+     * {@link IRelation#newElement(IPredicate, IBindingSet)} for the
+     * {@link IRelation} that is named by the head of the rule.
      * 
      * @param e
      *            The element.
@@ -88,7 +91,23 @@ public class Solution<E> implements ISolution<E>, Serializable {
 
         if ((flags & IJoinNexus.ELEMENT) != 0) {
 
-            this.e = (E) joinNexus.newElement(rule.getHead(), bindingSet);
+            /*
+             * The relation is responsible for how the elements are materialized
+             * from the bindings.
+             * 
+             * Note: Caching for this relation locator is very important!
+             */
+
+            // the head of the rule.
+            final IPredicate head = rule.getHead();
+            
+            // the relation named by the head of the rule.
+            final IRelation relation = joinNexus.getRelationLocator()
+                    .getRelation(head.getRelationName(),
+                            joinNexus.getReadTimestamp());
+
+            // use the relation's element factory.
+            this.e = (E) relation.newElement(head, bindingSet);
 
         } else {
 

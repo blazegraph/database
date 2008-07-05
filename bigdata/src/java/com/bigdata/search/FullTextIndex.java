@@ -375,6 +375,11 @@ public class FullTextIndex {
     private final long timeout;
     
     /**
+     * The basename of the search index.
+     */
+    public static final transient String NAME_SEARCH = "search";
+    
+    /**
      * <code>true</code> unless {{@link #getTimestamp()} is {@link ITx#UNISOLATED}.
      */
     final public boolean isReadOnly() {
@@ -471,7 +476,7 @@ public class FullTextIndex {
      */
     private void setupIndices() {
 
-        final String name = namespace + "search";
+        final String name = namespace + NAME_SEARCH;
 
         IIndex ndx = indexManager.getIndex(name, timestamp);
 

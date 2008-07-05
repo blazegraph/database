@@ -39,7 +39,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.service.IBigdataFederation;
@@ -64,6 +63,8 @@ import com.bigdata.sparse.SparseRowStore;
  * @version $Id$
  * @param <R>
  *            The generic type of the [R]elation.
+ * 
+ * @todo remove the generic type since locates any Class of existing relation.
  */
 public class DefaultRelationLocator<R> extends
         AbstractCachingRelationLocator<R> {

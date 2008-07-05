@@ -37,8 +37,11 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IPredicateConstraint;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * An abstraction corresponding to a set of elements using some schema (think a
@@ -127,4 +130,24 @@ public interface IRelation<E> {
      */
     Set<String> getIndexNames();
     
+    /**
+     * Create and return a new element. The element is constructed from the
+     * predicate given the bindings. Typically, this is used when generating an
+     * {@link ISolution} for an {@link IRule} during either a query or mutation
+     * operations. The element is NOT inserted into the relation.
+     * 
+     * @param predicate
+     *            The predicate that is the head of some {@link IRule}.
+     * @param bindingSet
+     *            A set of bindings for that {@link IRule}.
+     * 
+     * @return The new element.
+     * 
+     * @throws IllegalArgumentException
+     *             if any parameter is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the predicate is not fully bound given those bindings.
+     */
+    Object newElement(IPredicate predicate, IBindingSet bindingSet);
+
 }

@@ -136,21 +136,6 @@ public class LocalProgramTask implements IProgramTask,
 
     }
 
-    /**
-     * The default factory for rule evaluation.
-     * 
-     * @todo configure for scale-out variants?
-     */
-    private static transient IRuleTaskFactory defaultTaskFactory = new IRuleTaskFactory() {
-
-        public IStepTask newTask(IRule rule,IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
-            
-            return new LocalNestedSubqueryEvaluator(rule, joinNexus, buffer);
-            
-        }
-        
-    };
-    
 //    /**
 //     * De-serialization ctor.
 //     */
@@ -434,7 +419,7 @@ public class LocalProgramTask implements IProgramTask,
              */
 
             final QueryTask queryTask = new QueryTask(step, joinNexus,
-                    defaultTaskFactory, buffer, executorService, dataService);
+                    buffer, executorService, dataService);
 
             future = queryTask.submit();
             
@@ -520,7 +505,7 @@ public class LocalProgramTask implements IProgramTask,
             log.debug("begin: action="+action+", program=" + step.getName());
         
         final MutationTask mutationTask = new MutationTask(action, joinNexus,
-                step, defaultTaskFactory, executorService, dataService );
+                step, executorService, dataService );
 
         // submit to the service and await completion, returning the result.
         return mutationTask.submit().get();  
