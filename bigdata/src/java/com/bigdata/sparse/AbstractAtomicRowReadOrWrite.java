@@ -132,15 +132,16 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
      * @param primaryKey
      *            The primary key identifies the logical row of interest.
      * @param timestamp
-     *            A timestamp to obtain the value for the named property
-     *            whose timestamp does not exceed <i>timestamp</i> -or-
-     *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most
-     *            recent value for the property.
+     *            A timestamp to obtain the value for the named property whose
+     *            timestamp does not exceed <i>timestamp</i> -or-
+     *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most recent
+     *            value for the property.
      * @param filter
      *            An optional filter used to select the values for property
      *            names accepted by that filter.
      * 
-     * @return The logical row for that primary key.
+     * @return The logical row for that primary key -or- <code>null</code> iff
+     *         there is no data for the <i>primaryKey</i>.
      */
     protected static TPS atomicRead(IKeyBuilder keyBuilder, IIndex ndx,
             Schema schema, Object primaryKey, long timestamp, INameFilter filter) {
@@ -171,7 +172,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
      *         index. I.e., iff there are NO entries for that primary key
      *         regardless of whether or not they were selected.
      */
-    public Object apply(IIndex ndx) {
+    public TPS apply(final IIndex ndx) {
     
         return atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey, timestamp, filter);
         
@@ -188,9 +189,11 @@ abstract public class AbstractAtomicRowReadOrWrite extends AbstractIndexProcedur
      * @param timestamp
      * @param filter
      * 
-     * @return {@link TPS}
+     * @return {@link TPS} -or- <code>null</code> iff there is no data for the
+     *         logical row.
      */
-    protected static TPS atomicRead(IIndex ndx, final byte[] fromKey, final Schema schema, final long timestamp, final INameFilter filter) {
+    protected static TPS atomicRead(final IIndex ndx, final byte[] fromKey,
+            final Schema schema, final long timestamp, final INameFilter filter) {
     
         /*
          * Scan all entries within the fromKey/toKey range populating [tps] as

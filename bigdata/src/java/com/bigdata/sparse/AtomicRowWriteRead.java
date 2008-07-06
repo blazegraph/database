@@ -32,6 +32,8 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
      */
     private static final long serialVersionUID = 7481235291210326044L;
 
+    private IPrecondition precondition;
+    
     private Map<String,Object> propertySet;
     
     /**
@@ -59,9 +61,10 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
      * @param filter
      *            An optional filter used to restrict the property values
      *            that will be returned.
+     *            @param precondition
      */
     public AtomicRowWriteRead(Schema schema, Map<String, Object> propertySet,
-            long timestamp, INameFilter filter) {
+            long timestamp, INameFilter filter, IPrecondition precondition) {
         
         super(schema, propertySet.get(schema.getPrimaryKeyName()), timestamp,
                 filter);
@@ -89,21 +92,25 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
 
         }
 
+        this.precondition = precondition;
+        
         this.propertySet = propertySet;
         
     }
     
     /**
-     * If a property set was specified then do an atomic write of the
-     * property set. Regardless, an atomic read of the property set is then
-     * performed and the results of that atomic read are returned to the
-     * caller.
+     * If a property set was specified then do an atomic write of the property
+     * set. Regardless, an atomic read of the property set is then performed and
+     * the results of that atomic read are returned to the caller.
      * 
-     * @return The set of tuples for the primary key as a {@link TPS}
-     *         instance.
+     * @return The set of tuples for the primary key as a {@link TPS} instance
+     *         -or- <code>null</code> iff there is no data for the
+     *         <i>primaryKey</i>.
      */
-    public Object apply(IIndex ndx) {
+    public TPS apply(final IIndex ndx) {
 
+        final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
+        
         /*
          * Choose the timestamp.
          * 
@@ -142,9 +149,49 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
             
         }
         
+        /*
+         * Precondition test?
+         */
+        
+        if (precondition != null) {
+
+            /*
+             * Apply the optional precondition test.
+             */
+            
+            final TPS tps = atomicRead(keyBuilder, ndx, schema, propertySet.get(schema
+                    .getPrimaryKeyName()), timestamp, filter);
+
+            if(!precondition.accept(tps)) {
+
+                if(log.isInfoEnabled()) {
+
+                    log.info("precondition failed: "+tps);
+                    
+                }
+
+                // precondition failed.
+                tps.setPreconditionOk(false);
+                
+                // return the precondition state of the row.
+                return tps;
+                
+            }
+            
+        }
+        
+        /*
+         * Atomic write.
+         */
+        
         atomicWrite(ndx, schema, primaryKey, propertySet, timestamp);
 
         /*
+         * Atomic read
+         * 
+         * Note: the task hold a lock throughout so the pre-condition test, the
+         * atomic write, and the atomic read are atomic as a unit.
+         * 
          * Note: Read uses whatever timestamp was selected above!
          */
 
@@ -298,6 +345,8 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
         if (version != VERSION0)
             throw new IOException("Unknown version=" + version);
 
+        precondition = (IPrecondition)in.readObject();
+        
         /*
          * De-serialize into a property set using a tree map so that the
          * index write operations will be fully ordered.
@@ -332,7 +381,9 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
         
         // serialization version.
         out.writeShort(VERSION0);
-                    
+        
+        out.writeObject(precondition);
+        
         // #of property values
         out.writeInt(propertySet.size());
         

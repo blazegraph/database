@@ -526,7 +526,7 @@ public class BigdataRepository implements ContentRepository {
         
         // write the metadata (atomic operation).
         final ITPS tps = getMetadataIndex().write(metadataSchema, metadata,
-                AUTO_TIMESTAMP, null/* filter */);
+                AUTO_TIMESTAMP, null/* filter */, null/*precondition*/);
 
         final int version = (Integer) tps.get(MetadataSchema.VERSION).getValue();
 
@@ -647,7 +647,7 @@ public class BigdataRepository implements ContentRepository {
         metadata.remove(MetadataSchema.VERSION);
         
         return getMetadataIndex().write(metadataSchema, metadata,
-                AUTO_TIMESTAMP, null/* filter */).asMap();
+                AUTO_TIMESTAMP, null/* filter */,null/*precondition*/).asMap();
         
     }
     
@@ -708,7 +708,8 @@ public class BigdataRepository implements ContentRepository {
          * Mark the file version as deleted.
          * 
          * Note: This only deletes the "version" property - the other properties
-         * are not changed.
+         * are not changed.  Howevery, the file version will be understood as
+         * "deleted" by this class.
          */
         {
             
@@ -721,7 +722,7 @@ public class BigdataRepository implements ContentRepository {
             metadata.put(MetadataSchema.VERSION, null);
 
             getMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP,
-                    null/* filter */);
+                    null/* filter */, null/*precondition*/);
             
         }
 
@@ -990,7 +991,7 @@ public class BigdataRepository implements ContentRepository {
             
             ITuple<TPV> tuple = super.next();
 
-            // FIXME This does not update the timestamp!
+            // FIXME This does not update the timestamp which is part of the key!
             src.getIndex().insert(tuple.getKey(), ValueType.encode(null));
             
             return tuple;

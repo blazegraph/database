@@ -71,6 +71,28 @@ public class TPS implements ITPS, Externalizable {
     private TreeMap<TP,ITPV> tuples;
 
     /**
+     * Used to pass back additional metadata for an atomic write with an
+     * {@link IPrecondition} test.
+     */
+    private boolean preconditionOk = true;
+    
+    /**
+     * <code>true</code> unless an atomic write operation specified an
+     * {@link IPrecondition} and that {@link IPrecondition} was not satisified.
+     */
+    public boolean isPreconditionOk() {
+        
+        return preconditionOk;
+        
+    }
+    
+    void setPreconditionOk(boolean flag) {
+        
+        this.preconditionOk = flag;
+        
+    }
+    
+    /**
      * De-serialization constructor.
      */
     public TPS() {
@@ -416,6 +438,8 @@ public class TPS implements ITPS, Externalizable {
         // #of tuples.
         out.writeInt(tuples.size());
         
+        out.writeBoolean(preconditionOk);
+        
         // @todo property name codec.
         
         // @todo timestamp codec.
@@ -466,6 +490,8 @@ public class TPS implements ITPS, Externalizable {
         
         this.tuples = new TreeMap<TP,ITPV>();
 
+        this.preconditionOk = in.readBoolean();
+        
         // #of tuples.
         final int n = in.readInt();
 
