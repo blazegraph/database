@@ -26,6 +26,7 @@ package com.bigdata.sparse;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -33,10 +34,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.AbstractTupleFilterator.AtomicRowIterator2;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
-import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.repo.BigdataRepository;
 import com.bigdata.sparse.AtomicRowScan.TPSList;
 
 /**
@@ -136,25 +135,18 @@ import com.bigdata.sparse.AtomicRowScan.TPSList;
  * current row from the sparse row store since its value is greater or equal to
  * any valid timestamp.
  * </p>
+ * <p>
+ * Note: Very large objects should be stored in the {@link BigdataRepository}
+ * (distributed, atomic, versioned, chunked file system) and the identifier for
+ * that object can then be stored in the row store.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * FIXME write a REST service using Json to interchange data with the
- * {@link SparseRowStore}
- * 
- * FIXME Add atomic "get and create if not defined" operation. It will accept a
- * property set that gets written iff there is no property set for the schema
- * and primary key. If there is a row for the key, then it is returned and
- * nothing is written. Unlike a normal read, this operation will be UNISOLATED
- * in order to have an atomic guarentee.
- * 
- * @todo consider a caching layer using a {@link NamedLock} based on the schema
- *       and primary key and a {@link WeakValueCache} backed by an
- *       {@link LRUCache}. This would allow a remote client to read data that
- *       might be stale from the cache. This would be useful for hotspots but
- *       should be part of an application layer for the row store, not in the
- *       core impl.
+ * {@link SparseRowStore}. A caching layer in the web app could be used to
+ * reduce any hotspots.
  * 
  * @todo I am not sure that the timestamp filtering mechanism is of much use.
  *       You can't really filter out the low end for a property value since a
@@ -262,27 +254,18 @@ public class SparseRowStore {
 //     */
 //    public class TPVTupleSerializer implements ITupleSerializer {
 //
-//        final IKeyBuilder keyBuilder;
-//        
 //        /**
 //         * De-serialization ctor.
 //         */
 //        public TPVTupleSerializer() {
-//
-//            /*
-//             * @todo store relevant properties in the IndexMetadata so that we
-//             * can create the appropriate KeyBuilder instances on demand.
-//             */
-//            
-//            Properties properties = new Properties();
-//            
-//            keyBuilder = KeyBuilder.newUnicodeInstance(properties);
 //            
 //        }
 //        
 //        public byte[] serializeKey(TPV t) {
 //            
 //            if(t == null) throw new IllegalArgumentException();
+//            
+//            IKeyBuilder keyBuilder = getKeyBuilderFactory().getKeyBuilder();
 //            
 //            final byte[] key = t.getSchema().getKey(keyBuilder, t.primaryKey, t.getName(), t.getTimestamp());
 //            
@@ -422,8 +405,8 @@ public class SparseRowStore {
     public Map<String,Object> write(Schema schema,
             Map<String, Object> propertySet) {
 
-        return write(schema, propertySet, Long.MAX_VALUE/* timestamp */, null/* filter */)
-                .asMap();
+        return write(schema, propertySet, Long.MAX_VALUE/* timestamp */,
+                null/* filter */, null/* precondition */).asMap();
         
     }
 
@@ -432,7 +415,12 @@ public class SparseRowStore {
      * row.
      * <p>
      * Note: In order to cause a column value for row to be deleted you MUST
-     * specify a <code>null</code> column value for that column.
+     * specify a <code>null</code> column value for that column. A
+     * <code>null</code> will be written under the key for the column value
+     * with a new timestamp. This is interpreted as a deleted property value
+     * when the row is simplified as a {@link Map}. If you examine the
+     * {@link ITPS} you can see the {@link ITPV} with the <code>null</code>
+     * value and the timestamp of the delete.
      * <p>
      * Note: the value of the <i>primaryKey</i> is written each time the
      * logical row is updated and timestamp associate with the value for the
@@ -441,12 +429,31 @@ public class SparseRowStore {
      * Note: If the caller specified a <i>timestamp</i>, then that timestamp is
      * used by the atomic read. If the timestamp was assigned by the server,
      * then the server assigned timestamp is used by the atomic read.
+     * <p>
+     * Note: You can verify pre-conditions for the logical row on the server.
+     * Among other things this could be used to reject an update if someone has
+     * modified the logical row since you last read some value. Atomic
+     * distributed processes, can be managed in this way. For example, given an
+     * agreed upon lease duration, the atomic write sets a property
+     * ("running=UUID"), where the {@link UUID} is generated by the caller. A
+     * process must maintain the lease by re-writing the property value before
+     * the lease has expired. When a process finishes it does another atomic
+     * write with pre-condition test to verify that it is still the "running"
+     * {@link UUID}, perhaps causing the "running" property to be deleted
+     * (overwritten by a <code>null</code> property value). If the process
+     * {@link UUID} is not found for the "running" property, then the lease has
+     * been stolen. If a concurrent process sees that property and the lease has
+     * expired, then it needs to steal the row by overwriting the property
+     * value. The actual UUIDs are arbitrary and need only remain consistent for
+     * a given process.
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
      * 
      * @param propertySet
-     *            The column names and values for that row.
+     *            The column names and values for that row. The primaryKey as
+     *            identified by the {@link Schema} MUST be present in the
+     *            <i>propertySet</i>.
      * 
      * @param timestamp
      *            The timestamp to use for the row -or-
@@ -457,16 +464,25 @@ public class SparseRowStore {
      *            An optional filter used to select the property values that
      *            will be returned (this has no effect on the atomic write).
      * 
+     * @param precondition
+     *            When present, the pre-condition state of the row will be read
+     *            and offered to the {@link IPrecondition}. If the
+     *            {@link IPrecondition} fails, then the atomic write will NOT be
+     *            performed and the pre-condition state of the row will be
+     *            returned. If the {@link IPrecondition} succeeds, then the
+     *            atomic write will be performed and the post-condition state of
+     *            the row will be returned. Use {@link TPS#isPreconditionOk()}
+     *            to determine whether or not the write was performed.
+     * 
      * @return The result of an atomic read on the post-update state of the
-     *         logical row.
+     *         logical row -or- <code>null</code> iff there is no data for the
+     *         <i>primaryKey</i>. If an optional {@link IPrecondition} was
+     *         specified and the {@link IPrecondition} was NOT satisified, then
+     *         the write operation was NOT performed and the result is the
+     *         pre-condition state of the logical row (which will be
+     *         <code>null</code> iff there is no data for the <i>primaryKey</i>).
      * 
      * @see ITPS#getTimestamp()
-     * 
-     * @todo add an assertion that the caller can pass through to validate the
-     *       state of the logical row on the server before or after the atomic
-     *       update. Among other things this could be used to reject an update
-     *       if someone has modified the logical row since you last read some
-     *       value.
      * 
      * @todo the atomic read back may be overkill. When you need the data is
      *       means that you only do one RPC rather than two. When you do not
@@ -487,11 +503,11 @@ public class SparseRowStore {
      *       by the {@link Schema} and therefore factored out of this method
      *       signature.
      */
-    public ITPS write(Schema schema, Map<String, Object> propertySet,
-            long timestamp, INameFilter filter) {
-
+    public TPS write(Schema schema, Map<String, Object> propertySet,
+            long timestamp, INameFilter filter, IPrecondition precondition) {
+        
         final AtomicRowWriteRead proc = new AtomicRowWriteRead(schema,
-                propertySet, timestamp, filter);
+                propertySet, timestamp, filter, precondition);
 
         final Object primaryKey = propertySet.get(schema.getPrimaryKeyName());
 
@@ -513,8 +529,8 @@ public class SparseRowStore {
      * @return The deleted property values.
      */
     public ITPS delete(Schema schema, Object primaryKey) {
-        
-        return delete(schema,primaryKey,AUTO_TIMESTAMP,null/*filter*/);
+
+        return delete(schema, primaryKey, AUTO_TIMESTAMP, null/* filter */);
         
     }
     
@@ -534,6 +550,8 @@ public class SparseRowStore {
      *            will be deleted.
      * 
      * @return The deleted property values.
+     * 
+     * @todo add optional {@link IPrecondition}.
      * 
      * @todo unit tests.
      */

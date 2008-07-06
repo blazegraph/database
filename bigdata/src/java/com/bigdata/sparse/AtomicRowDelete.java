@@ -61,7 +61,7 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
      * 
      * @return The matching properties as read before they were deleted.
      */
-    public Object apply(IIndex ndx) {
+    public TPS apply(IIndex ndx) {
 
         /*
          * Choose the timestamp.

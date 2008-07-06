@@ -54,10 +54,12 @@ import com.bigdata.util.CSVReader;
 
 /**
  * Test suite for {@link SparseRowStore}.
+ * <p>
+ * Note: A lot of the pragmatic tests are being done by the
+ * {@link BigdataRepository} which uses the {@link SparseRowStore} for its file
+ * metadata index.
  * 
- * FIXME clean up this test suite. it's not got much to offer. a lot of the
- * pragmatic tests are being done by the {@link BigdataRepository} which uses
- * the {@link SparseRowStore} for its file metadata index.
+ * FIXME clean up this test suite.
  * 
  * @todo test with auto-generated timestamps.
  * 
@@ -194,11 +196,15 @@ public class TestSparseRowStore extends TestCase2 {
                  * FIXME compute the difference from the current row and store
                  * only the difference -- this should perhaps be done inside of
                  * write(). without this step, each row loaded replicates all
-                 * column values.
+                 * column values (this is only an issue for things like the CSV
+                 * load and could be performed on the client to minimize IO; if
+                 * performed on the server then an overwrite of a property value
+                 * would not update the timestamp, which might not be
+                 * desirable).
                  */
                 
                 // write on the sparse row store.
-                srs.write(schema, row, timestamp, null/*filter*/ );
+                srs.write(schema, row, timestamp, null/*filter*/, null/*precondition*/ );
 
                 /*
                  * Verify read back of the row that we just wrote.
@@ -364,6 +370,103 @@ public class TestSparseRowStore extends TestCase2 {
             assertEquals( "Mike", row.get("Name"));
             assertEquals( "UT", row.get("State"));
             
+        }
+        
+    }
+    
+    /**
+     * Test of {@link IPrecondition} handling for atomic writes.
+     */
+    public void test_writeWithPrecondition() {
+    
+        final Schema schema = new Schema("Employee", "Id", KeyType.Long);
+
+        SparseRowStore srs = new SparseRowStore(btree);
+
+        {
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 1L);
+            propertySet.put("Name", "Bryan");
+            propertySet.put("State", "DC");
+
+            final TPS tps = srs.write(schema, propertySet, 1L/* timestamp */,
+                    null/* filter */, new EmptyRowPrecondition());
+
+            assertTrue(tps.isPreconditionOk());
+            
+        }
+
+        {
+            /*
+             * Atomic write where the pre-condition is not satisfied.
+             */
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 1L);
+            propertySet.put("Name", "Mike");
+            propertySet.put("State", "UT");
+
+            final IPrecondition precondition = new IPrecondition() {
+
+                private static final long serialVersionUID = 1L;
+
+                public boolean accept(ITPS logicalRow) {
+
+                    return "Mike".equals(logicalRow.get("Name").getValue());
+                    
+                }
+                
+            };
+
+            final TPS tps = srs.write(schema, propertySet, 1L/* timestamp */,
+                    null/* filter */, precondition);
+
+            assertFalse(tps.isPreconditionOk());
+            
+            // verify row state is unchanged.
+            assertEquals(1L,tps.get("Id").getValue());
+            assertEquals("Bryan",tps.get("Name").getValue());
+            assertEquals("DC",tps.get("State").getValue());
+            
+        }
+
+        {
+            /*
+             * Atomic write where the pre-condition is satisfied.
+             */
+
+            final Map<String, Object> propertySet = new HashMap<String, Object>();
+
+            propertySet.put("Id", 1L);
+            propertySet.put("Name", "Bryan");
+            propertySet.put("State", "NC");
+
+            final IPrecondition precondition = new IPrecondition() {
+
+                private static final long serialVersionUID = 1L;
+
+                public boolean accept(ITPS logicalRow) {
+
+                    return "Bryan".equals(logicalRow.get("Name").getValue())
+                            && "DC".equals(logicalRow.get("State").getValue());
+
+                }
+
+            };
+
+            final TPS tps = srs.write(schema, propertySet, 1L/* timestamp */,
+                    null/* filter */, precondition);
+
+            assertTrue(tps.isPreconditionOk());
+
+            // verify row state is changed.
+            assertEquals(1L, tps.get("Id").getValue());
+            assertEquals("Bryan", tps.get("Name").getValue());
+            assertEquals("NC", tps.get("State").getValue());
+
         }
 
     }
