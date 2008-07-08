@@ -113,10 +113,6 @@ abstract public class AbstractSolutionBuffer<R> extends
 
             };
 
-            /*
-             * FIXME For the RDF DB, also write the solutions on the optional
-             * justifications index (if it is defined).
-             */
             return getRelation().insert(itr2);
             
         }

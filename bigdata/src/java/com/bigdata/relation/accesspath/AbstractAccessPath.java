@@ -62,6 +62,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     protected static final Logger log = Logger.getLogger(IAccessPath.class);
     
     protected final ExecutorService service;
+    protected final IRelation<R> relation;
     protected final IPredicate<R> predicate;
     protected final IKeyOrder<R> keyOrder;
     protected final IIndex ndx;
@@ -156,12 +157,16 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      *       must be layer on top of this lower-level constaint.
      */
     protected AbstractAccessPath(final ExecutorService service,
+            final IRelation<R> relation,// @todo MutableRelation? AbstractRelation?
             final IPredicate<R> predicate, final IKeyOrder<R> keyOrder,
             final IIndex ndx, final int flags) {
 
         if (service == null)
             throw new IllegalArgumentException();
-        
+
+        if (relation == null)
+            throw new IllegalArgumentException();
+
         if (predicate == null)
             throw new IllegalArgumentException();
 
@@ -172,6 +177,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             throw new IllegalArgumentException();
 
         this.service = service;
+
+        this.relation = relation;
         
         this.predicate = predicate;
 
@@ -202,7 +209,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                 @SuppressWarnings("unchecked")
                 public boolean isValid(ITuple tuple) {
                     
-                    R e = (R)tuple.getValue();
+                    R e = (R)tuple.getObject();
                     
                     return constraint.accept(e);
                     
@@ -282,19 +289,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
-//    /**
-//     * Convert an {@link IPredicate} into the equivalent element.
-//     * <p>
-//     * Note: Both constants and unbound variables need to be converted in a
-//     * type-specific manner
-//     * 
-//     * @param predicate
-//     *            The predicate.
-//     * 
-//     * @return The equivalent element.
-//     */
-//    abstract protected R toElement(IPredicate<R> predicate);
-
     public IIndex getIndex() {
         
         return ndx;
@@ -315,7 +309,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
         try {
             
-            return itr.hasNext();
+            return ! itr.hasNext();
             
         } finally {
             
@@ -527,8 +521,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         }
         
-        return new ChunkedArrayIterator<R>(nread, buffer, keyOrder);
+        if (nread == 0) {
+
+            return new EmptyChunkedIterator<R>(keyOrder);
             
+        }
+        
+        return new ChunkedArrayIterator<R>(nread, buffer, keyOrder);
+
     }
     
     /**
@@ -581,35 +581,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         buffer.setFuture(future);
         
         return buffer.iterator();
-        
-//        return new DelegateChunkedIterator<R>(buffer.iterator()) {
-//            
-//            /**
-//             * Extended to cancel the Future that is reading on the index if the
-//             * caller closes the iterator.
-//             */
-//            public void close() {
-//                
-//                try {
-//                
-//                    super.close();
-//                    
-//                } finally {
-//
-//                    if (log.isDebugEnabled()) {
-//
-//                        log.debug("Cancelling task: "
-//                                        + AbstractAccessPath.this);
-//                        
-//                    }
-//
-//                    future.cancel(true/* mayInterruptIfRunning */);
-//                    
-//                }
-//                
-//            }
-//            
-//        };
             
     }
 
@@ -662,9 +633,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     /**
      * This implementation removes all tuples that would be visited by the
-     * access path from the backing index. If you are maintaining multiple
-     * indices then you MUST override this method to remove the data from each
-     * of those indices.
+     * access path from the backing index.
+     * <p>
+     * Note: If you are maintaining multiple indices then you MUST override this
+     * method to remove the data from each of those indices.
      */
     public long removeAll() {
 
