@@ -33,6 +33,7 @@ import java.util.Properties;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.KeyBuilder.CollatorEnum;
 import com.bigdata.btree.KeyBuilder.Options;
 import com.bigdata.btree.KeyBuilder.StrengthEnum;
 
@@ -75,9 +76,19 @@ abstract public class AbstractUnicodeKeyBuilderTestCase extends TestCase2 {
 
         properties.setProperty(Options.USER_COUNTRY, Locale.US.getCountry());
         
-        properties.setProperty(Options.STRENGTH, ""+StrengthEnum.Primary);
+        properties.setProperty(Options.STRENGTH, StrengthEnum.Primary
+                .toString());
 
-        IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance(properties);
+        final DefaultKeyBuilderFactory factory = new DefaultKeyBuilderFactory(
+                properties);
+
+        assertEquals(Locale.US.getLanguage(), factory.getLocale().getLanguage());
+
+        assertEquals(Locale.US.getCountry(), factory.getLocale().getCountry());
+
+        assertEquals(StrengthEnum.Primary, factory.getStrength());
+        
+        final IKeyBuilder keyBuilder = factory.getKeyBuilder();
 
 //        // verify assumption under that configuration.
 //        {
@@ -156,7 +167,7 @@ abstract public class AbstractUnicodeKeyBuilderTestCase extends TestCase2 {
      */
     public void test_keyBuilder_unicode_String_noTrailingNul() {
 
-        IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance();
+        IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance(getProperties());
         
         keyBuilder.append("Hello World!");
         

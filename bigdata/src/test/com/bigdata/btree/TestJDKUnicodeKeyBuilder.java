@@ -30,6 +30,7 @@ package com.bigdata.btree;
 
 import java.util.Properties;
 
+import com.bigdata.btree.KeyBuilder.CollatorEnum;
 import com.bigdata.btree.KeyBuilder.Options;
 
 /**
@@ -58,9 +59,23 @@ public class TestJDKUnicodeKeyBuilder extends AbstractUnicodeKeyBuilderTestCase 
 
         Properties properties = new Properties(super.getProperties());
         
-        properties.setProperty(Options.ICU,"false");
+        properties.setProperty(Options.COLLATOR,CollatorEnum.JDK.toString());
         
         return properties;
+        
+    }
+    
+    public void test_correctCollator() {
+        
+        Properties properties = getProperties();
+        
+        log.info("properties="+properties);
+        
+        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
+                .newUnicodeInstance(properties);
+
+        assertEquals(JDKSortKeyGenerator.class, keyBuilder
+                .getSortKeyGenerator().getClass());
         
     }
     

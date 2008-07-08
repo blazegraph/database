@@ -28,10 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Properties;
 
 /**
  * Default implementation uses the {@link KeyBuilder} to format the object as a
@@ -41,29 +41,35 @@ import java.io.ObjectOutput;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NOPTupleSerializer implements ITupleSerializer, Externalizable {
+public class NOPTupleSerializer extends DefaultTupleSerializer {
+// implements ITupleSerializer, Externalizable {
 
     /**
      * 
      */
     private static final long serialVersionUID = 2211020411074955099L;
 
-    public static transient final ITupleSerializer INSTANCE = new NOPTupleSerializer();
-    
+    public static transient final ITupleSerializer INSTANCE = new NOPTupleSerializer(new DefaultKeyBuilderFactory(new Properties()));
+
+    /**
+     * De-serialization ctor.
+     */
     public NOPTupleSerializer() {
         
     }
 
-    /**
-     * Serialization using {@link KeyBuilder#asSortKey(Object)}
-     */
+    public NOPTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
+
+        super(keyBuilderFactory);
+        
+    }
+
     public byte[] serializeKey(Object obj) {
 
         if (obj == null)
             throw new IllegalArgumentException();
         
-        // @todo thread-local keybuilder instead?
-        return KeyBuilder.asSortKey(obj);
+        return getKeyBuilder().reset().append(obj).getKey();
         
     }
 
@@ -101,13 +107,13 @@ public class NOPTupleSerializer implements ITupleSerializer, Externalizable {
 
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 
-        // NOP
+        super.readExternal(in);
         
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        // NOP
+        super.writeExternal(out);
         
     }
 

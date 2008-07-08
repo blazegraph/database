@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule;
 
 import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * A generic implementation.
@@ -47,7 +48,7 @@ public class Predicate<E> implements IPredicate<E> {
     
     private final IVariableOrConstant[] values;
     
-    private final IPredicateConstraint<E> constraint;
+    private final IElementFilter<E> constraint;
 
     /**
      * Copy constructor creates a new instance of this class with any unbound
@@ -120,7 +121,7 @@ public class Predicate<E> implements IPredicate<E> {
      *            An optional constraint.
      */
     public Predicate(IRelationName<E> relation, IVariableOrConstant[] values,
-            IPredicateConstraint<E> constraint) {
+            IElementFilter<E> constraint) {
 
         if (relation == null)
             throw new IllegalArgumentException();
@@ -172,7 +173,7 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
 
-    public IPredicateConstraint<E> getConstraint() {
+    public IElementFilter<E> getConstraint() {
 
         return constraint;
         

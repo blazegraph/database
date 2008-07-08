@@ -81,7 +81,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      *            iff not known.
      */
     public ChunkedArrayIterator(int n, E[] a, IKeyOrder<E> keyOrder) {
-
+    
         if (a == null)
             throw new IllegalArgumentException();
 

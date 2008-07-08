@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
 
+import com.bigdata.btree.KeyBuilder.CollatorEnum;
 import com.bigdata.btree.KeyBuilder.Options;
 import com.ibm.icu.text.Collator;
 
@@ -69,9 +70,23 @@ public class TestICUUnicodeKeyBuilder extends AbstractUnicodeKeyBuilderTestCase 
 
         Properties properties = new Properties(super.getProperties());
         
-        properties.setProperty(Options.ICU,"true");
+        properties.setProperty(Options.COLLATOR,CollatorEnum.ICU.toString());
         
         return properties;
+        
+    }
+    
+    public void test_correctCollator() {
+        
+        Properties properties = getProperties();
+        
+        log.info("properties="+properties);
+        
+        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
+                .newUnicodeInstance(properties);
+
+        assertEquals(ICUSortKeyGenerator.class, keyBuilder
+                .getSortKeyGenerator().getClass());
         
     }
     
@@ -164,7 +179,15 @@ public class TestICUUnicodeKeyBuilder extends AbstractUnicodeKeyBuilderTestCase 
      */
     protected boolean doSuccessorTest(String s, Properties properties) {
 
-        final IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance(properties);
+        final DefaultKeyBuilderFactory factory = new DefaultKeyBuilderFactory(properties);
+        
+        assertEquals(factory.getCollator(), CollatorEnum.ICU);
+
+        assertEquals(factory.getLocale().getLanguage(), Locale.US.getLanguage());
+
+        assertEquals(factory.getLocale().getCountry(), Locale.US.getCountry());
+        
+        final IKeyBuilder keyBuilder = factory.getKeyBuilder();
 
         final String successor = SuccessorUtil.successor(s);
 

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -41,7 +42,7 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Program implements IProgram {
+public class Program implements IProgram, Serializable {
 
     private static final long serialVersionUID = 2774954504183880320L;
 
@@ -68,11 +69,24 @@ public class Program implements IProgram {
      * @param parallel
      *            <code>true</code> iff the steps in the program are
      *            parallelizable.
+     */
+    public Program(String name, boolean parallel) {
+
+        this(name,parallel,false/*closure*/);
+        
+    }
+    
+    /**
+     * An empty program.
+     * 
+     * @param parallel
+     *            <code>true</code> iff the steps in the program are
+     *            parallelizable.
      * @param closure
      *            <code>true</code> iff the steps in the program must be run
      *            until a fixed point is achieved.
      */
-    public Program(String name, boolean parallel, boolean closure) {
+    protected Program(String name, boolean parallel, boolean closure) {
         
         if (name == null)
             throw new IllegalArgumentException();

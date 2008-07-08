@@ -85,7 +85,7 @@ public class TestCompletionScan extends TestCase2 {
      * Used to form the keys for the index and to (de-)serialize the values
      * stored in the index.
      */
-    final ITupleSerializer tupleSer = new DefaultTupleSerializer();
+    final ITupleSerializer tupleSer = DefaultTupleSerializer.INSTANCE;
     
     protected ITuple<String> newTestTuple(String s) {
 

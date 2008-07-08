@@ -32,6 +32,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Properties;
 
 import com.bigdata.io.SerializerUtil;
 
@@ -49,12 +50,65 @@ public class DefaultTupleSerializer implements ITupleSerializer, Externalizable 
      */
     private static final long serialVersionUID = 2211020411074955099L;
 
-    public static transient final ITupleSerializer INSTANCE = new DefaultTupleSerializer();
+    public static transient final ITupleSerializer INSTANCE = new DefaultTupleSerializer(
+            new DefaultKeyBuilderFactory(new Properties()));
+
+    /**
+     * the factory specified to the ctor.
+     */
+    private IKeyBuilderFactory delegateKeyBuilderFactory;
+
+    /**
+     * the {@link #delegateKeyBuilderFactory} wrapped up in thread-local
+     * factory.
+     */
+    private transient IKeyBuilderFactory threadLocalKeyBuilderFactory;
     
+    /**
+     * De-serialization ctor.
+     */
     public DefaultTupleSerializer() {
         
     }
 
+    /**
+     * Designate ctor.
+     * 
+     * @param keyBuilderFactory
+     *            The {@link IKeyBuilderFactory}, which will be automatically
+     *            wrapped up by a {@link ThreadLocalKeyBuilderFactory}.
+     */
+    public DefaultTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
+
+        if (keyBuilderFactory == null)
+            throw new IllegalArgumentException();
+        
+        threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(
+                keyBuilderFactory);
+        
+        this.delegateKeyBuilderFactory = keyBuilderFactory;
+        
+    }
+    
+    /**
+     * A {@link ThreadLocalKeyBuilderFactory} wrapping a {@link DefaultKeyBuilderFactory} 
+     */
+    public IKeyBuilder getKeyBuilder() {
+
+        if(threadLocalKeyBuilderFactory == null) {
+            
+            /*
+             * This can happen if you use the de-serialization ctor by mistake.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        return threadLocalKeyBuilderFactory.getKeyBuilder();
+
+    }
+    
     /**
      * Serialization using {@link KeyBuilder#asSortKey(Object)}
      */
@@ -63,8 +117,7 @@ public class DefaultTupleSerializer implements ITupleSerializer, Externalizable 
         if (obj == null)
             throw new IllegalArgumentException();
         
-        // @todo thread-local keybuilder instead?
-        return KeyBuilder.asSortKey(obj);
+        return getKeyBuilder().reset().append(obj).getKey();
         
     }
 
@@ -115,13 +168,15 @@ public class DefaultTupleSerializer implements ITupleSerializer, Externalizable 
 
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 
-        // NOP
+        delegateKeyBuilderFactory = (IKeyBuilderFactory)in.readObject();
+        
+        threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(delegateKeyBuilderFactory);
         
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        // NOP
+        out.writeObject(delegateKeyBuilderFactory);
         
     }
 

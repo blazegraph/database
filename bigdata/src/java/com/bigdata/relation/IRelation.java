@@ -37,9 +37,9 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IPredicateConstraint;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ISolution;
 
@@ -105,7 +105,7 @@ public interface IRelation<E> {
      * irrelevant {@link ITuple}s during the scan - this is very important when
      * the index is remote!
      * <p>
-     * If there are any {@link IPredicateConstraint}s then the access path MUST
+     * If there are any {@link IElementFilter}s then the access path MUST
      * incorporate those constraints such that only elements that satisify the
      * constraints may be visited.
      * <p>
@@ -114,6 +114,12 @@ public interface IRelation<E> {
      * {@link IPredicate}, those constraints should be translated into
      * constraints imposed on the underlying {@link ITupleIterator} and sent
      * with it to be evaluated local to the data.
+     * <p>
+     * Note: Filters should be specified when the {@link IAccessPath} is
+     * constructed so that they will be evalated on the data service rather than
+     * materializing the elements and then filtering then. This can be
+     * accomplished by adding the filter as a constraint on the predicate when
+     * specifying the access path.
      * 
      * @param predicate
      *            The constraint on the elements to be visited.

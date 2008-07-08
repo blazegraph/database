@@ -83,7 +83,7 @@ import com.bigdata.service.IMetadataService;
  *            The generic type of the application value.
  */
 public interface ITupleSerializer<K extends Object, V extends Object> extends
-        Serializable {
+        IKeyBuilderFactory, Serializable {
 
 //    /**
 //     * This method is invoked to notify the implementation of the backing store.
@@ -122,6 +122,39 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
 //     *             if the store has already been set on this object.
 //     */
 //    void setStore(IRawStore store);
+
+//    /**
+//     * Automatically invoked to set the {@link IKeyBuilder} configured for the
+//     * {@link IIndex} when an {@link ITupleSerializer} is de-serialized from an
+//     * {@link IndexMetadata} object.
+//     * 
+//     * @todo if defined, then I also need to do this when de-serializing the
+//     *       {@link ITupleSerializer} for a {@link ResultSet}.
+//     * 
+//     * @todo an alternative is to define getKeyBuilderFactory() and a protocol
+//     *       to make sure that the factory is set on the
+//     *       {@link ITupleSerializer} if it is set on the owning
+//     *       {@link IndexMetadata}. Then the factory will stick with the
+//     *       {@link ITupleSerializer} without further troubles.
+//     * 
+//     * FIXME Best yet, have the factory on the {@link ITupleSerializer} directly
+//     * and have the {@link IndexMetadata} just read it off of the
+//     * {@link ITupleSerializer}! (Modify SPOTupleSerializer and DefaultTupleSerializer).
+//     */
+//    IKeyBuilderFactory getKeyBuilder();
+//    void setKeyBuilderFactory(IKeyBuilderFactory keyBuilderFactory);
+
+    /**
+     * Factory for thread-safe {@link IKeyBuilder} objects for use by
+     * {@link ITupleSerializer#serializeKey(Object)} and possibly others.
+     * <p>
+     * Note: A mutable B+Tree is always single-threaded. However, read-only
+     * B+Trees allow concurrent readers. Therefore, thread-safety requirement
+     * for this {@link IKeyBuilderFactory} is
+     * <em>safe for either a single writers -or-
+     * for concurrent readers</em>.
+     */
+    public IKeyBuilder getKeyBuilder();
     
     /**
      * Serialize a facet of an object's state that places the object into the

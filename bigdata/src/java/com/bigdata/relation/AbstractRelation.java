@@ -32,6 +32,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
@@ -39,6 +40,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -174,27 +176,41 @@ abstract public class AbstractRelation<E> implements IMutableRelation<E> {
 
     /**
      * 
-     * @todo race conditions in index registration could be handled by having a
-     *       property that indicated whether or not the indices were in the
-     *       process of being registered. The value of the property could be a
-     *       UUID identifying the client. The property would be cleared once the
-     *       indices were registered. Other clients observing the property would
-     *       wait until it had been cleared. If not cleared within a timeout
-     *       (say 10 seconds) then the waiting client should assume that the
-     *       client attempting to register the indices had died. In that case
-     *       the client should itself assert the property and then attempt to
-     *       register the indices itself - dropping existing indices is Ok IFF
-     *       they are empty, otherwise we need a thrown exception and a flag to
-     *       allow override.
+     * @todo Lock service supporting shared locks, leases and lease renewal,
+     *       excalation of shared locks to exclusive locks, deadlock detection,
+     *       and possibly a resource hierarchy. Leases should be Callable
+     *       objects that are submitted by the client to its executor service so
+     *       that they will renew automatically until cancelled (and will cancel
+     *       automatically if not renewed).
+     *       <P>
+     *       There is existing code that could be adapted for this purpose. It
+     *       might have to be adapted to support lock escalation (shared to
+     *       exclusive), a resource hierarchy, and a delay queue to cancel
+     *       leases that are not renewed. It would have to be wrapped up as a
+     *       low-latency service and made available via the
+     *       {@link IBigdataFederation}. It also needs to use a weak reference
+     *       cache for the collection of resource queues so that they are GC'd
+     *       rather than growing as new resources are locked and never
+     *       shrinking.
      *       <p>
-     *       To avoid a race condition when the client attemps to take a
-     *       compensating action we need a means to update a property iff some
-     *       pre-condition is satisified.
+     *       If we require pre-declaration of locks, then we do not need the
+     *       dependency graph since deadlocks can only arise with 2PL.
      *       <p>
-     *       A similar approach could be used when taking a triple store offline
-     *       and dropping its indices.
+     *       Since the service is remote it should use {@link UUID}s to
+     *       identify the lock owner(s).
+     *       <p>
+     *       The lock service would be used to bracket operations such as
+     *       relation {@link #create()} and {@link #destroy()} and would be used
+     *       to prevent those operations while a lease is held by concurrent
+     *       processes with a shared lock.
      *       <p>
      *       Add ctor flag to create iff not found?
+     *       <p>
+     *       There needs to be a lock protocol for subclasses so that they can
+     *       ensure that they are the only task running create (across the
+     *       federation) and so that they can release the lock when they are
+     *       done. The lock can be per the notes above, but the protocol with
+     *       the subclass will require some coordinating methods.
      */
     public AbstractRelation<E> create() {
         

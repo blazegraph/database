@@ -32,6 +32,7 @@ import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationName;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.ISolution;
 
@@ -60,7 +61,7 @@ public interface IPredicate<E> extends Cloneable {
     /**
      * An optional constraint on the visitable elements.
      */
-    public IPredicateConstraint<E> getConstraint();
+    public IElementFilter<E> getConstraint();
     
     /**
      * Return true iff all arguments of the predicate are bound (vs

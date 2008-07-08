@@ -1,9 +1,9 @@
 package com.bigdata.relation.rule.eval;
 
 import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IPredicateConstraint;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
@@ -42,7 +42,7 @@ public class DelegatePredicate<E> implements IPredicate<E> {
         return src.get(index);
     }
 
-    public IPredicateConstraint<E> getConstraint() {
+    public IElementFilter<E> getConstraint() {
         return src.getConstraint();
     }
 
