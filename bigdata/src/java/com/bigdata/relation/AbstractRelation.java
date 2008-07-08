@@ -43,10 +43,17 @@ import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.service.IBigdataFederation;
 
 /**
+ * Base class for {@link IRelation} and {@link IMutableRelation} impls.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <E>
  *            The generic type of the [E]lements of the relation.
+ * 
+ * @todo It would be interesting to do a GOM relation with its secondary index
+ *       support and the addition of clustered indices. We would then get
+ *       efficient JOINs via the rules layer for free and a high-level query
+ *       language could be mapped onto those JOINs.
  */
 abstract public class AbstractRelation<E> implements IMutableRelation<E> {
 

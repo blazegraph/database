@@ -86,7 +86,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * The default capacity for the internal buffer. Chunks can not be larger
      * than this.
      */
-    protected static transient final int DEFAULT_CAPACITY = 1000;
+    public static transient final int DEFAULT_CAPACITY = 1000;
     
     /**
      * The default minimum chunk size. If the buffer has fewer than this many
@@ -94,13 +94,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * wait up to {@link #DEFAULT_CHUNK_TIMEOUT} milliseconds before returning
      * the next chunk based on what is already in the buffer.
      */
-    protected static transient final int DEFAULT_MIN_CHUNK_SIZE = 100;
+    public static transient final int DEFAULT_MIN_CHUNK_SIZE = 100;
     
     /**
      * The maximum amount of time to wait in
      * {@link BlockingIterator#nextChunk()}.
      */
-    protected static transient final int DEFAULT_CHUNK_TIMEOUT = 1000/*ms*/;
+    public static transient final int DEFAULT_CHUNK_TIMEOUT = 1000/*ms*/;
 
     private volatile Future future;
     

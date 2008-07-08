@@ -70,6 +70,13 @@ public class ASCIIKeyBuilderFactory implements IKeyBuilderFactory, Externalizabl
         
     }
     
+    /**
+     * De-serialization ctor.
+     */
+    public ASCIIKeyBuilderFactory() {
+        
+    }
+    
     public ASCIIKeyBuilderFactory(int initialCapacity) {
     
         if (initialCapacity < 0)

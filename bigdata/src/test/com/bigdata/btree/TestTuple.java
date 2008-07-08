@@ -11,7 +11,7 @@ import com.bigdata.rawstore.IBlock;
  * @version $Id$
  * @param <E>
  */
-class TestTuple<E> implements ITuple<E> {
+public class TestTuple<E> implements ITuple<E> {
 
     private final int flags;
 
