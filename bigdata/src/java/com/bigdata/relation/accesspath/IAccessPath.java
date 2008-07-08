@@ -28,8 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
-import javax.swing.SpringLayout.Constraints;
-
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.IRelation;
@@ -37,7 +36,7 @@ import com.bigdata.relation.rule.IPredicate;
 
 /**
  * An abstraction for efficient reads on an {@link IRelation} using the index
- * selected by an {@link IPredicate} {@link Constraints}.
+ * selected by an {@link IPredicate} constraint.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -81,8 +80,20 @@ public interface IAccessPath<R> extends Iterable<R> {
     public long rangeCount(boolean exact);
 
     /**
+     * The index selected for the access path.
+     * <p>
+     * Note: The access path typically incorporates additional constraints from
+     * the specified {@link IPredicate} that are not present on the simple
+     * {@link IIndex} returned by this method.
+     */
+    public IIndex getIndex();
+    
+    /**
      * The raw iterator for traversing the selected index within the key range
      * implied by {@link IPredicate}.
+     * 
+     * @todo we need to be able to pass flags for the {@link ITupleIterator} in
+     *       here.
      */
     public ITupleIterator<R> rangeIterator();
     
@@ -96,8 +107,16 @@ public interface IAccessPath<R> extends Iterable<R> {
      * 
      * since a <i>limit</i> of ZERO (0) means no limit and a <i>capacity</i>
      * of ZERO (0) means whatever is the default capacity.
+     * <p>
+     * Note: Filters should be specified when the {@link IAccessPath} is
+     * constructed so that they will be evalated on the data service rather than
+     * materializing the elements and then filtering then. This can be
+     * accomplished by adding the filter as an {@link IElementFilter} on
+     * the {@link IPredicate} when requesting access path.
      * 
      * @return The iterator.
+     * 
+     * @see IRelation#getAccessPath(IPredicate)
      */
     public IChunkedOrderedIterator<R> iterator();
 
@@ -116,7 +135,7 @@ public interface IAccessPath<R> extends Iterable<R> {
      * 
      * @return The iterator.
      */
-    public IChunkedIterator<R> iterator(int limit, int capacity);
+    public IChunkedOrderedIterator<R> iterator(int limit, int capacity);
 
     /**
      * Remove all elements selected by the {@link IPredicate} (batch, parallel,

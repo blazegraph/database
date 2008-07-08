@@ -29,6 +29,7 @@ package com.bigdata.relation.accesspath;
 
 import com.bigdata.btree.FusedEntryIterator;
 import com.bigdata.btree.FusedView;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleFilter;
@@ -102,7 +103,7 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
     public boolean isEmpty() {
 
         return path1.isEmpty() && path2.isEmpty();
-        
+
     }
 
     /**
@@ -118,25 +119,39 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
      */
     public long rangeCount(boolean exact) {
 
-        if(exact) {
-            
+        if (exact) {
+
             throw new UnsupportedOperationException();
-            
+
         }
-        
+
         // @todo check for overflow on Long#Max_value
-        
+
         return path1.rangeCount(exact) + path2.rangeCount(exact);
-        
+
     }
 
     // FIXME These need to be raised in the API so that they can be passed down.
     final private int flags = IRangeQuery.DEFAULT;
+
     final private ITupleFilter filter = null;
+
+    /**
+     * @throws UnsupportedOperationException
+     *             always.
+     *             
+     * @todo this could be implemented with a variant (or relaxed form) of
+     *       {@link FusedView}.
+     */
+    public IIndex getIndex() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
     
     public ITupleIterator<E> rangeIterator() {
 
-        return rangeIterator(0,flags,filter);
+        return rangeIterator(0, flags, filter);
         
     }
     

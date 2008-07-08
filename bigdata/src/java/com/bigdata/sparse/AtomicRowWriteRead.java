@@ -150,7 +150,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
         }
         
         /*
-         * Precondition test?
+         * Precondition test.
          */
         
         if (precondition != null) {

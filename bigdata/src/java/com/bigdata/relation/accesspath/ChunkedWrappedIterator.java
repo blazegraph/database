@@ -30,6 +30,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * Converts an <code>Iterator</code> into chunked iterator.
  * <p>
@@ -43,12 +46,26 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     
     private boolean open = true;
 
+    /**
+     * The source iterator supplied by the caller. If this is an
+     * {@link IClosableIterator} then {@link #close()} will drill through and
+     * close the source as well.
+     */
+    private final Iterator<E> realSource;
+
+    /**
+     * If {@link #filter} is non-<code>null</code> then this is an iterator
+     * that filters the {@link #realSource}.
+     */
     private final Iterator<E> src;
 
     private final int chunkSize;
     
     private final IKeyOrder<E> keyOrder;
 
+    /** Optional filter applied to the source iterator. */
+    private final IElementFilter<E> filter;
+    
     /**
      * Create an iterator that reads from the source.
      * 
@@ -57,7 +74,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      */
     public ChunkedWrappedIterator(Iterator<E> src) {
 
-        this(src, DEFAULT_CHUNK_SIZE, null);
+        this(src, DEFAULT_CHUNK_SIZE, null/* keyOrder */, null/* filter */);
         
     }
 
@@ -71,8 +88,13 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      * @param keyOrder
      *            The order in which the elements will be visited by the source
      *            iterator if known and <code>null</code> otherwise.
+     * @param filter
+     *            Optional filter. When non-<code>null</code> only elements
+     *            accepted by the filter will be visited by this iterator.
      */
-    public ChunkedWrappedIterator(Iterator<E> src, int chunkSize, IKeyOrder<E> keyOrder) {
+    @SuppressWarnings("unchecked")
+    public ChunkedWrappedIterator(Iterator<E> src, int chunkSize,
+            IKeyOrder<E> keyOrder, final IElementFilter<E> filter) {
         
         if (src == null)
             throw new IllegalArgumentException();
@@ -80,11 +102,32 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         if (chunkSize <= 0)
             throw new IllegalArgumentException();
      
-        this.src = src;
+        this.realSource = src;
+        
+        /*
+         * If a filter was specified then use a Striterator to filter the source
+         * iterator such that it includes only those SPOs that match the filter.
+         */
+        
+        this.src = (filter == null //
+                ? src //
+                : new Striterator(src).addFilter(new Filter(filter){
+
+                    private static final long serialVersionUID = 1L;
+
+                    protected boolean isValid(Object arg0) {
+                        
+                        return filter.accept((E) arg0);
+                        
+                    }}
+                )
+                );
         
         this.chunkSize = chunkSize;
         
         this.keyOrder = keyOrder;
+        
+        this.filter = filter;
         
     }
     
@@ -95,9 +138,9 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         
         open = false;
 
-        if(src instanceof IChunkedIterator) {
+        if(realSource instanceof IClosableIterator) {
             
-            ((IChunkedIterator<E>)src).close();
+            ((IClosableIterator<E>)realSource).close();
             
         }
 

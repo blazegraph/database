@@ -3,6 +3,7 @@ package com.bigdata.relation.accesspath;
 import java.util.Collections;
 
 import com.bigdata.btree.EmptyTupleIterator;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.rule.IPredicate;
 
@@ -14,16 +15,31 @@ import com.bigdata.relation.rule.IPredicate;
  */
 public class EmptyAccessPath<E> implements IAccessPath<E> {
 
-//    /**
-//     * Shared instance.
-//     */
-//    public static final transient IAccessPath INSTANCE = new EmptyAccessPath();
-
     private final IPredicate<E> predicate;
+
     private final IKeyOrder<E> keyOrder;
-    
-    public EmptyAccessPath(IPredicate predicate,IKeyOrder keyOrder) {
+
+    /**
+     * Ctor variant does not specify the {@link #getPredicate()} or the
+     * {@link #getKeyOrder()} and those methods will throw an
+     * {@link UnsupportedOperationException} if invoked.
+     */
+    public EmptyAccessPath() {
+
+        this(null/* predicate */, null/* keyOrder */);
         
+    }
+    
+    /**
+     * Note: the {@link #getPredicate()} and {@link #getKeyOrder()} and methods
+     * will throw an {@link UnsupportedOperationException} if the corresponding
+     * argument is null.
+     * 
+     * @param predicate
+     * @param keyOrder
+     */
+    public EmptyAccessPath(IPredicate<E> predicate, IKeyOrder<E> keyOrder) {
+
         if (predicate == null)
             throw new IllegalArgumentException();
 
@@ -38,16 +54,38 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     
     /**
      * @throws UnsupportedOperationException
+     *             unless the caller specified an {@link IPredicate} to the
+     *             ctor.
      */
     public IPredicate<E> getPredicate() {
-        
+
+        if (predicate == null)
+            throw new UnsupportedOperationException();
+
         return predicate;
+
+    }
+
+    /**
+     * @throws UnsupportedOperationException
+     *             unless the caller specified an {@link IKeyOrder} to the ctor.
+     */
+    public IKeyOrder<E> getKeyOrder() {
+
+        if (keyOrder == null)
+            throw new UnsupportedOperationException();
+
+        return keyOrder;
         
     }
 
-    public IKeyOrder<E> getKeyOrder() {
+    /**
+     * @throws UnsupportedOperationException
+     *             since no index was selected.
+     */
+    public IIndex getIndex() {
         
-        return keyOrder;
+        throw new UnsupportedOperationException();
         
     }
     

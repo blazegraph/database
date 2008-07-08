@@ -1,6 +1,7 @@
 package com.bigdata.sparse;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.AbstractTupleFilterator.AtomicRowIterator2;
@@ -66,6 +67,12 @@ public class TPSTupleSerializer implements ITupleSerializer<Void,TPS> {
      *             always.
      */
     public byte[] serializeVal(TPS obj) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    public IKeyBuilder getKeyBuilder() {
         
         throw new UnsupportedOperationException();
         

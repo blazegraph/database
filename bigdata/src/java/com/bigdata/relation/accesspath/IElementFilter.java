@@ -23,22 +23,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 19, 2008
+ * Created on Jul 7, 2008
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.relation.accesspath;
 
 /**
- * A constraint that filters out visited predicates during a scan based solely
- * on the element being visited rather than the binding set from the join.
- * Predicate constraints are typically evaluated on the remote index during the
- * key-range scan for the predicate.
+ * Filter for accepting or rejecting visited elements.
+ * 
+ * @todo define api for declaring or adding filters for {@link IChunkedIterator}
+ * or IFilteredIterator?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IPredicateConstraint<E> {
+public interface IElementFilter<E> {
 
+    /**
+     * True iff the argument is matched by the filter.
+     * 
+     * @param e
+     *            An element.
+     * 
+     * @return true iff the element is accepted by the filter.
+     */
     public boolean accept(E e);
     
 }

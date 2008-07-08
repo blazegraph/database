@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.UUID;
 
 import junit.framework.TestCase;
@@ -79,7 +80,7 @@ public class TestBigdataMap extends TestCase {
          * the keys and the values are the same (basically, that you are using
          * the map like a set).
          */
-        indexMetadata.setTupleSerializer(new StringSerializer());
+        indexMetadata.setTupleSerializer(new StringSerializer(new DefaultKeyBuilderFactory(new Properties())));
         
         /*
          * @todo write tests where delete markers are and are not enabled or
@@ -166,7 +167,17 @@ public class TestBigdataMap extends TestCase {
 
         private static final long serialVersionUID = -3916736517088617622L;
 
-        public StringSerializer() {
+        private final IKeyBuilderFactory keyBuilderFactory;
+        
+        public StringSerializer(IKeyBuilderFactory keyBuilderFactory) {
+            
+            this.keyBuilderFactory = keyBuilderFactory;
+            
+        }
+
+        public IKeyBuilder getKeyBuilder() {
+
+            return keyBuilderFactory.getKeyBuilder();
             
         }
         

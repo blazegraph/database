@@ -28,18 +28,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.sparse;
 
+import org.apache.log4j.Logger;
+
 /**
  * {@link IPrecondition} succeeds iff there are no property values for the
- * logical row (it recognizes both a <code>null</code>, indicating no
- * property values, and an empty logical row, indicating that an
- * {@link INameFilter} was applied and that there were no property values which
- * satisified that filter).
+ * logical row (it recognizes a <code>null</code>, indicating no property
+ * values, and an empty logical row, indicating that an {@link INameFilter} was
+ * applied and that there were no property values which satisified that filter,
+ * and a deleted property value for the primary key, which is often used as a
+ * shorthand for deleting the logical row).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class EmptyRowPrecondition implements IPrecondition {
 
+    protected static final transient Logger log = Logger.getLogger(EmptyRowPrecondition.class);
+    
     /**
      * 
      */
@@ -47,8 +52,38 @@ public class EmptyRowPrecondition implements IPrecondition {
 
     public boolean accept(ITPS logicalRow) {
 
-        if (logicalRow == null || logicalRow.size() == 0) {
+        if (logicalRow == null) {
+        
+            if(log.isInfoEnabled()) {
+                
+                log.info("No property values for row: (null)");
+                
+            }
+            
+            return true;
+            
+        }
+        
+        if(logicalRow.size() == 0) {
 
+            if(log.isInfoEnabled()) {
+                
+                log.info("Logical row size is zero: "+logicalRow);
+                
+            }
+
+            return true;
+            
+        }
+        
+        if(logicalRow.getPrimaryKey() == null) {
+
+            if(log.isInfoEnabled()) {
+                
+                log.info("Primary key row is deleted: "+logicalRow);
+                
+            }
+            
             return true;
 
         }

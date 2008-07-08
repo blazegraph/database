@@ -43,7 +43,6 @@ import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IPredicateConstraint;
 import com.bigdata.service.IBigdataFederation;
 
 import cutthecrap.utils.striterators.Resolver;
@@ -69,7 +68,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     protected final int flags;
 
     /**
-     * The filter derived from the {@link IPredicateConstraint}.
+     * The filter derived from the {@link IElementFilter}.
      */
     final private ITupleFilter filter;
 
@@ -182,7 +181,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         this.flags = flags;
 
-        final IPredicateConstraint<R> constraint = predicate.getConstraint();
+        final IElementFilter<R> constraint = predicate.getConstraint();
 
         if (constraint == null) {
 
@@ -295,7 +294,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 //     * @return The equivalent element.
 //     */
 //    abstract protected R toElement(IPredicate<R> predicate);
-    
+
+    public IIndex getIndex() {
+        
+        return ndx;
+        
+    }
+
     public boolean isEmpty() {
 
         assertInitialized();

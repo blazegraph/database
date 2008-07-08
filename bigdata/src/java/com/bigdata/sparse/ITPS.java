@@ -49,7 +49,9 @@ public interface ITPS {
     /**
      * The value of the primary key.
      * 
-     * @return The value of the primary key
+     * @return The value of the primary key -or- <code>null</code> if there is
+     *         no property value bound for the property named by
+     *         {@link Schema#getName()}.
      */
     public Object getPrimaryKey();
   

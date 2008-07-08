@@ -140,7 +140,7 @@ public class TPS implements ITPS, Externalizable {
      * {@link Schema#getPrimaryKeyName()} property
      * 
      * @return The value of the primary key -or- <code>null</code> if there
-     *         are no property values bound for the property named by
+     *         is no property value bound for the property named by
      *         {@link Schema#getName()}.
      */
     public Object getPrimaryKey() {
