@@ -32,7 +32,7 @@ package com.bigdata.relation.accesspath;
  * Filter for accepting or rejecting visited elements.
  * 
  * @todo define api for declaring or adding filters for {@link IChunkedIterator}
- * or IFilteredIterator?
+ *       or IFilteredIterator?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
