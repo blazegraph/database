@@ -288,15 +288,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         if (!isValid(e)) {
 
-            if (log.isInfoEnabled())
-                log.info("reject: " + e.toString());
+            if (log.isDebugEnabled())
+                log.debug("reject: " + e.toString());
 
             return false;
 
         }
 
-        if (log.isInfoEnabled())
-            log.info("add: " + e.toString());
+//        if (log.isInfoEnabled())
+//            log.info("add: " + e.toString());
 
         // wait if the queue is full.
         while (true) {
@@ -307,8 +307,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     // item now on the queue.
 
-                    if (log.isInfoEnabled())
-                        log.info("added: " + e.toString());
+                    if (log.isDebugEnabled())
+                        log.debug("added: " + e.toString());
                     
                     return true;
                     
@@ -613,8 +613,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
             }
             
-            if (log.isInfoEnabled())
-                log.info("next: " + spo.toString());
+            if (log.isDebugEnabled())
+                log.debug("next: " + spo.toString());
 
             return spo;
 
@@ -623,6 +623,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         @SuppressWarnings("unchecked")
         public E[] nextChunk() {
 
+            final long begin = System.currentTimeMillis();
+            
             if (!hasNext()) {
 
                 throw new NoSuchElementException();
@@ -660,6 +662,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 // add to this chunk.
                 chunk[n++] = e;
+                
+            }
+            
+            if(log.isInfoEnabled()) {
+            
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                log.info("obtained chunk: size="+n+", elapsed="+elapsed+" ms");
                 
             }
             

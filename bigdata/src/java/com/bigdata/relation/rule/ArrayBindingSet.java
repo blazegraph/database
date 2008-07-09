@@ -295,7 +295,7 @@ public class ArrayBindingSet implements IBindingSet {
 
         if(log.isDebugEnabled()) {
             
-            log.debug("var=" + var + ", val=" + val + ", nbound=" + nbound);
+            log.debug("var=" + var + ", val=" + val + ", nbound=" + nbound+", capacity="+vars.length);
             
         }
         
