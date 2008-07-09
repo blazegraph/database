@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
@@ -37,7 +38,9 @@ import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
- * A temporary store that supports named indices.
+ * A temporary store that supports named indices. {@link #commit()} may be used
+ * to checkpoint the indices and {@link #abort()} may be used to revert to the
+ * last checkpoint.
  * 
  * @todo Consider a re-write a wrapper for creating a
  *       {@link BufferMode#Temporary} {@link Journal}.
@@ -49,7 +52,7 @@ import com.bigdata.sparse.SparseRowStore;
  *       However, the current approach is lighter weight precisely because it
  *       does not provide the thread-pool for concurrency control, so maybe it
  *       is useful to keep both approaches.
- *       
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -112,6 +115,74 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         name2Addr.setupCache(liveIndexCacheCapacity);
         
     }
+    
+    /**
+     * The address of the last checkpoint written. When ZERO(0L) no checkpoint
+     * has been written and {@link #name2Addr} is simple discarded on
+     * {@link #abort()}.
+     */
+    private long lastCheckpointAddr = 0L;
+
+    /**
+     * Reverts to the last checkpoint, if any. If there is no checkpoint, then
+     * the post-condition is as if the store had never been written on (except
+     * that the data is not recovered from the backing file).
+     */
+    public void abort() {
+        
+        name2Addr = null;
+        
+        if (lastCheckpointAddr != 0L) {
+
+            name2Addr = (Name2Addr) Name2Addr.load(this, lastCheckpointAddr);
+            
+        } else {
+            
+            setupName2AddrBTree();
+            
+        }
+        
+    }
+
+    /**
+     * Checkpoints the dirty indices and the {@link Name2Addr} object. You can
+     * revert to the last written checkpoint using {@link #abort()}. You can
+     * access {@link ITx#READ_COMMITTED} views of indices after a
+     * {@link #commit()}.
+     * 
+     * @return The commit time (local timestamp).
+     */
+    public long commit() {
+        
+        final long commitTime = System.currentTimeMillis();
+        
+        // check point the indices.
+        lastCheckpointAddr = name2Addr.handleCommit(commitTime);
+        
+        return commitTime;
+        
+    }
+
+//    public ICommitRecord getCommitRecord(long timestamp) {
+//        // TODO Auto-generated method stub
+//        return null;
+//    }
+//
+//    public long getRootAddr(int index) {
+//        // TODO Auto-generated method stub
+//        return 0;
+//    }
+//
+//    public IRootBlockView getRootBlockView() {
+//        // TODO Auto-generated method stub
+//        return null;
+//    }
+//
+//    public void setCommitter(int index, ICommitter committer) {
+//        // TODO Auto-generated method stub
+//        
+//    }
+    
 
     public void registerIndex(IndexMetadata metadata) {
         
@@ -152,11 +223,8 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
 
     /**
-     * Return the named index (unisolated). Writes on the returned index will be
-     * made restart-safe with the next {@link #commit()} regardless of the
-     * success or failure of a transaction. Transactional writes must use the
-     * same named method on the {@link Tx} in order to obtain an isolated
-     * version of the named btree.
+     * Return an {@link ITx#UNISOLATED} view of the named index -or-
+     * <code>null</code> if there is no registered index by that name.
      */
     public BTree getIndex(String name) {
 
@@ -170,6 +238,17 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     
     /**
      * Historical reads and transactions are not supported.
+     * <p>
+     * Note: If {@link ITx#READ_COMMITTED} is requested, then the returned
+     * {@link BTree} will reflect the state of the named index as of the last
+     * commit point for that index - the view will be read-only and is NOT
+     * updated by {@link #commit()}.
+     * <p>
+     * Note that you must actually {@link #commit()} before a read-committed
+     * view will be available.
+     * 
+     * @param name
+     * @param timestamp
      * 
      * @throws UnsupportedOperationException
      *             unless the timestamp is either {@link ITx#READ_COMMITTED} or
@@ -198,7 +277,11 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
                 
             }
             
-            return BTree.load(this, checkpointAddr);
+            final BTree btree = BTree.load(this, checkpointAddr);
+            
+            btree.setReadOnly(true);
+            
+            return btree;
             
         }
         
