@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
@@ -38,20 +37,18 @@ import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
- * A temporary store that supports named indices. {@link #commit()} may be used
- * to checkpoint the indices and {@link #abort()} may be used to revert to the
- * last checkpoint.
- * 
- * @todo Consider a re-write a wrapper for creating a
- *       {@link BufferMode#Temporary} {@link Journal}.
- *       <p>
- *       This has the advantage of full concurrency support, group commit, and
- *       low-latency startup (since the file is not created until the store
- *       attempts to write through to the disk).
- *       <p>
- *       However, the current approach is lighter weight precisely because it
- *       does not provide the thread-pool for concurrency control, so maybe it
- *       is useful to keep both approaches.
+ * A temporary store that supports named indices but no concurrency controls.
+ * {@link #checkpoint()} may be used to checkpoint the indices and
+ * {@link #restoreLastCheckpoint()} may be used to revert to the last
+ * checkpoint. If you note the checkpoint addresses from {@link #checkpoint()}
+ * then you can restore any checkpoint with {@link #restoreCheckpoint(long)}
+ * <p>
+ * If you want a temporary store that supports named indices and concurrency
+ * controls then choose a {@link Journal} with {@link BufferMode#Temporary}.
+ * This has the advantage of full concurrency support, group commit, and
+ * low-latency startup (since the file is not created until the store attempts
+ * to write through to the disk). However, {@link TemporaryStore} is lighter
+ * weight precisely because it does not provide concurrency control.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -124,17 +121,30 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     private long lastCheckpointAddr = 0L;
 
     /**
-     * Reverts to the last checkpoint, if any. If there is no checkpoint, then
-     * the post-condition is as if the store had never been written on (except
-     * that the data is not recovered from the backing file).
+     * Reverts to the last checkpoint, if any. If there is no last checkpoint,
+     * then the post-condition is as if the store had never been written on
+     * (except that the storage on the backing file is not reclaimed).
      */
-    public void abort() {
+    public void restoreLastCheckpoint() {
+        
+        restoreCheckpoint(lastCheckpointAddr);
+        
+    }
+    
+    /**
+     * Reverts to the checkpoint associated with the given <i>checkpointAddr</i>.
+     * When ZERO(0L), the post-condition is as if the store had never been
+     * written on (except that the storage on the backing file is not
+     * reclaimed). The <i>checkpointAddr</i> is noted as the current
+     * {@link #restoreLastCheckpoint()} point.
+     */
+    public void restoreCheckpoint(long checkpointAddr) {
         
         name2Addr = null;
         
-        if (lastCheckpointAddr != 0L) {
+        if (checkpointAddr != 0L) {
 
-            name2Addr = (Name2Addr) Name2Addr.load(this, lastCheckpointAddr);
+            name2Addr = (Name2Addr) Name2Addr.load(this, checkpointAddr);
             
         } else {
             
@@ -142,47 +152,34 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
             
         }
         
+        // note the restore point.
+        lastCheckpointAddr = checkpointAddr;
+
     }
 
     /**
-     * Checkpoints the dirty indices and the {@link Name2Addr} object. You can
-     * revert to the last written checkpoint using {@link #abort()}. You can
-     * access {@link ITx#READ_COMMITTED} views of indices after a
-     * {@link #commit()}.
+     * Checkpoints the dirty indices and notes the new {@link #restoreLastCheckpoint()} point.
+     * You can revert to the last written checkpoint using {@link #restoreLastCheckpoint()} or
+     * to an arbitrary checkpoint using {@link #restoreCheckpoint(long)}.
+     * <p>
+     * Note: {@link ITx#READ_COMMITTED} views of indices become available after
+     * a {@link #checkpoint()}. If the store has not been checkpointed, then
+     * the read committed views are unavailable for an index. After a checkpoint
+     * in which a given index was dirty, a new read-committed view is available
+     * for that index and checkpoint.
      * 
-     * @return The commit time (local timestamp).
+     * @return The checkpoint address.
      */
-    public long commit() {
+    public long checkpoint() {
         
         final long commitTime = System.currentTimeMillis();
         
-        // check point the indices.
+        // checkpoint the indices and note the restore point.
         lastCheckpointAddr = name2Addr.handleCommit(commitTime);
         
         return commitTime;
         
     }
-
-//    public ICommitRecord getCommitRecord(long timestamp) {
-//        // TODO Auto-generated method stub
-//        return null;
-//    }
-//
-//    public long getRootAddr(int index) {
-//        // TODO Auto-generated method stub
-//        return 0;
-//    }
-//
-//    public IRootBlockView getRootBlockView() {
-//        // TODO Auto-generated method stub
-//        return null;
-//    }
-//
-//    public void setCommitter(int index, ICommitter committer) {
-//        // TODO Auto-generated method stub
-//        
-//    }
-    
 
     public void registerIndex(IndexMetadata metadata) {
         
