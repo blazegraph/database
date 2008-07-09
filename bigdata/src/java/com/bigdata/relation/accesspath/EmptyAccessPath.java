@@ -40,11 +40,11 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
      */
     public EmptyAccessPath(IPredicate<E> predicate, IKeyOrder<E> keyOrder) {
 
-        if (predicate == null)
-            throw new IllegalArgumentException();
-
-        if (keyOrder == null)
-            throw new IllegalArgumentException();
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//
+//        if (keyOrder == null)
+//            throw new IllegalArgumentException();
 
         this.predicate = predicate;
       

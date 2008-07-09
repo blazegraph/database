@@ -48,7 +48,7 @@ public class RelationFusedView<E> implements IRelation<E> {
             throw new IllegalArgumentException();
 
         if (relation1 == relation2)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("same relation: " + relation1);
         
         this.relation1 = relation1;
         
