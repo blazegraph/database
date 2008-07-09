@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
@@ -168,18 +169,48 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     
     /**
+     * Historical reads and transactions are not supported.
+     * 
      * @throws UnsupportedOperationException
-     *             if <i>timestamp</i> NE {@link ITx#UNISOLATED}
+     *             unless the timestamp is either {@link ITx#READ_COMMITTED} or
+     *             {@link ITx#UNISOLATED}.
      */
     public BTree getIndex(String name,long timestamp) {
         
-        if(timestamp != ITx.UNISOLATED) {
+        if(timestamp == ITx.READ_COMMITTED) {
             
-            throw new UnsupportedOperationException("Only unisolated indices are supported");
+            final long checkpointAddr;
+            
+            synchronized(name2Addr) {
+                
+                final Entry entry = name2Addr.getEntry(name);
+                
+                if (entry == null) {
+
+                    log.warn("No such index: name=" + name + ", timestamp="
+                            + TimestampUtility.toString(timestamp));
+                    
+                    return null;
+                    
+                }
+
+                checkpointAddr = entry.checkpointAddr;
+                
+            }
+            
+            return BTree.load(this, checkpointAddr);
+            
+        }
+        
+        if(timestamp == ITx.UNISOLATED) {
+            
+            return getIndex(name);
             
         }
 
-        return getIndex(name);
+        throw new UnsupportedOperationException(
+                "Not supported: timestamp="
+                + TimestampUtility.toString(timestamp));
         
     }
 

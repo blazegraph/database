@@ -209,15 +209,27 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                 @SuppressWarnings("unchecked")
                 public boolean isValid(ITuple tuple) {
                     
-                    R e = (R)tuple.getObject();
+                    final Object obj = tuple.getObject();
                     
-                    return constraint.accept(e);
+                    try {
+
+                        return constraint.accept((R) obj);
+                        
+                    } catch (ClassCastException ex) {
+                        
+                        log.error(this + " : Found class=" + obj.getClass()
+                                + " using tupleSer="
+                                + tuple.getTupleSerializer().getClass());
+
+                        throw ex;
+                        
+                    }
                     
                 }
 
                 public void rewrite(ITuple tuple) {
                     
-                    throw new UnsupportedOperationException();
+                    // NOP.
                     
                 }
 
@@ -431,6 +443,11 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
         /*
          * Note: The [capacity] gets passed through to the DataService layer.
+         * 
+         * Note: The ElementFilter on the IPredicate (if any) is encapsulated
+         * within [filter] and is passed through to the DataService layer. It
+         * MUST be Serializable and it will be executed right up against the
+         * data.
          */
         final Iterator<R> src = new Striterator(rangeIterator(capacity, flags,
                 filter)).addFilter(new Resolver() {

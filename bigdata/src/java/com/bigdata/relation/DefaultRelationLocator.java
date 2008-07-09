@@ -145,10 +145,12 @@ public class DefaultRelationLocator<R> extends
 
         }
 
+        // lock is only for the named relation.
         final Lock lock = namedLock.acquireLock(namespace);
 
         try {
 
+            // test cache.
             IRelation<R> relation = get(namespace, timestamp);
             
             if(relation != null) {
@@ -163,6 +165,7 @@ public class DefaultRelationLocator<R> extends
                 
             }
             
+            // read properties from the global row store.
             final Properties properties = getProperties(namespace);
 
             if (properties == null) {
@@ -205,6 +208,7 @@ public class DefaultRelationLocator<R> extends
 
             }
 
+            // create a new instance of the relation.
             relation = newInstance(cls, service, indexManager, namespace,
                     timestamp, properties);
 
