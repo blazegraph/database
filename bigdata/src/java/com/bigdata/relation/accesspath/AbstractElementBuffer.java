@@ -47,11 +47,13 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
      *            The natural order in which the elements will appear in the
      *            buffer -or- <code>null</code> if you do not have a
      *            <em>strong</em> guarentee for that order.
+     * @param filter
+     *            An optional filter for keeping elements out of the buffer.
      */
-    protected AbstractElementBuffer(int capacity,
-            IMutableRelation<R> relation, IKeyOrder<R> keyOrder) {
+    protected AbstractElementBuffer(int capacity, IMutableRelation<R> relation,
+            IKeyOrder<R> keyOrder, IElementFilter<R> filter) {
 
-        super(capacity);
+        super(capacity, filter);
 
         if (relation == null)
             throw new IllegalArgumentException();
@@ -100,18 +102,18 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
      */
     public static class InsertBuffer<R> extends AbstractElementBuffer<R> {
 
-        /**
-         * Ctor variant when the element will be written into the buffer in an
-         * unknown order.
-         * 
-         * @param capacity
-         * @param relation
-         */
-        public InsertBuffer(int capacity, IMutableRelation<R> relation) {
-
-            this(capacity, relation,null/*keyOrder*/);
-
-        }
+//        /**
+//         * Ctor variant when the element will be written into the buffer in an
+//         * unknown order.
+//         * 
+//         * @param capacity
+//         * @param relation
+//         */
+//        public InsertBuffer(int capacity, IMutableRelation<R> relation) {
+//
+//            this(capacity, relation,null/*keyOrder*/);
+//
+//        }
 
         /**
          * Ctor variant used when you have a <em>strong</em> guarantee of the
@@ -120,10 +122,12 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
          * @param capacity
          * @param relation
          * @param keyOrder
+         * @param filter
          */
-        public InsertBuffer(int capacity, IMutableRelation<R> relation, IKeyOrder<R> keyOrder) {
+        public InsertBuffer(int capacity, IMutableRelation<R> relation,
+                IKeyOrder<R> keyOrder, IElementFilter<R> filter) {
 
-            super(capacity, relation, keyOrder);
+            super(capacity, relation, keyOrder, filter);
 
         }
 
@@ -146,18 +150,18 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
      */
     public static class DeleteBuffer<R> extends AbstractElementBuffer<R> {
 
-        /**
-         * Ctor variant when the element will be written into the buffer in an
-         * unknown order.
-         * 
-         * @param capacity
-         * @param relation
-         */
-        protected DeleteBuffer(int capacity, IMutableRelation<R> relation) {
-
-            this(capacity,relation,null/*keyOrder*/);
-
-        }
+//        /**
+//         * Ctor variant when the element will be written into the buffer in an
+//         * unknown order.
+//         * 
+//         * @param capacity
+//         * @param relation
+//         */
+//        protected DeleteBuffer(int capacity, IMutableRelation<R> relation) {
+//
+//            this(capacity,relation,null/*keyOrder*/);
+//
+//        }
 
         /**
          * Ctor variant used when you have a <em>strong</em> guarantee of the
@@ -167,9 +171,10 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
          * @param relation
          * @param keyOrder
          */
-        protected DeleteBuffer(int capacity, IMutableRelation<R> relation,IKeyOrder<R> keyOrder) {
+        protected DeleteBuffer(int capacity, IMutableRelation<R> relation,
+                IKeyOrder<R> keyOrder, IElementFilter<R> filter) {
 
-            super(capacity,relation,keyOrder);
+            super(capacity, relation, keyOrder, filter);
 
         }
         

@@ -158,26 +158,27 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
 
     /**
-     * Checkpoints the dirty indices and notes the new {@link #restoreLastCheckpoint()} point.
-     * You can revert to the last written checkpoint using {@link #restoreLastCheckpoint()} or
-     * to an arbitrary checkpoint using {@link #restoreCheckpoint(long)}.
+     * Checkpoints the dirty indices and notes the new
+     * {@link #restoreLastCheckpoint()} point. You can revert to the last
+     * written checkpoint using {@link #restoreLastCheckpoint()} or to an
+     * arbitrary checkpoint using {@link #restoreCheckpoint(long)}.
      * <p>
      * Note: {@link ITx#READ_COMMITTED} views of indices become available after
      * a {@link #checkpoint()}. If the store has not been checkpointed, then
      * the read committed views are unavailable for an index. After a checkpoint
      * in which a given index was dirty, a new read-committed view is available
      * for that index and checkpoint.
+     * <p>
+     * Note: This is NOT an atomic commit protocol, but the restore point will
+     * be updated iff the checkpoint succeeds.
      * 
      * @return The checkpoint address.
      */
     public long checkpoint() {
         
-        final long commitTime = System.currentTimeMillis();
-        
         // checkpoint the indices and note the restore point.
-        lastCheckpointAddr = name2Addr.handleCommit(commitTime);
-        
-        return commitTime;
+        return lastCheckpointAddr = name2Addr.handleCommit(System
+                .currentTimeMillis());
         
     }
 

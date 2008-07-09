@@ -563,8 +563,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
         log.debug("");
         
+        /*
+         * Note: The filter is applied by the ITupleIterator so that it gets
+         * evaluated close to the data, not here where it would be evaluated
+         * once the elements were materialized on the client.
+         */
         final BlockingBuffer<R> buffer = new BlockingBuffer<R>(
-                BlockingBuffer.DEFAULT_CAPACITY, keyOrder);
+                BlockingBuffer.DEFAULT_CAPACITY, keyOrder, null/* filter */);
         
         final Future<Void> future = service.submit(new Callable<Void>(){
         

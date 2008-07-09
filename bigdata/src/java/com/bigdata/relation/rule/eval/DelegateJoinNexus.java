@@ -119,4 +119,9 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getRuleTaskFactory(parallel, rule);
     }
 
+    public IJoinNexusFactory getJoinNexusFactory() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
 }

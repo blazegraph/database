@@ -64,6 +64,12 @@ import com.bigdata.relation.rule.IStep;
 public interface IJoinNexus {
 
     /**
+     * The factory object is used to materialize appropriate {@link IJoinNexus}
+     * instances when the rule execution crosses an RMI boundary.
+     */
+    IJoinNexusFactory getJoinNexusFactory();
+    
+    /**
      * Copy values the values from the visited element corresponding to the
      * given predicate into the binding set.
      * 

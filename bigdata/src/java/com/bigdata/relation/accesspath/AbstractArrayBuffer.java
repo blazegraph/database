@@ -42,19 +42,25 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     protected static final Logger log = Logger.getLogger(AbstractArrayBuffer.class);
     
     private final int capacity;
+    private final IElementFilter<E> filter;
+    
     private int n;
     private E[] buffer;
     
     /**
      * @param capacity
      *            The capacity of the backing buffer.
+     * @param filter
+     *            An optional filter for keeping elements out of the buffer.
      */
-    protected AbstractArrayBuffer(int capacity) {
+    protected AbstractArrayBuffer(int capacity, IElementFilter<E> filter) {
         
         if (capacity <= 0)
             throw new IllegalArgumentException();
         
         this.capacity = capacity;
+
+        this.filter = filter;
         
         /*
          * Note: The backing array is allocated once we receive the first
@@ -95,8 +101,14 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
      * 
      * @return <code>true</code> iff the buffer accepts the element.
      */
-    protected boolean isValid(E e) {
+    protected boolean accept(E e) {
 
+        if (filter != null) {
+
+            return filter.accept(e);
+            
+        }
+        
         return true;
 
     }
@@ -112,7 +124,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
             
         }
         
-        if (!isValid(e)) {
+        if (!accept(e)) {
 
             // rejected by the filter.
             

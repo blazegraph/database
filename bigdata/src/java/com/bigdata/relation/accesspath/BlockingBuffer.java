@@ -78,6 +78,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     private final IKeyOrder<E> keyOrder;
 
+    /** Optional filter to keep elements out of the buffer. */
+    private final IElementFilter<E> filter;
+    
     private final int minChunkSize;
     
     private final long chunkTimeout;
@@ -86,7 +89,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * The default capacity for the internal buffer. Chunks can not be larger
      * than this.
      */
-    public static transient final int DEFAULT_CAPACITY = 1000;
+    public static transient final int DEFAULT_CAPACITY = 5000;
     
     /**
      * The default minimum chunk size. If the buffer has fewer than this many
@@ -136,7 +139,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public BlockingBuffer(int capacity) {
 
-        this(capacity, null/* keyOrder */);
+        this(capacity, null/* keyOrder */, null/*filter*/);
 
     }
     
@@ -149,10 +152,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            <em>written</em> onto the buffer and <code>null</code> if
      *            you do not have a <em>strong</em> guarentee for the write
      *            order.
+     * @param filter
+     *            An optional filter for elements to be kept out of the buffer.
      */
-    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder) {
+    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder, IElementFilter filter) {
        
-        this(capacity, keyOrder, DEFAULT_MIN_CHUNK_SIZE, DEFAULT_CHUNK_TIMEOUT);
+        this(capacity, keyOrder, filter, DEFAULT_MIN_CHUNK_SIZE, DEFAULT_CHUNK_TIMEOUT);
         
     }
 
@@ -166,6 +171,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            <em>written</em> onto the buffer and <code>null</code> if
      *            you do not have a <em>strong</em> guarentee for the write
      *            order.
+     * @param filter
+     *            An optional filter for elements to be kept out of the buffer.
      * @param minChunkSize
      *            The minimum chunk size. If the buffer has fewer than this many
      *            elements and the buffer has not been {@link #close() closed}
@@ -176,14 +183,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            The maximum amount of time the {@link #iterator()} will wait
      *            to satisify the minimum chunk size.
      */
-    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder, int minChunkSize, long chunkTimeout) {
-        
+    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder,
+            IElementFilter filter, int minChunkSize, long chunkTimeout) {
+
         if (capacity <= 0)
             throw new IllegalArgumentException();
 
         if (minChunkSize < 0)
             throw new IllegalArgumentException();
-        
+
         if (minChunkSize > capacity)
             throw new IllegalArgumentException();
         
@@ -195,6 +203,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         this.iterator = new BlockingIterator();
 
         this.keyOrder = keyOrder;
+        
+        this.filter = filter;
         
         this.minChunkSize = minChunkSize;
         
@@ -273,10 +283,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * 
      * @param e
      *            A element.
-     *            
+     * 
      * @return true if the element is allowed into the buffer.
      */
-    protected boolean isValid(E e) {
+    protected boolean accept(E e) {
+
+        if (filter != null) {
+
+            return filter.accept(e);
+
+        }
         
         return true;
         
@@ -286,7 +302,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         assertOpen();
 
-        if (!isValid(e)) {
+        if (!accept(e)) {
 
             if (log.isDebugEnabled())
                 log.debug("reject: " + e.toString());

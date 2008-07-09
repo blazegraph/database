@@ -38,6 +38,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 
 /**
@@ -126,6 +127,11 @@ public class MockJoinNexus implements IJoinNexus {
     }
 
     public IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public IJoinNexusFactory getJoinNexusFactory() {
         // TODO Auto-generated method stub
         return null;
     }

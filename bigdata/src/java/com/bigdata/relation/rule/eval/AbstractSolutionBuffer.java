@@ -6,7 +6,9 @@ import com.bigdata.relation.accesspath.AbstractArrayBuffer;
 import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.ChunkedResolvingIterator;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IChunkedIterator;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 
 /**
@@ -27,20 +29,20 @@ abstract public class AbstractSolutionBuffer<R> extends
         AbstractArrayBuffer<ISolution<R>> {
 
     private final IMutableRelation<R> relation;
-
+    
     protected IMutableRelation<R> getRelation() {
         
         return relation;
         
     }
-    
+
     /**
      * @param capacity
      */
     protected AbstractSolutionBuffer(int capacity,
-            IMutableRelation<R> relation) {
+            IMutableRelation<R> relation, IElementFilter<ISolution<R>> filter) {
 
-        super(capacity);
+        super(capacity, filter);
 
         if (relation == null)
             throw new IllegalArgumentException();
@@ -92,9 +94,10 @@ abstract public class AbstractSolutionBuffer<R> extends
          * @param capacity
          * @param relation
          */
-        public InsertSolutionBuffer(int capacity, IMutableRelation<E> relation) {
+        public InsertSolutionBuffer(int capacity, IMutableRelation<E> relation,
+                IElementFilter<ISolution<E>> filter) {
 
-            super(capacity,relation);
+            super(capacity, relation, filter);
 
         }
 
@@ -133,9 +136,10 @@ abstract public class AbstractSolutionBuffer<R> extends
          * @param capacity
          * @param relation
          */
-        public DeleteSolutionBuffer(int capacity, IMutableRelation<E> relation) {
+        public DeleteSolutionBuffer(int capacity, IMutableRelation<E> relation,
+                IElementFilter<ISolution<E>> filter) {
 
-            super(capacity,relation);
+            super(capacity,relation, filter);
 
         }
 

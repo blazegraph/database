@@ -1941,7 +1941,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         /**
          * This class prevents {@link ITx#UNISOLATED} tasks from having direct
          * access to the {@link AbstractJournal} using
-         * {@link CopyOfAbstractTask#getJournal()}.
+         * {@link AbstractTask#getJournal()}.
          * 
          * @param source
          */
