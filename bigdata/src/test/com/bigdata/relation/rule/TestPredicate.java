@@ -30,7 +30,7 @@ package com.bigdata.relation.rule;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 
 /**
  * Test suite for {@link Predicate}.
@@ -53,7 +53,7 @@ public class TestPredicate extends TestCase2 {
         super(name);
     }
     
-    private final IRelationName relation = new MockRelationName();
+    private final IRelationIdentifier relation = new MockRelationName();
 
     private final static Constant<Long> c1 = new Constant<Long>(1L);
 
@@ -135,7 +135,7 @@ public class TestPredicate extends TestCase2 {
         /**
          * @param values
          */
-        public P(IRelationName relation, IVariableOrConstant[] values) {
+        public P(IRelationIdentifier relation, IVariableOrConstant[] values) {
 
             super(relation, values);
 

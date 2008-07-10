@@ -36,32 +36,43 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.ValidationError;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.MillisecondTimestampFactory;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Base class for {@link ResourceManager} test suites that can use normal
@@ -110,6 +121,8 @@ public class AbstractResourceManagerTestCase extends
     protected ResourceManager resourceManager;
     protected ConcurrencyManager concurrencyManager;
     protected AbstractLocalTransactionManager localTransactionManager;
+    private ExecutorService executorService; 
+    private IBigdataFederation fed;
 
     /**
      * Setup test fixtures.
@@ -119,72 +132,16 @@ public class AbstractResourceManagerTestCase extends
         super.setUp();
 
         metadataService = new MockMetadataService();
-//        {
-//        
-//            /*
-//             * Note: The metadata service uses a ResourceManager internally.
-//             * Therefore we setup a distinct DATA_DIR to avoid conflicts with
-//             * the ResourceManager instance whose behavior we are trying to
-//             * test.
-//             */
-//            Properties properties = new Properties(getProperties());
-//
-//            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//            
-//            metadataService = new MetadataService(properties) {
-//
-//                private final UUID uuid = UUID.randomUUID();
-//
-//                @Override
-//                protected IMetadataService getMetadataService() {
-//                    return this;
-//                }
-//
-//                @Override
-//                public UUID getServiceUUID() throws IOException {
-//                    return uuid;
-//                }
-//
-//                public UUID getUnderUtilizedDataService() throws IOException {
-//                    throw new UnsupportedOperationException();
-//                }
-//
-//                public IDataService getDataServiceByUUID(UUID serviceUUID)
-//                        throws IOException {
-//                    throw new UnsupportedOperationException();
-//                }
-//
-//            };
-//
-//        }
-
+        
         final Properties properties = getProperties();
 
         resourceManager = new ResourceManager(properties) {
 
             final private UUID dataServiceUUID = UUID.randomUUID();
             
-//            public ILoadBalancerService getLoadBalancerService() {
-//
-//                throw new UnsupportedOperationException();
-//                
-//            }
-//            
-//            public IMetadataService getMetadataService() {
-//
-//                return metadataService;
-//
-//            }
-//
-//            public IDataService getDataService(UUID dataService) {
-//
-//                throw new UnsupportedOperationException();
-//
-//            }
-
             public IBigdataFederation getFederation() {
                 
-                throw new UnsupportedOperationException();
+                return fed;
                 
             }
             
@@ -222,6 +179,10 @@ public class AbstractResourceManagerTestCase extends
         resourceManager.setConcurrencyManager(concurrencyManager);
         
         assertTrue( resourceManager.awaitRunning() );
+        
+        executorService = Executors.newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+        
+        fed = new MockFederation();
         
     }
 
@@ -274,11 +235,17 @@ public class AbstractResourceManagerTestCase extends
 //        if (metadataService!= null)
 //            metadataService.shutdownNow();
 
+        if (executorService != null) {
+            executorService.shutdownNow();
+        }
+        
     }
 
     /**
      * A minimal implementation of {@link IMetadataService} - only those methods
-     * actually used by the {@link ResourceManager} are implemented.
+     * actually used by the {@link ResourceManager} are implemented. This avoids
+     * conflicts with the {@link ResourceManager} instance whose behavior we are
+     * trying to test.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -312,10 +279,6 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public IndexMetadata getIndexMetadata(String name,long timestamp) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public String getStatistics(String name) throws IOException {
             throw new UnsupportedOperationException();
         }
 
@@ -405,6 +368,138 @@ public class AbstractResourceManagerTestCase extends
 
     }
 
+    /**
+     * A minimal implementation of only those methods actually utilized by the
+     * {@link ResourceManager} during the unit tests.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class MockFederation implements IBigdataFederation {
+
+        public void destroy() {
+            // TODO Auto-generated method stub
+            
+        }
+
+        public void dropIndex(String name) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        public IDataService getAnyDataService() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IBigdataClient getClient() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public String getClientCounterPathPrefix() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public CounterSet getCounterSet() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IDataService getDataService(UUID serviceUUID) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public UUID[] getDataServiceUUIDs(int maxCount) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public ExecutorService getExecutorService() {
+            
+            return executorService;
+            
+        }
+
+        public SparseRowStore getGlobalRowStore() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IIndex getIndex(String name, long timestamp) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IKeyBuilder getKeyBuilder() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public ILoadBalancerService getLoadBalancerService() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IMetadataIndex getMetadataIndex(String name, long timestamp) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IMetadataService getMetadataService() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public ITimestampService getTimestampService() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public boolean isDistributed() {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        public boolean isScaleOut() {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        public boolean isStable() {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        public long lastCommitTime() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public void registerIndex(IndexMetadata metadata) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IResourceLocator getResourceLocator() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+        
+    }
+    
     /**
      * Utility method to register an index partition on the {@link #resourceManager}.
      * 

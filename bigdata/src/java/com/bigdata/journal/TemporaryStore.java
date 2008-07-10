@@ -28,13 +28,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.IResourceLocator;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A temporary store that supports named indices but no concurrency controls.
@@ -86,7 +93,11 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
         setupName2AddrBTree();
 
-//        relationLocator = new DefaultRelationLocator(executorService,this);
+        executorService = Executors.newCachedThreadPool(DaemonThreadFactory
+                .defaultThreadFactory());
+        
+        resourceLocator = new DefaultResourceLocator(executorService, this,
+                null/*delegate*/);
         
     }
     
@@ -139,7 +150,9 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * {@link #restoreLastCheckpoint()} point.
      */
     public void restoreCheckpoint(long checkpointAddr) {
-        
+
+        assertOpen();
+
         name2Addr = null;
         
         if (checkpointAddr != 0L) {
@@ -175,7 +188,9 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * @return The checkpoint address.
      */
     public long checkpoint() {
-        
+
+        assertOpen();
+
         // checkpoint the indices and note the restore point.
         return lastCheckpointAddr = name2Addr.handleCommit(System
                 .currentTimeMillis());
@@ -200,6 +215,8 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
         synchronized (name2Addr) {
 
+            assertOpen();
+
             // add to the persistent name map.
             name2Addr.registerIndex(name, btree);
 
@@ -212,6 +229,8 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     public void dropIndex(String name) {
         
         synchronized(name2Addr) {
+
+            assertOpen();
 
             // drop from the persistent name map.
             name2Addr.dropIndex(name);
@@ -227,6 +246,8 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     public BTree getIndex(String name) {
 
         synchronized(name2Addr) {
+
+            assertOpen();
 
             return name2Addr.getIndex(name);
             
@@ -252,8 +273,10 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      *             unless the timestamp is either {@link ITx#READ_COMMITTED} or
      *             {@link ITx#UNISOLATED}.
      */
-    public BTree getIndex(String name,long timestamp) {
-        
+    public BTree getIndex(String name, long timestamp) {
+
+        assertOpen();
+
         if(timestamp == ITx.READ_COMMITTED) {
             
             final long checkpointAddr;
@@ -297,16 +320,42 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
     public SparseRowStore getGlobalRowStore() {
 
+        assertOpen();
+        
         return globalRowStoreHelper.getGlobalRowStore();
         
     }
     private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
 
-//    public IRelationLocator getRelationLocator() {
-//        
-//        return relationLocator;
-//    
-//    }
-//    private final IRelationLocator relationLocator;
+    public DefaultResourceLocator getResourceLocator() {
+
+        assertOpen();
+        
+        return resourceLocator;
+        
+    }
+    private final DefaultResourceLocator resourceLocator;
+    
+    /**
+     * Used for running misc tasks, especially those supporting
+     * {@link #getResourceLocator()}.
+     * 
+     * @todo there should be an interface method for this somewhere. it is part
+     *       of {@link IBigdataFederation} but there is no other interface for
+     *       that. perhaps on the {@link IIndexManager} since the requirement
+     *       arises with the {@link IResourceLocator} declared there (a
+     *       materialized {@link IRelation} needs an {@link ExecutorService} to
+     *       support requests).
+     */
+    private final ExecutorService executorService;
+    
+    public void close() {
+
+        // immediate shutdown.
+        executorService.shutdownNow();
+        
+        super.close();
+        
+    }
     
 }

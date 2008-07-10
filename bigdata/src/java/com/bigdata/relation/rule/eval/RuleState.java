@@ -8,9 +8,9 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationLocator;
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
@@ -541,9 +541,9 @@ public class RuleState {
      *       propagation of bindings and we can simplify how we set, clear, and
      *       reset the bindings!)
      *       <p>
-     *       It might also be worth while to cache the {@link IRelationName} to
+     *       It might also be worth while to cache the {@link IRelationIdentifier} to
      *       {@link IRelation} map. That should be done in the
-     *       {@link IRelationLocator} impl.
+     *       {@link IResourceLocator} impl.
      */
     public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
        
@@ -592,11 +592,11 @@ public class RuleState {
         final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
 
         // The name of the relation that the predicate will query.
-        final IRelationName relationName = predicate.getRelationName();
+        final IRelationIdentifier relationIdentifier = predicate.getRelationName();
         
         // Resolve the relation name to the IRelation object.
-        final IRelation relation = joinNexus.getRelationLocator().getRelation(
-                relationName, joinNexus.getReadTimestamp());
+        final IRelation relation = (IRelation) joinNexus.getRelationLocator().locate(
+                relationIdentifier, joinNexus.getReadTimestamp());
 
         // find the best access path for the predicate for that relation.
         final IAccessPath accessPath = relation.getAccessPath(predicate);

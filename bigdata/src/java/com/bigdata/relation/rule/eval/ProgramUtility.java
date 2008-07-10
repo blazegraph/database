@@ -41,15 +41,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationLocator;
-import com.bigdata.relation.IRelationName;
-import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
@@ -68,7 +66,7 @@ public class ProgramUtility {
     
     protected static Logger log = Logger.getLogger(ProgramUtility.class);
 
-    private final IRelationLocator relationLocator;
+    private final IResourceLocator resourceLocator;
 //    private final long readTimestamp;
 
     public ProgramUtility(IJoinNexus joinNexus) {
@@ -79,23 +77,23 @@ public class ProgramUtility {
 
     /**
      * 
-     * @param relationLocator
+     * @param resourceLocator
      */
-    public ProgramUtility(IRelationLocator relationLocator) {
+    public ProgramUtility(IResourceLocator resourceLocator) {
         
-        if (relationLocator == null)
+        if (resourceLocator == null)
             throw new IllegalArgumentException();
         
-        this.relationLocator = relationLocator;
+        this.resourceLocator = resourceLocator;
         
     }
     
     /**
      * The set of distinct relations identified by the various rules.
      */
-    public Set<IRelationName> getRelationNames(IStep step) {
+    public Set<IRelationIdentifier> getRelationNames(IStep step) {
 
-        Set<IRelationName> c = new HashSet<IRelationName>();
+        Set<IRelationIdentifier> c = new HashSet<IRelationIdentifier>();
         
         getRelationNames(step, c);
 
@@ -109,7 +107,7 @@ public class ProgramUtility {
         
     }
     
-    private void getRelationNames(IStep p, Set<IRelationName> c) {
+    private void getRelationNames(IStep p, Set<IRelationIdentifier> c) {
 
         if (p.isRule()) {
 
@@ -148,12 +146,12 @@ public class ProgramUtility {
      * @throws RuntimeException
      *             if any relation is not local.
      */
-    public Map<IRelationName, IRelation> getRelations(IStep step, long timestamp) {
+    public Map<IRelationIdentifier, IRelation> getRelations(IStep step, long timestamp) {
 
         if (step == null)
             throw new IllegalArgumentException();
 
-        final Map<IRelationName, IRelation> c = new HashMap<IRelationName, IRelation>();
+        final Map<IRelationIdentifier, IRelation> c = new HashMap<IRelationIdentifier, IRelation>();
 
         getRelations(step, c, timestamp );
 
@@ -169,18 +167,20 @@ public class ProgramUtility {
     }
 
     @SuppressWarnings("unchecked")
-    private void getRelations(IStep p, Map<IRelationName, IRelation> c, long timestamp) {
+    private void getRelations(IStep p, Map<IRelationIdentifier, IRelation> c, long timestamp) {
 
         if (p.isRule()) {
 
             final IRule r = (IRule) p;
 
-            final IRelationName relationName = r.getHead().getRelationName();
+            final IRelationIdentifier relationIdentifier = r.getHead().getRelationName();
 
-            if (!c.containsKey(relationName)) {
+            if (!c.containsKey(relationIdentifier)) {
 
-                c.put(relationName, relationLocator.getRelation(relationName,
-                        timestamp));
+                final IRelation relation = (IRelation) resourceLocator
+                        .locate(relationIdentifier, timestamp);
+                
+                c.put(relationIdentifier, relation );
                 
             }
 
@@ -295,7 +295,7 @@ public class ProgramUtility {
         /*
          * The set of distinct relations.
          */
-        final Map<IRelationName, IRelation> relations = getRelations(step,
+        final Map<IRelationIdentifier, IRelation> relations = getRelations(step,
                 timestamp);
 
         if(relations.isEmpty()) {
@@ -420,9 +420,9 @@ public class ProgramUtility {
      *             the relation) and the corresponding entry in the map does not
      *             implement {@link IMutableRelation}.
      */
-    protected Map<IRelationName, IBuffer<ISolution>> getMutationBuffers(
+    protected Map<IRelationIdentifier, IBuffer<ISolution>> getMutationBuffers(
             ActionEnum action, IJoinNexus joinNexus,
-            Map<IRelationName, IRelation> relations) {
+            Map<IRelationIdentifier, IRelation> relations) {
 
         if (action == ActionEnum.Query) {
 
@@ -436,17 +436,17 @@ public class ProgramUtility {
             
         }
 
-        final Map<IRelationName, IBuffer<ISolution>> c = new HashMap<IRelationName, IBuffer<ISolution>>(
+        final Map<IRelationIdentifier, IBuffer<ISolution>> c = new HashMap<IRelationIdentifier, IBuffer<ISolution>>(
                 relations.size());
 
-        final Iterator<Map.Entry<IRelationName, IRelation>> itr = relations
+        final Iterator<Map.Entry<IRelationIdentifier, IRelation>> itr = relations
                 .entrySet().iterator();
 
         while (itr.hasNext()) {
 
-            final Map.Entry<IRelationName, IRelation> entry = itr.next();
+            final Map.Entry<IRelationIdentifier, IRelation> entry = itr.next();
 
-            final IRelationName relationName = entry.getKey();
+            final IRelationIdentifier relationIdentifier = entry.getKey();
 
             final IRelation relation = entry.getValue();
 
@@ -472,7 +472,7 @@ public class ProgramUtility {
             
             }
 
-            c.put(relationName, buffer);
+            c.put(relationIdentifier, buffer);
             
         }
 

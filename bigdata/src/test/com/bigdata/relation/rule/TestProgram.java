@@ -30,7 +30,7 @@ package com.bigdata.relation.rule;
 
 import java.util.Iterator;
 
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Program;
@@ -117,7 +117,7 @@ public class TestProgram extends AbstractRuleTestCase {
         
         final Program program = new Program("p1", false/* parallel */, false/* closure */);
         
-        final IRelationName relation = new MockRelationName();
+        final IRelationIdentifier relation = new MockRelationName();
         
         final IRule rule = new TestRuleRdfs04a(relation);
         

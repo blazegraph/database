@@ -60,6 +60,8 @@ import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
@@ -165,7 +167,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             } else if (readOnly) {
 
                 // disallow writes.
-                journal = new ReadOnlyJournal(journal);
+                journal = new ReadOnlyJournal((AbstractJournal) journal);
                 
             }
 
@@ -1937,7 +1939,14 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     class IsolatedActionJournal implements IJournal {
         
         private final AbstractJournal delegate;
-                
+        private final IResourceLocator resourceLocator;
+        
+        public String toString() {
+
+            return getClass().getName() + "{task=" + AbstractTask.this + "}";
+
+        }
+        
         /**
          * This class prevents {@link ITx#UNISOLATED} tasks from having direct
          * access to the {@link AbstractJournal} using
@@ -1951,6 +1960,20 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 throw new IllegalArgumentException();
 
             this.delegate = source;
+        
+            /*
+             * Setup a locator for resources. Resources that correspond to
+             * indices declared by the task are accessible via the task itself.
+             * Other resources are assessible via the locator on the underlying
+             * journal. When the journal is part of a federation, that locator
+             * will be the federation's locator.
+             */
+
+            resourceLocator = new DefaultResourceLocator(//
+                    source.getExecutorService(), //
+                    source,// 
+                    source.getResourceLocator()//
+            );
 
         }
 
@@ -2054,6 +2077,12 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
         
+        public IResourceLocator getResourceLocator() {
+            
+            return resourceLocator;
+            
+        }
+
         /*
          * Disallowed methods (commit protocol and shutdown protocol).
          */
@@ -2213,13 +2242,34 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     private class ReadOnlyJournal implements IJournal {
 
         private final IJournal delegate;
+        private final DefaultResourceLocator resourceLocator;
         
-        public ReadOnlyJournal(IJournal source) {
+        public String toString() {
+
+            return getClass().getName() + "{task=" + AbstractTask.this + "}";
+
+        }
+
+        public ReadOnlyJournal(AbstractJournal source) {
 
             if (source == null)
                 throw new IllegalArgumentException();
 
             this.delegate = source;
+
+            /*
+             * Setup a locator for resources. Resources that correspond to
+             * indices declared by the task are accessible via the task itself.
+             * Other resources are assessible via the locator on the underlying
+             * journal. When the journal is part of a federation, that locator
+             * will be the federation's locator.
+             */
+
+            resourceLocator = new DefaultResourceLocator(//
+                    source.getExecutorService(), //
+                    source, //
+                    source.getResourceLocator()//
+            );
 
         }
 
@@ -2323,6 +2373,12 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
 
+        public DefaultResourceLocator getResourceLocator() {
+            
+            return resourceLocator;
+            
+        }
+        
         /*
          * Disallowed methods (commit and shutdown protocols).
          */

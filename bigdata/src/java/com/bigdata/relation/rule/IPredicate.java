@@ -30,7 +30,7 @@ package com.bigdata.relation.rule;
 
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -56,7 +56,7 @@ public interface IPredicate<E> extends Cloneable {
      * {@link IMutableRelation} on which the computed {@link ISolution}s will
      * be written.
      */
-    public IRelationName<E> getRelationName();
+    public IRelationIdentifier<E> getRelationName();
     
     /**
      * An optional constraint on the visitable elements.

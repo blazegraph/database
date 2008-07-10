@@ -43,10 +43,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
-import com.bigdata.relation.DefaultRelationLocator;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationLocator;
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
+import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
@@ -361,7 +361,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         }
                 
         // Note: These relations are ONLY used to get the index names.
-        final Map<IRelationName, IRelation> tmpRelations = util.getRelations(step,
+        final Map<IRelationIdentifier, IRelation> tmpRelations = util.getRelations(step,
                 timestamp);
 
         // Collect names of the required indices.
@@ -381,7 +381,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
          */
 
         final ExecutorService executorService = dataService.getFederation()
-                .getThreadPool();
+                .getExecutorService();
 
         /*
          * Create the inner task.
@@ -407,34 +407,42 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             @Override
             protected Object doTask() throws Exception {
 
-                log.info("Execution the inner task: "+this);
+                if (log.isInfoEnabled())
+                    log.info("Execution the inner task: " + this
+                            + ", indexManager=" + getJournal());
 
                 final IJoinNexus tmp = innerTask.joinNexus;
 
-                /*
-                 * FIXME This will loose any local resources, e.g., on a
-                 * TemporaryStore. Those resources need to be explicitly
-                 * declared. They are available for LDS (only) when running in
-                 * the DataService. Resolve this with
-                 * IJoinNexus#addLocalResource() and
-                 * IJoinNexus#getLocalResources(). Those need to be searched
-                 * before the DefaultRelationLocator. When we override that
-                 * locator here to use the isolation level of the task, we again
-                 * need to setup those resources so that they are searched
-                 * before the DefaultRelationLocator.
-                 */
-                final IRelationLocator relationLocator = new DefaultRelationLocator(
-                        executorService, getJournal());
+                final IResourceLocator resourceLocator = new DefaultResourceLocator(
+                        executorService, //
+                        getJournal(),// 
+                        getJournal().getResourceLocator()//
+                        );
 
                 innerTask.joinNexus = new DelegateJoinNexus(tmp) {
 
                     /**
                      * Overridden to resolve the indices using the AbstractTask.
                      */
-                    public IRelationLocator getRelationLocator() {
+                    public IResourceLocator getRelationLocator() {
 
-                        return relationLocator;
+                        return resourceLocator;
 
+                        /*
+                         * FIXME I am not clear yet why this construction works
+                         * but the simpler one below does not. Track this down.
+                         * 
+                         * One question is whether both locators really need to
+                         * specify a delegate. I would think that it should be
+                         * one or the other and that if both do it that we will
+                         * search one delegate twice, but clearly the delegates
+                         * are not the same or these would be interchangable
+                         * constructs. it would be much nicer if we don't have
+                         * to override this at all since that would make running
+                         * inside of the concurrency controls that much more
+                         * transparent.
+                         */
+//                      return getJournal().getResourceLocator();
                     }
 
                 };

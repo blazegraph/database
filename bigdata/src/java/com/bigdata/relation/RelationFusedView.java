@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutorService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.AccessPathFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 
@@ -103,7 +104,7 @@ public class RelationFusedView<E> implements IRelation<E> {
      * should be introduced without these methods.
      */
     
-    public IRelationName getRelationName() {
+    public IRelationIdentifier<E> getResourceIdentifier() {
         
         throw new UnsupportedOperationException();
         
@@ -121,22 +122,40 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
 
+    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+
+        return relation1.newElement(predicate, bindingSet);
+
+    }
+
     public IIndexManager getIndexManager() {
-        
+
         throw new UnsupportedOperationException();
-        
+
     }
 
     public String getNamespace() {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+    public IDatabase getDatabase() {
         
         throw new UnsupportedOperationException();
         
     }
 
-    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
-    
-        return relation1.newElement(predicate, bindingSet);
+    public IRelationIdentifier<IRelation<E>> getLocator() {
+
+        throw new UnsupportedOperationException();
         
     }
+
+    public IRelationIdentifier<ILocatableResource> getContainerName() {
     
+        throw new UnsupportedOperationException();
+        
+    }
+
 }

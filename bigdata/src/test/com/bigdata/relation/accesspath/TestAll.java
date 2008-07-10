@@ -60,20 +60,12 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("access path");
 
-        // @todo chunked iterator tests.
-        // TestChunkedWrappedIterator
-        // TestChunkedArrayIterator (fully buffered)
-        // TestChunkedIterator (async reader)
-
-        // @todo test blocking buffer with iterator to drain solutions.
-        // TestBlockingBuffer
-        // @todo test array backed buffer flushing through to a database.
-        // TestArrayBuffer
-
         /*
          * @todo test basic access path mechanisms and the access path fused
-         * view (right now these are tested in the rdf package since they have
-         * to be run against some data).
+         * view.
+         * 
+         * Note: these are tested in the rdf package for now since they have to
+         * be run against some data.
          */
         
         return suite;

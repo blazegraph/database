@@ -38,6 +38,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
@@ -55,22 +56,7 @@ import com.bigdata.relation.rule.eval.ISolution;
  * @param E
  *            The generic type for the elements in the relation.
  */
-public interface IRelation<E> {
-
-    /**
-     * The relation identifier.
-     */
-    public IRelationName getRelationName();
-    
-    /**
-     * The namespace for the indices used by the relation.
-     */
-    public String getNamespace();
-
-    /**
-     * The timestamp associated with the view of the relation.
-     */
-    public long getTimestamp();
+public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
 
     /**
      * The {@link IIndexManager} for the {@link IRelation}.

@@ -42,7 +42,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.relation.IRelationLocator;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -102,7 +101,7 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      * against the federation. This thread pool is automatically used by the
      * {@link ClientIndexView}.
      */
-    public ExecutorService getThreadPool();
+    public ExecutorService getExecutorService();
 
     /**
      * The {@link CounterSet} which the client will use report its statistics to
@@ -358,10 +357,5 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      * consistent view.
      */
     public long lastCommitTime();
-
-    /**
-     * Return the default {@link IRelationLocator}.
-     */
-    public IRelationLocator getRelationLocator();
 
 }

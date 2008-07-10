@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.relation.locator.IResourceLocator;
 
 /**
  * Interface for managing named indices.
@@ -70,4 +71,9 @@ public interface IIndexManager extends IIndexStore {
      */
     public void dropIndex(String name);
 
+    /**
+     * Return the {@link IResourceLocator} for this {@link IIndexManager}.
+     */
+    public IResourceLocator getResourceLocator();
+    
 }

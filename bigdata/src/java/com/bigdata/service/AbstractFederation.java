@@ -65,8 +65,7 @@ import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TaskCounters;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.relation.DefaultRelationLocator;
-import com.bigdata.relation.IRelationLocator;
+import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -257,11 +256,13 @@ abstract public class AbstractFederation implements IBigdataFederation {
     /**
      * Locator for relations.
      */
-    private final IRelationLocator relationLocator;
+    private final DefaultResourceLocator resourceLocator;
     
-    public IRelationLocator getRelationLocator() {
+    public DefaultResourceLocator getResourceLocator() {
         
-        return relationLocator;
+        assertOpen();
+        
+        return resourceLocator;
     
     }
     
@@ -423,7 +424,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * <p>
      * Note: Tasks run on this service generally update sampled values on
      * {@link ICounter}s reported to the {@link ILoadBalancerService}. Basic
-     * information on the {@link #getThreadPool()} is reported automatically.
+     * information on the {@link #getExecutorService()} is reported automatically.
      * Clients may add additional tasks to report on client-side aspects of
      * their application.
      * <p>
@@ -499,7 +500,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     }
     
-    public ExecutorService getThreadPool() {
+    public ExecutorService getExecutorService() {
         
         assertOpen();
         
@@ -662,10 +663,10 @@ abstract public class AbstractFederation implements IBigdataFederation {
         }
 
         /*
-         * Setup locator for relations. The default resolves relations using the
-         * global row store.
+         * Setup locator.
          */
-        relationLocator = new DefaultRelationLocator(getThreadPool(), this);
+        resourceLocator = new DefaultResourceLocator(getExecutorService(), this,
+                null/*delegate*/);
         
     }
     

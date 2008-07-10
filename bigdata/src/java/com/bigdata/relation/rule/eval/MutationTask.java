@@ -38,7 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;
@@ -100,12 +100,12 @@ public class MutationTask extends AbstractStepTask {
 
         final ProgramUtility util = new ProgramUtility(joinNexus);
         
-        final Map<IRelationName, IRelation> relations = util.getRelations(step,
+        final Map<IRelationIdentifier, IRelation> relations = util.getRelations(step,
                 joinNexus.getWriteTimestamp());
 
         assert !relations.isEmpty();
 
-        final Map<IRelationName, IBuffer<ISolution>> buffers = util
+        final Map<IRelationIdentifier, IBuffer<ISolution>> buffers = util
                 .getMutationBuffers(action, joinNexus, relations);
 
         assert !buffers.isEmpty();
@@ -144,7 +144,7 @@ public class MutationTask extends AbstractStepTask {
      * @throws ExecutionException
      */
     protected void flushBuffers(RuleStats totals, ExecutorService service,
-            Map<IRelationName, IBuffer<ISolution>> buffers)
+            Map<IRelationIdentifier, IBuffer<ISolution>> buffers)
             throws InterruptedException, ExecutionException {
 
         if (totals == null)
@@ -231,7 +231,7 @@ public class MutationTask extends AbstractStepTask {
      * @return
      */
     protected List<Callable<RuleStats>> newMutationTasks(IStep step,
-            IJoinNexus joinNexus, Map<IRelationName, IBuffer<ISolution>> buffers) {
+            IJoinNexus joinNexus, Map<IRelationIdentifier, IBuffer<ISolution>> buffers) {
 
         if (log.isDebugEnabled())
             log.debug("program=" + step.getName());

@@ -1627,7 +1627,7 @@ abstract public class DataService extends AbstractService
     }
 
     /**
-     * The task will be run on the {@link IBigdataFederation#getThreadPool()}.
+     * The task will be run on the {@link IBigdataFederation#getExecutorService()}.
      * <p>
      * The {@link Callable} MAY implement {@link IDataServiceAwareProcedure} to
      * obtain the {@link DataService} reference, which can be used to obtain a
@@ -1668,7 +1668,7 @@ abstract public class DataService extends AbstractService
             }
             
             // submit the task and await its completion.
-            return getFederation().getThreadPool().submit(task);
+            return getFederation().getExecutorService().submit(task);
         
         } finally {
             

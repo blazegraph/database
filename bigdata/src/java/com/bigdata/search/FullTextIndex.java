@@ -415,7 +415,7 @@ public class FullTextIndex {
     public FullTextIndex(IBigdataClient client, String namespace) {
 
         this(client.getProperties(), namespace, client.getFederation(), client
-                .getFederation().getThreadPool());
+                .getFederation().getExecutorService());
 
     }
     
@@ -1171,7 +1171,7 @@ public class FullTextIndex {
      * 
      * @throws InterruptedException
      *             If the operation is interrupted. Since the search runs on the
-     *             {@link IBigdataFederation#getThreadPool()}, a disconnect
+     *             {@link IBigdataFederation#getExecutorService()}, a disconnect
      *             from the federation will automatically interrupt the search.
      */
     public Hiterator search(String query, String languageCode,

@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,41 +20,48 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
-package com.bigdata.journal;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.sparse.GlobalRowStoreSchema;
-import com.bigdata.sparse.SparseRowStore;
+*/
+/*
+ * Created on Jul 9, 2008
+ */
+
+package com.bigdata.relation.locator;
 
 /**
- * Interface accessing named indices.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndexStore {
+public class ResourceIdentifier<T extends ILocatableResource> implements IResourceIdentifier<T> {
+    
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -8065510828530539906L;
+    
+    private final String namespace;
 
     /**
-     * Return a read-only view of the named index as of the specified timestamp.
      * 
-     * @param name
-     *            The index name.
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @return The index or <code>null</code> iff there is no index registered
-     *         with that name for that timestamp.
+     * @param namespace
+     *            The resource namespace.
      */
-    public IIndex getIndex(String name, long timestamp);
+    public ResourceIdentifier(String namespace) {
+        
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        
+        this.namespace = namespace;
+        
+    }
 
     /**
-     * Return the global {@link SparseRowStore} used to store named property
-     * sets.
-     * 
-     * @see GlobalRowStoreSchema
+     * The resource namespace.
      */
-    public SparseRowStore getGlobalRowStore();
+    public String toString() {
+        
+        return namespace;
+        
+    }
     
 }
