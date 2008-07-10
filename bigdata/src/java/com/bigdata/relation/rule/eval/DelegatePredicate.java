@@ -1,6 +1,7 @@
 package com.bigdata.relation.rule.eval;
 
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -46,7 +47,7 @@ public class DelegatePredicate<E> implements IPredicate<E> {
         return src.getConstraint();
     }
 
-    public IRelationName<E> getRelationName() {
+    public IRelationIdentifier<E> getRelationName() {
         return src.getRelationName();
     }
     

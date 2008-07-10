@@ -23,38 +23,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 23, 2008
+ * Created on Jul 9, 2008
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.relation;
 
-import com.bigdata.relation.IRelationIdentifier;
+import java.util.Iterator;
 
-public class MockRelationName<R> implements IRelationIdentifier<R> {
+import com.bigdata.relation.locator.ILocatableResource;
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+/**
+ * A collection of relations having a unique namespace. The relations within the
+ * container have namespaces within the container's namespace. Relations also
+ * know how to find their container.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public interface IDatabase<T> extends ILocatableResource<IDatabase<T>> {
 
-    private final String name;
-
-    public MockRelationName() {
-        
-        this("");
-        
-    }
-    
-    public MockRelationName(String name) {
-        
-        this.name = name;
-        
-    }
-    
-    public String toString() {
-        
-        return name;
-        
-    }
+    public Iterator<IRelation> relations();
     
 }

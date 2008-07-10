@@ -23,36 +23,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 25, 2008
+ * Created on Jul 9, 2008
  */
 
-package com.bigdata.relation;
+package com.bigdata.relation.locator;
 
 import java.io.Serializable;
 
 /**
- * The unique identifier for an {@link IRelation} (its namespace).
+ * An identifier for a typed {@link ILocatableResource} resource.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo There should be a facility for creating and destroying temporary
- *       indices. Perhaps they should be placed into their own namespace, e.g.,
- *       "#x" would be a temporary index named "x" (could support scale-out) and
- *       "##x" would be a data-service local temporary index named "x". "x" by
- *       itself is a normal index. Normally, such temporary indices should be
- *       scoped to something like a transaction but transaction support is not
- *       yet finished.
- *       <p>
- *       You can name a view of two relations by just concatenating their names.
- * 
- * @param <R>
- *            The generic type of the [R]elation.
+ * @param <T>
+ *            The generic type of the identiifed resource.
  */
-public interface IRelationName<R> extends Serializable {
+public interface IResourceIdentifier<T> extends Serializable {
 
     /**
-     * The namespace of the relation.
+     * The namespace of the resource (its unique identifier).
      */
     public String toString();
     

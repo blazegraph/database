@@ -21,40 +21,49 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.journal;
+package com.bigdata.relation.locator;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.sparse.GlobalRowStoreSchema;
-import com.bigdata.sparse.SparseRowStore;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Interface accessing named indices.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndexStore {
+public class TestAll extends TestCase {
 
     /**
-     * Return a read-only view of the named index as of the specified timestamp.
      * 
-     * @param name
-     *            The index name.
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @return The index or <code>null</code> iff there is no index registered
-     *         with that name for that timestamp.
      */
-    public IIndex getIndex(String name, long timestamp);
+    public TestAll() {
+        
+    }
 
     /**
-     * Return the global {@link SparseRowStore} used to store named property
-     * sets.
-     * 
-     * @see GlobalRowStoreSchema
+     * @param arg0
      */
-    public SparseRowStore getGlobalRowStore();
+    public TestAll(String arg0) {
+     
+        super(arg0);
+        
+    }
+
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        TestSuite suite = new TestSuite("locator");
+
+        suite.addTestSuite(TestDefaultResourceLocator.class);
+        
+        return suite;
+        
+    }
     
 }

@@ -172,7 +172,7 @@ public class LocalProgramTask implements IProgramTask,
      *            <code>null</code> iff the task is NOT submitted by a task
      *            running on a {@link DataService}.
      * 
-     * @see IBigdataFederation#getThreadPool()
+     * @see IBigdataFederation#getExecutorService()
      */
     public LocalProgramTask(ActionEnum action, IStep step,
             IJoinNexus joinNexus, ExecutorService executorService,
@@ -499,12 +499,13 @@ public class LocalProgramTask implements IProgramTask,
         if (!action.isMutation())
             throw new IllegalArgumentException();
         
-        if (log.isDebugEnabled())
-            log.debug("begin: action="+action+", program=" + step.getName());
-        
         final MutationTask mutationTask = new MutationTask(action, joinNexus,
                 step, executorService, dataService );
 
+        if (log.isDebugEnabled())
+            log.debug("begin: action=" + action + ", program=" + step.getName()
+                    + ", task=" + mutationTask);
+        
         // submit to the service and await completion, returning the result.
         return mutationTask.submit().get();  
         

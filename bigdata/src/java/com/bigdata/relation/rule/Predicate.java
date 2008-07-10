@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
@@ -44,7 +44,7 @@ public class Predicate<E> implements IPredicate<E> {
     /** #of unbound variables. */
     private final int nvars;
 
-    private final IRelationName<E> relation;
+    private final IRelationIdentifier<E> relationIdentifier;
     
     private final IVariableOrConstant[] values;
     
@@ -64,7 +64,7 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.arity = src.arity;
 
-        this.relation = src.relation;
+        this.relationIdentifier = src.relationIdentifier;
 
         this.values = src.values.clone();
 
@@ -100,36 +100,36 @@ public class Predicate<E> implements IPredicate<E> {
     
     /**
      * 
-     * @param relation
+     * @param relationName
      *            Identifies the relation to be queried.
      * @param values
      *            The values (order is important!).
      */
-    public Predicate(IRelationName<E> relation, IVariableOrConstant[] values) {
+    public Predicate(IRelationIdentifier<E> relationName, IVariableOrConstant[] values) {
         
-        this(relation, values, null/* constraint */);
+        this(relationName, values, null/* constraint */);
         
     }
 
     /**
      * 
-     * @param relation
+     * @param relationName
      *            Identifies the relation to be queried.
      * @param values
      *            The values (order is important!).
      * @param constraint
      *            An optional constraint.
      */
-    public Predicate(IRelationName<E> relation, IVariableOrConstant[] values,
+    public Predicate(IRelationIdentifier<E> relationName, IVariableOrConstant[] values,
             IElementFilter<E> constraint) {
 
-        if (relation == null)
+        if (relationName == null)
             throw new IllegalArgumentException();
 
         if (values == null)
             throw new IllegalArgumentException();
 
-        this.relation = relation;
+        this.relationIdentifier = relationName;
         
         this.arity = values.length;
 
@@ -155,9 +155,9 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
     
-    public IRelationName<E> getRelationName() {
+    public IRelationIdentifier<E> getRelationName() {
         
-        return relation;
+        return relationIdentifier;
         
     }
     

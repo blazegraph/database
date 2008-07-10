@@ -44,6 +44,7 @@ import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -107,6 +108,18 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
             throw new RuntimeException(ex);
             
         }
+        
+    }
+    
+    /**
+     * The UUID of this {@link TemporaryRawStore}. This is reported as part of
+     * {@link #getResourceMetadata()} and may also be used to ensure that
+     * {@link ILocatableResource}s created on a {@link TemporaryStore} are
+     * placed within a unique namespace.
+     */
+    final public UUID getUUID() {
+        
+        return uuid;
         
     }
     
@@ -242,6 +255,12 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         
     }
     
+    public String toString() {
+        
+        return getClass().getName() + "{file=" + getFile() + "}";
+        
+    }
+    
     final public File getFile() {
         
         return buf.getFile();
@@ -359,6 +378,13 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
     final public long size() {
         
         return buf.size();
+        
+    }
+    
+    final protected void assertOpen() {
+        
+        if (!isOpen())
+            throw new IllegalArgumentException();
         
     }
     

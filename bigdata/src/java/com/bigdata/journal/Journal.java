@@ -30,6 +30,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -40,10 +42,12 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.MillisecondTimestampFactory;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Concrete implementation suitable for a local and unpartitioned database.
@@ -84,6 +88,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         super(properties);
      
+        executorService = Executors.newCachedThreadPool(DaemonThreadFactory
+                .defaultThreadFactory());
+
+        resourceLocator = new DefaultResourceLocator(executorService, this,
+                null/*delegate*/);
+
         localTransactionManager = new AbstractLocalTransactionManager(this/* resourceManager */) {
          
             public long nextTimestamp() {
@@ -98,22 +108,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         localTransactionManager.setConcurrencyManager(concurrencyManager);
         
-//        /*
-//         * Note: This reuses the read service for executing oddball tasks. While
-//         * this is a bit odd, there is no real reason not to do this. However
-//         * those tasks will show up on the queue statistics for the read
-//         * service.
-//         */
-//        relationLocator = new DefaultRelationLocator(
-//                concurrencyManager.readService, this);
-        
     }
-    
-//    public long commit() {
-//
-//        return commitNow( localTransactionManager.nextTimestampRobust() );
-//
-//    }
 
     public ILocalTransactionManager getLocalTransactionManager() {
         
@@ -536,8 +531,34 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     synchronized public void shutdown() {
         
-        if(!isOpen()) return;
-        
+        if (!isOpen())
+            return;
+
+        executorService.shutdown();
+
+        try {
+
+            final long shutdownTimeout = 2;
+
+            final TimeUnit unit = TimeUnit.SECONDS;
+
+            final long begin = System.currentTimeMillis();
+
+            long elapsed = System.currentTimeMillis() - begin;
+
+            if (!executorService.awaitTermination(shutdownTimeout - elapsed,
+                    unit)) {
+
+                log.warn("timeout: elapsed=" + elapsed);
+
+            }
+
+        } catch (InterruptedException ex) {
+
+            log.warn("Awaiting executor service: "+ex);
+
+        }
+
         concurrencyManager.shutdown();
        
         localTransactionManager.shutdown();
@@ -554,6 +575,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         if(!isOpen()) return;
 
+        executorService.shutdownNow();
+        
         concurrencyManager.shutdownNow();
         
         localTransactionManager.shutdownNow();
@@ -642,16 +665,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-//    /**
-//     * @throws UnsupportedOperationException
-//     *             always.
-//     */
-//    public ILoadBalancerService getLoadBalancerService() {
-//
-//        throw new UnsupportedOperationException();
-//        
-//    }
-
     /**
      * @throws UnsupportedOperationException
      *             always.
@@ -661,16 +674,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         throw new UnsupportedOperationException();
         
     }
-    
-//    /**
-//     * @throws UnsupportedOperationException
-//     *             always.
-//     */
-//    public IDataService getDataService(UUID uuid) {
-//        
-//        throw new UnsupportedOperationException();
-//        
-//    }
     
     /**
      * @throws UnsupportedOperationException
@@ -727,12 +730,26 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
     
-//    public IRelationLocator getRelationLocator() {
-//        
-//        return relationLocator;
-//        
-//    }
-//    
-//    private final IRelationLocator relationLocator;
+    public DefaultResourceLocator getResourceLocator() {
+
+        assertOpen();
+        
+        return resourceLocator;
+        
+    }
+    
+    /**
+     * resource locator.
+     */
+    private final DefaultResourceLocator resourceLocator;
+    
+    public ExecutorService getExecutorService() {
+        
+        assertOpen();
+        
+        return executorService;
+        
+    }
+    private final ExecutorService executorService;
 
 }

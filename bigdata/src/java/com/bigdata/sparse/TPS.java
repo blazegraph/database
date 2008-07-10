@@ -435,10 +435,10 @@ public class TPS implements ITPS, Externalizable {
 //            obs = new OutputBitStream(baos);
 //        }
         
+        out.writeBoolean(preconditionOk);
+        
         // #of tuples.
         out.writeInt(tuples.size());
-        
-        out.writeBoolean(preconditionOk);
         
         // @todo property name codec.
         

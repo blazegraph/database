@@ -170,11 +170,11 @@ public class ClientIndexView implements IClientIndex {
     }
     
     /**
-     * The thread pool exposed by {@link IBigdataFederation#getThreadPool()}
+     * The thread pool exposed by {@link IBigdataFederation#getExecutorService()}
      */
     protected ThreadPoolExecutor getThreadPool() {
 
-        return (ThreadPoolExecutor)fed.getThreadPool();
+        return (ThreadPoolExecutor)fed.getExecutorService();
 
     }
 

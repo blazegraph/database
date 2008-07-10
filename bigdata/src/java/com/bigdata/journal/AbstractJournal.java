@@ -36,6 +36,7 @@ import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -63,14 +64,13 @@ import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
-import com.bigdata.sparse.GlobalRowStoreSchema;
-import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -1163,6 +1163,14 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     }
 
+    /**
+     * Service for running arbitrary tasks in support of
+     * {@link IResourceLocator}. There is no concurrency control associated
+     * with this service, but tasks run here may submit tasks to the
+     * {@link ConcurrencyManager}.
+     */
+    abstract public ExecutorService getExecutorService();
+    
     /**
      * Shutdown the journal (running tasks will run to completion, but no new
      * tasks will start).

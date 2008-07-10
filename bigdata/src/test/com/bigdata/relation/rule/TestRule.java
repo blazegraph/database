@@ -29,7 +29,7 @@ package com.bigdata.relation.rule;
 
 import java.util.Set;
 
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 
 /**
  * Test suite for basic {@link Rule} mechanisms.
@@ -53,7 +53,7 @@ public class TestRule extends AbstractRuleTestCase {
         super(name);
     }
     
-    private final IRelationName relation = new MockRelationName();
+    private final IRelationIdentifier relation = new MockRelationName();
 
     /**
      * Verify constructor of a simple rule.

@@ -29,7 +29,8 @@ package com.bigdata.relation.rule;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.IRelationIdentifier;
 
 /**
  * 
@@ -79,7 +80,7 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
     @SuppressWarnings("serial")
     static protected class TestRuleRdfs9 extends Rule {
         
-        public TestRuleRdfs9(IRelationName relation) {
+        public TestRuleRdfs9(IRelationIdentifier relation) {
             
             super(  "rdfs9",//
                     new P(relation,var("v"), rdfType, var("x")), //
@@ -109,7 +110,7 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
     @SuppressWarnings("serial")
     static protected class TestRuleRdfs04a extends Rule {
 
-        public TestRuleRdfs04a(IRelationName relation) {
+        public TestRuleRdfs04a(IRelationIdentifier relation) {
 
             super("rdfs4a",//
                     new P(relation,//
@@ -133,7 +134,7 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
          * @param p
          * @param o
          */
-        public P(IRelationName<E> relation, IVariableOrConstant<Long> s,
+        public P(IRelationIdentifier<E> relation, IVariableOrConstant<Long> s,
                 IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
             super(relation, new IVariableOrConstant[] { s, p, o });

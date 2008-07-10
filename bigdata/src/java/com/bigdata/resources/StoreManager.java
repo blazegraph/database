@@ -83,6 +83,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
@@ -1791,6 +1792,19 @@ abstract public class StoreManager extends ResourceEvents implements
         public SparseRowStore getGlobalRowStore() {
             
             return getFederation().getGlobalRowStore();
+            
+        }
+        
+        public DefaultResourceLocator getResourceLocator() {
+            
+            return (DefaultResourceLocator) getFederation()
+                    .getResourceLocator();
+            
+        }
+        
+        public ExecutorService getExecutorService() {
+            
+            return getFederation().getExecutorService();
             
         }
         

@@ -26,42 +26,47 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 30, 2008
  */
 
-package com.bigdata.relation;
+package com.bigdata.relation.locator;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.IRelationIdentifier;
+
 /**
- * A mapping between {@link IRelationName}s and {@link IRelationLocator}s.
+ * A mapping between {@link IRelationIdentifier}s and {@link IResourceLocator}s.
  * This can be used to locate local, temporary or virtual relations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated this is only useful if explicitly enumerating the resource locators.
  */
-public class RelationLocatorMap<R> implements IRelationLocator<R> {
+public class ResourceLocatorMap<T extends ILocatableResource> implements IResourceLocator<T> {
 
     /**
      * 
      */
-    private final Map<IRelationName<R>, IRelationLocator<R>> relationLocators = new ConcurrentHashMap<IRelationName<R>, IRelationLocator<R>>();
+    private final Map<IResourceIdentifier<T>, IResourceLocator<T>> resourceLocators = new ConcurrentHashMap<IResourceIdentifier<T>, IResourceLocator<T>>();
 
     /**
      * De-serialization ctor.
      */
-    public RelationLocatorMap() {
+    public ResourceLocatorMap() {
         
     }
         
     /**
-     * Add a mapping from an {@link IRelationName} to the
-     * {@link IRelationLocator} for the identified {@link IRelation}.
+     * Add a mapping from an {@link IRelationIdentifier} to the
+     * {@link IResourceLocator} for the identified {@link IRelation}.
      * 
      * @param relationName
      *            The relation name.
      * @param relationLocator
      *            The locator.
      */
-    public void addRelation(IRelationName<R> relationName, IRelationLocator<R> relationLocator) {
+    public void add(IResourceIdentifier<T> relationName, IResourceLocator<T> relationLocator) {
         
         if (relationName == null)
             throw new IllegalArgumentException();
@@ -69,16 +74,16 @@ public class RelationLocatorMap<R> implements IRelationLocator<R> {
         if (relationLocator == null)
             throw new IllegalArgumentException();
         
-        relationLocators.put(relationName, relationLocator);
+        resourceLocators.put(relationName, relationLocator);
         
     }
 
-    public IRelation<R> getRelation(IRelationName<R> relationName, long timestamp) {
+    public T locate(IResourceIdentifier<T> relationName, long timestamp) {
 
         if (relationName == null)
             throw new IllegalArgumentException();
         
-        IRelationLocator<R> relationLocator = relationLocators.get(relationName);
+        IResourceLocator<T> relationLocator = resourceLocators.get(relationName);
         
         if (relationLocator == null) {
 
@@ -86,7 +91,7 @@ public class RelationLocatorMap<R> implements IRelationLocator<R> {
 
         }
 
-        return relationLocator.getRelation(relationName, timestamp);
+        return relationLocator.locate(relationName, timestamp);
 
     }
 

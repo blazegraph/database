@@ -32,7 +32,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationName;
+import com.bigdata.relation.IRelationIdentifier;
 
 /**
  * Conjunctive query of N {@link IPredicate}s with optional {@link IConstraint}s.
@@ -48,7 +48,7 @@ import com.bigdata.relation.IRelationName;
  *            The generic type of the [E]lements materialized by the head of the
  *            rule. This should be the same as the generic type of the
  *            {@link IRelation} that can be materialized from the
- *            {@link IRelationName} associated with the {@link IPredicate} that
+ *            {@link IRelationIdentifier} associated with the {@link IPredicate} that
  *            is the head of the rule.
  */
 public interface IRule<E> extends IStep {

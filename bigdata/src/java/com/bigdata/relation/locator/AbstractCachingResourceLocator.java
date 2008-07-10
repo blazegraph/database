@@ -26,21 +26,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 30, 2008
  */
 
-package com.bigdata.relation;
+package com.bigdata.relation.locator;
+
+import java.lang.ref.WeakReference;
 
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.util.NT;
 
 /**
- * Abstract base class for {@link IRelationLocator}s with caching.
+ * Abstract base class for {@link IResourceLocator}s with caching. The cache
+ * uses {@link WeakReference}s so that cache entries will be cleared if the
+ * referenced item is cleared.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractCachingRelationLocator<R> implements IRelationLocator<R> {
+abstract public class AbstractCachingResourceLocator<T extends ILocatableResource> implements IResourceLocator<T> {
 
-    private transient WeakValueCache<NT,IRelation<R>> cache;
+    private transient WeakValueCache<NT, T> cache;
 
     private int capacity;
     
@@ -55,63 +59,62 @@ abstract public class AbstractCachingRelationLocator<R> implements IRelationLoca
         
     }
 
-    protected AbstractCachingRelationLocator() {
+    protected AbstractCachingResourceLocator() {
 
         this(DEFAULT_CACHE_CAPACITY);
 
     }
 
-    protected AbstractCachingRelationLocator(int capacity) {
+    protected AbstractCachingResourceLocator(int capacity) {
 
         this.capacity = capacity;
         
-        this.cache = new WeakValueCache<NT, IRelation<R>>(
-                new LRUCache<NT, IRelation<R>>(capacity));
+        this.cache = new WeakValueCache<NT, T>(new LRUCache<NT, T>(capacity));
 
     }
 
     /**
-     * Looks up the relation in the cache.
+     * Looks up the resource in the cache.
      * <p>
      * Note: The caller MUST be synchronized across their
-     * {@link IRelationLocator#getRelation(IRelationName, long)} implementation.
+     * {@link IResourceLocator#locate(IRelationName, long)} implementation.
      * 
-     * @param relationName
+     * @param namespace
      * 
      * @param timestamp
      * 
      * @return The relation -or- <code>null</code> iff it is not in the cache.
      */
-    protected IRelation<R> get(String namespace, long timestamp) {
+    protected T get(String namespace, long timestamp) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
 
-        final IRelation<R> r = cache.get(new NT(namespace, timestamp));
+        final T r = cache.get(new NT(namespace, timestamp));
         
         return r;
 
     }
 
     /**
-     * Places the relation in the cache.
+     * Places the resource in the cache.
      * <p>
      * Note: The caller MUST be synchronized across their
-     * {@link IRelationLocator#getRelation(IRelationName, long)} implementation.
+     * {@link IResourceLocator#locate(IRelationName, long)} implementation.
      * 
-     * @param relation
+     * @param resource
      *            The relation.
      */
-    protected void put(IRelation<R> relation) {
+    protected void put(T resource) {
         
-        if (relation == null)
+        if (resource == null)
             throw new IllegalArgumentException();
         
-        final String namespace = relation.getNamespace();
+        final String namespace = resource.getResourceIdentifier().toString();
 
-        final long timestamp = relation.getTimestamp();
+        final long timestamp = resource.getTimestamp();
         
-        cache.put(new NT(namespace, timestamp), relation, false/* dirty */);
+        cache.put(new NT(namespace, timestamp), resource, false/* dirty */);
         
     }
 

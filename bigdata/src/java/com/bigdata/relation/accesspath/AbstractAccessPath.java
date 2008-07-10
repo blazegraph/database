@@ -138,7 +138,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * 
      * @param service
      *            The executor service used for asynchronous iterators (this is
-     *            typically {@link IBigdataFederation#getThreadPool()}).
+     *            typically {@link IBigdataFederation#getExecutorService()}).
      * @param predicate
      *            The constraints on the access path.
      * @param keyOrder

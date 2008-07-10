@@ -40,6 +40,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.relation.locator.ILocatableResource;
+import com.bigdata.relation.locator.IResourceIdentifier;
+import com.bigdata.relation.locator.RelationSchema;
+import com.bigdata.relation.locator.ResourceIdentifier;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -65,7 +69,9 @@ abstract public class AbstractRelation<E> implements IMutableRelation<E> {
     
     private final String namespace;
 
-    private final IRelationName<E> relationName;
+    private final IResourceIdentifier<ILocatableResource> containerName;
+
+    private final IRelationIdentifier<E> relationIdentifier;
 
     private final long timestamp;
     
@@ -88,10 +94,16 @@ abstract public class AbstractRelation<E> implements IMutableRelation<E> {
         return namespace;
         
     }
-    
-    public IRelationName getRelationName() {
 
-        return relationName;
+    public IResourceIdentifier<ILocatableResource> getContainerName() {
+        
+        return containerName;
+        
+    }
+    
+    public IRelationIdentifier<E> getResourceIdentifier() {
+
+        return relationIdentifier;
         
     }
 
@@ -116,7 +128,8 @@ abstract public class AbstractRelation<E> implements IMutableRelation<E> {
     public String toString(){
         
         return getClass().getSimpleName() + "{timestamp=" + timestamp
-                + ", namespace=" + namespace + "}";
+                + ", namespace=" + namespace + ", indexManager=" + indexManager
+                + "}";
 
     }
 
@@ -145,7 +158,14 @@ abstract public class AbstractRelation<E> implements IMutableRelation<E> {
 
         this.namespace = namespace;
 
-        this.relationName = new RelationName<E>(namespace);
+        {
+            String val = properties.getProperty(RelationSchema.CONTAINER);
+
+            this.containerName = val == null ? null : new ResourceIdentifier<ILocatableResource>(val);
+        
+        }
+        
+        this.relationIdentifier = new RelationName<E>(namespace);
 
         this.timestamp = timestamp;
 
@@ -154,6 +174,13 @@ abstract public class AbstractRelation<E> implements IMutableRelation<E> {
         properties.setProperty(RelationSchema.NAMESPACE, namespace);
 
         properties.setProperty(RelationSchema.CLASS, getClass().getName());
+        
+        if (log.isInfoEnabled()) {
+
+            log.info("namespace=" + namespace + ", timestamp=" + timestamp
+                    + ", indexManager=" + indexManager);
+            
+        }
         
     }
 

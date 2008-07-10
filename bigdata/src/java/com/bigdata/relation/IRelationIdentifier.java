@@ -23,38 +23,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 23, 2008
+ * Created on Jun 25, 2008
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.relation;
 
-import com.bigdata.relation.IRelationIdentifier;
+import com.bigdata.relation.locator.IResourceIdentifier;
 
-public class MockRelationName<R> implements IRelationIdentifier<R> {
+
+/**
+ * A unique identifier for typed {@link IRelation} resource.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ * 
+ * @param <R> The generic type of the elements of the identified relation.
+ */
+public interface IRelationIdentifier<R> extends IResourceIdentifier<IRelation<R>> {
 
     /**
-     * 
+     * The namespace of the resource (its unique identifier).
      */
-    private static final long serialVersionUID = 1L;
-
-    private final String name;
-
-    public MockRelationName() {
-        
-        this("");
-        
-    }
-    
-    public MockRelationName(String name) {
-        
-        this.name = name;
-        
-    }
-    
-    public String toString() {
-        
-        return name;
-        
-    }
+    public String toString();
     
 }

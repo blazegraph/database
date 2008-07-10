@@ -1,5 +1,6 @@
-package com.bigdata.relation;
+package com.bigdata.relation.locator;
 
+import com.bigdata.relation.IRelation;
 import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
 
@@ -24,19 +25,26 @@ public class RelationSchema extends Schema {
      * 
      */
     private static final long serialVersionUID = -558566998386484688L;
-    
 
     /**
      * The name of the property whose value is the namespace of the
-     * {@link IRelation} (this is the primary key).
+     * {@link ILocatableResource} (this is the primary key).
      */
     public static final String NAMESPACE = "namespace";
 
     /**
      * The name of the property whose value is the name of the {@link Class}
-     * used to instantiate the {@link IRelation}.
+     * used to instantiate the {@link ILocatableResource}.
      */
-    public static final String CLASS = "relationClass";
+    public static final String CLASS = "class";
+
+    /**
+     * The name of the property whose value is namespace of the container (if
+     * any) for this the {@link ILocatableResource} resource having {@link #NAMESPACE}
+     * as its resource identifer. When defined, this value MUST be a prefix of
+     * the value stored under the {@link #NAMESPACE} property.
+     */
+    public static final String CONTAINER = "container";
 
     /**
      * A shared instance.
