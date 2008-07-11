@@ -4,14 +4,13 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IClosableIterator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
 
@@ -46,17 +45,13 @@ public class QueryTask extends AbstractStepTask {
      * 
      * @param buffer
      *            The buffer on which the {@link ISolution}s will be written.
-     * 
-     * @throws IllegalArgumentException
-     *             if any argument is <code>null</code>.
      */
-    public QueryTask(IStep step, IJoinNexus joinNexus,
-//            List<Callable<RuleStats>> tasks,
-//            IRuleTaskFactory defaultTaskFactory,
-            IBlockingBuffer<ISolution> buffer,
-            ExecutorService executorService, DataService dataService) {
+    public QueryTask(IStep step, IJoinNexusFactory joinNexusFactory,
+            IBlockingBuffer<ISolution> buffer, IIndexManager indexManager,
+            DataService dataService) {
 
-        super(ActionEnum.Query, joinNexus, step, executorService, dataService);
+        super(ActionEnum.Query, joinNexusFactory, step, indexManager,
+                dataService);
         
         if (buffer == null)
             throw new IllegalArgumentException();
@@ -73,33 +68,40 @@ public class QueryTask extends AbstractStepTask {
      */
     public RuleStats call() throws Exception {
 
-        if (executorService == null) {
+        /*
+         * Create the IJoinNexus that will be used to evaluate the Query now
+         * that we are in the execution context and have the correct
+         * IIndexManager object.
+         */
+        
+        final IJoinNexus joinNexus = joinNexusFactory.newInstance(indexManager);
 
-            /*
-             * See the base class.
-             */
-            
-            throw new IllegalStateException();
-            
-        }
+        /*
+         * Create the individual tasks that we need to execute now that we are
+         * in the correct execution context.
+         */
         
         final List<Callable<RuleStats>> tasks = newQueryTasks(step, joinNexus,
                 buffer);
 
+        /*
+         * Run those tasks.
+         */
+
         assert tasks != null;
         assert !tasks.isEmpty();
-        
+
         try {
 
             final RuleStats totals;
 
             if (!step.isRule() && ((IProgram)step).isParallel()) {
 
-                totals = runParallel(executorService, step, tasks);
+                totals = runParallel(step, tasks);
 
             } else {
 
-                totals = runSequential(executorService, step, tasks);
+                totals = runSequential(step, tasks);
 
             }
 

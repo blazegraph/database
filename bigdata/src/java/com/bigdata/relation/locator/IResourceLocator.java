@@ -68,6 +68,6 @@ public interface IResourceLocator<T extends ILocatableResource> {
      * @throws RuntimeException
      *             if there is an error when resolving the identifier.
      */
-    public T locate(IResourceIdentifier<T> relationName, long timestamp);
+    public T locate(IResourceIdentifier<T> identifier, long timestamp);
     
 }

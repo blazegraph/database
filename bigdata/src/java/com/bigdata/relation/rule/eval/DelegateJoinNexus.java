@@ -30,6 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -95,12 +96,8 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.runQuery(step);
     }
 
-    public ExecutorService getExecutorService() {
-        return delegate.getExecutorService();
-    }
-
-    public IResourceLocator getRelationLocator() {
-        return delegate.getRelationLocator();
+    public IIndexManager getIndexManager() {
+        return delegate.getIndexManager();
     }
 
     public long getWriteTimestamp() {

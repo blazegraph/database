@@ -23,7 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.util.concurrent.ExecutorService;
+
 import com.bigdata.btree.IIndex;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
@@ -56,5 +59,28 @@ public interface IIndexStore {
      * @see GlobalRowStoreSchema
      */
     public SparseRowStore getGlobalRowStore();
+    
+    /**
+     * Return the default locator for resources that are logical index
+     * containers (relations and relation containers).
+     */
+    public IResourceLocator getResourceLocator();
+
+    /**
+     * A {@link ExecutorService} that may be used to parallelize operations.
+     * This service is automatically used when materializing located resources.
+     * While the service does not impose concurrency controls, tasks run on this
+     * service may submit operations to a {@link ConcurrencyManager}.
+     */
+    public ExecutorService getExecutorService();
+
+    /**
+     * The service that may be used to acquire exclusive or shared locks for a
+     * resource hierarchy. This is used primarily when creating or destroying
+     * {@link IRelation}s in order to make those operations atomic, but the
+     * service may be used for any resource whether or not they correspond to
+     * the global index namespace.
+     */
+    public IResourceLockManager getResourceLockManager();
     
 }

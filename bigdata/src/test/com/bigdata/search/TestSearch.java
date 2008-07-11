@@ -32,6 +32,7 @@ import java.io.StringReader;
 import java.util.Iterator;
 import java.util.Properties;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
 
 /**
@@ -56,6 +57,8 @@ public class TestSearch extends AbstractLocalDataServiceFederationTestCase {
     public TestSearch(String name) {
         super(name);
     }
+
+    final String NAMESPACE = "test";
 
     FullTextIndex ndx;
 
@@ -104,8 +107,11 @@ public class TestSearch extends AbstractLocalDataServiceFederationTestCase {
     public void setUp() throws Exception {
 
         super.setUp();
+
+        ndx = new FullTextIndex(client.getFederation(), NAMESPACE,
+                ITx.UNISOLATED, client.getProperties());
         
-        ndx = new FullTextIndex(client, "test");
+        ndx.create();
 
         /*
          * Index the documents.

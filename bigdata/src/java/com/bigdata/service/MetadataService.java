@@ -134,7 +134,7 @@ abstract public class MetadataService extends DataService implements
      * locator information and should not be overloaded for other purposes.
      */
     @Override
-    public Future submit(Callable proc) {
+    public Future<? extends Object> submit(Callable<? extends Object> proc) {
 
         throw new UnsupportedOperationException();
         
@@ -378,7 +378,8 @@ abstract public class MetadataService extends DataService implements
                 
                 metadata.setDeleteMarkers(true);
                 
-                log.info("Enabling delete markers: "+metadata.getName());
+                if (log.isInfoEnabled())
+                    log.info("Enabling delete markers: "+metadata.getName());
                 
             }
             

@@ -56,22 +56,8 @@ import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
  * @param <E>
  *            The generic type of the [E]lements of the relation.
  */
-public interface IMutableRelation<E> extends IRelation<E> {
+public interface IMutableRelation<E> extends IRelation<E>, IMutableResource<IRelation<E>> {
 
-    /**
-     * Create the indices for the relation.
-     * <p>
-     * Note: Implementations SHOULD strengthen the return type for convenience.
-     * 
-     * @return <i>this</i> relation.
-     */
-    public IMutableRelation<E> create();
-    
-    /**
-     * Destroy the indices for the relation.
-     */
-    public void destroy();
-    
     /**
      * Write elements on the relation.
      * 

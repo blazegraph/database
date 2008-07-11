@@ -34,16 +34,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
 
@@ -55,53 +54,51 @@ import com.bigdata.service.DataService;
  */
 public class MutationTask extends AbstractStepTask {
 
-//    private final Map<IRelationName, IBuffer<ISolution>> buffers;
-
     /**
      * @param buffers
      *            The buffers on which the tasks will write. There must be one
      *            buffer for each distinct relation in the heads of the various
      *            rules from which the tasks were created.
      */
-    protected MutationTask(ActionEnum action, IJoinNexus joinNexus, IStep step,
-//            IRuleTaskFactory defaultTaskFactory,
-//            List<Callable<RuleStats>> tasks,
-//            Map<IRelationName, IBuffer<ISolution>> buffers,
-            ExecutorService executorService,DataService dataService
+    protected MutationTask(ActionEnum action,
+            IJoinNexusFactory joinNexusFactory, IStep step,
+            IIndexManager indexManager,DataService dataService
             ) {
 
-        super(action, joinNexus, step, executorService,dataService);
-
-//        if (buffers == null)
-//            throw new IllegalArgumentException();
-//
-//        this.buffers = buffers;
-//        
+        super(action, joinNexusFactory, step, indexManager, dataService);
         
     }
 
     /**
      * Run the task.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link #executorService} is <code>null</code>.
      */
     public RuleStats call() throws Exception {
         
-        if (executorService == null) {
+        /*
+         * Create the IJoinNexus that will be used to evaluate the Query now
+         * that we are in the execution context and have the correct
+         * IIndexManager object.
+         */
+        final IJoinNexus joinNexus = joinNexusFactory.newInstance(indexManager);
 
-            /*
-             * See the base class.
-             */
-            
-            throw new IllegalStateException();
-            
-        }
+        /*
+         * Create the individual tasks that we need to execute now that we are
+         * in the correct execution context.
+         * 
+         * Note: The mutation tasks write on buffers and those buffers flush to
+         * indices in the mutable relations. We have to defer the creation of
+         * those buffers until we are in the execution context and have access
+         * to the correct indices. In turn, this means that we can not create
+         * the tasks that we are going to execute until we have those buffers on
+         * hand. Hence everything gets deferred until we are in the correct
+         * execution context and have the actual IIndexManager with which the
+         * tasks will execute.
+         */
 
-        final ProgramUtility util = new ProgramUtility(joinNexus);
+        final ProgramUtility util = new ProgramUtility();
         
-        final Map<IRelationIdentifier, IRelation> relations = util.getRelations(step,
-                joinNexus.getWriteTimestamp());
+        final Map<IRelationIdentifier, IRelation> relations = util
+                .getRelations(indexManager, step, joinNexus.getWriteTimestamp());
 
         assert !relations.isEmpty();
 
@@ -119,14 +116,14 @@ public class MutationTask extends AbstractStepTask {
 
         if (!step.isRule() && ((IProgram) step).isParallel()) {
 
-            totals = runParallel(executorService, step, tasks);
+            totals = runParallel( step, tasks);
 
-            flushBuffers(totals, executorService, buffers);
+            flushBuffers(totals, buffers);
 
         } else {
 
             // Note: flushes buffer after each step.
-            totals = runSequential(executorService, step, tasks);
+            totals = runSequential(step, tasks);
 
         }
 
@@ -143,14 +140,11 @@ public class MutationTask extends AbstractStepTask {
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected void flushBuffers(RuleStats totals, ExecutorService service,
+    protected void flushBuffers(RuleStats totals,
             Map<IRelationIdentifier, IBuffer<ISolution>> buffers)
             throws InterruptedException, ExecutionException {
 
         if (totals == null)
-            throw new IllegalArgumentException();
-        
-        if (service == null)
             throw new IllegalArgumentException();
         
         if (buffers == null)
@@ -203,7 +197,7 @@ public class MutationTask extends AbstractStepTask {
                 
             }
             
-            final List<Future<Long>> futures = service.invokeAll(tasks);
+            final List<Future<Long>> futures = indexManager.getExecutorService().invokeAll(tasks);
             
             for( Future<Long> f : futures ) {
                 

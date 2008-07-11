@@ -66,7 +66,7 @@ public class DropIndexTask extends AbstractTask {
              * The index does not exist.
              */
 
-            log.info("Index does not exist: " + name);
+            log.warn("Index does not exist: " + name);
 
             return Boolean.FALSE;
 

@@ -34,6 +34,7 @@ import java.io.StringReader;
 import java.util.Properties;
 
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
 import com.bigdata.service.LocalDataServiceClient;
@@ -103,8 +104,11 @@ public class TestRestartSafeWithLDS extends AbstractLocalDataServiceFederationTe
         final String languageCode = "EN";
         {
         
-            FullTextIndex ndx = new FullTextIndex(client, NAMESPACE);
+            FullTextIndex ndx = new FullTextIndex(client.getFederation(),
+                    NAMESPACE, ITx.UNISOLATED, client.getProperties());
 
+            ndx.create();
+            
             TokenBuffer buffer = new TokenBuffer(2, ndx);
 
             ndx.index(buffer, docId, fieldId, languageCode, new StringReader(
@@ -120,7 +124,8 @@ public class TestRestartSafeWithLDS extends AbstractLocalDataServiceFederationTe
         /* Search w/o restart. */
         {
 
-            FullTextIndex ndx = new FullTextIndex(client, NAMESPACE);
+            FullTextIndex ndx = new FullTextIndex(client.getFederation(),
+                    NAMESPACE, ITx.UNISOLATED, client.getProperties());
 
             Hiterator itr = ndx.search(text, languageCode);
 
@@ -158,7 +163,8 @@ public class TestRestartSafeWithLDS extends AbstractLocalDataServiceFederationTe
         /* Search with restart. */
         {
 
-            FullTextIndex ndx = new FullTextIndex(client, NAMESPACE);
+            FullTextIndex ndx = new FullTextIndex(client.getFederation(),
+                    NAMESPACE, ITx.UNISOLATED, client.getProperties());
 
             Hiterator itr = ndx.search(text, languageCode);
 

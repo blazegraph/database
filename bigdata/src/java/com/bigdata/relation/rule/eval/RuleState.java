@@ -30,24 +30,24 @@ import com.bigdata.relation.rule.Var;
 public class RuleState {
 
     protected static final Logger log = Logger.getLogger(RuleState.class);
-    
+
     /**
      * The {@link Rule} being evaluated.
      */
     final protected IRule rule;
-    
+
     /**
      * Helper class for managing predicates, bindings, and solutions.
      */
     final private IJoinNexus joinNexus;
 
     /**
-     * The {@link Rule} that is being executed. 
+     * The {@link Rule} that is being executed.
      */
     final public IRule getRule() {
-        
+
         return rule;
-        
+
     }
 
     /**
@@ -56,11 +56,11 @@ public class RuleState {
      * <i>rule</i>.
      */
     final public IJoinNexus getJoinNexus() {
-        
+
         return joinNexus;
-        
+
     }
-    
+
     /**
      * The {@link IAccessPath} corresponding to each {@link IPredicate} in the
      * tail of the {@link Rule}.
@@ -72,12 +72,12 @@ public class RuleState {
      * Note: {@link #resetBindings()} clears all elements of this array.
      */
     final private IAccessPath[] accessPath;
-    
+
     /**
      * The evaluation order for the predicates in the tail of the {@link Rule}.
      */
     final protected int[] order;
-    
+
     /**
      * Map from the variable to the index of the predicate in tail of the
      * {@link Rule} that first binds that variable in terms of the evaluation
@@ -86,8 +86,8 @@ public class RuleState {
      * preserved. If a variable is listed here with a lower index than the
      * starting index to be cleared then its binding is NOT cleared.
      */
-    final protected Map<Var,Integer> depends;
-    
+    final protected Map<Var, Integer> depends;
+
     /**
      * 
      * @param rule
@@ -101,16 +101,16 @@ public class RuleState {
 
         if (rule == null)
             throw new IllegalArgumentException();
-        
-        if (joinNexus== null)
+
+        if (joinNexus == null)
             throw new IllegalArgumentException();
-        
+
         this.rule = rule;
 
         this.joinNexus = joinNexus;
-        
+
         final int tailCount = rule.getTailCount();
-        
+
         // Allocate access path cache.
         this.accessPath = new IAccessPath[tailCount];
 
@@ -123,7 +123,7 @@ public class RuleState {
          */
         this.depends = Collections
                 .unmodifiableMap(computeVariableDependencyMap(order));
-       
+
     }
 
     /**
@@ -132,9 +132,9 @@ public class RuleState {
     public String toString() {
 
         return toString(null);
-        
+
     }
-    
+
     /**
      * Externalizes the rule displaying variable names, their bindings,
      * constants, and the evaluation order.
@@ -154,51 +154,50 @@ public class RuleState {
     public String toString(IBindingSet bindingSet) {
 
         final StringBuilder sb = new StringBuilder();
-        
+
         sb.append(rule.getName());
-        
+
         sb.append(" : ");
-        
+
         // write out bindings for the tail.
-        
+
         int i = 0;
-        
-        for(Iterator<IPredicate> itr = rule.getTail(); itr.hasNext(); i++) {
+
+        for (Iterator<IPredicate> itr = rule.getTail(); itr.hasNext(); i++) {
 
             final IPredicate pred = itr.next();
-            
+
             sb.append(pred.toString(bindingSet));
-            
-//            if (bindingSet == null) {
 
-                // displays the evaluation order as an index on the predicate.
+            // if (bindingSet == null) {
 
-                sb.append("[" + order[i] + "]");
-                
-//            }
-            
+            // displays the evaluation order as an index on the predicate.
+
+            sb.append("[" + order[i] + "]");
+
+            // }
+
             if (itr.hasNext()) {
-                
+
                 sb.append(", ");
-                
+
             }
-            
+
         }
 
         sb.append(" -> ");
-        
+
         // write out bindings for the head.
         {
-            
+
             sb.append(rule.getHead().toString(bindingSet));
 
         }
-        
+
         return sb.toString();
 
     }
 
-    
     /**
      * Given an evaluation <i>order</i>, construct the dependency graph for the
      * variables in the tail of the rule. The dependency graph is a map from
@@ -211,54 +210,54 @@ public class RuleState {
      * 
      * @return The dependency graph.
      */
-    public Map<Var,Integer> computeVariableDependencyMap(final int[] order) {
-        
+    public Map<Var, Integer> computeVariableDependencyMap(final int[] order) {
+
         if (order == null)
             throw new IllegalArgumentException();
-        
+
         if (order.length != rule.getTailCount())
             throw new IllegalArgumentException();
-        
-        final Map<Var,Integer> depends = new HashMap<Var,Integer>();
-        
+
+        final Map<Var, Integer> depends = new HashMap<Var, Integer>();
+
         final int tailCount = rule.getTailCount();
-        
-        for(int i=0; i<tailCount; i++) {
-            
+
+        for (int i = 0; i < tailCount; i++) {
+
             final IPredicate pred = rule.getTail(order[i]);
-            
+
             final int arity = pred.arity();
-            
-            for(int j=0; j<arity; j++) {
+
+            for (int j = 0; j < arity; j++) {
 
                 final IVariableOrConstant t = pred.get(j);
-                
-                if(t.isVar()) {
-                
-                    final Var var = (Var)t;
-                
-                    if(!depends.containsKey(var)) {
-                        
+
+                if (t.isVar()) {
+
+                    final Var var = (Var) t;
+
+                    if (!depends.containsKey(var)) {
+
                         depends.put(var, i);
-                        
+
                     }
-                
+
                 }
-            
+
             }
-                            
+
         }
-        
+
         if (log.isDebugEnabled()) {
 
             log.debug("dependenyGraph=" + depends);
-            
+
         }
 
         return depends;
-        
+
     }
-    
+
     /**
      * Initialize the bindings from the constants and variables in the rule.
      * <p>
@@ -278,85 +277,86 @@ public class RuleState {
         }
 
     }
-    
-//    /**
-//     * <p>
-//     * Return the current binding for the variable or constant.
-//     * </p>
-//     * 
-//     * @param var
-//     *            The variable or constant.
-//     * 
-//     * @return Its binding. The binding will be <code>null</code> if a
-//     *         variable is not currently bound.
-//     * 
-//     * @throws NullPointerException
-//     *             if <i>var</i> is <code>null</code>.
-//     * @throws IllegalArgumentException
-//     *             if the variable is not used in the rule.
-//     * @throws IllegalArgumentException
-//     *             if var is a constant.
-//     * 
-//     * @see #set(Var, Object)
-//     * @see #bind(int, SPO)
-//     */
-//    public Object get(IBindingSet bindings,IVariableOrConstant var) {
-//    
-//        return get(bindings,var, true);
-//        
-//    }
-//    
-//    /**
-//     * <p>
-//     * Return the current binding for the variable or constant.
-//     * </p>
-//     * 
-//     * @param var
-//     *            The variable or constant.
-//     * @param required
-//     *            When <code>true</code> an exception is reported if the
-//     *            variable is not used in the rule. Note that specializing a
-//     *            rule often results in variables being replaced by constants
-//     *            such that an {@link IConstraint} might no longer be evaluable
-//     *            for the rule in terms of that variable.
-//     * 
-//     * @return Its binding. The binding will be <code>null</code> if a
-//     *         variable is not currently bound or if the variable is not used in
-//     *         the rule and <code>required := false</code>.
-//     * 
-//     * @throws NullPointerException
-//     *             if <i>var</i> is <code>null</code>.
-//     * @throws IllegalArgumentException
-//     *             if <code>required := true</code> and the variable is not
-//     *             used in the rule.
-//     * @throws IllegalArgumentException
-//     *             if var is a constant.
-//     * 
-//     * @see #set(Var, Object)
-//     * @see #bind(int, SPO)
-//     */
-//    public Object get(IBindingSet bindings,IVariableOrConstant var, boolean required) {
-//        
-////        if (var == null)
-////            throw new NullPointerException();
-//
-//        if (var.isConstant()) {
-//
-//            return var.get();
-//            
-//        }
-//
-//        if (required && !rule.isDeclared((IVariable)var)) {
-//
-//            throw new IllegalArgumentException("Not declared: " + var + " by "
-//                    + rule);
-//            
-//        }
-//        
-//        return bindings.get((IVariable) var);
-//                
-//    }
-    
+
+    // /**
+    // * <p>
+    // * Return the current binding for the variable or constant.
+    // * </p>
+    // *
+    // * @param var
+    // * The variable or constant.
+    // *
+    // * @return Its binding. The binding will be <code>null</code> if a
+    // * variable is not currently bound.
+    // *
+    // * @throws NullPointerException
+    // * if <i>var</i> is <code>null</code>.
+    // * @throws IllegalArgumentException
+    // * if the variable is not used in the rule.
+    // * @throws IllegalArgumentException
+    // * if var is a constant.
+    // *
+    // * @see #set(Var, Object)
+    // * @see #bind(int, SPO)
+    // */
+    // public Object get(IBindingSet bindings,IVariableOrConstant var) {
+    //    
+    // return get(bindings,var, true);
+    //        
+    // }
+    //    
+    // /**
+    // * <p>
+    // * Return the current binding for the variable or constant.
+    // * </p>
+    // *
+    // * @param var
+    // * The variable or constant.
+    // * @param required
+    // * When <code>true</code> an exception is reported if the
+    // * variable is not used in the rule. Note that specializing a
+    // * rule often results in variables being replaced by constants
+    // * such that an {@link IConstraint} might no longer be evaluable
+    // * for the rule in terms of that variable.
+    // *
+    // * @return Its binding. The binding will be <code>null</code> if a
+    // * variable is not currently bound or if the variable is not used in
+    // * the rule and <code>required := false</code>.
+    // *
+    // * @throws NullPointerException
+    // * if <i>var</i> is <code>null</code>.
+    // * @throws IllegalArgumentException
+    // * if <code>required := true</code> and the variable is not
+    // * used in the rule.
+    // * @throws IllegalArgumentException
+    // * if var is a constant.
+    // *
+    // * @see #set(Var, Object)
+    // * @see #bind(int, SPO)
+    // */
+    // public Object get(IBindingSet bindings,IVariableOrConstant var, boolean
+    // required) {
+    //        
+    // // if (var == null)
+    // // throw new NullPointerException();
+    //
+    // if (var.isConstant()) {
+    //
+    // return var.get();
+    //            
+    // }
+    //
+    // if (required && !rule.isDeclared((IVariable)var)) {
+    //
+    // throw new IllegalArgumentException("Not declared: " + var + " by "
+    // + rule);
+    //            
+    // }
+    //        
+    // return bindings.get((IVariable) var);
+    //                
+    // }
+
     /**
      * Binds the variable.
      * <p>
@@ -376,26 +376,26 @@ public class RuleState {
      * 
      * @see #bind(int, Object)
      */
-//    * @throws IllegalArgumentException
-//    *             if the variable does not appear in the rule.
+    // * @throws IllegalArgumentException
+    // * if the variable does not appear in the rule.
     public void set(IVariable var, IConstant val, IBindingSet bindings) {
 
-//        // verify variable declared by the rule.
-//        if(!rule.isDeclared(var)) throw new IllegalArgumentException();
+        // // verify variable declared by the rule.
+        // if(!rule.isDeclared(var)) throw new IllegalArgumentException();
 
         // bind the variable.
-        if(val==null) {
-            
+        if (val == null) {
+
             bindings.clear(var);
-            
+
         } else {
-            
+
             bindings.set(var, val);
-            
+
         }
 
         final int tailCount = rule.getTailCount();
-        
+
         // clear cached access path for preds using that variable.
         for (int i = 0; i < tailCount; i++) {
 
@@ -449,9 +449,9 @@ public class RuleState {
 
         // verify constraints.
         return rule.isConsistent(bindings);
-        
+
     }
-    
+
     /**
      * Clear downstream bindings in the evaluation {@link #order}[]. If a
      * variable in a downstream predicate was 1st bound by an upstream predicate
@@ -473,11 +473,11 @@ public class RuleState {
         if (log.isDebugEnabled()) {
 
             log.debug("index=" + index + ", bindingSet=" + bindingSet);
-            
+
         }
-        
+
         final int tailCount = rule.getTailCount();
-        
+
         for (int i = index; i < tailCount; i++) {
 
             final IPredicate pred = rule.getTail(order[index]);
@@ -503,9 +503,9 @@ public class RuleState {
             }
 
         }
-        
+
     }
-    
+
     /**
      * Return the {@link IAccessPath} that would be used to read from the
      * selected tail {@link IPredicate}.
@@ -541,27 +541,27 @@ public class RuleState {
      *       propagation of bindings and we can simplify how we set, clear, and
      *       reset the bindings!)
      *       <p>
-     *       It might also be worth while to cache the {@link IRelationIdentifier} to
-     *       {@link IRelation} map. That should be done in the
-     *       {@link IResourceLocator} impl.
+     *       It might also be worth while to cache the
+     *       {@link IRelationIdentifier} to {@link IRelation} map. That should
+     *       be done in the {@link IResourceLocator} impl.
      */
     public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
-       
+
         if (bindingSet == null)
             throw new IllegalArgumentException();
-        
+
         // check the cache.
         IAccessPath accessPath = this.accessPath[index];
-        
+
         if (accessPath == null) {
 
             accessPath = getAccessPathNoCache(index, bindingSet);
 
             // update the cache.
             this.accessPath[index] = accessPath;
-        
+
         }
-    
+
         return accessPath;
 
     }
@@ -586,24 +586,27 @@ public class RuleState {
      *             if the name of the relation can not be resolved by the
      *             {@link IJoinNexus} to an {@link IRelation} instance.
      */
-    protected IAccessPath getAccessPathNoCache(final int index, final IBindingSet bindingSet) {
+    protected IAccessPath getAccessPathNoCache(final int index,
+            final IBindingSet bindingSet) {
 
         // based on the given bindings.
         final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
 
         // The name of the relation that the predicate will query.
-        final IRelationIdentifier relationIdentifier = predicate.getRelationName();
-        
+        final IRelationIdentifier relationIdentifier = predicate
+                .getRelationName();
+
         // Resolve the relation name to the IRelation object.
-        final IRelation relation = (IRelation) joinNexus.getRelationLocator().locate(
-                relationIdentifier, joinNexus.getReadTimestamp());
+        final IRelation relation = (IRelation) joinNexus.getIndexManager()
+                .getResourceLocator().locate(relationIdentifier,
+                        joinNexus.getReadTimestamp());
 
         // find the best access path for the predicate for that relation.
         final IAccessPath accessPath = relation.getAccessPath(predicate);
-        
+
         // return that access path.
         return accessPath;
 
     }
-    
+
 }

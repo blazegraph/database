@@ -35,8 +35,10 @@ import java.util.UUID;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.journal.IResourceLockManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.ResourceLockManager;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.util.InnerCause;
@@ -56,6 +58,7 @@ import com.bigdata.util.NT;
 public class LocalDataServiceFederation extends AbstractFederation {
 
     private TimestampService timestampService;
+    private ResourceLockManager resourceLockManager;
     private LoadBalancerService loadBalancerService;
     private LocalDataServiceImpl dataService;
     
@@ -69,6 +72,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
         final Properties properties = client.getProperties();
         
         timestampService = new EmbeddedTimestampService(UUID.randomUUID(),
+                properties);
+        
+        resourceLockManager = new EmbeddedResourceLockManager(UUID.randomUUID(),
                 properties);
         
         /*
@@ -332,6 +338,14 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
 
+    public IResourceLockManager getResourceLockManager() {
+        
+        assertOpen();
+        
+        return resourceLockManager;
+        
+    }
+    
     /**
      * Returns the embedded data service IFF the given serviceUUID is
      * the UUID for the embedded data service and <code>null</code>
@@ -411,6 +425,14 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         }
 
+        if (resourceLockManager != null) {
+
+            resourceLockManager.shutdown();
+
+            resourceLockManager = null;
+
+        }
+        
     }
     
     /**
@@ -444,6 +466,14 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         }
 
+        if (resourceLockManager != null) {
+
+            resourceLockManager.shutdownNow();
+
+            resourceLockManager = null;
+
+        }
+        
     }
 
     /**

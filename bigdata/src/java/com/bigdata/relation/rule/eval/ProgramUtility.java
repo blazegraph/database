@@ -47,7 +47,6 @@ import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
@@ -66,25 +65,25 @@ public class ProgramUtility {
     
     protected static Logger log = Logger.getLogger(ProgramUtility.class);
 
-    private final IResourceLocator resourceLocator;
+//    private final IResourceLocator resourceLocator;
 //    private final long readTimestamp;
 
-    public ProgramUtility(IJoinNexus joinNexus) {
-        
-        this(joinNexus.getRelationLocator());//, joinNexus.getReadTimestamp());
-        
-    }
+//    public ProgramUtility(IJoinNexus joinNexus) {
+//        
+//        this(joinNexus.getRelationLocator());//, joinNexus.getReadTimestamp());
+//        
+//    }
 
-    /**
-     * 
-     * @param resourceLocator
-     */
-    public ProgramUtility(IResourceLocator resourceLocator) {
+//    /**
+//     * 
+//     * @param resourceLocator
+//     */
+    public ProgramUtility() {//IResourceLocator resourceLocator) {
         
-        if (resourceLocator == null)
-            throw new IllegalArgumentException();
-        
-        this.resourceLocator = resourceLocator;
+//        if (resourceLocator == null)
+//            throw new IllegalArgumentException();
+//        
+//        this.resourceLocator = resourceLocator;
         
     }
     
@@ -146,14 +145,14 @@ public class ProgramUtility {
      * @throws RuntimeException
      *             if any relation is not local.
      */
-    public Map<IRelationIdentifier, IRelation> getRelations(IStep step, long timestamp) {
+    public Map<IRelationIdentifier, IRelation> getRelations(IIndexManager indexManager, IStep step, long timestamp) {
 
         if (step == null)
             throw new IllegalArgumentException();
 
         final Map<IRelationIdentifier, IRelation> c = new HashMap<IRelationIdentifier, IRelation>();
 
-        getRelations(step, c, timestamp );
+        getRelations(indexManager, step, c, timestamp );
 
         if (log.isDebugEnabled()) {
 
@@ -167,7 +166,7 @@ public class ProgramUtility {
     }
 
     @SuppressWarnings("unchecked")
-    private void getRelations(IStep p, Map<IRelationIdentifier, IRelation> c, long timestamp) {
+    private void getRelations(IIndexManager indexManager, IStep p, Map<IRelationIdentifier, IRelation> c, long timestamp) {
 
         if (p.isRule()) {
 
@@ -177,7 +176,7 @@ public class ProgramUtility {
 
             if (!c.containsKey(relationIdentifier)) {
 
-                final IRelation relation = (IRelation) resourceLocator
+                final IRelation relation = (IRelation) indexManager.getResourceLocator()
                         .locate(relationIdentifier, timestamp);
                 
                 c.put(relationIdentifier, relation );
@@ -190,7 +189,7 @@ public class ProgramUtility {
 
             while (itr.hasNext()) {
 
-                getRelations(itr.next(), c, timestamp);
+                getRelations(indexManager, itr.next(), c, timestamp);
 
             }
 
@@ -284,7 +283,7 @@ public class ProgramUtility {
      *             if there are relations belonging to different
      *             {@link IBigdataFederation}s.
      */
-    public IBigdataFederation getFederation(IStep step, long timestamp) {
+    public IBigdataFederation getFederation(IIndexManager indexManager, IStep step, long timestamp) {
 
         if (step == null)
             throw new IllegalArgumentException();
@@ -295,7 +294,7 @@ public class ProgramUtility {
         /*
          * The set of distinct relations.
          */
-        final Map<IRelationIdentifier, IRelation> relations = getRelations(step,
+        final Map<IRelationIdentifier, IRelation> relations = getRelations(indexManager, step,
                 timestamp);
 
         if(relations.isEmpty()) {

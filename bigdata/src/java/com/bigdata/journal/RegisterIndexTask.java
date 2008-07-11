@@ -91,7 +91,8 @@ public class RegisterIndexTask extends AbstractTask {
 
             final UUID indexUUID = ndx.getIndexMetadata().getIndexUUID();
 
-            log.info("Index exists: name=" + name + ", indexUUID=" + indexUUID);
+            if (log.isInfoEnabled())
+                log.info("Index exists: name=" + name + ", indexUUID=" + indexUUID);
 
             return indexUUID;
 
@@ -100,10 +101,11 @@ public class RegisterIndexTask extends AbstractTask {
         // register the index.
         ndx = getJournal().registerIndex(name, metadata);
 
-        final UUID indexUUID = ndx .getIndexMetadata().getIndexUUID();
+        final UUID indexUUID = ndx.getIndexMetadata().getIndexUUID();
 
-        log.info("Registered index: name=" + name + ", class="
-                + ndx.getClass() + ", indexUUID=" + indexUUID);
+        if (log.isInfoEnabled())
+            log.info("Registered index: name=" + name + ", class="
+                    + ndx.getClass() + ", indexUUID=" + indexUUID);
 
         return indexUUID;
         

@@ -43,6 +43,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.service.EmbeddedResourceLockManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
@@ -91,34 +92,38 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         executorService = Executors.newCachedThreadPool(DaemonThreadFactory
                 .defaultThreadFactory());
 
-        resourceLocator = new DefaultResourceLocator(executorService, this,
-                null/*delegate*/);
+        resourceLocator = new DefaultResourceLocator(//
+                this,//
+                null //delegate
+                );
 
+        resourceLockManager = new EmbeddedResourceLockManager(UUID.randomUUID(),properties);
+    
         localTransactionManager = new AbstractLocalTransactionManager(this/* resourceManager */) {
-         
+
             public long nextTimestamp() {
 
                 return MillisecondTimestampFactory.nextMillis();
 
             }
-            
+
         };
-        
+
         concurrencyManager = new ConcurrencyManager(properties, this, this);
-        
+
         localTransactionManager.setConcurrencyManager(concurrencyManager);
-        
+
     }
 
     public ILocalTransactionManager getLocalTransactionManager() {
-        
+
         return localTransactionManager;
-        
+
     }
-    
+
     synchronized public CounterSet getCounters() {
-        
-        if(counters==null) {
+
+        if (counters == null) {
 
             counters = super.getCounters();
             
@@ -563,6 +568,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
        
         localTransactionManager.shutdown();
         
+        if (resourceLockManager != null) {
+
+            resourceLockManager.shutdown();
+
+            resourceLockManager = null;
+
+        }
+        
         super.shutdown();
         
     }
@@ -580,6 +593,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         concurrencyManager.shutdownNow();
         
         localTransactionManager.shutdownNow();
+
+        resourceLockManager.shutdownNow();
 
         super.shutdownNow();
         
@@ -737,12 +752,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return resourceLocator;
         
     }
-    
-    /**
-     * resource locator.
-     */
     private final DefaultResourceLocator resourceLocator;
     
+    public IResourceLockManager getResourceLockManager() {
+        
+        assertOpen();
+        
+        return resourceLockManager;
+        
+    }
+    private ResourceLockManager resourceLockManager;
+
     public ExecutorService getExecutorService() {
         
         assertOpen();

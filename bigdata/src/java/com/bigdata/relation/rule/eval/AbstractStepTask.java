@@ -43,13 +43,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationIdentifier;
-import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IClientIndex;
 import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 
 /**
@@ -61,22 +61,24 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     protected static final transient Logger log = Logger.getLogger(AbstractStepTask.class);
     
     protected final ActionEnum action;
-    protected /*final*/ IJoinNexus joinNexus;
+    protected final IJoinNexusFactory joinNexusFactory;
+    protected /*final*/ IIndexManager indexManager;
     protected final IStep step;
-//    protected final IRuleTaskFactory defaultTaskFactory;
-//    protected final List<Callable<RuleStats>> tasks;
-    protected/* final */ExecutorService executorService;
+//    protected/* final */ExecutorService executorService;
     protected DataService dataService;
     
     public void setDataService(DataService dataService) {
 
         if (dataService == null)
             throw new IllegalArgumentException();
-        
-        log.info("Running on data service: dataService="+dataService);
+
+        if (log.isInfoEnabled())
+            log.info("Running on data service: dataService="+dataService);
         
         this.dataService = dataService;
 
+//        this.executorService = dataService.getFederation().getExecutorService();
+        
     }
 
     /**
@@ -87,9 +89,9 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * Note: The {@link DataService} will notice the
      * {@link IDataServiceAwareProcedure} interface and set a reference to
      * itself using {@link #setDataService(DataService)}. {@link #submit()}
-     * notices this case and causes <i>this</i> task to be {@link #clone()},
-     * the {@link ExecutorService} set, and it is then submitted to the
-     * {@link ConcurrencyManager} for the {@link DataService}.
+     * notices this case and causes <i>this</i> task to be {@link #clone()}ed,
+     * the {@link ExecutorService} set on the clone, and the clone is then
+     * submitted to the {@link ConcurrencyManager} for the {@link DataService}.
      * 
      * @param step
      *            The rule or program.
@@ -113,38 +115,26 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @throws IllegalArgumentException
      *             if <i>tasks</i> is <code>null</code>.
      */
-    protected AbstractStepTask(ActionEnum action, IJoinNexus joinNexus,
-            IStep step, 
-//            IRuleTaskFactory defaultTaskFactory,
-            //List<Callable<RuleStats>> tasks,
-            ExecutorService executorService,DataService dataService) {
+    protected AbstractStepTask(ActionEnum action,
+            IJoinNexusFactory joinNexusFactory, IStep step,
+            IIndexManager indexManager, DataService dataService) {
 
         if (action == null)
             throw new IllegalArgumentException();
 
-        if (joinNexus == null)
+        if (joinNexusFactory == null)
             throw new IllegalArgumentException();
         
         if (step == null)
             throw new IllegalArgumentException();
 
-//        if (defaultTaskFactory == null)
-//            throw new IllegalArgumentException();
-        
-//        if (tasks == null)
-//            throw new IllegalArgumentException();
-
         this.action = action;
         
-        this.joinNexus = joinNexus;
+        this.joinNexusFactory = joinNexusFactory;
         
         this.step = step;
         
-//        this.defaultTaskFactory = defaultTaskFactory;
-        
-//        this.tasks = tasks;
-        
-        this.executorService = executorService;
+        this.indexManager = indexManager; // @todo MAY be null?
         
         this.dataService = dataService;
         
@@ -153,8 +143,9 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     public String toString() {
         
         return "{" + getClass().getSimpleName() + ", action=" + action
-                + ", step=" + step.getName() + ", executorService="
-                + executorService + ", dataService=" + dataService + "}"; 
+                + ", step=" + step.getName() + ", joinNexusFactory="
+                + joinNexusFactory + ", indexManager=" + indexManager
+                + ", dataService=" + dataService + "}"; 
         
     }
     
@@ -177,14 +168,19 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      *       <p>
      *       Do the same thing for running a program as a sequence.
      */
-    protected RuleStats runParallel(ExecutorService service, IStep program,
+    protected RuleStats runParallel(IStep program,
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
     
         if (log.isDebugEnabled())
             log.debug("program=" + program.getName()+", #tasks="+tasks.size());
         
+        if (indexManager == null)
+            throw new IllegalStateException();
+        
         final RuleStats totals = new RuleStats(program);
+        
+        final ExecutorService service = indexManager.getExecutorService();
         
         // submit tasks and await their completion.
         final List<Future<RuleStats>> futures = service.invokeAll(tasks);
@@ -216,14 +212,20 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected RuleStats runSequential(ExecutorService service, IStep program, List<Callable<RuleStats>> tasks)
-            throws InterruptedException, ExecutionException {
+    protected RuleStats runSequential(IStep program,
+            List<Callable<RuleStats>> tasks) throws InterruptedException,
+            ExecutionException {
     
         final int ntasks = tasks.size();
         
         if (log.isDebugEnabled())
             log.debug("program=" + program.getName()+", #tasks="+ntasks);
     
+        if (indexManager == null)
+            throw new IllegalStateException();
+        
+        final ExecutorService service = indexManager.getExecutorService();
+        
         final RuleStats totals = new RuleStats(program);
         
         final Iterator<Callable<RuleStats>> itr = tasks.iterator();
@@ -265,67 +267,71 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     /**
      * Run <i>this</i> task.
      * <p>
-     * The task will be submitted to the {@link #executorService} iff it is
-     * defined and otherwise the {@link #dataService} must be defined and a copy
-     * of this task will be submitted to the {@link ConcurrencyManager} for that
-     * {@link DataService}.
+     * If we are executing on a {@link DataService} then {@link #dataService}
+     * will have been set automatically and the task will be submitted to the
+     * {@link ConcurrencyManager} for that {@link DataService}.
      * <p>
-     * This condition occurs when this Callable is sent to the DataService using
-     * IDataService#submit(Callable). In order to gain access to the named
-     * indices for the relation, we have to wrap up this Callable as an
-     * AbstractTask that declares the appropriate timestamp and resources and
-     * set [service] to an ExecutorService running on the DataService itself.
-     * The AbstractTask will then be submitted to the ConcurrencyManager for
-     * execution. It will delegate back to #call(). Since [service] will be
-     * non-null, the other code branch will be followed.
-     * 
-     * Note: The {@link #dataService} reference is set by the
-     * {@link DataService} itself when it executes this {@link Callable} and
-     * notices the {@link IDataServiceAwareProcedure} interface. It is then
-     * preserved by {@link #clone()}.
-     * 
-     * Note: The {@link #executorService} field is NOT serializable and MUST NOT
-     * be set if this task is to execute on the DataService.
-     * 
-     * @throws IllegalStateException
-     *             if {@link #dataService} is <code>null</code>
-     * @throws IllegalStateException
-     *             if {@link #executorService} is <code>non-null</code>
+     * This condition occurs when this {@link Callable} is sent to the
+     * {@link DataService} using {@link DataService#submit(Callable)}. In order
+     * to gain access to the named indices for the relation, we have to wrap up
+     * this {@link Callable} as an {@link AbstractTask} that declares the
+     * appropriate timestamp and resources. The {@link AbstractTask} is then
+     * submitted to the {@link ConcurrencyManager} for execution. Once the
+     * {@link AbstractTask} is actually running, the inner task
+     * <em>overrides</em> the {@link #indexManager} to be
+     * {@link AbstractTask#getJournal()}. This provides access to the indices,
+     * relations, etc. appropriate for the isolation level granted to the task
+     * by the {@link ConcurrencyManager} - without this step the
+     * {@link AbstractTask} will wind up using an {@link IClientIndex} view and
+     * lose the benefits of access to unisolated indices.
      */
     public Future<RuleStats> submit() {
 
-        if (executorService != null) {
+        if (dataService == null) {
 
             if(log.isInfoEnabled()) {
 
-                log.info("running on executorService: " + this);
+                log.info("running w/o concurrency control: " + this);
                 
             }
             
-            return executorService.submit(this);
+            return indexManager.getExecutorService().submit(this);
 
         }
 
+        return submitToConcurrencyManager();
+        
+    }
+    
+    private Future<RuleStats> submitToConcurrencyManager() {
+        
         if (dataService == null)
             throw new IllegalStateException();
 
-        final IConcurrencyManager concurrencyManager = dataService
-                .getConcurrencyManager();
+        final ProgramUtility util = new ProgramUtility();
 
-        final ProgramUtility util = new ProgramUtility(joinNexus);
+        {
+            
+            final boolean isClosure = util.isClosureProgram(step);
 
-        final boolean isClosure = util.isClosureProgram(step);
+            if (isClosure) {
 
-        if (isClosure) {
+                /*
+                 * Note: The steps above the closure should have been flattened
+                 * out by the caller and run directly so that we never reach
+                 * this point with a closure operation.
+                 */
 
-            /*
-             * Note: The steps above the closure should have been flattened out
-             * by the caller and run directly so that we never reach this point
-             * with a closure operation.
-             */
+                throw new UnsupportedOperationException();
 
-            throw new UnsupportedOperationException();
+            }
 
+        }
+        
+        if(log.isInfoEnabled()) {
+
+            log.info("running w/ concurrency control: " + this);
+            
         }
 
         /*
@@ -342,64 +348,82 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
          * 
          * 2. Collect the names of the indices maintained by those relations.
          * 
-         * 3. @todo verify that those indices are all local to this data
-         * service.
-         * 
-         * 4. Declare the indices since the task will need an exclusive lock on
+         * 3. Declare the indices since the task will need an exclusive lock on
          * them (mutation) or at least the ability to read from those indices
          * (query).
+         * 
+         * Note: if an index is not found on the live journal then it will be
+         * resolved against the federation (if running in a federation). This
+         * means that the task will run with the live index objects when they
+         * are local and with IClientIndex objects when the index is remote.
+         * 
+         * Note; In general, mixtures of live and remote index objects do not
+         * occur since indices are either partitioned (a federation) or
+         * monolithic (a Journal).
+         * 
+         * Note: You CAN place indices onto specific data services running on a
+         * set of machines and set [enableOverflow := false] such that the
+         * indices never become partitioned. In that case you can have optimized
+         * joins for some relations on one data service and for other relations
+         * on another data service. E.g., locating the statement indices for the
+         * triple store on one data service, the lexicon on another, and a repo
+         * on a third. This will give very good performance for Query and Truth
+         * Maintenance since the JOINs will be mostly executing against live
+         * index objects.
          */
 
-        // choose timestamp based on more recent view required.
-        final long timestamp = action.isMutation() ? joinNexus
-                .getWriteTimestamp() : joinNexus.getReadTimestamp();
+        final long timestamp;
+        {
+         
+            // flyweight instance.
+            IJoinNexus joinNexus = joinNexusFactory.newInstance(indexManager);
+            
+            // choose timestamp based on more recent view required.
+            timestamp = action.isMutation() ? joinNexus.getWriteTimestamp()
+                    : joinNexus.getReadTimestamp();
+            
+        }
 
         if(log.isInfoEnabled()) {
          
             log.info("timestamp="+timestamp+", task="+this);
             
         }
-                
-        // Note: These relations are ONLY used to get the index names.
-        final Map<IRelationIdentifier, IRelation> tmpRelations = util.getRelations(step,
-                timestamp);
 
-        // Collect names of the required indices.
-        final Set<String> indexNames = util.getIndexNames(tmpRelations.values());
+        // Declare all index names to which we want access.
+        final String[] resource;
+        {
+        
+            // Note: These relations are ONLY used to get the index names.
+            final Map<IRelationIdentifier, IRelation> tmpRelations = util
+                    .getRelations(indexManager, step, timestamp);
 
-        // Declare all index names.
-        final String[] resource = indexNames.toArray(new String[] {});
+            // Collect names of the required indices.
+            final Set<String> indexNames = util.getIndexNames(tmpRelations
+                    .values());
 
-        if (log.isInfoEnabled()) {
+            // The set of indices that the task will declare.
+            resource = indexNames.toArray(new String[] {});
 
-            log.info("resource=" + Arrays.toString(resource));
+            if (log.isInfoEnabled()) {
+
+                log.info("resource=" + Arrays.toString(resource));
+
+            }
 
         }
 
         /*
-         * Setup the AbstractTask.
-         */
-
-        final ExecutorService executorService = dataService.getFederation()
-                .getExecutorService();
-
-        /*
-         * Create the inner task.
-         * 
-         * Note: This sets the service which breaks the recursion. The [service]
-         * is the thread pool that will be used to execute the rules with
-         * parallelism once the innerTask runs.
-         * 
-         * Note: This also sets the data service since the DataService won't see
-         * the [innerTask] but the innerTask still needs the [dataService]
-         * reference.
+         * Create the inner task. A clone is used to prevent possible side
+         * effects on the original task.
          * 
          * Note: The [timestamp] was choosen above. The writeTimestamp iff this
          * is a mutation operation and the [readTimestamp] otherwise.
          */
         final AbstractStepTask innerTask = this.clone();
 
-        innerTask.executorService = executorService;
+        final IConcurrencyManager concurrencyManager = dataService
+                .getConcurrencyManager();
 
         final AbstractTask task = new AbstractTask(concurrencyManager,
                 timestamp, resource) {
@@ -408,44 +432,62 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             protected Object doTask() throws Exception {
 
                 if (log.isInfoEnabled())
-                    log.info("Execution the inner task: " + this
-                            + ", indexManager=" + getJournal());
+                    log.info("Executing inner task: " + this
+//                            + ", indexManager=" + getJournal()
+                            );
 
-                final IJoinNexus tmp = innerTask.joinNexus;
-
-                final IResourceLocator resourceLocator = new DefaultResourceLocator(
-                        executorService, //
-                        getJournal(),// 
-                        getJournal().getResourceLocator()//
-                        );
-
-                innerTask.joinNexus = new DelegateJoinNexus(tmp) {
-
-                    /**
-                     * Overridden to resolve the indices using the AbstractTask.
-                     */
-                    public IResourceLocator getRelationLocator() {
-
-                        return resourceLocator;
-
-                        /*
-                         * FIXME I am not clear yet why this construction works
-                         * but the simpler one below does not. Track this down.
-                         * 
-                         * One question is whether both locators really need to
-                         * specify a delegate. I would think that it should be
-                         * one or the other and that if both do it that we will
-                         * search one delegate twice, but clearly the delegates
-                         * are not the same or these would be interchangable
-                         * constructs. it would be much nicer if we don't have
-                         * to override this at all since that would make running
-                         * inside of the concurrency controls that much more
-                         * transparent.
-                         */
+                /*
+                 * Override to use the IJournal exposed by the AbstractTask.
+                 * This IJournal imposes the correct isolation control and
+                 * allows access to the unisolated indices (if you have declared
+                 * them and are running an UNISOLATED AbstractTask).
+                 */
+                innerTask.indexManager = getJournal();
+                
+////                final IJoinNexus tmp = innerTask.joinNexus;
+//
+////                final IResourceLocator resourceLocator = new DefaultResourceLocator(
+////                        executorService, //
+////                        getJournal(),// 
+////                        getJournal().getResourceLocator()//
+////                        );
+////
+//                innerTask.joinNexus = new DelegateJoinNexus(tmp) {
+//
+//                    /**
+//                     * Overridden to resolve the indices using the
+//                     * {@link IJournal} exposed to the task by the
+//                     * {@link AbstractTask}.
+//                     * <p>
+//                     * Note: Without this, the joinNexus in effect will use the
+//                     * locator for the caller, which was probably resolving
+//                     * using the {@link IBigdataFederation}'s locator.
+//                     */
+//                    public IResourceLocator getRelationLocator() {
+//
+////                        return resourceLocator;
+//
+////                        /* Note: This issue appears to be resolved.
+////                         *
+////                         * FIXME I am not clear yet why this construction works
+////                         * but the simpler one below does not. Track this down.
+////                         * 
+////                         * One question is whether both locators really need to
+////                         * specify a delegate. I would think that it should be
+////                         * one or the other and that if both do it that we will
+////                         * search one delegate twice, but clearly the delegates
+////                         * are not the same or these would be interchangable
+////                         * constructs. it would be much nicer if we don't have
+////                         * to override this at all since that would make running
+////                         * inside of the concurrency controls that much more
+////                         * transparent.
+////                         */
+//                        
 //                      return getJournal().getResourceLocator();
-                    }
-
-                };
+//                      
+//                    }
+//
+//                };
 
                 return innerTask.call();
 

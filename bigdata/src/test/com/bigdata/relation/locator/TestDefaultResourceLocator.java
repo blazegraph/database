@@ -109,8 +109,8 @@ public class TestDefaultResourceLocator extends TestCase2 {
         try {
 
             // instantiate relation.
-            MockRelation mockRelation = new MockRelation(executorService,
-                    store, namespace, ITx.UNISOLATED, properties);
+            MockRelation mockRelation = new MockRelation(store, namespace,
+                    ITx.UNISOLATED, properties);
 
             {
                 /*
@@ -233,15 +233,14 @@ public class TestDefaultResourceLocator extends TestCase2 {
          * @param timestamp
          * @param properties
          */
-        protected MockRelation(ExecutorService service,
-                IIndexManager indexManager, String namespace, long timestamp,
+        protected MockRelation(IIndexManager indexManager, String namespace, long timestamp,
                 Properties properties) {
             
-            super(service, indexManager, namespace, timestamp, properties);
+            super(indexManager, namespace, timestamp, properties);
             
         }
 
-        public MockRelation create() {
+        public void create() {
             
             super.create();
             
@@ -256,8 +255,6 @@ public class TestDefaultResourceLocator extends TestCase2 {
                 getIndex();
                 
             }
-            
-            return this;
             
         }
 

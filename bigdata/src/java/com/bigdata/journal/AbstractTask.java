@@ -98,6 +98,9 @@ import com.bigdata.util.InnerCause;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo declare generic type for the return as <? extends Object> to be compatible
+ * with {@link ConcurrencyManager#submit(AbstractTask)}
  */
 public abstract class AbstractTask implements Callable<Object>, ITask {
 
@@ -1587,7 +1590,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     /**
      * Call {@link #doTask()} for an unisolated write task.
      * <p>
-     * Note: This coordinates with {@link IConcurrencyManager#getLockManager()}
+     * Note: This coordinates with {@link IConcurrencyManager#getResourceLockManager()}
      * to force a schedule on tasks that write on unisolated indices.
      * 
      * @throws Exception
@@ -1954,6 +1957,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          * 
          * @param source
          */
+        @SuppressWarnings("unchecked")
         public IsolatedActionJournal(AbstractJournal source) {
 
             if (source == null)
@@ -1970,9 +1974,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              */
 
             resourceLocator = new DefaultResourceLocator(//
-                    source.getExecutorService(), //
-                    source,// 
-                    source.getResourceLocator()//
+                    this,// IndexManager
+                    source.getResourceLocator()// delegate locator
             );
 
         }
@@ -2083,6 +2086,18 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
 
+        public IResourceLockManager getResourceLockManager() {
+            
+            return delegate.getResourceLockManager();
+            
+        }
+
+        public ExecutorService getExecutorService() {
+            
+            return delegate.getExecutorService();
+            
+        }
+        
         /*
          * Disallowed methods (commit protocol and shutdown protocol).
          */
@@ -2250,6 +2265,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         }
 
+        @SuppressWarnings("unchecked")
         public ReadOnlyJournal(AbstractJournal source) {
 
             if (source == null)
@@ -2266,9 +2282,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
              */
 
             resourceLocator = new DefaultResourceLocator(//
-                    source.getExecutorService(), //
-                    source, //
-                    source.getResourceLocator()//
+                    this, // IndexManager
+                    source.getResourceLocator()// delegate locator
             );
 
         }
@@ -2379,6 +2394,18 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
         
+        public IResourceLockManager getResourceLockManager() {
+            
+            return delegate.getResourceLockManager();
+            
+        }
+
+        public ExecutorService getExecutorService() {
+            
+            return delegate.getExecutorService();
+            
+        }
+
         /*
          * Disallowed methods (commit and shutdown protocols).
          */

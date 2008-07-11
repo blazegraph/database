@@ -41,10 +41,13 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IResourceLockManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.ResourceLockManager;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
@@ -86,6 +89,9 @@ public class EmbeddedFederation extends AbstractFederation {
      * The (in process) {@link TimestampService}.
      */
     private TimestampService timestampService;
+    
+    /** The (in process) {@link LockManager} */
+    private ResourceLockManager resourceLockManager;
     
     /**
      * The (in process) {@link LoadBalancerService}.
@@ -131,6 +137,15 @@ public class EmbeddedFederation extends AbstractFederation {
         // Note: return null if service not available/discovered.
         
         return timestampService;
+        
+    }
+    
+    /**
+     * The (in process) {@link IResourceLockManager}.
+     */
+    public IResourceLockManager getResourceLockManager() {
+        
+        return resourceLockManager;
         
     }
     
@@ -253,6 +268,12 @@ public class EmbeddedFederation extends AbstractFederation {
          * Start the timestamp service.
          */
         timestampService = new EmbeddedTimestampService( UUID.randomUUID(), properties );
+
+        /*
+         * Start the lock manager.
+         */
+        resourceLockManager = new EmbeddedResourceLockManager(UUID.randomUUID(),
+                properties);
         
         /*
          * Start the load balancer.
@@ -708,6 +729,14 @@ public class EmbeddedFederation extends AbstractFederation {
             timestampService = null;
 
         }
+
+        if (resourceLockManager != null) {
+
+            resourceLockManager.shutdown();
+
+            resourceLockManager = null;
+
+        }
         
         log.info("done");
 
@@ -745,6 +774,14 @@ public class EmbeddedFederation extends AbstractFederation {
             timestampService.shutdownNow();
 
             timestampService = null;
+
+        }
+
+        if (resourceLockManager != null) {
+
+            resourceLockManager.shutdownNow();
+
+            resourceLockManager = null;
 
         }
         

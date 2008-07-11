@@ -102,8 +102,8 @@ public class Solution<E> implements ISolution<E>, Serializable {
             final IPredicate head = rule.getHead();
             
             // the relation named by the head of the rule.
-            final IRelation relation = (IRelation) joinNexus.getRelationLocator()
-                    .locate(head.getRelationName(),
+            final IRelation relation = (IRelation) joinNexus.getIndexManager()
+                    .getResourceLocator().locate(head.getRelationName(),
                             joinNexus.getReadTimestamp());
 
             // use the relation's element factory.

@@ -72,6 +72,7 @@ import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
+import com.bigdata.journal.IResourceLockManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
@@ -1805,6 +1806,12 @@ abstract public class StoreManager extends ResourceEvents implements
         public ExecutorService getExecutorService() {
             
             return getFederation().getExecutorService();
+            
+        }
+        
+        public IResourceLockManager getResourceLockManager() {
+
+            return getFederation().getResourceLockManager();
             
         }
         

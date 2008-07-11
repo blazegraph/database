@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.WeakHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
@@ -43,6 +42,7 @@ import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.IRelation;
@@ -54,7 +54,7 @@ import com.bigdata.sparse.SparseRowStore;
  * method signature:
  * 
  * <pre>
- * public NAME ( ExecutorService service, IIndexManager indexManager, String namespace, Long timestamp, Properties properties )
+ * public NAME ( IIndexManager indexManager, String namespace, Long timestamp, Properties properties )
  * </pre>
  * 
  * <p>
@@ -114,8 +114,6 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     protected static final transient Logger log = Logger
             .getLogger(DefaultResourceLocator.class);
 
-    protected final transient ExecutorService service;
-
     protected final transient IIndexManager indexManager;
 
     private final IResourceLocator<T> delegate;
@@ -125,47 +123,28 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      */
     private final transient NamedLock<String> namedLock = new NamedLock<String>();
 
-//    public DefaultResourceLocator(IBigdataFederation fed) {
-//
-//        this(fed.getThreadPool(), (IIndexManager) fed, null/*delegate*/);
-//
-//    }
-
-//    public DefaultResourceLocator(ExecutorService service, AbstractTask task) {
-//
-//        // @todo is the "client"'s ExecutorService available to the task? It
-//        // should be.
-//        this(service, (IIndexManager) task.getJournal());
-//
-//    }
-
     /**
-     * Designated constructor - all others delegate to this ctor.
+     * Designated constructor.
      * 
-     * @param service
      * @param indexManager
      * @param delegate
      *            Optional {@link IResourceLocator} to which unanswered requests
      *            are then delegated.
      */
-    public DefaultResourceLocator(ExecutorService service,
-            IIndexManager indexManager, IResourceLocator<T> delegate) {
-
-        if (service == null)
-            throw new IllegalArgumentException();
+    public DefaultResourceLocator(final IIndexManager indexManager,
+            final IResourceLocator<T> delegate) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();
 
-        this.service = service;
-
         this.indexManager = indexManager;
 
         this.delegate = delegate;// MAY be null.
-        
+
     }
 
-    public T locate(IResourceIdentifier<T> identifier, long timestamp) {
+    public T locate(final IResourceIdentifier<T> identifier,
+            final long timestamp) {
 
         if (identifier == null)
             throw new IllegalArgumentException();
@@ -174,7 +153,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         if (log.isInfoEnabled()) {
 
-            log.info("namespace=" + namespace);
+            log.info("namespace=" + namespace+", timestamp="+timestamp);
 
         }
 
@@ -240,7 +219,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                 }
                 
                 throw new IllegalStateException("Not found: namespace="
-                        + namespace);
+                        + namespace+", timestamp="+timestamp);
 
             }
 
@@ -256,7 +235,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             if (className == null) {
 
-                throw new IllegalStateException("Not found: namespace="
+                throw new IllegalStateException("Required property not found: namespace="
                         + namespace + ", property=" + RelationSchema.CLASS);
 
             }
@@ -279,8 +258,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             }
 
             // create a new instance of the relation.
-            resource = newInstance(cls, service, indexManager, namespace,
-                    timestamp, properties);
+            resource = newInstance(cls, indexManager, namespace, timestamp,
+                    properties);
 
             if (log.isInfoEnabled()) {
 
@@ -289,7 +268,16 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             }
 
             // add to the cache.
-            put(resource);
+            if (timestamp != ITx.READ_COMMITTED) {
+
+                /*
+                 * FIXME not allowing read-committed views into the cache. Those
+                 * views need to be let in, but the read-committed view of a
+                 * BTree must update when the store commits!
+                 */
+                put(resource);
+                
+            }
 
             return resource;
 
@@ -446,9 +434,6 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     /**
      * Core impl (all other methods should delegate to this one).
      * 
-     * @param service
-     *            A service to which you can submit tasks not requiring
-     *            concurrency control.
      * @param indexManager
      *            The index views will be obtained from the {@link Journal}.
      * @param namespace
@@ -460,13 +445,10 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * 
      * @return A new instance of the identifed resource.
      */
-    public T newInstance(Class<? extends T> cls, ExecutorService service,
-            IIndexManager indexManager, String namespace, long timestamp,
-            Properties properties) {
+    public T newInstance(Class<? extends T> cls, IIndexManager indexManager,
+            String namespace, long timestamp, Properties properties) {
 
         if (cls == null)
-            throw new IllegalArgumentException();
-        if (service == null)
             throw new IllegalArgumentException();
         if (indexManager == null)
             throw new IllegalArgumentException();
@@ -479,7 +461,6 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         try {
 
             ctor = cls.getConstructor(new Class[] {//
-                    ExecutorService.class,// 
                             IIndexManager.class,//
                             String.class,// relation namespace
                             Long.class, // timestamp of the view
@@ -496,9 +477,19 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         final T r;
         try {
 
-            r = ctor.newInstance(new Object[] { service, indexManager,
-                    namespace, timestamp, properties });
+            r = ctor.newInstance(new Object[] {//
+                    indexManager,//
+                    namespace, //
+                    timestamp, //
+                    properties //
+                    });
 
+            if(log.isInfoEnabled()) {
+                
+                log.info("new instance: "+r);
+                
+            }
+            
             return r;
 
         } catch (Exception ex) {
