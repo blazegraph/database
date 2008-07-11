@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IRandomAccessByteArray;
 import com.bigdata.btree.KeyBuilder;
@@ -46,6 +48,8 @@ import com.bigdata.rawstore.Bytes;
  * @version $Id$
  */
 public class FastRDFKeyCompression implements IDataSerializer, Externalizable {
+
+    protected transient static final Logger log = Logger.getLogger(FastRDFKeyCompression.class);
 
     /**
      * 
@@ -309,8 +313,8 @@ public class FastRDFKeyCompression implements IDataSerializer, Externalizable {
              * auto-extend aggressively or they are writing onto a fixed buffer
              * that writes on a socket.
              */
-            if (SPOIndexWriteProc.INFO)
-                SPOIndexWriteProc.log.info(n
+            if (log.isDebugEnabled())
+                log.debug(n
                         + " statements were serialized in " + obs.writtenBits()
                         + " bytes using " + nsymbols
                         + " symbols with a code length of " + codeBitLength
