@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.Properties;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -78,6 +79,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.BNS;
 import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -108,7 +110,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
     public TestRDFXMLInterchangeWithStatementIdentifiers(String name) {
         super(name);
     }
-
+    
     /**
      * Test case builds up a graph from Sesame {@link Value} objects, using
      * {@link BNode}s to create statements about statements. The state of the
@@ -332,6 +334,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             */
            buf.flush();
            
+           if(log.isInfoEnabled())
            log.info("after load:\n" + store.dumpStore().toString());
 
        }
@@ -491,8 +494,22 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              * Deserialize the RDF/XML into a temporary store and verify
              * read-back of the graph.
              */
-            final TempTripleStore tempStore = new TempTripleStore(store
-                    .getProperties());
+            final TempTripleStore tempStore;
+            {
+
+                Properties properties = new Properties(store.getProperties());
+
+                /*
+                 * turn off closure so that the graph that we read back in will
+                 * correspond exactly to the graph that we write out.
+                 */
+                properties.setProperty(DataLoader.Options.CLOSURE,
+                        DataLoader.ClosureEnum.None.toString());
+
+                tempStore = new TempTripleStore(properties);
+
+            }
+
             try {
 
                 log.info("Reading RDF/XML into temp store.");
@@ -646,10 +663,25 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         System.err.println(rdfXml);
 
         /*
-         * Deserialize the RDF/XML into a temporary store and verify
-         * read-back of the graph with statement-level provenance metadata.
+         * Deserialize the RDF/XML into a temporary store and verify read-back
+         * of the graph with statement-level provenance metadata.
          */
-        final TempTripleStore tempStore = new TempTripleStore(store.getProperties());
+        final TempTripleStore tempStore;
+        {
+
+            Properties properties = new Properties(store.getProperties());
+
+            /*
+             * turn off closure so that the graph that we read back in will
+             * correspond exactly to the graph that we write out.
+             */
+            properties.setProperty(DataLoader.Options.CLOSURE,
+                    DataLoader.ClosureEnum.None.toString());
+
+            tempStore = new TempTripleStore(properties);
+
+        }
+
         try {
             
             log.info("Reading RDF/XML into temp store.");

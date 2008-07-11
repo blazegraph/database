@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import com.bigdata.rdf.rules.TestMatch;
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase2;
@@ -77,10 +79,6 @@ public class TestTripleStoreBasics extends TestCase2 {
 
         // test suite for the completion scan (prefix match for literals).
         suite.addTestSuite(TestCompletionScan.class);
-        
-        // test suite for the "match" rule (entity matching).
-        // @todo move to the rules package since this is a completion scan + a rule?
-        suite.addTestSuite(TestMatch.class);
         
         // somewhat dated test of sustained insert rate on synthetic data.
         suite.addTestSuite(TestInsertRate.class);

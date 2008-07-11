@@ -33,6 +33,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
@@ -48,7 +49,9 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * <p>
@@ -114,6 +117,12 @@ import com.bigdata.relation.rule.Rule;
  * by Jeen Broekstra and Arjohn Kampman.
  * </p>
  * 
+ * 
+ * FIXME use custom {@link ITupleSerializer} to generate keys and de-serialize.
+ * 
+ * FIXME accept {@link ISolution}s when writing justifications rather than
+ * long[] bindings (same data, different format).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -141,7 +150,7 @@ public class Justification implements Comparable<Justification> {
     /**
      * From the ctor, but not persisted.
      */
-    public final transient Rule rule;
+    public final transient IRule rule;
     
     /**
      * Term identifiers for the head and bindings.
@@ -165,10 +174,12 @@ public class Justification implements Comparable<Justification> {
      *            The entailment licensed by the rule and the bindings.
      * @param bindings
      *            The bindings for that rule that licensed the entailment.
+     * 
+     * @todo no longer used?
      */
     public Justification(Rule rule, SPO head, SPO[] bindings) {
 
-        assert rule != null;
+//        assert rule != null;
         assert head != null;
         assert bindings != null;
 
@@ -255,10 +266,12 @@ public class Justification implements Comparable<Justification> {
      *            justified the entailments. A binding MAY be
      *            {@link IRawTripleStore#NULL} in which case it MUST be
      *            interpreted as a wildcard.
+     * 
+     * @todo only used by a test case?
      */
-    public Justification(Rule rule, SPO head, long[] bindings) {
+    public Justification(IRule rule, SPO head, long[] bindings) {
 
-        assert rule != null;
+//        assert rule != null;
         assert head != null;
         assert bindings != null;
         
@@ -293,6 +306,8 @@ public class Justification implements Comparable<Justification> {
      * 
      * @param itr
      *            The iterator visiting the index entries.
+     * 
+     * @todo use {@link ITupleSerializer} to deserialize
      */
     public Justification(ITupleIterator itr) {
         
@@ -813,6 +828,8 @@ public class Justification implements Comparable<Justification> {
                 btree.removeAll();
 
                 tupleSer = null;
+                
+                btree.getStore().close();
                 
             }
             

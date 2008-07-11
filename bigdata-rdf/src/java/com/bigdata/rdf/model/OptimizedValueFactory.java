@@ -398,10 +398,10 @@ public class OptimizedValueFactory implements ValueFactory {
             
         }
         
-        /**
-         * The #of times that this term has been used in a {@link Statement}.
-         */
-        public int count = 0;
+//        /**
+//         * The #of times that this term has been used in a {@link Statement}.
+//         */
+//        public int count = 0;
         
         /**
          * Initially <code>false</code>, this field is set <code>true</code>

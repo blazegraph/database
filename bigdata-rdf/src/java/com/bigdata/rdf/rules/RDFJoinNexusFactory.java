@@ -65,16 +65,27 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     
     private final long writeTime;
     private final long readTime;
+    private final boolean justify;
     private final int solutionFlags;
     private final IElementFilter filter;
 
-    public RDFJoinNexusFactory(long writeTime, long readTime,
+    /**
+     * 
+     * @param writeTime
+     * @param readTime
+     * @param justify
+     * @param solutionFlags
+     * @param filter
+     */
+    public RDFJoinNexusFactory(long writeTime, long readTime, boolean justify,
             int solutionFlags, IElementFilter filter) {
 
         this.writeTime = writeTime;
 
         this.readTime = readTime;
 
+        this.justify = justify;
+        
         this.solutionFlags = solutionFlags;
 
         this.filter = filter;
@@ -84,7 +95,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     public IJoinNexus newInstance(IIndexManager indexManager) {
 
         return new RDFJoinNexus(this, indexManager, writeTime, readTime,
-                solutionFlags, filter);
+                justify, solutionFlags, filter);
 
     }
 
