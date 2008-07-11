@@ -1225,7 +1225,7 @@ abstract public class AbstractTripleStore extends
 
             }
 
-            return (BigdataStatement) itr.next();
+            return itr.next();
 
         } finally {
 
@@ -1677,6 +1677,8 @@ abstract public class AbstractTripleStore extends
     /**
      * Utility method dumps the statements in the store onto {@link System#err}
      * using the SPO index (subject order).
+     * 
+     * @todo change the return type to {@link StringBuilder}
      */
     final public String dumpStore() {
 
@@ -1803,6 +1805,47 @@ abstract public class AbstractTripleStore extends
         
     }
 
+    /**
+     * Dumps the access path, resolving term identifiers to terms.
+     * 
+     * @param accessPath
+     */
+    public StringBuilder dump(IAccessPath<SPO> accessPath) {
+                
+        final StringBuilder sb = new StringBuilder();
+        
+        final BigdataStatementIterator itr = asStatementIterator(accessPath.iterator());
+        
+        try {
+            
+            while(itr.hasNext()) {
+                
+                sb.append("\n"+itr.next());
+                
+            }
+            
+            return sb;
+            
+        } catch(SailException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        } finally {
+            
+            try {
+
+                itr.close();
+                
+            } catch (SailException ex) {
+                
+                log.error(ex, ex);
+                
+            }
+            
+        }
+        
+    }
+    
     /**
      * Returns some usage information for the database.
      * 

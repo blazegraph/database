@@ -91,7 +91,11 @@ public class TestTripleStoreBasics extends TestCase2 {
         // test suite for the SPORelation.
         suite.addTest( com.bigdata.rdf.spo.TestAll.suite() );
         
-        // test suite for the rio parser and data loading integration.
+        /*
+         * test suite for the rio parser and data loading integration, including
+         * support for statement identifiers and handling of blank nodes when
+         * statement identifiers are NOT enabled.
+         */
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
         // test suite for the rule execution layer (query and closure operations).

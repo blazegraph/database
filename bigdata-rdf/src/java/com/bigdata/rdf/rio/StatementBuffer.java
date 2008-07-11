@@ -140,7 +140,10 @@ public class StatementBuffer implements IStatementBuffer {
     /**
      * A canonicalizing map for blank nodes. This map MUST be cleared before you
      * begin to add statements to the buffer from a new "source" otherwise it
-     * will co-reference blank nodes from distinct sources.
+     * will co-reference blank nodes from distinct sources. The life cycle of
+     * the map is the life cycle of the document being loaded, so if you are
+     * loading a large document with a lot of blank nodes the map will also
+     * become large.
      */
     private Map<String, _BNode> bnodes;
     
@@ -148,9 +151,12 @@ public class StatementBuffer implements IStatementBuffer {
      * Statements which use blank nodes in their {s,p,o} positions must be
      * deferred when statement identifiers are enabled until (a) either the
      * blank node is observed in the context position of a statement; or (b)
-     * {@link #endSource()} is invoked, indicating that no more data will be
-     * loaded from the current source and therefore that the blank node is NOT a
-     * statement identifier.
+     * {@link #flush()} is invoked, indicating that no more data will be loaded
+     * from the current source and therefore that the blank node is NOT a
+     * statement identifier. This map is used IFF statement identifers are
+     * enabled. When statement identifiers are NOT enabled blank nodes are
+     * always blank nodes and we do not need to defer statements, only maintain
+     * the canonicalizing {@link #bnodes} mapping.
      */
     private Set<_Statement> deferredStmts;
 
@@ -436,7 +442,8 @@ public class StatementBuffer implements IStatementBuffer {
                     
                 }
                 
-                log.info(""+n+" out of "+nbefore+" deferred statements used only blank nodes.");
+                if (log.isInfoEnabled())
+                    log.info("" + n + " out of "+nbefore+" deferred statements used only blank nodes.");
                 
                 /*
                  * Flush everything in the buffer so that the blank nodes that
@@ -1063,7 +1070,7 @@ public class StatementBuffer implements IStatementBuffer {
                 
                 if (deferredStmts == null) {
 
-                    deferredStmts = new HashSet<_Statement>(/* capacity? */);
+                    deferredStmts = new HashSet<_Statement>(stmts.length);
 
                 }
 

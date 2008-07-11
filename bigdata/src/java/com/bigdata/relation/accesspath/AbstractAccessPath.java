@@ -30,7 +30,6 @@ package com.bigdata.relation.accesspath;
 
 import java.util.Iterator;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
@@ -43,7 +42,6 @@ import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.service.IBigdataFederation;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -61,7 +59,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     protected static final Logger log = Logger.getLogger(IAccessPath.class);
     
-    protected final ExecutorService service;
     protected final IRelation<R> relation;
     protected final IPredicate<R> predicate;
     protected final IKeyOrder<R> keyOrder;
@@ -136,9 +133,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     
     /**
      * 
-     * @param service
-     *            The executor service used for asynchronous iterators (this is
-     *            typically {@link IBigdataFederation#getExecutorService()}).
+     * @param relation
      * @param predicate
      *            The constraints on the access path.
      * @param keyOrder
@@ -152,17 +147,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * @todo This needs to be more generalized so that you can use a index that
      *       is best without being optimal by specifying a low-level filter to
      *       be applied to the index.
-     * 
-     * @todo When the predicate also specifies a filter constraint then that
-     *       must be layer on top of this lower-level constaint.
      */
-    protected AbstractAccessPath(final ExecutorService service,
-            final IRelation<R> relation,// @todo MutableRelation? AbstractRelation?
-            final IPredicate<R> predicate, final IKeyOrder<R> keyOrder,
-            final IIndex ndx, final int flags) {
-
-        if (service == null)
-            throw new IllegalArgumentException();
+    protected AbstractAccessPath(//
+            final IRelation<R> relation,  // 
+            final IPredicate<R> predicate,//
+            final IKeyOrder<R> keyOrder,  //
+            final IIndex ndx,//
+            final int flags  //
+            ) {
 
         if (relation == null)
             throw new IllegalArgumentException();
@@ -175,8 +167,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         if (ndx == null)
             throw new IllegalArgumentException();
-
-        this.service = service;
 
         this.relation = relation;
         
@@ -290,6 +280,15 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         }
         
         return this;
+        
+    }
+    
+    /** 
+     * The return type SHOULD be strengthened by impls.
+     */
+    public IRelation<R> getRelation() {
+        
+        return relation;
         
     }
     
@@ -571,7 +570,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         final BlockingBuffer<R> buffer = new BlockingBuffer<R>(
                 BlockingBuffer.DEFAULT_CAPACITY, keyOrder, null/* filter */);
         
-        final Future<Void> future = service.submit(new Callable<Void>(){
+        final Future<Void> future = getRelation().getExecutorService().submit(new Callable<Void>(){
         
             public Void call() {
                 
@@ -624,7 +623,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         if (log.isDebugEnabled()) {
 
-            log.debug("n=" + n + " : " + toString());
+            log.debug("exact="+exact+", n=" + n + " : " + toString());
             
         }
 

@@ -152,7 +152,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     /**
      * Run program steps in parallel.
      * 
-     * @param service
+     * @param program
      * @param tasks
      * 
      * @throws InterruptedException
@@ -204,8 +204,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     /**
      * Run program steps in sequence.
      * 
-     * @param service
-     * 
+     * @param program
      * @param tasks
      * 
      * @return 

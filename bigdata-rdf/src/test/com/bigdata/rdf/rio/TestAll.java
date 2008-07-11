@@ -52,14 +52,15 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      */
-    public static Test suite()
-    {
+    public static Test suite() {
 
         TestSuite suite = new TestSuite("RIO Integration");
 
-        suite.addTestSuite( TestStatementBuffer.class);
+        suite.addTestSuite(TestStatementBuffer.class);
 
-        suite.addTestSuite( TestLoadAndVerify.class);
+        suite.addTestSuite(TestLoadAndVerify.class);
+        
+        suite.addTestSuite(TestRDFXMLInterchangeWithStatementIdentifiers.class);
         
         return suite;
         

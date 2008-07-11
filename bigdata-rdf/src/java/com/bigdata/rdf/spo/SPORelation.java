@@ -234,6 +234,15 @@ public class SPORelation extends AbstractRelation<SPO> {
 
     }
 
+    /**
+     * Strengthened return type.
+     */
+    public AbstractTripleStore getContainer() {
+        
+        return (AbstractTripleStore)super.getContainer();
+        
+    }
+
     public boolean exists() {
         
         if (oneAccessPath && spo == null)
@@ -685,8 +694,7 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
-        return new SPOAccessPath(getExecutorService(), this, predicate,
-                keyOrder, ndx, flags).init();
+        return new SPOAccessPath(this, predicate, keyOrder, ndx, flags).init();
         
     }
     
@@ -844,6 +852,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * that is being deleted).
      * 
      * @see AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)
+     * @see SPOAccessPath#removeAll()
      */
     public long delete(IChunkedOrderedIterator<SPO> itr) {
 
