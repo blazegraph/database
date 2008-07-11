@@ -418,6 +418,8 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final Justification[] b = new Justification[ n ];
 
+            final boolean writeJustifications = false;
+            
             for(int i=0; i<chunk.length; i++) {
                 
                 if(log.isDebugEnabled()) {
@@ -430,18 +432,19 @@ public class RDFJoinNexus implements IJoinNexus {
                 
                 final SPO spo = solution.get();
 
+                if(writeJustifications) {
+                    
                 final IBindingSet bindingSet = solution.getBindingSet();
                 
                 final long[] bindings = new long[bindingSet.size()];
 
-                // FIXME
-                if (true)
-                    throw new UnsupportedOperationException(
-                            "Must populate binding[] from rule by variable order");
+                // FIXME Must populate binding[] from rule by variable order
                 
                 final IRule rule = solution.getRule();
                 
                 b[i] = new Justification(rule, spo, bindings);
+
+                }
                                 
             }
             
@@ -467,6 +470,7 @@ public class RDFJoinNexus implements IJoinNexus {
                 }
             });
             
+            if(writeJustifications)
             tasks.add(new Callable<Long>(){
                 public Long call() {
                     return r
@@ -488,6 +492,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
                 mutationCount = futures.get(0).get();
 
+                if(writeJustifications)
                                 futures.get(1).get();
 
             } catch (InterruptedException ex) {
