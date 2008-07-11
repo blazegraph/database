@@ -30,15 +30,19 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.spo.ISPOBuffer;
-import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.AbstractArrayBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * Abtract base class for buffering {@link SPO}s for some batch api operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link AbstractArrayBuffer}, but this class is more tightly
+ * coupled to the {@link AbstractTripleStore}.
  */
 abstract public class AbstractSPOBuffer implements ISPOBuffer {
 
@@ -103,7 +107,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      * An optional filter. When present, statements matched by the filter are
      * NOT retained by the {@link SPOAssertionBuffer}.
      */
-    protected final ISPOFilter filter;
+    protected final IElementFilter<SPO> filter;
     
     /**
      * The buffer capacity.
@@ -124,7 +128,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      *            The maximum #of Statements, URIs, Literals, or BNodes that the
      *            buffer can hold.
      */
-    protected AbstractSPOBuffer(AbstractTripleStore store, ISPOFilter filter,
+    protected AbstractSPOBuffer(AbstractTripleStore store, IElementFilter<SPO> filter,
             int capacity) {
 
         if (capacity <= 0)
@@ -195,7 +199,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
         
         assert stmt != null;
 
-        if (filter != null && filter.isMatch(stmt)) {
+        if (filter != null && filter.accept(stmt)) {
             
             /*
              * Note: Do not store statements (or justifications) matched by the

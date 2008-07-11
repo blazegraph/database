@@ -35,12 +35,15 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
+
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
@@ -50,10 +53,12 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPOTupleSerializer;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
  * <p>
@@ -147,8 +152,11 @@ abstract public class AbstractTestCase
              * Read properties from a hierarchy of sources and cache a
              * reference.
              */
+//            m_properties = super.getProperties();
+
+            // disregard the inherited properties.
+            m_properties = new Properties();
             
-            m_properties = super.getProperties();
 //            m_properties = new Properties( m_properties );
 
             m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
@@ -304,9 +312,6 @@ abstract public class AbstractTestCase
      * Dumps the lexicon in a variety of ways.
      * 
      * @param store
-     * 
-     * @todo ClientIndexView does not disclose whether or not the index is
-     *       isolatable so this will not work for a bigadata federation.
      */
     void dumpTerms(AbstractTripleStore store) {
 
@@ -401,7 +406,7 @@ abstract public class AbstractTestCase
         /**
          * Dumps the term:id index.
          */
-        for( Iterator<Long> itr = ((AbstractTripleStore)store).termIdIndexScan(); itr.hasNext(); ) {
+        for( Iterator<Long> itr = store.getLexiconRelation().termIdIndexScan(); itr.hasNext(); ) {
             
             System.err.println("term->id : "+itr.next());
             
@@ -410,7 +415,7 @@ abstract public class AbstractTestCase
         /**
          * Dumps the id:term index.
          */
-        for( Iterator<Value> itr = ((AbstractTripleStore)store).idTermIndexScan(); itr.hasNext(); ) {
+        for( Iterator<Value> itr = store.getLexiconRelation().idTermIndexScan(); itr.hasNext(); ) {
             
             System.err.println("id->term : "+itr.next());
             
@@ -419,7 +424,7 @@ abstract public class AbstractTestCase
         /**
          * Dumps the terms in term order.
          */
-        for( Iterator<Value> itr = ((AbstractTripleStore)store).termIterator(); itr.hasNext(); ) {
+        for( Iterator<Value> itr = store.getLexiconRelation().termIterator(); itr.hasNext(); ) {
             
             System.err.println("termOrder : "+itr.next());
             
@@ -488,13 +493,13 @@ abstract public class AbstractTestCase
 //
 //    }
 
-    static public void assertSameSPOs(SPO[] expected, ISPOIterator actual) {
+    static public void assertSameSPOs(SPO[] expected, IChunkedOrderedIterator<SPO>actual) {
 
         assertSameSPOs("", expected, actual);
 
     }
 
-    static public void assertSameSPOs(String msg, SPO[] expected, ISPOIterator actual) {
+    static public void assertSameSPOs(String msg, SPO[] expected, IChunkedOrderedIterator<SPO> actual) {
 
         /*
          * clone expected[] and put into the same order as the iterator.
@@ -502,7 +507,7 @@ abstract public class AbstractTestCase
         
         expected = expected.clone();
 
-        KeyOrder keyOrder = actual.getKeyOrder();
+        IKeyOrder<SPO> keyOrder = actual.getKeyOrder();
 
         if (keyOrder != null) {
 
@@ -556,7 +561,7 @@ abstract public class AbstractTestCase
      * @param actual
      */
     static public void assertSameSPOsAnyOrder(AbstractTripleStore store,
-            SPO[] expected, ISPOIterator actual) {
+            SPO[] expected, IChunkedOrderedIterator<SPO>actual) {
 
         assertSameSPOsAnyOrder(store,expected,actual,false);
     }
@@ -568,11 +573,12 @@ abstract public class AbstractTestCase
      * @param store
      *            Used to resolve term identifiers for messages.
      * @param expected
-     * @param actual
+     * @param actual (The iterator will be closed).
      * @param ignoreAxioms
      */
     static public void assertSameSPOsAnyOrder(AbstractTripleStore store,
-            SPO[] expected, ISPOIterator actual, boolean ignoreAxioms) {
+            SPO[] expected, IChunkedOrderedIterator<SPO> actual,
+            boolean ignoreAxioms) {
         
         try {
 
@@ -696,16 +702,16 @@ abstract public class AbstractTestCase
         AtomicInteger nerrs = new AtomicInteger(0);
 
         // scan SPO, checking...
-        assertSameStatements(db, KeyOrder.SPO, KeyOrder.POS, nerrs);
-        assertSameStatements(db, KeyOrder.SPO, KeyOrder.OSP, nerrs);
+        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.POS, nerrs);
+        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.OSP, nerrs);
 
         // scan POS, checking...
-        assertSameStatements(db, KeyOrder.POS, KeyOrder.SPO, nerrs);
-        assertSameStatements(db, KeyOrder.POS, KeyOrder.OSP, nerrs);
+        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.SPO, nerrs);
+        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.OSP, nerrs);
         
         // scan OSP, checking...
-        assertSameStatements(db, KeyOrder.OSP, KeyOrder.SPO, nerrs);
-        assertSameStatements(db, KeyOrder.OSP, KeyOrder.POS, nerrs);
+        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.SPO, nerrs);
+        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.POS, nerrs);
         
         assertEquals(0,nerrs.get());
         
@@ -723,14 +729,18 @@ abstract public class AbstractTestCase
      *            Verifying that each statement is also present in this index.
      */
     private void assertSameStatements(AbstractTripleStore db,
-            KeyOrder keyOrderExpected, KeyOrder keyOrderActual,
+            SPOKeyOrder keyOrderExpected, SPOKeyOrder keyOrderActual,
             AtomicInteger nerrs) {
 
         log.info("Verifying "+keyOrderExpected+" against "+keyOrderActual);
 
-        ISPOIterator itre = db.getAccessPath(keyOrderExpected).iterator();
+        final IIndex ndx = db.getSPORelation().getIndex(keyOrderActual);
+
+        final SPOTupleSerializer tupleSer = (SPOTupleSerializer)ndx.getIndexMetadata().getTupleSerializer();
         
-        IIndex ndx = db.getStatementIndex(keyOrderActual);
+        final IChunkedOrderedIterator<SPO> itre = db.getAccessPath(keyOrderExpected).iterator();
+        
+        try {
         
         while(itre.hasNext()) {
 
@@ -739,8 +749,8 @@ abstract public class AbstractTestCase
             
             final SPO expectedSPO = itre.next();
             
-            final byte[] fromKey = db.getKeyBuilder().statement2Key(
-                    keyOrderActual, expectedSPO);
+            final byte[] fromKey = tupleSer.statement2Key(keyOrderActual,
+                        expectedSPO);
 
             final byte[] toKey = null;
 
@@ -762,7 +772,7 @@ abstract public class AbstractTestCase
                 
             }
 
-            final SPO actualSPO = new SPO(keyOrderActual, itr);
+            final SPO actualSPO = (SPO)itr.next().getObject();
 
             if (!expectedSPO.equals(actualSPO)) {
 
@@ -778,6 +788,12 @@ abstract public class AbstractTestCase
                 nerrs.incrementAndGet();
                 
             }            
+            
+        }
+        
+        } finally {
+            
+            itre.close();
             
         }
 

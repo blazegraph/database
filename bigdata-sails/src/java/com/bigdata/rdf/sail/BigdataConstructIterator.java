@@ -1,20 +1,20 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
-import java.util.Iterator;
+
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.spo.ChunkedSPOIterator;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
+import com.bigdata.relation.accesspath.IClosableIterator;
 
 public class BigdataConstructIterator implements
         CloseableIteration<Statement, QueryEvaluationException> {
@@ -29,7 +29,7 @@ public class BigdataConstructIterator implements
         this.db = db;
         stmtIt =
                 new BigdataStatementIteratorImpl(db, db
-                        .bulkCompleteStatements(new ChunkedSPOIterator(
+                        .bulkCompleteStatements(new ChunkedWrappedIterator<SPO>(
                                 new SPOConverter(src))));
     }
 
@@ -61,13 +61,15 @@ public class BigdataConstructIterator implements
         }
     }
 
-    private class SPOConverter implements ISPOIterator {
+    private class SPOConverter implements IClosableIterator<SPO> {
         
         private final CloseableIteration<? extends BindingSet, QueryEvaluationException> src;
 
         public SPOConverter(
                 final CloseableIteration<? extends BindingSet, QueryEvaluationException> src) {
+            
             this.src = src;
+            
         }
         
         public void close() {
@@ -128,26 +130,28 @@ public class BigdataConstructIterator implements
             return spo;
         }
         
-        /**
-         * Don't really need chunking, but we do need to be closeable.
-         */
-        public SPO[] nextChunk() {
-            return nextChunk(null);
-        }
-
-        /**
-         * Don't really need chunking, but we do need to be closeable.
-         */
-        public KeyOrder getKeyOrder() {
-            return KeyOrder.SPO;
-        }
-
-        /**
-         * Don't really need chunking, but we do need to be closeable.
-         */
-        public SPO[] nextChunk(KeyOrder keyOrder) {
-            return new SPO[] { next() };
-        }
+//        /**
+//         * Don't really need chunking, but we do need to be closeable.
+//         */
+//        public SPO[] nextChunk() {
+//            return nextChunk(null);
+//        }
+//
+//        /**
+//         * Don't really need chunking, but we do need to be closeable.
+//         */
+//        public SPOKeyOrder getKeyOrder() {
+//            
+//            return SPOKeyOrder.SPO;
+//            
+//        }
+//
+//        /**
+//         * Don't really need chunking, but we do need to be closeable.
+//         */
+//        public SPO[] nextChunk(KeyOrder keyOrder) {
+//            return new SPO[] { next() };
+//        }
         
     }
 }

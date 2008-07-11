@@ -40,13 +40,15 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.rule.Rule;
 
 /**
  * <p>
@@ -533,7 +535,7 @@ public class Justification implements Comparable<Justification> {
             boolean testFocusStore
             ) {
 
-        VisitedSPOSet visited = new VisitedSPOSet(focusStore.getStore());        
+        VisitedSPOSet visited = new VisitedSPOSet(focusStore.getIndexManager());        
         
         try {
 
@@ -608,8 +610,10 @@ public class Justification implements Comparable<Justification> {
              * database are explicit).
              */
             
-            ISPOIterator itr = db.getAccessPath(head.s, head.p, head.o)
-                    .iterator(0,0);
+            final IChunkedOrderedIterator<SPO> itr = db.getAccessPath(head.s,
+                    head.p, head.o).iterator(0,0);
+            
+            try {
             
             while(itr.hasNext()) {
                 
@@ -664,6 +668,12 @@ public class Justification implements Comparable<Justification> {
             
             }
             
+            } finally {
+                
+                itr.close();
+                
+            }
+            
         }
 
         if(head.isFullyBound()) {
@@ -692,9 +702,9 @@ public class Justification implements Comparable<Justification> {
                  * M-1 triple patterns of N elements each.
                  */
                 
-                Justification jst = itr.next();
+                final Justification jst = itr.next();
                 
-                SPO[] tail = jst.getTail();
+                final SPO[] tail = jst.getTail();
                 
                 /*
                  * if all in tail are explicit in the statement indices, then done.
@@ -747,13 +757,10 @@ public class Justification implements Comparable<Justification> {
      */
     public static class VisitedSPOSet {
        
-        private final BTree btree;
+        private BTree btree;
 
-        /**
-         * Generate an SPO key.
-         */
-        private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(N * Bytes.SIZEOF_LONG));
-
+        private SPOTupleSerializer tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO);
+        
         public VisitedSPOSet(TemporaryRawStore tempStore) {
             
             IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
@@ -762,7 +769,7 @@ public class Justification implements Comparable<Justification> {
             
             metadata.setLeafValueSerializer(NoDataSerializer.INSTANCE);
   
-            btree = BTree.create(tempStore,metadata);
+            btree = BTree.create(tempStore, metadata);
             
         }
 
@@ -775,24 +782,24 @@ public class Justification implements Comparable<Justification> {
          */
         public boolean add(SPO spo) {
            
-            byte[] key = keyBuilder.statement2Key(KeyOrder.SPO, spo);
-            
-            if(!btree.contains(key)) {
-             
+            final byte[] key = tupleSer.statement2Key(SPOKeyOrder.SPO, spo);
+
+            if (!btree.contains(key)) {
+
                 btree.insert(key, null);
-                
+
                 return true;
-                
+
             }
-            
+
             return false;
-        
+
         }
 
         public int size() {
-            
+
             return btree.getEntryCount();
-            
+
         }
 
         /**
@@ -800,11 +807,23 @@ public class Justification implements Comparable<Justification> {
          * on the backing store yet then nothing ever will be.
          */
         public void close() {
-            
-            btree.removeAll();
+
+            if (btree != null) {
+
+                btree.removeAll();
+
+                tupleSer = null;
+                
+            }
             
         }
-        
+
+        protected void finalized() throws Exception {
+
+            close();
+
+        }
+
     }
-    
+
 }

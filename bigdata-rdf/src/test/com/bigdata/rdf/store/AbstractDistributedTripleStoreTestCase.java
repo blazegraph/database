@@ -74,7 +74,10 @@ abstract public class AbstractDistributedTripleStoreTestCase extends AbstractDis
         super.setUp();
 
         // connect to the database.
-        store = new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
+        store = new ScaleOutTripleStore(client.getFederation(), "test_",
+                ITx.UNISOLATED, client.getProperties());
+        
+        store.create();
         
     }
 

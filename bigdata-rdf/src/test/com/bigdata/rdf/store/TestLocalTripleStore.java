@@ -72,7 +72,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
          */
 
         // ...
-        suite.addTestSuite(TestCompletionScan.class);
+//        suite.addTestSuite(TestCompletionScan.class);
         
         /*
          * Proxied test suite for use only with the LocalTripleStore.

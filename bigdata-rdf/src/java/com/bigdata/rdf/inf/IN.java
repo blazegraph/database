@@ -47,20 +47,32 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.inf.Rule.IConstraint;
-import com.bigdata.rdf.inf.Rule.State;
-import com.bigdata.rdf.inf.Rule.Var;
+import java.util.HashSet;
+
+import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
+import com.bigdata.relation.rule.IConstraint;
+import com.bigdata.relation.rule.IVariable;
 
 /**
  * A constraint that a variable may only take on the bindings enumerated by some
  * set.
+ * 
+ * @todo this could be optimized in a variety of ways, including the use of a
+ *       {@link HashSet} or a sorted array and a binary search.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class IN implements IConstraint {
 
-    private final Var x;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 5805883429399100605L;
+
+    private final IVariable<Long> x;
+    
     private final long[] set;
 
     /**
@@ -71,7 +83,7 @@ public class IN implements IConstraint {
      *            A set of legal term identifiers providing a constraint on the
      *            allowable values for that variable.
      */
-    public IN(Var x, long[] set) {
+    public IN(IVariable<Long> x, long[] set) {
         
         if (x == null || set == null)
             throw new IllegalArgumentException();
@@ -85,16 +97,18 @@ public class IN implements IConstraint {
         
     }
     
-    public boolean accept(State s) {
+    public boolean accept(IBindingSet bindingSet) {
         
         // get binding for "x".
-        long x = s.get(this.x);
+        final IConstant<Long> x = bindingSet.get(this.x);
        
-        if(x==NULL) return true; // not yet bound.
+        if(x==null) return true; // not yet bound.
 
+        final long v = x.get();
+        
         for(int i=0; i<set.length; i++) {
             
-            if(x == set[i]) return true;
+            if(v == set[i]) return true;
             
         }
         

@@ -462,17 +462,6 @@ Notes on store level record checksums and record compression.
        a heap buffer pool, dynamic heap allocations for
        (de-)compression, or a serialized access to an instance per
        NodeSerializer instance (and hence per BTree instance).
-			
-     - Support copy in/out of keys and vals in lookup(), insert(),
-       remove(), and rangeIterator so that we can (a) be more
-       efficient in handling keys and vals by copying; (b) handle keys
-       and vals that are byte aligned or bit aligned in the node or
-       leaf; (c) reduce GC by converting to a compacting record for
-       the node/leaf; and (d) expose the version counter and deletion
-       marker for fused views of indices with isolation.
-
-     - Turn off sendVals for rangeIterators if we recognize the value
-       serialized as the NoDataSerializer?
 
      - Change checksums to be at the store/record level.  Interpret
        the record length as having 2 additional bytes for read/write
@@ -507,10 +496,6 @@ Notes on store level record checksums and record compression.
       - Concurrent RDF data load as a map/reduce job.
 
     - Tune network IO
-
-      - Modify the procedure logic to abstract a 'next key/val'
-        iterator using a shared buffer for de-compression in order to
-        minimize heap churn on the data server.
 
       - huffman encoding is appropriate for network IO, but hu-tucker
         is not required since we have to decompress keys to get them
@@ -838,23 +823,6 @@ Short term tasks:
        index partitions.  Also, provide some aggregation over the MDI,
        including the total #of partitions and tuples.
 
-     - (**) The per-host physical disk counters for linux are not
-       being collected.
-
-       Write the Sar, iostat, or vmstat utility to collect these data.
-       This is a bit more complex under Linux since the data are
-       reported by device and the relationship of the devices to the
-       file system should be explicated.
-
-       Use [df] to report the % free space remaining?  There should be
-       one value for the logical disk (perhaps), and there should be a
-       report of the % free space remaining on the volume on which the
-       dataDir is located and the volume on which the tmpDir is
-       located.
-
-       Note: The StoreManager also reports the free space on the
-       volume for both the data dir and the temp dir.
-
      - The counters are overflowing to days before midnight.  Check
        the locale and see when timestamp causes an overflow to the
        next hour and the next day in some unit tests.
@@ -896,6 +864,13 @@ Short term tasks:
      - Done. Problem w/ correlated view of counters. Was plotting a
        String[] rather than its elements.
 
+
+     - Add counters to the client index view showing the times for
+       each operation and also showing the times for querying the
+       metadata index to split an key[] operation or map a key-range
+       operation.  This will be help identify if/when the MDI is a
+       bottleneck for the client.
+
    - Admin UI
    
      - It would be nice to be able to drill down into the index data,
@@ -908,8 +883,138 @@ Short term tasks:
 
    - Sparse row store support.
 
-     - Add a web application that let's people easily write on or read
-       from the sparse row store using JSon or the like.
+     - JSON API
+
+       - Add a web application that let's people easily write on or
+         read from the sparse row store using JSON or the like.
+
+       - The JSON API should be compatible to the extent possible with
+         HBASE and GAE.
+
+       - This web application will have to be distributed in order to
+         eliminate bottlenecks.  One approach is to re-direct HTTP
+         clients to an embedded web service co-located with the data
+         service on which the row resides.  HTTP clients can continue
+         to address that server until they receive a redirect.
+
+     - Add a BLOB reference column type.  There are at least two
+       design options for this.  I think that we should support at
+       least (1) and (2).
+
+       (1) the blocks are stored locally and hence are always
+           available from the same data service as the BLOB reference
+           column value - this might limit the maximum effective blob
+           size (in bytes) since the data will have to fit in the same
+           index partition and hence be co-located on a single host.
+           In fact, the blocks will be in the same index segment as
+           the column value once the journal overflows.  One advantage
+           of this approach is the block updates can be atomic with
+           block metadata updates - a feature that is not otherwise
+           available without full transactions.
+       
+       (2) the blob reference includes the name of the scale-out index
+           on which the blocks for that blob are stored - in this
+           model the blocks can reside anywhere and splits of the
+           blocks will have no relevance to splits of the metadata.
+           This also makes it easier to locate the partitions of the
+           index containing the blocks on data services that are
+           specifically provisioned for large data blocks.
+
+       (3) the blob reference contains the primary key for the blob
+           and the blob is stored either in the same index or in
+           another index.  I am not sure that this variant adds value
+           over (1) and (2).
+
+     - Refactor the BigdataRepository to use the BLOB reference type.
+
+   - IndexSegment
+
+     - Done. Verify that there is an atomic commit point for the
+       IndexSegment so that partial index segment writes can be
+       recognized.
+
+     - Done. The addrLeaves and addrNodes can not be expressed as a
+       single long since they are regions spanning many records and a
+       long would limit their byteCount to whatever was allowed by the
+       offsetBits.
+
+     - Done. The logic to buffer the nodes was actually examining the
+       extent of the leaves.
+
+     - Done. Added checksum to the index segment store checkpoint
+       record.
+
+     - Done (the problem was failing to flush the write cache to the
+       disk before initiating the channel to channel transfer - since
+       the data were not on the channel they naturally were not being
+       transferred.)  Stress test of U100 and very large runs of
+       TestIndexSegmentBuilderWithLargeTrees (m=32, nentries=m**4)
+       cause corrupt leaves in an index segment build.
+
+     - Done. Modify IndexSegmentBuilder to support fast reverse scan,
+       at least in the data and in DumpIndexStore.
+
+     - Done. IndexSegmentBuilder should be refactored to implement
+       Runnable/Callable.  The ctor can do the setup and the index
+       build will run in run()/call().  The return can be a status code
+       for the operation or statistics on the operation.  Throw an
+       exception for an error.
+
+     - Done. Modify IndexSegmentBuilder to support fast forward scan,
+       at least in the data and in DumpIndexStore.
+
+     - An index segment build that could operate without the actual #of
+       entries would avoid one pass over the data.  See how expensive
+       that traversal is (it is done in one location) and decide
+       whether it is worth trying to operate without that information
+       on hand.  Eg, by using the upper bound on the entry count and
+       then allowing leaves and nodes to underflow.
+
+     - Done. Support transparent byte[] <=> value (de-)serialization
+       using a serializer object associated with the index metadata.
+
+     - Done. Add Map and Set impls. based on the BTree.
+
+     - Done (IUpdateStore). I need to create an interface extending
+       IRawStore, put those methods on that interface, and then declare
+       that interface on TemporaryRawStore in order to be able to
+       access these methods.
+
+   - DiskOnlyStrategy
+
+     - Done. write tests of transferTo.  I did find a bug in
+       writeAll(), but that was not the problem (it was writing each
+       pass at the same offset in the file when a write required
+       multiple IOs).
+
+     - Done. Refactor to create a Journal using a Temporary BufferMode.
+
+     - Done. Refactor DiskOnlyStrategy to permit lazy creation of the
+       backing file.
+
+     - Done. Refactor of TemporaryRawStore to use DiskOnlyStrategy with
+       lazy creation of the backing file.
+
+     - Done. Found a bug in DiskOnlyStrategy where it was always
+       reading a record three times....  Probably there was little
+       performance impact since the read would have come from the OS
+       cache after the first time, but still....
+
+     - Evaluate effect of the write cache capacity.  If 1M is as good
+       as 10M then just use the DirectBufferPool for the write cache
+       for the live journal, which will simplify some things.
+
+     * Add counters reporting the #of bytes written/commit.
+
+     * Test suite for Temporary mode journals.
+
+   - DirectBufferPool
+
+     - Done. Static config via System#getProperties() for the direct buffer pool
+
+     - Done. Counters for reporting out the pool state.
+
+     - Done. Report "bytesUsed" for the DirectBufferPool.
 
    - Transaction support.
 
@@ -939,6 +1044,97 @@ Short term tasks:
        further and see if this problem can be addressed without using
        a full transaction.  If not, then we will need to use a full
        transaction to avoid this issue.
+
+  - (*****) Iterator refactor
+
+     - Cursor based tuple:
+
+       - BTree (uses listeners to support concurrent modification).
+
+       - IndexSegment (uses prior/next leaf and data are immutable).
+
+       - FusedView
+
+     - Modify the procedure logic to abstract a 'next key/val'
+       iterator using a shared buffer for de-compression in order to
+       minimize heap churn on the data server.
+
+     - **** Modify IndexSegment to use fast forward and fast reverse
+	    scans.  I need to override or replace the iterator to do
+	    this.  It should use a priorLeaf/nextLeaf method in order
+	    for this to be easy to do.
+
+	    Ah. There is a protected [AbstractBTree#leafIterator()]
+	    method, but it is not being used.  Perhaps this could be
+	    modified to accept a fromKey and toKey and then used to
+	    allow replacement of the striterator-based
+	    postOrderNodeIterator().
+
+	    Modify the iterator to support prior/next and modification
+	    with concurrent traversal.  This really should not be any
+	    more complicated than the case for the GOM link set
+	    iterator.
+
+     - **** I have seen the index segment store closed during iterator
+	    traversal.  I've modified the class slightly to re-open the
+	    store transparently and we will see how that goes.
+
+	    *** The observed problem was during iterator traversal.  I
+	    suspect that iterator traversal should not allow the index
+	    to be closed since it requires valid hard references to the
+	    stack of nodes being traversed.  Figure out who is closing
+	    the index.  We may have to ignore the close if there is an
+	    open iterator.
+
+	    If the iterator is modified to use prior/next leaf methods
+	    for traversal and those methods are robust, then they can
+	    simply reopen() the index if it has been asynchronously
+	    closed.  The version for the index segment will not need
+	    the node stack.  A version that does not rely on a node
+	    stack could also be written for the BTree using lookup() to
+	    re-discover the current leaf and tuple.
+
+	    * Consider modifying the leaf iterator to require calling
+	      next() for the first leaf.  Consider changing next() to
+	      nextLeafInScanOrder().
+
+     - Support copy in/out of keys and vals in lookup(), insert(),
+       remove(), and rangeIterator so that we can (a) be more
+       efficient in handling keys and vals by copying; (b) handle keys
+       and vals that are byte aligned or bit aligned in the node or
+       leaf; (c) reduce GC by converting to a compacting record for
+       the node/leaf; and (d) expose the version counter and deletion
+       marker for fused views of indices with isolation.
+
+     - Turn off sendVals for rangeIterators if we recognize the value
+       serialized as the NoDataSerializer?
+
+     - (***) The distinct term scan (really, the prefix scan) needs to
+       be optimized for the data service and the federation use cases.
+       This also effects the sparse row store.  Also, the sparse row
+       store needs to use an extended split handler that always
+       chooses a split point which is on a logical row boundary.
+
+     - (*) Need ability to request a rangeIterator that reads in
+       reverse key order and the ability to visit the prior or next
+       key.  This requirement arises in particular for the bigdata
+       repository which is currently using the ILinearList API for the
+       AtomicAppend.  This will also help us to replace the
+       requirement for the ILinearList API in the metadata index.
+       
+       The change needs to occur at several levels and should include
+       a prior() method on ITupleIterator and the ability to acquire
+       an ITupleIterator for ITuple returned from lookup(), insert(),
+       etc. so that it can be turned into an iterator for prior/next
+       visitation.
+
+       This is a good time to do efficient prior/next leaf operations
+       for the IndexSegment and to make that more efficient for the
+       BTree as well.
+
+     * There are some heavy costs for the tuple iterator for the
+       distributed mode because it is sending around more data than is
+       strictly required.
 
      - (*****) The consistentRead option used by the
        PartitionedIndexRangeIterator needs to use the most recent
@@ -1013,28 +1209,6 @@ Short term tasks:
        Consider batching a set of rangeQueries together in a single
        operation vs parallel submits.
 
-     - (***) The distinct term scan (really, the prefix scan) needs to
-       be optimized for the data service and the federation use cases.
-       This also effects the sparse row store.  Also, the sparse row
-       store needs to use an extended split handler that always
-       chooses a split point which is on a logical row boundary.
-
-     - (*) Need ability to request a rangeIterator that reads in
-       reverse key order and the ability to visit the prior or next
-       key.  This requirement arises in particular for the bigdata
-       repository which is currently using the ILinearList API for the
-       AtomicAppend.  This will also help us to replace the
-       requirement for the ILinearList API in the metadata index.
-       
-       The change needs to occur at several levels and should include
-       a prior() method on ITupleIterator and the ability to acquire
-       an ITupleIterator for ITuple returned from lookup(), insert(),
-       etc. so that it can be turned into an iterator for prior/next visitation.
-
-       This is a good time to do efficient prior/next leaf operations
-       for the IndexSegment and to make that more efficient for the
-       BTree as well.
-
      - Done. (get() and find() were running as unisolated tasks.)  I
        am seeing a lot of tasks in the concurrency manager for the
        metadata service, but few commits on the live journal.  What
@@ -1048,6 +1222,13 @@ Short term tasks:
         happen once asynchronous overflow handling was complete.
 
    - StoreManager / IndexManager
+
+      - Done. Add counter for bytes under management on the
+        StoreManager.  I want to see bytes placed under management,
+        bytes for stores that have been deleted, and bytes for stores
+        that are remaining.  It would also be great to see the bytes
+        remaining on the volume where the data are stored in the same
+        view.
 
       - Modify  LRU  to  purge  entries  older than  a  specified  age
         (including an asych  daemon thread to make sure  that they get
@@ -1383,10 +1564,6 @@ Short term tasks:
           displayed by the jini browser....  This may well be an issue
           with failing to expose the interfaces and service classes
           via an http service as downloadable code.
-
-	- Done. Verify that there is an atomic commit point for the
-          IndexSegment so that partial index segment writes can be
-          recognized.
  
 ============================================================
 
@@ -1786,24 +1963,46 @@ JF-U1000-host12-2DS-noOverflow
 
       (a) EF with one data service;
 
-EF-U100-host3-1DS-5M:
+EF-U100-host3-1DS-5M: 5965
 
-	5965 tps w/ 5M initial extent and 5M maximum extent and 15
-	overflows in 46 minutes (a stress test run).  Note: The
-	initial and maximum extent were configured in the test suite
-	code.  Run was successful.  The only reported errors were
-	index partition split tasks that were still executing when the
-	run was terminated.
+	Note: This used a 5M initial extent and 5M maximum extent.
+	There were 15 overflows in 46 minutes (a stress test run).
+	The initial and maximum extent were configured in the test
+	suite code.  Run was successful.  The only reported errors
+	were index partition split tasks that were still executing
+	when the run was terminated.
 
-EF-U100-host3-1DS: 5922
+EF-U100-host3-1DS: 5922 (this is not the final tally since the client
+		         died during shutdown).
 
-		   w/ 200M initial extent and 200M maximum extent.
+        w/ 200M initial extent and 200M maximum extent.
 
 	--------------------
 
       (b) for JF with one data services with on one machine; 
 
-JF-U100-host3-1DS: ************* RUN NEXT *********
+JF-U100-host3-1DS: 5543
+
+	Note: This run came close to using all RAM on the machine
+	80%).  The RAM was mostly going to the sole data service.  In
+	fact, the data service RSS was 2G, which is maxed out.
+
+	Note: Some overflow tasks were cancelled! (timeout).  
+
+	Several index partition split tasks began but all were
+	cancelled due to timeout.  I have increased the default
+	timeout and I will run again.  I have also added counters to
+	report failed and cancelled async overflow tasks.
+
+	* Once splits start, look for the overhead of the MDS (there
+          is still an MDS overhead since we need to find the locator
+          to decide that there are no splits)
+
+	* Look at the LBS host and service scores.
+
+	* Look for index _moves_.
+
+	* Network counters begin to become interesting.
 
 	--------------------
 
@@ -1815,17 +2014,24 @@ JF-U100-host3-2DS:
       
       (d) for JF with two data services on two machines.
 
-JF-U100-host23-2DS:
+JF-U100-host23-2DS:  ******** RUNNING NOW *********
+
+	Note: I am only running a single client for this test.  The
+	client is on host3.  This should be Ok since we are data
+	service bound.  If the client can not keep up with the data
+	services on two machines then that's good news :-)
 
 	--------------------
 
       Choose runs where we have the data w/o overflow from above.
 
- - Done. Add counter for bytes under management on the StoreManager.
-   I want to see bytes placed under management, bytes for stores that
-   have been deleted, and bytes for stores that are remaining.  It
-   would also be great to see the bytes remaining on the volume where
-   the data are stored in the same view.
+      Do at least one run with post-facto validation turned on.
+
+      Note: It is important to also save the service nohup.out files
+      since they show interesting data about the asynchronous index
+      partition overflow tasks and any errors reported by the service
+      during such tasks (those errors do not make it back to the
+      clients since the tasks are run by the services themselves).
 
     --------------------
 
@@ -1891,169 +2097,6 @@ JF-U100-host23-2DS:
 
 ============================================================
 
-- Add counters to the client index view showing the times for each
-  operation and also showing the times for querying the metadata index
-  to split an key[] operation or map a key-range operation.  This will
-  be help identify if/when the MDI is a bottleneck for the client.
-
-- Done. Verify [limit := capacity; pos := 0] before each xfer for temp
-  to disk.
-
-- Survey and verify all file channel IO using loops in case more than
-  one op is required for the transfer (as has been shown to be the
-  case sometimes under heavy loads).
-
-  - Done. DiskOnlyStrategy#read(long)
-
-  - Done. DiskOnlyStrategy#writeRootBlock()
-
-  - Done. DirectByteBuffer#write(...)
-
-  - Done. DiskBackedBufferStrategy#writeRootBlock() (same as for DiskOnly version)
-
-  - FileMetadata#<init>
-
-     - Done. writing both root blocks.
-     
-     - Done. reading both root blocks.
-
-     - Done. reading a fully buffered store into memory.
-
-  - IndexSegmentStore
-
-     - Done. fully buffering the node region.
-
-     - Done. read(long)
-
-     - Done. readBloomFilter()
-
-     - Done. readMetadata()
-
-  - Done. BasicBufferStrategy#transferTo(RAF) - should be per
-    AbstractBufferStrategy#transferTo(...)
-
-  - IndexSegment
-
-    - Done. The addrLeaves and addrNodes can not be expressed as a
-      single long since they are regions spanning many records and a
-      long would limit their byteCount to whatever was allowed by the
-      offsetBits.
-
-    - Done. The logic to buffer the nodes was actually examining the
-      extent of the leaves.
-
-    - Done. Added checksum to the index segment store checkpoint
-      record.
-
-    - Done (the problem was failing to flush the write cache to the
-      disk before initiating the channel to channel transfer - since
-      the data were not on the channel they naturally were not being
-      transferred.)  Stress test of U100 and very large runs of
-      TestIndexSegmentBuilderWithLargeTrees (m=32, nentries=m**4)
-      cause corrupt leaves in an index segment build.
-
-    - Done. Modify IndexSegmentBuilder to support fast reverse scan,
-      at least in the data and in DumpIndexStore.
-     
-    - Done. IndexSegmentBuilder should be refactored to implement
-      Runnable/Callable.  The ctor can do the setup and the index
-      build will run in run()/call().  The return can be a status code
-      for the operation or statistics on the operation.  Throw an
-      exception for an error.
-
-    - Done. Modify IndexSegmentBuilder to support fast forward scan,
-      at least in the data and in DumpIndexStore.
-
-    - **** Modify IndexSegment to use fast forward and fast reverse
-           scans.  I need to override or replace the iterator to do
-           this.  It should use a priorLeaf/nextLeaf method in order
-           for this to be easy to do.
-  
-	   Ah. There is a protected [AbstractBTree#leafIterator()]
-	   method, but it is not being used.  Perhaps this could be
-	   modified to accept a fromKey and toKey and then used to
-	   allow replacement of the striterator-based
-	   postOrderNodeIterator().
-
-	   Modify the iterator to support prior/next and modification
-	   with concurrent traversal.  This really should not be any
-	   more complicated than the case for the GOM link set
-	   iterator.
-
-    - **** I have seen the index segment store closed during iterator
-           traversal.  I've modified the class slightly to re-open the
-           store transparently and we will see how that goes.
-	   
-	   *** The observed problem was during iterator traversal.  I
-	   suspect that iterator traversal should not allow the index
-	   to be closed since it requires valid hard references to the
-	   stack of nodes being traversed.  Figure out who is closing
-	   the index.  We may have to ignore the close if there is an
-	   open iterator.
-
-	   If the iterator is modified to use prior/next leaf methods
-	   for traversal and those methods are robust, then they can
-	   simply reopen() the index if it has been asynchronously
-	   closed.  The version for the index segment will not need
-	   the node stack.  A version that does not rely on a node
-	   stack could also be written for the BTree using lookup() to
-	   re-discover the current leaf and tuple.
-
-	   * Consider modifying the leaf iterator to require calling
-             next() for the first leaf.  Consider changing next() to
-             nextLeafInScanOrder().
-
-    - An index segment build that could operate without the actual #of
-      entries would avoid one pass over the data.  See how expensive
-      that traversal is (it is done in one location) and decide
-      whether it is worth trying to operate without that information
-      on hand.  Eg, by using the upper bound on the entry count and
-      then allowing leaves and nodes to underflow.
-
-    * Support transparent byte[] <=> value (de-)serialization using a
-      serializer object associated with the index metadata.  
-
-    * Add Map and Set impls. based on the BTree.
-
-    - Done (IUpdateStore). I need to create an interface extending
-      IRawStore, put those methods on that interface, and then declare
-      that interface on TemporaryRawStore in order to be able to
-      access these methods.
-
-  - DiskOnlyStrategy
-
-    - Done. write tests of transferTo.  I did find a bug in
-      writeAll(), but that was not the problem (it was writing each
-      pass at the same offset in the file when a write required
-      multiple IOs).
-
-    - Done. Refactor to create a Journal using a Temporary BufferMode.
-
-    - Done. Refactor DiskOnlyStrategy to permit lazy creation of the
-      backing file.
-
-    - Done. Refactor of TemporaryRawStore to use DiskOnlyStrategy with
-      lazy creation of the backing file.
-
-    - Done. Found a bug in DiskOnlyStrategy where it was always
-      reading a record three times....  Probably there was little
-      performance impact since the read would have come from the OS
-      cache after the first time, but still....
-
-    - Evaluate effect of the write cache capacity.  If 1M is as good
-      as 10M then just use the DirectBufferPool for the write cache
-      for the live journal, which will simplify some things.
-
-      Add counters reporting the #of bytes written/commit.
-
-    * Test suite for Temporary mode journals.
-
-  - DirectBufferPool
-
-    - Done. Static config via System#getProperties() for the direct buffer pool
-
-    - Done. Counters for reporting out the pool state.
-
 - Presentations
 
   - Provenance
@@ -2068,28 +2111,441 @@ JF-U100-host23-2DS:
 
 ============================================================
 
-file : test_buildOrder10.seg checkpoint : magic=87ab34f5,
-segmentUUID=6794d657-68ec-4df1-8c79-06bde3959c4b, offsetBits=38,
-height=0, nleaves=1, nnodes=0, nentries=10, maxNodeOrLeafLength=655,
-leavesRegion={extent=655, offset=420}, nodesRegion={extent=0,
-offset=0}, blobsRegion={extent=0, offset=0},
-addrRoot={nbytes=655,offset=420,region=BASE},
-addrFirstLeaf={nbytes=655,offset=420,region=BASE},
-addrLastLeaf={nbytes=655,offset=420,region=BASE}, length=1626,
-addrMetadata={nbytes=551,offset=1075,region=BASE}, addrBloom=NULL,
-checksum=-1396895030, commitTime=Tue May 20 12:08:24 EDT 2008
 
-metadata : addrMetadata=0, name=N/A,
-indexUUID=b8a4caaf-6e3f-441c-a136-773a8993ff27, branchingFactor=10,
-indexSegmentBranchingFactor=512, pmd=null,
-class=com.bigdata.btree.IndexSegment,
-checkpointClass=com.bigdata.btree.Checkpoint,
-childAddrSerializer=com.bigdata.btree.AddressSerializer,
-nodeKeySerializer=com.bigdata.btree.IDataSerializer$SimplePrefixSerializer,
-leafKeySerializer=com.bigdata.btree.IDataSerializer$SimplePrefixSerializer,
-valueSerializer=com.bigdata.btree.IDataSerializer$DefaultDataSerializer,
-conflictResolver=N/A, deleteMarkers=false, versionTimestamps=false,
-isolatable=false, errorRate=0.0, overflowHandler=N/A,
-splitHandler=com.bigdata.resources.DefaultSplitHandler
+- MetadataService
 
-bloomFilter : N/A
+    - Caching.
+
+       - Collect statistics and monitor the MDS as we split the
+         indices.
+
+       - Consider caching to reduce RMI for splitting operations
+         across index partitions.
+
+- Scale-out scripts
+
+    - Script to collect nohups, config files, and counters in a
+      directory and tarball for post-mortem.
+
+- Service and host statistics:
+      
+   - **** There are no majorFaultsPerSec or percentFreeDiskSpace
+          numbers on a per-host basis so only defaults are being used
+          for those values when computing the host score.  I need to
+          write a new SAR collector to get those data.
+
+    ** The per-host physical disk counters for linux are not being
+       collected, including the major page faults per second for the
+       _host_.  This is one of the primary clues so we need that.
+
+       Write the Sar, iostat, or vmstat utility to collect these data.
+       This is a bit more complex under Linux since the data are
+       reported by device and the relationship of the devices to the
+       file system should be explicated.
+
+       Use [df] to report the % free space remaining?  There should be
+       one value for the logical disk (perhaps), and there should be a
+       report of the % free space remaining on the volume on which the
+       dataDir is located and the volume on which the tmpDir is
+       located.
+
+       Note: The StoreManager also reports the free space on the
+       volume for both the data dir and the temp dir.
+
+   *** IP Addr shows up for host2 but not host1 or host3.
+
+       192.168.20.27 is showing up as a host for DataServer3 but no
+       host statistics are being reported for that IP addr (they are
+       reported for the hostname instead) with the result that the IP
+       addr is getting the default values for the metrics used to
+       compute the host scores.
+
+       There is still the problem with how that IP addr is getting
+       reported and with whether or not any services are understood to
+       be running on that host (they are not).
+       
+       *** A host without services running on it effects the ranking
+           of the hosts and the host with the highest score. Does it
+           also effect any recommendations made by the LBS?
+
+   - Done. Modified host score to interpret high IO Wait as high
+     utilization.
+
+   - Done (mostly). The counter names need to be symbolic to avoid
+     edits causing counters to not be found during analysis.
+
+- Overflow processing
+
+   *** If overflow processing is taken so long then there is a
+       problem.  Perhaps there needs to be an alternative that lies
+       between an index partition "copy" and a full compacting build,
+       e.g., an incremental build that lets us discard the old
+       journal.  It would generate an index segment having just the
+       last committed state for the BTree absorbing writes for that
+       index partition on the old journal.  The view of the index
+       partition on the new journal would be updated when the task was
+       complete.  A full build would have the effect of combining the
+       history from several such incremental builds.
+
+       Likewise, we may need to trade off how many splits we perform
+       choosing to do incremental builds instead to keep down the
+       total processing time/costs for asynchronous overflow
+       processing.
+
+       Can an analysis of the queue concurrency with locks held help
+       decide whether some index partition should be moved to another
+       data service?
+
+   - Done. Asynch overflow needs to report the index and task for each
+     failure as part of the exception.
+
+   - Done. Metadata service needs to report the scale-out index name
+     (or the index partition name) for "No such locator" errors.
+
+   - Done. Add the createTime to the live journal counters.
+
+   - Done. Move the LBS counters from /var/log/bigdata to
+     /var/bigdata.  Update scripts in CVS and on the server and the
+     script documentation.
+
+   * It would be useful to have AND as well as OR semantics for
+     "filter=".
+
+   * Change the TITLE for the httpd counter view to the hostname and
+     the last component of the path, e.g.:
+
+	  hostname  ... serviceIFace ... lastComponent
+
+     Or use the last 60 characters of the path, etc.  The point is to
+     have titles that are somewhat easier to figure out.
+
+   * It could be useful to have a view by serviceIface rather than
+     host.  This could be assembled dynamically by a scan of the
+     services across the hosts.
+
+   - The IndexManager view of the LBS needs to aggregate some key
+     statistics by index across the index partitions including the #of
+     index entries on the data service and the time spent on the index
+     (perhaps broken down by IO, serialization, key search, etc., but
+     definately the aggregate time).  I am just not getting enough
+     information from this view and digging down makes it too
+     difficult to get the gestalt state of the indices without copying
+     a correlated view of the counters into Excel.
+
+   - Done. Review the per-service scores, but I really need to have
+     more than one service on a host for this.  It should probably be
+     using a response time measure, e.g., averageQueuingTime.
+
+   - Done (problem was timestamp parsing since only the time of day
+     was being reported, not the UTC time - it now uses the system
+     clock). Now I am not seeing any host CPU scores aggregated by the
+     load balancer.
+
+   - Done. The normalized [score] is not being computed for hosts or
+     services (it is always zero).
+
+============================================================
+
+Index allocation:
+
+      The initial index allocation appears to assign much more of the
+      effort to host3.  Either try random assignment or reconsider the
+      2-host assignment behavior.
+
+log files:
+
+    The log files do not interleave the logs by timestamp.  Clearly
+    there is no way to do this exactly in a distributed system.
+    However it might be done better if it all went through syslog.
+    Rather than an elapsed ms (or in addition) I need the UTC time in
+    a field that I can readily identify.  With that I could even merge
+    sort the logs together.
+
+DataServer3:
+
+The problem here is that there is no entry under the leftSeparatorKey
+for the partition in the MDS.  I am not clear why.  I have added a
+test for this condition and an exception which will provide more
+information.
+
+Caused by: java.lang.NullPointerException
+	at com.bigdata.mdi.PartitionLocator.equals(PartitionLocator.java:231)
+	at com.bigdata.service.MetadataService$MoveIndexPartitionTask.doTask(MetadataService.java:803)
+
+What led up to this was:
+
+testSPO#0	 = willBuild(name=testSPO#0)
+testterm2id#0	 = willSplit(name=testterm2id#0)
+
+and
+
+testSPO#0	 = willMove(name=testSPO#0,target=ba2214f9-b220-43f5-9f50-8f1095ce3ec6)
+testterm2id#1	 = willBuild(name=testterm2id#1)
+testterm2id#2	 = willBuild(name=testterm2id#2)
+
+and the exception was for the move.
+
+--------------------
+
+DataServer4:
+
+Caused by: java.lang.RuntimeException: Expected
+
+oldLocator={ partitionId=1, dataServices=[ba2214f9-b220-43f5-9f50-8f1095ce3ec6], leftSeparator=[], rightSeparator=null}, but
+    actual={ partitionId=0, dataServices=[2eed9964-6c1c-40ee-8b3f-ceb5b30278d5], leftSeparator=[], rightSeparator=null}
+	at com.bigdata.service.MetadataService$SplitIndexPartitionTask.doTask(MetadataService.java:519)
+
+This is what was happening at the time.
+
+__global_namespace_index#0	 = wasCopied(name=__global_namespace_index#0)
+testOSP#1	 = willBuild(name=testOSP#1)
+testOSP#2	 = willBuild(name=testOSP#2)
+testPOS#1	 = willBuild(name=testPOS#1)
+testPOS#2	 = willBuild(name=testPOS#2)
+testSPO#1	 = willSplit(name=testSPO#1)
+testid2term#0	 = willBuild(name=testid2term#0)
+testjust#0	 = wasCopied(name=testjust#0)
+testsearch#0	 = willBuild(name=testsearch#0)
+
+So this looks like a cascade of the move problem.  So we need some
+compensating action for the failed move since it seems to have been at
+least partly effective even through there was an exception thrown.
+
+--------------------
+
+This was in the client's stack trace.  i've added the index name to
+the stack trace, but again it looks linked to the problem with the SPO
+MOVE failure.
+
+Caused by: java.lang.NullPointerException
+	at com.bigdata.service.ClientIndexView.splitKeys(ClientIndexView.java:1751)
+	at com.bigdata.service.ClientIndexView.submit(ClientIndexView.java:877)
+	at com.bigdata.rdf.store.SPOIndexWriter.call(SPOIndexWriter.java:280)
+	at com.bigdata.rdf.store.SPOIndexWriter.call(SPOIndexWriter.java:73)
+	... 5 more
+
+
+
+============================================================
+
+Integrate new rule execution layer while maintaining the old inference
+engine for comparison tests (if possible).
+
+   FIXME performance and correctness testing w/ and w/o full text
+   index and sids!!!  The text indexer seems slow, but performance
+   seems fine w/o it.  Make it a hard reference, etc.
+
+   FIXME I am seeing errors when sids are disabled (or enabled ?!?)
+   for ../rdf-data/Thesaurus.owl on the LocalTripleStore.  When they
+   are disabled I think the problem is bnode handling.  When they are
+   enabled, I think that the problem is having more bnodes than fit in
+   a buffer.  An incremental write during the processing of deferred
+   statements causes the following stack trace:
+
+java.lang.AssertionError: Not fully bound? : < 5177285B, 92U, NULL : Explicit >
+	at com.bigdata.rdf.rio.StatementBuffer.addStatements(StatementBuffer.java:735)
+	at com.bigdata.rdf.rio.StatementBuffer.incrementalWrite(StatementBuffer.java:641)
+	at com.bigdata.rdf.rio.StatementBuffer.add(StatementBuffer.java:689)
+	at com.bigdata.rdf.rio.StatementBuffer.processDeferredStatements(StatementBuffer.java:430)
+	at com.bigdata.rdf.rio.StatementBuffer.flush(StatementBuffer.java:337)
+	at com.bigdata.rdf.rio.PresortRioLoader.success(PresortRioLoader.java:113)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf2(BasicRioLoader.java:210)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:141)
+	at com.bigdata.rdf.store.DataLoader.loadData3(DataLoader.java:809)
+	at com.bigdata.rdf.store.DataLoader.loadData2(DataLoader.java:732)
+	at com.bigdata.rdf.store.DataLoader.loadData(DataLoader.java:553)
+	at com.bigdata.rdf.store.DataLoader.loadData(DataLoader.java:512)
+	at com.bigdata.rdf.store.TestTripleStoreLoadRateLocal.test_U1(TestTripleStoreLoadRateLocal.java:129)
+
+
+   - Rip out all of the IResourceIdentifier nonsense and replace it
+     with the simple String namespace. 
+
+     Simplify finding "contained" resource with a logical row scan
+     from the namespace to fix-length bit string successor of the
+     namespace - that will cover all spanned resources.  Of course,
+     that scan could bridge an index partition, but that should be Ok
+     since we use a global lock anyway for create/destroy.
+
+   *** Must defeat cache for READ-COMMITTED resource locator views.
+
+	  Note: Currently not allowed into the cache.          
+
+	  !!! TestDefaultResourceLocator !!!
+
+	  Note: the global row store unisolated writes are not
+          auto-committed when using a Journal, just when using a
+          federation.  This means that the read-committed resource
+          views are not available until an explicit commit for a
+          Journal.
+
+   *** Could have ReadCommitted BTree variant that was notified of (or
+       simply noticed) commits and re-loaded itself from the new
+       checkpoint.  This could be done in getRoot() and in a few
+       additional methods that return fields (index metadata,
+       entryCount, etc).
+
+       Could also lookup the last commit time (or the last closure
+       time) and use that timestamp rather than specifying
+       READ_COMMITTED.
+
+   *** Modify the SPOAccessPath, which MUST delegate removeAll() to
+       the IDatabase.
+
+       Write tests for locating all database variants.
+
+       Delete the "Isolation" local triple store tests?  There is no
+       way to turn on isolation right now.
+
+   - Monitor the [executorService] queue.
+
+   - verify basic triple store semantics.
+     
+	- The access paths must respect the timestamp of the index
+          views.  In particular, an UNISOLATED relation view MUST use
+          UNISOLATED reads - if it uses READ_COMMITTED reads then it
+          will not see its own writes!
+	  
+	  The situation is different for the rule execution layer
+	  since (a) the read and write timestamps are explicitly
+	  specified to the IJoinNexus; and (b) we often choose a
+	  consistent historical read and unisolated writes in order to
+	  have better concurrency during rule execution.
+
+	  *** However, this means that you MUST do a commit before
+              performing closure!!!  That logic probably needs to be
+              encapsulated on the database, which perhaps should offer
+              a "closure" method.  The method will do the commit.
+
+	      It could also obtain an exclusive write lock on the
+              database, thus raising our lock criteria to exclusive,
+              exclusiveWrite, and share.  These lock levels could
+              probably be refined or simplified: the concerns are (a)
+              the ability to create or drop a database or relation;
+              (b) the ability to perform an exlusive operation on the
+              unisolated indices, such as closure; and (c) locks that
+              conflict with exclusive locks so that the database or
+              relation is not dropped during (b) or (b).
+
+          *** Equally, after running a program someone needs to do a
+              commit before the results will be visible to Query
+              (which uses a read-committed view).
+	 
+     LocalTripleStore
+     
+     TempTripleStore
+
+     ScaleOutTripleStore {LDS, EDS, JDS}
+
+         Note: You CAN place indices onto specific data services
+         running on a set of machines and set [enableOverflow :=
+         false] such that the indices never become partitioned. In
+         that case you can have optimized joins for some relations on
+         one data service and for other relations on another data
+         service. E.g., locating the statement indices for the triple
+         store on one data service, the lexicon on another, and a repo
+         on a third. This will give very good performance for Query
+         and Truth Maintenance since the JOINs will be mostly
+         executing against live index objects.
+
+        - Verify serialziation of the JoinNexusFactory, setup of the
+          JoinNexus on the data service, and distributed execution.
+
+	- Export a proxy for IChunkedOrderedIterator when using an
+          async process, but if LT 1000 results then fully buffer
+          instead of creating a proxy (have to wait to figure that
+          out).
+
+	- Unroll loops for faster distributed joins.
+
+       - Scale-out version of distinct term scan (rdf01, rdfs4a,
+         rdfs4b), the closure over the various property sets
+         (fastClosure 3, 5, 6, 7 and 9), and the MatchRule (completion
+         scan against the full text index with join to the
+         SPORelation).  This MAY require driving through the CURSOR
+         and ITupleFilter changes.
+
+       - Modify the JOIN to be more efficient for the scale-out case
+         and compare the performance for LTS, LDS, and JDS.  The main
+         change is to unroll the inner loop for each chunk of the
+         outer loop and parallelize the inner loop queries.  Be
+         careful with the parallelization as the thread pools are
+         typically uncapped and a large #of elements are in each
+         chunk.  However, the maximum parallelization will be the #of
+         index partitions and the ClientIndexView should provide that
+         parallelization automatically if I unroll the loop.
+     
+   - verify closure and truth maintenance.
+
+      - *** database at once closure is the place to start.  do this
+            for each of the database variants.  the point to look for
+            problems is reading from the last committed view and, of
+            course, getting the right answers!
+
+	    Then try TM.
+
+      - Modify TM to remove constraints on scaling imposed by the use
+        of fully buffered iterators to avoid concurrency problems.
+
+      - For the TempTripleStore, the data will wind up on disk in any
+        case since we have to checkpoint the temporary store in order
+        to have the read-committed view available.
+
+	Maybe we should read on the UNISOLATED view for the temp
+        store, which is safe for concurrent readers as long as there
+        is no writer.  This is with regard to the use as a place into
+        which we load the file whose closure will be computed against
+        the database (the focusStore).  Once we have loaded the
+        focusStore, the rules just read on it when they compute the
+        closure.
+
+	There is another place where the temp store shows up - TM for
+	statement removal.  Check that out also.
+
+      - BlockingBuffer - tune for effective chunk sizes.  The buffer
+        sizes can be easily configured by the IJoinNexusFactory, as
+        can parameters for timeouts, etc. for the blocking buffer's
+        iterator.
+
+      - verify fix point programs.
+
+      - verify write of justifications (must use a different buffer
+        impl to write the solution bindings).
+
+      - verify concurrency
+
+      - verify update of the read-behind point so that rules in each
+        CLOSURE ROUND read from the commit point corresponding to the
+        end of the prior round (so there must be a commit for the
+        LocalTripleStore at the end of each round!)
+
+      - verify read-committed view of kb is of the last closure
+        checkpoint, not the last commit.
+
+	Extend the federation to allow communication of the commit
+        timestamp corresponding to the last closure of the kb.
+
+      - Run some performance tests, specifically of the
+        LocalTripleStore against the LDS for closure rates.
+
+Translate Sesame2 queries to Rules dynamically so that they can
+execute on the native rule engine.
+
+   - verify that query is against the last committed state of the kb.
+
+   - simple conjunctive query.
+
+   - optionals
+
+   - resolution of terms to term ids and visa versa using JOINs?
+
+   - filters for various kinds of things, especially those that can be
+     computed directly from the bit markings on the term identifiers.
+
+   - filters that require JOINs to the lexicon and ordered scans by
+     datatype literals.
+
+- Snapshot release:
+
+   - Move the ant build to the bigdata module and also the startup kit
+     and its documentation.

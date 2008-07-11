@@ -38,8 +38,8 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 
 /**
  * Wraps the raw iterator that traverses a statement index and exposes each
@@ -76,7 +76,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
     /**
      * The source iterator.
      */
-    private final ISPOIterator src;
+    private final IChunkedOrderedIterator<SPO> src;
     
     /**
      * The index of the last entry returned in the current {@link #chunk} and
@@ -108,7 +108,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 //    *            traversal.
     public BigdataStatementIteratorImpl(AbstractTripleStore db,
 //            Map<Long,BigdataBNode> bnodes, 
-            ISPOIterator src) {
+            IChunkedOrderedIterator<SPO> src) {
 
         if (db == null)
             throw new IllegalArgumentException();
@@ -182,7 +182,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
             log.info("Resolving "+ids.size()+" term identifiers");
             
             // batch resolve term identifiers to terms.
-            terms = db.getTerms(ids);
+            terms = db.getLexiconRelation().getTerms(ids);
 
             // reset the index.
             lastIndex = 0;

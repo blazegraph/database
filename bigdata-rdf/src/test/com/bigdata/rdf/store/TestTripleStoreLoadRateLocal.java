@@ -67,6 +67,10 @@ public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
         properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None
                 .toString());
 
+        properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
+
+        properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
+        
         return properties;
 
     }
@@ -102,4 +106,44 @@ public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
 
     }
 
+    /**
+     * FIXME This refuses to load the files found in a directory.  it is currently
+     * loading a thesaurus instead.
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_U1() throws InterruptedException, IOException {
+        
+//        String file = "../rdf-data/lehigh/U1";
+      String file = "../rdf-data/lehigh/U10/University0_0.owl";
+//        String file = "../rdf-data/wordnet_nouns-20010201.rdf";
+//      String file = "../rdf-data/Thesaurus.owl";
+      
+      // FIXME correct baseURL for leigh?
+//      String baseURL = "http://www.bigdata.com";
+      String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
+//      String baseURL = "";
+      
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            // load the data set.
+//            store.getDataLoader().loadData("../rdf-data/lehigh/U1", "",
+//                    RDFFormat.RDFXML);
+             store.getDataLoader().loadData(file, baseURL, RDFFormat.RDFXML);
+
+            // compute the database at once closure.
+//            store.getInferenceEngine().computeClosure(null/* focusStore */);
+
+            store.commit();
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+        
+    }
+    
 }

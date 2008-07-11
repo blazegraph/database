@@ -28,11 +28,14 @@ package com.bigdata.rdf.inf;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+
 import org.apache.log4j.Logger;
-import com.bigdata.rdf.spo.ISPOIterator;
+
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
  * Provides backward chaining for property collection and reverse property
@@ -50,7 +53,16 @@ import com.bigdata.rdf.util.KeyOrder;
  * @version $Id: BackchainOwlSameAsPropertiesIterator.java,v 1.2 2008/03/20
  *          04:05:51 mrpersonick Exp $
  */
-public class BackchainOwlSameAsPropertiesIterator implements ISPOIterator {
+public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIterator<SPO> {
+    
+    protected final static transient long NULL = IRawTripleStore.NULL;
+    
+    /**
+     * Enables record of stack traces for callers and verification that the
+     * iterator is closed.
+     */
+    private static final boolean RECORD_STACK_TRACES = true;
+    
     private static final Logger log =
             Logger.getLogger(BackchainOwlSameAsPropertiesIterator.class);
 
@@ -60,14 +72,20 @@ public class BackchainOwlSameAsPropertiesIterator implements ISPOIterator {
 
     @Override
     protected void finalize() throws Throwable {
+        
         super.finalize();
+        
         if (!closed) {
+            
             log
-                    .error("DANGER! Someone needs to close this iterator correctly.\n"+stack);
+                    .error("DANGER! Someone needs to close this iterator correctly.\n"
+                            + (stack != null ? stack : ""));
+            
         }
+        
     }
 
-    private ISPOIterator delegate;
+    private IChunkedOrderedIterator<SPO> delegate;
 
     /**
      * Create an iterator that will visit all statements in the source iterator
@@ -76,8 +94,8 @@ public class BackchainOwlSameAsPropertiesIterator implements ISPOIterator {
      * 
      * @param src
      *            The source iterator. {@link #nextChunk()} will sort statements
-     *            into the {@link KeyOrder} reported by this iterator (as long
-     *            as the {@link KeyOrder} is non-<code>null</code>).
+     *            into the {@link IKeyOrder} reported by this iterator (as long
+     *            as the {@link IKeyOrder} is non-<code>null</code>).
      * @param s
      *            The subject of the triple pattern.
      * @param p
@@ -91,57 +109,90 @@ public class BackchainOwlSameAsPropertiesIterator implements ISPOIterator {
      *            The term identifier that corresponds to owl:sameAs for the
      *            database.
      */
-    public BackchainOwlSameAsPropertiesIterator(ISPOIterator src, long s,
-            long p, long o, AbstractTripleStore db, final long sameAs) {
+    public BackchainOwlSameAsPropertiesIterator(
+            IChunkedOrderedIterator<SPO> src, long s, long p, long o,
+            AbstractTripleStore db, final long sameAs) {
+
         if (s != NULL && o != NULL) {
+            
             this.delegate =
                     new BackchainOwlSameAsPropertiesSPOIterator(
                             src, s, p, o, db, sameAs);
+            
         } else if (s != NULL && o == NULL) {
+            
             this.delegate =
                     new BackchainOwlSameAsPropertiesSPIterator(
                             src, s, p, db, sameAs);
+            
         } else if (s == NULL && o != NULL) {
+            
             this.delegate =
                     new BackchainOwlSameAsPropertiesPOIterator(
                             src, p, o, db, sameAs);
+            
         } else if (s == NULL && o == NULL) {
+            
             this.delegate =
                     new BackchainOwlSameAsPropertiesPIterator(
                             src, p, db, sameAs);
+            
+        } else throw new AssertionError();
+        
+        if (RECORD_STACK_TRACES) {
+         
+            StringWriter sw = new StringWriter();
+            
+            new Exception("Stack trace").printStackTrace(new PrintWriter(sw));
+            
+            stack = sw.toString();
+            
         }
         
-        StringWriter sw = new StringWriter();
-        new Exception("Stack trace").printStackTrace(new PrintWriter(sw));
-        stack = sw.toString();
     }
 
-    public KeyOrder getKeyOrder() {
+    public IKeyOrder<SPO> getKeyOrder() {
+        
         return delegate.getKeyOrder();
+        
     }
 
     public boolean hasNext() {
+        
         return delegate.hasNext();
+        
     }
 
     public SPO next() {
+        
         return delegate.next();
+        
     }
 
     public SPO[] nextChunk() {
+        
         return delegate.nextChunk();
+        
     }
 
-    public SPO[] nextChunk(KeyOrder keyOrder) {
+    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+        
         return delegate.nextChunk(keyOrder);
+        
     }
 
     public void close() {
+
         delegate.close();
+        
         closed = true;
+        
     }
 
     public void remove() {
+        
         delegate.remove();
+        
     }
+
 }

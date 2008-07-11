@@ -253,15 +253,15 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             assertEquals(0,p3.count);
             assertEquals(0,o3.count);
     
-            /*
-             * generate the term sort keys.
-             */
-            buffer.generateTermSortKeys(store.getKeyBuilder());
-            
-            /*
-             * sort terms by the assigned sort keys.
-             */
-            buffer.sortTermsBySortKeys();
+//            /*
+//             * generate the term sort keys.
+//             */
+//            buffer.generateTermSortKeys(store.getKeyBuilder());
+//            
+//            /*
+//             * sort terms by the assigned sort keys.
+//             */
+//            buffer.sortTermsBySortKeys();
     
 //            /* verify iterator before filtering.
 //             * 

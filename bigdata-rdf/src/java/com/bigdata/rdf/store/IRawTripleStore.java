@@ -31,12 +31,18 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.lexicon.ITermIdCodes;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.spo.ISPOFilter;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
  * Low-level API directly using long term identifiers rather than an RDF Value
@@ -64,27 +70,37 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     public static final int N = 3;
 
     /**
-     * The name of the index mapping terms to term identifiers.
+     * Constant appended to the database namespace to obtain the
+     * {@link SPORelation}'s namespace.
      */
-    static final public String name_term2Id = "term2id";
+    String NAME_SPO_RELATION = ".spo.";
+    
+    /**
+     * Constant appended to the database namespace to obtain the
+     * {@link LexiconRelation}'s namespace.
+     */
+    String NAME_LEXICON_RELATION = ".lexicon.";
+    
+    /**
+     * The name of the index mapping terms to term identifiers.
+     * 
+     * @todo deprecate by {@link LexiconKeyOrder}
+     */
+    static final public String name_term2Id = LexiconKeyOrder.TERM2ID.toString();
     
     /**
      * The name of the index mapping term identifiers to terms.
      */
-    static final public String name_id2Term = "id2term";
+    static final public String name_id2Term = LexiconKeyOrder.ID2TERM.toString();
 
-    /**
-     * The name of the index providing full text lookup for terms.
-     */
-    static final public String name_freeText = "text";
-    
     /*
      * The names of the various statement indices. 
      */
     
-    static final public String name_spo = KeyOrder.SPO.toString();
-    static final public String name_pos = KeyOrder.POS.toString();
-    static final public String name_osp = KeyOrder.OSP.toString();
+    /**@todo deprecate by {@link SPOKeyOrder}*/
+    static final public String name_spo = SPOKeyOrder.SPO.toString();
+    static final public String name_pos = SPOKeyOrder.POS.toString();
+    static final public String name_osp = SPOKeyOrder.OSP.toString();
     
     /**
      * The name of the optional index in which {@link Justification}s are
@@ -92,27 +108,29 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      */
     static final public String name_just = "just";
 
+    /** @todo deprecate these methods in favor of {@link LexiconRelation}? */
     abstract public IIndex getTerm2IdIndex();
-
     abstract public IIndex getId2TermIndex();
 
+    /** @todo deprecate these methods in favor of {@link SPORelation}? */
     abstract public IIndex getSPOIndex();
-
     abstract public IIndex getPOSIndex();
-
     abstract public IIndex getOSPIndex();
     
+    /**
+     * The optional index on which {@link Justification}s are stored.
+     */
     abstract public IIndex getJustificationIndex();
 
     /**
-     * Return the statement index identified by the {@link KeyOrder}.
+     * Return the statement index identified by the {@link IKeyOrder}.
      * 
      * @param keyOrder
      *            The key order.
      * 
      * @return The statement index for that access path.
      */
-    abstract public IIndex getStatementIndex(KeyOrder keyOrder);
+    abstract public IIndex getStatementIndex(IKeyOrder<SPO> keyOrder);
 
     /**
      * Add a term into the term:id index and the id:term index, returning the
@@ -177,15 +195,19 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * @param o
      *            The term identifier for the object -or-
      *            {@link IRawTripleStore#NULL}.
+     * 
+     * @deprecated by {@link SPORelation#getAccessPath(long, long, long)}
      */
-    public IAccessPath getAccessPath(long s, long p, long o);
+    public IAccessPath<SPO> getAccessPath(long s, long p, long o);
 
     /**
-     * Return the {@link IAccessPath} for the specified {@link KeyOrder} and
+     * Return the {@link IAccessPath} for the specified {@link IKeyOrder} and
      * a fully unbound triple pattern.  This is generally used only when you
      * want to perform a {@link IAccessPath#distinctTermScan()}.
+     * 
+     * @deprecated by {@link SPORelation#getAccessPath(SPOKeyOrder, com.bigdata.relation.rule.IPredicate)}
      */
-    public IAccessPath getAccessPath(KeyOrder keyOrder);
+    public IAccessPath<SPO> getAccessPath(IKeyOrder<SPO> keyOrder);
     
     /**
      * Return the statement from the database (fully bound s:p:o only).
@@ -213,7 +235,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * truth maintenance).
      * 
      * @param stmts
-     *            The statements (sorted into {@link KeyOrder#SPO} order as a
+     *            The statements (sorted into {@link IKeyOrder#SPO} order as a
      *            side-effect).
      * 
      * @param numStmts
@@ -225,7 +247,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *         count as well as any statement that was not pre-existing in the
      *         database).
      */
-    public int addStatements(SPO[] stmts, int numStmts );
+    public long addStatements(SPO[] stmts, int numStmts );
     
     /**
      * Writes the statements onto the statement indices (batch, parallel, NO
@@ -247,7 +269,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *         count as well as any statement that was not pre-existing in the
      *         database).
      */
-    public int addStatements(SPO[] stmts, int numStmts, ISPOFilter filter );
+    public long addStatements(SPO[] stmts, int numStmts, IElementFilter<SPO> filter );
     
     /**
      * Writes the statements onto the statement indices (batch, parallel, NO
@@ -265,8 +287,10 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *         an explicit statement by this method will be reported in this
      *         count as well as any statement that was not pre-existing in the
      *         database).
+     *         
+     * @deprecated by {@link SPORelation#insert(IChunkedOrderedIterator)}
      */
-    public int addStatements(ISPOIterator itr, ISPOFilter filter);
+    public long addStatements(IChunkedOrderedIterator<SPO> itr, IElementFilter<SPO> filter);
 
     /**
      * Removes the statements from the statement indices (batch, parallel, NO
@@ -281,7 +305,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return The #of statements that were removed from the indices.
      */
-    public int removeStatements(SPO[] stmts, int numStmts);
+    public long removeStatements(SPO[] stmts, int numStmts);
 
     /**
      * Removes the statements from the statement indices (batch, parallel, NO
@@ -296,7 +320,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return The #of statements that were removed from the indices.
      */
-    public int removeStatements(ISPOIterator itr);
+    public long removeStatements(IChunkedOrderedIterator<SPO> itr);
     
     /**
      * Filter the supplied set of SPO objects for whether they are "present" or
@@ -313,7 +337,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return an iteration over the filtered set of statements
      */
-    public ISPOIterator bulkFilterStatements(SPO[] stmts, int numStmts,
+    public IChunkedOrderedIterator<SPO> bulkFilterStatements(SPO[] stmts, int numStmts,
             boolean present);
     
     /**
@@ -329,7 +353,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return an iteration over the filtered set of statements
      */
-    public ISPOIterator bulkFilterStatements(ISPOIterator itr, boolean present);
+    public IChunkedOrderedIterator<SPO> bulkFilterStatements(IChunkedOrderedIterator<SPO> itr, boolean present);
     
     /**
      * Externalizes a statement using an appreviated syntax.

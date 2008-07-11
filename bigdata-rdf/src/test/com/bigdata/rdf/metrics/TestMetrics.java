@@ -1131,7 +1131,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
             statementsAdded = statementCount1 - statementCount0;
 //            inferencesAdded = inferenceCount1 - inferenceCount0;
-            inferencesAdded = loadStats.closureStats.nentailments;
+            inferencesAdded = loadStats.closureStats.mutationCount;
 //            int explicitAdded   = statementsAdded - inferencesAdded;
             proofsAdded     = proofCount1 - proofCount0;
             urisAdded       = uriCount1 - uriCount0;

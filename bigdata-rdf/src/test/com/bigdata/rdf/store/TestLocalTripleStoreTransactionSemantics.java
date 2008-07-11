@@ -1,8 +1,9 @@
 package com.bigdata.rdf.store;
 
+import junit.framework.AssertionFailedError;
+
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.LocalTripleStore.ReadCommittedTripleStore;
 
 /**
  * Test suite for the transaction semantics of the {@link LocalTripleStore}.
@@ -33,7 +34,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
         try {
 
             // read-committed view of the same database.
-            ReadCommittedTripleStore view = store.asReadCommittedView();
+            final AbstractTripleStore view = store.asReadCommittedView();
 
             final long s = 1, p = 2, o = 3;
 
@@ -45,15 +46,27 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
                         },//
                         1);
 
+                final boolean stmtInStore = store.hasStatement(s, p, o);
+
+                log.info("stmtInStore: "+stmtInStore);
+                
+                final boolean stmtInView = view.hasStatement(s, p, o);
+
+                log.info("stmtInView: "+stmtInView);
+
                 // visible in the repo.
-                assertTrue(store.hasStatement(s, p, o));
+                assertTrue( stmtInStore );
 
                 // not visible in the view.
-                assertFalse(view.hasStatement(s, p, o));
+                assertFalse( stmtInView );
 
                 // commit the transaction.
                 store.commit();
 
+            } catch (AssertionFailedError t) {
+                
+                throw t;
+                
             } catch (Throwable t) {
 
                 log.error(t);

@@ -55,15 +55,16 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
+import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
-import com.bigdata.rdf.spo.ISPOFilter;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * The {@link TruthMaintenance} class facilitates maintaining the RDF(S)+
@@ -145,8 +146,8 @@ public class TruthMaintenance {
      * perform batch writes on the tempStore.
      * <p>
      * Likewise, you can use
-     * {@link IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)} and it
-     * will automatically perform batch writes.
+     * {@link IRawTripleStore#addStatements(IChunkedOrderedIterator, IElementFilter)}
+     * and it will automatically perform batch writes.
      * <p>
      * Regardless, when you have written all data on the tempStore, use
      * {@link #assertAll(TempTripleStore)} or
@@ -220,7 +221,7 @@ public class TruthMaintenance {
      *       is extremely large.
      */
     static public int applyExistingStatements(AbstractTripleStore focusStore,
-            AbstractTripleStore database, ISPOFilter filter) {
+            AbstractTripleStore database, IElementFilter<SPO> filter) {
         
         log.info("Filtering statements already known to the database");
 
@@ -231,8 +232,8 @@ public class TruthMaintenance {
          * explicit).
          */
 
-        final ISPOIterator itr = focusStore.getAccessPath(KeyOrder.SPO)
-                .iterator(ExplicitSPOFilter.INSTANCE);
+        final IChunkedOrderedIterator<SPO> itr = focusStore.getAccessPath(
+                SPOKeyOrder.SPO, ExplicitSPOFilter.INSTANCE).iterator();
 
         int nremoved = 0;
         
@@ -406,7 +407,10 @@ public class TruthMaintenance {
         log.info("Copying statements from the temporary store to the database");
 
 //        tempStore.dumpStore(database,true,true,false,true);
-        int ncopied = tempStore.copyStatements(database, null/*filter*/, true /*copyJustifications*/);
+
+        final long ncopied = tempStore.copyStatements(database,
+                null/* filter */, true /* copyJustifications */);
+        
 //        database.dumpStore(database,true,true,false,true);
 
         // note: this is the number that are _new_ to the database.
@@ -578,13 +582,16 @@ public class TruthMaintenance {
         /*
          * Temp store used to absorb statements for which no grounded
          * justification chain could be discovered.
+         * 
+         * FIXME There should be no lexicon for this tempStore, right? Should
+         * there be only one access path? How is the tempStore being used?
          */
 
         final TempTripleStore focusStore = new TempTripleStore(database
                 .getProperties(), database);
         
         // consider each statement in the tempStore.
-        final ISPOIterator itr = tempStore.getAccessPath(KeyOrder.SPO).iterator();
+        final IChunkedOrderedIterator<SPO> itr = tempStore.getAccessPath(SPOKeyOrder.SPO).iterator();
 
         final long nretracted;
         try {
@@ -857,7 +864,7 @@ public class TruthMaintenance {
              */
             
             final SPOArrayIterator tmp = new SPOArrayIterator(focusStore, focusStore
-                    .getAccessPath(KeyOrder.SPO), 0/* limit */, null/* filter */);
+                    .getAccessPath(SPOKeyOrder.SPO), 0/* limit */, null/* filter */);
             
             if(DEBUG && database.getStatementCount()<200) {
                 
@@ -888,7 +895,7 @@ public class TruthMaintenance {
             }
             
             // subtract out the statements we used to start the closure.
-            final int nremoved = focusStore
+            final long nremoved = focusStore
                     .removeStatements(tmp, false/* computeClosureForStatementIdentifiers */);
             
             if(DEBUG && database.getStatementCount()<200) {
@@ -907,7 +914,7 @@ public class TruthMaintenance {
             
         }
 
-        if( focusStore.getAccessPath(KeyOrder.SPO).isEmpty()) {
+        if( focusStore.getAccessPath(SPOKeyOrder.SPO).isEmpty()) {
 
             log.info("Done - closure of focusStore produced no entailments to consider.");
             

@@ -34,13 +34,20 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
  * A buffer that will block when it is full.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link BlockingBuffer} - used only
+ *             {@link LocalTripleStore#match(org.openrdf.model.Literal[], org.openrdf.model.URI[], org.openrdf.model.URI)}
  */
 public class SPOBlockingBuffer implements ISPOAssertionBuffer {
     
@@ -58,7 +65,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      * Optional filter used to reject {@link SPO}s such that they do
      * not enter into the buffer.
      */
-    private final ISPOFilter filter;
+    private final IElementFilter<SPO> filter;
     
     /**
      * Used to coordinate the reader and the writer.
@@ -76,7 +83,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      * @param capacity
      *            The capacity of the buffer.
      */
-    public SPOBlockingBuffer(AbstractTripleStore store, ISPOFilter filter, int capacity) {
+    public SPOBlockingBuffer(AbstractTripleStore store, IElementFilter<SPO> filter, int capacity) {
         
         this.store = store;
         
@@ -149,7 +156,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
     
     public boolean add(SPO spo) {
         
-        if(filter != null && filter.isMatch(spo)) {
+        if(filter != null && filter.accept(spo)) {
             
             if (log.isInfoEnabled())
                 log.info("reject: " + spo.toString(store));
@@ -215,7 +222,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      * 
      * @return The iterator.
      */
-    public ISPOIterator iterator() {
+    public IChunkedOrderedIterator<SPO> iterator() {
         
         return iterator( null /*filter*/ );
         
@@ -229,7 +236,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      *            {@link SPO}s which match the filter will not be visited by
      *            the iterator (optional).
      */
-    public ISPOIterator iterator(ISPOFilter filter) {
+    public IChunkedOrderedIterator<SPO> iterator(IElementFilter<SPO> filter) {
         
         return new SPOBlockingIterator( filter );
         
@@ -241,7 +248,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class SPOBlockingIterator implements ISPOIterator {
+    private class SPOBlockingIterator implements IChunkedOrderedIterator<SPO> {
         
         /**
          * <code>true</code> iff this iterator is open - it is closed when the
@@ -260,7 +267,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
         /**
          * Optional filter applied by the iterator as it reads from the buffer.
          */
-        private final ISPOFilter filter;
+        private final IElementFilter<SPO> filter;
         
         /**
          * Create an iterator that reads from the buffer.
@@ -269,7 +276,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
          *            {@link SPO}s which match the filter will not be visited
          *            by the iterator (optional).
          */
-        SPOBlockingIterator(ISPOFilter filter) {
+        SPOBlockingIterator(IElementFilter<SPO> filter) {
        
             this.filter = filter;
 
@@ -293,7 +300,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
          * Returns <code>null</code> since the {@link SPO}s are not in any
          * specific order.
          */
-        public KeyOrder getKeyOrder() {
+        public IKeyOrder<SPO> getKeyOrder() {
 
             return null;
             
@@ -347,7 +354,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
                     
                 }
                 
-                if (filter != null && filter.isMatch(spo)) {
+                if (filter != null && filter.accept(spo)) {
 
                     // rejected by the filter.
 
@@ -446,7 +453,7 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
             
         }
 
-        public SPO[] nextChunk(KeyOrder keyOrder) {
+        public SPO[] nextChunk(IKeyOrder keyOrder) {
             
             if (keyOrder == null)
                 throw new IllegalArgumentException();

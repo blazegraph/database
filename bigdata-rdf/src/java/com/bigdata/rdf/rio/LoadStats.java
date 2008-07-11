@@ -43,27 +43,27 @@ public class LoadStats {
      * Used iff the closure is computed as the data are loaded.
      */
     public final ClosureStats closureStats = new ClosureStats();
-    
+
     public long triplesPerSecond() {
-        
-        return ((long)( ((double)toldTriples) / ((double)totalTime) * 1000d ));
-        
+
+        return ((long) (((double) toldTriples) / ((double) totalTime) * 1000d));
+
     }
-    
+
     public void add(LoadStats stats) {
-        
+
         toldTriples += stats.toldTriples;
-        
+
         loadTime += stats.loadTime;
-        
+
         commitTime += stats.commitTime;
-        
+
         totalTime += stats.totalTime;
-        
-        if(stats.closureStats!=null) {
-            
+
+        if (stats.closureStats != null) {
+
             closureStats.add(stats.closureStats);
-            
+
         }
         
     }

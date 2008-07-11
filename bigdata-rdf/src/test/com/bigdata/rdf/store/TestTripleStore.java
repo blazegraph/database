@@ -43,7 +43,8 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.rdf.inf.SPOAssertionBuffer;
+import com.bigdata.rdf.lexicon.Id2TermWriteProc;
+import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
@@ -52,8 +53,8 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOArrayIterator;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 
 /**
  * Test basic features of the {@link ITripleStore} API.
@@ -492,18 +493,25 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             SPO spo2 = new SPO(A.termId, rdfType.termId, C.termId,
                     StatementEnum.Explicit);            
 
-            System.err.println("adding statements");
+            log.info("adding statements");
             
-            store.addStatements(new SPO[]{spo1,spo2}, 2);
+            log.info("spo1: "+spo1);
 
-            System.err.println(store.usage());
+            log.info("spo2: "+spo2);
             
-            System.err.println(store.dumpStore());
+            assertEquals("mutationCount", 2L, store.addStatements(new SPO[] {
+                    spo1, spo2 }, 2));
+
+            log.info("\n"+store.dumpStore());
+            
+            log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
+            log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
+            log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
 
             // verify range count on each of the statement indices.
-            assertEquals(2,store.getStatementIndex(KeyOrder.SPO).rangeCount(null, null));
-            assertEquals(2,store.getStatementIndex(KeyOrder.POS).rangeCount(null, null));
-            assertEquals(2,store.getStatementIndex(KeyOrder.OSP).rangeCount(null, null));
+            assertEquals(2,store.getStatementIndex(SPOKeyOrder.SPO).rangeCount());
+            assertEquals(2,store.getStatementIndex(SPOKeyOrder.POS).rangeCount());
+            assertEquals(2,store.getStatementIndex(SPOKeyOrder.OSP).rangeCount());
 
             /*
              * check indices for spo1.
@@ -543,13 +551,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * range count after the statement has been removed.
              */
             
-            System.err.println("Removing 1st statement.");
+            log.info("Removing 1st statement.");
             
             assertEquals(1,store.getAccessPath(spo1.s, spo1.p, spo1.o).removeAll());
 
-            System.err.println(store.usage());
-            
-            System.err.println(store.dumpStore());
+            log.info("\n"+store.dumpStore());
+
+            log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
+            log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
+            log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
 
             /*
              * verify that the statement is gone from each of the statement
@@ -579,9 +589,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * remove all statements (only spo2 remains).
              */
             
-            System.err.println("Removing all statements.");
+            log.info("Removing all statements.");
 
             assertEquals(1,store.getAccessPath(NULL,NULL,NULL).removeAll());
+
+            log.info("\n"+store.dumpStore());
+
+            log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
+            log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
+            log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
 
             /*
              * verify that the statement is gone from each of the statement
@@ -606,10 +622,6 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertSameSPOs(new SPO[] {}, store.getAccessPath(NULL, NULL,
                     NULL).iterator());
-
-            System.err.println(store.usage());
-            
-            System.err.println(store.dumpStore());
             
         } finally {
             
@@ -656,7 +668,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
-            System.err.println(store.dumpStore());
+            log.info("\n"+store.dumpStore());
             
             assertEquals(1, store.getAccessPath(NULL, NULL, store.getTermId(B))
                     .removeAll());
@@ -665,7 +677,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             store.commit();
             
-            System.err.println(store.dumpStore());
+            log.info("\n"+store.dumpStore());
             
             assertSameSPOs(new SPO[] {
                     new SPO(store.getTermId(A), store
@@ -692,14 +704,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
         try {
             
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
-                    null/* filter */, 100/* capacity */, false/*justified*/);
+//            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
+//                    null/* filter */, 100/* capacity */, false/*justified*/);
+  
+            SPO[] a = new SPO[] {
             
-            buffer.add(new SPO(1, 2, 3, StatementEnum.Explicit));
-            buffer.add(new SPO(2, 2, 3, StatementEnum.Inferred));
-            buffer.add(new SPO(3, 2, 3, StatementEnum.Axiom));
+            new SPO(1, 2, 3, StatementEnum.Explicit),
+            new SPO(2, 2, 3, StatementEnum.Inferred),
+            new SPO(3, 2, 3, StatementEnum.Axiom)
+            };
 
-            buffer.flush();
+            store.addStatements(a,a.length);
+            
+//            buffer.flush();
 
             store.commit();
             
@@ -711,7 +728,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
-            System.err.println(store.dumpStore());
+            log.info("\n"+store.dumpStore());
             
         } finally {
             
@@ -753,11 +770,11 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getStatements(null,null,null)
                     );
 
-            System.err.println(store.dumpStore());
+            log.info("\n"+store.dumpStore());
             
-            assertEquals(1,store.removeStatements(null, null, B));
+            assertEquals(1L,store.removeStatements(null, null, B));
 
-            System.err.println(store.dumpStore());
+            log.info("\n"+store.dumpStore());
             
             assertSameStatements(new Statement[]{
                     new StatementImpl(A,RDF.TYPE,C),
@@ -774,7 +791,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     }
     
     /**
-     * Test of {@link IRawTripleStore#removeStatements(com.bigdata.rdf.spo.ISPOIterator)}
+     * Test of
+     * {@link IRawTripleStore#removeStatements(com.bigdata.relation.accesspath.IChunkedOrderedIterator)}
+     * 
+     * FIXME verify that there is a variant of this test with statement
+     * identifiers enabled in order to make sure that we are testing the closure
+     * computation over the statement identifiers.
      */
     public void test_removeStatements() {
         
@@ -809,21 +831,32 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameIterator(new Statement[]{},
                     store.getAccessPath(null,null,null).iterator());
             
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
-                    null/* filter */, 100/* capacity */, false/*justify*/);
+//            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
+//                    null/* filter */, 100/* capacity */, false/*justify*/);
             
-            buffer.add(new SPO(x1, y2, z3,StatementEnum.Explicit));
-            buffer.add(new SPO(y2, y2, z3,StatementEnum.Explicit));
+            SPO[] a = new SPO[] {
+
+                    new SPO(x1, y2, z3,StatementEnum.Explicit),
+                    
+                    new SPO(y2, y2, z3,StatementEnum.Explicit)
             
-            buffer.flush();
+            };
+            
+            store.addStatements(a,a.length);
+            
+//            buffer.flush();
 
             assertTrue(store.hasStatement(x1,y2,z3));
             assertTrue(store.hasStatement(y2,y2,z3));
             assertEquals(2,store.getStatementCount());
             
-            assertEquals(1, store.removeStatements(new SPOArrayIterator(
-                    new SPO[] { new SPO(x1, y2, z3, StatementEnum.Explicit) },
-                    1)));
+            assertEquals(1, store.removeStatements(new ChunkedArrayIterator<SPO>(
+                    1,
+                    new SPO[] {
+                            new SPO(x1, y2, z3, StatementEnum.Explicit)
+                            },
+                    null/*keyOrder*/
+                    ), false/* computeClosureForStatementIdentifiers */));
 
             assertFalse(store.hasStatement(x1,y2,z3));
             assertTrue(store.hasStatement(y2,y2,z3));

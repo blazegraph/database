@@ -31,17 +31,26 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IAccessPath;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.relation.accesspath.ChunkedArrayIterator;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
  * Iterator visits {@link SPO}s and supports removal (fully buffered).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link ChunkedArrayIterator} but this still has some very
+ *             purpose specific uses mainly dealing with
+ *             {@link TruthMaintenance} and with fully buffering precisely
+ *             because the DB impl is not using concurrency controls.
  */
-public class SPOArrayIterator implements ISPOIterator {
+public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
 
     private boolean open = true;
     
@@ -51,10 +60,10 @@ public class SPOArrayIterator implements ISPOIterator {
     private AbstractTripleStore db;
 
     /**
-     * The {@link KeyOrder} in which statements are being visited and
+     * The {@link IKeyOrder} in which statements are being visited and
      * <code>null</code> if not known.
      */
-    private final KeyOrder keyOrder;
+    private final IKeyOrder<SPO> keyOrder;
 
 //    /**
 //     * Optional filter. When non-<code>null</code>, only matching statements
@@ -88,7 +97,7 @@ public class SPOArrayIterator implements ISPOIterator {
         
     }
 
-    public KeyOrder getKeyOrder() {
+    public IKeyOrder<SPO> getKeyOrder() {
         
         return keyOrder;
         
@@ -96,7 +105,7 @@ public class SPOArrayIterator implements ISPOIterator {
     
     /**
      * An iterator that visits the {@link SPO}s in the given array whose
-     * {@link KeyOrder} is NOT known.
+     * {@link IKeyOrder} is NOT known.
      * <p>
      * Note: This constructor variant results in an iterator that does NOT
      * support {@link #remove()} and whose {@link #getKeyOrder()} method returns
@@ -139,8 +148,8 @@ public class SPOArrayIterator implements ISPOIterator {
      *            An optional filter. When non-<code>null</code>, only
      *            matching statements will be visited.
      */
-    public SPOArrayIterator(AbstractTripleStore db, KeyOrder keyOrder,
-            SPO[] stmts, int numStmts, ISPOFilter filter) {
+    public SPOArrayIterator(AbstractTripleStore db, IKeyOrder<SPO> keyOrder,
+            SPO[] stmts, int numStmts, IElementFilter<SPO> filter) {
 
         this.db = db; // MAY be null (remove() will be disabled).
 
@@ -179,8 +188,8 @@ public class SPOArrayIterator implements ISPOIterator {
      *            An optional filter. When non-<code>null</code>, only
      *            matching statements will be visited.
      */
-    public SPOArrayIterator(AbstractTripleStore db, IAccessPath accessPath,
-            int limit, ISPOFilter filter) {
+    public SPOArrayIterator(AbstractTripleStore db, IAccessPath<SPO> accessPath,
+            int limit, IElementFilter<SPO> filter) {
 
         if (accessPath == null)
             throw new IllegalArgumentException();
@@ -194,7 +203,7 @@ public class SPOArrayIterator implements ISPOIterator {
 
 //        this.filter = filter;
         
-        final long rangeCount = accessPath.rangeCount();
+        final long rangeCount = accessPath.rangeCount(false/*exact*/);
 
         if (rangeCount > 10000000) {
             
@@ -218,15 +227,15 @@ public class SPOArrayIterator implements ISPOIterator {
          * @todo for scale-out, pass the filter to the data service.
          */
         
-        ITupleIterator itr = accessPath.rangeQuery();
+        ITupleIterator itr = accessPath.rangeIterator();
 
         int i = 0;
 
         while (itr.hasNext() && i < n) {
 
-            SPO spo = new SPO(keyOrder, itr);
+            SPO spo = (SPO)itr.next().getObject();
             
-            if (filter != null && !filter.isMatch(spo)) {
+            if (filter != null && !filter.accept(spo)) {
 
                 continue;
                 
@@ -370,12 +379,12 @@ public class SPOArrayIterator implements ISPOIterator {
         
     }
     
-    public SPO[] nextChunk(KeyOrder keyOrder) {
+    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
 
-        SPO[] stmts = nextChunk();
+        final SPO[] stmts = nextChunk();
 
         if (keyOrder != this.keyOrder) {
 

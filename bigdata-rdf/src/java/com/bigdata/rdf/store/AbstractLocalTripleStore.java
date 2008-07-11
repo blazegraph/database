@@ -28,24 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.search.FullTextIndex;
-import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Abstract base class for both transient and persistent {@link ITripleStore}
  * implementations using local storage.
- * <p>
- * This implementation presumes unisolated writes on local indices and a single
- * client writing on a local database. Unlike the {@link ScaleOutTripleStore}
- * this implementation does NOT feature auto-commit for unisolated writes.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -53,113 +41,113 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
     /**
-     * @todo configure capacity using
-     *       {@link IBigdataClient.Options#DEFAULT_CLIENT_THREAD_POOL_SIZE}
-     *       semantics.
+     * @param indexManager
+     * @param namespace
+     * @param timestamp
+     * @param properties
      */
-    public AbstractLocalTripleStore(Properties properties) {
-        
-        super(properties);
+    protected AbstractLocalTripleStore(IIndexManager indexManager,
+            String namespace, Long timestamp, Properties properties) {
 
-        // client thread pool setup.
-        final int threadPoolSize;
-        {
-         
-            threadPoolSize = Integer.parseInt(properties.getProperty(
-                    IBigdataClient.Options.CLIENT_THREAD_POOL_SIZE,
-                    IBigdataClient.Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
+        super(indexManager, namespace, timestamp, properties);
 
-            log.info(IBigdataClient.Options.CLIENT_THREAD_POOL_SIZE + "=" + threadPoolSize);
-
-        }
-
-        if (threadPoolSize == 0) {
-
-            threadPool = (ThreadPoolExecutor) Executors
-                    .newCachedThreadPool(DaemonThreadFactory
-                            .defaultThreadFactory());
-
-        } else {
-
-            threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    threadPoolSize, DaemonThreadFactory.defaultThreadFactory());
-
-        }
-        
-    }
-
-    /**
-     * Note: The local triple stores do not {@link IBigdataClient} and therefore
-     * do not have access to the {@link IBigdataFederation#getThreadPool()}.
-     * Therefore a local {@link ExecutorService} is created on a per-{@link AbstractLocalTripleStore}
-     * basis.
-     */
-    private final ExecutorService threadPool;
-
-    /**
-     * Note: The capacity of the thread pool may be configured using the
-     * {@link IBigdataClient.Options#CLIENT_THREAD_POOL_SIZE} property.
-     */
-    public ExecutorService getThreadPool() {
-        
-        return threadPool;
-        
-    }
-
-    /**
-     * Terminates the {@link #threadPool}.
-     */
-    protected void shutdown() {
-            
-        threadPool.shutdown();
-
-        try {
-
-            threadPool.awaitTermination(2, TimeUnit.SECONDS);
-
-        } catch (InterruptedException ex) {
-
-            log.warn("Write service did not terminate within timeout.");
-
-        }
-            
-        super.shutdown();
-        
     }
     
-    /**
-     * A factory returning the singleton for the {@link FullTextIndex}.
-     */
-    synchronized public FullTextIndex getSearchEngine() {
+//    /**
+//     * Shared {@link IndexMetadata} configuration.
+//     * 
+//     * @param name
+//     *            The index name.
+//     * 
+//     * @return A new {@link IndexMetadata} object for that index.
+//     */
+//    protected IndexMetadata getIndexMetadata(String name) {
+//
+//        final IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
+//
+//        metadata.setBranchingFactor(branchingFactor);
+//
+//        /*
+//         * Note: Mainly used for torture testing.
+//         */
+//        if(false){
+//            
+//            // An override that makes a split very likely.
+//            final ISplitHandler splitHandler = new DefaultSplitHandler(
+//                    10 * Bytes.kilobyte32, // minimumEntryCount
+//                    50 * Bytes.kilobyte32, // entryCountPerSplit
+//                    1.5, // overCapacityMultiplier
+//                    .75, // underCapacityMultiplier
+//                    20 // sampleRate
+//            );
+//            
+//            metadata.setSplitHandler(splitHandler);
+//            
+//        }
+//                
+//        return metadata;
+//
+//    }
+//
+//    /**
+//     * Overrides for the {@link IRawTripleStore#getTerm2IdIndex()}.
+//     */
+//    protected IndexMetadata getTerm2IdIndexMetadata(String name) {
+//
+//        final IndexMetadata metadata = getIndexMetadata(name);
+//
+//        return metadata;
+//
+//    }
+//
+//    /**
+//     * Overrides for the {@link IRawTripleStore#getId2TermIndex()}.
+//     */
+//    protected IndexMetadata getId2TermIndexMetadata(String name) {
+//
+//        final IndexMetadata metadata = getIndexMetadata(name);
+//
+//        return metadata;
+//
+//    }
+//
+//    /**
+//     * Overrides for the statement indices.
+//     */
+//    protected IndexMetadata getStatementIndexMetadata(String name) {
+//
+//        final IndexMetadata metadata = getIndexMetadata(name);
+//
+//        metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
+//
+//        if (!statementIdentifiers) {
+//
+//            /*
+//             * FIXME this value serializer does not know about statement
+//             * identifiers. Therefore it is turned off if statement identifiers
+//             * are enabled. Examine some options for value compression for the
+//             * statement indices when statement identifiers are enabled.
+//             */
+//
+//            metadata.setLeafValueSerializer(new FastRDFValueCompression());
+//
+//        }
+//        
+//        return metadata;
+//
+//    }
+//
+//    /**
+//     * Overrides for the {@link IRawTripleStore#getJustificationIndex()}.
+//     */
+//    protected IndexMetadata getJustIndexMetadata(String name) {
+//
+//        final IndexMetadata metadata = getIndexMetadata(name);
+//
+//        metadata.setLeafValueSerializer(NoDataSerializer.INSTANCE);
+//
+//        return metadata;
+//
+//    }
 
-        if (searchEngine == null) {
-
-            // FIXME namespace once used by localtriplestore.
-            final String namespace = "";
-
-            searchEngine = new FullTextIndex(getProperties(), namespace,
-                    getStore(), 
-                    getThreadPool()
-//                    Executors
-//                            .newSingleThreadExecutor(DaemonThreadFactory
-//                                    .defaultThreadFactory())
-                                    );
-
-        }
-
-        return searchEngine;
-
-    }
-
-    private FullTextIndex searchEngine;
-
-    abstract IIndexManager getStore();
-
-    public void abort() {
-        
-        searchEngine = null;
-
-        
-    }
-    
 }

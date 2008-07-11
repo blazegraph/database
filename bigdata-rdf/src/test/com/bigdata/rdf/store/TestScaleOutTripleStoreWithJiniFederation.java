@@ -408,7 +408,13 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     protected AbstractTripleStore getStore() {
         
         // Connect to the triple store.
-        return new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
+        AbstractTripleStore store = new ScaleOutTripleStore(client
+                .getFederation(), "test", ITx.UNISOLATED, client
+                .getProperties());
+        
+        store.create();
+        
+        return store;
         
     }
  
@@ -438,7 +444,9 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         client.connect();
         
         // obtain view of the triple store.
-        return getStore();
+        return new ScaleOutTripleStore(client
+                .getFederation(), "test", ITx.UNISOLATED, client
+                .getProperties());
         
     }
 

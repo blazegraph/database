@@ -38,7 +38,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class OwlAxioms extends RdfsAxioms {
     
-    protected OwlAxioms(AbstractTripleStore db)
+    public OwlAxioms(AbstractTripleStore db)
     {
         
         super( db );

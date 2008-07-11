@@ -25,17 +25,13 @@ package com.bigdata.rdf.spo;
 
 import java.util.Arrays;
 
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.relation.rule.IConstant;
 
 /**
  * Represents a triple.
@@ -43,7 +39,7 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPO implements Comparable {
+public class SPO implements ISPO, Comparable<SPO> {
     
     private transient static final long NULL = IRawTripleStore.NULL;
 
@@ -56,6 +52,18 @@ public class SPO implements Comparable {
     /** The term identifier for the object position. */
     public final long o;
     
+    final public long s() {
+        return s;
+    }
+
+    final public long p() {
+        return p;
+    }
+
+    final public long o() {
+        return o;
+    }
+
     /**
      * Statement type (inferred, explicit, or axiom).
      */
@@ -68,8 +76,6 @@ public class SPO implements Comparable {
      * {@link SPO} to the database. However, when reading {@link SPO}s from the
      * database the statement identifier is aleady on hand and is set
      * immediately.
-     * 
-     * @see #SPO(KeyOrder, ITupleIterator)
      */
     private long sid = NULL;
 
@@ -210,6 +216,21 @@ public class SPO implements Comparable {
     }
     
     /**
+     * Variant to create an {@link SPO} from constants (used by the unit tests).
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param type
+     */
+    public SPO(IConstant<Long> s, IConstant<Long> p, IConstant<Long> o,
+            StatementEnum type) {
+
+        this(s.get(), p.get(), o.get(), type);
+
+    }
+    
+    /**
      * Sets the statement type and optionally the statement identifier by
      * decoding the value associated with the key one of the statement indices.
      * 
@@ -246,118 +267,118 @@ public class SPO implements Comparable {
     }
     
     
-    /**
-     * Construct a triple from the sort key.
-     * <p>
-     * Note: If statement identifiers are enabled, then the statement identifier
-     * will be read from the tuple and set on this {@link SPO}.
-     * 
-     * @param keyOrder
-     *            Indicates the permutation of the subject, predicate and object
-     *            used by the key.
-     * 
-     * @param itr
-     *            The iterator that is visiting the entries in a statement
-     *            index. The next entry will fetched from the iterator and
-     *            decoded into an {@link SPO}.
-     * 
-     * @see RdfKeyBuilder#key2Statement(byte[], long[])
-     * 
-     * @todo This decodes the key directly. If {@link RdfKeyBuilder} is to
-     *       decode the key then the fields on this class can not be final.
-     */
-    public SPO(KeyOrder keyOrder, ITupleIterator itr) {
-        
-        if (keyOrder == null)
-            throw new IllegalArgumentException();
-        
-        if (itr == null)
-            throw new IllegalArgumentException();
-
-        final ITuple tuple = itr.next();
-
-//      // clone of the key.
-//      final byte[] key = itr.getKey();
-      
-        // copy of the key in a reused buffer.
-        final byte[] key = tuple.getKeyBuffer().array(); 
-
-//        long[] ids = new long[IRawTripleStore.N];
-        
-        /*
-         * Note: GTE since the key is typically a reused buffer which may be
-         * larger than the #of bytes actually holding valid data.
-         */
-        assert key.length >= 8 * IRawTripleStore.N;
-//      assert key.length == 8 * IRawTripleStore.N + 1;
-        
-//        final long _0 = KeyBuilder.decodeLong(key, 1);
-//      
-//        final long _1 = KeyBuilder.decodeLong(key, 1+8);
-//      
-//        final long _2 = KeyBuilder.decodeLong(key, 1+8+8);
-        
-        final long _0 = KeyBuilder.decodeLong(key, 0);
-        
-        final long _1 = KeyBuilder.decodeLong(key, 8);
-      
-        final long _2 = KeyBuilder.decodeLong(key, 8+8);
-        
-        switch (keyOrder) {
-
-        case SPO:
-            s = _0;
-            p = _1;
-            o = _2;
-            break;
-            
-        case POS:
-            p = _0;
-            o = _1;
-            s = _2;
-            break;
-            
-        case OSP:
-            o = _0;
-            s = _1;
-            p = _2;
-            break;
-
-        default:
-
-            throw new UnsupportedOperationException();
-
-        }
-        
-        decodeValue(tuple.getValue());
-        
-//        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
+//    /**
+//     * Construct a triple from the sort key.
+//     * <p>
+//     * Note: If statement identifiers are enabled, then the statement identifier
+//     * will be read from the tuple and set on this {@link SPO}.
+//     * 
+//     * @param keyOrder
+//     *            Indicates the permutation of the subject, predicate and object
+//     *            used by the key.
+//     * 
+//     * @param itr
+//     *            The iterator that is visiting the entries in a statement
+//     *            index. The next entry will fetched from the iterator and
+//     *            decoded into an {@link SPO}.
+//     * 
+//     * @see RdfKeyBuilder#key2Statement(byte[], long[])
+//     * 
+//     * @todo This decodes the key directly. If {@link RdfKeyBuilder} is to
+//     *       decode the key then the fields on this class can not be final.
+//     */
+//    public SPO(KeyOrder keyOrder, ITupleIterator itr) {
 //        
-//        final byte code = vbuf.getByte(0);
+//        if (keyOrder == null)
+//            throw new IllegalArgumentException();
 //        
-//        type = StatementEnum.decode( code ); 
-//        
-//        if (vbuf.limit() == 1 + 8) {
+//        if (itr == null)
+//            throw new IllegalArgumentException();
 //
-//            /*
-//             * The value buffer appears to contain a statement identifier, so we
-//             * read it.
-//             */
+//        final ITuple tuple = itr.next();
+//
+////      // clone of the key.
+////      final byte[] key = itr.getKey();
+//      
+//        // copy of the key in a reused buffer.
+//        final byte[] key = tuple.getKeyBuffer().array(); 
+//
+////        long[] ids = new long[IRawTripleStore.N];
+//        
+//        /*
+//         * Note: GTE since the key is typically a reused buffer which may be
+//         * larger than the #of bytes actually holding valid data.
+//         */
+//        assert key.length >= 8 * IRawTripleStore.N;
+////      assert key.length == 8 * IRawTripleStore.N + 1;
+//        
+////        final long _0 = KeyBuilder.decodeLong(key, 1);
+////      
+////        final long _1 = KeyBuilder.decodeLong(key, 1+8);
+////      
+////        final long _2 = KeyBuilder.decodeLong(key, 1+8+8);
+//        
+//        final long _0 = KeyBuilder.decodeLong(key, 0);
+//        
+//        final long _1 = KeyBuilder.decodeLong(key, 8);
+//      
+//        final long _2 = KeyBuilder.decodeLong(key, 8+8);
+//        
+//        switch (keyOrder) {
+//
+//        case SPO:
+//            s = _0;
+//            p = _1;
+//            o = _2;
+//            break;
 //            
-//            sid = vbuf.getLong(1);
-//        
-//            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
-//                    + toString(sid);
+//        case POS:
+//            p = _0;
+//            o = _1;
+//            s = _2;
+//            break;
+//            
+//        case OSP:
+//            o = _0;
+//            s = _1;
+//            p = _2;
+//            break;
 //
-//            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
-//                    + toString();
+//        default:
 //
-//            assert sid != NULL : "statement identifier is NULL for explicit statement: "
-//                    + toString();
+//            throw new UnsupportedOperationException();
 //
 //        }
-        
-    }
+//        
+//        decodeValue(tuple.getValue());
+//        
+////        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
+////        
+////        final byte code = vbuf.getByte(0);
+////        
+////        type = StatementEnum.decode( code ); 
+////        
+////        if (vbuf.limit() == 1 + 8) {
+////
+////            /*
+////             * The value buffer appears to contain a statement identifier, so we
+////             * read it.
+////             */
+////            
+////            sid = vbuf.getLong(1);
+////        
+////            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
+////                    + toString(sid);
+////
+////            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
+////                    + toString();
+////
+////            assert sid != NULL : "statement identifier is NULL for explicit statement: "
+////                    + toString();
+////
+////        }
+//        
+//    }
 
     /**
      * Return the byte[] that would be written into a statement index for this
@@ -488,17 +509,15 @@ public class SPO implements Comparable {
      * Note: By design, this does NOT differentiate between statements with the
      * different {@link StatementEnum} values.
      */
-    public int compareTo(Object other) {
+    public int compareTo(SPO stmt2) {
 
-        if (other == this) {
+        if (stmt2 == this) {
 
             return 0;
 
         }
 
         final SPO stmt1 = this;
-        
-        final SPO stmt2 = (SPO) other;
         
         /*
          * Note: logic avoids possible overflow of [long] by not computing the
@@ -526,6 +545,15 @@ public class SPO implements Comparable {
 
         return ret;
 
+    }
+
+    public boolean equals(Object o) {
+        
+        if (this == o)
+            return true;
+
+        return equals((SPO) o);
+        
     }
     
     /**

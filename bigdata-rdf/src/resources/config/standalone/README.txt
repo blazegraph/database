@@ -2,7 +2,11 @@ A sample configuration for a standalone bigdata instance (single host, one or
 more data servers).
 
 Note: If you want to modify this configuration for multiple hosts then
-you MUST edit the *.config files to enable multicast discovery.  Change
+you MUST edit the *.config files to enable multicast discovery or explicitly
+enumerate the URIs of the service registrar(s) (only localhost is listed by
+default).
+
+To enable multicase, change:
 
 	/*
 	 * Note: multicast discovery is always used if LookupDiscovery.ALL_GROUPS is

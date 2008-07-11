@@ -40,20 +40,19 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * @author personickm
  */
-abstract class BaseAxioms implements Axioms {
+public abstract class BaseAxioms implements Axioms {
     
     private final long NULL = IRawTripleStore.NULL;
     
@@ -65,12 +64,12 @@ abstract class BaseAxioms implements Axioms {
      * The axioms in SPO order.
      */
     private BTree btree;
-
+    
     /**
-     * Used to generate keys for the {@link #btree}.
+     * Used to format keys for that {@link BTree}.
      */
-    private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder());    
-
+    private SPOTupleSerializer tupleSer;
+    
     private final AbstractTripleStore db;
 
     /**
@@ -80,7 +79,7 @@ abstract class BaseAxioms implements Axioms {
      *            for the axioms and on which the axioms will be lazily written
      *            by {@link #addAxioms()}.
      */
-    protected BaseAxioms(AbstractTripleStore db)
+    public BaseAxioms(AbstractTripleStore db)
     {
         
         if (db == null)
@@ -290,7 +289,7 @@ abstract class BaseAxioms implements Axioms {
      */
     public void addAxioms() {
 
-        if(btree==null) {
+        if (btree == null) {
 
             defineAxioms();
             
@@ -347,23 +346,24 @@ abstract class BaseAxioms implements Axioms {
              * 
              * @todo use FastRDFValueCompression once API is aligned.
              */
-            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
             
             metadata.setBranchingFactor(branchingFactor);
+
+            tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO);
+            
+            metadata.setTupleSerializer(tupleSer);
             
             btree = BTree.create(new SimpleMemoryRawStore(), metadata);
             
-//            btree = new BTree(new SimpleMemoryRawStore(), branchingFactor, UUID
-//                    .randomUUID(), ByteArrayValueSerializer.INSTANCE);
-
             // SPO[] exposed by our StatementBuffer subclass.
-            SPO[] stmts = ((MyStatementBuffer)buffer).stmts;
+            final SPO[] stmts = ((MyStatementBuffer)buffer).stmts;
             
             if (stmts != null) {
 
                 for (SPO spo : stmts) {
 
-                    btree.insert(keyBuilder.statement2Key(KeyOrder.SPO, spo),
+                    btree.insert(tupleSer.statement2Key(SPOKeyOrder.SPO, spo),
                             spo.getType().serialize());
 
                 }
@@ -403,7 +403,7 @@ abstract class BaseAxioms implements Axioms {
 
         }
 
-        byte[] key = keyBuilder.statement2Key(s,p,o);
+        final byte[] key = tupleSer.statement2Key(s,p,o);
         
         if(btree.contains(key)) {
             
@@ -435,7 +435,7 @@ abstract class BaseAxioms implements Axioms {
         /**
          * Save off a copy of the axioms in SPO order on {@link #stmts}.
          */
-        protected int writeSPOs(SPO[] stmts, int numStmts) {
+        protected long writeSPOs(SPO[] stmts, int numStmts) {
             
             if (this.stmts == null) {
 
@@ -443,7 +443,7 @@ abstract class BaseAxioms implements Axioms {
 
                 System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
 
-                Arrays.sort( this.stmts, KeyOrder.SPO.getComparator() );
+                Arrays.sort( this.stmts, SPOKeyOrder.SPO.getComparator() );
                 
             }
             

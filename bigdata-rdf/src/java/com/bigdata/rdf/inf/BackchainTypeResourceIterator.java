@@ -32,11 +32,17 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.ClosableEmptyIterator;
+import com.bigdata.relation.accesspath.ClosableSingleItemIterator;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IClosableIterator;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
@@ -60,28 +66,30 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */ 
-public class BackchainTypeResourceIterator implements ISPOIterator {
+public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SPO> {
     
-    private final ISPOIterator _src;
+    protected final static transient long NULL = IRawTripleStore.NULL;
+    
+    private final IChunkedOrderedIterator<SPO> _src;
     private final Iterator<SPO> src;
 //    private final long s;
 //    private final AbstractTripleStore db;
     private final long rdfType, rdfsResource;
-    private final KeyOrder keyOrder;
+    private final IKeyOrder<SPO> keyOrder;
 
     /**
      * The subject(s) whose (s rdf:type rdfs:Resource) entailments will be
      * visited.
      */
-    private Iterator<Long> resourceIds;
+    private IClosableIterator<Long> resourceIds;
     
     /**
-     * An iterator reading on the {@link KeyOrder#POS} index. The predicate is
+     * An iterator reading on the {@link SPOKeyOrder#POS} index. The predicate is
      * bound to <code>rdf:type</code> and the object is bound to
      * <code>rdfs:Resource</code>. If the subject was given to the ctor, then
      * it will also be bound.
      */
-    private ISPOIterator posItr;
+    private IChunkedOrderedIterator<SPO> posItr;
     
     private boolean sourceExhausted = false;
     
@@ -89,10 +97,10 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
 
     /**
      * This is set each time by {@link #nextChunk()} and inspected by
-     * {@link #nextChunk(KeyOrder)} in order to decide whether the chunk needs
+     * {@link #nextChunk(IKeyOrder)} in order to decide whether the chunk needs
      * to be sorted.
      */
-    private KeyOrder chunkKeyOrder = null; 
+    private IKeyOrder<SPO> chunkKeyOrder = null; 
 
     /**
      * The last {@link SPO} visited by {@link #next()}.
@@ -106,8 +114,8 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
      * 
      * @param src
      *            The source iterator. {@link #nextChunk()} will sort statements
-     *            into the {@link KeyOrder} reported by this iterator (as long
-     *            as the {@link KeyOrder} is non-<code>null</code>).
+     *            into the {@link IKeyOrder} reported by this iterator (as long
+     *            as the {@link IKeyOrder} is non-<code>null</code>).
      * @param s
      *            The subject of the triple pattern.
      * @param p
@@ -124,8 +132,9 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
      *            The term identifier that corresponds to rdf:Resource for the
      *            database.
      */
-    public BackchainTypeResourceIterator(ISPOIterator src, long s, long p,
-            long o, AbstractTripleStore db, final long rdfType, final long rdfsResource) {
+    public BackchainTypeResourceIterator(IChunkedOrderedIterator<SPO> src,
+            long s, long p, long o, AbstractTripleStore db, final long rdfType,
+            final long rdfsResource) {
         
         if (src == null)
             throw new IllegalArgumentException();
@@ -141,10 +150,10 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
             private static final long serialVersionUID = 1L;
 
             protected boolean isValid(Object arg0) {
-                
-                SPO o = (SPO)arg0;
-                
-                if(o.p==rdfType && o.o==rdfsResource) {
+
+                SPO o = (SPO) arg0;
+
+                if (o.p == rdfType && o.o == rdfsResource) {
                     
                     return false;
                     
@@ -175,13 +184,14 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
              * resources that are no longer in use by the KB.
              */
 
-            resourceIds = db.getAccessPath(KeyOrder.SPO).distinctTermScan();
+            resourceIds = db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO);
 
             /*
              * Reading (? rdf:Type rdfs:Resource) using the POS index.
              */
-            
-            posItr = db.getAccessPath(NULL, rdfType, rdfsResource).iterator(ExplicitSPOFilter.INSTANCE);
+
+            posItr = db.getAccessPath(NULL, rdfType, rdfsResource,
+                    ExplicitSPOFilter.INSTANCE).iterator();
 
         } else if ((p == NULL || p == rdfType)
                 && (o == NULL || o == rdfsResource)) {
@@ -191,14 +201,15 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
              * rdfs:Resource).
              */
 
-            resourceIds = Arrays.asList(new Long[] { s }).iterator();
-            
+            resourceIds = new ClosableSingleItemIterator<Long>(s);
+
             /*
              * Reading a single point (s type resource), so this will actually
              * use the SPO index.
              */
-            
-            posItr = db.getAccessPath(s, rdfType, rdfsResource).iterator(ExplicitSPOFilter.INSTANCE);
+
+            posItr = db.getAccessPath(s, rdfType, rdfsResource,
+                    ExplicitSPOFilter.INSTANCE).iterator();
 
         } else {
 
@@ -206,7 +217,7 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
              * Backchain will not generate any statements.
              */
 
-            resourceIds = Arrays.asList(new Long[] {}).iterator();
+            resourceIds = new ClosableEmptyIterator<Long>();
 
             posItr = null;
             
@@ -220,7 +231,7 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
         
     }
 
-    public KeyOrder getKeyOrder() {
+    public IKeyOrder<SPO> getKeyOrder() {
 
         return keyOrder;
         
@@ -236,6 +247,8 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
 
         _src.close();
 
+        resourceIds.close();
+        
         resourceIds = null;
         
         if (posItr != null) {
@@ -292,9 +305,11 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
      * Visits all {@link SPO}s visited by the source iterator and then begins
      * to backchain ( x rdf:type: rdfs:Resource ) statements.
      * <p>
-     * The "backchain" scans two iterators: an ISPOIterator on ( ? rdf:type
-     * rdfs:Resource ) that reads on the database (this tells us whether we have
-     * an explicit (x rdf:type rdfs:Resource) in the database for a given
+     * The "backchain" scans two iterators: an {@link IChunkedOrderedIterator}
+     * on <code>( ? rdf:type
+     * rdfs:Resource )</code> that reads on the database
+     * (this tells us whether we have an explicit
+     * <code>(x rdf:type rdfs:Resource)</code> in the database for a given
      * subject) and iterator that reads on the term identifiers for the distinct
      * resources in the database (this bounds the #of backchained statements
      * that we will emit).
@@ -344,11 +359,11 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
     }
 
     /**
-     * Note: This method preserves the {@link KeyOrder} of the source iterator
-     * iff it is reported by {@link ISPOIterator#getKeyOrder()}. Otherwise
-     * chunks read from the source iterator will be in whatever order that
-     * iterator is using while chunks containing backchained entailments will be
-     * in {@link KeyOrder#POS} order.
+     * Note: This method preserves the {@link IKeyOrder} of the source iterator
+     * iff it is reported by {@link #getKeyOrder()}. Otherwise chunks read from
+     * the source iterator will be in whatever order that iterator is using
+     * while chunks containing backchained entailments will be in
+     * {@link SPOKeyOrder#POS} order.
      * <p>
      * Note: In order to ensure that a consistent ordering is always used within
      * a chunk the backchained entailments will always begin on a chunk
@@ -420,7 +435,7 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
             
         }
                 
-        if (keyOrder != null && keyOrder != KeyOrder.POS) {
+        if (keyOrder != null && keyOrder != SPOKeyOrder.POS) {
 
             /*
              * Sort into the same order as the source iterator.
@@ -438,18 +453,18 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
          * indices.
          */
         
-        chunkKeyOrder = KeyOrder.POS;
+        chunkKeyOrder = SPOKeyOrder.POS;
         
         return stmts;
         
     }
 
-    public SPO[] nextChunk(KeyOrder keyOrder) {
+    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
         
         if (keyOrder == null)
             throw new IllegalArgumentException();
 
-        SPO[] stmts = nextChunk();
+        final SPO[] stmts = nextChunk();
         
         if (chunkKeyOrder != keyOrder) {
 

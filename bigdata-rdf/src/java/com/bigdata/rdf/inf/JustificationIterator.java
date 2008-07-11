@@ -35,21 +35,23 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Iterator visits {@link Justification}s reading from the justification index.
  * The iterator optionally supports asynchronous read ahead.
  * 
- * @todo write tests.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated replace with appropriate access path reading on the
+ *             justifications index for SPORelation (or treat as a secondary
+ *             relation).
  */
 public class JustificationIterator implements IJustificationIterator {
 
@@ -68,7 +70,7 @@ public class JustificationIterator implements IJustificationIterator {
     /**
      * The #of statements that have been read <strong>from the source</strong>
      * and placed into the buffer. All such statements will also have passed the
-     * optional {@link ISPOFilter}.
+     * optional {@link IElementFilter}.
      */
     private int numBuffered;
 

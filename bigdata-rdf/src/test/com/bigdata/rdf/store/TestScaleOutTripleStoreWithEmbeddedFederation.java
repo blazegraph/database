@@ -180,7 +180,15 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
     protected AbstractTripleStore getStore() {
         
         // connect to the database.
-        return new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
+//        return new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
+        
+        AbstractTripleStore store = new ScaleOutTripleStore(client
+                .getFederation(), "test_", ITx.UNISOLATED, client
+                .getProperties());
+        
+        store.create();
+        
+        return store;
         
     }
  
@@ -212,8 +220,9 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         client.connect();
         
         // Obtain view on the triple store.
-        return getStore();
-
+        return new ScaleOutTripleStore(client.getFederation(), "test_",
+                ITx.UNISOLATED, client.getProperties());
+        
     }
 
 }

@@ -29,7 +29,7 @@ import junit.framework.TestSuite;
 
 /**
  * Aggregates test suites into increasing dependency order.
- *
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -51,16 +51,17 @@ public class TestAll extends TestCase {
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
+     * 
+     * @todo while there is nothing left in this test suite the src/java package
+     *       is the {@link BigdataValue} and {@link BigdataStatement}
+     *       implementation and those implementations should be tested for
+     *       Sesame 2 API compatibility.
      */
     public static Test suite()
     {
 
         TestSuite suite = new TestSuite("RDF data model");
 
-        suite.addTestSuite(TestSerialization.class);
-
-        suite.addTestSuite(TestStatementEnum.class);
-        
         return suite;
         
     }

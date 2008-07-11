@@ -57,6 +57,9 @@ public class TestTripleStoreBasics extends TestCase2 {
         // test adding terms and statements.
         suite.addTestSuite(TestTripleStore.class);
 
+        // make sure that the db can find the relations and they their container
+        suite.addTestSuite(TestRelationLocator.class);
+        
         // test adding terms and statements is restart safe.
         suite.addTestSuite(TestRestartSafe.class);
 
@@ -72,14 +75,27 @@ public class TestTripleStoreBasics extends TestCase2 {
         // test suite for the access path api.
         suite.addTestSuite(TestAccessPath.class);
 
+        // test suite for the completion scan (prefix match for literals).
+        suite.addTestSuite(TestCompletionScan.class);
+        
+        // test suite for the "match" rule (entity matching).
+        // @todo move to the rules package since this is a completion scan + a rule?
+        suite.addTestSuite(TestMatch.class);
+        
         // somewhat dated test of sustained insert rate on synthetic data.
         suite.addTestSuite(TestInsertRate.class);
 
+        // test suite for the LexiconRelation.
+        suite.addTest( com.bigdata.rdf.lexicon.TestAll.suite() );
+
+        // test suite for the SPORelation.
+        suite.addTest( com.bigdata.rdf.spo.TestAll.suite() );
+        
         // test suite for the rio parser and data loading integration.
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
-        // test suite for the inference engine.
-        suite.addTest(com.bigdata.rdf.inf.TestAll.suite());
+        // test suite for the rule execution layer (query and closure operations).
+        suite.addTest( com.bigdata.rdf.rules.TestAll.suite() );
 
         return suite;
         

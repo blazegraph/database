@@ -33,6 +33,7 @@ import java.io.FilenameFilter;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 
@@ -119,6 +120,8 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
 
         final long timeout = Long.parseLong(System.getProperty("timeout","20000")); 
 
+        final String namespace = System.getProperty("namespace","test");
+
         final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
         
         final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
@@ -168,8 +171,19 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         
         System.err.println("Will run with "+N+" data services");
 
-        ScaleOutTripleStore store = new ScaleOutTripleStore(client,"test",ITx.UNISOLATED);
+        ScaleOutTripleStore store = new ScaleOutTripleStore(client
+                .getFederation(), namespace, ITx.UNISOLATED, client
+                .getProperties());
 
+        if(!new SPORelation(store.getIndexManager(), store.getNamespace()
+                + store.NAME_SPO_RELATION, store.getTimestamp(), store.getProperties()).exists()) {
+            
+            // Presume that the KB does not exist.
+            
+            store.create();
+            
+        }
+        
         final FilenameFilter filter = new FilenameFilter() {
 
             public boolean accept(File dir, String name) {

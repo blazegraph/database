@@ -202,6 +202,7 @@ public class BasicRioLoader implements IRioLoader {
 
             insertTime = System.currentTimeMillis() - insertStart;
 
+            if(log.isInfoEnabled())
             log.info("parse complete: elapsed=" + insertTime
                     + "ms, toldTriples=" + stmtsAdded + ", tps="
                     + getInsertRate());

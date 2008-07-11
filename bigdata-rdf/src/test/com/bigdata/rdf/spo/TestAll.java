@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -39,37 +40,46 @@ public class TestAll extends TestCase {
      * 
      */
     public TestAll() {
+        
     }
 
     /**
      * @param arg0
      */
     public TestAll(String arg0) {
+     
         super(arg0);
+        
     }
 
     /**
-     * Returns a test that will run test suites in turn.
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     * <p>
+     * Note: Much of the testing of the {@link SPORelation} is performed by
+     * the tests in the com.bigdata.rdf.store package.
+     * 
+     * @todo SPO (compareTo, equals, hashCode)
      */
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("SPO");
-     
-        /* FIXME write tests.
-         * 
-         * @todo SPO (compareTo, equals, hashCode)
-         * 
-         * @todo SPO (de-)serialization as key + statement type.
-         * 
-         * @todo SPO comparators.
-         * 
-         * @todo SPOIterator
-         * 
-         * @todo SPOArrayIterator
-         */
-       
-        suite.addTestSuite(TestSPOBlockingBuffer.class);
+        TestSuite suite = new TestSuite("SPORelation");
+
+        // test predicate impls.
+        suite.addTestSuite(TestSPOPredicate.class);
+        
+        // test {inferred, explicit, axiom} enum class.
+        suite.addTestSuite(TestStatementEnum.class);
+
+        // @todo test IKeyOrder impl (comparators).
+        suite.addTestSuite(TestSPOKeyOrder.class);
+
+        // @todo test various key and value compressors here.
+        suite.addTestSuite(TestKeyCompression.class);
+
+        // key and value (de-)serialization of SPO tuples for B+Tree.
+        suite.addTestSuite(TestSPOTupleSerializer.class);
         
         return suite;
         

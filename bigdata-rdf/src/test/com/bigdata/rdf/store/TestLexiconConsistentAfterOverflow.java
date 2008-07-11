@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 
 import junit.framework.TestCase;

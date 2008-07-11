@@ -28,23 +28,33 @@
 package com.bigdata.rdf.spo;
 
 import com.bigdata.rdf.inf.Justification;
-import com.bigdata.rdf.inf.Rule;
+import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.AbstractElementBuffer.InsertBuffer;
+import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 
 /**
  * A buffer that is written on by {@link Rule}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @depreated by {@link InsertBuffer} and {@link InsertSolutionBuffer}
  */
 public interface ISPOAssertionBuffer extends ISPOBuffer {
 
     /**
      * The #of justifications currently in the buffer.
+     * 
+     * @deprecated not used.
      */
     public int getJustificationCount();
 
     /**
      * Add a statement and an optional justification to the buffer.
+     * 
+     * @deprecated by {@link ISolution}s in an {@link IBuffer}.
      */
     public boolean add(SPO stmt, Justification justification);
 

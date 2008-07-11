@@ -66,8 +66,9 @@ import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOBuffer;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.ClientException;
@@ -125,7 +126,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo experiment with varying #clients and buffer capacity.
  * 
  * @todo As an alternative to indexing the locally loaded data, experiment with
- *       converting {@link StatementBuffer}s to {@link ISPOBuffer}s (using the
+ *       converting {@link StatementBuffer}s to {@link IBuffer}s (using the
  *       distributed terms indices), and then write out the long[3] data into a
  *       raw file. Once the local data have been converted to long[]s we can
  *       sort them into total SPO order (by chunks if necessary) and build the
@@ -1574,7 +1575,8 @@ public class ConcurrentDataLoader {
             // Verify terms (batch operation).
             if (numValues > 0) {
 
-                database.addTerms(values, numValues, true/* readOnly */);
+                database.getLexiconRelation()
+                        .addTerms(values, numValues, true/* readOnly */);
 
             }
 
@@ -1629,14 +1631,23 @@ public class ConcurrentDataLoader {
                     
                 }
                 
-                ISPOIterator itr = database.bulkCompleteStatements(a, n);
-                
-                while(itr.hasNext()) {
-                    
-                    itr.next();
-                    
-                }
+                final IChunkedOrderedIterator<SPO> itr = database
+                        .bulkCompleteStatements(a, n);
 
+                try {
+
+                    while (itr.hasNext()) {
+
+                        itr.next();
+
+                    }
+
+                } finally {
+
+                    itr.close();
+
+                }
+                
                 for (int i = 0; i < n; i++) {
 
                     final SPO spo = a[i];

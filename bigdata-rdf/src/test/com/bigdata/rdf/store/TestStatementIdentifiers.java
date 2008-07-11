@@ -72,11 +72,11 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer.StatementCyclesException;
 import com.bigdata.rdf.rio.StatementBuffer.UnificationException;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOComparator;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.relation.accesspath.ChunkedArrayIterator;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 
 /**
  * Test of the statement identifier semantics.
@@ -189,7 +189,9 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 assertFalse(AbstractTripleStore.isURI(sid));
                 assertFalse(AbstractTripleStore.isBNode(sid));
                 
-                System.err.println(stmts[i].toString(store)+" ::: "+stmts[i].toString());
+                if (log.isInfoEnabled())
+                    log.info(stmts[i].toString(store) + " ::: "
+                            + stmts[i].toString());
                 
             }
             
@@ -202,11 +204,13 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             {
 
-                final ISPOIterator itr = store.getAccessPath(KeyOrder.SPO).iterator();
+                final IChunkedOrderedIterator<SPO> itr = store.getAccessPath(SPOKeyOrder.SPO).iterator();
+                
+                try {
                 
                 for(int i=0; i<stmts.length; i++) {
                     
-                    assertTrue("i="+i, itr.hasNext());
+                    assertTrue("expecting more elements: i="+i, itr.hasNext());
                     
                     final SPO expected = stmts[i];
                     
@@ -224,6 +228,12 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                             .getStatementIdentifier(), actual
                             .getStatementIdentifier());
 
+                }
+                
+                } finally {
+                    
+                    itr.close();
+                    
                 }
 
             }
@@ -250,7 +260,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                     
                 }
                 
-                final int nwritten = store.addStatements(a, a.length);
+                final long nwritten = store.addStatements(a, a.length);
 
                 for(int i=0;i<stmts.length; i++) {
                     
@@ -266,11 +276,11 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                  * read the pre-existing statement identifiers out of the KB and
                  * assigned them to a[].
                  */
-                assertEquals("#written",0,nwritten);
+                assertEquals("#written", 0L, nwritten);
                 
             }
 
-            BigdataStatementIterator itr = store.getStatements(null, null, null);
+            final BigdataStatementIterator itr = store.getStatements(null, null, null);
             
             try {
 
@@ -290,7 +300,8 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
                 rdfWriter.endRDF();
                 
-                System.err.println(w.toString());
+                if (log.isInfoEnabled())
+                    log.info(w.toString());
                 
             } catch(Exception ex) {
                 
@@ -349,7 +360,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                     }
 
-                    final int nwritten = store.addStatements(a, a.length);
+                    final long nwritten = store.addStatements(a, a.length);
 
                     for (int i = 0; i < stmts.length; i++) {
 
@@ -365,7 +376,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                      * have just read the pre-existing statement identifiers out
                      * of the KB and assigned them to a[].
                      */
-                    assertEquals("#written", 0, nwritten);
+                    assertEquals("#written", 0L, nwritten);
 
                 }
             }
@@ -475,7 +486,8 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             {
                 
-                store.removeStatements(new SPOArrayIterator(stmts1,stmts1.length));
+                store.removeStatements(new ChunkedArrayIterator<SPO>(
+                        stmts1.length, stmts1, null/*keyOrder*/));
 
                 assertSameSPOArray(store, new SPO[]{}, 0/*numStmts*/);
 
@@ -606,7 +618,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             {
                 
-                store.removeStatements(new SPOArrayIterator(stmts1,stmts1.length));
+                store.removeStatements(new ChunkedArrayIterator<SPO>(stmts1.length,stmts1,null/*keyOrder*/));
 
                 assertSameSPOArray(store, new SPO[]{}, 0/*numStmts*/);
 
@@ -638,34 +650,41 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
         
         Arrays.sort(all, 0, all.length, SPOComparator.INSTANCE);
 
-        ISPOIterator itr = store.getAccessPath(KeyOrder.SPO).iterator();
-        
-        for(int i=0; i<all.length; i++) {
-            
-            assertTrue("i=" + i, itr.hasNext());
+        final IChunkedOrderedIterator<SPO> itr = store.getAccessPath(
+                SPOKeyOrder.SPO).iterator();
 
-            final SPO expected = all[i];
+        try {
 
-            final SPO actual = itr.next();
+            for (int i = 0; i < all.length; i++) {
 
-            assertEquals("S @ i=" + i, expected.s, actual.s);
+                assertTrue("i=" + i, itr.hasNext());
 
-            assertEquals("P @ i=" + i, expected.p, actual.p);
+                final SPO expected = all[i];
 
-            assertEquals("O @ i=" + i, expected.o, actual.o);
+                final SPO actual = itr.next();
 
-            assertEquals("TYPE @ i=" + i, expected.getType(),
-                    actual.getType());
+                assertEquals("S @ i=" + i, expected.s, actual.s);
 
-            assertEquals("SID @ i=" + i, expected
-                    .getStatementIdentifier(), actual
-                    .getStatementIdentifier());                    
-            
+                assertEquals("P @ i=" + i, expected.p, actual.p);
+
+                assertEquals("O @ i=" + i, expected.o, actual.o);
+
+                assertEquals("TYPE @ i=" + i, expected.getType(), actual
+                        .getType());
+
+                assertEquals("SID @ i=" + i, expected.getStatementIdentifier(),
+                        actual.getStatementIdentifier());
+
+            }
+
+            assertFalse("iterator is willing to visit more than " + numStmts
+                    + " statements", itr.hasNext());
+        } finally {
+
+            itr.close();
+
         }
         
-        assertFalse("iterator is willing to visit more than " + numStmts
-                + " statements", itr.hasNext());
-
     }
 
     /**
