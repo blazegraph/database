@@ -41,7 +41,9 @@ public class NoAxioms extends BaseAxioms {
      * @param db
      */
     public NoAxioms(AbstractTripleStore db) {
+        
         super(db);
+        
     }
 
 }

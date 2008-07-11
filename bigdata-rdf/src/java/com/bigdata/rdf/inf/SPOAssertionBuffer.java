@@ -32,16 +32,17 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.rdf.spo.ISPOAssertionBuffer;
-import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.JustificationWriter;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOArrayIterator;
+import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.JustificationWriter;
-import com.bigdata.rdf.store.StatementWriter;
+import com.bigdata.relation.accesspath.ChunkedArrayIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.AbstractElementBuffer.InsertBuffer;
+import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 
 /**
  * A buffer for {@link SPO}s and optional {@link Justification}s that is
@@ -52,6 +53,9 @@ import com.bigdata.rdf.store.StatementWriter;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link InsertBuffer} and {@link InsertSolutionBuffer} and the
+ *             changes to how truth maintenance is handled (by rule rewrites).
  */
 public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAssertionBuffer {
 
@@ -121,7 +125,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
      *            focusStore {@link Justification}s for entailments.
      */
     public SPOAssertionBuffer(AbstractTripleStore focusStore,
-            AbstractTripleStore db, ISPOFilter filter, int capacity,
+            AbstractTripleStore db, IElementFilter<SPO> filter, int capacity,
             boolean justified) {
 
         super(db, filter, capacity);
@@ -170,7 +174,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
 
         if (isEmpty()) return 0;
 
-        final int n;
+        final long n;
         
         log.info("numStmts=" + numStmts+", numJustifications="+numJustifications);
 
@@ -179,8 +183,11 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         if (numJustifications == 0) {
             
             // batch insert statements into the focusStore.
-            n = db.addStatements(focusStore, true/* copyOnly */,
-                    new SPOArrayIterator(stmts, numStmts), null/*filter*/);
+            n = db.addStatements(
+                            focusStore,
+                            true/* copyOnly */,
+                            new ChunkedArrayIterator<SPO>(numStmts, stmts, null/*keyOrder*/),
+                            null/*filter*/);
 
         } else {
             
@@ -199,17 +206,18 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
              */
            
             // set as a side-effect.
-            AtomicInteger nwritten = new AtomicInteger();
+            AtomicLong nwritten = new AtomicLong();
 
             // task will write SPOs on the statement indices.
-            tasks.add(new StatementWriter(getTermDatabase(), focusStore, false/* copyOnly */,
-                    new SPOArrayIterator(stmts, numStmts), nwritten));
+            tasks.add(new StatementWriter(getTermDatabase(), focusStore,
+                    false/* copyOnly */, new ChunkedArrayIterator<SPO>(
+                            numStmts, stmts, null/*keyOrder*/), nwritten));
             
             // task will write justifications on the justifications index.
             AtomicLong nwrittenj = new AtomicLong();
             tasks.add(new JustificationWriter(focusStore,
-                    new JustificationArrayIterator(justifications,
-                            numJustifications),nwrittenj));
+                    new ChunkedArrayIterator<Justification>(numJustifications,
+                            justifications, null/* keyOrder */), nwrittenj));
             
             final List<Future<Long>> futures;
             final long elapsed_SPO;
@@ -217,7 +225,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             
             try {
 
-                futures = focusStore.getThreadPool().invokeAll( tasks );
+                futures = focusStore.getIndexManager().getExecutorService().invokeAll( tasks );
 
                 elapsed_SPO = futures.get(0).get();
                 elapsed_JST = futures.get(1).get();
@@ -254,7 +262,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
 
         numStmts = numJustifications = 0;
 
-        return n;
+        // FIXME Note: being truncated to int, but whole class is deprecated.
+        return (int) Math.min(Integer.MAX_VALUE, n);
 
     }
 

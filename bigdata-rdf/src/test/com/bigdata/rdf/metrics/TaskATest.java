@@ -37,10 +37,9 @@ import java.util.Properties;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.inf.ClosureStats;
-import com.bigdata.rdf.inf.InferenceEngine;
-import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
-import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.store.DataLoader.CommitEnum;
@@ -232,7 +231,7 @@ public class TaskATest
         properties.setProperty(DataLoader.Options.COMMIT,CommitEnum.Batch.toString());
 
         // Note: this turns off sameAs processing.
-        properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+        properties.setProperty(Options.RDFS_ONLY, "true");
 
         // generate justifications for TM.
 //        properties.setProperty(Options.JUSTIFY, "true");
@@ -477,7 +476,7 @@ public class TaskATest
             
             // Explicit + (Entailments = Axioms + Inferred)
             final long totalTriples = loadStats[run].toldTriples
-                    + (closureStats!=null?closureStats.nentailments : 0);
+                    + (closureStats!=null?closureStats.mutationCount : 0);
 
             // loadTime + closureTime + commitTime.
             final long totalTime = loadStats[run].loadTime
@@ -490,9 +489,9 @@ public class TaskATest
                             +", "+loadStats[run].toldTriples
                             +", "+loadStats[run].loadTime/1000
                             +", "+tps(loadStats[run].toldTriples,loadStats[run].loadTime)
-                            +", "+(closureStats!=null?closureStats.nentailments:"")
+                            +", "+(closureStats!=null?closureStats.mutationCount:"")
                             +", "+(closureStats!=null?closureStats.elapsed/1000:"")
-                            +", "+(closureStats!=null?tps(closureStats.nentailments,closureStats.elapsed):"")
+                            +", "+(closureStats!=null?tps(closureStats.mutationCount,closureStats.elapsed):"")
                             +", "+loadStats[run].commitTime
                             +", "+tps(totalTriples,totalTime)
 

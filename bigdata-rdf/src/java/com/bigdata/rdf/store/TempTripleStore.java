@@ -27,188 +27,95 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.util.Enumeration;
 import java.util.Properties;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data
- * is buffered in memory but will overflow to disk for large stores.
+ * is buffered in memory but will overflow to disk for large stores. The backing
+ * store is a {@link TemporaryStore}.
+ * <p>
+ * Note: the {@link TempTripleStore} declares indices that do NOT support
+ * isolation. This offers a significant performance boost when you do not need
+ * transactions or the ability to purge historical data versions from the store
+ * as they age.
+ * <p>
+ * Note: Users of the {@link TempTripleStore} may find it worthwhile to turn off
+ * a variety of options in order to minimize the time and space burden of the
+ * temporary store depending on the use which will be made of it, including
+ * {@link Options#LEXICON} and {@link Options#ONE_ACCESS_PATH}.
+ * <p>
+ * Note: Multiple KBs MAY be created in the backing {@link TemporaryStore} but
+ * all MUST be assigned the {@link TemporaryStore#getUUID()} as their prefix in
+ * order to avoid possible conflicts within a global namespace. This is
+ * especially important when the relations in the {@link TemporaryStore} are
+ * resolvable by an {@link IBigdataFederation} or {@link Journal}.
  * <p>
  * Note: This class is often used to support inference. When so used, the
  * statement indices are populated with the term identifiers from the main
- * database and the ids and terms indices in the {@link TempTripleStore} are NOT
- * used.
+ * database and the {@link SPORelation} in the {@link TempTripleStore} is
+ * disabled using {@link Options#LEXICON}.
  * <p>
- * Note: This class does NOT support {@link #commit()} or {@link #abort()}. If
- * you want an in-memory {@link ITripleStore} that supports commit and abort
- * then use a {@link LocalTripleStore} and specify
+ * Note: If you want an in-memory {@link ITripleStore} that supports commit and
+ * abort then use a {@link LocalTripleStore} and specify
  * {@link com.bigdata.journal.Options#BUFFER_MODE} as
- * {@link BufferMode#Transient}.
- * 
- * FIXME examine use of {@link TemporaryStore} vs a {@link Journal} with
- * {@link BufferMode#Temporary}. The latter provides full concurrency control
- * and group commit while the former presumably has less startup costs because
- * it does not have the thread pools for concurrency control.
+ * {@link BufferMode#Temporary} or as {@link BufferMode#Transient} if you want
+ * the triple store to begin in memory and overflow to disk if necessary. Both
+ * of these configurations provide full concurrency control and group commit.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class TempTripleStore extends AbstractLocalTripleStore implements ITripleStore {
-
-    private BTree ndx_term2Id;
-    private BTree ndx_id2Term;
-
-    private BTree ndx_spo;
-    private BTree ndx_pos;
-    private BTree ndx_osp;
-
-    private BTree ndx_just;
     
-    private TemporaryStore store;
+    private final TemporaryStore store;
     
-    private final AbstractTripleStore db;
-    
-    public TemporaryStore getStore() {
+    public TemporaryStore getIndexManager() {
         
         return store;
         
     }
 
-    final public IIndex getSPOIndex() {
-
-        return ndx_spo;
-        
-    }
-    
-    final public IIndex getPOSIndex() {
-
-        return ndx_pos;
-
-    }
-    
-    final public IIndex getOSPIndex() {
-        
-        return ndx_osp;
-
-    }
-
-    final public IIndex getTerm2IdIndex() {
-
-        return ndx_term2Id;
-        
-    }
-    
-    final public IIndex getId2TermIndex() {
-
-        return ndx_id2Term;
-        
-    }
-
-    final public IIndex getJustificationIndex() {
-        
-        return ndx_just;
-        
-    }
-    
     /**
-     * NOP - the temporary store does not support commits or aborts.
+     * Delegates the operation to the backing store.
      */
     final public void commit() {
+     
+        final long begin = System.currentTimeMillis();
+
+        super.commit();
         
+        final long checkpointAddr = getIndexManager().checkpoint();
+
+        final long elapsed = System.currentTimeMillis() - begin;
+
+        if (log.isInfoEnabled())
+            log.info("latency=" + elapsed + "ms, checkpointAddr="
+                    + checkpointAddr);
+
     }
-    
-    /**
-     * NOP - the temporary store does not support commits or aborts.
-     */
+
     final public void abort() {
+                
+        super.abort();
         
+        // discard the write sets.
+        getIndexManager().restoreLastCheckpoint();
+
     }
     
     final public boolean isStable() {
         
         return store.isStable();
-        
-    }
-    
-    final public boolean isReadOnly() {
-        
-        return false;
-        
-    }
-    
-    final public void clear() {
-        
-//        if(true) {
-
-            if(lexicon) {
-
-                ndx_term2Id.removeAll();
-                ndx_id2Term.removeAll();
-                
-                if(textIndex) {
-                    
-                    getSearchEngine().clear();
-                    
-                }
-                
-            }
-    
-            ndx_spo.removeAll();
-            
-            if(!oneAccessPath) {
-             
-                ndx_pos.removeAll();
-                
-                ndx_osp.removeAll();
-                
-            }
-            
-            if(justify) {
-
-                ndx_just.removeAll();
-                
-            }
-            
-//        } else {        
-//
-//            if(lexicon) {
-//            
-//                store.dropIndex(name_idTerm); ndx_termId = null;
-//                store.dropIndex(name_termId); ndx_idTerm = null;
-//                
-//                if(textIndex) {
-//                    
-////                    store.dropIndex(name_freeText); ndx_freeText = null;
-//                    
-//                }
-//                
-//            }
-//            
-//            store.dropIndex(name_spo); ndx_spo = null;
-//            
-//            if(!oneAccessPath) {
-//            
-//                store.dropIndex(name_pos); ndx_pos = null;
-//             
-//                store.dropIndex(name_osp); ndx_osp = null;
-//                
-//            }
-//            
-//            if(justify) {
-//
-//                store.dropIndex(name_just); ndx_just = null;
-//                
-//            }
-//            
-//            createIndices();
-//            
-//        }
         
     }
     
@@ -229,19 +136,6 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     }
     
     /**
-     * Uses the thread-local {@link RdfKeyBuilder} on the
-     * {@link AbstractTripleStore} supplied to the ctor if defined and otherwise
-     * creates its own thread-local {@link RdfKeyBuilder}s.
-     */
-    final public RdfKeyBuilder getKeyBuilder() {
-        
-        if(db != null) return db.getKeyBuilder();
-        
-        return super.getKeyBuilder();
-        
-    }
-    
-    /**
      * 
      * @todo define options for {@link TemporaryStore} and then extend them
      *       here.
@@ -254,17 +148,8 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     }
     
     /**
-     * Create a transient {@link ITripleStore} backed by a
+     * Create a transient {@link ITripleStore} backed by a new
      * {@link TemporaryStore}.
-     * <p>
-     * Note: the {@link TempTripleStore} declares its indices that do NOT
-     * support isolation. This offers a significant performance boost when you
-     * do not need transactions or the ability to purge historical data versions
-     * from the store as they age.
-     * <p>
-     * Note: Users of the {@link TempTripleStore} may find it worthwhile to turn
-     * off a variety of options in order to minimize the time and space burden
-     * of the temporary store depending on the use which will be made of it.
      * 
      * @param properties
      *            See {@link Options}.
@@ -276,89 +161,118 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     }
     
     /**
-     * Variant that will reuse the same thread-local {@link RdfKeyBuilder}s
-     * exposed by the optional <i>db</i>.
+     * Create a transient {@link ITripleStore} backed by a new
+     * {@link TemporaryStore}. The {@link ITripleStore} will default its
+     * properties based on those specified for the optional <i>db</i> and then
+     * override those defaults using the given <i>properties</i>.
+     * <p>
+     * Note: This variant is especially useful when the {@link TempTripleStore}
+     * will have its own lexicon and you need it to be compatible with the
+     * lexicon for the <i>db</i>.
+     * <p>
+     * Note: When <i>db</i> is non-<code>null</code>, the relations on the
+     * {@link TempTripleStore} will be locatable by the specified <i>db</i>.
+     * 
+     * @todo multiple KBs in a TempTripleStore could make sense for things like
+     *       closure. Closure has to create a lot of temp stores - those could
+     *       be in the same backing file.
      * 
      * @param properties
+     *            Overrides for the database's properties.
      * @param db
-     *            A database to which requests for a thread-local
-     *            {@link RdfKeyBuilder} will be delegated (optional).
+     *            The optional database (a) will establish the defaults for the
+     *            {@link TempTripleStore}; and (b) will be able to locate
+     *            relations declared on the backing {@link TemporaryStore}.
      */
-    public TempTripleStore(Properties properties,AbstractTripleStore db) {
+    public TempTripleStore(Properties properties, AbstractTripleStore db) {
         
-        super(properties);
+        this(new TemporaryStore(), db == null ? properties : stackProperties(
+                properties, db));
 
-        this.db = db;
-        
+        if (db != null) {
+
+            ((DefaultResourceLocator) db.getIndexManager().getResourceLocator())
+                    .add(store);
+
+        }
+
         /*
-         * @todo property for how large the temporary store can get in memory
-         * before it overflows (Question is how to minimize the time to create
-         * the backing file, which adds significant latency - plus the temp
-         * store is not as concurrency savvy).
+         * Create the KB for this ctor variant!
          */
-        
-        store = new TemporaryStore();
 
-        createIndices();
-        
+        create();
+
     }
 
-    private void createIndices() {
+    /**
+     * Note: This is here just to make it easy to have the reference to the
+     * [store] and its [uuid] when we create one in the calling ctor.
+     */
+    private TempTripleStore(TemporaryStore store, Properties properties) {
 
-        if (lexicon) {
+        this(store, store.getUUID() + "kb", ITx.UNISOLATED, properties);
 
-            ndx_term2Id = (BTree) store.registerIndex(name_term2Id, BTree.create(
-                    store, getTerm2IdIndexMetadata(name_term2Id)));
-
-            ndx_id2Term = (BTree) store.registerIndex(name_id2Term, BTree.create(
-                    store, getId2TermIndexMetadata(name_id2Term)));
-
-        }
-
-        if (oneAccessPath) {
-
-            ndx_spo = (BTree) store.registerIndex(name_spo, BTree.create(store,
-                    getStatementIndexMetadata(name_spo)));
-
-        } else {
-
-            ndx_spo = (BTree) store.registerIndex(name_spo, BTree.create(store,
-                    getStatementIndexMetadata(name_spo)));
-
-            ndx_pos = (BTree) store.registerIndex(name_pos, BTree.create(store,
-                    getStatementIndexMetadata(name_pos)));
-
-            ndx_osp = (BTree) store.registerIndex(name_osp, BTree.create(store,
-                    getStatementIndexMetadata(name_osp)));
-
-        }
-
-        if (justify) {
-
-            ndx_just = (BTree) store.registerIndex(name_just, BTree.create(
-                    store, getJustIndexMetadata(name_just)));
-
-        }
-
-        if(textIndex) {
-            
-            getSearchEngine();
-            
-        }
-        
     }
-    
-    public String usage(){
-        
-        return super.usage()+
-        ("\nfile="+store.getBufferStrategy().getFile())+
-        ("\nbyteCount="+store.getBufferStrategy().getNextOffset())
-        ;
-        
+
+    /**
+     * Ctor specified by {@link DefaultResourceLocator}.
+     * 
+     * @param indexManager
+     * @param namespace
+     * @param timestamp
+     * @param properties
+     */
+    public TempTripleStore(IIndexManager indexManager, String namespace,
+            Long timestamp, Properties properties) {
+
+        super(indexManager, namespace, timestamp, properties);
+
+        store = (TemporaryStore) indexManager;
+
     }
     
     /**
-     * This store is NOT safe for concurrent operations.
+     * Stacks the <i>properties</i> on top of the <i>db</i>'s properties so
+     * that the databases properties will be treated as defaults and anything in
+     * <i>properties</i> will override anything in database's properties.
+     * 
+     * @param properties
+     *            The properties for the {@link TempTripleStore}.
+     * @param db
+     *            The database from which we will obtain default properties.
+     * 
+     * @return The stacked properties.
+     */
+    private static Properties stackProperties(Properties properties, AbstractTripleStore db) {
+        
+        Properties tmp = db.getProperties();
+        
+        Enumeration e = properties.keys();
+        
+        while(e.hasMoreElements()) {
+            
+            Object ekey = e.nextElement();
+            
+            if(!(ekey instanceof String)) {
+                
+                continue;
+                
+            }
+            
+            final String key = (String)ekey;
+            
+            tmp.setProperty(key,properties.getProperty(key));
+            
+        }
+        
+        return tmp;
+        
+    }
+
+    /**
+     * This store is NOT safe for concurrent operations on an
+     * {@link ITx#UNISOLATED} index. However, it does support concurrent readers
+     * on the {@link ITx#READ_COMMITTED} view of an index.
      */
     public boolean isConcurrent() {
 

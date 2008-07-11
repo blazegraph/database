@@ -25,6 +25,7 @@ package com.bigdata.rdf.spo;
 
 import java.util.Comparator;
 
+
 /**
  * Imposes p:o:s ordering based on termIds only.
  * 

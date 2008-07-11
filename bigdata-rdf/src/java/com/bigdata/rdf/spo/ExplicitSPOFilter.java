@@ -27,7 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import java.io.IOException;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
+
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * Filter matches only {@link StatementEnum#Explicit} {@link SPO}s.
@@ -35,21 +40,48 @@ import com.bigdata.rdf.model.StatementEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class ExplicitSPOFilter implements ISPOFilter {
+final public class ExplicitSPOFilter implements IElementFilter<SPO>, Serializable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 2123102826207595688L;
+    
     /**
      * Shared instance.
      */
-    static public final transient ISPOFilter INSTANCE = new ExplicitSPOFilter();
+    static public final transient IElementFilter<SPO> INSTANCE = new ExplicitSPOFilter();
     
     private ExplicitSPOFilter() {
         
     }
     
-    public boolean isMatch(SPO spo) {
+    public boolean accept(SPO spo) {
 
         return spo.getType() == StatementEnum.Explicit;
         
     }
 
+    /**
+     * Imposes the canonicalizing mapping during object de-serialization.
+     */
+    private Object readResolve() throws ObjectStreamException {
+        
+        return INSTANCE;
+        
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+
+        // NOP - stateless.
+        
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws IOException,
+            ClassNotFoundException {
+
+        // NOP - stateless.
+
+    }
+    
 }

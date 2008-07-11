@@ -38,7 +38,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class RdfsAxioms extends BaseAxioms {
     
-    protected RdfsAxioms(AbstractTripleStore db)
+    public RdfsAxioms(AbstractTripleStore db)
     {
         
         super(db);

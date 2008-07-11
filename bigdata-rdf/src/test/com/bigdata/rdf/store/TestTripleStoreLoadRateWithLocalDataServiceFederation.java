@@ -76,7 +76,8 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         super.setUp();
 
         // connect to the database.
-        store = new ScaleOutTripleStore(client, "test_", ITx.UNISOLATED);
+        store = new ScaleOutTripleStore(client.getFederation(), "test_",
+                ITx.UNISOLATED, client.getProperties());
 
     }
 

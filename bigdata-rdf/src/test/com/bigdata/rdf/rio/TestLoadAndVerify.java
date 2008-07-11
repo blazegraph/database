@@ -46,12 +46,15 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.ConcurrentDataLoader;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
  * Test loads an RDF/XML resource into a database and then verifies by re-parse
@@ -60,6 +63,11 @@ import com.bigdata.rdf.util.KeyOrder;
  * @todo this test will probably fail if the source data contains bnodes since
  *       it does not validate bnodes based on consistent RDF properties but only
  *       based on their Java fields.
+ * 
+ * @todo we have three ways in which we can verify the database. This class, the
+ *       bulk filter and bulk contain methods, and the
+ *       {@link ConcurrentDataLoader}. These are doubtless partly redundent and
+ *       this implementation in particular does not scale-out well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -169,13 +177,13 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                             
                             if (_s != NULL && _p != NULL && _o != NULL) {
                             
-                                assertStatement(db, KeyOrder.SPO, _s, _p, _o,
+                                assertStatement(db, SPOKeyOrder.SPO, _s, _p, _o,
                                         stmt );
                                 
-                                assertStatement(db, KeyOrder.OSP, _s, _p, _o,
+                                assertStatement(db, SPOKeyOrder.OSP, _s, _p, _o,
                                         stmt );
 
-                                assertStatement(db, KeyOrder.POS, _s, _p, _o,
+                                assertStatement(db, SPOKeyOrder.POS, _s, _p, _o,
                                         stmt );
 
                             }
@@ -251,21 +259,26 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                          * @param stmt
                          */
                         private void assertStatement(
-                                AbstractTripleStore db, KeyOrder keyOrder,
+                                AbstractTripleStore db, IKeyOrder<SPO> keyOrder,
                                 long s, long p, long o,
                                 Statement stmt) {
 
-                            IIndex ndx = db.getStatementIndex(keyOrder);
+                            final IIndex ndx = db
+                                        .getStatementIndex(keyOrder);
 
-                            final SPO expectedSPO = new SPO(s, p, o,
-                                    StatementEnum.Explicit);
-                            
-                            final byte[] fromKey = db.getKeyBuilder()
-                                        .statement2Key(keyOrder, expectedSPO);
+                                final SPOTupleSerializer tupleSer = (SPOTupleSerializer) ndx
+                                        .getIndexMetadata()
+                                        .getTupleSerializer();
+
+                                final SPO expectedSPO = new SPO(s, p, o,
+                                        StatementEnum.Explicit);
+
+                                final byte[] fromKey = tupleSer.statement2Key(
+                                        keyOrder, expectedSPO);
 
                             final byte[] toKey = null;
 
-                            ITupleIterator itr = ndx.rangeIterator(fromKey,
+                            final ITupleIterator itr = ndx.rangeIterator(fromKey,
                                     toKey);
 
                             if (!itr.hasNext()) {
@@ -286,7 +299,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                                 
                             }
 
-                            final SPO actualSPO = new SPO(keyOrder, itr);
+                            final SPO actualSPO = (SPO)itr.next().getObject();
 
                             if (!expectedSPO.equals(actualSPO)) {
 

@@ -4,44 +4,57 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
- * Supports the bulk filter.
+ * Supports the bulk statement filter and bulk statement completion operations.
  * 
- * @version $Id$
+ * @version $Id: SPOConvertingIterator.java,v 1.2 2008/06/18 14:16:25
+ *          thompsonbry Exp $
  */
-public class SPOConvertingIterator implements ISPOIterator {
+public class SPOConvertingIterator implements IChunkedOrderedIterator<SPO> {
     
     private final static Logger log = Logger.getLogger(SPOConvertingIterator.class);
     
-    private final ISPOIterator src;
+    private final IChunkedOrderedIterator<SPO> src;
 
     private final SPOConverter converter;
 
-    private final KeyOrder keyOrder;
+    private final IKeyOrder<SPO> keyOrder;
 
     private SPO[] converted = new SPO[0];
 
     private int pos = 0;
 
-    public SPOConvertingIterator(ISPOIterator src, SPOConverter converter) {
+    public SPOConvertingIterator(IChunkedOrderedIterator<SPO> src, SPOConverter converter) {
+        
         this(src, converter, src.getKeyOrder());
+        
     }
 
-    public SPOConvertingIterator(ISPOIterator src, SPOConverter converter,
-            KeyOrder keyOrder) {
+    public SPOConvertingIterator(IChunkedOrderedIterator<SPO> src,
+            SPOConverter converter, IKeyOrder<SPO> keyOrder) {
+        
         this.src = src;
+        
         this.converter = converter;
+        
         this.keyOrder = keyOrder;
+        
     }
 
     private SPO[] convert(SPO[] src) {
+
         return converter.convert(src);
+        
     }
 
     public void close() {
+        
         src.close();
+        
     }
 
     public SPO next() {
@@ -73,8 +86,10 @@ public class SPOConvertingIterator implements ISPOIterator {
         return hasNext;
     }
 
-    public KeyOrder getKeyOrder() {
+    public IKeyOrder<SPO> getKeyOrder() {
+        
         return keyOrder;
+        
     }
 
     public SPO[] nextChunk() {
@@ -95,13 +110,29 @@ public class SPOConvertingIterator implements ISPOIterator {
         return nextChunk;
     }
 
-    public SPO[] nextChunk(KeyOrder keyOrder) {
+    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+        
         SPO[] chunk = nextChunk();
+        
         Arrays.sort(chunk, keyOrder.getComparator());
+        
         return chunk;
+        
     }
 
+    /**
+     * This is a chunk at a time type processor (SPO to SPO). Elements can be
+     * dropped, have their state changed, or have their state replaced by a
+     * "completed" element (e.g., one with the {@link StatementEnum} and
+     * statement identifier).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     public static interface SPOConverter {
+        
         SPO[] convert(SPO[] src);
+        
     }
+
 }

@@ -27,14 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.util.Arrays;
-
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
-
-import com.bigdata.rdf.rio.IStatementBuffer;
-import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
  * Test suite for {@link IAccessPath}.
@@ -72,118 +67,32 @@ public class TestAccessPath extends AbstractTripleStoreTestCase {
         AbstractTripleStore store = getStore();
 
         try {
+            
+            final SPORelation r = store.getSPORelation();
 
-            assertEquals(KeyOrder.SPO, store.getAccessPath(NULL, NULL, NULL)
+            assertEquals(SPOKeyOrder.SPO, r.getAccessPath(NULL, NULL, NULL)
                     .getKeyOrder());
 
-            assertEquals(KeyOrder.SPO, store.getAccessPath(1, NULL, NULL)
+            assertEquals(SPOKeyOrder.SPO, r.getAccessPath(1, NULL, NULL)
                     .getKeyOrder());
 
-            assertEquals(KeyOrder.SPO, store.getAccessPath(1, 1, NULL)
+            assertEquals(SPOKeyOrder.SPO, r.getAccessPath(1, 1, NULL)
                     .getKeyOrder());
 
-            assertEquals(KeyOrder.SPO, store.getAccessPath(1, 1, 1)
+            assertEquals(SPOKeyOrder.SPO, r.getAccessPath(1, 1, 1)
                     .getKeyOrder());
 
-            assertEquals(KeyOrder.POS, store.getAccessPath(NULL, 1, NULL)
+            assertEquals(SPOKeyOrder.POS, r.getAccessPath(NULL, 1, NULL)
                     .getKeyOrder());
 
-            assertEquals(KeyOrder.POS, store.getAccessPath(NULL, 1, 1)
+            assertEquals(SPOKeyOrder.POS, r.getAccessPath(NULL, 1, 1)
                     .getKeyOrder());
 
-            assertEquals(KeyOrder.OSP, store.getAccessPath(NULL, NULL, 1)
+            assertEquals(SPOKeyOrder.OSP, r.getAccessPath(NULL, NULL, 1)
                     .getKeyOrder());
 
-            assertEquals(KeyOrder.OSP, store.getAccessPath(1, NULL, 1)
+            assertEquals(SPOKeyOrder.OSP, r.getAccessPath(1, NULL, 1)
                     .getKeyOrder());
-
-        } finally {
-
-            store.closeAndDelete();
-
-        }
-
-    }
-
-    /**
-     * Unit test for {@link IAccessPath#distinctTermScan()}
-     */
-    public void test_getDistinctTermIdentifiers() {
-
-        AbstractTripleStore store = getStore();
-
-        try {
-
-            IStatementBuffer buffer = new StatementBuffer(store,
-                    100/* capacity */);
-
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI B = new URIImpl("http://www.foo.org/B");
-            URI C = new URIImpl("http://www.foo.org/C");
-            URI D = new URIImpl("http://www.foo.org/D");
-            URI E = new URIImpl("http://www.foo.org/E");
-
-            buffer.add(A, B, C);
-            buffer.add(C, B, D);
-            buffer.add(A, E, C);
-
-            // flush statements to the store.
-            buffer.flush();
-
-            assertTrue(store.hasStatement(A, B, C));
-            assertTrue(store.hasStatement(C, B, D));
-            assertTrue(store.hasStatement(A, E, C));
-
-            // distinct subject term identifiers.
-            {
-
-                Long[] expected = new Long[] {
-
-                store.getTermId(A), store.getTermId(C)
-
-                };
-
-                // term identifers will be in ascending order.
-                Arrays.sort(expected);
-
-                assertSameItr(expected, store.getAccessPath(KeyOrder.SPO)
-                        .distinctTermScan());
-
-            }
-
-            // distinct predicate term identifiers.
-            {
-
-                Long[] expected = new Long[] {
-
-                store.getTermId(B), store.getTermId(E)
-
-                };
-
-                // term identifers will be in ascending order.
-                Arrays.sort(expected);
-
-                assertSameItr(expected, store.getAccessPath(KeyOrder.POS)
-                        .distinctTermScan());
-
-            }
-
-            // distinct object term identifiers.
-            {
-
-                Long[] expected = new Long[] {
-
-                store.getTermId(C), store.getTermId(D)
-
-                };
-
-                // term identifers will be in ascending order.
-                Arrays.sort(expected);
-
-                assertSameItr(expected, store.getAccessPath(KeyOrder.OSP)
-                        .distinctTermScan());
-
-            }
 
         } finally {
 

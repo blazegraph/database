@@ -2,10 +2,15 @@ package com.bigdata.rdf.inf;
 
 import java.util.Set;
 import java.util.TreeSet;
-import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
-public abstract class BackchainOwlSameAsIterator implements ISPOIterator {
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+
+public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedIterator<SPO> {
+    
+    protected final static transient long NULL = IRawTripleStore.NULL;
     
     /**
      * The database.
@@ -20,9 +25,9 @@ public abstract class BackchainOwlSameAsIterator implements ISPOIterator {
     
     protected long sameAs;
 
-    protected ISPOIterator src;
+    protected IChunkedOrderedIterator<SPO> src;
 
-    public BackchainOwlSameAsIterator(ISPOIterator src, AbstractTripleStore db,
+    public BackchainOwlSameAsIterator(IChunkedOrderedIterator<SPO> src, AbstractTripleStore db,
             long sameAs) {
         if (src == null)
             throw new IllegalArgumentException();
@@ -51,7 +56,7 @@ public abstract class BackchainOwlSameAsIterator implements ISPOIterator {
     }
 
     public void getSames(long id, Set<Long> sames) {
-        ISPOIterator it = db.getAccessPath(id, sameAs, NULL).iterator();
+        IChunkedOrderedIterator<SPO> it = db.getAccessPath(id, sameAs, NULL).iterator();
         try {
             while (it.hasNext()) {
                 long same = it.next().o;

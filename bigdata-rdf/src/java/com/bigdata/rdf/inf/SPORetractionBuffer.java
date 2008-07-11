@@ -30,6 +30,9 @@ package com.bigdata.rdf.inf;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.ChunkedArrayIterator;
+import com.bigdata.relation.accesspath.AbstractElementBuffer.DeleteBuffer;
+import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.DeleteSolutionBuffer;
 
 /**
  * A buffer for {@link SPO}s which causes the corresponding statements (and
@@ -38,6 +41,9 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link DeleteBuffer} and {@link DeleteSolutionBuffer} and the
+ *             changes to how truth maintenance is handled (rule rewrites).
  */
 public class SPORetractionBuffer extends AbstractSPOBuffer {
 
@@ -72,14 +78,15 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
 
         if (isEmpty()) return 0;
         
-        int nremoved = store.removeStatements(new SPOArrayIterator(stmts,
-                numStmts), computeClosureForStatementIdentifiers);
+        long n = store.removeStatements(new ChunkedArrayIterator<SPO>(numStmts,stmts,
+                null/*keyOrder*/), computeClosureForStatementIdentifiers);
 
         // reset the counter.
         numStmts = 0;
 
-        return nremoved;
-        
+        // FIXME Note: being truncated to int, but whole class is deprecated.
+        return (int) Math.min(Integer.MAX_VALUE, n);
+
     }
 
 }

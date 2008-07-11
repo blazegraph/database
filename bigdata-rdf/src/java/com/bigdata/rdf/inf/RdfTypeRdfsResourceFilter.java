@@ -1,7 +1,13 @@
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.spo.ISPOFilter;
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
+import com.bigdata.rdf.rules.RDFSVocabulary;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * Filter matches <code>(x rdf:type rdfs:Resource).
@@ -9,24 +15,36 @@ import com.bigdata.rdf.spo.SPO;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RdfTypeRdfsResourceFilter implements ISPOFilter {
+public class RdfTypeRdfsResourceFilter implements IElementFilter<SPO>, Externalizable {
 
-    private final long rdfType;
-    private final long rdfsResource;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -2157234197316632000L;
+    
+    private long rdfType;
+    private long rdfsResource;
+    
+    /**
+     * De-serialization ctor.
+     */
+    public RdfTypeRdfsResourceFilter() {
+        
+    }
     
     /**
      * 
      * @param vocab
      */
-    public RdfTypeRdfsResourceFilter(RDFSHelper vocab) {
+    public RdfTypeRdfsResourceFilter(RDFSVocabulary vocab) {
         
-        this.rdfType = vocab.rdfType.id;
+        this.rdfType = vocab.rdfType.get();
         
-        this.rdfsResource = vocab.rdfsResource.id;
+        this.rdfsResource = vocab.rdfsResource.get();
         
     }
 
-    public boolean isMatch(SPO spo) {
+    public boolean accept(SPO spo) {
 
         if (spo.p == rdfType && spo.o == rdfsResource) {
             
@@ -39,6 +57,22 @@ public class RdfTypeRdfsResourceFilter implements ISPOFilter {
         // Accept everything else.
         
         return false;
+        
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        
+        rdfType = in.readLong();
+
+        rdfsResource = in.readLong();
+        
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        out.writeLong(rdfType);
+
+        out.writeLong(rdfsResource);
         
     }
     

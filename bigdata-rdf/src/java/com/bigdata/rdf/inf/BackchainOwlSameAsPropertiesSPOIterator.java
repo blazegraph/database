@@ -27,16 +27,16 @@
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
-import java.util.TreeSet;
+
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IKeyOrder;
 
 /**
  * Provides backward chaining for property collection and reverse property
@@ -54,7 +54,8 @@ import com.bigdata.rdf.util.KeyOrder;
  */
 public class BackchainOwlSameAsPropertiesSPOIterator extends
         BackchainOwlSameAsIterator {
-    private ISPOIterator sameAs2and3It;
+
+    private IChunkedOrderedIterator<SPO> sameAs2and3It;
 
     private TempTripleStore sameAs2and3;
 
@@ -67,8 +68,8 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
      * 
      * @param src
      *            The source iterator. {@link #nextChunk()} will sort statements
-     *            into the {@link KeyOrder} reported by this iterator (as long
-     *            as the {@link KeyOrder} is non-<code>null</code>).
+     *            into the {@link IKeyOrder} reported by this iterator (as long
+     *            as the {@link IKeyOrder} is non-<code>null</code>).
      * @param s
      *            The subject of the triple pattern. Cannot be null.
      * @param p
@@ -82,8 +83,9 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
      *            The term identifier that corresponds to owl:sameAs for the
      *            database.
      */
-    public BackchainOwlSameAsPropertiesSPOIterator(ISPOIterator src, long s,
-            long p, long o, AbstractTripleStore db, final long sameAs) {
+    public BackchainOwlSameAsPropertiesSPOIterator(
+            IChunkedOrderedIterator<SPO> src, long s, long p, long o,
+            AbstractTripleStore db, final long sameAs) {
         super(src, db, sameAs);
         Properties props = db.getProperties();
         // do not store terms
@@ -115,7 +117,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             for (long s1 : sAndSames) {
                 for (long o1 : oAndSames) {
                     // get the links between this {s,o} tuple
-                    ISPOIterator it = db.getAccessPath(s1, p, o1).iterator();
+                    IChunkedOrderedIterator<SPO> it = db.getAccessPath(s1, p, o1).iterator();
                     while (it.hasNext()) {
                         long p1 = it.next().p;
                         // do not add ( s sameAs s ) inferences
@@ -124,7 +126,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
                         }
                         if (numSPOs == chunkSize) {
                             boolean present = false; // filter for not present
-                            ISPOIterator absent = db.bulkFilterStatements(spos,
+                            IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos,
                                     numSPOs, present);
                             db.addStatements(sameAs2and3,copyOnly,absent, null);
                             numSPOs = 0;
@@ -136,19 +138,23 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             }
             // final flush of the buffer
             boolean present = false; // filter for not present
-            ISPOIterator absent = db.bulkFilterStatements(spos, numSPOs,
+            IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos, numSPOs,
                     present);
             db.addStatements(sameAs2and3,copyOnly,absent, null);
         }
-        sameAs2and3It = sameAs2and3.getAccessPath(KeyOrder.SPO).iterator();
+        sameAs2and3It = sameAs2and3.getAccessPath(SPOKeyOrder.SPO).iterator();
     }
 
-    public KeyOrder getKeyOrder() {
+    public IKeyOrder<SPO> getKeyOrder() {
+     
         return src.getKeyOrder();
+        
     }
 
     public boolean hasNext() {
+        
         return src.hasNext() || sameAs2and3It.hasNext();
+        
     }
 
     public SPO next() {
@@ -176,7 +182,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
         return stmts;
     }
 
-    public SPO[] nextChunk(KeyOrder keyOrder) {
+    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
         if (keyOrder == null)
             throw new IllegalArgumentException();
         SPO[] stmts = nextChunk();

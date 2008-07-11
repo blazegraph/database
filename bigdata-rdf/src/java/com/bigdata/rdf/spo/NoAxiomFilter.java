@@ -27,7 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import java.io.IOException;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
+
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * A filter that matches explicit or inferred statements but not those whose
@@ -36,21 +41,49 @@ import com.bigdata.rdf.model.StatementEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NoAxiomFilter implements ISPOFilter {
+public class NoAxiomFilter implements IElementFilter<SPO>, Serializable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 6979067019748992496L;
+    
     /**
      * Shared instance.
      */
-    static public final transient ISPOFilter INSTANCE = new NoAxiomFilter();
+    static public final transient IElementFilter<SPO> INSTANCE = new NoAxiomFilter();
     
     private NoAxiomFilter() {
         
     }
     
-    public boolean isMatch(SPO spo) {
+    public boolean accept(SPO spo) {
+
+        return spo.getType() != StatementEnum.Axiom;
         
-        return spo.getType()!=StatementEnum.Axiom;
+    }
+
+
+    /**
+     * Imposes the canonicalizing mapping during object de-serialization.
+     */
+    private Object readResolve() throws ObjectStreamException {
         
+        return INSTANCE;
+        
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+
+        // NOP - stateless.
+        
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws IOException,
+            ClassNotFoundException {
+
+        // NOP - stateless.
+
     }
 
 }

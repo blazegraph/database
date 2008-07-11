@@ -32,6 +32,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.IBuffer;
 
 /**
  * A buffer for {@link SPO}s. {@link ISPOBuffer}s are used to collect
@@ -40,6 +41,8 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link IBuffer}
  */
 public interface ISPOBuffer {
 

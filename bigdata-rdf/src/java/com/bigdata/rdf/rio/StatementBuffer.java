@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rio;
 
 import java.beans.Statement;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -45,21 +44,18 @@ import org.openrdf.sail.SailConnection;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
-import com.bigdata.rdf.spo.ISPOFilter;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.relation.accesspath.ChunkedArrayIterator;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * A write buffer for absorbing the output of the RIO parser or other
@@ -244,7 +240,7 @@ public class StatementBuffer implements IStatementBuffer {
      * may be used to perform efficient batch write of Sesame {@link Value}s or
      * {@link Statement}s onto the <i>database</i>. If you already have
      * {@link SPO}s then use
-     * {@link IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)} and
+     * {@link IRawTripleStore#addStatements(IChunkedOrderedIterator, IElementFilter)} and
      * friends.
      * 
      * @param database
@@ -431,7 +427,7 @@ public class StatementBuffer implements IStatementBuffer {
                     }
 
                     // fully grounded so add to the buffer.
-                    handleStatement(stmt.s, stmt.p, stmt.o, stmt.c, stmt.type);
+                    add(stmt.s, stmt.p, stmt.o, stmt.c, stmt.type);
                     
                     // the statement has been handled.
                     itr.remove();
@@ -622,86 +618,6 @@ public class StatementBuffer implements IStatementBuffer {
     }
     
     /**
-     * Generates the sort keys for the terms in the buffer and sets the
-     * {@link #haveKeys} flag.
-     * 
-     * @param keyBuilder
-     *            When one thread is used to parse, buffer, and generate
-     *            keys and the other is used to insert the data into the
-     *            store a <em>distinct instance</em> of the key builder
-     *            object must be used by the main thread in order to avoid
-     *            concurrent overwrites of the key buffer by the
-     *            {@link ConsumerThread}, which is still responsible for
-     *            generating statement keys.<br>
-     *            Note further that the key builder MUST be provisioned in
-     *            the same manner with respect to unicode support in order
-     *            for keys to be comparable!
-     */
-    public void generateTermSortKeys(RdfKeyBuilder keyBuilder) {
-
-        assert !haveKeys;
-
-        final int numTerms = numURIs + numLiterals + numBNodes;
-        
-        assert numTerms == numValues;
-        
-        final long begin = System.currentTimeMillis();
-
-        database.generateSortKeys(keyBuilder, values, numValues);
-
-        haveKeys = true;
-        
-        log.info("generated "+numTerms+" term sort keys: "
-                + (System.currentTimeMillis() - begin) + "ms");
-     
-    }
-
-    /**
-     * Sorts the terms by their pre-assigned sort keys and sets the
-     * {@link #sorted} flag.
-     * 
-     * @see #generateSortKeys(), which must be invoked as a pre-condition.
-     */
-    public void sortTermsBySortKeys() {
-        
-//        assert haveKeys;
-        assert ! sorted;
-        assert values != null;
-        
-        final int numTerms = numURIs + numLiterals + numBNodes;
-        
-        assert numTerms == numValues;
-
-        final long begin = System.currentTimeMillis();
-        
-        if (numValues > 0)
-            Arrays.sort(values, 0, numValues, _ValueSortKeyComparator.INSTANCE);
-        
-        sorted = true;
-
-        log.info("sorted "+numTerms+" terms: "
-                + (System.currentTimeMillis() - begin) + "ms");
-     
-    }
-    
-    /**
-     * Sorts the terms by their pre-assigned termIds.
-     */
-    public void sortTermsByTermIds() {
-        
-        final long begin = System.currentTimeMillis();
-
-        if( numValues>0)
-            Arrays.sort(values, 0, numValues, TermIdComparator.INSTANCE);
-
-        sorted = true;
-
-        log.info("sorted terms by ids: "
-                + (System.currentTimeMillis() - begin) + "ms");
-     
-    }
-    
-    /**
      * Batch insert buffered data (terms and statements) into the store.
      */
     protected void incrementalWrite() {
@@ -798,7 +714,7 @@ public class StatementBuffer implements IStatementBuffer {
      * 
      * @return The #of statements written on the database.
      */
-    final protected int addStatements(final _Statement[] stmts, final int numStmts) {
+    final protected long addStatements(final _Statement[] stmts, final int numStmts) {
         
         SPO[] tmp = new SPO[numStmts];
         
@@ -814,7 +730,11 @@ public class StatementBuffer implements IStatementBuffer {
             final SPO spo = new SPO(stmt.s.termId, stmt.p.termId, stmt.o.termId,
                     stmt.type);
 
-            assert spo.isFullyBound();
+            if(!spo.isFullyBound()) {
+                
+                throw new AssertionError("Not fully bound? : "+spo);
+                
+            }
             
             tmp[i] = spo;
 
@@ -837,7 +757,7 @@ public class StatementBuffer implements IStatementBuffer {
          * side-effect on its order so that we can unify the assigned statement
          * identifiers below.
          */
-        final int nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
+        final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
 
         if( sids ) {
 
@@ -919,14 +839,13 @@ public class StatementBuffer implements IStatementBuffer {
      * 
      * @return The #of statements written on the database.
      * 
-     * @see AbstractTripleStore#addStatements(AbstractTripleStore, boolean,
-     *      ISPOIterator, ISPOFilter)
+     * @see AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)
      */
-    protected int writeSPOs(SPO[] stmts, int numStmts) {
+    protected long writeSPOs(SPO[] stmts, int numStmts) {
 
-        final ISPOIterator itr = new SPOArrayIterator(stmts, numStmts);
+        final IChunkedOrderedIterator<SPO> itr = new ChunkedArrayIterator<SPO>(numStmts, stmts, null/*keyOrder*/);
         
-        final int nwritten;
+        final long nwritten;
 
         if (statementStore != null) {
 

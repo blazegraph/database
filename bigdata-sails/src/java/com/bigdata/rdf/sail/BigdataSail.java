@@ -115,7 +115,6 @@ import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 import org.openrdf.sail.helpers.SailBase;
 
-import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -125,10 +124,9 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection.BigdataTripleSource;
-import com.bigdata.rdf.spo.ChunkedIterator;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -137,14 +135,18 @@ import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.BigdataValueIterator;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
-import com.bigdata.rdf.store.EmptyAccessPath;
 import com.bigdata.rdf.store.EmptyStatementIterator;
-import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
+import com.bigdata.relation.accesspath.EmptyAccessPath;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 
@@ -1112,7 +1114,9 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 // clear the database.
 
-                database.clear();
+                // @todo obtain exclusive lock 1st.
+                database.destroy();
+                database.create();
                 
             } else {
 
@@ -1248,7 +1252,7 @@ public class BigdataSail extends SailBase implements Sail {
             }
 
             // #of explicit statements removed.
-            final int n;
+            final long n;
 
             if (getTruthMaintenance()) {
 
@@ -1264,8 +1268,9 @@ public class BigdataSail extends SailBase implements Sail {
                  * obtain a chunked iterator using the triple pattern that
                  * visits only the explicit statements.
                  */
-                final ISPOIterator itr = database.getAccessPath(s, p, o)
-                        .iterator(ExplicitSPOFilter.INSTANCE);
+                final IChunkedOrderedIterator<SPO> itr = database
+                        .getAccessPath(s, p, o, ExplicitSPOFilter.INSTANCE)
+                        .iterator();
 
                 // the tempStore absorbing retractions.
                 final AbstractTripleStore tempStore = getRetractionBuffer()
@@ -1287,8 +1292,9 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
 
-            return n;
-
+            // avoid overflow.
+            return (int) Math.min(Integer.MAX_VALUE, n);
+            
         }
         
         /**
@@ -1505,7 +1511,11 @@ public class BigdataSail extends SailBase implements Sail {
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-            final IAccessPath accessPath = database.getAccessPath(s, p, o);
+            final IElementFilter<SPO> filter = includeInferred ? null
+                    : ExplicitSPOFilter.INSTANCE;
+
+            final IAccessPath<SPO> accessPath = database.getAccessPath(s, p, o,
+                    filter);
 
             if(accessPath instanceof EmptyAccessPath) {
                 
@@ -1523,7 +1533,7 @@ public class BigdataSail extends SailBase implements Sail {
              * Some valid access path.
              */
             
-            final ISPOIterator src;
+            final IChunkedOrderedIterator<SPO> src;
             
             if(getTruthMaintenance() && includeInferred) {
 
@@ -1533,10 +1543,14 @@ public class BigdataSail extends SailBase implements Sail {
                  * InferenceEngine was configured.
                  */
                 
-                long[] ids = accessPath.getTriplePattern();
+//                long[] ids = accessPath.getTriplePattern();
+                final IPredicate<SPO> pred = accessPath.getPredicate();
 
                 src = getInferenceEngine().backchainIterator(//
-                        ids[0], ids[1], ids[2] // the triple pattern.
+                        // the triple pattern.
+                        (Long)pred.get(0).get(),//
+                        (Long)pred.get(1).get(),//
+                        (Long)pred.get(2).get() // 
                         );
                 
             } else {
@@ -1546,18 +1560,18 @@ public class BigdataSail extends SailBase implements Sail {
                  * statements actually present in the database.
                  */
                 
-                // Read straight from the database.
-                if(includeInferred) {
+//                // Read straight from the database.
+//                if(includeInferred) {
 
                     // include statements in the database that are axioms or inferences.
                     src = accessPath.iterator();
                     
-                } else {
-                    
-                    // filter such that the caller only sees the explicit statements.
-                    src = accessPath.iterator(ExplicitSPOFilter.INSTANCE);
-                    
-                }
+//                } else {
+//                    
+//                    // filter such that the caller only sees the explicit statements.
+//                    src = accessPath.iterator(ExplicitSPOFilter.INSTANCE);
+//                    
+//                }
                 
             }
             
@@ -1615,8 +1629,6 @@ public class BigdataSail extends SailBase implements Sail {
         
         /**
          * Removes all "inferred" statements from the database.
-         * <p>
-         * Note: This does NOT commit the database.
          */
         public void removeAllEntailments() throws SailException {
             
@@ -1624,8 +1636,10 @@ public class BigdataSail extends SailBase implements Sail {
             
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-            database.getAccessPath(NULL, NULL, NULL).removeAll(
-                    InferredSPOFilter.INSTANCE);
+            // @todo write unit test - make sure the filter is applied before remove!
+            database
+                    .getAccessPath(NULL, NULL, NULL, InferredSPOFilter.INSTANCE)
+                    .removeAll();
             
         }
 
@@ -1964,7 +1978,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * to constants in the query.
                  */
 
-                final long rangeCount = accessPath.rangeCount();
+                final long rangeCount = accessPath.rangeCount(false/*exact*/);
 
                 cardinality = rangeCount;
 
@@ -2212,7 +2226,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * BigdataValue objects that we can pass along to Sesame.
                  */
                 this.src = new BigdataValueIteratorImpl(database,
-                        new ChunkedIterator<Long>(new Striterator(src)
+                        new ChunkedWrappedIterator<Long>(new Striterator(src)
                                 .addFilter(new Resolver() {
 
                                     private static final long serialVersionUID = 1L;

@@ -30,9 +30,10 @@ package com.bigdata.rdf.store;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 
 /**
  * Test bulk filter API.
@@ -118,7 +119,8 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
                 
                 boolean present = false;
 
-                ISPOIterator itr = store.bulkFilterStatements(stmts, numStmts, present);
+                final IChunkedOrderedIterator<SPO> itr = store
+                        .bulkFilterStatements(stmts, numStmts, present);
                 
                 assertSameSPOsAnyOrder(store,
                     
@@ -145,7 +147,8 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
                 
                 boolean present = true;
 
-                ISPOIterator itr = store.bulkFilterStatements(stmts, numStmts, present);
+                final IChunkedOrderedIterator<SPO> itr = store
+                        .bulkFilterStatements(stmts, numStmts, present);
                 
                 assertSameSPOsAnyOrder(store,
                     
@@ -231,7 +234,8 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
 
             { // filter out and complete
                 
-                ISPOIterator itr = store.bulkCompleteStatements(stmts, numStmts);
+                final IChunkedOrderedIterator<SPO> itr = store
+                        .bulkCompleteStatements(stmts, numStmts);
                 
                 assertSameSPOsAnyOrder(store,
                     

@@ -42,13 +42,13 @@ import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.inf.ClosureStats;
-import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.SPO;
 
 /**

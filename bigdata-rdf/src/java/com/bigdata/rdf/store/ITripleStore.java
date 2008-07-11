@@ -35,14 +35,16 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.DataLoader.Options;
+import com.bigdata.relation.accesspath.EmptyAccessPath;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 
 /**
  * Interface for a triple store.
@@ -74,19 +76,6 @@ import com.bigdata.rdf.store.DataLoader.Options;
  * @version $Id$
  */
 public interface ITripleStore {
-
-    final Logger log = Logger.getLogger(ITripleStore.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
 
     /**
      * The #of triples in the store.
@@ -243,7 +232,7 @@ public interface ITripleStore {
      * 
      * @return The #of statements removed.
      */
-    public int removeStatements(Resource s, URI p, Value o);
+    public long removeStatements(Resource s, URI p, Value o);
 
     /**
      * Returns an {@link IAccessPath} matching the triple pattern.
@@ -261,24 +250,24 @@ public interface ITripleStore {
      *         database this method will return an {@link EmptyAccessPath}.
      * 
      * @see IAccessPath
-     * @see #asStatementIterator(ISPOIterator)
+     * @see #asStatementIterator(IChunkedOrderedIterator)
      */
-    public IAccessPath getAccessPath(Resource s, URI p, Value o);
+    public IAccessPath<SPO> getAccessPath(Resource s, URI p, Value o);
     
     /**
-     * Wraps an {@link ISPOIterator} as a {@link BigdataStatementIterator}.
+     * Wraps an {@link IChunkedOrderedIterator} as a {@link BigdataStatementIterator}.
      * <p>
      * Note: The object visited will be {@link BigdataStatementImpl}s.
      * 
      * @param src
-     *            An {@link ISPOIterator}
+     *            An {@link IChunkedOrderedIterator} visiting {@link SPO}s
      * 
      * @return The {@link BigdataStatementIterator}.
      * 
      * @see IAccessPath
      * @see #getAccessPath(Resource, URI, Value)
      */
-    public BigdataStatementIterator asStatementIterator(ISPOIterator src);
+    public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<SPO> src);
 
     /**
      * Convert an internal {@link SPO} into a Sesame {@link Statement}.
@@ -325,16 +314,16 @@ public interface ITripleStore {
      * Commit changes on the database.
      * <p>
      * Note: The semantics of this operation depend on whether the database is
-     * embedded (does a commit), temporary (ignored since the store is not
-     * restart safe), or a federation (ignored since unisolated writes on the
-     * federation are atomic and auto-committed).
+     * embedded (does a commit), temporary (checkpoint), or a federation
+     * (ignored since unisolated writes on the federation are atomic and
+     * auto-committed).
      */
     public void commit();
     
     /**
      * Deletes all data for the {@link ITripleStore}.
      */
-    public void clear();
+    public void destroy();
     
     /**
      * Close the connection to the {@link ITripleStore}.

@@ -54,10 +54,9 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
-import org.openrdf.query.QueryEvaluationException;
 
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.spo.IChunkedIterator;
+import com.bigdata.relation.accesspath.IChunkedIterator;
 
 /**
  * Wraps an iterator that visits term identifiers and exposes each visited term
@@ -168,7 +167,7 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
             log.info("Resolving "+ids.size()+" term identifiers");
             
             // batch resolve term identifiers to terms.
-            terms = db.getTerms(ids);
+            terms = db.getLexiconRelation().getTerms(ids);
 
             // reset the index.
             lastIndex = 0;
