@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -64,7 +65,6 @@ import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
@@ -75,8 +75,16 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.KeyBuilder.StrengthEnum;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 
@@ -235,10 +243,14 @@ import com.bigdata.service.IBigdataFederation;
  * 
  * @todo support more term weighting schemes and make them easy to configure.
  * 
+ * @todo is there an appropriate generic type for the full text index?
+ *       Basically, it contains "document fields", or at least their indexed
+ *       terms.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FullTextIndex {
+public class FullTextIndex extends AbstractRelation {
 
     final public Logger log = Logger.getLogger(FullTextIndex.class);
 
@@ -253,13 +265,6 @@ public class FullTextIndex {
      */
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
-
-//    private final IBigdataFederation fed;
-    
-    private final long timestamp;
-    
-    /** The namespace for the indices maintained by this class (from the ctor). */
-    private final String namespace;
     
     /**
      * The backing index.
@@ -276,31 +281,6 @@ public class FullTextIndex {
         
     }
     
-    private final Properties properties;
-    
-    /**
-     * Return an object wrapping the properties used to configured this
-     * instance.
-     */
-    public Properties getProperties() {
-        
-        return new Properties( properties );
-        
-    }
-
-    final private IIndexManager indexManager;
-    
-    final private ExecutorService threadPool;
-    
-    /**
-     * The {@link ExecutorService} that will be used to run queries.
-     */
-    protected ExecutorService getThreadPool() {
-        
-        return threadPool;
-        
-    }
-
     /**
      * Options understood by the {@link FullTextIndex}.
      * 
@@ -384,7 +364,7 @@ public class FullTextIndex {
      */
     final public boolean isReadOnly() {
         
-        return timestamp != ITx.UNISOLATED;
+        return getTimestamp() != ITx.UNISOLATED;
         
     }
 
@@ -399,6 +379,8 @@ public class FullTextIndex {
     }
     
     /**
+     * Ctor specified by {@link DefaultResourceLocator}.
+     * 
      * @param client
      *            The client. Configuration information is obtained from the
      *            client. See {@link Options}.
@@ -412,37 +394,10 @@ public class FullTextIndex {
      *       #of entries) are reasonable. The #of entries per split could be
      *       smaller if we know that we are storing more data in the values.
      */
-    public FullTextIndex(IBigdataClient client, String namespace) {
+    public FullTextIndex(IIndexManager indexManager, String namespace,
+            Long timestamp, Properties properties) {
 
-        this(client.getProperties(), namespace, client.getFederation(), client
-                .getFederation().getExecutorService());
-
-    }
-    
-    public FullTextIndex(Properties properties, String namespace,
-            IIndexManager indexManager, ExecutorService threadPool) {
-        
-        if (properties == null)
-            throw new IllegalArgumentException();
-        
-        if (namespace == null)
-            throw new IllegalArgumentException();
-        
-        if (indexManager == null)
-            throw new IllegalArgumentException();
-        
-        if (threadPool == null)
-            throw new IllegalArgumentException();
-        
-        this.properties = (Properties) properties.clone();
-        
-        this.namespace = namespace;
-        
-        this.indexManager = indexManager;
-        
-        this.threadPool = threadPool;
-
-        this.timestamp = ITx.UNISOLATED;
+        super(indexManager, namespace, timestamp, properties);
         
         // indexer.overwrite
         {
@@ -464,7 +419,8 @@ public class FullTextIndex {
 
         }
         
-        setupIndices();
+        // resolve index (might not exist, in which case this will be null).
+        ndx = getIndexManager().getIndex(getNamespace()+NAME_SEARCH, getTimestamp());
         
     }
 
@@ -474,19 +430,20 @@ public class FullTextIndex {
      * @throws IllegalStateException
      *             if the client does not have write access.
      */
-    private void setupIndices() {
+    public void create() {
 
-        final String name = namespace + NAME_SEARCH;
+        assertWritable();
+        
+        final String name = getNamespace() + NAME_SEARCH;
 
-        IIndex ndx = indexManager.getIndex(name, timestamp);
+        final IIndexManager indexManager = getIndexManager();
 
-        if (ndx == null) {
+        final IResourceLock resourceLock = indexManager.getResourceLockManager().acquireExclusiveLock(
+                getNamespace());
 
-            log.warn("No such index: name="+name);
-            
-            assertWritable();
-            
-            IndexMetadata indexMetadata = new IndexMetadata(name, UUID
+        try {
+
+            final IndexMetadata indexMetadata = new IndexMetadata(name, UUID
                     .randomUUID());
 
             /*
@@ -497,56 +454,44 @@ public class FullTextIndex {
              * encapsulate the use of PRIMARY strength for the key builder.
              * 
              * FIXME put the IKeyBuilderFactory on the index.
-             * 
-             * FIXME register as relation with the globalRowStore.
              */
-            
+
             indexManager.registerIndex(indexMetadata);
-            
-            log.warn("Registered new text index: name="+name);
 
-            ndx = indexManager.getIndex(name, timestamp);
-            
-        } else {
+            if (log.isInfoEnabled())
+                log.info("Registered new text index: name=" + name);
 
-            log.warn("Re-opened text index: name="+name);
+            ndx = indexManager.getIndex(name, getTimestamp());
+
+        } finally {
+
+            resourceLock.unlock();
 
         }
-
-        assert ndx != null;
         
-        this.ndx = ndx;
-
     }
 
-    /**
-     * Clears all indexed data.
-     * 
-     * @todo While this method is synchronized, that only serializes concurent
-     *       invocations of this method. When multiple clients have write access
-     *       to the {@link FullTextIndex} the caller MUST ensure that no
-     *       concurrent client has write access.
-     */
-    synchronized public void clear() {
+    public void destroy() {
 
         log.info("");
 
         assertWritable();
 
-        if (ndx instanceof BTree && !ndx.getIndexMetadata().getDeleteMarkers()) {
+        final IIndexManager indexManager = getIndexManager();
 
-            ((BTree) ndx).removeAll();
+        final IResourceLock lock = indexManager.getResourceLockManager()
+                .acquireExclusiveLock(getNamespace());
 
-        } else {
+        try {
 
-            final String name = namespace + "search";
+            indexManager.dropIndex(getNamespace() + NAME_SEARCH);
 
-            indexManager.dropIndex(name);
+        } finally {
 
-            setupIndices();
+            lock.unlock();
 
         }
-
+        
     }
 
     /**
@@ -1241,12 +1186,14 @@ public class FullTextIndex {
             
         }
 
-        final ExecutorService threadPool = getThreadPool();
+        final ExecutorService threadPool = getIndexManager()
+                .getExecutorService();
 
         // run on the client's thread pool.
-        final List<Future<Object>> futures = threadPool.invokeAll(tasks, timeout, TimeUnit.MILLISECONDS);
-        
-        for(Future f : futures) {
+        final List<Future<Object>> futures = threadPool.invokeAll(tasks,
+                timeout, TimeUnit.MILLISECONDS);
+
+        for (Future f : futures) {
             
             if(!f.isDone()) {
                 
@@ -1292,6 +1239,39 @@ public class FullTextIndex {
          */
         return new Hiterator<Hit>(Arrays.asList(a), elapsed, minCosine, maxRank);
 
+    }
+    
+    /*
+     * @todo implement the relevant methods.
+     */
+
+    @Override
+    public String getFQN(IKeyOrder keyOrder) {
+        throw new UnsupportedOperationException();
+    }
+
+    public long delete(IChunkedOrderedIterator itr) {
+        throw new UnsupportedOperationException();
+    }
+
+    public long insert(IChunkedOrderedIterator itr) {
+        throw new UnsupportedOperationException();
+    }
+
+    public IAccessPath getAccessPath(IPredicate predicate) {
+        throw new UnsupportedOperationException();
+    }
+
+    public long getElementCount(boolean exact) {
+        throw new UnsupportedOperationException();
+    }
+
+    public Set getIndexNames() {
+        throw new UnsupportedOperationException();
+    }
+
+    public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+        throw new UnsupportedOperationException();
     }
         
 }

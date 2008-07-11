@@ -144,7 +144,7 @@ abstract public class TimestampService implements ITimestampService, IServiceShu
     }
 
     /**
-     * Return the {@link UUID} for the itimestampservice.
+     * Return the {@link UUID} for the {@link ITimestampService}.
      * 
      * @throws IOException
      */

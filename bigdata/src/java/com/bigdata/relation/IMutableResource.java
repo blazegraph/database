@@ -23,45 +23,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jul 9, 2008
+ * Created on Jul 10, 2008
  */
 
-package com.bigdata.relation.locator;
+package com.bigdata.relation;
+
+import com.bigdata.relation.locator.ILocatableResource;
 
 /**
+ * Mutation interface 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResourceIdentifier<T> implements IResourceIdentifier<T> {
-    
-    /**
-     * 
-     */
-    private static final long serialVersionUID = -8065510828530539906L;
-    
-    private final String namespace;
+public interface IMutableResource<T> extends ILocatableResource<T> {
 
     /**
-     * 
-     * @param namespace
-     *            The resource namespace.
+     * Create any logically contained resources (relations, indices).
      */
-    public ResourceIdentifier(String namespace) {
-        
-        if (namespace == null)
-            throw new IllegalArgumentException();
-        
-        this.namespace = namespace;
-        
-    }
+    void create();
 
     /**
-     * The resource namespace.
+     * Destroy any logically contained resources (relations, indices).
      */
-    public String toString() {
-        
-        return namespace;
-        
-    }
-    
+    void destroy();
+
 }

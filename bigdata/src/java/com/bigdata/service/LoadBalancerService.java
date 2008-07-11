@@ -2464,8 +2464,6 @@ abstract public class LoadBalancerService extends AbstractService
         
         MDC.remove("serviceUUID");
         
-        MDC.remove("hostname");
-        
     }
 
 }

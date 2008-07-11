@@ -665,8 +665,10 @@ abstract public class AbstractFederation implements IBigdataFederation {
         /*
          * Setup locator.
          */
-        resourceLocator = new DefaultResourceLocator(getExecutorService(), this,
-                null/*delegate*/);
+        resourceLocator = new DefaultResourceLocator(//
+                this,//
+                null //delegate
+                );
         
     }
     
@@ -849,7 +851,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
         synchronized(indexCache) {
             
-            Iterator<ICacheEntry<NT,IClientIndex>> itr = indexCache.entryIterator();
+            final Iterator<ICacheEntry<NT,IClientIndex>> itr = indexCache.entryIterator();
             
             while(itr.hasNext()) {
                 

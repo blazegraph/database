@@ -52,6 +52,7 @@ import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.IResourceLockManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITransactionManager;
@@ -494,6 +495,11 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public IResourceLocator getResourceLocator() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IResourceLockManager getResourceLockManager() {
             // TODO Auto-generated method stub
             return null;
         }

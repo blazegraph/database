@@ -23,45 +23,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jul 9, 2008
+ * Created on Jul 10, 2008
  */
 
-package com.bigdata.relation.locator;
+package com.bigdata.relation;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResourceIdentifier<T> implements IResourceIdentifier<T> {
-    
-    /**
-     * 
-     */
-    private static final long serialVersionUID = -8065510828530539906L;
-    
-    private final String namespace;
+public interface IMutableDatabase<E> extends IDatabase<E>, IMutableResource<IDatabase<E>> {
 
-    /**
-     * 
-     * @param namespace
-     *            The resource namespace.
-     */
-    public ResourceIdentifier(String namespace) {
-        
-        if (namespace == null)
-            throw new IllegalArgumentException();
-        
-        this.namespace = namespace;
-        
-    }
-
-    /**
-     * The resource namespace.
-     */
-    public String toString() {
-        
-        return namespace;
-        
-    }
-    
 }

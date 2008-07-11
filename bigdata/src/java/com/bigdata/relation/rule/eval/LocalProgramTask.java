@@ -38,7 +38,7 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ITx;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -47,7 +47,6 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 
@@ -103,20 +102,30 @@ public class LocalProgramTask implements IProgramTask,
     private final ActionEnum action;
     
     private final IStep step;
+
+    /**
+     * Serializable field specified when the {@link LocalProgramTask} will be
+     * submitted (via RMI or not) to a {@link DataService}. A new
+     * {@link IJoinNexus} is instantiated in the execution context on the
+     * {@link DataService} from this field.
+     */
+    private final IJoinNexusFactory joinNexusFactory;
+    
+//    /**
+//     * Note: NOT serialized!
+//     */
+//    * <p>
+//    * Note: NOT <code>final</code> since this field must be patched when we
+//    * create an {@link AbstractTask} in order to resolve the named indices
+//    * using the {@link AbstractTask}.
+//    private transient IJoinNexus joinNexus;
     
     /**
-     * Note: NOT serialized!
-     * <p>
-     * Note: NOT <code>final</code> since this field must be patched when we
-     * create an {@link AbstractTask} in order to resolve the named indices
-     * using the {@link AbstractTask}.
+     * Note: NOT serialized! The {@link IIndexManager} will be set by
+     * {@link #setDataService(DataService)} if this object submitted using
+     * {@link DataService#submit(Callable)}.
      */
-    private transient IJoinNexus joinNexus;
-    
-    /**
-     * Note: NOT serialized!
-     */
-    private final transient ExecutorService executorService;
+    private transient IIndexManager indexManager;
     
     /**
      * Note: NOT serialized!
@@ -127,33 +136,53 @@ public class LocalProgramTask implements IProgramTask,
 
         if (dataService == null)
             throw new IllegalArgumentException();
-        
-        log.info("Running on data service: dataService="+dataService);
+
+        if (log.isInfoEnabled())
+            log.info("Running on data service: dataService="+dataService);
         
         this.dataService = dataService;
+        
+        this.indexManager = dataService.getFederation();
 
     }
-
-//    /**
-//     * De-serialization ctor.
-//     */
-//    public LocalProgramTask() {
-//
-//    }
 
     /**
      * Variant when the task will be submitted using
      * {@link IDataService#submit(Callable)} (efficient since all indices will
      * be local, but the indices must not be partitioned and must all exist on
      * the target {@link DataService}).
+     * <p>
+     * Note: the caller MUST submit using DataService#submit() in which case
+     * {@link #dataService} will be set after the ctor is done by the
+     * {@link DataService} itself. The {@link DataService} will be used to
+     * identify an {@link ExecutorService} and the {@link IJoinNexusFactory}
+     * will be used to establish access to indices, relations, etc. that first
+     * resolves against the {@link AbstractTask} - see
+     * {@link AbstractStepTask#submit()}.
      * 
      * @param action
      * @param step
      * @param joinNexus
      */
-    public LocalProgramTask(ActionEnum action, IStep step, IJoinNexus joinNexus) {
+    public LocalProgramTask(ActionEnum action, IStep step,
+            IJoinNexusFactory joinNexusFactory) {
 
-        this(action, step, joinNexus, null/* executorService */, null/* dataService */);
+        if (action == null)
+            throw new IllegalArgumentException();
+
+        if (step == null)
+            throw new IllegalArgumentException();
+
+        if (joinNexusFactory == null)
+            throw new IllegalArgumentException();
+
+        this.action = action;
+
+        this.step = step;
+
+        this.joinNexusFactory = joinNexusFactory;
+        
+        this.indexManager = null; 
 
     }
 
@@ -162,21 +191,13 @@ public class LocalProgramTask implements IProgramTask,
      * 
      * @param action
      * @param step
-     * @param joinNexus
-     * @param executorService
-     *            The service that will be used to parallelize the task
-     *            execution. If <code>null</code>, then the caller MUST
-     *            submit this task using {@link IDataService#submit(Callable)}.
-     * @param dataService
-     *            The {@link DataService} submitting this task or
-     *            <code>null</code> iff the task is NOT submitted by a task
-     *            running on a {@link DataService}.
+     * @param joinNexusFactory
+     * @param indexManager
      * 
-     * @see IBigdataFederation#getExecutorService()
+     * @throws IllegalArgumentException
+     *             if any parameter is <code>null</code>.
      */
-    public LocalProgramTask(ActionEnum action, IStep step,
-            IJoinNexus joinNexus, ExecutorService executorService,
-            DataService dataService) {
+    public LocalProgramTask(ActionEnum action, IStep step, IJoinNexusFactory joinNexusFactory, IIndexManager indexManager) {
 
         if (action == null)
             throw new IllegalArgumentException();
@@ -184,35 +205,20 @@ public class LocalProgramTask implements IProgramTask,
         if (step == null)
             throw new IllegalArgumentException();
 
-        if (joinNexus == null)
+        if (joinNexusFactory == null)
+            throw new IllegalArgumentException();
+
+        if (indexManager == null)
             throw new IllegalArgumentException();
 
         this.action = action;
-        
+
         this.step = step;
 
-        this.joinNexus = joinNexus;
-        
-        /*
-         * If [null], then the caller MUST submit using DataService#submit() in
-         * which case [dataService] will be set after the ctor is done by the
-         * DataService itself.
-         */
-        this.executorService = executorService; 
+        this.joinNexusFactory = joinNexusFactory;
 
-        if (action.isMutation()
-                && joinNexus.getWriteTimestamp() != ITx.UNISOLATED) {
+        this.indexManager = indexManager;
 
-            /*
-             * @todo Mutation requires UNISOLATED writes until full transactions
-             * are working.
-             */
-
-            throw new UnsupportedOperationException(
-                    "mutation requires unisolated writes"); 
-            
-        }
-        
     }
 
     /**
@@ -230,7 +236,7 @@ public class LocalProgramTask implements IProgramTask,
 
         try {
 
-            final ProgramUtility util = new ProgramUtility(joinNexus);
+            final ProgramUtility util = new ProgramUtility();
 
             if (util.isClosureProgram(step)) {
 
@@ -283,8 +289,7 @@ public class LocalProgramTask implements IProgramTask,
                     
                     if (!step.isRule() && ((IProgram) step).isClosure()) {
                         
-                        final RuleStats stats = executeClosure(action,
-                                (IProgram) step, joinNexus);
+                        final RuleStats stats = executeClosure((IProgram) step);
                         
                         totals.add( stats );
                         
@@ -292,7 +297,7 @@ public class LocalProgramTask implements IProgramTask,
                         
                         // A non-closure step.
                         
-                        final RuleStats stats = executeMutation(action, step);
+                        final RuleStats stats = executeMutation(step);
                         
                         totals.add(stats);
                         
@@ -304,7 +309,7 @@ public class LocalProgramTask implements IProgramTask,
                 
             } else if (action.isMutation()) {
 
-                return executeMutation(action, step).mutationCount.get();
+                return executeMutation(step).mutationCount.get();
 
             } else {
 
@@ -392,7 +397,8 @@ public class LocalProgramTask implements IProgramTask,
             log.debug("program=" + step.getName());
         
         // buffer shared by all rules run in this query.
-        final IBlockingBuffer<ISolution> buffer = joinNexus.newQueryBuffer();
+        final IBlockingBuffer<ISolution> buffer = joinNexusFactory.newInstance(
+                indexManager).newQueryBuffer();
         
         Future<RuleStats> future = null;
         
@@ -416,8 +422,8 @@ public class LocalProgramTask implements IProgramTask,
              * buffered iterator.
              */
 
-            final QueryTask queryTask = new QueryTask(step, joinNexus,
-                    buffer, executorService, dataService);
+            final QueryTask queryTask = new QueryTask(step, joinNexusFactory,
+                    buffer, indexManager, dataService);
 
             future = queryTask.submit();
             
@@ -487,11 +493,8 @@ public class LocalProgramTask implements IProgramTask,
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected RuleStats executeMutation(final ActionEnum action,
-            final IStep step) throws InterruptedException, ExecutionException {
-
-        if (action == null)
-            throw new IllegalArgumentException();
+    protected RuleStats executeMutation(final IStep step)
+            throws InterruptedException, ExecutionException {
 
         if (step == null)
             throw new IllegalArgumentException();
@@ -499,8 +502,8 @@ public class LocalProgramTask implements IProgramTask,
         if (!action.isMutation())
             throw new IllegalArgumentException();
         
-        final MutationTask mutationTask = new MutationTask(action, joinNexus,
-                step, executorService, dataService );
+        final MutationTask mutationTask = new MutationTask(action, joinNexusFactory,
+                step, indexManager, dataService );
 
         if (log.isDebugEnabled())
             log.debug("begin: action=" + action + ", program=" + step.getName()
@@ -556,14 +559,10 @@ public class LocalProgramTask implements IProgramTask,
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    protected RuleStats executeClosure(ActionEnum action, IProgram program,
-            IJoinNexus joinNexus) throws InterruptedException,
-            ExecutionException {
+    protected RuleStats executeClosure(IProgram program)
+            throws InterruptedException, ExecutionException {
 
         if (program == null)
-            throw new IllegalArgumentException();
-
-        if (joinNexus == null)
             throw new IllegalArgumentException();
 
         if(!action.isMutation()) {
@@ -625,7 +624,7 @@ public class LocalProgramTask implements IProgramTask,
             if (log.isDebugEnabled())
                 log.debug("round=" + round);
 
-            final RuleStats tmp = executeMutation(action, program);
+            final RuleStats tmp = executeMutation(program);
 
             /*
              * Post-round mutation counter.

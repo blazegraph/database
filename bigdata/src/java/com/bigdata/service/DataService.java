@@ -1644,7 +1644,7 @@ abstract public class DataService extends AbstractService
      *       then additional network topology smarts would be required to make
      *       good choices.
      */
-    public Future submit(Callable task)
+    public Future<? extends Object> submit(Callable<? extends Object> task)
             throws InterruptedException, ExecutionException {
      
         setupLoggingContext();

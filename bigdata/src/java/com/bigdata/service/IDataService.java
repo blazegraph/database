@@ -452,7 +452,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      * @throws ExecutionException
      * @throws IOException
      */
-    public Future submit(Callable proc)
+    public Future<? extends Object> submit(Callable<? extends Object> proc)
             throws InterruptedException, ExecutionException, IOException;
     
     /**

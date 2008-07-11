@@ -32,15 +32,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Simple test verifies that the {@link FullTextIndex} data are restart safe
@@ -80,10 +78,6 @@ public class TestRestartSafeWithJournal extends TestCase2 {
         
         final String NAMESPACE = "test";
 
-        final ExecutorService service = Executors
-                .newSingleThreadExecutor(DaemonThreadFactory
-                        .defaultThreadFactory());
-
         Journal journal = new Journal(properties);
 
         try {
@@ -97,8 +91,8 @@ public class TestRestartSafeWithJournal extends TestCase2 {
             final int fieldId = 3;
             {
 
-                FullTextIndex ndx = new FullTextIndex(properties, NAMESPACE,
-                        journal, service);
+                FullTextIndex ndx = new FullTextIndex(journal,NAMESPACE,
+                        ITx.UNISOLATED, properties);
 
                 TokenBuffer buffer = new TokenBuffer(2, ndx);
 
@@ -115,8 +109,8 @@ public class TestRestartSafeWithJournal extends TestCase2 {
             // do the search.
             {
 
-                FullTextIndex ndx = new FullTextIndex(properties, NAMESPACE,
-                        journal, service);
+                FullTextIndex ndx = new FullTextIndex(journal,NAMESPACE,
+                        ITx.UNISOLATED, properties);
 
                 Hiterator itr = ndx.search(text, languageCode);
 
@@ -150,8 +144,8 @@ public class TestRestartSafeWithJournal extends TestCase2 {
              */
             {
 
-                FullTextIndex ndx = new FullTextIndex(properties, NAMESPACE,
-                        journal, service);
+                FullTextIndex ndx = new FullTextIndex(journal,NAMESPACE,
+                        ITx.UNISOLATED, properties);
 
                 Hiterator itr = ndx.search(text, languageCode);
 

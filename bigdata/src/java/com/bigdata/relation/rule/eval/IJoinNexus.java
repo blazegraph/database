@@ -29,9 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
-import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.IRelationIdentifier;
@@ -204,17 +204,10 @@ public interface IJoinNexus {
     long getReadTimestamp();
     
     /**
-     * The service that should be used to run tasks such as parallel rule
-     * execution.
+     * Used to locate indices, relations and relation containers.
      */
-    ExecutorService getExecutorService();
+    IIndexManager getIndexManager();
  
-    /**
-     * The object responsible for resolving {@link IRelationIdentifier}s to
-     * {@link IRelation}s.
-     */
-    IResourceLocator getRelationLocator();
-    
     /**
      * Run as a query.
      * 

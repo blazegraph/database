@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -35,10 +36,8 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.EmbeddedResourceLockManager;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -96,8 +95,10 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         executorService = Executors.newCachedThreadPool(DaemonThreadFactory
                 .defaultThreadFactory());
         
-        resourceLocator = new DefaultResourceLocator(executorService, this,
-                null/*delegate*/);
+        resourceLocator = new DefaultResourceLocator(//
+                this,//
+                null // delegate
+        );
         
     }
     
@@ -336,23 +337,43 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     private final DefaultResourceLocator resourceLocator;
     
-    /**
-     * Used for running misc tasks, especially those supporting
-     * {@link #getResourceLocator()}.
-     * 
-     * @todo there should be an interface method for this somewhere. it is part
-     *       of {@link IBigdataFederation} but there is no other interface for
-     *       that. perhaps on the {@link IIndexManager} since the requirement
-     *       arises with the {@link IResourceLocator} declared there (a
-     *       materialized {@link IRelation} needs an {@link ExecutorService} to
-     *       support requests).
-     */
+    public ExecutorService getExecutorService() {
+    
+        assertOpen();
+        
+        return executorService;
+        
+    }
     private final ExecutorService executorService;
     
+    synchronized public IResourceLockManager getResourceLockManager() {
+        
+        assertOpen();
+        
+        if (resourceLockManager == null) {
+
+            resourceLockManager = new EmbeddedResourceLockManager(UUID
+                    .randomUUID(), new Properties());
+            
+        }
+        
+        return resourceLockManager;
+        
+    }
+    private ResourceLockManager resourceLockManager;
+
     public void close() {
 
         // immediate shutdown.
         executorService.shutdownNow();
+        
+        if (resourceLockManager != null) {
+
+            resourceLockManager.shutdownNow();
+
+            resourceLockManager = null;
+
+        }
         
         super.close();
         

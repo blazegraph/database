@@ -23,45 +23,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jul 9, 2008
+ * Created on Jul 10, 2008
  */
 
-package com.bigdata.relation.locator;
+package com.bigdata.service;
 
-/**
+import java.util.Properties;
+import java.util.UUID;
+
+import com.bigdata.journal.ResourceLockManager;
+
+/** 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResourceIdentifier<T> implements IResourceIdentifier<T> {
-    
-    /**
-     * 
-     */
-    private static final long serialVersionUID = -8065510828530539906L;
-    
-    private final String namespace;
+public class EmbeddedResourceLockManager extends ResourceLockManager {
 
     /**
      * 
-     * @param namespace
-     *            The resource namespace.
      */
-    public ResourceIdentifier(String namespace) {
+    public EmbeddedResourceLockManager(UUID serviceUUID, Properties properties) {
+
+        super(properties);
         
-        if (namespace == null)
+        if (serviceUUID == null)
             throw new IllegalArgumentException();
         
-        this.namespace = namespace;
+        setServiceUUID(serviceUUID);
         
     }
 
-    /**
-     * The resource namespace.
-     */
-    public String toString() {
-        
-        return namespace;
-        
-    }
-    
 }

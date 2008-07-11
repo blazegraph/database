@@ -29,10 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
-import java.util.concurrent.ExecutorService;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -56,12 +55,10 @@ public interface IJoinNexusFactory extends Serializable {
     /**
      * New instance.
      * 
-     * @param executorService
-     *            Used to run and parallelize {@link IStepTask}s
-     * @param resourceLocator
-     *            Used to locate relations during rule execution.
+     * @param indexManager
+     *            Used to locate relations and parallelize operations during
+     *            rule execution.
      */
-    IJoinNexus newInstance(ExecutorService executorService,
-            IResourceLocator resourceLocator);
+    IJoinNexus newInstance(IIndexManager indexManager);
     
 }

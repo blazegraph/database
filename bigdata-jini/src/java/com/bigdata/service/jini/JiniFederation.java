@@ -36,6 +36,7 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 
+import com.bigdata.journal.IResourceLockManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -56,6 +57,8 @@ public class JiniFederation extends AbstractDistributedFederation {
     protected DataServicesClient dataServicesClient;
 
     protected LoadBalancerClient loadBalancerClient;
+
+    protected ResourceLockManagerClient resourceLockManagerClient;
 
     protected TimestampServiceClient timestampServiceClient;
     
@@ -107,6 +110,9 @@ public class JiniFederation extends AbstractDistributedFederation {
             // Start discovery for the load balancer service.
             loadBalancerClient = new LoadBalancerClient(discoveryManager);
 
+            // Start discovery for the resource lock manager.
+            resourceLockManagerClient = new ResourceLockManagerClient(discoveryManager);
+
         } catch (Exception ex) {
 
             log.fatal("Problem initiating service discovery: " + ex.getMessage(), ex);
@@ -148,6 +154,15 @@ public class JiniFederation extends AbstractDistributedFederation {
         if(timestampServiceClient == null) return null;
         
         return timestampServiceClient.getTimestampService();
+        
+    }
+    
+    public IResourceLockManager getResourceLockManager() {
+        
+        // Note: return null if service not available/discovered.
+        if(resourceLockManagerClient == null) return null;
+        
+        return resourceLockManagerClient.getResourceLockManager();
         
     }
     
@@ -281,6 +296,14 @@ public class JiniFederation extends AbstractDistributedFederation {
      */
     private void terminateDiscoveryProcesses() {
 
+        if (resourceLockManagerClient != null) {
+
+            resourceLockManagerClient.terminate();
+
+            resourceLockManagerClient = null;
+            
+        }
+        
         if (timestampServiceClient != null) {
 
             timestampServiceClient.terminate();

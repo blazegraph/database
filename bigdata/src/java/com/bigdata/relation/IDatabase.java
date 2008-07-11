@@ -40,8 +40,11 @@ import com.bigdata.relation.locator.ILocatableResource;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IDatabase<T> extends ILocatableResource<IDatabase<T>> {
+public interface IDatabase<E> extends ILocatableResource<IDatabase<E>> {
 
-    public Iterator<IRelation> relations();
+    /**
+     * Visits the logically contained {@link IRelation} resources.
+     */
+    Iterator<IRelation> relations();
     
 }
