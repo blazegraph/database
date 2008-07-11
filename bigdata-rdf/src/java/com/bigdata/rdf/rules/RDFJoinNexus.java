@@ -28,7 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
@@ -36,12 +40,16 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IChunkedIterator;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -95,6 +103,8 @@ public class RDFJoinNexus implements IJoinNexus {
     
     private final long readTimestamp;
     
+    private final boolean justify;
+    
     private final int solutionFlags;
     
     private final IElementFilter filter;
@@ -132,7 +142,8 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     public RDFJoinNexus(IJoinNexusFactory joinNexusFactory,
             IIndexManager indexManager, long writeTimestamp,
-            long readTimestamp, int solutionFlags, IElementFilter filter) {
+            long readTimestamp, boolean justify, int solutionFlags,
+            IElementFilter filter) {
 
         if (joinNexusFactory == null)
             throw new IllegalArgumentException();
@@ -148,6 +159,8 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.readTimestamp = readTimestamp;
 
+        this.justify = justify;
+        
         this.solutionFlags = solutionFlags;
 
         this.filter = filter;
@@ -331,6 +344,175 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     private final int DEFAULT_BUFFER_CAPACITY = 10000;
     
+    /**
+     * Buffer writes on {@link IMutableRelation#insert(IChunkedIterator)} when it is
+     * {@link #flush() flushed}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    public static class InsertSPOAndJustificationBuffer<E> extends AbstractSolutionBuffer<E> {
+
+//        private final IElementFilter filter;
+        
+        /**
+         * @param capacity
+         * @param relation
+         */
+        public InsertSPOAndJustificationBuffer(int capacity, IMutableRelation<E> relation,
+                IElementFilter<ISolution<E>> filter) {
+
+            super(capacity, relation, filter);
+
+//            this.filter = filter;
+            
+        }
+
+        @Override
+        protected long flush(IChunkedOrderedIterator<ISolution<E>> itr) {
+
+            try {
+
+                /*
+                 * The mutation count is the #of SPOs written (there is one
+                 * justification written per solution generated, but the
+                 * mutation count does not reflect duplicate justifications -
+                 * only duplicate statements).
+                 * 
+                 * Note: the optional filter for the ctor was already applied.
+                 * If an element/solution was rejected, then it is not in the
+                 * buffer and we will never see it during flush().
+                 */
+                
+                long mutationCount = 0;
+                
+                while (itr.hasNext()) {
+
+                    final ISolution<E>[] chunk = itr.nextChunk();
+
+                    mutationCount += writeChunk(chunk);
+                    
+                }
+                
+                return mutationCount;
+                
+            } finally {
+
+                itr.close();
+
+            }
+            
+        }
+        
+        private long writeChunk(final ISolution<E>[] chunk) {
+
+            final int n = chunk.length;
+            
+            if(log.isDebugEnabled()) 
+                log.debug("chunkSize="+n);
+            
+            final long begin = System.currentTimeMillis();
+
+            final SPO[] a = new SPO[ n ];
+
+            final Justification[] b = new Justification[ n ];
+
+            for(int i=0; i<chunk.length; i++) {
+                
+                if(log.isDebugEnabled()) {
+                    
+                    log.debug("chunk["+i+"] = "+chunk[i]);
+                    
+                }
+                
+                final ISolution<SPO> solution = (ISolution<SPO>)chunk[i];
+                
+                final SPO spo = solution.get();
+
+                final IBindingSet bindingSet = solution.getBindingSet();
+                
+                final long[] bindings = new long[bindingSet.size()];
+
+                // FIXME
+                if (true)
+                    throw new UnsupportedOperationException(
+                            "Must populate binding[] from rule by variable order");
+                
+                final IRule rule = solution.getRule();
+                
+                b[i] = new Justification(rule, spo, bindings);
+                                
+            }
+            
+            final SPORelation r = (SPORelation) (IMutableRelation) getRelation();
+
+            /*
+             * Use a thread pool to write out the statement and the
+             * justifications concurrently. This drammatically reduces the
+             * latency when also writing justifications.
+             */
+
+            final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
+
+            /*
+             * Note: we reject using the filter before stmts or justifications
+             * make it into the buffer so we do not need to apply the filter
+             * again here.
+             */
+
+            tasks.add(new Callable<Long>(){
+                public Long call() {
+                    return r.insert(a,a.length,null/*filter*/);
+                }
+            });
+            
+            tasks.add(new Callable<Long>(){
+                public Long call() {
+                    return r
+                            .addJustifications(new ChunkedArrayIterator<Justification>(
+                                    b.length, b, null/* keyOrder */));
+                }
+            });
+            
+            final List<Future<Long>> futures;
+
+            /*
+             * @todo The timings for the tasks that we run here are not being
+             * reported up to this point.
+             */
+            final long mutationCount;
+            try {
+
+                futures = r.getExecutorService().invokeAll(tasks);
+
+                mutationCount = futures.get(0).get();
+
+                                futures.get(1).get();
+
+            } catch (InterruptedException ex) {
+
+                throw new RuntimeException(ex);
+
+            } catch (ExecutionException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            if (log.isInfoEnabled())
+                log.info("Wrote " + mutationCount
+                                + " statements and justifications in "
+                                + elapsed + "ms");
+
+            return mutationCount;
+
+        }
+
+    }
+    
     @SuppressWarnings("unchecked")
     public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
 
@@ -339,6 +521,25 @@ public class RDFJoinNexus implements IJoinNexus {
             log.debug("relation="+relation);
             
         }
+        
+        if(justify) {
+
+            /*
+             * Buffer knows how to write the computed elements on the statement
+             * indices and the computed binding sets on the justifications
+             * indices.
+             */
+            
+            return new InsertSPOAndJustificationBuffer(
+                    DEFAULT_BUFFER_CAPACITY, relation, filter == null ? null
+                            : new SolutionFilter(filter));
+            
+        }
+        
+        /*
+         * Buffer resolves the computed elements and writes them on the
+         * statement indices.
+         */
         
         return new AbstractSolutionBuffer.InsertSolutionBuffer(
                 DEFAULT_BUFFER_CAPACITY, relation, filter == null ? null

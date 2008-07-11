@@ -692,6 +692,8 @@ public class SPORelation extends AbstractRelation<SPO> {
         
         final IIndex ndx = getIndex(keyOrder);
 
+        assert ndx != null : "no index? keyOrder="+keyOrder;
+        
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
         return new SPOAccessPath(this, predicate, keyOrder, ndx, flags).init();
@@ -890,6 +892,8 @@ public class SPORelation extends AbstractRelation<SPO> {
      * @param filter
      *            An optional filter on the elements to be written.
      * 
+     * @return The mutation count.
+     * 
      * @todo raise the filter into the caller?
      */
     public long insert(SPO[] a, int numStmts, IElementFilter<SPO> filter) {
@@ -1018,9 +1022,8 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         // The mutation count.
         final AtomicLong mutationCount = new AtomicLong(0);
-        
-        final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(
-                3);
+
+        final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
         tasks.add(new SPOIndexRemover(this, stmts, numStmts,
                 SPOKeyOrder.SPO, false/* clone */, sortTime, writeTime));

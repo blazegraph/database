@@ -44,6 +44,9 @@ public class StatementWriter implements Callable<Long>{
      *            indices as a side-effect.
      * 
      * @todo allow an optional {@link IElementFilter} here.
+     * 
+     * @deprecated by {@link SPORelation#insert(IChunkedOrderedIterator)}? (Still used by 
+     * copyStatements)
      */
     public StatementWriter(AbstractTripleStore database,
             AbstractTripleStore statementStore, boolean copyOnly,

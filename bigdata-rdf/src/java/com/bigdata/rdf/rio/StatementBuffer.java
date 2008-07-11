@@ -41,7 +41,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.sail.SailConnection;
 
-import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
@@ -68,11 +67,11 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * {@link Statement} duplication. Hence we pay an unnecessary overhead if we try
  * to make the statements distinct in the buffer.
  * <p>
- * Note: This also provides an explanation for why neither this class nor the
- * {@link SPOAssertionBuffer} do better when "distinct" statements is turned on -
- * the "Value" objects in that case are only represented by long integers and
- * duplication in their values does not impose a burden on either the heap or
- * the index writers. In contrast, the duplication of {@link Value}s in the
+ * Note: This also provides an explanation for why neither this class nor writes
+ * of SPOs do better when "distinct" statements is turned on - the "Value"
+ * objects in that case are only represented by long integers and duplication in
+ * their values does not impose a burden on either the heap or the index
+ * writers. In contrast, the duplication of {@link Value}s in the
  * {@link StatementBuffer} imposes a burden on both the heap and the index
  * writers.
  * 
@@ -322,6 +321,14 @@ public class StatementBuffer implements IStatementBuffer {
         
         this.statementIdentifiers = database.getStatementIdentifiers();
         
+        if(log.isInfoEnabled()) {
+            
+            log.info("capacity=" + capacity + ", sids=" + statementIdentifiers
+                    + ", statementStore=" + statementStore + ", database="
+                    + database);
+            
+        }
+        
     }
 
     /**
@@ -398,9 +405,11 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
 
-        log.info("processing "+deferredStmts.size()+" deferred statements");
-        
-        incrementalWrite(); // @todo why bother?
+        if (log.isInfoEnabled())
+            log.info("processing " + deferredStmts.size()
+                    + " deferred statements");
+
+        incrementalWrite();
         
         try {
             
@@ -487,7 +496,7 @@ public class StatementBuffer implements IStatementBuffer {
                         }
                         
                         // fully grounded so add to the buffer.
-                        handleStatement(stmt.s, stmt.p, stmt.o, stmt.c, stmt.type);
+                        add(stmt.s, stmt.p, stmt.o, stmt.c, stmt.type);
                         
                         // deferred statement has been handled.
                         itr.remove();
@@ -495,14 +504,16 @@ public class StatementBuffer implements IStatementBuffer {
                     }
                     
                     final int nafter = deferredStmts.size();
-                    
-                    log.info("round="+nrounds+" : #before="+nbefore+", #after="+nafter);
+
+                    if (log.isInfoEnabled())
+                        log.info("round=" + nrounds+" : #before="+nbefore+", #after="+nafter);
                     
                     if(nafter == nbefore) {
-                        
-                        log.info("fixed point after " + nrounds
-                                + " rounds with " + nafter
-                                + " ungrounded statements");
+                    
+                        if (log.isInfoEnabled())
+                            log.info("fixed point after " + nrounds
+                                    + " rounds with " + nafter
+                                    + " ungrounded statements");
                         
                         break;
                         
@@ -641,6 +652,11 @@ public class StatementBuffer implements IStatementBuffer {
                 }
             }
             database.addTerms(values, numValues);
+            if(DEBUG) {
+                for(int i=0; i<numValues; i++) {
+                    log.debug(" added term: "+values[i]+" (termId="+values[i].termId+")");
+                }
+            }
         }
 
         // Insert statements (batch operation).
@@ -723,7 +739,7 @@ public class StatementBuffer implements IStatementBuffer {
      */
     final protected long addStatements(final _Statement[] stmts, final int numStmts) {
         
-        SPO[] tmp = new SPO[numStmts];
+        final SPO[] tmp = new SPO[numStmts];
         
         for(int i=0; i<tmp.length; i++) {
             
@@ -734,20 +750,21 @@ public class StatementBuffer implements IStatementBuffer {
              * are in use since the statement identifier is assigned based on
              * the {s,p,o} triple.
              */
-            final SPO spo = new SPO(stmt.s.termId, stmt.p.termId, stmt.o.termId,
-                    stmt.type);
 
+            final SPO spo = new SPO(stmt.s.termId, stmt.p.termId,
+                    stmt.o.termId, stmt.type);
+
+            if (DEBUG)
+                log.debug("adding: " + stmt.toString() + " (" + spo + ")");
+            
             if(!spo.isFullyBound()) {
                 
-                throw new AssertionError("Not fully bound? : "+spo);
+                throw new AssertionError("Not fully bound? : " + spo);
                 
             }
             
             tmp[i] = spo;
 
-            if (DEBUG)
-                log.debug("adding: " + stmt.toString() + " (" + spo + ")");
-            
         }
         
         /*
@@ -968,6 +985,12 @@ public class StatementBuffer implements IStatementBuffer {
             
             // return the pre-existing term.
             
+            if(log.isDebugEnabled()) {
+                
+                log.debug("duplicate: "+term);
+                
+            }
+            
             return existingTerm;
             
         }
@@ -1018,28 +1041,28 @@ public class StatementBuffer implements IStatementBuffer {
         if (distinct) {
             {
                 final _Value tmp = getDistinctTerm((_Value) s);
-                if (tmp.count > 0) {
+                if (tmp != s) {
                     duplicateS = true;
                 }
                 s = (Resource) tmp;
             }
             {
                 final _Value tmp = getDistinctTerm((_Value) p);
-                if (tmp.count > 0) {
+                if (tmp != p) {
                     duplicateP = true;
                 }
                 p = (URI) tmp;
             }
             {
                 final _Value tmp = getDistinctTerm((_Value) o);
-                if (tmp.count > 0) {
+                if (tmp != o) {
                     duplicateO = true;
                 }
                 o = (Value) tmp;
             }
             if (c != null) {
                 final _Value tmp = getDistinctTerm((_Value) c);
-                if (tmp.count > 0) {
+                if (tmp != c) {
                     duplicateC = true;
                 }
                 c = (Resource) tmp;
@@ -1084,13 +1107,6 @@ public class StatementBuffer implements IStatementBuffer {
                 // add to the buffer.
                 stmts[numStmts++] = stmt;
 
-                // increment usage counts on terms iff stmt added to buffer.
-                ((_Value) s).count++;
-                ((_Value) p).count++;
-                ((_Value) o).count++;
-                if (c != null)
-                    ((_Value) c).count++;
-                
             }
             
         }

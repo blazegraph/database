@@ -2556,8 +2556,8 @@ abstract public class AbstractTripleStore extends
          */
         final long readTime = ITx.READ_COMMITTED;
 
-        return new RDFJoinNexusFactory(writeTime, readTime, solutionFlags,
-                filter);
+        return new RDFJoinNexusFactory(writeTime, readTime, justify,
+                solutionFlags, filter);
         
     }
     
