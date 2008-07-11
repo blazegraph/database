@@ -67,7 +67,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure {
 
-    protected static final Logger log = Logger.getLogger(SPOIndexWriteProc.class);
+    protected transient static final Logger log = Logger.getLogger(SPOIndexWriteProc.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
