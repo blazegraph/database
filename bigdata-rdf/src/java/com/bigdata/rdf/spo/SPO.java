@@ -650,7 +650,7 @@ public class SPO implements ISPO, Comparable<SPO> {
             }
             
             // Note: the statement [id] is not stored in the reverse lexicon.
-            final String idStr = (sid==NULL?"":" : id="+sid);
+            final String idStr = (sid==NULL?"":" : sid="+sid);
             
             return t +" : " + store.toString(s, p, o) + idStr;
             

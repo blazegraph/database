@@ -1,9 +1,6 @@
 package com.bigdata.rdf.spo;
 
-import java.util.concurrent.ExecutorService;
-
 import com.bigdata.btree.IIndex;
-import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
@@ -21,8 +18,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class SPOAccessPath extends AbstractAccessPath<SPO> {
 
-    // @todo IRawTripleStore when re-factored back to the rdf module.
-    private static transient final long NULL = 0L;
+    private static transient final long NULL = IRawTripleStore.NULL;
 
     private SPOTupleSerializer tupleSer;
     
@@ -57,11 +53,10 @@ public class SPOAccessPath extends AbstractAccessPath<SPO> {
      * @param ndx
      * @param flags
      */
-    public SPOAccessPath(ExecutorService service, SPORelation relation,
-            IPredicate<SPO> predicate, IKeyOrder<SPO> keyOrder, IIndex ndx,
-            int flags) {
+    public SPOAccessPath(SPORelation relation, IPredicate<SPO> predicate,
+            IKeyOrder<SPO> keyOrder, IIndex ndx, int flags) {
 
-        super(service, relation, predicate, keyOrder, ndx, flags);
+        super(relation, predicate, keyOrder, ndx, flags);
 
         {
 
@@ -200,17 +195,31 @@ public class SPOAccessPath extends AbstractAccessPath<SPO> {
     }
 
     /**
-     * Overriden to write on all access paths.
-     * 
-     * FIXME This MUST delegate to
+     * Strenghened return type.
+     */
+    public SPORelation getRelation() {
+        
+        return (SPORelation) super.getRelation();
+        
+    }
+    
+    /**
+     * Overriden to delegate to
      * {@link AbstractTripleStore#removeStatements(IChunkedOrderedIterator)} in
-     * order to correctly handle {@link Justification}s and statement
-     * identifiers.
+     * order to (a) write on all access paths; (b) handle statement identifiers,
+     * including truth maintenance for statement identifiers; and (c) if
+     * justifications are being maintained, then retract justifications having
+     * no support once the statements visitable by this access path have been
+     * retracted.
      */
     @Override
     public long removeAll() {
         
-        return ((SPORelation)relation).delete(iterator());
+        final SPORelation r = getRelation();
+
+        final AbstractTripleStore db = r.getContainer();
+
+        return db.removeStatements(iterator());
         
     }
     

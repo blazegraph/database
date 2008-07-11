@@ -615,9 +615,7 @@ public class QueueStatisticsTask implements Runnable {
      * 
      * @param counterSet
      *            The counters will be added to this {@link CounterSet}.
-     * @param service
-     *            The service for which the counters will be reported.
-     * 
+     *            
      * @return The caller's <i>counterSet</i>
      */
     public CounterSet addCounters(CounterSet counterSet) {

@@ -1417,7 +1417,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
          * use and therefore rangeCount() will report the exact count.
          */
 
-        return rangeCount(null, null);
+        return rangeCount(fromKey, toKey);
 
     }
     

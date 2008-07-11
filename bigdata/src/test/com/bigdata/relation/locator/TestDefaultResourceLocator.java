@@ -227,7 +227,6 @@ public class TestDefaultResourceLocator extends TestCase2 {
         private IIndex ndx;
         
         /**
-         * @param service
          * @param indexManager
          * @param namespace
          * @param timestamp
