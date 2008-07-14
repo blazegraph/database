@@ -189,6 +189,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         this(new TemporaryStore(), db == null ? properties : stackProperties(
                 properties, db));
 
+        if(log.isInfoEnabled()) {
+            
+            log.info("new temporary store: "+store.getFile()+", uuid="+store.getUUID());
+            
+        }
+
         if (db != null) {
 
             ((DefaultResourceLocator) db.getIndexManager().getResourceLocator())
@@ -211,7 +217,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     private TempTripleStore(TemporaryStore store, Properties properties) {
 
         this(store, store.getUUID() + "kb", ITx.UNISOLATED, properties);
-
+        
     }
 
     /**
@@ -229,6 +235,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
         store = (TemporaryStore) indexManager;
 
+        if(log.isInfoEnabled()) {
+            
+            log.info("view on existing temporary store: "+store.getUUID());
+            
+        }
+        
     }
     
     /**

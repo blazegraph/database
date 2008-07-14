@@ -642,6 +642,15 @@ public class RDFJoinNexus implements IJoinNexus {
      * 
      * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
      *         (mutation count).
+     * 
+     * FIXME It is possible to locate monolithic indices for a distributed
+     * database such that certain JOINs (especially, the {@link SPORelation}
+     * self-JOINs required for inference and most query answering) are purely
+     * local.
+     * <p>
+     * Make it easy (a) to deploy under this configuration, (b) to detect when
+     * that deployment exists, and (c) then submit the rules to the
+     * {@link DataService} on which the {@link SPORelation}'s indices reside.
      */
     protected Object runProgram(ActionEnum action, IStep step)
             throws Exception {
@@ -652,28 +661,29 @@ public class RDFJoinNexus implements IJoinNexus {
         if (step == null)
             throw new IllegalArgumentException();
 
-        final ProgramUtility util = new ProgramUtility();
+        final IIndexManager indexManager = getIndexManager();
         
-        final IBigdataFederation fed = util.getFederation(indexManager, step,
-                getReadTimestamp());
+        if(indexManager instanceof IBigdataFederation) {
+            
+            final IBigdataFederation fed = (IBigdataFederation)indexManager;
+            
+            if(fed instanceof LocalDataServiceFederation) {
+                
+                final DataService dataService = ((LocalDataServiceFederation) fed)
+                .getDataService();
 
-        if (fed == null) {
+                // single data service program execution.
+                return runDataServiceProgram(dataService, action, step);
 
-            // local Journal or TemporaryStore execution.
-            return runLocalProgram(action, step);
-
-        } else if (fed instanceof LocalDataServiceFederation) {
-
-            final DataService dataService = ((LocalDataServiceFederation) fed)
-                    .getDataService();
-
-            // single data service program execution.
-            return runDataServiceProgram(dataService, action, step);
-
-        } else {
-
+            }
+            
             // distributed program execution.
             return runDistributedProgram(fed, action, step);
+            
+        } else {
+            
+            // local Journal or TemporaryStore execution.
+            return runLocalProgram(action, step);
 
         }
 

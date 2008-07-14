@@ -39,6 +39,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
@@ -229,145 +230,137 @@ public class ProgramUtility {
         
     }
 
-    /**
-     * Return the {@link IBigdataFederation} that is capable of resolving all
-     * non-local indices used by the {@link IRelation}s in the program -or-
-     * <code>null</code> if all indices are resolved by local resources
-     * outside of {@link IBigdataFederation} control.
-     * <p>
-     * Note: If the {@link IBigdataFederation} is completely local to the
-     * machine on which the program will run and any indices outside of the
-     * federation's control are also local to that same machine, then the
-     * federation reference will be returned and the local resources will be
-     * resolved.
-     * <p>
-     * Note: If any index is hosted by a scale-out {@link IBigdataFederation}
-     * and there are any machine local resources that are not resolvable by a
-     * remote host for some part of the program then an exception will be
-     * thrown.
-     * <p>
-     * Note: If the returned {@link IBigdataFederation} is a
-     * {@link LocalDataServiceFederation} then optimizations are possible by
-     * running program as an {@link AbstractTask} within the
-     * {@link LocalDataServiceImpl}, including the case where there is access
-     * to local resources.
-     * 
-     * @param step
-     *            The program.
-     * @param timestamp
-     *            The timestamp is relatively arbitrary. We do not actually use
-     *            the relation objects that are being created other than to
-     *            inquire after the names of their indices.
-     * 
-     * @return The {@link IBigdataFederation} -or- <code>null</code> if the
-     *         indices are all hosted by <strong>local</strong> resources
-     *         outside of {@link IBigdataFederation} control, such as a
-     *         {@link Journal} or {@link TemporaryStore}.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>program</i> is <code>null</code>
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>program</i> is empty (not an {@link IRule} and having
-     *             no {@link IProgram#steps()}).
-     * 
-     * @throws IllegalStateException
-     *             if some of the indices are hosted on local resources and
-     *             {@link IBigdataFederation#isDistributed()} is
-     *             <code>true</code> (this implies that those resources MAY be
-     *             unreachable from at least some of the {@link DataService}s
-     *             in the federation).
-     * 
-     * @throws IllegalStateException
-     *             if there are relations belonging to different
-     *             {@link IBigdataFederation}s.
-     */
-    public IBigdataFederation getFederation(IIndexManager indexManager, IStep step, long timestamp) {
-
-        if (step == null)
-            throw new IllegalArgumentException();
-
-        if(!step.isRule() && ((IProgram)step).stepCount()==0)
-            throw new IllegalArgumentException("empty program");
-
-        /*
-         * The set of distinct relations.
-         */
-        final Map<String, IRelation> relations = getRelations(indexManager, step,
-                timestamp);
-
-        if(relations.isEmpty()) {
-            
-            // Note: this is either an empty program or a bug.
-            throw new IllegalArgumentException();
-            
-        }
-        
-        // set of distinct index managers (IBigdataFederation, TemporaryStore, Journal, etc).
-        final Set<IIndexManager> indexManagers = new HashSet<IIndexManager>();
-
-        IBigdataFederation fed = null;
-        
-        final Set<IIndexManager> localResources = new HashSet<IIndexManager>();
-        
-        final Set<IBigdataFederation> feds = new HashSet<IBigdataFederation>();
-        
-        for(IRelation relation : relations.values()) {
-            
-            final IIndexManager tmp = relation.getIndexManager();
-            
-            indexManagers.add( tmp );
-            
-            if(tmp instanceof IBigdataFederation) {
-                
-                feds.add( (IBigdataFederation)tmp );
-               
-                if(fed == null) {
-                
-                    fed = (IBigdataFederation)tmp;
-                    
-                }
-                
-            } else {
-            
-                localResources.add(tmp);
-                
-            }
-            
-        }
-
-        assert !indexManagers.isEmpty();
-        
-        if(fed == null) {
-            
-            /*
-             * No federation, so all resources must be local.
-             */
-            
-            assert ! localResources.isEmpty();
-
-            // Note: [null] indicates non-federation based operation.
-            return null;
-            
-        }
-
-        if (feds.size() > 2) {
-            
-            throw new IllegalStateException(
-                    "Program uses more than one federation: #feds="
-                            + feds.size());
-            
-        }
-
-        if(!localResources.isEmpty() && fed.isDistributed()) {
-            
-            throw new IllegalStateException("Program uses local resources but federation is distributed.");
-            
-        }
-        
-        return fed;
-        
-    }
+//    /**
+//     * Return the {@link IIndexManager} that is capable of resolving all
+//     * relations (and their indices) used in the {@link IStep} -or-
+//     * <code>null</code> if some relations or indices are not resolvable from
+//     * the current context (in general, either because they do not exist or
+//     * because they rely on machine or JVM local resources not accessible from
+//     * the current execution context).
+//     * <p>
+//     * Note: If the returned {@link IIndexManager} is an {@link AbstractJournal},
+//     * an {@link LocalDataServiceFederation} then various optimizations are
+//     * possible, including running program as an {@link AbstractTask} within the
+//     * {@link LocalDataServiceImpl}, including the case where there is access
+//     * to local resources.
+//     * 
+//     * @param step
+//     *            The program.
+//     * @param timestamp
+//     *            The timestamp is relatively arbitrary. We do not actually use
+//     *            the relation objects that are being created other than to
+//     *            inquire after the names of their indices.
+//     * 
+//     * @return The {@link IBigdataFederation} -or- <code>null</code> if the
+//     *         indices are all hosted by <strong>local</strong> resources
+//     *         outside of {@link IBigdataFederation} control, such as a
+//     *         {@link Journal} or {@link TemporaryStore}.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if <i>program</i> is <code>null</code>
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if <i>program</i> is empty (not an {@link IRule} and having
+//     *             no {@link IProgram#steps()}).
+//     * 
+//     * @throws IllegalStateException
+//     *             if some of the indices are hosted on local resources and
+//     *             {@link IBigdataFederation#isDistributed()} is
+//     *             <code>true</code> (this implies that those resources MAY be
+//     *             unreachable from at least some of the {@link DataService}s
+//     *             in the federation).
+//     * 
+//     * @throws IllegalStateException
+//     *             if there are relations belonging to different
+//     *             {@link IBigdataFederation}s.
+//     */
+//    public IBigdataFederation getFederation(IIndexManager indexManager,
+//            IStep step, long timestamp) {
+//
+//        if (step == null)
+//            throw new IllegalArgumentException();
+//
+//        if(!step.isRule() && ((IProgram)step).stepCount()==0)
+//            throw new IllegalArgumentException("empty program");
+//
+//        /*
+//         * The set of distinct relations.
+//         */
+//        final Map<String, IRelation> relations = getRelations(indexManager, step,
+//                timestamp);
+//
+//        if(relations.isEmpty()) {
+//            
+//            // Note: this is either an empty program or a bug.
+//            throw new IllegalArgumentException();
+//            
+//        }
+//        
+//        // set of distinct index managers (IBigdataFederation, TemporaryStore, Journal, etc).
+//        final Set<IIndexManager> indexManagers = new HashSet<IIndexManager>();
+//
+//        IBigdataFederation fed = null;
+//        
+//        final Set<IIndexManager> localResources = new HashSet<IIndexManager>();
+//        
+//        final Set<IBigdataFederation> feds = new HashSet<IBigdataFederation>();
+//        
+//        for(IRelation relation : relations.values()) {
+//            
+//            final IIndexManager tmp = relation.getIndexManager();
+//            
+//            indexManagers.add( tmp );
+//            
+//            if(tmp instanceof IBigdataFederation) {
+//                
+//                feds.add( (IBigdataFederation)tmp );
+//               
+//                if(fed == null) {
+//                
+//                    fed = (IBigdataFederation)tmp;
+//                    
+//                }
+//                
+//            } else {
+//            
+//                localResources.add(tmp);
+//                
+//            }
+//            
+//        }
+//
+//        assert !indexManagers.isEmpty();
+//        
+//        if(fed == null) {
+//            
+//            /*
+//             * No federation, so all resources must be local.
+//             */
+//            
+//            assert ! localResources.isEmpty();
+//
+//            // Note: [null] indicates non-federation based operation.
+//            return null;
+//            
+//        }
+//
+//        if (feds.size() > 2) {
+//            
+//            throw new IllegalStateException(
+//                    "Program uses more than one federation: #feds="
+//                            + feds.size());
+//            
+//        }
+//
+//        if(!localResources.isEmpty() && fed.isDistributed()) {
+//            
+//            throw new IllegalStateException("Program uses local resources but federation is distributed.");
+//            
+//        }
+//        
+//        return fed;
+//        
+//    }
 
     /**
      * <code>true</code> iff the program either is the fix point closure of a
