@@ -106,8 +106,8 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             
             final RDFSVocabulary inf = new RDFSVocabulary(store);
             
-            final Rule r = new RuleRdfs03(getStore().getSPORelation()
-                    .getNamespace(), inf);
+            final Rule r = new RuleRdfs03(
+                    store.getSPORelation().getNamespace(), inf);
             
             final IElementFilter<SPO> filter = new DoNotAddFilter(inf,
                     new NoAxioms(store), true/* forwardChainRdfTypeRdfsResource */);
