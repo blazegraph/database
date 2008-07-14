@@ -28,19 +28,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPORelationView;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
+import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.IVariable;
+import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.DelegatePredicate;
@@ -92,14 +94,16 @@ public class TMUtility {
      * already part of the database (for insert) or as if they had already been
      * removed (for delete). Given a single rule with N predicates in the tail,
      * we generate N new rules that we will run <em>instead of</em> the
-     * original rule. For each of those N new rules, we set the relation for
-     * tail[i] to <i>focusIndex</i>. When the new rule is run, tail[i] will
+     * original rule. For each of those N new rules in turn, we set the relation
+     * for tail[i] to <i>focusStore</i>. When the new rule is run, tail[i] will
      * read from the [focusStore] rather than the original database. All other
-     * predicates in the tail will read from the fused view of the [focusStore]
-     * and the [database]. As a special case, when the rule has a single
+     * predicates in the tail are modified to read from the fused view of the
+     * [database + focusStore]. As a special case, when the rule has a single
      * predicate in the tail, the predicate is only run against the
-     * <i>focusStore</i> rather than database or the fused view [focusStore +
-     * database]. For all cases, the head of the rule is unchanged.
+     * <i>focusStore</i> rather than <i>database</i> or the fused view
+     * <i>[database + focusStore]. For all cases, the head of the rule is
+     * unchanged - this is the relation on which the rules will write and it
+     * should always be the <i>database</i>.
      * 
      * @param rule
      *            The original rule. The {@link IPredicate}s in this
@@ -115,7 +119,7 @@ public class TMUtility {
      *         of the individual rules.
      */
     public Program mapRuleForTruthMaintenance(final IRule rule,
-            final IRelationIdentifier<SPO> focusStore) {
+            final String focusStore) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -127,34 +131,6 @@ public class TMUtility {
 
         final int tailCount = rule.getTailCount();
 
-        /*
-         * Setup the fused view (focusStore + database).
-         */
-
-        final IRelationIdentifier<SPO> fusedView;
-        
-        if (tailCount == 1) {
-
-            /*
-             * The fused view will not be used if there is only a single
-             * predicate in the tail.
-             */
-
-            fusedView = null;
-
-        } else {
-
-            /*
-             * Note: This assumes that the relation is the same for each of the
-             * tail predicates. This is true of course for RDF, and RDF is where
-             * we use truth maintenance, but it is not true in the general case.
-             */
-
-            fusedView = new SPORelationView(rule.getTail(0).getRelationName(),
-                    focusStore);
-
-        }
-        
         /*
          * The head of the rule is preserved unchanged. 
          */
@@ -235,16 +211,9 @@ public class TMUtility {
                      * the tail.
                      */
 
-                    p2 = new DelegatePredicate<SPO>(p) {
+                    p2 = new MyDelegatePredicate<SPO>(
+                            new String[] { focusStore }, p);
 
-                        public IRelationIdentifier<SPO> getRelationName() {
-
-                            return focusStore;
-
-                        }
-
-                    };
-                    
                 } else {
 
                     /*
@@ -252,15 +221,8 @@ public class TMUtility {
                      * view of the focusStore and the database.
                      */
 
-                    p2 = new DelegatePredicate<SPO>(p) {
-
-                        public IRelationIdentifier<SPO> getRelationName() {
-
-                            return fusedView;
-
-                        }
-
-                    };
+                    p2 = new MyDelegatePredicate<SPO>(new String[] {
+                            p.getOnlyRelationName(), focusStore }, p);
 
                 }
 
@@ -297,7 +259,7 @@ public class TMUtility {
      * @todo unit tests.
      */
     public Program mapProgramForTruthMaintenance(IProgram program,
-            IRelationIdentifier<SPO> focusStore) {
+            String focusStore) {
 
         if (program == null)
             throw new IllegalArgumentException();
@@ -347,7 +309,7 @@ public class TMUtility {
            
     }
     
-    public Program mapForTruthMaintenance(IStep step, IRelationIdentifier<SPO> focusStore) {
+    public Program mapForTruthMaintenance(IStep step, String focusStore) {
         
         if(step.isRule()) {
             
@@ -359,6 +321,94 @@ public class TMUtility {
             
         }
         
+    }
+
+    /**
+     * Class overrides the relation name(s) and delegates all other operations.  By
+     * overriding the relation names rather than creating a new instance we preserve
+     * the implementation object in the delegate (if that matters). 
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    private static class MyDelegatePredicate<E> extends DelegatePredicate<E> {
+        
+        private String[] relationName;
+        
+        public MyDelegatePredicate(String[] relationName,IPredicate<E> delegate) {
+            
+            super(delegate);
+            
+            this.relationName = relationName;
+            
+        }
+
+        @Override
+        public String getOnlyRelationName(){
+            
+            if (relationName.length != 1)
+                throw new IllegalStateException();
+            
+            return relationName[0];
+            
+        }
+
+        @Override
+        public String getRelationName(int index) {
+            
+            return relationName[index];
+            
+        }
+        
+        @Override
+        public int getRelationCount() {
+            
+            return relationName.length;
+            
+        }
+
+        /**
+         * Overriden to display the overriden relation names.
+         */
+        @Override
+        public String toString() {
+            return toString(null);
+        }
+
+        /**
+         * Overriden to display the overriden relation names.
+         */
+        @Override
+        public String toString(IBindingSet bindingSet) {
+
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("(");
+
+            sb.append(Arrays.toString(relationName));
+            
+            final int arity = arity();
+            
+            for (int i = 0; i < arity; i++) {
+
+//                if (i > 0)
+                    sb.append(", ");
+
+                final IVariableOrConstant v = get(i);
+
+                sb.append(v.isConstant() || bindingSet == null
+                        || !bindingSet.isBound((IVariable) v) ? v.toString()
+                        : bindingSet.get((IVariable) v));
+
+            }
+
+            sb.append(")");
+
+            return sb.toString();
+
+        }
+     
     }
     
 }

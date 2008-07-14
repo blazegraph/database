@@ -45,9 +45,9 @@ import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Generic implementation relies on a ctor for the resource with the following
@@ -100,9 +100,6 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * </dl>
  * 
- * @todo add atomic "create if not found" operation - requires operation with
- *       those semantics on the {@link SparseRowStore}.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <T>
@@ -143,13 +140,10 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
     }
 
-    public T locate(final IResourceIdentifier<T> identifier,
-            final long timestamp) {
+    public T locate(final String namespace, final long timestamp) {
 
-        if (identifier == null)
+        if (namespace == null)
             throw new IllegalArgumentException();
-
-        final String namespace = identifier.toString();
 
         if (log.isInfoEnabled()) {
 
@@ -202,7 +196,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     }
                     
                     // pass request to delegate.
-                    resource = delegate.locate(identifier, timestamp);
+                    resource = delegate.locate(namespace, timestamp);
                     
                     if (resource != null) {
 
@@ -502,12 +496,72 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     }
 
     /**
+     * Places the instance into the cache iff there is no existing instance in
+     * the cache for the same resource and timestamp.
+     * <p>
+     * Note: This is done automatically by {@link AbstractResource}.
+     * 
+     * @param instance
+     *            The instance.
+     */
+    public T putInstance(T instance) {
+      
+        if (instance == null)
+            throw new IllegalArgumentException();
+
+        final String namespace = instance.getNamespace();
+        
+        final long timestamp = instance.getTimestamp();
+        
+        if (log.isInfoEnabled()) {
+
+            log.info("namespace=" + namespace+", timestamp="+timestamp);
+
+        }
+
+        // lock is only for the named relation.
+        final Lock lock = namedLock.acquireLock(namespace);
+
+        try {
+
+            final T tmp = get(namespace, timestamp);
+            
+            if (tmp != null) {
+
+                if(log.isInfoEnabled()) {
+                    
+                    log.info("Existing instance already in cache: "+tmp);
+                    
+                }
+                
+                return tmp;
+                
+            }
+            
+            put(instance);
+            
+            if (log.isInfoEnabled()) {
+
+                log.info("Instance added to cache: " + instance);
+                
+            }
+            
+            return instance;
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
+        
+    }
+    
+    /**
      * Causes the {@link IIndexManager} to be tested when attempting to resolve
-     * {@link IResourceIdentifier}s. The {@link IIndexManager} will be
-     * automatically cleared from the set of {@link IIndexManager}s to be
-     * tested if its reference is cleared by the JVM. If it becomes closed
-     * asynchronously then a warning will be logged until its reference is
-     * cleared.
+     * a resource identifiers. The {@link IIndexManager} will be automatically
+     * cleared from the set of {@link IIndexManager}s to be tested if its
+     * reference is cleared by the JVM. If it becomes closed asynchronously then
+     * a warning will be logged until its reference is cleared.
      * <p>
      * Note: The default {@link IIndexManager} specified to the ctor normally
      * ensures that the global namespace is consistent (it is not possible to

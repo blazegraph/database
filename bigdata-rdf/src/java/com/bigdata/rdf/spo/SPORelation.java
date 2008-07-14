@@ -604,7 +604,8 @@ public class SPORelation extends AbstractRelation<SPO> {
         final IVariableOrConstant<Long> O = (o == NULL ? Var.var("o")
                 : new Constant<Long>(o));
         
-        return getAccessPath(new SPOPredicate(getResourceIdentifier(), S, P, O, filter));
+        return getAccessPath(new SPOPredicate(new String[] { getNamespace() },
+                S, P, O, filter));
         
     }
 
@@ -1217,8 +1218,8 @@ public class SPORelation extends AbstractRelation<SPO> {
         
         {
             
-            final IPredicate<SPO> pred = new SPOPredicate(getResourceIdentifier(),
-                    Var.var("s"), Var.var("p"), Var.var("o"));
+            final IPredicate<SPO> pred = new SPOPredicate(getNamespace(), Var
+                    .var("s"), Var.var("p"), Var.var("o"));
 
             final IChunkedOrderedIterator<SPO> itr = getAccessPath(keyOrder,
                     pred).iterator();

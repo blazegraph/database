@@ -37,9 +37,7 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.RelationFusedView;
-import com.bigdata.relation.RelationName;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -98,7 +96,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
      */
     public AbstractRuleFastClosure_3_5_6_7_9(//
             String name,
-            IRelationIdentifier<SPO> relationName,
+            String relationName,
             final IConstant<Long> rdfsSubPropertyOf,
             final IConstant<Long> propertyId,
             IRuleTaskFactory taskFactory
@@ -140,9 +138,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
      */
     abstract protected static class FastClosureRuleTask implements IStepTask {
 
-        private final IRelationIdentifier<SPO> database;
+        private final String database;
         
-        private final IRelationIdentifier<SPO> focusStore;
+        private final String focusStore;
         
         private final IRule rule;
 
@@ -191,8 +189,8 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          *            The propertyId to be used in the assertions.
          */
         public FastClosureRuleTask(//
-                IRelationIdentifier<SPO> database,
-                IRelationIdentifier<SPO> focusStore,
+                String database,
+                String focusStore,
                 IRule rule,
                 IJoinNexus joinNexus,
                 IBuffer<ISolution> buffer,
@@ -258,7 +256,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
              * for tail[0].
              */
             final SPORelation relation = (SPORelation) resourceLocator
-                    .locate(rule.getHead().getRelationName(), timestamp);
+                    .locate(rule.getHead().getOnlyRelationName(), timestamp);
 
             /*
              * Query for the set {P} rather than requiring it as an input.
@@ -559,7 +557,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                     for (Long p : P) {
 
                         final SPOPredicate pred = new SPOPredicate(//
-                                new RelationName<SPO>("view"),//
+                                "view",//
                                 Var.var("x"), new Constant<Long>(p), Var.var("y")//
                                 );
                         
@@ -692,7 +690,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
         public Set<Long> getSubPropertiesOf(IConstant<Long> p) {
 
             final SPOPredicate pred = new SPOPredicate(//
-                    new RelationName<SPO>("view"), //
+                    "view", //
                     Var.var("x"), rdfsSubPropertyOf, p//
             );
             

@@ -681,9 +681,9 @@ public class InferenceEngine extends RDFSVocabulary {
         final long begin = System.currentTimeMillis();
 
         final MappedProgram program = getFastForwardClosureProgram(//
-                database.getSPORelation().getResourceIdentifier(),
+                database.getSPORelation().getNamespace(),
                 (focusStore == null ? null : focusStore.getSPORelation()
-                        .getResourceIdentifier()),//
+                        .getNamespace()),//
                 forwardChainRdfTypeRdfsResource, //
                 rdfsOnly,//
                 forwardChainOwlSameAsClosure, //
@@ -731,9 +731,9 @@ public class InferenceEngine extends RDFSVocabulary {
         final long begin = System.currentTimeMillis();
 
         final MappedProgram program = getFastForwardClosureProgram(//
-                database.getSPORelation().getResourceIdentifier(),//
+                database.getSPORelation().getNamespace(),//
                 (focusStore == null ? null : focusStore.getSPORelation()
-                        .getResourceIdentifier()),//
+                        .getNamespace()),//
                 forwardChainRdfTypeRdfsResource, //
                 rdfsOnly,//
                 forwardChainOwlSameAsClosure, //

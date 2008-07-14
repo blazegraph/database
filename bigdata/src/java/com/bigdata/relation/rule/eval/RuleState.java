@@ -8,7 +8,6 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
@@ -542,7 +541,7 @@ public class RuleState {
      *       reset the bindings!)
      *       <p>
      *       It might also be worth while to cache the
-     *       {@link IRelationIdentifier} to {@link IRelation} map. That should
+     *       {@link String} to {@link IRelation} map. That should
      *       be done in the {@link IResourceLocator} impl.
      */
     public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
@@ -593,8 +592,8 @@ public class RuleState {
         final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
 
         // The name of the relation that the predicate will query.
-        final IRelationIdentifier relationIdentifier = predicate
-                .getRelationName();
+        final String relationIdentifier = predicate
+                .getOnlyRelationName();
 
         // Resolve the relation name to the IRelation object.
         final IRelation relation = (IRelation) joinNexus.getIndexManager()

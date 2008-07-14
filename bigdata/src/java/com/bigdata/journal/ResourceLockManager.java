@@ -34,7 +34,9 @@ import java.util.UUID;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.AbstractService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IServiceShutdown;
 
@@ -82,6 +84,29 @@ import com.bigdata.service.IServiceShutdown;
  * should not require deadlock detection since all locks will be declared by the
  * time we do the commit.
  * <p>
+ * 
+ * @todo use a lock refresh policy for lock leases (5 minute lease default). The
+ *       application acquires and releases locks. on the client side, a lock
+ *       counter is maintained and the lease for the lock is automatically
+ *       renewed before the lease would expire if the counter is non-zero.
+ *       <p>
+ *       Add a method to force the release of the lock and its lease and use
+ *       that to release all locks held by the client when (a) they become
+ *       finalizable; and (b) when the {@link IBigdataFederation} is closed.
+ *       Make the locks canonical so that any shared lock for the same resource
+ *       is the same lock object and any exclusive lock for the same resource is
+ *       the same lock object. (In particular, the relation cache maintained by
+ *       the {@link DefaultResourceLocator} should not keep other processes from
+ *       acquiring an exclusive resource lock if the application is done with
+ *       its shared lock.) Perhaps locks older than N seconds need to be closed,
+ *       where N might be equal to the 1.5 x of the lease renew period without
+ *       an acquire().
+ *       <p>
+ *       Add the ability to invalidate all shared locks in order to obtain an
+ *       exclusive lock, e.g., for emergency ops. Clients must be notified that
+ *       their lock is no good (throw exception) the next time they try to renew
+ *       their shared lock (including when acquire is a cache hit on a lock
+ *       lease).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

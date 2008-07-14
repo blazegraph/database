@@ -44,7 +44,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IKeyOrder;
@@ -104,13 +103,23 @@ public class TestDefaultResourceLocator extends TestCase2 {
         
         final String namespace = "test";
         
-        final IResourceIdentifier<MockRelation> identifier = new ResourceIdentifier<MockRelation>(namespace);
-        
         try {
 
             // instantiate relation.
             MockRelation mockRelation = new MockRelation(store, namespace,
                     ITx.UNISOLATED, properties);
+            
+            /*
+             * the index for the relation does not exist yet. we verify
+             * that, and then create the index.
+             */
+
+            assertNull(mockRelation.getIndex());
+
+            // create indices.
+            mockRelation.create();
+
+            assertNotNull(mockRelation.getIndex());
 
             {
                 /*
@@ -118,12 +127,12 @@ public class TestDefaultResourceLocator extends TestCase2 {
                  * store are unisolated (ah!, but only if you are using the
                  * concurrency control API)
                  */
-                assertNotNull(store.getResourceLocator().locate(identifier,
+                assertNotNull(store.getResourceLocator().locate(namespace,
                         ITx.UNISOLATED));
 
                 // a request for the unisolated view gives us the same instance.
                 assertTrue(((MockRelation) store.getResourceLocator().locate(
-                        identifier, ITx.UNISOLATED)).getIndex() == mockRelation);
+                        namespace, ITx.UNISOLATED)) == mockRelation);
 
                 /*
                  * the read-committed relation is also locatable since its in
@@ -131,52 +140,41 @@ public class TestDefaultResourceLocator extends TestCase2 {
                  * (a) they have been created; and (b) there has been a commit
                  * of the journal.
                  */
-                assertNotNull(store.getResourceLocator().locate(identifier,
+                assertNotNull(store.getResourceLocator().locate(namespace,
                         ITx.READ_COMMITTED));
 
                 // a request for the read committed view is not the same
                 // instance as the unisolated view.
                 assertTrue(((MockRelation) store.getResourceLocator().locate(
-                        identifier, ITx.READ_COMMITTED)).getIndex() == mockRelation);
+                        namespace, ITx.READ_COMMITTED)) != mockRelation);
 
             }
             
             {
-                /*
-                 * the index for the relation does not exist yet. we verify
-                 * that, and then create the index.
-                 */
-
-                assertNull(mockRelation.getIndex());
-
-                // create indices.
-                mockRelation.create();
-
-                assertNotNull(mockRelation.getIndex());
 
                 // a request for the unisolated view shows that the index
                 // exists.
                 assertNotNull(((MockRelation) store.getResourceLocator()
-                        .locate(identifier, ITx.UNISOLATED)).getIndex());
+                        .locate(namespace, ITx.UNISOLATED)).getIndex());
 
                 // a request for the unisolated view gives us the same instance.
                 assertTrue(((MockRelation) store.getResourceLocator().locate(
-                        identifier, ITx.UNISOLATED)).getIndex() == mockRelation);
+                        namespace, ITx.UNISOLATED)) == mockRelation);
 
                 /*
-                 * the read-committed view still does not see the index since
+                 * the read-committed view still does not see the relation since
                  * there has not been a commit yet after the index was created.
                  */
                 assertNull(((MockRelation) store.getResourceLocator().locate(
-                        identifier, ITx.READ_COMMITTED)).getIndex());
+                        namespace, ITx.READ_COMMITTED)));
             
                 final MockRelation readCommittedView1 = (MockRelation) store
-                        .getResourceLocator().locate(identifier,
+                        .getResourceLocator().locate(namespace,
                                 ITx.READ_COMMITTED);
 
                 // same view before a commit.
                 assertTrue(readCommittedView1 == (MockRelation) store
-                        .getResourceLocator().locate(identifier,
+                        .getResourceLocator().locate(namespace,
                                 ITx.READ_COMMITTED));
 
                 
@@ -190,7 +188,7 @@ public class TestDefaultResourceLocator extends TestCase2 {
                  * if there HAS been a commit
                  */
                 final MockRelation readCommittedView2 = (MockRelation) store
-                        .getResourceLocator().locate(identifier,
+                        .getResourceLocator().locate(namespace,
                                 ITx.READ_COMMITTED);
         
                 // different view after a commit.
@@ -206,7 +204,7 @@ public class TestDefaultResourceLocator extends TestCase2 {
                 
                 // another request gives us the same view
                 assertTrue(readCommittedView2 == (MockRelation) store
-                        .getResourceLocator().locate(identifier,
+                        .getResourceLocator().locate(namespace,
                                 ITx.READ_COMMITTED));
 
             }
@@ -232,7 +230,7 @@ public class TestDefaultResourceLocator extends TestCase2 {
          * @param timestamp
          * @param properties
          */
-        protected MockRelation(IIndexManager indexManager, String namespace, long timestamp,
+        public MockRelation(IIndexManager indexManager, String namespace, Long timestamp,
                 Properties properties) {
             
             super(indexManager, namespace, timestamp, properties);

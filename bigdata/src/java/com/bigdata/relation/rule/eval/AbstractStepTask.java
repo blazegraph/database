@@ -45,7 +45,6 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
@@ -394,7 +393,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         {
         
             // Note: These relations are ONLY used to get the index names.
-            final Map<IRelationIdentifier, IRelation> tmpRelations = util
+            final Map<String, IRelation> tmpRelations = util
                     .getRelations(indexManager, step, timestamp);
 
             // Collect names of the required indices.

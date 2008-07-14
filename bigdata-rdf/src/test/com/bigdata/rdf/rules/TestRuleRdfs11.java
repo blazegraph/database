@@ -85,7 +85,7 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
             assertFalse(store.hasStatement(A, rdfsSubClassOf, C));
             assertEquals(2,store.getStatementCount());
 
-            Rule r = new RuleRdfs11(store.getSPORelation().getResourceIdentifier(),new RDFSVocabulary(store));
+            Rule r = new RuleRdfs11(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
             
             applyRule(store, r, -1/*solutionCount*/,1/* mutationCount*/);
 

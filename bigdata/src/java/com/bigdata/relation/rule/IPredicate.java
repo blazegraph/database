@@ -30,7 +30,6 @@ package com.bigdata.relation.rule;
 
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -49,14 +48,42 @@ import com.bigdata.relation.rule.eval.ISolution;
 public interface IPredicate<E> extends Cloneable {
 
     /**
-     * Identifies the {@link IRelation} associated with this {@link IPredicate}.
-     * This is ignored if the {@link IRule} is executed as a query. However,
-     * when the {@link IRule} is executed as an {@link ActionEnum#Insert} or
+     * Resource identifier (aka namespace) identifies the {@link IRelation}
+     * associated with this {@link IPredicate}.
+     * <p>
+     * This is more or less ignored when the {@link IRule} is executed as a
+     * query.
+     * <p>
+     * When the {@link IRule} is executed as an {@link ActionEnum#Insert} or
      * {@link ActionEnum#Delete} then this identifies the target
      * {@link IMutableRelation} on which the computed {@link ISolution}s will
      * be written.
+     * 
+     * @throws IllegalStateException
+     *             if there is more than on element in the view.
+     * 
+     * @deprecated by {@link #getRelationName(int)}
      */
-    public IRelationIdentifier<E> getRelationName();
+    public String getOnlyRelationName();
+
+    /**
+     * Return the ith element of the relation view. The view is an ordered array
+     * of resource identifiers that describes the view for the relation.
+     * 
+     * @param index
+     *            The index into the array of relation names in the view.
+     * 
+     * @todo is there any particular reason to use an ordered view? TM does not
+     *       appear to require this and we always write on the relation that is
+     *       associated with the head of the rule, and that should always be the
+     *       "database" (vs the focusStore).
+     */
+    public String getRelationName(int index);
+    
+    /**
+     * The #of elements in the relation view.
+     */
+    public int getRelationCount();
     
     /**
      * An optional constraint on the visitable elements.

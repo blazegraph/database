@@ -114,7 +114,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
             InferenceEngine inf = store.getInferenceEngine();
 
             // the rule.
-            Rule r = new RuleRdf01(store.getSPORelation().getResourceIdentifier(),inf);
+            Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),inf);
 
             // the entailment.
             SPO head = new SPO(A, inf.rdfType.get(), inf.rdfProperty.get(),

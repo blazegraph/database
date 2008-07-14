@@ -31,7 +31,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;

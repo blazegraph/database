@@ -28,14 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
-import java.util.concurrent.ExecutorService;
-
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;

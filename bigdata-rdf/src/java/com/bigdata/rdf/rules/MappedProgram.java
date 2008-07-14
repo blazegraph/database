@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.Program;
 
@@ -47,7 +45,7 @@ public class MappedProgram extends Program {
      */
     private static final long serialVersionUID = -2747355754941497325L;
     
-    private IRelationIdentifier<SPO> focusStore;
+    private String focusStore;
     
 //    /**
 //     * De-serialization ctor.
@@ -67,7 +65,7 @@ public class MappedProgram extends Program {
      * @param parallel
      * @param closure
      */
-    public MappedProgram(String name, IRelationIdentifier<SPO> focusStore, boolean parallel, boolean closure) {
+    public MappedProgram(String name, String focusStore, boolean parallel, boolean closure) {
         
         super(name, parallel, closure);
         

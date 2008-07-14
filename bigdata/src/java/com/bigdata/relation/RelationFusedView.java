@@ -7,7 +7,6 @@ import java.util.concurrent.ExecutorService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.AccessPathFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 
@@ -103,12 +102,6 @@ public class RelationFusedView<E> implements IRelation<E> {
      * Perhaps either the code should use AbstractRelation or another interface
      * should be introduced without these methods.
      */
-    
-    public IRelationIdentifier<E> getResourceIdentifier() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
 
     public long getTimestamp() {
         
@@ -146,13 +139,7 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
 
-    public IRelationIdentifier<IRelation<E>> getLocator() {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
-    public IRelationIdentifier<ILocatableResource> getContainerName() {
+    public String getContainerNamespace() {
     
         throw new UnsupportedOperationException();
         

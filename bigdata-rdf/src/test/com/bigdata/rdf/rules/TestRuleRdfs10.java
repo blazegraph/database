@@ -99,7 +99,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U, RDF.TYPE, RDFS.CLASS));
             assertEquals(1,store.getStatementCount());
 
-            Rule r = new RuleRdfs10(store.getSPORelation().getResourceIdentifier(),
+            Rule r = new RuleRdfs10(store.getSPORelation().getNamespace(),
                     new RDFSVocabulary(store));
 
             // apply the rule.
@@ -158,7 +158,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U1, RDF.TYPE, RDFS.CLASS));
             assertEquals(2,store.getStatementCount());
 
-            Rule r = new RuleRdfs10(store.getSPORelation().getResourceIdentifier(),new RDFSVocabulary(store));
+            Rule r = new RuleRdfs10(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
             
             // apply the rule.
             applyRule(store, r, -1/*solutionCount*/,2/*mutationCount*/);

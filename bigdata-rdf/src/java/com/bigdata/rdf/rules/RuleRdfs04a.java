@@ -27,9 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.relation.IRelationIdentifier;
 
 /**
  * rdfs4a:
@@ -48,7 +46,7 @@ public class RuleRdfs04a extends AbstractRuleDistinctTermScan {
      */
     private static final long serialVersionUID = 6070683089054966426L;
 
-    public RuleRdfs04a(IRelationIdentifier<SPO>relationName,RDFSVocabulary inf) {
+    public RuleRdfs04a(String relationName,RDFSVocabulary inf) {
 
             super(  "rdfs04",//
                     new SPOPredicate(relationName,var("u"), inf.rdfType, inf.rdfsResource), //

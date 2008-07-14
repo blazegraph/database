@@ -84,7 +84,7 @@ public class TestRelationLocator extends AbstractTripleStoreTestCase {
             final AbstractTripleStore foundStore = (AbstractTripleStore) store
                     .getIndexManager()
                     .getResourceLocator()
-                    .locate(store.getResourceIdentifier(), store.getTimestamp());
+                    .locate(store.getNamespace(), store.getTimestamp());
             
             assertNotNull(foundStore);
             
@@ -95,10 +95,10 @@ public class TestRelationLocator extends AbstractTripleStoreTestCase {
 
                 assertNotNull(foundSPORelation);
 
-                assertNotNull(foundSPORelation.getContainerName());
+                assertNotNull(foundSPORelation.getContainerNamespace());
 
-                foundSPORelation.getContainerName().equals(
-                        store.getResourceIdentifier());
+                foundSPORelation.getContainerNamespace().equals(
+                        store.getNamespaces());
 
                 assertNotNull(foundSPORelation.getContainer());
 
@@ -112,10 +112,10 @@ public class TestRelationLocator extends AbstractTripleStoreTestCase {
 
                 assertNotNull(foundLexiconRelation);
 
-                assertNotNull(foundLexiconRelation.getContainerName());
+                assertNotNull(foundLexiconRelation.getContainerNamespace());
 
-                foundLexiconRelation.getContainerName().equals(
-                        store.getResourceIdentifier());
+                foundLexiconRelation.getContainerNamespace().equals(
+                        store.getNamespace());
 
                 assertNotNull(foundLexiconRelation.getContainer());
 

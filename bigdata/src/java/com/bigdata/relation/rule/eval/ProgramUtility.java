@@ -45,7 +45,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
@@ -90,9 +89,9 @@ public class ProgramUtility {
     /**
      * The set of distinct relations identified by the various rules.
      */
-    public Set<IRelationIdentifier> getRelationNames(IStep step) {
+    public Set<String> getRelationNames(IStep step) {
 
-        Set<IRelationIdentifier> c = new HashSet<IRelationIdentifier>();
+        Set<String> c = new HashSet<String>();
         
         getRelationNames(step, c);
 
@@ -106,13 +105,13 @@ public class ProgramUtility {
         
     }
     
-    private void getRelationNames(IStep p, Set<IRelationIdentifier> c) {
+    private void getRelationNames(IStep p, Set<String> c) {
 
         if (p.isRule()) {
 
             final IRule r = (IRule) p;
 
-            c.add(r.getHead().getRelationName());
+            c.add(r.getHead().getOnlyRelationName());
 
         } else {
             
@@ -145,12 +144,12 @@ public class ProgramUtility {
      * @throws RuntimeException
      *             if any relation is not local.
      */
-    public Map<IRelationIdentifier, IRelation> getRelations(IIndexManager indexManager, IStep step, long timestamp) {
+    public Map<String, IRelation> getRelations(IIndexManager indexManager, IStep step, long timestamp) {
 
         if (step == null)
             throw new IllegalArgumentException();
 
-        final Map<IRelationIdentifier, IRelation> c = new HashMap<IRelationIdentifier, IRelation>();
+        final Map<String, IRelation> c = new HashMap<String, IRelation>();
 
         getRelations(indexManager, step, c, timestamp );
 
@@ -166,13 +165,13 @@ public class ProgramUtility {
     }
 
     @SuppressWarnings("unchecked")
-    private void getRelations(IIndexManager indexManager, IStep p, Map<IRelationIdentifier, IRelation> c, long timestamp) {
+    private void getRelations(IIndexManager indexManager, IStep p, Map<String, IRelation> c, long timestamp) {
 
         if (p.isRule()) {
 
             final IRule r = (IRule) p;
 
-            final IRelationIdentifier relationIdentifier = r.getHead().getRelationName();
+            final String relationIdentifier = r.getHead().getOnlyRelationName();
 
             if (!c.containsKey(relationIdentifier)) {
 
@@ -294,7 +293,7 @@ public class ProgramUtility {
         /*
          * The set of distinct relations.
          */
-        final Map<IRelationIdentifier, IRelation> relations = getRelations(indexManager, step,
+        final Map<String, IRelation> relations = getRelations(indexManager, step,
                 timestamp);
 
         if(relations.isEmpty()) {
@@ -419,9 +418,9 @@ public class ProgramUtility {
      *             the relation) and the corresponding entry in the map does not
      *             implement {@link IMutableRelation}.
      */
-    protected Map<IRelationIdentifier, IBuffer<ISolution>> getMutationBuffers(
+    protected Map<String, IBuffer<ISolution>> getMutationBuffers(
             ActionEnum action, IJoinNexus joinNexus,
-            Map<IRelationIdentifier, IRelation> relations) {
+            Map<String, IRelation> relations) {
 
         if (action == ActionEnum.Query) {
 
@@ -435,17 +434,17 @@ public class ProgramUtility {
             
         }
 
-        final Map<IRelationIdentifier, IBuffer<ISolution>> c = new HashMap<IRelationIdentifier, IBuffer<ISolution>>(
+        final Map<String, IBuffer<ISolution>> c = new HashMap<String, IBuffer<ISolution>>(
                 relations.size());
 
-        final Iterator<Map.Entry<IRelationIdentifier, IRelation>> itr = relations
+        final Iterator<Map.Entry<String, IRelation>> itr = relations
                 .entrySet().iterator();
 
         while (itr.hasNext()) {
 
-            final Map.Entry<IRelationIdentifier, IRelation> entry = itr.next();
+            final Map.Entry<String, IRelation> entry = itr.next();
 
-            final IRelationIdentifier relationIdentifier = entry.getKey();
+            final String relationIdentifier = entry.getKey();
 
             final IRelation relation = entry.getValue();
 

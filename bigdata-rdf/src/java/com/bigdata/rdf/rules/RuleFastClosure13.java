@@ -24,9 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.NE;
 
@@ -53,7 +51,7 @@ public class RuleFastClosure13 extends AbstractRuleFastClosure_11_13 {
     /**
      * @param inf
      */
-    public RuleFastClosure13(IRelationIdentifier<SPO>relationName,RDFSVocabulary inf) {
+    public RuleFastClosure13(String relationName,RDFSVocabulary inf) {
         
         super(  "fastClosure13",//
                 new SPOPredicate(relationName,var("z"), inf.rdfType, var("b")),//

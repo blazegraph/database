@@ -53,4 +53,11 @@ public class TestSPOKeyOrder extends TestCase2 {
         super(name);
     }
 
+    /**
+     * @todo write tests.
+     */
+    public void test_nothing() {
+        
+    }
+    
 }

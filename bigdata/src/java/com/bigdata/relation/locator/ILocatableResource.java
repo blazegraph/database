@@ -46,15 +46,7 @@ import com.bigdata.btree.IIndex;
 public interface ILocatableResource<T> {
 
     /**
-     * The resource identifier
-     * 
-     * @return The identifier.
-     */
-    public IResourceIdentifier<? extends T> getResourceIdentifier();
-
-    /**
-     * The identifying namespace (this is an untyped {@link String} version of
-     * the {@link IResourceIdentifier}).
+     * The identifying namespace.
      */
     public String getNamespace();
     
@@ -69,6 +61,6 @@ public interface ILocatableResource<T> {
      * @return The identifier of the containing resource -or- <code>null</code>
      *         if there is no containing resource.
      */
-    public IResourceIdentifier<? extends ILocatableResource> getContainerName();
+    public String getContainerNamespace();
     
 }

@@ -29,8 +29,6 @@ package com.bigdata.rdf.rules;
 
 import java.util.Set;
 
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
@@ -50,8 +48,8 @@ public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
      * @param P
      */
     public RuleFastClosure3(
-            final IRelationIdentifier<SPO> database,
-            final IRelationIdentifier<SPO> focusStore,
+            final String database,
+            final String focusStore,
             final RDFSVocabulary inf) {
         //, Set<Long> P) {
         

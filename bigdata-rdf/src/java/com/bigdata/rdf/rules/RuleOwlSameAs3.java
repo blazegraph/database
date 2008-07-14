@@ -27,9 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.Rule;
 
@@ -51,7 +49,7 @@ public class RuleOwlSameAs3 extends Rule {
      */
     private static final long serialVersionUID = -8182152612151810691L;
 
-    public RuleOwlSameAs3(IRelationIdentifier<SPO>relationName, RDFSVocabulary inf) {
+    public RuleOwlSameAs3(String relationName, RDFSVocabulary inf) {
 
         super(  "owlSameAs3", //
                 new SPOPredicate(relationName,var("z"), var("a"), var("y")), //

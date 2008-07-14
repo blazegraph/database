@@ -98,7 +98,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertEquals(2,store.getStatementCount());
 
             final Rule r = new RuleRdfs07(store.getSPORelation()
-                    .getResourceIdentifier(), new RDFSVocabulary(store));
+                    .getNamespace(), new RDFSVocabulary(store));
             
             // apply the rule.
 //            RuleStats stats = 
@@ -163,7 +163,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertFalse(store.hasStatement(U2, B, Y2));
             assertEquals(3,store.getStatementCount());
 
-            final Rule r = new RuleRdfs07(store.getSPORelation().getResourceIdentifier(),new RDFSVocabulary(store));
+            final Rule r = new RuleRdfs07(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
             
             // apply the rule.
 //            RuleStats stats = 
@@ -231,7 +231,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U, A, Y));
             assertEquals(3,store.getStatementCount());
 
-            final Rule r = new RuleRdfs07(store.getSPORelation().getResourceIdentifier(),new RDFSVocabulary(store));
+            final Rule r = new RuleRdfs07(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
             
             // apply the rule.
 //            RuleStats stats = 

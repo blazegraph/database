@@ -27,9 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.Rule;
 
 /**
@@ -51,7 +49,7 @@ public class RuleOwlEquivalentClass extends Rule {
     /**
      * @param inf
      */
-    public RuleOwlEquivalentClass(IRelationIdentifier<SPO>relationName, RDFSVocabulary inf) {
+    public RuleOwlEquivalentClass(String relationName, RDFSVocabulary inf) {
 
 
         super(  "owl:equivalentClass",//

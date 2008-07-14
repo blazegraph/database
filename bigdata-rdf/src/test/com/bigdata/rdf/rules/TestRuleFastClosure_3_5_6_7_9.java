@@ -37,19 +37,10 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.AbstractRuleFastClosure_3_5_6_7_9;
-import com.bigdata.rdf.rules.InferenceEngine;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleFastClosure3;
-import com.bigdata.rdf.rules.RuleFastClosure5;
-import com.bigdata.rdf.rules.RuleFastClosure6;
-import com.bigdata.rdf.rules.RuleFastClosure7;
-import com.bigdata.rdf.rules.RuleFastClosure9;
 import com.bigdata.rdf.rules.AbstractRuleFastClosure_3_5_6_7_9.SubPropertyClosureTask;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
@@ -219,7 +210,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             RDFSVocabulary inf = new RDFSVocabulary(store);
 
             Rule rule = new MyRuleFastClosure6("myFastClosure6", store
-                    .getSPORelation().getResourceIdentifier(), null/* focusStore */,
+                    .getSPORelation().getNamespace(), null/* focusStore */,
                     inf.rdfsSubPropertyOf, inf.rdfsRange, R);
             
             applyRule(store, rule, -1/*@todo 2? solutionCount*/,1/*mutationCount*/);
@@ -262,8 +253,8 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             AbstractRuleFastClosure_3_5_6_7_9 {
 
         public MyRuleFastClosure6(String name,
-                final IRelationIdentifier<SPO> database,
-                final IRelationIdentifier<SPO> focusStore,
+                final String database,
+                final String focusStore,
                 final IConstant<Long> rdfsSubPropertyOf,
                 final IConstant<Long> propertyId,
                 final Set<Long> set) {

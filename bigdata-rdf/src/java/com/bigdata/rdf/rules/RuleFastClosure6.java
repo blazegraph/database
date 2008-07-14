@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.relation.IRelationIdentifier;
 
 public class RuleFastClosure6 extends AbstractRuleFastClosure_5_6_7_9 {
 
@@ -41,7 +39,7 @@ public class RuleFastClosure6 extends AbstractRuleFastClosure_5_6_7_9 {
      * @param inf
      * @param R
      */
-    public RuleFastClosure6(IRelationIdentifier<SPO> database, IRelationIdentifier<SPO> focusStore, RDFSVocabulary inf) {
+    public RuleFastClosure6(String database, String focusStore, RDFSVocabulary inf) {
         // Set<Long> R) {
 
         super("fastClosure6", database, focusStore, inf.rdfsSubPropertyOf,

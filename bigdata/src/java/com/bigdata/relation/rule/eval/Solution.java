@@ -103,7 +103,7 @@ public class Solution<E> implements ISolution<E>, Serializable {
             
             // the relation named by the head of the rule.
             final IRelation relation = (IRelation) joinNexus.getIndexManager()
-                    .getResourceLocator().locate(head.getRelationName(),
+                    .getResourceLocator().locate(head.getOnlyRelationName(),
                             joinNexus.getReadTimestamp());
 
             // use the relation's element factory.
