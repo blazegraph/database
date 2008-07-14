@@ -107,7 +107,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
              * (?x, rdf:type, ?b).
              */
             RuleFastClosure11 rule = new RuleFastClosure11(store
-                    .getSPORelation().getResourceIdentifier(), inf);
+                    .getSPORelation().getNamespace(), inf);
 
             /*
              * Test run the rule.
@@ -176,7 +176,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
              * (?z, rdf:type, ?b).
              */
             RuleFastClosure13 rule = new RuleFastClosure13(store
-                    .getSPORelation().getResourceIdentifier(), inf);
+                    .getSPORelation().getNamespace(), inf);
 
             /*
              * Test run the rule.

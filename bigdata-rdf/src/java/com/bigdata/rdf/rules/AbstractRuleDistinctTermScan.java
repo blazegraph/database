@@ -246,7 +246,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
              */
             final SPORelation relation = (SPORelation) joinNexus
                     .getIndexManager().getResourceLocator().locate(
-                            rule.getHead().getRelationName(), timestamp);
+                            rule.getHead().getOnlyRelationName(), timestamp);
             
 //            final SPOAccessPath accessPath = relation.getAccessPath(
 //                    keyOrder, rule.getTail(0));

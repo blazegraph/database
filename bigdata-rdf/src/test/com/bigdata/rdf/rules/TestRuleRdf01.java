@@ -84,7 +84,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertFalse(store.hasStatement(B, rdfType, rdfProperty ));
             assertEquals(1,store.getStatementCount());
     
-            Rule r = new RuleRdf01(store.getSPORelation().getResourceIdentifier(),new RDFSVocabulary(store));
+            Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
             
             applyRule(store, r, 1/* solutionCount*/,1/*mutationCount*/);
             
@@ -139,7 +139,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertFalse(store.hasStatement(E, rdfType, rdfProperty));
             assertEquals(3,store.getStatementCount());
 
-            Rule r = new RuleRdf01(store.getSPORelation().getResourceIdentifier(),new RDFSVocabulary(store));
+            Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
 
             applyRule(store, r, 2/* solutionCount */, 2/* mutationCount */);
 

@@ -8,7 +8,6 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IVariable;
@@ -27,7 +26,7 @@ public class MatchRule extends Rule<SPO> {
      */
     private static final long serialVersionUID = -5002902183499739018L;
 
-    public MatchRule(IRelationIdentifier<SPO> relationName, RDFSVocabulary inf,
+    public MatchRule(String relationName, RDFSVocabulary inf,
             IVariable<Long> lit, long[] preds,
             IConstant<Long> cls) {
 
@@ -35,7 +34,7 @@ public class MatchRule extends Rule<SPO> {
             new SPOPredicate(relationName, var("s"), var("t"), lit), //
             new SPOPredicate[] { //
                 new SPOPredicate(relationName, var("s"), var("p"), lit),//
-                new SPOPredicate(relationName, var("s"), inf.rdfType, var("t"),ExplicitSPOFilter.INSTANCE), //
+                new SPOPredicate(new String[]{relationName}, var("s"), inf.rdfType, var("t"),ExplicitSPOFilter.INSTANCE), //
                 new SPOPredicate(relationName, var("t"), inf.rdfsSubClassOf, cls) //
                 },
             new IConstraint[] {

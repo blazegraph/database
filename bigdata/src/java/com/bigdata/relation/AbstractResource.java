@@ -38,10 +38,9 @@ import java.util.concurrent.ExecutorService;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
-import com.bigdata.relation.locator.IResourceIdentifier;
 import com.bigdata.relation.locator.RelationSchema;
-import com.bigdata.relation.locator.ResourceIdentifier;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -57,7 +56,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
     
     final private String namespace;
 
-    final private IResourceIdentifier<ILocatableResource> containerName;
+    final private String containerNamespace;
 
     final private long timestamp;
     
@@ -88,7 +87,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         {
             String val = properties.getProperty(RelationSchema.CONTAINER);
 
-            this.containerName = val == null ? null : new ResourceIdentifier<ILocatableResource>(val);
+            this.containerNamespace = val;
         
         }
         
@@ -103,22 +102,22 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         if (log.isInfoEnabled()) {
 
             log.info("namespace=" + namespace + ", timestamp=" + timestamp
-                    + ", container=" + containerName + ", indexManager="
+                    + ", container=" + containerNamespace + ", indexManager="
                     + indexManager);
             
         }
         
     }
-
+    
     public final String getNamespace() {
         
         return namespace;
         
     }
 
-    public IResourceIdentifier<ILocatableResource> getContainerName() {
+    public String getContainerNamespace() {
         
-        return containerName;
+        return containerNamespace;
         
     }
 
@@ -129,15 +128,15 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
      */
     public ILocatableResource getContainer() {
 
-        if (getContainerName() != null) {
+        if (getContainerNamespace() != null) {
 
             if(log.isInfoEnabled()) {
                 
-                log.info("resolving container: "+getContainerName());
+                log.info("resolving container: "+getContainerNamespace());
                 
             }
             
-            return getIndexManager().getResourceLocator().locate(getContainerName(),
+            return getIndexManager().getResourceLocator().locate(getContainerNamespace(),
                     getTimestamp());
 
         }
@@ -187,7 +186,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
     public String toString() {
         
         return getClass().getSimpleName() + "{timestamp=" + timestamp
-                + ", namespace=" + namespace + ", container=" + containerName
+                + ", namespace=" + namespace + ", container=" + containerNamespace
                 + ", indexManager=" + indexManager + "}";
     
     }
@@ -240,7 +239,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
          */
         final Map<String,Object> map = new HashMap<String, Object>();
         
-        Enumeration<? extends Object> e = properties.propertyNames();
+        final Enumeration<? extends Object> e = properties.propertyNames();
     
         while (e.hasMoreElements()) {
     
@@ -268,6 +267,18 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
             log.debug("Properties after write: "+afterMap);
             
         }
+        
+        /*
+         * Add this instance to the locator cache.
+         * 
+         * Note: Normally, the instances are created by the locator cache
+         * itself. In general the only the the application creates an instance
+         * directly is when it is going to attempt to create the relation. This
+         * takes advantage of that pattern to notify the locator that it should
+         * cache this instance.
+         */
+        
+        ((DefaultResourceLocator)getIndexManager().getResourceLocator()).putInstance(this);
         
     }
 

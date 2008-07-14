@@ -105,7 +105,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             RDFSVocabulary inf = new RDFSVocabulary(store);
             
-            Rule r = new RuleOwlSameAs1(store.getSPORelation().getResourceIdentifier(),inf);
+            Rule r = new RuleOwlSameAs1(store.getSPORelation().getNamespace(),inf);
 
             // apply the rule.
             applyRule(store, r, -1/*solutionCount*/,1/*mutationCount*/);
@@ -164,7 +164,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             RDFSVocabulary inf = new RDFSVocabulary(store);
             
-            Rule r = new RuleOwlSameAs1b(store.getSPORelation().getResourceIdentifier(),inf);
+            Rule r = new RuleOwlSameAs1b(store.getSPORelation().getNamespace(),inf);
 
             // apply the rule.
             applyRule(store, r, -1/*solutionCount*/,1/*mutationCount*/);
@@ -228,7 +228,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             RDFSVocabulary inf = new RDFSVocabulary(store);
             
-            Rule r = new RuleOwlSameAs2(store.getSPORelation().getResourceIdentifier(),inf);
+            Rule r = new RuleOwlSameAs2(store.getSPORelation().getNamespace(),inf);
 
             // apply the rule.
             applyRule(store, r, -1/* solutionCount */, 1/* mutationCount */);
@@ -292,7 +292,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             RDFSVocabulary inf = new RDFSVocabulary(store);
 
-            Rule r = new RuleOwlSameAs3(store.getSPORelation().getResourceIdentifier(),inf);
+            Rule r = new RuleOwlSameAs3(store.getSPORelation().getNamespace(),inf);
             
             // apply the rule.
             applyRule(store,r, -1/*solutionCount*/,1/*mutationCount*/);

@@ -232,6 +232,9 @@ public class SPOIndexWriter implements Callable<Long> {
 
             final SPO spo = stmts[i];
 
+            if (spo == null)
+                throw new IllegalArgumentException("null @ index=" + i);
+            
             if (!spo.isFullyBound())
                 throw new IllegalArgumentException("Not fully bound: "
                         + spo.toString());

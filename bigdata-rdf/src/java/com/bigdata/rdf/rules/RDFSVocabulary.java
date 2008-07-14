@@ -34,10 +34,8 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -180,8 +178,8 @@ public class RDFSVocabulary {
      *       focusStore (or for the database if no focusStore is used).
      */
     public IStep getRDFSClosureProgram(//
-            IRelationIdentifier<SPO> db,//
-            IRelationIdentifier<SPO> focusStore,//
+            String db,//
+            String focusStore,//
             boolean forwardChainRdfTypeRdfsResource,//
             boolean rdfsOnly,//
             boolean forwardChainOwlSameAsClosure,//
@@ -309,8 +307,8 @@ public class RDFSVocabulary {
      *       maintenance.
      */
     public MappedProgram getFastForwardClosureProgram(//
-            IRelationIdentifier<SPO> db,//
-            IRelationIdentifier<SPO> focusStore,//
+            String db,//
+            String focusStore,//
             boolean forwardChainRdfTypeRdfsResource,//
             boolean rdfsOnly,//
             boolean forwardChainOwlSameAsClosure,//

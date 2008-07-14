@@ -32,7 +32,6 @@ import java.lang.ref.WeakReference;
 
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
-import com.bigdata.journal.ITx;
 import com.bigdata.util.NT;
 
 /**
@@ -111,7 +110,7 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
         if (resource == null)
             throw new IllegalArgumentException();
         
-        final String namespace = resource.getResourceIdentifier().toString();
+        final String namespace = resource.getNamespace().toString();
 
         final long timestamp = resource.getTimestamp();
         

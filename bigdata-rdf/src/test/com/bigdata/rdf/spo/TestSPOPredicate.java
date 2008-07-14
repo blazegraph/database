@@ -30,11 +30,8 @@ package com.bigdata.rdf.spo;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.MockRelationName;
 import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Var;
 
@@ -59,7 +56,7 @@ public class TestSPOPredicate extends TestCase2 {
         super(name);
     }
     
-    final IRelationIdentifier relation  = new MockRelationName();
+    final String relation  = "test";
 
     final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
             1L);

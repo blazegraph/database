@@ -92,4 +92,11 @@ public class TestKeyCompression extends TestCase {
         super(arg0);
     }
 
+    /**
+     * @todo write tests.
+     */
+    public void test_nothing() {
+        
+    }
+
 }

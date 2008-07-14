@@ -112,9 +112,7 @@ import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.relation.locator.IResourceIdentifier;
 import com.bigdata.relation.locator.RelationSchema;
-import com.bigdata.relation.locator.ResourceIdentifier;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -493,8 +491,6 @@ abstract public class AbstractTripleStore extends
         addNamespace(OWL.NAMESPACE, "owl");
         addNamespace(XMLSchema.NAMESPACE, "xsd");
 
-        resourceIdentifier = new ResourceIdentifier(getNamespace());
-        
     }
 
     
@@ -503,12 +499,12 @@ abstract public class AbstractTripleStore extends
 //        return (IRelationIdentifier)super.getResourceIdentifier();
 //        
 //    }
-    public IResourceIdentifier getResourceIdentifier() {
-        
-        return resourceIdentifier;
-        
-    }
-    final private IResourceIdentifier resourceIdentifier;
+//    public IResourceIdentifier getResourceIdentifier() {
+//        
+//        return resourceIdentifier;
+//        
+//    }
+//    final private IResourceIdentifier resourceIdentifier;
     
     /**
      * Return <code>true</code> iff the store is safe for concurrent readers
@@ -696,8 +692,8 @@ abstract public class AbstractTripleStore extends
         if (spoRelation == null) {
 
             spoRelation = (SPORelation) getIndexManager().getResourceLocator()
-                    .locate(new ResourceIdentifier(getNamespace()
-                                    + NAME_SPO_RELATION), getTimestamp());
+                    .locate(getNamespace()
+                                    + NAME_SPO_RELATION, getTimestamp());
 
         }
 
@@ -716,8 +712,8 @@ abstract public class AbstractTripleStore extends
 
             lexiconRelation = (LexiconRelation) getIndexManager()
                     .getResourceLocator().locate(
-                            new ResourceIdentifier(getNamespace()
-                                    + NAME_LEXICON_RELATION), getTimestamp());
+                            getNamespace()
+                                    + NAME_LEXICON_RELATION, getTimestamp());
             
         }
 
@@ -892,7 +888,7 @@ abstract public class AbstractTripleStore extends
             if(view == null) {
                 
                 view = (AbstractTripleStore) getIndexManager().getResourceLocator()
-                        .locate(getResourceIdentifier(), ITx.READ_COMMITTED);
+                        .locate(getNamespace(), ITx.READ_COMMITTED);
                 
                 readCommittedRef = new SoftReference<AbstractTripleStore>(view);
                 
@@ -1384,8 +1380,9 @@ abstract public class AbstractTripleStore extends
 
         final SPORelation r = getSPORelation();
         
-        final SPOPredicate p = new SPOPredicate(r.getResourceIdentifier(), Var.var("s"),
-                Var.var("p"), Var.var("o"), filter);
+        final SPOPredicate p = new SPOPredicate(
+                new String[] { r.getNamespace() }, Var.var("s"), Var.var("p"),
+                Var.var("o"), filter);
 
         return getSPORelation().getAccessPath(keyOrder, p);
 
@@ -2730,7 +2727,7 @@ abstract public class AbstractTripleStore extends
         final IVariable<Long>lit = Var.var("lit");
 
         // instantiate the rule.
-        final Rule r = new MatchRule(getSPORelation().getResourceIdentifier(),
+        final Rule r = new MatchRule(getSPORelation().getNamespace(),
                 getInferenceEngine(), lit, _preds, new Constant<Long>(_cls));
 
         // bindings used to specialize the rule for each completed literal.

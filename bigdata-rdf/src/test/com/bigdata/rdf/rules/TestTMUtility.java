@@ -30,14 +30,9 @@ package com.bigdata.rdf.rules;
 
 import java.util.Iterator;
 
-import com.bigdata.rdf.rules.TMUtility;
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPORelationView;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.rule.AbstractRuleTestCase;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.MockRelationName;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 
@@ -67,9 +62,9 @@ public class TestTMUtility extends AbstractRuleTestCase {
         
     }
 
-    final private IRelationIdentifier<SPO> database = new MockRelationName<SPO>("database");
+    final private String database = "database";
 
-    final private IRelationIdentifier<SPO> focusStore = new MockRelationName<SPO>("focusStore");
+    final private String focusStore = "focusStore";
 
     /**
      * Test mapping of a rule with a single predicate in the tail across two
@@ -93,7 +88,7 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
             log.info(r0.toString());
 
-            assertTrue(r0.getTail(0).getRelationName() == focusStore);
+            assertTrue(r0.getTail(0).getOnlyRelationName() == focusStore);
             
         }
         
@@ -130,17 +125,13 @@ public class TestTMUtility extends AbstractRuleTestCase {
             log.info(r0.toString());
 
             // 1st tail.
-            assertTrue(r0.getTail(0).getRelationName() == focusStore);
+            assertEquals(focusStore,r0.getTail(0).getOnlyRelationName());
 
             // 2nd tail
-            assertTrue(r0.getTail(1).getRelationName() instanceof SPORelationView);
+            assertEquals(database, r0.getTail(1).getRelationName(0));
+            assertEquals(focusStore, r0.getTail(1).getRelationName(1));
+            assertEquals(2, r0.getTail(1).getRelationCount());
 
-            SPORelationView fusedView = (SPORelationView)r0.getTail(1).getRelationName();
-
-            assertTrue(fusedView.getDatabase() == database);
-
-            assertTrue(fusedView.getFocusStore() == focusStore);
-            
         }
 
         {
@@ -150,16 +141,12 @@ public class TestTMUtility extends AbstractRuleTestCase {
             log.info(r1.toString());
 
             // 1st tail.
-            assertTrue(r1.getTail(0).getRelationName() instanceof SPORelationView);
-
-            SPORelationView fusedView = (SPORelationView)r1.getTail(0).getRelationName();
-
-            assertTrue(fusedView.getDatabase() == database);
-
-            assertTrue(fusedView.getFocusStore() == focusStore);
+            assertEquals(database, r1.getTail(0).getRelationName(0));
+            assertEquals(focusStore, r1.getTail(0).getRelationName(1));
+            assertEquals(2, r1.getTail(0).getRelationCount());
             
             // 2nd tail
-            assertTrue(r1.getTail(1).getRelationName() == focusStore);
+            assertEquals(focusStore,r1.getTail(1).getOnlyRelationName());
 
         }
         

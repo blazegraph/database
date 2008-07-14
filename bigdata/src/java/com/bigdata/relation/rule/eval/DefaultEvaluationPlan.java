@@ -33,7 +33,6 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
@@ -358,11 +357,11 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
         }
 
         // The name of the relation that the predicate will query.
-        final IRelationIdentifier relationIdentifier = predicate.getRelationName();
+        final String relationName = predicate.getOnlyRelationName();
         
         // Resolve the relation name to the IRelation object.
         final IRelation relation = (IRelation) joinNexus.getIndexManager()
-                .getResourceLocator().locate(relationIdentifier,
+                .getResourceLocator().locate(relationName,
                         joinNexus.getReadTimestamp());
         
         // find the best access path for the predicate for that relation.

@@ -39,11 +39,11 @@ import java.io.Serializable;
  * @param <T>
  *            The generic type of the identiifed resource.
  */
-public interface IResourceIdentifier<T> extends Serializable {
+public interface IResourceIdentifier<T> {//extends Serializable {
 
-    /**
-     * The namespace of the resource (its unique identifier).
-     */
-    public String toString();
+//    /**
+//     * The namespace of the resource (its unique identifier).
+//     */
+//    public String toString();
     
 }

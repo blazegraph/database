@@ -353,8 +353,6 @@ public class RDFJoinNexus implements IJoinNexus {
      * @param <E>
      */
     public static class InsertSPOAndJustificationBuffer<E> extends AbstractSolutionBuffer<E> {
-
-//        private final IElementFilter filter;
         
         /**
          * @param capacity
@@ -364,8 +362,6 @@ public class RDFJoinNexus implements IJoinNexus {
                 IElementFilter<ISolution<E>> filter) {
 
             super(capacity, relation, filter);
-
-//            this.filter = filter;
             
         }
 
@@ -432,6 +428,8 @@ public class RDFJoinNexus implements IJoinNexus {
                 
                 final SPO spo = solution.get();
 
+                a[i] = spo;
+                
                 if(writeJustifications) {
                     
                 final IBindingSet bindingSet = solution.getBindingSet();

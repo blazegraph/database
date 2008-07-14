@@ -33,7 +33,6 @@ import java.util.Properties;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IKeyOrder;
-import com.bigdata.relation.locator.IResourceIdentifier;
 
 /**
  * Base class for {@link IRelation} and {@link IMutableRelation} impls.
@@ -58,18 +57,8 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
             Long timestamp, Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
-       
-        this.resourceIdentifier = new RelationName<E>(namespace);
-
 
     }
-
-    public IRelationIdentifier<E> getResourceIdentifier() {
-        
-        return resourceIdentifier;
-        
-    }
-    final private IRelationIdentifier<E> resourceIdentifier;
 
     /**
      * The fully qualified name of the index.

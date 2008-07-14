@@ -91,7 +91,7 @@ public class TestRuleOwlEquivalentClass extends AbstractRuleTestCase {
             RDFSVocabulary inf = new RDFSVocabulary(store);
 
             Rule r = new RuleOwlEquivalentClass(store.getSPORelation()
-                    .getResourceIdentifier(),inf);
+                    .getNamespace(),inf);
             
             // apply the rule.
             applyRule(store,r, -1/*solutionCount*/,1/*mutationCount*/);

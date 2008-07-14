@@ -31,7 +31,6 @@ package com.bigdata.rdf.spo;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -179,7 +178,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
     @SuppressWarnings("serial")
     static protected class TestRuleRdfs9 extends Rule {
         
-        public TestRuleRdfs9(IRelationIdentifier relation) {
+        public TestRuleRdfs9(String relation) {
             
             super(  "rdfs9",//
                     new P(relation,var("v"), rdfType, var("x")), //
@@ -204,7 +203,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
          * @param p
          * @param o
          */
-        public P(IRelationIdentifier<E> relation, IVariableOrConstant<Long> s,
+        public P(String relation, IVariableOrConstant<Long> s,
                 IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
             super(relation, new IVariableOrConstant[] { s, p, o });
@@ -228,8 +227,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
         try {
 
-            final IRelationIdentifier relationIdentifier = store
-                    .getSPORelation().getResourceIdentifier();
+            final String relationIdentifier = store.getSPORelation()
+                    .getNamespace();
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
                     IJoinNexus.ALL, null/* filter */).newInstance(
@@ -344,8 +343,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
         try {
 
-            final IRelationIdentifier relationIdentifier = store.getSPORelation()
-                    .getResourceIdentifier();
+            final String relationIdentifier = store.getSPORelation()
+                    .getNamespace();
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
                     IJoinNexus.ALL, null/* filter */).newInstance(
@@ -548,8 +547,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
         try {
 
-            final IRelationIdentifier relationIdentifier = store.getSPORelation()
-                    .getResourceIdentifier();
+            final String relationIdentifier = store.getSPORelation()
+                    .getNamespace();
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
                     IJoinNexus.ALL, null/* filter */).newInstance(

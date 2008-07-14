@@ -1,10 +1,11 @@
 package com.bigdata.relation.rule.eval;
 
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
+import java.util.Arrays;
+
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
@@ -47,10 +48,18 @@ public class DelegatePredicate<E> implements IPredicate<E> {
         return src.getConstraint();
     }
 
-    public IRelationIdentifier<E> getRelationName() {
-        return src.getRelationName();
+    public String getOnlyRelationName() {
+        return src.getOnlyRelationName();
     }
     
+    public String getRelationName(int index) {
+        return src.getRelationName(index);
+    }
+    
+    public int getRelationCount() {
+        return src.getRelationCount();
+    }
+
     public int getVariableCount() {
         return src.getVariableCount();
     }
@@ -66,6 +75,5 @@ public class DelegatePredicate<E> implements IPredicate<E> {
     public String toString(IBindingSet bindingSet) {
         return src.toString(bindingSet);
     }
-    
-    
+       
 }

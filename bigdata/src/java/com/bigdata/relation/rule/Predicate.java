@@ -28,7 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
-import com.bigdata.relation.IRelationIdentifier;
+import java.util.Arrays;
+
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
@@ -44,7 +45,7 @@ public class Predicate<E> implements IPredicate<E> {
     /** #of unbound variables. */
     private final int nvars;
 
-    private final IRelationIdentifier<E> relationIdentifier;
+    private final String[] relationName;
     
     private final IVariableOrConstant[] values;
     
@@ -64,7 +65,7 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.arity = src.arity;
 
-        this.relationIdentifier = src.relationIdentifier;
+        this.relationName = src.relationName;
 
         this.values = src.values.clone();
 
@@ -105,22 +106,22 @@ public class Predicate<E> implements IPredicate<E> {
      * @param values
      *            The values (order is important!).
      */
-    public Predicate(IRelationIdentifier<E> relationName, IVariableOrConstant[] values) {
+    public Predicate(String relationName, IVariableOrConstant[] values) {
         
-        this(relationName, values, null/* constraint */);
+        this(new String[]{relationName}, values, null/* constraint */);
         
     }
 
     /**
      * 
      * @param relationName
-     *            Identifies the relation to be queried.
+     *            Identifies the relation(s) in the view.
      * @param values
      *            The values (order is important!).
      * @param constraint
      *            An optional constraint.
      */
-    public Predicate(IRelationIdentifier<E> relationName, IVariableOrConstant[] values,
+    public Predicate(String[] relationName, IVariableOrConstant[] values,
             IElementFilter<E> constraint) {
 
         if (relationName == null)
@@ -129,7 +130,7 @@ public class Predicate<E> implements IPredicate<E> {
         if (values == null)
             throw new IllegalArgumentException();
 
-        this.relationIdentifier = relationName;
+        this.relationName = relationName;
         
         this.arity = values.length;
 
@@ -155,9 +156,24 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
     
-    public IRelationIdentifier<E> getRelationName() {
+    public String getOnlyRelationName() {
         
-        return relationIdentifier;
+        if (relationName.length != 1)
+            throw new IllegalStateException();
+        
+        return relationName[0];
+        
+    }
+    
+    public String getRelationName(int index) {
+        
+        return relationName[index];
+        
+    }
+    
+    public int getRelationCount() {
+        
+        return relationName.length;
         
     }
     
@@ -246,9 +262,11 @@ public class Predicate<E> implements IPredicate<E> {
 
         sb.append("(");
 
+        sb.append(Arrays.toString(relationName));
+        
         for (int i = 0; i < arity; i++) {
 
-            if (i >= 0)
+//            if (i > 0)
                 sb.append(", ");
 
             final IVariableOrConstant v = values[i];

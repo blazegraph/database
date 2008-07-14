@@ -38,7 +38,6 @@ import java.util.concurrent.Future;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;
@@ -97,12 +96,12 @@ public class MutationTask extends AbstractStepTask {
 
         final ProgramUtility util = new ProgramUtility();
         
-        final Map<IRelationIdentifier, IRelation> relations = util
+        final Map<String, IRelation> relations = util
                 .getRelations(indexManager, step, joinNexus.getWriteTimestamp());
 
         assert !relations.isEmpty();
 
-        final Map<IRelationIdentifier, IBuffer<ISolution>> buffers = util
+        final Map<String, IBuffer<ISolution>> buffers = util
                 .getMutationBuffers(action, joinNexus, relations);
 
         assert !buffers.isEmpty();
@@ -141,7 +140,7 @@ public class MutationTask extends AbstractStepTask {
      * @throws ExecutionException
      */
     protected void flushBuffers(RuleStats totals,
-            Map<IRelationIdentifier, IBuffer<ISolution>> buffers)
+            Map<String, IBuffer<ISolution>> buffers)
             throws InterruptedException, ExecutionException {
 
         if (totals == null)
@@ -225,7 +224,7 @@ public class MutationTask extends AbstractStepTask {
      * @return
      */
     protected List<Callable<RuleStats>> newMutationTasks(IStep step,
-            IJoinNexus joinNexus, Map<IRelationIdentifier, IBuffer<ISolution>> buffers) {
+            IJoinNexus joinNexus, Map<String, IBuffer<ISolution>> buffers) {
 
         if (log.isDebugEnabled())
             log.debug("program=" + step.getName());
@@ -238,7 +237,7 @@ public class MutationTask extends AbstractStepTask {
 
             final IRule rule = (IRule) step;
 
-            final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getRelationName());
+            final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getOnlyRelationName());
             
             final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(false/*parallel*/,
                     rule).newTask(rule, joinNexus, buffer);
@@ -260,7 +259,7 @@ public class MutationTask extends AbstractStepTask {
                 // @todo handle sub-programs.
                 final IRule rule = (IRule) itr.next();
 
-                final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getRelationName());
+                final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getOnlyRelationName());
                 
                 final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(parallel, rule)
                         .newTask(rule, joinNexus, buffer);

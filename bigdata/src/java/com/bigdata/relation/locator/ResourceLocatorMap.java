@@ -32,10 +32,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.IRelationIdentifier;
 
 /**
- * A mapping between {@link IRelationIdentifier}s and {@link IResourceLocator}s.
+ * A mapping between {@link String}s and {@link IResourceLocator}s.
  * This can be used to locate local, temporary or virtual relations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -48,7 +47,7 @@ public class ResourceLocatorMap<T extends ILocatableResource> implements IResour
     /**
      * 
      */
-    private final Map<IResourceIdentifier<T>, IResourceLocator<T>> resourceLocators = new ConcurrentHashMap<IResourceIdentifier<T>, IResourceLocator<T>>();
+    private final Map<String, IResourceLocator<T>> resourceLocators = new ConcurrentHashMap<String, IResourceLocator<T>>();
 
     /**
      * De-serialization ctor.
@@ -58,7 +57,7 @@ public class ResourceLocatorMap<T extends ILocatableResource> implements IResour
     }
         
     /**
-     * Add a mapping from an {@link IRelationIdentifier} to the
+     * Add a mapping from an {@link String} to the
      * {@link IResourceLocator} for the identified {@link IRelation}.
      * 
      * @param relationName
@@ -66,7 +65,7 @@ public class ResourceLocatorMap<T extends ILocatableResource> implements IResour
      * @param relationLocator
      *            The locator.
      */
-    public void add(IResourceIdentifier<T> relationName, IResourceLocator<T> relationLocator) {
+    public void add(String relationName, IResourceLocator<T> relationLocator) {
         
         if (relationName == null)
             throw new IllegalArgumentException();
@@ -78,7 +77,7 @@ public class ResourceLocatorMap<T extends ILocatableResource> implements IResour
         
     }
 
-    public T locate(IResourceIdentifier<T> relationName, long timestamp) {
+    public T locate(String relationName, long timestamp) {
 
         if (relationName == null)
             throw new IllegalArgumentException();

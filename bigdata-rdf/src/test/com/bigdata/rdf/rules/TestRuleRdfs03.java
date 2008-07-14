@@ -107,7 +107,7 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             final RDFSVocabulary inf = new RDFSVocabulary(store);
             
             final Rule r = new RuleRdfs03(getStore().getSPORelation()
-                    .getResourceIdentifier(), inf);
+                    .getNamespace(), inf);
             
             final IElementFilter<SPO> filter = new DoNotAddFilter(inf,
                     new NoAxioms(store), true/* forwardChainRdfTypeRdfsResource */);
@@ -156,7 +156,7 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
 
             final RDFSVocabulary inf = new RDFSVocabulary(store);
             
-            final Rule r = new RuleRdfs03(store.getSPORelation().getResourceIdentifier(),inf);
+            final Rule r = new RuleRdfs03(store.getSPORelation().getNamespace(),inf);
 
             applyRule(store, r, -1/* solutionCount */, 1/* mutationCount */);
 

@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
-import com.bigdata.relation.IRelationIdentifier;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -40,7 +39,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class SPOPredicate implements IPredicate<SPO> {
 
-    private final IRelationIdentifier<SPO> relation;
+    private final String[] relationName;
     
     private final IVariableOrConstant<Long> s;
 
@@ -50,9 +49,24 @@ public class SPOPredicate implements IPredicate<SPO> {
 
     private final IElementFilter<SPO> constraint;
 
-    public IRelationIdentifier<SPO> getRelationName() {
+    public String getOnlyRelationName() {
         
-        return relation;
+        if (relationName.length != 1)
+            throw new IllegalStateException();
+        
+        return relationName[0];
+        
+    }
+    
+    public String getRelationName(int index) {
+        
+        return relationName[index];
+        
+    }
+    
+    public int getRelationCount() {
+        
+        return relationName.length;
         
     }
 
@@ -62,25 +76,41 @@ public class SPOPredicate implements IPredicate<SPO> {
         
     }
 
-    public SPOPredicate(IRelationIdentifier<SPO> relation, IVariableOrConstant<Long> s,
+    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
-        this(relation, s, p, o, null/* constraint */);
+        this(new String[]{relationName}, s, p, o, null/* constraint */);
         
     }
     
-    public SPOPredicate(IRelationIdentifier<SPO> relation,
+    public SPOPredicate(String[] relationName,
             IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
             IElementFilter<SPO> constraint) {
         
-        assert relation != null;
+        if (relationName == null)
+            throw new IllegalArgumentException();
+       
+        for(int i=0; i<relationName.length; i++) {
+            
+            if (relationName[i] == null)
+                throw new IllegalArgumentException();
+            
+        }
         
-        assert s != null;
-        assert p != null;
-        assert o != null;
+        if (relationName.length == 0)
+            throw new IllegalArgumentException();
         
-        this.relation = relation;
+        if (s == null)
+            throw new IllegalArgumentException();
+        
+        if (p == null)
+            throw new IllegalArgumentException();
+        
+        if (o == null)
+            throw new IllegalArgumentException();
+        
+        this.relationName = relationName;
         
         this.s = s;
         this.p = p;
@@ -208,7 +238,7 @@ public class SPOPredicate implements IPredicate<SPO> {
             }
         }
         
-        return new SPOPredicate(relation, s, p, o, constraint);
+        return new SPOPredicate(relationName, s, p, o, constraint);
         
     }
     
