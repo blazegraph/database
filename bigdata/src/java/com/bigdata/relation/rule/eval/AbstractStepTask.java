@@ -319,15 +319,17 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         final ProgramUtility util = new ProgramUtility();
 
         {
-            
-            final boolean isClosure = util.isClosureProgram(step);
 
-            if (isClosure) {
+            if (!step.isRule() && !((IProgram) step).isClosure()
+                    && util.isClosureProgram(step)) {
 
                 /*
-                 * Note: The steps above the closure should have been flattened
-                 * out by the caller and run directly so that we never reach
-                 * this point with a closure operation.
+                 * If this is not a rule, and it is not a closure of a flat rule
+                 * set, and there is a buried closure operation inside of the
+                 * program then we have a problem since the steps above the
+                 * closure should have been flattened out by the caller and run
+                 * directly such that we never reach this point with a closure
+                 * operation.
                  */
 
                 throw new UnsupportedOperationException();

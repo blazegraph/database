@@ -47,6 +47,17 @@ Modifications:
 
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDFS;
+
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.rule.Program;
+import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+
 /**
  * Unit tests for database at once closure, fix point of a rule set (does not
  * test truth maintenance under assertion and retraction or the justifications).
@@ -82,6 +93,110 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     public void test_fixedPoint() {
         
         fail("write test");
+        
+    }
+
+    /**
+     * Example using only {@link RuleRdfs11} that requires multiple rounds to
+     * compute the fix point closure of a simple data set. This example is based
+     * on closure of the class hierarchy. Given
+     * 
+     * <pre>
+     * a sco b
+     * b sco c
+     * c sco d
+     * </pre>
+     * 
+     * round 1 adds
+     * 
+     * <pre>
+     * a sco c
+     * b sco d
+     * </pre>
+     * 
+     * round 2 adds
+     * 
+     * <pre>
+     * a sco d
+     * </pre>
+     * 
+     * and that is the fixed point.
+     * 
+     * @throws Exception 
+     */
+    public void test_simpleFixPoint() throws Exception {
+        
+        final AbstractTripleStore store = getStore();
+        
+        try {
+            
+            final URI A = new URIImpl("http://www.bigdata.com/a");
+            final URI B = new URIImpl("http://www.bigdata.com/b");
+            final URI C = new URIImpl("http://www.bigdata.com/c");
+            final URI D = new URIImpl("http://www.bigdata.com/d");
+            final URI SCO = RDFS.SUBCLASSOF;
+            
+            final RDFSVocabulary vocab = new RDFSVocabulary(store);
+            
+            /*
+             * Add the original statements.
+             */
+            {
+                
+                StatementBuffer buf = new StatementBuffer(store,10);
+                
+                buf.add(A, SCO, B);
+                buf.add(B, SCO, C);
+                buf.add(C, SCO, D);
+                
+                buf.flush();
+                
+                store.dumpStore();
+                
+                // make the data visible to a read-committed view.
+                store.commit();
+                
+            }
+            
+            // only the three statements that we added explicitly.
+            assertEquals(3L, store.getStatementCount());
+            
+            // setup program to run rdfs11 to fixed point.
+            final Program program = new Program("rdfs11", false);
+            
+            program.addClosureOf(new RuleRdfs11(store.getSPORelation()
+                    .getNamespace(), vocab));
+
+            /*
+             * Run the rule to fixed point on the data.
+             */
+            {
+                
+                final IJoinNexusFactory joinNexusFactory = store
+                        .newJoinNexusFactory(ActionEnum.Insert, IJoinNexus.ALL,
+                                null/*filter*/);
+            
+                final long mutationCount = joinNexusFactory.newInstance(
+                        store.getIndexManager()).runMutation(program);
+
+                assertEquals("mutationCount", 3, mutationCount);
+
+                assertEquals("statementCount", 6, store.getStatementCount());
+                
+            }
+            
+            /*
+             * Verify the entailments.
+             */
+            assertNotNull(store.getStatement(A, SCO, C));
+            assertNotNull(store.getStatement(B, SCO, D));
+            assertNotNull(store.getStatement(A, SCO, D));
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
         
     }
     

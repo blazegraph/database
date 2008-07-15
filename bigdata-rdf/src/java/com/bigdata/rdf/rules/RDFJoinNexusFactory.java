@@ -72,6 +72,32 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     private final int solutionFlags;
     private final IElementFilter filter;
 
+    public String toString() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{ action="+action);
+
+        sb.append(", writeTime="+writeTime);
+        
+        sb.append(", readTime="+readTime);
+        
+        sb.append(", justify="+justify);
+        
+        sb.append(", bufferCapacity="+bufferCapacity);
+        
+        sb.append(", solutionFlags="+solutionFlags);
+        
+        sb.append(", filter="+(filter==null?"N/A":filter.getClass().getName()));
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+    
     /**
      * 
      * @param writeTime

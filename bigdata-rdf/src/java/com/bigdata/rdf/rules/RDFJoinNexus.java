@@ -36,8 +36,10 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
@@ -90,6 +92,10 @@ import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 /**
  * {@link IProgram} execution support for the RDF DB.
  * 
+ * FIXME The handling of the various deployment scenarios (local {@link Journal},
+ * {@link TemporaryStore}, and {@link IBigdataFederation}) is a bit messy and
+ * it is going to be difficult to generalize to full transaction support.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -97,7 +103,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
     protected final static transient Logger log = Logger.getLogger(RDFJoinNexus.class);
     
-    private final IJoinNexusFactory joinNexusFactory;
+    private final RDFJoinNexusFactory joinNexusFactory;
     
     private final IIndexManager indexManager;
 
@@ -152,7 +158,7 @@ public class RDFJoinNexus implements IJoinNexus {
      * 
      * @todo collapse the executor service and index manager?
      */
-    public RDFJoinNexus(IJoinNexusFactory joinNexusFactory,
+    public RDFJoinNexus(RDFJoinNexusFactory joinNexusFactory,
             IIndexManager indexManager, ActionEnum action, long writeTimestamp,
             long readTimestamp, boolean justify, int bufferCapacity,
             int solutionFlags, IElementFilter filter) {
@@ -252,6 +258,20 @@ public class RDFJoinNexus implements IJoinNexus {
                 return ITx.UNISOLATED;
                 
             }
+            
+        }
+        
+        if (lastCommitTime != 0L) {
+            
+            /*
+             * Note: This advances the read-behind timestamp for a local Journal
+             * configuration without the ConcurrencyManager (the only scenario
+             * where we do an explicit commit).
+             * 
+             * @issue negative timestamp for historical read.
+             */
+            
+            return -lastCommitTime;
             
         }
         
@@ -893,5 +913,79 @@ public class RDFJoinNexus implements IJoinNexus {
         return dataService.submit(innerTask).get();
 
     }
+
+    public void makeWriteSetsVisible() {
+        
+        assert action.isMutation();
+        
+        assert getWriteTimestamp() == ITx.UNISOLATED;
+        
+        if (indexManager instanceof Journal) {
+        
+            /*
+             * A journal utilized without concurrency controls (the currency
+             * controls are imposed by the data service API, at least for the
+             * RDF DB).
+             */
+            
+            final long timestamp = ((AbstractJournal)indexManager).commit();
+            
+            if(timestamp != 0L) {
+                
+                /*
+                 * Note: A timestamp of ZERO is return if there was nothing to
+                 * commit.  We ignore ZEROs and only update the commit time when
+                 * it is actually advancing.
+                 */
+                
+                assert lastCommitTime < timestamp;
+                
+                lastCommitTime = timestamp;
+                
+                if(log.isInfoEnabled()) {
+                    
+                    log.info("Committed local journal: lastCommitTime="
+                            + lastCommitTime);
+                    
+                }
+                
+            }
+
+        } else if(indexManager instanceof IJournal) {
+            
+            /*
+             * An IJournal object exposed by the AbstractTask. We don't have to
+             * commit anything since the writes were performed under the control
+             * of the ConcurrencyManager.
+             */
+
+        } else if(indexManager instanceof TemporaryStore) {
+            
+            /*
+             * We don't bother with a checkpoint for the temporary store.
+             * Instead we use UNISOLATED reads.
+             */
+            
+        } else if(indexManager instanceof IBigdataFederation) {
+            
+            /*
+             * The federation API auto-commits unisolated writes.
+             */
+            
+        } else {
+            
+            throw new AssertionError("Not expecting: "
+                    + indexManager.getClass());
+            
+        }
+        
+    }
+
+    /**
+     * Updated each time {@link #makeWriteSetsVisible()} does a commit (which
+     * only occurs for the local {@link Journal} scenario) and used instead of
+     * {@link ITx#READ_COMMITTED} for the read time for the {@link Journal}.
+     */
+    private long lastCommitTime = 0L;
 
 }

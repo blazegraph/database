@@ -36,7 +36,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -61,8 +63,7 @@ public class MutationTask extends AbstractStepTask {
      */
     protected MutationTask(ActionEnum action,
             IJoinNexusFactory joinNexusFactory, IStep step,
-            IIndexManager indexManager,DataService dataService
-            ) {
+            IIndexManager indexManager, DataService dataService) {
 
         super(action, joinNexusFactory, step, indexManager, dataService);
         
@@ -120,7 +121,7 @@ public class MutationTask extends AbstractStepTask {
 
             totals = runParallel( step, tasks);
 
-            flushBuffers(totals, buffers);
+            flushBuffers(joinNexus, totals, buffers);
 
         } else {
 
@@ -142,10 +143,13 @@ public class MutationTask extends AbstractStepTask {
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected void flushBuffers(RuleStats totals,
+    protected void flushBuffers(IJoinNexus joinNexus, RuleStats totals,
             Map<String, IBuffer<ISolution>> buffers)
             throws InterruptedException, ExecutionException {
 
+        if (joinNexus == null)
+            throw new IllegalArgumentException();
+        
         if (totals == null)
             throw new IllegalArgumentException();
         
@@ -211,6 +215,9 @@ public class MutationTask extends AbstractStepTask {
             
         }
 
+        // make the write sets visible.
+        joinNexus.makeWriteSetsVisible();
+        
         if(log.isInfoEnabled()) {
             
             log.info(totals);

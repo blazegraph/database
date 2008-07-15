@@ -612,28 +612,26 @@ public class LocalProgramTask implements IProgramTask,
         final RuleStats totals = new RuleStats(program);
         
         int round = 0;
-
+        
         while (true) {
 
             final long mutationCount0 = totals.mutationCount.get();
             
             if (log.isDebugEnabled())
-                log.debug("round=" + round);
+                log.debug("round=" + round+", mutationCount(before)="+mutationCount0);
 
             final RuleStats tmp = executeMutation(program);
 
             /*
-             * Post-round mutation counter.
+             * #of mutations for this round.
              * 
              * Note: We MUST flush the buffer(s) before obtaining this counter -
              * otherwise there may be solutions in the buffer(s) that have not
              * been flushed to the mutable relation which would lead to
              * undercounting the #of mutations in this round.
              */
-            final long mutationCount1 = totals.mutationCount.get();
+            final long mutationDelta = tmp.mutationCount.get();
 
-            final long mutationDelta = mutationCount1 - mutationCount0;
-            
             // aggregate the rule statistics.
             totals.add(tmp);
 
@@ -641,7 +639,7 @@ public class LocalProgramTask implements IProgramTask,
 
                 log.debug("round# " + round + ", mutationCount(delta="
                         + mutationDelta + ", before=" + mutationCount0
-                        + ", after=" + mutationCount1 + "):" + totals);
+                        + ", after=" + (mutationCount0+mutationDelta) + "):" + totals);
 
             }
 
