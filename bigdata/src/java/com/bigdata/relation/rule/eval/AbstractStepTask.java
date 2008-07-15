@@ -29,6 +29,10 @@
 package com.bigdata.relation.rule.eval;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +48,13 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IProgram;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
@@ -370,37 +380,83 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
          * index objects.
          */
 
-        final long timestamp;
+//        final long timestamp;
+//        {
+//         
+//            // flyweight instance.
+//            IJoinNexus joinNexus = joinNexusFactory.newInstance(indexManager);
+//            
+//            // choose timestamp based on more recent view required.
+//            timestamp = action.isMutation() ? joinNexus.getWriteTimestamp()
+//                    : joinNexus.getReadTimestamp();
+//            
+//        }
+//
+//        if(log.isInfoEnabled()) {
+//         
+//            log.info("timestamp="+timestamp+", task="+this);
+//            
+//        }
+
+        /*
+         * The set of indices that we need to declare for the task.
+         */
+        final Set<String> indexNames = new HashSet<String>();
+        
+        if(action.isMutation()) {
+         
+            /*
+             * Obtain the name of each index for which we want write access.
+             * These are the indices for the relations named in the head of each
+             * rule.
+             * 
+             * Note: We are not actually issuing any tasks here, just
+             * materializing relation views so that we can obtain the names of
+             * the indices required for those views in order to declare them to
+             * the ConcurrencyManager. (In fact, we will defer the choice of the
+             * views on which we write until execution time since we will run
+             * the mutation operation inside of the ConcurrencyManager.) Hence
+             * the timestamp associated with the request does not really matter.
+             */
+            final Map<String, IRelation> tmpRelations = getWriteRelations(
+                indexManager, step, ITx.UNISOLATED);
+            
+            // Collect names of the required indices.
+            final Set<String> writeIndexNames = getIndexNames(tmpRelations
+                    .values());
+            
+            indexNames.addAll(writeIndexNames);
+
+        }
+
         {
-         
-            // flyweight instance.
-            IJoinNexus joinNexus = joinNexusFactory.newInstance(indexManager);
-            
-            // choose timestamp based on more recent view required.
-            timestamp = action.isMutation() ? joinNexus.getWriteTimestamp()
-                    : joinNexus.getReadTimestamp();
+
+            /*
+             * Obtain the name of each index for which we want read access.
+             * These are the indices for the relation view(s) named in the tails
+             * of each rule.
+             * 
+             * Note: We are not actually issuing any tasks here, just
+             * materializing relation views so that we can obtain the names of
+             * the indices required for those views. UNISOLATED is always safe
+             * in this context, even for a relation on a temporary where data
+             * has been written but no commits performed.
+             */
+            final Map<String, IRelation> tmpRelations = getReadRelations(
+                    indexManager, step, ITx.UNISOLATED);
+                
+            // Collect names of the required indices.
+            final Set<String> readIndexNames = getIndexNames(tmpRelations
+                    .values());
+                
+            indexNames.addAll(readIndexNames);
             
         }
-
-        if(log.isInfoEnabled()) {
-         
-            log.info("timestamp="+timestamp+", task="+this);
-            
-        }
-
-        // Declare all index names to which we want access.
+        
         final String[] resource;
         {
-        
-            // Note: These relations are ONLY used to get the index names.
-            final Map<String, IRelation> tmpRelations = util
-                    .getRelations(indexManager, step, timestamp);
-
-            // Collect names of the required indices.
-            final Set<String> indexNames = util.getIndexNames(tmpRelations
-                    .values());
-
-            // The set of indices that the task will declare.
+            
+             // The set of indices that the task will declare.
             resource = indexNames.toArray(new String[] {});
 
             if (log.isInfoEnabled()) {
@@ -412,6 +468,40 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         }
 
         /*
+         * Choose the timestamp for the AbstractTask. The most interesting
+         * choice is whether or not the task is UNISOLATED (an unisolated task
+         * will obtain exclusive locks on the live indices declared by the
+         * task).
+         * 
+         * A mutation task runs with the writeTimestamp.
+         * 
+         * A query task runs as READ_COMMITTED.
+         * 
+         * @todo handle transactions in this context.
+         */
+        final long timestamp;
+        {
+            
+            if (action.isMutation()) {
+
+                timestamp = joinNexusFactory.newInstance(indexManager)
+                        .getWriteTimestamp();
+
+            } else {
+
+                timestamp = ITx.READ_COMMITTED;
+                
+            }
+
+            if (log.isInfoEnabled()) {
+
+                log.info("timestamp=" + timestamp + ", task=" + this);
+
+            }
+            
+        }
+        
+        /*
          * Create the inner task. A clone is used to prevent possible side
          * effects on the original task.
          * 
@@ -422,7 +512,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         final IConcurrencyManager concurrencyManager = dataService
                 .getConcurrencyManager();
-
+        
         final AbstractTask task = new AbstractTask(concurrencyManager,
                 timestamp, resource) {
 
@@ -430,9 +520,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             protected Object doTask() throws Exception {
 
                 if (log.isInfoEnabled())
-                    log.info("Executing inner task: " + this
-//                            + ", indexManager=" + getJournal()
-                            );
+                    log.info("Executing inner task: " + this);
 
                 /*
                  * Override to use the IJournal exposed by the AbstractTask.
@@ -442,51 +530,6 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
                  */
                 innerTask.indexManager = getJournal();
                 
-////                final IJoinNexus tmp = innerTask.joinNexus;
-//
-////                final IResourceLocator resourceLocator = new DefaultResourceLocator(
-////                        executorService, //
-////                        getJournal(),// 
-////                        getJournal().getResourceLocator()//
-////                        );
-////
-//                innerTask.joinNexus = new DelegateJoinNexus(tmp) {
-//
-//                    /**
-//                     * Overridden to resolve the indices using the
-//                     * {@link IJournal} exposed to the task by the
-//                     * {@link AbstractTask}.
-//                     * <p>
-//                     * Note: Without this, the joinNexus in effect will use the
-//                     * locator for the caller, which was probably resolving
-//                     * using the {@link IBigdataFederation}'s locator.
-//                     */
-//                    public IResourceLocator getRelationLocator() {
-//
-////                        return resourceLocator;
-//
-////                        /* Note: This issue appears to be resolved.
-////                         *
-////                         * FIXME I am not clear yet why this construction works
-////                         * but the simpler one below does not. Track this down.
-////                         * 
-////                         * One question is whether both locators really need to
-////                         * specify a delegate. I would think that it should be
-////                         * one or the other and that if both do it that we will
-////                         * search one delegate twice, but clearly the delegates
-////                         * are not the same or these would be interchangable
-////                         * constructs. it would be much nicer if we don't have
-////                         * to override this at all since that would make running
-////                         * inside of the concurrency controls that much more
-////                         * transparent.
-////                         */
-//                        
-//                      return getJournal().getResourceLocator();
-//                      
-//                    }
-//
-//                };
-
                 return innerTask.call();
 
             }
@@ -527,5 +570,292 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
     }
 
+    /**
+     * The set of distinct relations identified by the head of each rule in the
+     * program.
+     */
+    protected Set<String> getWriteRelationNames(IStep step) {
+
+        Set<String> c = new HashSet<String>();
+        
+        getWriteRelationNames(step, c);
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Found "+c.size()+" relations, program="+step.getName());
+            
+        }
+
+        return c;
+        
+    }
+    
+    private void getWriteRelationNames(IStep p, Set<String> c) {
+
+        if (p.isRule()) {
+
+            final IRule r = (IRule) p;
+
+            c.add(r.getHead().getOnlyRelationName());
+
+        } else {
+            
+            final Iterator<IStep> itr = ((IProgram)p).steps();
+
+            while (itr.hasNext()) {
+
+                getWriteRelationNames(itr.next(), c);
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Locate the distinct relation identifiers corresponding to the head of
+     * each rule and resolve them to their relations.
+     * 
+     * @param timestamp
+     *            The timestamp associated with the relation views on which the
+     *            rule(s) will write.
+     * 
+     * @throws RuntimeException
+     *             if any relation can not be resolved.
+     */
+    protected Map<String, IRelation> getWriteRelations(
+            IIndexManager indexManager, IStep step, long timestamp) {
+
+        if (step == null)
+            throw new IllegalArgumentException();
+
+        final Map<String, IRelation> c = new HashMap<String, IRelation>();
+
+        getWriteRelations(indexManager, step, c, timestamp);
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("Located " + c.size()
+                    + " relations in the head(s), program=" + step.getName());
+
+        }
+
+        return c;
+
+    }
+
+    @SuppressWarnings("unchecked")
+    private void getWriteRelations(IIndexManager indexManager, IStep p,
+            Map<String, IRelation> c, long timestamp) {
+
+        if (p.isRule()) {
+
+            final IRule r = (IRule) p;
+
+            final String relationIdentifier = r.getHead().getOnlyRelationName();
+
+            if (!c.containsKey(relationIdentifier)) {
+
+                final IRelation relation = (IRelation) indexManager
+                        .getResourceLocator().locate(relationIdentifier,
+                                timestamp);
+
+                c.put(relationIdentifier, relation);
+
+            }
+
+        } else {
+            
+            final Iterator<IStep> itr = ((IProgram)p).steps();
+
+            while (itr.hasNext()) {
+
+                getWriteRelations(indexManager, itr.next(), c, timestamp);
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Locate the distinct relation identifiers corresponding to the tail(s) of
+     * each rule and resolve them to their relations.
+     * 
+     * @throws RuntimeException
+     *             if any relation can not be resolved.
+     */
+    protected Map<String, IRelation> getReadRelations(IIndexManager indexManager,
+            IStep step, final long timestamp) {
+
+        if (step == null)
+            throw new IllegalArgumentException();
+
+        final Map<String, IRelation> c = new HashMap<String, IRelation>();
+
+        getReadRelations(indexManager, step, c, timestamp);
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("Located " + c.size()
+                    + " relations in the tail(s), program=" + step.getName());
+
+        }
+
+        return c;
+
+    }
+
+    @SuppressWarnings("unchecked")
+    private void getReadRelations(IIndexManager indexManager, IStep p,
+            Map<String, IRelation> c, long timestamp) {
+
+        if (p.isRule()) {
+
+            final IRule r = (IRule) p;
+
+            final Iterator<IPredicate> itr = r.getTail();
+            
+            while (itr.hasNext()) {
+
+                final String relationName = r.getHead()
+                        .getOnlyRelationName();
+
+                if (!c.containsKey(relationName)) {
+
+                    final IRelation relation = (IRelation) indexManager
+                            .getResourceLocator().locate(relationName,
+                                    timestamp);
+
+                    c.put(relationName, relation);
+
+                }
+
+            }
+
+        } else {
+            
+            final Iterator<IStep> itr = ((IProgram)p).steps();
+
+            while (itr.hasNext()) {
+
+                getReadRelations(indexManager, itr.next(), c, timestamp);
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Create the appropriate buffers to absorb writes by the rules in the
+     * program that target an {@link IMutableRelation}.
+     * 
+     * @return the map from relation identifier to the corresponding buffer.
+     * 
+     * @throws IllegalStateException
+     *             if the program is being executed as mutation.
+     * @throws RuntimeException
+     *             If a rule requires mutation for a relation (it will write on
+     *             the relation) and the corresponding entry in the map does not
+     *             implement {@link IMutableRelation}.
+     */
+    protected Map<String, IBuffer<ISolution>> getMutationBuffers(
+            IJoinNexus joinNexus, Map<String, IRelation> relations) {
+
+        if (!action.isMutation()) {
+
+            throw new IllegalStateException();
+            
+        }
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("");
+            
+        }
+
+        final Map<String, IBuffer<ISolution>> c = new HashMap<String, IBuffer<ISolution>>(
+                relations.size());
+
+        final Iterator<Map.Entry<String, IRelation>> itr = relations
+                .entrySet().iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<String, IRelation> entry = itr.next();
+
+            final String relationIdentifier = entry.getKey();
+
+            final IRelation relation = entry.getValue();
+
+            final IBuffer<ISolution> buffer;
+
+            switch (action) {
+            
+            case Insert:
+                
+                buffer = joinNexus.newInsertBuffer((IMutableRelation)relation);
+                
+                break;
+                
+            case Delete:
+                
+                buffer = joinNexus.newDeleteBuffer((IMutableRelation)relation);
+                
+                break;
+                
+            default:
+                
+                throw new AssertionError("action=" + action);
+            
+            }
+
+            c.put(relationIdentifier, buffer);
+            
+        }
+
+        if(log.isDebugEnabled()) {
+            
+            log.debug("Created "+c.size()+" mutation buffers: action="+action);
+            
+        }
+
+        return c;
+        
+    }
+    
+    /**
+     * Returns the names of the indices maintained by the relations.
+     * 
+     * @param c
+     *            A collection of {@link IRelation}s.
+     * 
+     * @return The names of the indices maintained by those relations.
+     */
+    @SuppressWarnings("unchecked")
+    protected Set<String> getIndexNames(Collection<IRelation> c) {
+
+        if (c == null)
+            throw new IllegalArgumentException();
+
+        if (c.isEmpty())
+            return Collections.EMPTY_SET;
+
+        final Set<String> set = new HashSet<String>();
+        
+        final Iterator<IRelation> itr = c.iterator();
+        
+        while(itr.hasNext()) {
+            
+            final IRelation relation = itr.next();
+            
+            set.addAll(relation.getIndexNames());
+            
+        }
+
+        return set;
+        
+    }
 
 }

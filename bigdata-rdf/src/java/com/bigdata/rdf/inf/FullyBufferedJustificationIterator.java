@@ -109,14 +109,14 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
          * Materialize the matching justifications.
          */
         
-        ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
+        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.KEYS, null/* filter */);
 
         int i = 0;
 
         while (itr.hasNext()) {
 
-            Justification jst = new Justification(itr);
+            Justification jst = (Justification) itr.next().getObject();
 
             // @todo comment out and make ids private.
             assert jst.ids[0] == head.s : jst.toString(db);
@@ -181,7 +181,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
          * stored under the key).
          */
 
-        ndx.remove(current.getKey(keyBuilder));
+        ndx.remove(Justification.getKey(keyBuilder, current));
         
     }
 

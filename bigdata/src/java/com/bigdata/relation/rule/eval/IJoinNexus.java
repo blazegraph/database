@@ -34,6 +34,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -191,15 +192,40 @@ public interface IJoinNexus {
      * exceptions thrown out of the {@link BTree} class.
      */
     long getWriteTimestamp();
-    
+
     /**
      * The timestamp used when obtaining an {@link IAccessPath} to read on a
      * {@link IRelation}. When computing the closure of a set of {@link IRule}s,
      * it is beneficial to specify a read timestamp that remains fixed during
      * each round of closure. The timestamp that should be choosen is the last
      * commit time for the database prior to the execution of the round.
+     * 
+     * @param relationName
+     *            The relation on which you will read.
      */
-    long getReadTimestamp();
+    long getReadTimestamp(String relationName);
+    
+    /**
+     * Locates and returns the view of the relation(s) identified by the
+     * {@link IPredicate}.
+     * <p>
+     * Note: This method is responsible for returning a fused view when more
+     * than one relation name was specified for the {@link IPredicate}. It
+     * SHOULD be used whenever the {@link IRelation} is selected based on a
+     * predicate in the tail of an {@link IRule} and could therefore be a fused
+     * view of more than one relation instance. (The head of the {@link IRule}
+     * must be a simple {@link IRelation} and not a view.)
+     * <p>
+     * Note: The implementation should choose the read timestamp for each
+     * relation in the view using {@link #getReadTimestamp(String)}.
+     * 
+     * @param name
+     *            The predicate
+     * 
+     * @return The {@link IRelation}, which might be a
+     *         {@link RelationFusedView}.
+     */
+    IRelation getReadRelationView(IPredicate pred);
     
     /**
      * Used to locate indices, relations and relation containers.

@@ -31,17 +31,13 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
-import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.TemporaryRawStore;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.spo.JustificationTupleSerializer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
@@ -49,8 +45,9 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ISolution;
 
 /**
@@ -117,18 +114,17 @@ import com.bigdata.relation.rule.eval.ISolution;
  * by Jeen Broekstra and Arjohn Kampman.
  * </p>
  * 
- * 
- * FIXME use custom {@link ITupleSerializer} to generate keys and de-serialize.
- * 
- * FIXME accept {@link ISolution}s when writing justifications rather than
- * long[] bindings (same data, different format).
+ * @todo the tails could be represented more efficiently if we only stored the
+ *       variable bindings and not all values in each tail. however, we might
+ *       then need the rule on hand in order to decode the tail(s) and
+ *       substitute in the missing constants.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class Justification implements Comparable<Justification> {
 
-    protected static final Logger log = Logger.getLogger(Justification.class);
+    protected static transient final Logger log = Logger.getLogger(Justification.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
@@ -164,44 +160,44 @@ public class Justification implements Comparable<Justification> {
      */
     final long[] ids;
     
-    /**
-     * Construct an entailment for an {@link StatementEnum#Inferred} statement.
-     * 
-     * @param rule
-     *            The rule that licensed the entailment (this is only used for
-     *            debugging).
-     * @param head
-     *            The entailment licensed by the rule and the bindings.
-     * @param bindings
-     *            The bindings for that rule that licensed the entailment.
-     * 
-     * @todo no longer used?
-     */
-    public Justification(Rule rule, SPO head, SPO[] bindings) {
-
-//        assert rule != null;
-        assert head != null;
-        assert bindings != null;
-
-        this.rule = rule;
-        
-        ids = new long[ (1 + bindings.length ) * N];
-
-        int i = 0;
-        
-        ids[i++] = head.s;
-        ids[i++] = head.p;
-        ids[i++] = head.o;
-        
-        for( SPO spo : bindings ) {
-            
-            ids[i++] = spo.s;
-            ids[i++] = spo.p;
-            ids[i++] = spo.o;
-            
-        }
-    
-    }
+//    /**
+//     * Construct an entailment for an {@link StatementEnum#Inferred} statement.
+//     * 
+//     * @param rule
+//     *            The rule that licensed the entailment (this is only used for
+//     *            debugging).
+//     * @param head
+//     *            The entailment licensed by the rule and the bindings.
+//     * @param bindings
+//     *            The bindings for that rule that licensed the entailment.
+//     * 
+//     * @todo no longer used?
+//     */
+//    public Justification(Rule rule, SPO head, SPO[] bindings) {
+//
+////        assert rule != null;
+//        assert head != null;
+//        assert bindings != null;
+//
+//        this.rule = rule;
+//        
+//        ids = new long[ (1 + bindings.length ) * N];
+//
+//        int i = 0;
+//        
+//        ids[i++] = head.s;
+//        ids[i++] = head.p;
+//        ids[i++] = head.o;
+//        
+//        for( SPO spo : bindings ) {
+//            
+//            ids[i++] = spo.s;
+//            ids[i++] = spo.p;
+//            ids[i++] = spo.o;
+//            
+//        }
+//    
+//    }
     
     /**
      * Returns the head as an {@link SPO}.
@@ -252,94 +248,112 @@ public class Justification implements Comparable<Justification> {
     }
     
     /**
-     * Construct a justification directly from the term identifier bindings for
-     * the tail.
+     * Construct a justification directly an {@link ISolution}.
      * 
-     * @param rule
-     *            The rule (used for debugging only).
-     * 
-     * @param head
-     *            The entailment licensed by the rule and the bindings.
-     * 
-     * @param bindings
-     *            The term identifiers for the bindings under which the rule
-     *            justified the entailments. A binding MAY be
-     *            {@link IRawTripleStore#NULL} in which case it MUST be
-     *            interpreted as a wildcard.
-     * 
-     * @todo only used by a test case?
+     * @param solution
+     *            The solution.
      */
-    public Justification(IRule rule, SPO head, long[] bindings) {
+    public Justification(ISolution solution) {
+        
+        // the rule that licensed the entailment.
+        final IRule rule = solution.getRule();
+        
+        // the entailed statement.
+        final SPO head = (SPO) solution.get();
 
-//        assert rule != null;
+        // the binding set for the solution.
+        final IBindingSet bindingSet = solution.getBindingSet();
+
+//        final long[] bindings = new long[(rule.getTailCount() + 1) * N];
+
+        assert rule != null;
         assert head != null;
-        assert bindings != null;
+        assert bindingSet != null;
         
-        // verify enough bindings for one or more triple patterns.
-        assert bindings.length % N == 0 : "bindings.length=" + bindings.length;
-        assert bindings.length / N >= 1 : "bindings.length=" + bindings.length;
+//        // verify enough bindings for one or more triple patterns.
+//        assert bindings.length % N == 0 : "bindings.length=" + bindings.length;
+//        assert bindings.length / N >= 1 : "bindings.length=" + bindings.length;
         
-        this.rule = rule;
+        this.rule = rule; // Note: transient field.
         
         // #of triple patterns in the tail.
-        final int m = bindings.length / N;
+        final int tailCount = rule.getTailCount();
 
         // allocate enough for the head and the tail.
-        ids = new long[(1 + m) * N];
+        ids = new long[(1 + tailCount) * N];
         
-        int i = 0;
+        int j = 0;
         
-        ids[i++] = head.s;
-        ids[i++] = head.p;
-        ids[i++] = head.o;
+        ids[j++] = head.s;
+        ids[j++] = head.p;
+        ids[j++] = head.o;
         
-        for(long id : bindings) {
+        for(int i=0; i<tailCount; i++) {
             
-            ids[i++] = id;
+            final IPredicate predicate = rule.getTail(i).asBound(bindingSet);
+            
+            ids[j++] = (Long)predicate.get(0/*s*/).get();
+            ids[j++] = (Long)predicate.get(1/*p*/).get();
+            ids[j++] = (Long)predicate.get(2/*o*/).get();
             
         }
         
     }
     
+//    /**
+//     * Deserialize a justification from an index entry.
+//     * 
+//     * @param itr
+//     *            The iterator visiting the index entries.
+//     * 
+//     * @todo use {@link ITupleSerializer} to deserialize
+//     */
+//    public Justification(ITupleIterator itr) {
+//        
+//        final ITuple tuple = itr.next();
+//        
+//        final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
+//        
+//        final int keyLen = kbuf.limit();
+//        
+//        final byte[] data = kbuf.array();
+//        
+//        this.rule = null; // Not persisted.
+//        
+//        // verify key is even multiple of (N*sizeof(long)).
+//        assert keyLen % (N * Bytes.SIZEOF_LONG) == 0;
+//
+//        // #of term identifiers in the key.
+//        final int m = keyLen / Bytes.SIZEOF_LONG;
+//
+//        // A justification must include at least a head and one tuple in the tail.
+//        assert m >= N * 2 : "keyLen="+keyLen+", N="+N+", m="+m;
+//        
+//        ids = new long[m];
+//        
+//        for (int i = 0; i < m; i++) {
+//
+//            ids[i] = KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG);
+//            
+//        }
+//        
+//    }
+
     /**
-     * Deserialize a justification from an index entry.
+     * Used by the {@link JustificationTupleSerializer} to materialize
+     * justifications.
      * 
-     * @param itr
-     *            The iterator visiting the index entries.
-     * 
-     * @todo use {@link ITupleSerializer} to deserialize
+     * @param ids
+     *            The bindings on the head and tail(s).
      */
-    public Justification(ITupleIterator itr) {
+    public Justification(long[] ids) {
         
-        final ITuple tuple = itr.next();
+        this.rule = null; // not serialized.
         
-        final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
-        
-        final int keyLen = kbuf.limit();
-        
-        final byte[] data = kbuf.array();
-        
-        this.rule = null; // Not persisted.
-        
-        // verify key is even multiple of (N*sizeof(long)).
-        assert keyLen % (N * Bytes.SIZEOF_LONG) == 0;
-
-        // #of term identifiers in the key.
-        final int m = keyLen / Bytes.SIZEOF_LONG;
-
-        // A justification must include at least a head and one tuple in the tail.
-        assert m >= N * 2 : "keyLen="+keyLen+", N="+N+", m="+m;
-        
-        ids = new long[m];
-        
-        for (int i = 0; i < m; i++) {
-
-            ids[i] = KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG);
-            
-        }
+        this.ids = ids;
         
     }
-
+    
     /**
      * Serialize a justification as an index key. The key length is a function
      * of the #of bindings in the justification.
@@ -349,28 +363,37 @@ public class Justification implements Comparable<Justification> {
      * 
      * @return The key.
      */
-    public byte[] getKey(KeyBuilder keyBuilder) {
+    static public byte[] getKey(IKeyBuilder keyBuilder, Justification jst) {
 
+        if (keyBuilder == null)
+            throw new IllegalArgumentException();
+
+        if (jst == null)
+            throw new IllegalArgumentException();
+        
         keyBuilder.reset();
 
-        for(int i=0; i<ids.length; i++) {
-            
+        final long[] ids = jst.ids;
+
+        for (int i = 0; i < ids.length; i++) {
+
             keyBuilder.append(ids[i]);
-            
+
         }
-        
+
         return keyBuilder.getKey();
-        
+
     }
     
     public boolean equals(Justification o) {
-        
+
         // Note: ignores transient [rule].
-        
-        if(this==o) return true;
-        
+
+        if (this == o)
+            return true;
+
         return Arrays.equals(ids, o.ids);
-        
+
     }
     
     /**

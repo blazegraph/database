@@ -231,6 +231,10 @@ public class Rule<E> implements IRule<E>, Serializable {
      *             if the <i>head</i> declares any variables that are not
      *             declared in the tail.
      */
+//    * @throws IllegalArgumentException
+//    *             if the <i>head</i> names more the one relation in its view
+//    *             (tails may name more than one, which is interpreted as a
+//    *             fused view of the named relations).
     public Rule(String name, IPredicate head, IPredicate[] tail,
             IConstraint[] constraints) {
 
@@ -294,6 +298,14 @@ public class Rule<E> implements IRule<E>, Serializable {
         this.head = head;
         {
 
+            if (head.getRelationCount() != 1) {
+                
+                throw new IllegalArgumentException(
+                        "Expecting a single relation identifier for the head: head="
+                                + head);
+                
+            }
+            
             final int arity = head.arity();
 
             for (int j = 0; j < arity; j++) {

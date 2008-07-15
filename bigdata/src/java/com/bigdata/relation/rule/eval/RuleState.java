@@ -9,7 +9,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
@@ -539,10 +538,6 @@ public class RuleState {
      *       bindings on the predicate then there are no side-effects from the
      *       propagation of bindings and we can simplify how we set, clear, and
      *       reset the bindings!)
-     *       <p>
-     *       It might also be worth while to cache the
-     *       {@link String} to {@link IRelation} map. That should
-     *       be done in the {@link IResourceLocator} impl.
      */
     public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
 
@@ -591,14 +586,8 @@ public class RuleState {
         // based on the given bindings.
         final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
 
-        // The name of the relation that the predicate will query.
-        final String relationIdentifier = predicate
-                .getOnlyRelationName();
-
         // Resolve the relation name to the IRelation object.
-        final IRelation relation = (IRelation) joinNexus.getIndexManager()
-                .getResourceLocator().locate(relationIdentifier,
-                        joinNexus.getReadTimestamp());
+        final IRelation relation = (IRelation) joinNexus.getReadRelationView(predicate);
 
         // find the best access path for the predicate for that relation.
         final IAccessPath accessPath = relation.getAccessPath(predicate);

@@ -232,21 +232,22 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
             final long computeStart = System.currentTimeMillis();
 
             /*
-             * find the distinct predicates in the KB (efficient op).
-             */
-
-            final long timestamp = joinNexus.getReadTimestamp();
-
-            /*
              * Note: Since this task is always applied to a single tail rule,
              * the {@link TMUtility} rewrite of the rule will always read from
              * the focusStore alone. This makes the choice of the relation on
              * which to read easy - just read on whichever relation is specified
              * for tail[0].
              */
+            final String relationName = rule.getHead().getOnlyRelationName();
+
+            /*
+             * find the distinct predicates in the KB (efficient op).
+             */
+            final long timestamp = joinNexus.getReadTimestamp(relationName);
+
             final SPORelation relation = (SPORelation) joinNexus
                     .getIndexManager().getResourceLocator().locate(
-                            rule.getHead().getOnlyRelationName(), timestamp);
+                            relationName, timestamp);
             
 //            final SPOAccessPath accessPath = relation.getAccessPath(
 //                    keyOrder, rule.getTail(0));

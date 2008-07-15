@@ -275,7 +275,7 @@
   <dt>map/reduce</dt>
   <dd>http://labs.google.com/papers/mapreduce.html</dd>
 
-  <dt>Hadoop</dt>
+  <dt>Hadoop &amp; HBase</dt>
   <dd>http://lucene.apache.org/hadoop/</dd>
 
   <dt>Pig</dt>
@@ -295,6 +295,9 @@
 
   <dt>mg4j</dt>
   <dd>http://mg4j.dsi.unimi.it/</dd>
+
+  <dt>Cassandra (FaceBook)</dt>
+  <dd>http://www.25hoursaday.com/weblog/CommentView.aspx?guid=c573171e-8e62-45b4-b85c-7b411b528e51#commentstart</dd>
 
   </dl>
 

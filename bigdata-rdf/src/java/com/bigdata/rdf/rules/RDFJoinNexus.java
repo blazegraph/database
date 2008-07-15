@@ -45,6 +45,8 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -73,7 +75,6 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.LocalNestedSubqueryEvaluator;
 import com.bigdata.relation.rule.eval.LocalProgramTask;
-import com.bigdata.relation.rule.eval.ProgramUtility;
 import com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTaskFactory;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -189,10 +190,60 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-    public long getReadTimestamp() {
+    public long getReadTimestamp(String relationName) {
         
+        /*
+         * FIXME when the relation is the focusStore SPORelation choose
+         * ITx.UNISOLATED. Otherwise choose read-committed (or whatever was
+         * specified). This is because we avoid doing a commit on the focusStore
+         * and instead just its its UNISOLATED indices. This is more efficient
+         * since they are already buffered and since we can avoid touching disk
+         * at all for small data sets.
+         */
         return readTimestamp;
         
+    }
+    
+    public IRelation getReadRelationView(IPredicate pred) {
+
+        if (pred == null)
+            throw new IllegalArgumentException();
+        
+        final int nsources = pred.getRelationCount();
+
+        if (nsources == 1) {
+
+            final String relationName = pred.getOnlyRelationName();
+
+            final long timestamp = getReadTimestamp(relationName);
+
+            return (SPORelation) getIndexManager().getResourceLocator().locate(relationName,
+                    timestamp);
+
+        } else if (nsources == 2) {
+
+            final String relationName0 = pred.getRelationName(0);
+
+            final String relationName1 = pred.getRelationName(1);
+
+            final long timestamp0 = getReadTimestamp(relationName0);
+
+            final long timestamp1 = getReadTimestamp(relationName1);
+
+            final SPORelation relation0 = (SPORelation) getIndexManager()
+                    .getResourceLocator().locate(relationName0, timestamp0);
+
+            final SPORelation relation1 = (SPORelation) getIndexManager()
+                    .getResourceLocator().locate(relationName1, timestamp1);
+
+            return new RelationFusedView<SPO>(relation0, relation1);
+
+        } else {
+
+            throw new UnsupportedOperationException();
+
+        }
+
     }
     
     public IIndexManager getIndexManager() {
@@ -414,8 +465,6 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final Justification[] b = new Justification[ n ];
 
-            final boolean writeJustifications = false;
-            
             for(int i=0; i<chunk.length; i++) {
                 
                 if(log.isDebugEnabled()) {
@@ -426,23 +475,9 @@ public class RDFJoinNexus implements IJoinNexus {
                 
                 final ISolution<SPO> solution = (ISolution<SPO>)chunk[i];
                 
-                final SPO spo = solution.get();
-
-                a[i] = spo;
+                a[i] = solution.get();
                 
-                if(writeJustifications) {
-                    
-                final IBindingSet bindingSet = solution.getBindingSet();
-                
-                final long[] bindings = new long[bindingSet.size()];
-
-                // FIXME Must populate binding[] from rule by variable order
-                
-                final IRule rule = solution.getRule();
-                
-                b[i] = new Justification(rule, spo, bindings);
-
-                }
+                b[i] = new Justification(solution);
                                 
             }
             
@@ -468,7 +503,6 @@ public class RDFJoinNexus implements IJoinNexus {
                 }
             });
             
-            if(writeJustifications)
             tasks.add(new Callable<Long>(){
                 public Long call() {
                     return r
@@ -490,7 +524,6 @@ public class RDFJoinNexus implements IJoinNexus {
 
                 mutationCount = futures.get(0).get();
 
-                if(writeJustifications)
                                 futures.get(1).get();
 
             } catch (InterruptedException ex) {
