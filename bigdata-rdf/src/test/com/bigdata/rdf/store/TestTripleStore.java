@@ -493,20 +493,28 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             SPO spo2 = new SPO(A.termId, rdfType.termId, C.termId,
                     StatementEnum.Explicit);            
 
-            log.info("adding statements");
-            
-            log.info("spo1: "+spo1);
+            if(log.isInfoEnabled()) {
 
-            log.info("spo2: "+spo2);
+                log.info("adding statements");
+            
+                log.info("spo1: "+spo1);
+
+                log.info("spo2: "+spo2);
+                
+            }
             
             assertEquals("mutationCount", 2L, store.addStatements(new SPO[] {
                     spo1, spo2 }, 2));
 
-            log.info("\n"+store.dumpStore());
+            if (log.isInfoEnabled()) {
+
+                log.info("\n" + store.dumpStore());
             
-            log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
-            log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
-            log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
+                log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
+                log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
+                log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
+                
+            }
 
             // verify range count on each of the statement indices.
             assertEquals(2,store.getStatementIndex(SPOKeyOrder.SPO).rangeCount());
@@ -555,11 +563,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             assertEquals(1,store.getAccessPath(spo1.s, spo1.p, spo1.o).removeAll());
 
-            log.info("\n"+store.dumpStore());
+            if(log.isInfoEnabled()) {
 
-            log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
-            log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
-            log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
+                log.info("\n"+store.dumpStore());
+
+                log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
+                log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
+                log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
+                
+            }
 
             /*
              * verify that the statement is gone from each of the statement
@@ -593,11 +605,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertEquals(1,store.getAccessPath(NULL,NULL,NULL).removeAll());
 
-            log.info("\n"+store.dumpStore());
+            if(log.isInfoEnabled()) {
 
-            log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
-            log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
-            log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
+                log.info("\n"+store.dumpStore());
+
+                log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
+                log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
+                log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
+                
+            }
 
             /*
              * verify that the statement is gone from each of the statement
@@ -668,7 +684,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
-            log.info("\n"+store.dumpStore());
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
             
             assertEquals(1, store.getAccessPath(NULL, NULL, store.getTermId(B))
                     .removeAll());
@@ -677,7 +694,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             store.commit();
             
-            log.info("\n"+store.dumpStore());
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
             
             assertSameSPOs(new SPO[] {
                     new SPO(store.getTermId(A), store
@@ -728,7 +746,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
-            log.info("\n"+store.dumpStore());
+            if(log.isInfoEnabled())log.info("\n"+store.dumpStore());
             
         } finally {
             
@@ -770,11 +788,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getStatements(null,null,null)
                     );
 
-            log.info("\n"+store.dumpStore());
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
             
             assertEquals(1L,store.removeStatements(null, null, B));
 
-            log.info("\n"+store.dumpStore());
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
             
             assertSameStatements(new Statement[]{
                     new StatementImpl(A,RDF.TYPE,C),

@@ -562,7 +562,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                     for (Long p : P) {
 
                         final SPOPredicate pred = new SPOPredicate(//
-                                "view",//
+                                "view",// @todo the label here is ignored, but should be the ordered names of the relations in the view. 
                                 Var.var("x"), new Constant<Long>(p), Var.var("y")//
                                 );
                         
@@ -582,7 +582,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                             while (itr.hasNext()) {
 
-                                SPO[] stmts = itr.nextChunk();
+                                final SPO[] stmts = itr.nextChunk();
 
                                 for (SPO stmt : stmts) {
 

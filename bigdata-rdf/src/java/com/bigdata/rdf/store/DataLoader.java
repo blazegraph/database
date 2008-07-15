@@ -146,7 +146,7 @@ public class DataLoader {
 
             if (tm != null) {
 
-                buffer = new StatementBuffer(tm.getTempStore(),
+                buffer = new StatementBuffer(tm.newTempTripleStore(),
                         database, bufferCapacity);
 
             } else {

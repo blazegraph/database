@@ -1734,23 +1734,21 @@ abstract public class AbstractTripleStore extends
     /**
      * Utility method dumps the statements in the store using the SPO index
      * (subject order).
-     * 
-     * @todo change the return type to {@link StringBuilder}
      */
-    final public String dumpStore() {
+    final public StringBuilder dumpStore() {
 
         return dumpStore(true, true, true);
 
     }
 
-    final public String dumpStore(boolean explicit, boolean inferred,
+    final public StringBuilder dumpStore(boolean explicit, boolean inferred,
             boolean axioms) {
 
         return dumpStore(this, explicit, inferred, axioms);
 
     }
 
-    final public String dumpStore(AbstractTripleStore resolveTerms,
+    final public StringBuilder dumpStore(AbstractTripleStore resolveTerms,
             boolean explicit, boolean inferred, boolean axioms) {
 
         return dumpStore(resolveTerms, explicit, inferred, axioms, false);
@@ -1774,11 +1772,11 @@ abstract public class AbstractTripleStore extends
      * @param justifications
      *            Dump the justifications index also.
      */
-    final public String dumpStore(AbstractTripleStore resolveTerms,
+    final public StringBuilder dumpStore(AbstractTripleStore resolveTerms,
             boolean explicit, boolean inferred, boolean axioms,
             boolean justifications) {
 
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         final long nstmts = getStatementCount();
 
@@ -1858,7 +1856,7 @@ abstract public class AbstractTripleStore extends
                 + nexplicit + ", #inferred=" + ninferred + ", #axioms="
                 + naxioms + (justifications ? ", #just=" + njust : "")+"\n");
 
-        return sb.toString();
+        return sb;
         
     }
 

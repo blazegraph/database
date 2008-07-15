@@ -76,7 +76,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * {@link #retractAll(TempTripleStore)} as appropriate to update the closure of
  * the database, at which point the {@link TempTripleStore} is discarded (closed
  * and deleted). An instance of this class may be reused, but you need to obtain
- * a new {@link TempTripleStore} using {@link #getTempStore()} each time you
+ * a new {@link TempTripleStore} using {@link #newTempTripleStore()} each time you
  * want to buffer more {@link SPO}s after updating the closure.
  * <p>
  * Note: Neither this class nor updating closure is thread-safe. In particular,
@@ -130,11 +130,11 @@ public class TruthMaintenance {
     protected final InferenceEngine inferenceEngine;
 
     /**
-     * Return a {@link TempTripleStore} that may be used to buffer {@link SPO}s
-     * to be either asserted or retracted from the database. It is recommended
-     * to use this factory method to provision the tempStore as it disables the
-     * lexicon (it will not be used) but leaves other features enabled (such as
-     * all access paths) which support truth maintenance.
+     * Return a new {@link TempTripleStore} that may be used to buffer
+     * {@link SPO}s to be either asserted or retracted from the database. It is
+     * recommended to use this factory method to provision the tempStore as it
+     * disables the lexicon (it will not be used) but leaves other features
+     * enabled (such as all access paths) which support truth maintenance.
      * <p>
      * You can wrap this with an {@link IStatementBuffer} using:
      * 
@@ -156,9 +156,9 @@ public class TruthMaintenance {
      * 
      * @todo max in memory size for the temporary store?
      */
-    public TempTripleStore getTempStore() {
+    public TempTripleStore newTempTripleStore() {
 
-        Properties properties = database.getProperties();
+        final Properties properties = database.getProperties();
 
         // // turn off justifications for the tempStore.
         // properties.setProperty(Options.JUSTIFY, "false");
@@ -168,7 +168,8 @@ public class TruthMaintenance {
                 com.bigdata.rdf.store.AbstractTripleStore.Options.LEXICON,
                 "false");
 
-        TempTripleStore tempStore = new TempTripleStore(properties, database);
+        final TempTripleStore tempStore = new TempTripleStore(properties,
+                database);
 
         return tempStore;
         
@@ -326,9 +327,10 @@ public class TruthMaintenance {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        log.info("Removed " + nremoved + " statements from the focusStore"
-                + " and upgraded " + nupgraded
-                + " statements in the database in " + elapsed + " ms.");
+        if (log.isInfoEnabled())
+            log.info("Removed " + nremoved + " statements from the focusStore"
+                    + " and upgraded " + nupgraded
+                    + " statements in the database in " + elapsed + " ms.");
         
         return nremoved;
         
@@ -369,8 +371,9 @@ public class TruthMaintenance {
         
         final long nbeforeClosure = tempStore.getStatementCount();
 
-        log.info("Computing closure of the temporary store with "
-                + nbeforeClosure + " statements");
+        if (log.isInfoEnabled())
+            log.info("Computing closure of the temporary store with "
+                    + nbeforeClosure + " statements");
 
         /*
          * For each statement in the tempStore that is already in the database,

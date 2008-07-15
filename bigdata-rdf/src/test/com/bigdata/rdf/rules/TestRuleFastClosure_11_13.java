@@ -100,7 +100,8 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
             store.commit();
 
-            System.err.println(store.dumpStore());
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
 
             /*
              * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->
@@ -169,7 +170,8 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
             store.commit();
 
-            System.err.println(store.dumpStore());
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
 
             /*
              * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->

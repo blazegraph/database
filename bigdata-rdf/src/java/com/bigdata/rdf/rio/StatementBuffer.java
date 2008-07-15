@@ -889,12 +889,24 @@ public class StatementBuffer implements IStatementBuffer {
 
             // Writing statements on the secondary store.
 
+            if(log.isInfoEnabled()) {
+                
+                log.info("writing "+numStmts+" on statementStore: "+statementStore);
+                
+            }
+            
             nwritten = database.addStatements(statementStore,
                     false/* copyOnly */, itr, null /* filter */);
 
         } else {
 
             // Write statements on the primary database.
+
+            if(log.isInfoEnabled()) {
+                
+                log.info("writing "+numStmts+" on database: "+database);
+                
+            }
 
             nwritten = database.addStatements(database, false/* copyOnly */,
                     itr, null /*filter*/);
