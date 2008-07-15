@@ -44,8 +44,11 @@ import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
 
 /**
+ * Base class for locatable resources.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
  * @param <E>
  */
 abstract public class AbstractResource<E> implements IMutableResource<E>{
@@ -237,30 +240,34 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         /*
          * Convert the Properties to a Map.
          */
-        final Map<String,Object> map = new HashMap<String, Object>();
-        
-        final Enumeration<? extends Object> e = properties.propertyNames();
-    
-        while (e.hasMoreElements()) {
-    
-            final Object key = e.nextElement();
-    
-            if (!(key instanceof String)) {
-    
-                log.warn("Will not store non-String key: "+key);
-                
-                continue;
-                
+        final Map<String, Object> map = new HashMap<String, Object>();
+        {
+
+            final Enumeration<? extends Object> e = properties.propertyNames();
+
+            while (e.hasMoreElements()) {
+
+                final Object key = e.nextElement();
+
+                if (!(key instanceof String)) {
+
+                    log.warn("Will not store non-String key: " + key);
+
+                    continue;
+
+                }
+
+                final String name = (String) key;
+
+                map.put(name, properties.getProperty(name));
+
             }
-    
-            final String name = (String) key;
-    
-            map.put(name, properties.getProperty(name));
-    
+
         }
     
         // Write the map on the row store.
-        final Map afterMap = indexManager.getGlobalRowStore().write(RelationSchema.INSTANCE, map);
+        final Map afterMap = indexManager.getGlobalRowStore().write(
+                RelationSchema.INSTANCE, map);
         
         if(log.isDebugEnabled()) {
             

@@ -683,7 +683,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 if (truthMaintenance) {
 
-                    assertBuffer = new StatementBuffer(tm.getTempStore(),
+                    assertBuffer = new StatementBuffer(tm.newTempTripleStore(),
                             database, bufferCapacity);
                     
                 } else {
@@ -735,7 +735,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 if (truthMaintenance) {
 
-                    retractBuffer = new StatementBuffer(tm.getTempStore(),
+                    retractBuffer = new StatementBuffer(tm.newTempTripleStore(),
                             database, bufferCapacity);
 
                 } else {

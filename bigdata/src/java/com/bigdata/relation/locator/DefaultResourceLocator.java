@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
@@ -175,7 +176,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
              * First, test this locator, including any [seeAlso] IIndexManager
              * objects.
              */
-            Properties properties = locateResource(namespace);
+            AtomicReference<IIndexManager> foundOn = new AtomicReference<IIndexManager>();
+
+            Properties properties = locateResource(namespace, foundOn);
             
             if (properties == null) {
 
@@ -224,8 +227,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             }
 
             // can throw a ClassCastException.
-            final String className = properties
-                    .getProperty(RelationSchema.CLASS);
+            final String className = properties.getProperty(RelationSchema.CLASS);
 
             if (className == null) {
 
@@ -252,14 +254,14 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             }
 
             // create a new instance of the relation.
-            resource = newInstance(cls, indexManager, namespace, timestamp,
+            resource = newInstance(cls, foundOn.get(), namespace, timestamp,
                     properties);
 
-            if (log.isInfoEnabled()) {
-
-                log.info("new instance: " + resource);
-
-            }
+//            if (log.isInfoEnabled()) {
+//
+//                log.info("new instance: " + resource);
+//
+//            }
 
             // add to the cache.
             if (timestamp != ITx.READ_COMMITTED) {
@@ -269,6 +271,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                  * views need to be let in, but the read-committed view of a
                  * BTree must update when the store commits!
                  */
+                
                 put(resource);
                 
             }
@@ -287,12 +290,15 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * Note: Caller is synchronized for this <i>namespace</i>.
      * 
      * @param namespace
+     *            The namespace for the resource.
+     * @param foundOn
+     *            Used to pass back the {@link IIndexManager} on which the
+     *            resource was found as a side-effect.
      * 
-     * @return
+     * @return The properties for that resource.
      */
-    protected Properties locateResource(String namespace) {
-
-        Properties properties = null;
+    protected Properties locateResource(String namespace,
+            AtomicReference<IIndexManager> foundOn) {
 
         synchronized (seeAlso) {
 
@@ -302,6 +308,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                  * read properties from the global row store for the default
                  * index manager.
                  */
+                Properties properties = null;
+
                 try {
                 
                     properties = locateResourceOn(indexManager, namespace);
@@ -329,6 +337,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
                     }
 
+                    // tell the caller _where_ we found the resource.
+                    foundOn.set(indexManager);
+                    
                     return properties;
 
                 }
@@ -337,29 +348,30 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         }
 
-        if (properties == null && indexManager != null) {
+        /*
+         * read properties from the global row store for the default index
+         * manager.
+         */
+        
+        final Properties properties = locateResourceOn(indexManager, namespace);
 
-            /*
-             * read properties from the global row store for the default index
-             * manager.
-             */
-            properties = locateResourceOn(indexManager, namespace);
+        if (properties != null) {
 
-            if (properties != null) {
+            if (log.isInfoEnabled()) {
 
-                if (log.isInfoEnabled()) {
-
-                    log.info("Found: namespace=" + namespace + " on "
-                            + indexManager);
-
-                }
-
-                return properties;
+                log.info("Found: namespace=" + namespace + " on "
+                        + indexManager);
 
             }
 
-        }
+            // tell the caller _where_ we found the resource.
+            foundOn.set(indexManager);
 
+            return properties;
+
+        }
+        
+        // will be null.
         return properties;
 
     }
@@ -426,10 +438,11 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     }
 
     /**
-     * Core impl (all other methods should delegate to this one).
+     * Create a new view of the relation.
      * 
      * @param indexManager
-     *            The index views will be obtained from the {@link Journal}.
+     *            The {@link IIndexManager} that will be used to resolve the
+     *            named indices for the relation.
      * @param namespace
      *            The namespace for the relation.
      * @param timestamp
@@ -439,15 +452,18 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * 
      * @return A new instance of the identifed resource.
      */
-    public T newInstance(Class<? extends T> cls, IIndexManager indexManager,
+    protected T newInstance(Class<? extends T> cls, IIndexManager indexManager,
             String namespace, long timestamp, Properties properties) {
 
         if (cls == null)
             throw new IllegalArgumentException();
+        
         if (indexManager == null)
             throw new IllegalArgumentException();
+        
         if (namespace == null)
             throw new IllegalArgumentException();
+        
         if (properties == null)
             throw new IllegalArgumentException();
 
