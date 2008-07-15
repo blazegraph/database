@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import java.util.Arrays;
+
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.ITupleIterator;
@@ -43,6 +45,7 @@ import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
+import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.Solution;
@@ -131,8 +134,8 @@ public class TestJustifications extends AbstractRuleTestCase {
             final Rule rule = new RuleRdf01(store.getSPORelation().getNamespace(),inf);
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
-                    IJoinNexus.ALL, null/* filter */).newInstance(
-                            store.getIndexManager());
+                    ActionEnum.Insert, IJoinNexus.ALL, null/* filter */)
+                    .newInstance(store.getIndexManager());
             
             /*
              * The buffer that accepts solutions and causes them to be written
@@ -153,9 +156,17 @@ public class TestJustifications extends AbstractRuleTestCase {
             
                 final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
-                bindingSet.set(Var.var("u"), new Constant<Long>(U));
+                /*
+                 * Note: rdfs1 is implemented using a distinct term scan. This
+                 * has the effect of leaving the variables that do not appear in
+                 * the head of the rule unbound. Therefore we DO NOT bind those
+                 * variables here in the test case and they will be represented
+                 * as ZERO (0L) in the justifications index and interpreted as
+                 * wildcards.
+                 */
+//                bindingSet.set(Var.var("u"), new Constant<Long>(U));
                 bindingSet.set(Var.var("a"), new Constant<Long>(A));
-                bindingSet.set(Var.var("y"), new Constant<Long>(Y));
+//                bindingSet.set(Var.var("y"), new Constant<Long>(Y));
                 
                 final ISolution solution = new Solution(joinNexus, rule,
                         bindingSet);
@@ -168,17 +179,29 @@ public class TestJustifications extends AbstractRuleTestCase {
 
                     jst = new Justification(solution);
 
-                    // verify the bindings on the head of the rule as represented by the justification.
+                    /*
+                     * Verify the bindings on the head of the rule as
+                     * represented by the justification.
+                     */
                     assertEquals(expectedEntailment, jst.getHead());
 
-                    // verify the bindings on the tail of the rule as represented b the justification.
-                    assertEquals(//
-                            new SPO[] {//
-                                    new SPO(U, A, Y, StatementEnum.Inferred)//
-                            },//
-                            jst.getTail()//
-                            );
-
+                    /*
+                     * Verify the bindings on the tail of the rule as
+                     * represented by the justification. Again, note that the
+                     * variables that do not appear in the head of the rule are
+                     * left unbound for rdfs1 as a side-effect of evaluation
+                     * using a distinct term scan.
+                     */
+                    final SPO[] expectedTail = new SPO[] {//
+                            new SPO(NULL, A, NULL, StatementEnum.Inferred)//
+                    };
+                    
+                    if(!Arrays.equals(expectedTail, jst.getTail())) {
+                    
+                        fail("Expected: "+Arrays.toString(expectedTail)+", but actual: "+jst);
+                        
+                    }
+                    
                 }
                 
                 // insert solution into the buffer.

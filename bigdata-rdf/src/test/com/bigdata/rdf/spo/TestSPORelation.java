@@ -231,9 +231,9 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                     .getNamespace();
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
-                    IJoinNexus.ALL, null/* filter */).newInstance(
-                    store.getIndexManager());
-
+                    ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
+                    .newInstance(store.getIndexManager());
+            
             /*
              * rdfs9 uses a constant in the [p] position of the for both tails
              * and the other positions are unbound, so the correct index is POS
@@ -347,8 +347,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                     .getNamespace();
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
-                    IJoinNexus.ALL, null/* filter */).newInstance(
-                    store.getIndexManager());
+                    ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
+                    .newInstance(store.getIndexManager());
             
             final SPORelation spoRelation = store.getSPORelation();
 
@@ -550,10 +550,6 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             final String relationIdentifier = store.getSPORelation()
                     .getNamespace();
 
-            final IJoinNexus joinNexus = store.newJoinNexusFactory(
-                    IJoinNexus.ALL, null/* filter */).newInstance(
-                    store.getIndexManager());
-            
             final SPORelation spoRelation = store.getSPORelation();
 
             // define some vocabulary.
@@ -573,6 +569,10 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             {
 
                 log.info("\n\nQuery w/o data in KB\n");
+
+                final IJoinNexus joinNexus = store.newJoinNexusFactory(
+                        ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
+                        .newInstance(store.getIndexManager());
 
                 final IChunkedOrderedIterator<ISolution> itr = joinNexus
                         .runQuery(rule);
@@ -653,6 +653,10 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
              */
             {
 
+                final IJoinNexus joinNexus = store.newJoinNexusFactory(
+                        ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
+                        .newInstance(store.getIndexManager());
+
                 /*
                  * Note: We commit before running the Query since the writes
                  * will not otherwise be present in the read-committed view.
@@ -716,10 +720,13 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
              */
             {
 
+                final IJoinNexus joinNexus = store.newJoinNexusFactory(
+                        ActionEnum.Insert, IJoinNexus.ALL, null/* filter */)
+                        .newInstance(store.getIndexManager());
+
                 log.info("\n\nRun rules as insert operations\n");
 
-                final long mutationCount = joinNexus.runMutation(
-                        ActionEnum.Insert, rule);
+                final long mutationCount = joinNexus.runMutation(rule);
 
                 assertEquals("mutationCount", 1L, mutationCount);
 

@@ -131,13 +131,15 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
 
         try {
 
-            if (store.getStatementIdentifiers()) {
-
-                doStatementIdentifiersTest(store);
+            if (!store.getStatementIdentifiers()) {
 
                 log.warn("Statement identifiers not enabled - skipping test");
                 
+                return;
+                
             }
+            
+            doStatementIdentifiersTest(store);
 
         } finally {
 
@@ -565,28 +567,32 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             _Literal bryan = new _Literal("bryan");
             _Literal mike = new _Literal("mike");
 
-            _BNode sid1 = new _BNode("_S1");
-            _BNode sid2 = new _BNode("_S2");
-            _BNode sid3 = new _BNode("_S3");
+            _BNode sid1 = new _BNode("_sid1");
+            _BNode sid2 = new _BNode("_sid2");
+            _BNode sid3 = new _BNode("_sid3");
 
-            StatementBuffer buf = new StatementBuffer(store, 100/* capacity */);
+            {
+             
+                final StatementBuffer buf = new StatementBuffer(store, 10/* capacity */);
 
-            // ground statements using BNodes for statement identifiers.
-            buf.add(x, rdfType, A, sid1);
-            buf.add(y, rdfType, B, sid2);
-            buf.add(z, rdfType, C, sid3);
+                // ground statements using BNodes for statement identifiers.
+                buf.add(x, rdfType, A, sid1);
+                buf.add(y, rdfType, B, sid2);
+                buf.add(z, rdfType, C, sid3);
 
-            // statements about statements using statement identifiers.
-            buf.add(sid1, dcCreator, bryan);
-            buf.add(sid2, dcCreator, bryan);
-            buf.add(sid2, dcCreator, mike);
-            buf.add(sid3, dcCreator, mike);
+                // statements about statements using statement identifiers.
+                buf.add(sid1, dcCreator, bryan);
+                buf.add(sid2, dcCreator, bryan);
+                buf.add(sid2, dcCreator, mike);
+                buf.add(sid3, dcCreator, mike);
 
-            /*
-             * Flush to the database, resolving statement identifiers as
-             * necessary.
-             */
-            buf.flush();
+                /*
+                 * Flush to the database, resolving statement identifiers as
+                 * necessary.
+                 */
+                buf.flush();
+
+            }
 
             /*
              * Verify the structure of the graph, at least those aspects
@@ -595,12 +601,9 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              */
             {
 
-                final SPO spo1 = store.getStatement(x.termId,
-                        rdfType.termId, A.termId);
-                final SPO spo2 = store.getStatement(y.termId,
-                        rdfType.termId, B.termId);
-                final SPO spo3 = store.getStatement(z.termId,
-                        rdfType.termId, C.termId);
+                final SPO spo1 = store.getStatement(x.termId, rdfType.termId, A.termId);
+                final SPO spo2 = store.getStatement(y.termId, rdfType.termId, B.termId);
+                final SPO spo3 = store.getStatement(z.termId, rdfType.termId, C.termId);
 
                 assertNotNull(spo1);
                 assertNotNull(spo2);

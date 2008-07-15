@@ -166,8 +166,9 @@ public class QueryTask extends AbstractStepTask {
 
             final IRule rule = (IRule) step;
 
-            final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(false/* parallel */,
-                    rule).newTask(rule, joinNexus, buffer);
+            final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(
+                    false/* parallel */, rule)
+                    .newTask(rule, joinNexus, buffer);
             
             tasks.add(task);
 

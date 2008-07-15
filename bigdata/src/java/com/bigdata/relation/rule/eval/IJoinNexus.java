@@ -69,6 +69,11 @@ public interface IJoinNexus {
     IJoinNexusFactory getJoinNexusFactory();
     
     /**
+     * The kind of operation that is being executed (Query, Insert, or Delete).
+     */
+    ActionEnum getAction();
+    
+    /**
      * Copy values the values from the visited element corresponding to the
      * given predicate into the binding set.
      * 
@@ -206,7 +211,23 @@ public interface IJoinNexus {
     long getReadTimestamp(String relationName);
     
     /**
-     * Locates and returns the view of the relation(s) identified by the
+     * Locate and return the view of the relation identified by the
+     * {@link IPredicate}. The implementation must choose a view that will
+     * accept writes iff this is a mutation operation and which is associated
+     * with an appropriate timestamp.
+     * 
+     * @param pred
+     *            The {@link IPredicate}, which MUST be the head of some
+     *            {@link IRule}.
+     * 
+     * @return The {@link IRelation}, which will never be a fused view and
+     *         which will accept writes iff the rules are being executed as a
+     *         mutation operation.
+     */
+    IRelation getHeadRelationView(IPredicate pred);
+    
+    /**
+     * Locate and return the view of the relation(s) identified by the
      * {@link IPredicate}.
      * <p>
      * Note: This method is responsible for returning a fused view when more
@@ -219,14 +240,14 @@ public interface IJoinNexus {
      * Note: The implementation should choose the read timestamp for each
      * relation in the view using {@link #getReadTimestamp(String)}.
      * 
-     * @param name
-     *            The predicate
+     * @param pred
+     *            The {@link IPredicate}, which MUST be a tail from some {@link IRule}.
      * 
      * @return The {@link IRelation}, which might be a
      *         {@link RelationFusedView}.
      */
-    IRelation getReadRelationView(IPredicate pred);
-    
+    IRelation getTailRelationView(IPredicate pred);
+
     /**
      * Used to locate indices, relations and relation containers.
      */
@@ -240,6 +261,8 @@ public interface IJoinNexus {
      * 
      * @return An iterator from which you can read the solutions.
      * 
+     * @throws IllegalStateException
+     *             unless this is an {@link ActionEnum#Query}.
      * @throws IllegalArgumentException
      *             if either argument is <code>null</code>.
      */
@@ -249,8 +272,6 @@ public interface IJoinNexus {
      * Run as mutation operation (it will write any solutions onto the relations
      * named in the head of the various {@link IRule}s).
      * 
-     * @param action
-     *            The action.
      * @param step
      *            The {@link IRule} or {@link IProgram}.
      * 
@@ -258,11 +279,11 @@ public interface IJoinNexus {
      *         relation(s)).
      * 
      * @throws IllegalArgumentException
-     *             unless <i>action</i> is a mutation (insert or delete).
+     *             unless {@link ActionEnum#isMutation()} is <code>true</code>.
      * @throws IllegalArgumentException
      *             if either argument is <code>null</code>.
      */
-    long runMutation(ActionEnum action, IStep step) throws Exception;
+    long runMutation(IStep step) throws Exception;
     
     /**
      * Return a thread-safe buffer onto which the computed {@link ISolution}s

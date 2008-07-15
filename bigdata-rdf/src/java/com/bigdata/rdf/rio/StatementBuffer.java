@@ -409,7 +409,7 @@ public class StatementBuffer implements IStatementBuffer {
             log.info("processing " + deferredStmts.size()
                     + " deferred statements");
 
-        incrementalWrite();
+//        incrementalWrite();
         
         try {
             
@@ -452,7 +452,10 @@ public class StatementBuffer implements IStatementBuffer {
                 }
                 
                 if (log.isInfoEnabled())
-                    log.info("" + n + " out of "+nbefore+" deferred statements used only blank nodes.");
+                    log.info(""+ n
+                                + " out of "
+                                + nbefore
+                                + " deferred statements used only blank nodes (vs statement identifiers).");
                 
                 /*
                  * Flush everything in the buffer so that the blank nodes that
@@ -660,8 +663,19 @@ public class StatementBuffer implements IStatementBuffer {
         }
 
         // Insert statements (batch operation).
-        if (numStmts > 0)
+        if (numStmts > 0) {
+            if(DEBUG) {
+                for(int i=0; i<numStmts; i++) {
+                    log.debug("adding stmt: "+stmts[i]);
+                }
+            }
             addStatements(stmts, numStmts);
+            if(DEBUG) {
+                for(int i=0; i<numStmts; i++) {
+                    log.debug(" added stmt: "+stmts[i]);
+                }
+            }
+        }
         
         // Reset the state of the buffer (but not the bnodes nor deferred stmts).
         _clear();
@@ -955,7 +969,7 @@ public class StatementBuffer implements IStatementBuffer {
             } else {
 
                 // test canonicalizing map for blank nodes.
-                _BNode existingBNode = bnodes.get(term.term);
+                final _BNode existingBNode = bnodes.get(term.term);
 
                 if (existingBNode != null) {
 
@@ -1115,7 +1129,7 @@ public class StatementBuffer implements IStatementBuffer {
          * Update counters.
          */
         
-        if (!duplicateS) {
+        if (!duplicateS) {// && ((_Value) s).termId == 0L) {
 
             if (s instanceof _URI) {
 
@@ -1137,7 +1151,7 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
 
-        if (!duplicateP) {
+        if (!duplicateP) {//&& ((_Value) s).termId == 0L) {
             
             values[numValues++] = (_Value)p;
 
@@ -1145,7 +1159,7 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
 
-        if (!duplicateO) {
+        if (!duplicateO) {// && ((_Value) s).termId == 0L) {
 
             if (o instanceof _URI) {
 
@@ -1173,7 +1187,7 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
 
-        if (c != null && !duplicateC) {
+        if (c != null && !duplicateC && ((_Value) s).termId == 0L) {
 
             if (c instanceof _URI) {
 

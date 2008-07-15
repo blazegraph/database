@@ -86,8 +86,12 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.newSolution(rule, bindingSet);
     }
 
-    public long runMutation(ActionEnum action, IStep step) throws Exception {
-        return delegate.runMutation(action, step);
+    public ActionEnum getAction() {
+        return delegate.getAction();
+    }
+    
+    public long runMutation(IStep step) throws Exception {
+        return delegate.runMutation(step);
     }
 
     public IChunkedOrderedIterator<ISolution> runQuery(IStep step) throws Exception {
@@ -118,8 +122,12 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getJoinNexusFactory();
     }
 
-    public IRelation getReadRelationView(IPredicate pred) {
-        return delegate.getReadRelationView(pred);
+    public IRelation getTailRelationView(IPredicate pred) {
+        return delegate.getTailRelationView(pred);
+    }
+
+    public IRelation getHeadRelationView(IPredicate pred) {
+        return delegate.getHeadRelationView(pred);
     }
 
 }

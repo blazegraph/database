@@ -38,6 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.Justification;
@@ -99,12 +100,16 @@ public class RDFJoinNexus implements IJoinNexus {
     private final IJoinNexusFactory joinNexusFactory;
     
     private final IIndexManager indexManager;
+
+    private final ActionEnum action;
     
     private final long writeTimestamp;
     
     private final long readTimestamp;
     
     private final boolean justify;
+
+    private final int bufferCapacity;
     
     private final int solutionFlags;
     
@@ -124,6 +129,9 @@ public class RDFJoinNexus implements IJoinNexus {
      *            execution.
      * @param indexManager
      *            The object used to resolve indices, relations, etc.
+     * @param action
+     *            Indicates whether this is a Query, Insert, or Delete
+     *            operation.
      * @param writeTimestamp
      *            The timestamp of the relation view(s) using to write on the
      *            {@link IMutableRelation}s (ignored if you are not execution
@@ -131,6 +139,9 @@ public class RDFJoinNexus implements IJoinNexus {
      * @param readTimestamp
      *            The timestamp of the relation view(s) used to read from the
      *            access paths.
+     * @param bufferCapacity
+     *            The capacity of the buffers used to support chunked iterators
+     *            and efficient ordered writes.
      * @param solutionFlags
      *            Flags controlling the behavior of
      *            {@link #newSolution(IRule, IBindingSet)}.
@@ -142,9 +153,9 @@ public class RDFJoinNexus implements IJoinNexus {
      * @todo collapse the executor service and index manager?
      */
     public RDFJoinNexus(IJoinNexusFactory joinNexusFactory,
-            IIndexManager indexManager, long writeTimestamp,
-            long readTimestamp, boolean justify, int solutionFlags,
-            IElementFilter filter) {
+            IIndexManager indexManager, ActionEnum action, long writeTimestamp,
+            long readTimestamp, boolean justify, int bufferCapacity,
+            int solutionFlags, IElementFilter filter) {
 
         if (joinNexusFactory == null)
             throw new IllegalArgumentException();
@@ -152,15 +163,22 @@ public class RDFJoinNexus implements IJoinNexus {
         if (indexManager == null)
             throw new IllegalArgumentException();
 
+        if (action == null)
+            throw new IllegalArgumentException();
+
         this.joinNexusFactory = joinNexusFactory;
         
         this.indexManager = indexManager;
+        
+        this.action = action;
         
         this.writeTimestamp = writeTimestamp;
 
         this.readTimestamp = readTimestamp;
 
         this.justify = justify;
+        
+        this.bufferCapacity = bufferCapacity;
         
         this.solutionFlags = solutionFlags;
 
@@ -184,41 +202,106 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
     
+    public ActionEnum getAction() {
+        
+        return action;
+        
+    }
+    
     public long getWriteTimestamp() {
         
         return writeTimestamp;
         
     }
 
+    /**
+     * When the relation is the focusStore SPORelation choose
+     * {@link ITx#UNISOLATED}. Otherwise choose whatever was specified to the
+     * {@link RDFJoinNexusFactory}. This is because we avoid doing a commit on
+     * the focusStore and instead just its its UNISOLATED indices. This is more
+     * efficient since they are already buffered and since we can avoid touching
+     * disk at all for small data sets.
+     * 
+     * FIXME Rather than parsing the relation name, it would be better to have
+     * the temporary store UUIDs explicitly declared.
+     */
     public long getReadTimestamp(String relationName) {
         
-        /*
-         * FIXME when the relation is the focusStore SPORelation choose
-         * ITx.UNISOLATED. Otherwise choose read-committed (or whatever was
-         * specified). This is because we avoid doing a commit on the focusStore
-         * and instead just its its UNISOLATED indices. This is more efficient
-         * since they are already buffered and since we can avoid touching disk
-         * at all for small data sets.
+        /* This is a typical UUID-based temporary store relation name.
+         *           1         2         3
+         * 01234567890123456789012345678901234567
+         * 81ad63b9-2172-45dc-bd97-03b63dfe0ba0kb.spo
          */
+        
+        if (relationName.length() > 37) {
+         
+            /*
+             * Could be a relation on a temporary store.
+             */
+            if (       relationName.charAt( 8) == '-' //
+                    && relationName.charAt(13) == '-' //
+                    && relationName.charAt(18) == '-' //
+                    && relationName.charAt(23) == '-' //
+                    && relationName.charAt(38) == '.' //
+            ) {
+                
+                /*
+                 * Pretty certain to be a relation on a temporary store.
+                 */
+                
+                return ITx.UNISOLATED;
+                
+            }
+            
+        }
+        
         return readTimestamp;
         
     }
     
-    public IRelation getReadRelationView(IPredicate pred) {
+    public IRelation getHeadRelationView(IPredicate pred) {
+        
+        if (pred == null)
+            throw new IllegalArgumentException();
+        
+        if (pred.getRelationCount() != 1)
+            throw new IllegalArgumentException();
+        
+        final String relationName = pred.getOnlyRelationName();
+        
+        final long timestamp = (getAction().isMutation() ? getWriteTimestamp()
+                : getReadTimestamp(relationName));
+
+        final IRelation relation = (IRelation) getIndexManager()
+                .getResourceLocator().locate(relationName, timestamp);
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug("predicate: "+pred+", head relation: "+relation);
+            
+        }
+        
+        return relation;
+        
+    }
+    
+    public IRelation getTailRelationView(IPredicate pred) {
 
         if (pred == null)
             throw new IllegalArgumentException();
         
         final int nsources = pred.getRelationCount();
 
+        final IRelation relation;
+        
         if (nsources == 1) {
 
             final String relationName = pred.getOnlyRelationName();
 
             final long timestamp = getReadTimestamp(relationName);
 
-            return (SPORelation) getIndexManager().getResourceLocator().locate(relationName,
-                    timestamp);
+            relation = (IRelation) getIndexManager().getResourceLocator().locate(
+                    relationName, timestamp);
 
         } else if (nsources == 2) {
 
@@ -236,7 +319,7 @@ public class RDFJoinNexus implements IJoinNexus {
             final SPORelation relation1 = (SPORelation) getIndexManager()
                     .getResourceLocator().locate(relationName1, timestamp1);
 
-            return new RelationFusedView<SPO>(relation0, relation1);
+            relation = new RelationFusedView<SPO>(relation0, relation1);
 
         } else {
 
@@ -244,6 +327,14 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
+        if(log.isDebugEnabled()) {
+            
+            log.debug("predicate: "+pred+", tail relation: "+relation);
+            
+        }
+        
+        return relation;
+        
     }
     
     public IIndexManager getIndexManager() {
@@ -371,29 +462,25 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
     
+    /**
+     * Note: {@link ISolution} elements (not {@link SPO}s) will be written on
+     * the buffer concurrently by different rules so there is no natural order
+     * for the elements in the buffer.
+     * <p>
+     * Note: the {@link BlockingBuffer} can not deliver a chunk larger than its
+     * internal queue capacity.
+     */
     @SuppressWarnings("unchecked")
     public IBlockingBuffer<ISolution> newQueryBuffer() {
 
-        /*
-         * Note: ISolution elements (not SPOs) will be written on the buffer
-         * concurrently by different rules so there is no natural order for the
-         * elements in the buffer.
-         */
+        if (getAction().isMutation())
+            throw new IllegalStateException();
         
-        return new BlockingBuffer<ISolution>(DEFAULT_BUFFER_CAPACITY,
+        return new BlockingBuffer<ISolution>(bufferCapacity,
                 null/* keyOrder */, filter == null ? null
                         : new SolutionFilter(filter));
         
     }
-    
-    /**
-     * The default buffer capacity.
-     * 
-     * @todo config via the {@link RDFJoinNexusFactory}. Note that the
-     *       {@link BlockingBuffer} can not deliver a chunk larger than its
-     *       internal queue capacity.
-     */
-    private final int DEFAULT_BUFFER_CAPACITY = 10000;
     
     /**
      * Buffer writes on {@link IMutableRelation#insert(IChunkedIterator)} when it is
@@ -552,6 +639,9 @@ public class RDFJoinNexus implements IJoinNexus {
     @SuppressWarnings("unchecked")
     public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
 
+        if (getAction() != ActionEnum.Insert)
+            throw new IllegalStateException();
+
         if(log.isDebugEnabled()) {
             
             log.debug("relation="+relation);
@@ -567,7 +657,7 @@ public class RDFJoinNexus implements IJoinNexus {
              */
             
             return new InsertSPOAndJustificationBuffer(
-                    DEFAULT_BUFFER_CAPACITY, relation, filter == null ? null
+                    bufferCapacity, relation, filter == null ? null
                             : new SolutionFilter(filter));
             
         }
@@ -578,13 +668,17 @@ public class RDFJoinNexus implements IJoinNexus {
          */
         
         return new AbstractSolutionBuffer.InsertSolutionBuffer(
-                DEFAULT_BUFFER_CAPACITY, relation, filter == null ? null
+                bufferCapacity, relation, filter == null ? null
                         : new SolutionFilter(filter));
 
     }
     
     @SuppressWarnings("unchecked")
     public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
+
+        if (getAction() != ActionEnum.Delete)
+            throw new IllegalStateException();
+
 
         if(log.isDebugEnabled()) {
             
@@ -593,7 +687,7 @@ public class RDFJoinNexus implements IJoinNexus {
         }
 
         return new AbstractSolutionBuffer.DeleteSolutionBuffer(
-                DEFAULT_BUFFER_CAPACITY, relation, filter == null ? null
+                bufferCapacity, relation, filter == null ? null
                         : new SolutionFilter(filter));
 
     }
@@ -622,20 +716,17 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
-    public long runMutation(ActionEnum action, IStep step)
+    public long runMutation(IStep step)
             throws Exception {
 
-        if (action == null)
-            throw new IllegalArgumentException();
-        
         if (step == null)
             throw new IllegalArgumentException();
         
         if (!action.isMutation())
-            throw new IllegalArgumentException();
+            throw new IllegalStateException();
         
         if(log.isInfoEnabled())
-            log.info("action="+action+", program="+step.getName());
+            log.info("action=" + action + ", program=" + step.getName());
         
         if(isEmptyProgram(step)) {
 

@@ -387,7 +387,7 @@ public class LocalProgramTask implements IProgramTask,
      */
     protected IChunkedOrderedIterator<ISolution> executeQuery(final IStep step)
             throws Exception {
-
+        
         if (step == null)
             throw new IllegalArgumentException();
 

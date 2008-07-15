@@ -49,6 +49,7 @@ package com.bigdata.rdf.rules;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 
@@ -63,9 +64,11 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      */
     private static final long serialVersionUID = 8270873764858640472L;
     
+    private final ActionEnum action;
     private final long writeTime;
     private final long readTime;
     private final boolean justify;
+    private final int bufferCapacity;
     private final int solutionFlags;
     private final IElementFilter filter;
 
@@ -77,14 +80,22 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      * @param solutionFlags
      * @param filter
      */
-    public RDFJoinNexusFactory(long writeTime, long readTime, boolean justify,
+    public RDFJoinNexusFactory(ActionEnum action, long writeTime,
+            long readTime, boolean justify, int bufferCapacity,
             int solutionFlags, IElementFilter filter) {
 
+        if (action == null)
+            throw new IllegalArgumentException();
+        
+        this.action = action;
+        
         this.writeTime = writeTime;
 
         this.readTime = readTime;
 
         this.justify = justify;
+
+        this.bufferCapacity = bufferCapacity;
         
         this.solutionFlags = solutionFlags;
 
@@ -94,8 +105,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
     public IJoinNexus newInstance(IIndexManager indexManager) {
 
-        return new RDFJoinNexus(this, indexManager, writeTime, readTime,
-                justify, solutionFlags, filter);
+        return new RDFJoinNexus(this, indexManager, action, writeTime,
+                readTime, justify, bufferCapacity, solutionFlags, filter);
 
     }
 
