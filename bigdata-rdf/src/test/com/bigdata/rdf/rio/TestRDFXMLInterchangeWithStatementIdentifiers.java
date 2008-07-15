@@ -336,8 +336,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             */
            buf.flush();
            
-           if(log.isInfoEnabled())
-           log.info("after load:\n" + store.dumpStore().toString());
+           if (log.isInfoEnabled())
+                log.info("after load:\n" + store.dumpStore());
 
        }
        

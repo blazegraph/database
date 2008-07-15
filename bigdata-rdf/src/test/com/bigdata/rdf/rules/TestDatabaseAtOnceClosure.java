@@ -236,7 +236,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 
                 buf.flush();
                 
-                store.dumpStore();
+                if (log.isInfoEnabled())
+                    log.info("\n" + store.dumpStore());
                 
                 // make the data visible to a read-committed view.
                 store.commit();

@@ -132,7 +132,7 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertEquals("#lits",3,store.getLiteralCount());
         assertEquals("#bnodes",2,store.getBNodeCount());
 
-        System.err.println(store.dumpStore());
+        if(log.isInfoEnabled())log.info("\n"+store.dumpStore());
         
         store.commit();
 
@@ -140,7 +140,7 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
 
             store = reopenStore(store);
 
-            System.err.println(store.dumpStore());
+            if(log.isInfoEnabled())log.info("\n"+store.dumpStore());
 
             assertEquals(x_id, store.getTermId(x));
             assertEquals(y_id, store.getTermId(y));

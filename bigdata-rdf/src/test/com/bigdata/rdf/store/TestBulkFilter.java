@@ -105,7 +105,8 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             final long y = store.getTermId(Y);
             final long z = store.getTermId(Z);
             
-            System.err.println(store.dumpStore(true, true, false));
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore(true, true, false));
 
             SPO[] stmts = new SPO[] {
                 new SPO(x,a,y,StatementEnum.Explicit),
@@ -222,7 +223,8 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             
             store.commit();
     
-            System.err.println(store.dumpStore(true, true, false));
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore(true, true, false));
 
             stmts = new SPO[] {
                 new SPO(x,a,y),

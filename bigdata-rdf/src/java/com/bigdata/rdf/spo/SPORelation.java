@@ -699,7 +699,8 @@ public class SPORelation extends AbstractRelation<SPO> {
         
             throw new IllegalArgumentException("no index? relation="
                     + getNamespace() + ", timestamp=" + getTimestamp()
-                    + ", keyOrder=" + keyOrder + ", pred=" + predicate);
+                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
+                    + ", indexManager=" + getIndexManager());
             
         }
         
@@ -982,7 +983,7 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         }
 
-        long elapsed = System.currentTimeMillis() - begin;
+        final long elapsed = System.currentTimeMillis() - begin;
 
         if (numStmts > 1000) {
 

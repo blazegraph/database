@@ -175,7 +175,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             buffer.flush();
 
-            System.err.println(store.dumpStore());
+            if(log.isInfoEnabled()) log.info("\n"+store.dumpStore());
 
             IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
