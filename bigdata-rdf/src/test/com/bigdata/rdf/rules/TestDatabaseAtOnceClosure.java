@@ -47,12 +47,27 @@ Modifications:
 
 package com.bigdata.rdf.rules;
 
+import java.io.IOException;
+import java.util.Properties;
+
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
+import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParseException;
+import org.openrdf.sail.SailException;
+import org.openrdf.sail.inferencer.fc.ForwardChainingRDFSInferencer;
+import org.openrdf.sail.memory.MemoryStore;
 
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -90,9 +105,79 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * for the relation views and whether and if those read times are updated
      * correctly after each round of closure.
      */
-    public void test_fixedPoint() {
+    public void test_fixedPoint() throws SailException, RepositoryException, 
+    	IOException, RDFParseException {
         
-        fail("write test");
+        final AbstractTripleStore closure = getStore();
+        
+        final TempTripleStore groundTruth = 
+        	new TempTripleStore(new Properties());
+        
+        try {
+        	
+        	{ // use the Sesame2 inferencer to get ground truth
+        		
+	            StatementBuffer buf = new StatementBuffer(groundTruth ,10);
+	            
+	            Repository sesame2 = new SailRepository(
+	                    new ForwardChainingRDFSInferencer(
+	                    new MemoryStore()));
+	            
+	            sesame2.initialize();
+	            
+	            RepositoryConnection cxn = sesame2.getConnection();
+	            
+	            cxn.setAutoCommit(false);
+	            
+	            try {
+	            	
+	            	cxn.add(getClass().getResourceAsStream("sample data.rdf"), 
+	            			"", RDFFormat.RDFXML);
+	            	
+	            	cxn.commit();
+	            	
+	            	RepositoryResult<Statement> stmts = 
+	            		cxn.getStatements(null, null, null, true);
+	            	
+	            	while(stmts.hasNext()) {
+	            		
+	            		Statement stmt = stmts.next();
+	            		
+	            		buf.add(stmt.getSubject(), stmt.getPredicate(), 
+	            				stmt.getObject());
+	            		
+	            	}
+	            	
+	                buf.flush();
+	                
+	                groundTruth.dumpStore();
+	                
+	                // make the data visible to a read-committed view.
+	                groundTruth.commit();
+	                
+	            } finally {
+	            	
+	            	cxn.close();
+	            	
+	            }
+        	
+        	}
+        	
+        	{ // load the same data into the closure store
+        		
+        		
+        		
+        	}
+            
+        	assertTrue(modelsEqual(closure, groundTruth));
+            
+        } finally {
+            
+            closure.closeAndDelete();
+            
+            groundTruth.closeAndDelete();
+            
+        }
         
     }
 

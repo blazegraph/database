@@ -1,0 +1,1362 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+	xmlns:ns1="http://expcollab.net/aether/domain#"
+	xmlns:ns5="http://www.w3.org/2002/07/owl#"
+	xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+	xmlns:ns2="http://expcollab.net/aether/system#">
+
+<!-- ONTOLOGY -->
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Document">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A document in the system.</rdfs:comment>
+	<rdfs:label>Document</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#documentForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the document in the system.  There are several forms that represent intermediate processing.</rdfs:comment>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Document"/>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Document"/>
+	<rdfs:label>document form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#rawSourceForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the Document that represents the original document as it was harvested into the system.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentForm"/>
+	<rdfs:label>raw source form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#nativeTextForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the Document that represents the text of the original document in the native language.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentForm"/>
+	<rdfs:label>native text form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#nativeMicroHTMLForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the Document that represents the html version of the original document in the native language.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentForm"/>
+	<rdfs:label>native micro HTML form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#nativeMentionHTMLForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the Document that represents the html version of the original document in the native language with annotations for the entities and links found in the document.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentForm"/>
+	<rdfs:label>native mention HTML form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#rdfXmlForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the Document that represents the RDF XML serialization for the entities and links found in the document.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentForm"/>
+	<rdfs:label>RDF-XML Entity Form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#englishTextForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the Document that represents the text of the original document as translated to English, if appropriate.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentForm"/>
+	<rdfs:label>english text form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#englishMicroHTMLForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A form of the Document that represents the html of the original document as translated to English, if appropriate.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentForm"/>
+	<rdfs:label>english micro HTML form</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#documentMetadata">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A super class for metadata about a document in the system.</rdfs:comment>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Document"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+	<rdfs:label>document metadata</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#contentType">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>Metadata representing the content type, e.g. HTML, Text, MS Word, PDF, etc.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentMetadata"/>
+	<rdfs:label>content type</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#contentLanguage">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>Metadata representing the content language.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentMetadata"/>
+	<rdfs:label>content language</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#contentEncoding">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>Metadata representing the content encoding for the document.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentMetadata"/>
+	<rdfs:label>content encoding</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#contentSource">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>Metadata representing the source of the document.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentMetadata"/>
+	<rdfs:label>content source</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#contentTitle">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>Metadata representing the title of the document.  This may be extracted directly or generated depending upon the document source form.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentMetadata"/>
+	<rdfs:label>content title</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#contentLength">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>Metadata representing the size of the content in bytes.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentMetadata"/>
+	<rdfs:label>content length</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#ingestTimestamp">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>Metadata representing the date and time that the document was ingested into the system.</rdfs:comment>
+	<rdfs:subPropertyOf rdf:resource="http://bigdata.com/test/system#documentMetadata"/>
+	<rdfs:label>ingest timestamp</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Evidence">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>An abstract class representing things that may be used as evidence within the system.</rdfs:comment>
+	<rdfs:label>Evidence</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Entity">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>An abstract class representing things that service as entities or the targets of relationships.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Evidence"/>
+	<rdfs:label>Entity</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Actor">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>An abstract class representing a person or process that may act on content in the system.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Actor</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Author">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>The author of a statement, which may be an entity, link, bookmark, folder, etc.</rdfs:comment>
+	<rdfs:label>Author</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#User">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A user in the system.</rdfs:comment>
+	<rdfs:label>User</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Link">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>An abstract class representing a relationship in the system between two entities.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Evidence"/>
+	<rdfs:label>Link</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Bookmark">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A bookmark to an entity or document in the system made by a user.</rdfs:comment>
+	<rdfs:label>Bookmark</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Folder">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A folder for organizing bookmarks.</rdfs:comment>
+	<rdfs:label>Bookmark Folder</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Graph">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class of resources signifying a named Graph in the system.</rdfs:comment>
+	<rdfs:label>Graph</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#GlobalDataSet">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class of resources signifying a named global data set in the system.</rdfs:comment>
+	<rdfs:label>Global Data Set</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#fromEntity">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:label>From entity</rdfs:label>
+	<rdfs:comment>A relationship from an entity in the system.</rdfs:comment>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Link"/>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Entity"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#toEntity">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship to an entity in the system.</rdfs:comment>
+	<rdfs:label>To entity</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Link"/>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Entity"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#extractedFrom">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating the subject statement was extracted from the object resource.</rdfs:comment>
+	<rdfs:label>Extracted from</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Evidence"/>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#hasAuthor">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating the subject statement was authored by the object resource.</rdfs:comment>
+	<rdfs:label>has author</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Evidence"/>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Author"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#lexicalForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating the subject statement has a lexical form, e.g. also known as, in the system.</rdfs:comment>
+	<rdfs:label>Lexical form</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Evidence"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#nominalForm">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating the subject statement has a nominal form, e.g. Mr, the Professor, etc., in the system.</rdfs:comment>
+	<rdfs:label>Nominal Form</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Evidence"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#hasFolder">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating that a bookmark exists in the folder.</rdfs:comment>
+	<rdfs:label>has folder</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Bookmark"/>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Folder"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#hasFolderDescription">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating that a folder has a description.</rdfs:comment>
+	<rdfs:label>has folder</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Folder"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#hasParentFolder">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating that a folder has a parent folder.</rdfs:comment>
+	<rdfs:label>has parent folder</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Folder"/>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Folder"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#bookmarkOf">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A relationship indicating that the bookmark points to a resource in the system.</rdfs:comment>
+	<rdfs:label>A bookmark of</rdfs:label>
+	<rdfs:domain rdf:resource="http://bigdata.com/test/system#Bookmark"/>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Resource"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#currentPOI">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A property matching up a user with their current problem of interest.</rdfs:comment>
+	<rdfs:label>current POI</rdfs:label>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#Graph"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Import">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Class"/>
+	<rdfs:comment>A class representing a data set import.</rdfs:comment>
+	<rdfs:label>Import</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#importedFrom">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A property describing the source of the import.</rdfs:comment>
+	<rdfs:label>imported from</rdfs:label>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#importedBy">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A property describing the user who performed the import.</rdfs:comment>
+	<rdfs:label>imported by</rdfs:label>
+	<rdfs:range rdf:resource="http://bigdata.com/test/system#User"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#importedTimestamp">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A property representing the date and time that the import occurred.</rdfs:comment>
+	<rdfs:label>import timestamp</rdfs:label>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#connectedTo">
+	<rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+	<rdfs:comment>A property representing a connection to a GDS.</rdfs:comment>
+	<rdfs:label>connected to</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#JungleBrowser">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Resource"/>
+	<rdfs:comment>A resource identifying the Jungle browser.</rdfs:comment>
+	<rdfs:label>Jungle Browser</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/system#Annotator">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Resource"/>
+	<rdfs:comment>A resource identifying the Annotator.</rdfs:comment>
+	<rdfs:label>Annotator</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Artifact">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing an artifact.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Artifact</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Topic">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a topic.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Topic</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Location">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing locations in the system.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Location</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Event">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing an event.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Event</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Date">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing dates in the system.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Date</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Time">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing expressions of time, such as last year, the former user, etc.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Time</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#DateTime">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing dates in the system.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Date"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Time"/>
+	<rdfs:label>DateTime</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Account">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing an account.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Entity"/>
+	<rdfs:label>Account</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Organization">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing an organization.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Actor"/>
+	<rdfs:label>Organization</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Person">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing an individual person in the system.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Actor"/>
+	<rdfs:label>Person</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Vessel">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a ship or vessel.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+	<rdfs:label>Vessel</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Corporation">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a corporation.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Organization"/>
+	<rdfs:label>Corporation</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Government">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a government.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Organization"/>
+	<rdfs:label>Government</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Group">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a group.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Organization"/>
+	<rdfs:label>Group</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#PhysicalLocation">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a physical location.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Location"/>
+	<rdfs:label>Physical location</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#NamedLocation">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a named location.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#PhysicalLocation"/>
+	<rdfs:label>Named location</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#ZipCode">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a zip code.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#NamedLocation"/>
+	<rdfs:label>Zip Code</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Address">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing an physical address, such as a Postal address.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#NamedLocation"/>
+	<rdfs:label>Address</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#City">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a city.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#NamedLocation"/>
+	<rdfs:label>City</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Country">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a country.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#NamedLocation"/>
+	<rdfs:label>Country</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Continent">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a continent.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#NamedLocation"/>
+	<rdfs:label>Continent</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Coordinate">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a physical coordinate.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#PhysicalLocation"/>
+	<rdfs:label>Coordinate</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#NetworkLocation">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a location on some kind of network, including phone numbers, DNS addresses, URLs, etc.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#Location"/>
+	<rdfs:label>Network location</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#PhoneNumber">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing any kind of telephone number.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#NetworkLocation"/>
+	<rdfs:label>Phone Number</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#BusinessPhoneNumber">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a business phone number.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#PhoneNumber"/>
+	<rdfs:label>Business phone number</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HomePhoneNumber">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a home phone number.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#PhoneNumber"/>
+	<rdfs:label>Home phone number</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#FaxNumber">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a Fax number.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#PhoneNumber"/>
+	<rdfs:label>Fax Number</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#CellPhoneNumber">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a cell phone number.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#PhoneNumber"/>
+	<rdfs:label>Cell Phone Number</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#InternetLocation">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a location on the Internet.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#NetworkLocation"/>
+	<rdfs:label>Internet Location</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#Email">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing an E-mail address.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#InternetLocation"/>
+	<rdfs:label>Email Address</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#DNS">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a DNS address, including an IP number or a symbolic host name.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#InternetLocation"/>
+	<rdfs:label>DNS Address</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#URL">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:comment>A class representing a URL address.</rdfs:comment>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#InternetLocation"/>
+	<rdfs:label>URL Address</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#AffiliatedWith">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Link"/>
+	<rdfs:label>affiliated with</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#MemberOf">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#AffiliatedWith"/>
+	<rdfs:label>member of</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#LeaderOf">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#AffiliatedWith"/>
+	<rdfs:label>leader of</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#OwnerOf">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#AffiliatedWith"/>
+	<rdfs:label>owner of</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#EmployeeOf">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#AffiliatedWith"/>
+	<rdfs:label>employee of</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#ProductOf">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#AffiliatedWith"/>
+	<rdfs:label>product of</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#RegisteredTo">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#AffiliatedWith"/>
+	<rdfs:label>registered to</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasDateTime">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Link"/>
+	<rdfs:label>has datetime</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasLocation">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/system#Link"/>
+	<rdfs:label>has location</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasAddress">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#HasLocation"/>
+	<rdfs:label>has address</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasEmailAddress">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#HasLocation"/>
+	<rdfs:label>has email address</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasPhoneNumber">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#HasLocation"/>
+	<rdfs:label>has phone number</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasURL">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#HasLocation"/>
+	<rdfs:label>has URL</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasCoordinate">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#HasLocation"/>
+	<rdfs:label>has coordinate</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/domain#HasHomePort">
+	<rdf:type rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class"/>
+	<rdfs:subClassOf rdf:resource="http://bigdata.com/test/domain#HasLocation"/>
+	<rdfs:label>has home port</rdfs:label>
+</rdf:Description>
+
+
+<!-- SAMPLE DATA -->
+
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d">
+	<ns2:contentType>text/html</ns2:contentType>
+	<ns2:nativeTextForm rdf:resource="http://bigdata.com/test/docs#daef62c7-8bef-4544-9000-625555df5c65"/>
+	<ns2:contentEncoding>iso-8859-1</ns2:contentEncoding>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Person"/>
+	<ns1:looks>stunning</ns1:looks>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#9f34c8c3-431f-4da4-ad19-6aaf5ec74f2e">
+	<ns2:lexicalForm>rdf</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b">
+	<rdfs:comment>here is a comment about Mike</rdfs:comment>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#a637448b-d1b5-4516-a359-075dad250e9a">
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+	<ns2:contentType>application/rdf+xml</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#84f1a67a-4f07-4861-b230-c37002f537f2">
+	<rdfs:label>Semantic Web</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#0bb3e8e4-91b9-47c7-9f37-81ce03de1e10">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<rdfs:label>SYSTAP</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#bc8cd28e-1528-42e5-a823-05ff2db3a7ba"/>
+	<ns2:lexicalForm>SYSTAP</ns2:lexicalForm>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#94ebe6b5-92c5-4e01-ac0b-a44924b38e8c">
+	<ns2:contentType>application/rdf+xml</ns2:contentType>
+	<ns2:contentLength>3497</ns2:contentLength>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#66deb090-c993-4c79-ba7e-5700f7b6ef30">
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#d88031df-8c07-467a-8414-ccadc324e91e">
+	<ns2:jobCreatedByUser rdf:resource="http://bigdata.com/test/user#aether"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#66deb090-c993-4c79-ba7e-5700f7b6ef30">
+	<ns2:lexicalForm>intelligence community</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#84f1a67a-4f07-4861-b230-c37002f537f2">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#481b48f7-13d5-4099-b15a-a0e331031e3e"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#e9cc2afb-cb1e-4c19-bec8-2b1553773183">
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+	<ns2:toEntity rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<ns2:fromEntity rdf:resource="http://bigdata.com/test/elm#137040ce-e1c9-4f12-a6b2-754f8480c30e"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#OwnerOf"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#bc0a3e4a-b072-483b-beab-eaca2b826655">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentLength>5061</ns2:contentLength>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<ns2:contentType>text/html</ns2:contentType>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#cb380de9-48f6-4731-b859-ff161ba9ff7d">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b"/>
+	<ns2:lexicalForm>Michael Personick</ns2:lexicalForm>
+	<rdfs:label>Michael Personick</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Person"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns2:nativeTextForm rdf:resource="http://bigdata.com/test/docs#5449a892-6474-455f-b408-c256051efda8"/>
+	<ns2:contentEncoding>iso-8859-1</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#8bc86d25-58fe-4ee5-80cf-10c997ab9fdb">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentLength>4745</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d">
+	<ns2:contentLength>3564</ns2:contentLength>
+	<ns2:contentSource>http://www.systap.com/services.htm</ns2:contentSource>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#8bc86d25-58fe-4ee5-80cf-10c997ab9fdb">
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65cbdfa5-7a11-4ccb-9a99-638784314aba">
+	<rdfs:label>open source</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3">
+	<ns2:nativeMicroHTMLForm rdf:resource="http://bigdata.com/test/docs#f4422a07-b8bb-42f9-a29a-4ffb5debcc2a"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65cbdfa5-7a11-4ccb-9a99-638784314aba">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Topic"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#3312e780-ad86-4ed9-91d9-59d51da45eac">
+	<ns2:contentType>text/html</ns2:contentType>
+	<ns2:contentLength>2124</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#5449a892-6474-455f-b408-c256051efda8">
+	<ns2:contentType>text/plain</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#d88031df-8c07-467a-8414-ccadc324e91e">
+	<ns2:jobEndTime>4/16/08 2:30:48 PM GMT</ns2:jobEndTime>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3b6402c7-a7f9-4cf7-8714-c41fd3935949">
+	<rdfs:label>semantic web</rdfs:label>
+	<ns2:lexicalForm>semantic web</ns2:lexicalForm>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d">
+	<ns2:englishMicroHTMLForm rdf:resource="http://bigdata.com/test/docs#3312e780-ad86-4ed9-91d9-59d51da45eac"/>
+	<rdfs:label>services.htm:  SYSTAP services</rdfs:label>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#8bc86d25-58fe-4ee5-80cf-10c997ab9fdb">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#f0068258-58b9-495c-8b5d-f02643cf291c">
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns2:contentLength>8260</ns2:contentLength>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentType>text/html</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#4747fccf-8a01-4d5c-beb0-9dda15443066">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#5f15a66f-6291-42cf-b7ca-71b0c872d5d4"/>
+	<ns2:lexicalForm>open source</ns2:lexicalForm>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Topic"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#9f34c8c3-431f-4da4-ad19-6aaf5ec74f2e">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3944254e-4849-47cf-8332-5b9b8f5619f6">
+	<rdfs:label>SAIC</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#94ebe6b5-92c5-4e01-ac0b-a44924b38e8c">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#d88031df-8c07-467a-8414-ccadc324e91e">
+	<ns2:jobSeed>http://www.systap.com</ns2:jobSeed>
+	<ns2:jobStartTime>4/16/08 2:30:47 PM GMT</ns2:jobStartTime>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d">
+	<ns2:ingestTimestamp>4/16/08 2:30:57 PM GMT</ns2:ingestTimestamp>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#d88031df-8c07-467a-8414-ccadc324e91e">
+	<ns2:jobName></ns2:jobName>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a29b70c4-e95d-4d5e-a324-5a44f9adbc2b">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Group"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#6bc74672-e91f-4894-9477-8846447dea17">
+	<rdfs:label>Science Applications International</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns2:lexicalForm>Science Applications International</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3944254e-4849-47cf-8332-5b9b8f5619f6"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#8bc86d25-58fe-4ee5-80cf-10c997ab9fdb">
+	<ns2:contentType>application/rdf+xml</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e">
+	<ns2:lexicalForm>SYSTAP</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#9f34c8c3-431f-4da4-ad19-6aaf5ec74f2e">
+	<rdfs:label>rdf</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3">
+	<ns2:contentType>text/html</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#84f1a67a-4f07-4861-b230-c37002f537f2">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#6df807ce-9541-4d32-8d07-9480d2dca95a"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#f4422a07-b8bb-42f9-a29a-4ffb5debcc2a">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns2:contentLength>2982</ns2:contentLength>
+	<ns2:contentType>text/html</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#1be4c339-353a-4b12-8a54-3f1792a96645">
+	<ns2:lexicalForm>SYSTAP LLC</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+	<rdfs:label>SYSTAP LLC</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#d88031df-8c07-467a-8414-ccadc324e91e">
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Job"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#f4422a07-b8bb-42f9-a29a-4ffb5debcc2a">
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#d88031df-8c07-467a-8414-ccadc324e91e">
+	<ns2:harvestedDocument rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#1cf3c078-d898-40e9-a534-7183b750aeca">
+	<ns2:harvestedDocument rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Job"/>
+	<ns2:jobStartTime>4/16/08 2:31:04 PM GMT</ns2:jobStartTime>
+	<ns2:jobSeed>http://www.systap.com/people.htm</ns2:jobSeed>
+	<ns2:jobEndTime>4/16/08 2:31:04 PM GMT</ns2:jobEndTime>
+	<ns2:jobName></ns2:jobName>
+	<ns2:jobCreatedByUser rdf:resource="http://bigdata.com/test/user#aether"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#a637448b-d1b5-4516-a359-075dad250e9a">
+	<ns2:contentLength>2718</ns2:contentLength>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de">
+	<ns2:rdfXmlForm rdf:resource="http://bigdata.com/test/docs#94ebe6b5-92c5-4e01-ac0b-a44924b38e8c"/>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<ns2:nativeMicroHTMLForm rdf:resource="http://bigdata.com/test/docs#16fdddc6-b878-40f7-9100-78712a99f02e"/>
+	<ns2:contentLength>2632</ns2:contentLength>
+	<ns2:contentSource>http://www.systap.com</ns2:contentSource>
+	<ns2:contentType>text/html</ns2:contentType>
+	<ns2:contentEncoding>iso-8859-1</ns2:contentEncoding>
+	<ns2:englishTextForm rdf:resource="http://bigdata.com/test/docs#e7264712-53d1-41c2-9738-9bd73a4184b2"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+	<ns2:nativeMentionHTMLForm rdf:resource="http://bigdata.com/test/docs#bc0a3e4a-b072-483b-beab-eaca2b826655"/>
+	<ns2:nativeTextForm rdf:resource="http://bigdata.com/test/docs#e7264712-53d1-41c2-9738-9bd73a4184b2"/>
+	<rdfs:label>www.systap.com:  SYSTAP, LLC</rdfs:label>
+	<ns2:englishMicroHTMLForm rdf:resource="http://bigdata.com/test/docs#16fdddc6-b878-40f7-9100-78712a99f02e"/>
+	<ns2:ingestTimestamp>4/16/08 2:30:48 PM GMT</ns2:ingestTimestamp>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#6df807ce-9541-4d32-8d07-9480d2dca95a">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3b6402c7-a7f9-4cf7-8714-c41fd3935949"/>
+	<rdfs:label>Semantic Web</rdfs:label>
+	<ns2:lexicalForm>Semantic Web</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#06c7c833-d1f3-493f-a56e-3a45d9f0fce4">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#66deb090-c993-4c79-ba7e-5700f7b6ef30"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Group"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<rdfs:label>Intelligence Community</rdfs:label>
+	<ns2:lexicalForm>Intelligence Community</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#daef62c7-8bef-4544-9000-625555df5c65">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentType>text/plain</ns2:contentType>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3944254e-4849-47cf-8332-5b9b8f5619f6">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#f4422a07-b8bb-42f9-a29a-4ffb5debcc2a">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65fb7712-3b0a-4736-8738-30cb89d2cf3b">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#1be4c339-353a-4b12-8a54-3f1792a96645"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3">
+	<ns2:englishTextForm rdf:resource="http://bigdata.com/test/docs#5449a892-6474-455f-b408-c256051efda8"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a29b70c4-e95d-4d5e-a324-5a44f9adbc2b">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#66deb090-c993-4c79-ba7e-5700f7b6ef30"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#5f15a66f-6291-42cf-b7ca-71b0c872d5d4">
+	<ns2:lexicalForm>open source</ns2:lexicalForm>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Topic"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#65cbdfa5-7a11-4ccb-9a99-638784314aba"/>
+	<rdfs:label>open source</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#4747fccf-8a01-4d5c-beb0-9dda15443066">
+	<rdfs:label>open source</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#65cbdfa5-7a11-4ccb-9a99-638784314aba"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a8707489-801f-4a24-b0dd-f7047b6a7d0c">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Organization"/>
+	<rdfs:label>Darden Graduate School of Business</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#481b48f7-13d5-4099-b15a-a0e331031e3e">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<ns2:lexicalForm>Semantic Web</ns2:lexicalForm>
+	<rdfs:label>Semantic Web</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3b6402c7-a7f9-4cf7-8714-c41fd3935949"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#6df807ce-9541-4d32-8d07-9480d2dca95a"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3944254e-4849-47cf-8332-5b9b8f5619f6">
+	<ns2:lexicalForm>science applications international</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#66deb090-c993-4c79-ba7e-5700f7b6ef30">
+	<rdfs:label>intelligence community</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#daef62c7-8bef-4544-9000-625555df5c65">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<ns2:contentLength>2040</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3944254e-4849-47cf-8332-5b9b8f5619f6">
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#df4488b9-b16c-4a30-af72-ac0a6984cc18">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#137040ce-e1c9-4f12-a6b2-754f8480c30e"/>
+	<rdfs:label>Bryan Thompson</rdfs:label>
+	<ns2:lexicalForm>Bryan Thompson</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#f2b9b2da-4d41-431d-874f-298bc05a4c08">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Organization"/>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+	<rdfs:label>darden graduate school of business</rdfs:label>
+	<ns2:lexicalForm>darden graduate school of business</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/imports#e4c324c2-c7b9-4487-b7f6-1a041f9e7b94">
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Import"/>
+	<ns2:importedBy rdf:resource="http://bigdata.com/test/user#aether"/>
+	<ns2:importedTimestamp>4/16/08 2:30:36 PM GMT</ns2:importedTimestamp>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#e7264712-53d1-41c2-9738-9bd73a4184b2">
+	<ns2:contentLength>1227</ns2:contentLength>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentType>text/plain</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#5607f65c-2caa-46e0-b2b4-dc693da826da">
+	<rdfs:label>SAIC</rdfs:label>
+	<ns2:lexicalForm>SAIC</ns2:lexicalForm>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3944254e-4849-47cf-8332-5b9b8f5619f6"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#cc0b8bfe-7d97-40f8-bb41-8c151a9cf43d">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+	<rdfs:label>SYSTAP LLC</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<ns2:lexicalForm>SYSTAP LLC</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#65fb7712-3b0a-4736-8738-30cb89d2cf3b"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#1be4c339-353a-4b12-8a54-3f1792a96645"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#3312e780-ad86-4ed9-91d9-59d51da45eac">
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a29b70c4-e95d-4d5e-a324-5a44f9adbc2b">
+	<ns2:lexicalForm>Intelligence Community</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#3312e780-ad86-4ed9-91d9-59d51da45eac">
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a29b70c4-e95d-4d5e-a324-5a44f9adbc2b">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#06c7c833-d1f3-493f-a56e-3a45d9f0fce4"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#66deb090-c993-4c79-ba7e-5700f7b6ef30">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Group"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#84f1a67a-4f07-4861-b230-c37002f537f2">
+	<ns2:lexicalForm>Semantic Web</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a29b70c4-e95d-4d5e-a324-5a44f9adbc2b">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<rdfs:label>Intelligence Community</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#7a09a307-56e3-466a-bf5a-3f5fed4d0d8c">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<rdfs:label>bigdata</rdfs:label>
+	<ns2:lexicalForm>bigdata</ns2:lexicalForm>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#00c5fc5a-298e-43c5-9853-28115631b359"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#815f03f0-2812-4296-9298-0ad76b4ef469">
+	<rdfs:label>cognitive web</rdfs:label>
+	<ns2:lexicalForm>cognitive web</ns2:lexicalForm>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#d7f3a3d9-6818-4ef1-b5b8-92e178d61c0d">
+	<rdfs:label>virginia</rdfs:label>
+	<ns2:lexicalForm>virginia</ns2:lexicalForm>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#PhysicalLocation"/>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3">
+	<rdfs:label>people.htm:  SYSTAP people</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+	<ns2:rdfXmlForm rdf:resource="http://bigdata.com/test/docs#8bc86d25-58fe-4ee5-80cf-10c997ab9fdb"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b">
+	<rdfs:label>Mike Personick</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a8707489-801f-4a24-b0dd-f7047b6a7d0c">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e">
+	<ns2:lexicalForm>SYSTAP, LLC.</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#df4488b9-b16c-4a30-af72-ac0a6984cc18">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Person"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#f5ba1b0b-53b5-4227-bb96-ae7dbb8ca33e"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#bc8cd28e-1528-42e5-a823-05ff2db3a7ba">
+	<rdfs:label>SYSTAP</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#5449a892-6474-455f-b408-c256051efda8">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns2:contentLength>2900</ns2:contentLength>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#12703239-9458-4371-bf47-b6860699cf32">
+	<ns2:lexicalForm>Intelligence Community</ns2:lexicalForm>
+	<rdfs:label>Intelligence Community</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#a29b70c4-e95d-4d5e-a324-5a44f9adbc2b"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#66deb090-c993-4c79-ba7e-5700f7b6ef30"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#06c7c833-d1f3-493f-a56e-3a45d9f0fce4"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Group"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#f5ba1b0b-53b5-4227-bb96-ae7dbb8ca33e">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#137040ce-e1c9-4f12-a6b2-754f8480c30e"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65fb7712-3b0a-4736-8738-30cb89d2cf3b">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65cbdfa5-7a11-4ccb-9a99-638784314aba">
+	<ns2:lexicalForm>open source</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#f5ba1b0b-53b5-4227-bb96-ae7dbb8ca33e">
+	<rdfs:label>Bryan Thompson</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3">
+	<ns2:ingestTimestamp>4/16/08 2:31:04 PM GMT</ns2:ingestTimestamp>
+	<ns2:nativeMentionHTMLForm rdf:resource="http://bigdata.com/test/docs#f0068258-58b9-495c-8b5d-f02643cf291c"/>
+	<ns2:contentSource>http://www.systap.com/people.htm</ns2:contentSource>
+	<ns2:contentLength>4486</ns2:contentLength>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#137040ce-e1c9-4f12-a6b2-754f8480c30e">
+	<ns2:lexicalForm>Bryan B Thompson</ns2:lexicalForm>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Person"/>
+	<ns2:lexicalForm>Bryan Thompson</ns2:lexicalForm>
+	<rdfs:label>Bryan Thompson</rdfs:label>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#16fdddc6-b878-40f7-9100-78712a99f02e">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentLength>1307</ns2:contentLength>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+	<ns2:contentType>text/html</ns2:contentType>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/jobs#e8d295f1-c78c-4bbb-8e22-0260bccbe051">
+	<ns2:jobSeed>http://www.systap.com/services.htm</ns2:jobSeed>
+	<ns2:jobName></ns2:jobName>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Job"/>
+	<ns2:jobStartTime>4/16/08 2:30:56 PM GMT</ns2:jobStartTime>
+	<ns2:harvestedDocument rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<ns2:jobEndTime>4/16/08 2:30:57 PM GMT</ns2:jobEndTime>
+	<ns2:jobCreatedByUser rdf:resource="http://bigdata.com/test/user#aether"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#c6199aeb-c2a2-49e8-a098-6347d10207ee">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#0bb3e8e4-91b9-47c7-9f37-81ce03de1e10"/>
+	<rdfs:label>SYSTAP</rdfs:label>
+	<ns2:lexicalForm>SYSTAP</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#bc8cd28e-1528-42e5-a823-05ff2db3a7ba"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#00c5fc5a-298e-43c5-9853-28115631b359">
+	<ns2:lexicalForm>bigdata</ns2:lexicalForm>
+	<rdfs:label>bigdata</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e">
+	<rdfs:label>SYSTAP</rdfs:label>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#84f1a67a-4f07-4861-b230-c37002f537f2">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#5fa4aa1a-475b-4eef-a625-959d911bd336">
+	<ns2:lexicalForm>RDF</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#84f1a67a-4f07-4861-b230-c37002f537f2">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3b6402c7-a7f9-4cf7-8714-c41fd3935949"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65fb7712-3b0a-4736-8738-30cb89d2cf3b">
+	<ns2:lexicalForm>SYSTAP LLC</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65cbdfa5-7a11-4ccb-9a99-638784314aba">
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#51d0cd3b-ccd5-4b1e-a29f-a9ae2bea14a5">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns2:lexicalForm>Virginia</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#d7f3a3d9-6818-4ef1-b5b8-92e178d61c0d"/>
+	<rdfs:label>Virginia</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#PhysicalLocation"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#e3951406-ac16-4d0d-a782-1f4e48bcd180">
+	<rdfs:label>utah</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#PhysicalLocation"/>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+	<ns2:lexicalForm>utah</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#5fa4aa1a-475b-4eef-a625-959d911bd336">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Artifact"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#bc8cd28e-1528-42e5-a823-05ff2db3a7ba">
+	<ns2:lexicalForm>SYSTAP</ns2:lexicalForm>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#0a2033c2-296e-4cb6-90d5-725960a20d29">
+	<ns2:contentEncoding>UTF-8</ns2:contentEncoding>
+	<ns2:contentLength>5860</ns2:contentLength>
+	<ns2:rawSourceForm rdf:resource="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/system#Document"/>
+	<ns2:contentType>text/html</ns2:contentType>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#ad541de9-633d-4a69-90f1-186a011d3a7d">
+	<ns2:nativeMicroHTMLForm rdf:resource="http://bigdata.com/test/docs#3312e780-ad86-4ed9-91d9-59d51da45eac"/>
+	<ns2:nativeMentionHTMLForm rdf:resource="http://bigdata.com/test/docs#0a2033c2-296e-4cb6-90d5-725960a20d29"/>
+	<ns2:rdfXmlForm rdf:resource="http://bigdata.com/test/docs#a637448b-d1b5-4516-a359-075dad250e9a"/>
+	<ns2:englishTextForm rdf:resource="http://bigdata.com/test/docs#daef62c7-8bef-4544-9000-625555df5c65"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#9f34c8c3-431f-4da4-ad19-6aaf5ec74f2e">
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a8707489-801f-4a24-b0dd-f7047b6a7d0c">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#f2b9b2da-4d41-431d-874f-298bc05a4c08"/>
+	<ns2:lexicalForm>Darden Graduate School of Business</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b">
+	<ns2:lexicalForm>Michael Personick</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#a8dfd9a6-8302-450e-8283-a8b6ee4c7914">
+	<ns2:fromEntity rdf:resource="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b"/>
+	<ns2:importedFrom>file:/D:/Documents and Settings/mikep/Desktop/systap.csv</ns2:importedFrom>
+	<ns2:toEntity rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#OwnerOf"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#5fa4aa1a-475b-4eef-a625-959d911bd336">
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#9f34c8c3-431f-4da4-ad19-6aaf5ec74f2e"/>
+	<rdfs:label>RDF</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#001a82f0-b92d-404c-8d1b-554614b80fd8">
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#cb380de9-48f6-4731-b859-ff161ba9ff7d"/>
+	<ns2:lexicalForm>Michael Personick</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3">
+	<ns2:englishMicroHTMLForm rdf:resource="http://bigdata.com/test/docs#f4422a07-b8bb-42f9-a29a-4ffb5debcc2a"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3f26a006-7553-441e-a112-a1848635447b">
+	<ns2:lexicalForm>Mike Personick</ns2:lexicalForm>
+	<ns1:age>30</ns1:age>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#3944254e-4849-47cf-8332-5b9b8f5619f6">
+	<ns2:lexicalForm>SAIC</ns2:lexicalForm>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#65fb7712-3b0a-4736-8738-30cb89d2cf3b">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Corporation"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#3212ed4d-fafd-4cb2-b198-363567288a3e"/>
+	<rdfs:label>SYSTAP LLC</rdfs:label>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#5ef60b9c-b8cf-40cb-a7ae-93e8da17398d">
+	<rdfs:label>open source</rdfs:label>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#4747fccf-8a01-4d5c-beb0-9dda15443066"/>
+	<ns2:lexicalForm>open source</ns2:lexicalForm>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#65cbdfa5-7a11-4ccb-9a99-638784314aba"/>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Topic"/>
+	<ns5:sameAs rdf:resource="http://bigdata.com/test/elm#5f15a66f-6291-42cf-b7ca-71b0c872d5d4"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#f5ba1b0b-53b5-4227-bb96-ae7dbb8ca33e">
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Person"/>
+	<ns2:lexicalForm>Bryan Thompson</ns2:lexicalForm>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#c190660b-f4b9-4acd-8055-52491a0a44de"/>
+</rdf:Description>
+
+<rdf:Description rdf:about="http://bigdata.com/test/elm#001a82f0-b92d-404c-8d1b-554614b80fd8">
+	<rdfs:label>Michael Personick</rdfs:label>
+	<rdf:type rdf:resource="http://bigdata.com/test/domain#Person"/>
+	<ns2:extractedFrom rdf:resource="http://bigdata.com/test/docs#02534ac8-369d-4da2-a1b4-99f1b2f399e3"/>
+</rdf:Description>
+
+</rdf:RDF>
