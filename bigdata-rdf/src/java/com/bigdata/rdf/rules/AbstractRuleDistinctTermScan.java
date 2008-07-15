@@ -238,16 +238,18 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
              * which to read easy - just read on whichever relation is specified
              * for tail[0].
              */
-            final String relationName = rule.getHead().getOnlyRelationName();
+//            final String relationName = rule.getHead().getOnlyRelationName();
+//
+//            /*
+//             * find the distinct predicates in the KB (efficient op).
+//             */
+//            final long timestamp = joinNexus.getReadTimestamp(relationName);
+//
+//            final SPORelation relation = (SPORelation) joinNexus
+//                    .getIndexManager().getResourceLocator().locate(
+//                            relationName, timestamp);
 
-            /*
-             * find the distinct predicates in the KB (efficient op).
-             */
-            final long timestamp = joinNexus.getReadTimestamp(relationName);
-
-            final SPORelation relation = (SPORelation) joinNexus
-                    .getIndexManager().getResourceLocator().locate(
-                            relationName, timestamp);
+            final SPORelation relation = (SPORelation)joinNexus.getTailRelationView(rule.getTail(0));
             
 //            final SPOAccessPath accessPath = relation.getAccessPath(
 //                    keyOrder, rule.getTail(0));

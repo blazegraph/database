@@ -95,19 +95,15 @@ public class Solution<E> implements ISolution<E>, Serializable {
              * The relation is responsible for how the elements are materialized
              * from the bindings.
              * 
-             * Note: Caching for this relation locator is very important!
+             * Note: Caching for this relation is very important!
              */
 
             // the head of the rule.
             final IPredicate head = rule.getHead();
-            
-            final String relationName = head.getOnlyRelationName();
-            
-            // the relation named by the head of the rule.
-            final IRelation relation = (IRelation) joinNexus.getIndexManager()
-                    .getResourceLocator().locate(relationName,
-                            joinNexus.getReadTimestamp(relationName));
 
+            // the relation for the head of the rule.
+            final IRelation relation = joinNexus.getHeadRelationView(head);
+            
             // use the relation's element factory.
             this.e = (E) relation.newElement(head, bindingSet);
 

@@ -69,6 +69,7 @@ import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
@@ -123,6 +124,7 @@ import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
+import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -285,6 +287,15 @@ abstract public class AbstractTripleStore extends
     final protected boolean statementIdentifiers;
 
     /**
+     * The capacity of the buffers used when computing entailments (for insert
+     * or query).
+     * 
+     * @see Options#BUFFER_CAPACITY
+     * @see #newJoinNexusFactory(ActionEnum, int, IElementFilter)
+     */
+    private final int bufferCapacity;
+
+    /**
      * When <code>true</code> the database will support statement identifiers.
      * <p>
      * A statement identifier is a unique 64-bit integer taken from the same
@@ -442,6 +453,44 @@ abstract public class AbstractTripleStore extends
         String STATEMENT_IDENTIFIERS = "statementIdentifiers";
 
         String DEFAULT_STATEMENT_IDENTIFIERS = "true";
+        
+        /**
+         * <p>
+         * Sets the capacity of the buffers used by the chunked iterators for
+         * query answering and truth maintenance. These buffers make it possible
+         * to perform efficient ordered writes using the batch API (default
+         * 200k).
+         * </p>
+         * <p>
+         * Some results for comparison on a 45k triple data set:
+         * </p>
+         * 
+         * <pre>
+         *  1k    - Computed closure in 4469ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=17966
+         *  10k   - Computed closure in 3250ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=24704
+         *  50k   - Computed closure in 3187ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=25193
+         *  100k  - Computed closure in 3359ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23903
+         *  1000k - Computed closure in 3954ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=20306
+         * </pre>
+         * 
+         * <p>
+         * Note that the actual performance will depend on the sustained
+         * behavior of the JVM, including online performance tuning, parallism
+         * in the implementation, and the characteristics of the specific
+         * ontology, especially how it influences the #of entailments generated
+         * by each rule.
+         * </p>
+         * 
+         * @todo add a buffer capacity property for the
+         *       {@link InferenceEngine#backchainIterator(long, long, long)} or
+         *       use this capacity there as well.
+         */
+        public static final String BUFFER_CAPACITY = "bufferCapacity";
+
+        /**
+         * @todo experiment with different values for this capacity.
+         */
+        public static final String DEFAULT_BUFFER_CAPACITY = ""+200*Bytes.kilobyte32;
 
     }
 
@@ -482,6 +531,19 @@ abstract public class AbstractTripleStore extends
                         Options.DEFAULT_STATEMENT_IDENTIFIERS));
 
         log.info(Options.STATEMENT_IDENTIFIERS + "=" + statementIdentifiers);
+
+        {
+            bufferCapacity = Integer.parseInt(properties.getProperty(
+                    Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
+
+            if (bufferCapacity <= 0) {
+                throw new IllegalArgumentException(Options.BUFFER_CAPACITY
+                        + " must be positive");
+            }
+
+            log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
+            
+        }
 
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
@@ -2540,7 +2602,11 @@ abstract public class AbstractTripleStore extends
      *            Optional filter.
      * @return
      */
-    public IJoinNexusFactory newJoinNexusFactory(int solutionFlags, IElementFilter filter) {
+    public IJoinNexusFactory newJoinNexusFactory(ActionEnum action,
+            int solutionFlags, IElementFilter filter) {
+        
+        if (action == null)
+            throw new IllegalArgumentException();
         
         final long writeTime = getTimestamp();
         
@@ -2551,8 +2617,8 @@ abstract public class AbstractTripleStore extends
          */
         final long readTime = ITx.READ_COMMITTED;
 
-        return new RDFJoinNexusFactory(writeTime, readTime, isJustify(),
-                solutionFlags, filter);
+        return new RDFJoinNexusFactory(action, writeTime, readTime,
+                isJustify(), bufferCapacity, solutionFlags, filter);
         
     }
     
@@ -2661,7 +2727,8 @@ abstract public class AbstractTripleStore extends
         final int solutionFlags = IJoinNexus.ELEMENT;
 
         // @todo any filter to apply here?
-        final IJoinNexus joinNexus = newJoinNexusFactory(solutionFlags, null/* filter */)
+        final IJoinNexus joinNexus = newJoinNexusFactory(ActionEnum.Query,
+                solutionFlags, null/* filter */)
                 .newInstance(getIndexManager());
 
         /*

@@ -65,7 +65,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.ISPOBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -275,9 +274,6 @@ public class ConcurrentDataLoader {
      *            ...
      * @param nthreads
      *            The #of concurrent loaders.
-     * @param bufferCapacity
-     *            The capacity of the {@link StatementBuffer} (the #of
-     *            statements that are buffered into a batch operation).
      * @param baseURL
      *            The baseURL and <code>""</code> if none is required.
      * @param fallback

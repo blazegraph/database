@@ -250,13 +250,15 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
              * which to read easy - just read on whichever relation is specified
              * for tail[0].
              */
-            final String relationName = rule.getHead().getOnlyRelationName();
-            
-            final long timestamp = joinNexus.getReadTimestamp(relationName);
+//            final String relationName = rule.getHead().getOnlyRelationName();
+//            
+//            final long timestamp = joinNexus.getReadTimestamp(relationName);
+//
+//            final SPORelation relation = (SPORelation) joinNexus
+//                    .getIndexManager().getResourceLocator().locate(
+//                            relationName, timestamp);
 
-            final SPORelation relation = (SPORelation) joinNexus
-                    .getIndexManager().getResourceLocator().locate(
-                            relationName, timestamp);
+            final SPORelation relation = (SPORelation)joinNexus.getTailRelationView(rule.getTail(0));
 
             /*
              * Query for the set {P} rather than requiring it as an input.

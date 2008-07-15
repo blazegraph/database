@@ -116,14 +116,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
 
         while (itr.hasNext()) {
 
-            Justification jst = (Justification) itr.next().getObject();
-
-            // @todo comment out and make ids private.
-            assert jst.ids[0] == head.s : jst.toString(db);
-            assert jst.ids[1] == head.p : jst.toString(db);
-            assert jst.ids[2] == head.o : jst.toString(db);
-            
-            justifications[i++] = jst;
+            justifications[i++] = (Justification) itr.next().getObject();
             
         }
 

@@ -29,8 +29,13 @@ import com.bigdata.rdf.spo.SPOPredicate;
  * rdf1:
  * 
  * <pre>
- * (?v rdf:type rdf:Property) :- ( ?u ?v ?y ).
+ * (?a rdf:type rdf:Property) :- ( ?u ?a ?y ).
  * </pre>
+ * 
+ * Note: This rule is evaluated using a {@link DistinctTermScan}. The variables
+ * that DO NOT appear in the head of the rule remain unbound in the generated
+ * solutions (?u and ?y). When justifications are generated, those unbound
+ * variables will be represented as ZERO (0L)s and interpreted as wildcards.
  */
 public class RuleRdf01 extends AbstractRuleDistinctTermScan {
     

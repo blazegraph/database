@@ -108,12 +108,13 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         if(log.isInfoEnabled())
             log.info("\ndatabase(before)::\n" + db.dumpStore());
 
-        final IJoinNexus joinNexus = db.newJoinNexusFactory(IJoinNexus.ALL,
-                filter).newInstance(db.getIndexManager());
-        
         // run as query.
         {
-            
+
+            final IJoinNexus joinNexus = db.newJoinNexusFactory(
+                    ActionEnum.Query, IJoinNexus.ALL, filter).newInstance(
+                    db.getIndexManager());
+
             long n = 0;
             
             final IChunkedOrderedIterator<ISolution> itr = joinNexus.runQuery(rule);
@@ -154,8 +155,11 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         // run as insert.
         {
 
-            final long actualMutationCount = joinNexus.runMutation(
-                    ActionEnum.Insert, rule);
+            final IJoinNexus joinNexus = db.newJoinNexusFactory(
+                    ActionEnum.Insert, IJoinNexus.ALL, filter).newInstance(
+                    db.getIndexManager());
+
+            final long actualMutationCount = joinNexus.runMutation(rule);
 
             if (log.isInfoEnabled())
                 log.info("Inserted " + actualMutationCount + " elements : "

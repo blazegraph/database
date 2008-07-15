@@ -680,7 +680,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     
     /**
      * Locate the distinct relation identifiers corresponding to the tail(s) of
-     * each rule and resolve them to their relations.
+     * each rule and resolve them to their relations. Note that a tail predicate
+     * can read on a fused view of more than one relation.
      * 
      * @throws RuntimeException
      *             if any relation can not be resolved.
@@ -715,22 +716,29 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             final IRule r = (IRule) p;
 
             final Iterator<IPredicate> itr = r.getTail();
-            
+
             while (itr.hasNext()) {
 
-                final String relationName = r.getHead()
-                        .getOnlyRelationName();
+                final IPredicate pred = itr.next();
 
-                if (!c.containsKey(relationName)) {
+                final int relationCount = pred.getRelationCount();
 
-                    final IRelation relation = (IRelation) indexManager
-                            .getResourceLocator().locate(relationName,
-                                    timestamp);
+                for (int i = 0; i < relationCount; i++) {
 
-                    c.put(relationName, relation);
+                    final String relationName = pred.getRelationName(i);
+
+                    if (!c.containsKey(relationName)) {
+
+                        final IRelation relation = (IRelation) indexManager
+                                .getResourceLocator().locate(relationName,
+                                        timestamp);
+
+                        c.put(relationName, relation);
+
+                    }
 
                 }
-
+                
             }
 
         } else {

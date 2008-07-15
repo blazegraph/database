@@ -46,8 +46,11 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariable;
+import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ISolution;
 
 /**
@@ -252,6 +255,22 @@ public class Justification implements Comparable<Justification> {
      * 
      * @param solution
      *            The solution.
+     * 
+     * FIXME If [rule == null] then this ctor will thrown an
+     * {@link AssertionError}. In the original rule execution layer the
+     * bindings were are long[] and the were encoded by position. At the moment
+     * the bindingSet is indexed by the {@link IVariable} (essentially by the
+     * variable name). This means that we MUST have the {@link IRule} on hand in
+     * order extract the bindings that we need.
+     * <p>
+     * Modify the new rule execution layer to assign variables an integer index
+     * in [0:nvars] for each rule and then we can do positional decoding of the
+     * binding set and loose the requirement for the rule when generating
+     * justifications.
+     * <p>
+     * This might not be that important for scale-out since the solutions are, I
+     * believe, processed solely in a local buffer for Insert and Delete and
+     * only serialized for Query.
      */
     public Justification(ISolution solution) {
         
@@ -268,6 +287,7 @@ public class Justification implements Comparable<Justification> {
 
         assert rule != null;
         assert head != null;
+        assert head.isFullyBound();
         assert bindingSet != null;
         
 //        // verify enough bindings for one or more triple patterns.
@@ -288,13 +308,48 @@ public class Justification implements Comparable<Justification> {
         ids[j++] = head.p;
         ids[j++] = head.o;
         
-        for(int i=0; i<tailCount; i++) {
+        /*
+         * Note: Some of variables in the tail(s) are left unbound by some of
+         * the rules, e.g., rdfs1. This is because any binding for those
+         * variables is valid. The justifications index treats these unbound
+         * variables as wildcards and represents them with 0L in the key. (The
+         * computed entailment is ALWAYS fully bound, it is just that some of
+         * the variables in the tails might be unbound).
+         */
+        
+        for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
             
-            final IPredicate predicate = rule.getTail(i).asBound(bindingSet);
-            
-            ids[j++] = (Long)predicate.get(0/*s*/).get();
-            ids[j++] = (Long)predicate.get(1/*p*/).get();
-            ids[j++] = (Long)predicate.get(2/*o*/).get();
+            final IPredicate predicate = rule.getTail(tailIndex);
+
+            for(int i=0; i<N; i++) {
+
+                final IVariableOrConstant<Long> t = predicate.get(i);
+                
+                final long id;
+                
+                if (t.isVar()) {
+                 
+                    final IConstant<Long> c = bindingSet.get((IVariable)t);
+                    
+                    if(c == null) {
+                    
+                        id = IRawTripleStore.NULL;
+                        
+                    } else {
+                        
+                        id = c.get();
+                        
+                    }
+                    
+                } else {
+                    
+                    id = t.get();
+                    
+                }
+
+                ids[j++] = id;
+
+            }
             
         }
         
