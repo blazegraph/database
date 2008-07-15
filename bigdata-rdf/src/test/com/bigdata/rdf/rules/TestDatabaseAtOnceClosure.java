@@ -114,7 +114,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         	new TempTripleStore(new Properties());
         
         try {
-        	
+
+            final StatementBuffer sb = new StatementBuffer(closure,10000);
+            
         	{ // use the Sesame2 inferencer to get ground truth
         		
 	            StatementBuffer buf = new StatementBuffer(groundTruth ,10);
@@ -146,11 +148,19 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            		buf.add(stmt.getSubject(), stmt.getPredicate(), 
 	            				stmt.getObject());
 	            		
+                        // add to the statement buffer at the same time.
+                        sb.add(stmt.getSubject(), stmt.getPredicate(), 
+                                stmt.getObject());
+                        
 	            	}
 	            	
 	                buf.flush();
 	                
-	                groundTruth.dumpStore();
+	                if (log.isInfoEnabled()) {
+
+                        log.info("\ngroundTruth:\n" + groundTruth.dumpStore());
+                        
+                    }
 	                
 	                // make the data visible to a read-committed view.
 	                groundTruth.commit();
@@ -165,8 +175,22 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         	
         	{ // load the same data into the closure store
         		
+                // flush the statement buffer onto the closure store.
+        		sb.flush();
         		
-        		
+                /*
+                 * compute the database at once closure.
+                 * 
+                 * Note: You can run either the full closure or the fast closure
+                 * method depending on how you setup the store. You can also use
+                 * an explicit InferenceEngine ctor to setup for either closure
+                 * method by overriding the appropriate property (it will be set
+                 * by the proxy test case otherwise which does not give you much
+                 * control).
+                 */
+                closure.getInferenceEngine()
+                        .computeClosure(null/* focusStore */);
+                
         	}
             
         	assertTrue(modelsEqual(closure, groundTruth));
