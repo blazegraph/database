@@ -130,4 +130,9 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getHeadRelationView(pred);
     }
 
+    public void makeWriteSetsVisible() {
+        // TODO Auto-generated method stub
+        
+    }
+
 }

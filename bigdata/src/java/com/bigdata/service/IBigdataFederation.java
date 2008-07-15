@@ -303,42 +303,6 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      */
     public SparseRowStore getGlobalRowStore();
     
-//    /**
-//     * Return a named object stored in the global namespace for the federation.
-//     * 
-//     * @param name
-//     *            The name under which the object is stored.
-//     * 
-//     * @return The named record together -or- <code>null</code> iff there was
-//     *         no record recorded under that name.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if <i>name</i> is <code>null</code>.
-//     */
-//    public Object getNamedRecord(String name);
-//    
-//    /**
-//     * Store or update a named object in the global namespace for the
-//     * federation.
-//     * 
-//     * @param name
-//     *            The name under which the object is to be stored.
-//     * @param value
-//     *            The value to be stored under that name -or- <code>null</code>
-//     *            to clear any value associated with that name.
-//     * 
-//     * @return The old value -or- <code>null</code> if there was no value
-//     *         stored under that name.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if <i>name</i> is <code>null</code>.
-//     * 
-//     * @todo Consider replacing with <code>getGlobalRowStore()</code> since we
-//     *       can use that directly to store property sets, serialized objects,
-//     *       etc.
-//     */
-//    public Object putNamedRecord(String name, Object value);
-
     /**
      * Destroys all discovered services belonging to the federation and their
      * persistent data and disconnects from the federation.

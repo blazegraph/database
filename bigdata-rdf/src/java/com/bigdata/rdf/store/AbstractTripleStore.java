@@ -1732,8 +1732,8 @@ abstract public class AbstractTripleStore extends
     }
 
     /**
-     * Utility method dumps the statements in the store onto {@link System#err}
-     * using the SPO index (subject order).
+     * Utility method dumps the statements in the store using the SPO index
+     * (subject order).
      * 
      * @todo change the return type to {@link StringBuilder}
      */

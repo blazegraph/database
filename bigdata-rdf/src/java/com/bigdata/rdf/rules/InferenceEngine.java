@@ -641,8 +641,12 @@ public class InferenceEngine extends RDFSVocabulary {
                 forwardChainOwlEquivalentClass//
                 );
 
+        /*
+         * FIXME remove IJoinNexus.RULE once we no longer need the rule to
+         * generate the justifications.
+         */
         final int solutionFlags = IJoinNexus.ELEMENT//
-                | (justify ? IJoinNexus.BINDINGS : 0)//
+                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
 //              | IJoinNexus.RULE  // iff debugging.
               ;
       
@@ -691,8 +695,12 @@ public class InferenceEngine extends RDFSVocabulary {
                 forwardChainOwlEquivalentClass//
                 );
         
+        /*
+         * @todo remove IJoinNexus.RULE once we no longer need the rule to
+         * generate the justifications.
+         */
         final int solutionFlags = IJoinNexus.ELEMENT//
-                | (justify ? IJoinNexus.BINDINGS : 0)//
+                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
 //      | IJoinNexus.RULE  // iff debugging.
                 ;
         
