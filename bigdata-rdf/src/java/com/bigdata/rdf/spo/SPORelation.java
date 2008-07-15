@@ -49,7 +49,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.AbstractTask;
@@ -560,6 +559,8 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         metadata.setLeafValueSerializer(NoDataSerializer.INSTANCE);
 
+        metadata.setTupleSerializer(new JustificationTupleSerializer(IRawTripleStore.N));
+
         return metadata;
 
     }
@@ -591,7 +592,8 @@ public class SPORelation extends AbstractRelation<SPO> {
      * @return
      */
     @SuppressWarnings("unchecked")
-    public IAccessPath<SPO> getAccessPath(final long s, final long p, final long o,IElementFilter<SPO> filter) {
+    public IAccessPath<SPO> getAccessPath(final long s, final long p,
+            final long o, IElementFilter<SPO> filter) {
 
 //      return new AccessPath(this, KeyOrder.get(s, p, o), s, p, o);
 
@@ -693,7 +695,13 @@ public class SPORelation extends AbstractRelation<SPO> {
         
         final IIndex ndx = getIndex(keyOrder);
 
-        assert ndx != null : "no index? keyOrder="+keyOrder;
+        if (ndx == null) {
+        
+            throw new IllegalArgumentException("no index? relation="
+                    + getNamespace() + ", timestamp=" + getTimestamp()
+                    + ", keyOrder=" + keyOrder + ", pred=" + predicate);
+            
+        }
         
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
@@ -1144,16 +1152,21 @@ public class SPORelation extends AbstractRelation<SPO> {
 
             final long begin = System.currentTimeMillis();
 
-            /*
-             * Note: This capacity estimate is based on N longs per SPO, one
-             * head, and 2-3 SPOs in the tail. The capacity will be extended
-             * automatically if necessary.
-             */
-
-            final KeyBuilder keyBuilder = new KeyBuilder(IRawTripleStore.N
-                    * (1 + 3) * Bytes.SIZEOF_LONG);
+//            /*
+//             * Note: This capacity estimate is based on N longs per SPO, one
+//             * head, and 2-3 SPOs in the tail. The capacity will be extended
+//             * automatically if necessary.
+//             */
+//
+//            final KeyBuilder keyBuilder = new KeyBuilder(IRawTripleStore.N
+//                    * (1 + 3) * Bytes.SIZEOF_LONG);
 
             long nwritten = 0;
+
+            final IIndex ndx = getJustificationIndex();
+            
+            final JustificationTupleSerializer tupleSer = (JustificationTupleSerializer) ndx
+                    .getIndexMetadata().getTupleSerializer();
 
             while (itr.hasNext()) {
 
@@ -1168,9 +1181,9 @@ public class SPORelation extends AbstractRelation<SPO> {
 
                 for (int i = 0; i < n; i++) {
 
-                    final Justification jst = a[i];
+//                    final Justification jst = a[i];
 
-                    keys[i] = jst.getKey(keyBuilder);
+                    keys[i] = tupleSer.serializeKey(a[i]);//jst.getKey(keyBuilder);
 
                 }
 
@@ -1181,7 +1194,6 @@ public class SPORelation extends AbstractRelation<SPO> {
                  * See above for the alternative.
                  */
                 // Arrays.sort(keys,UnsignedByteArrayComparator.INSTANCE);
-                final IIndex ndx = getJustificationIndex();
 
                 final LongAggregator aggregator = new LongAggregator();
 

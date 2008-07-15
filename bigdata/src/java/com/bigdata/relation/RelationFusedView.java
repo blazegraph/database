@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.accesspath.AccessPathFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IBindingSet;
@@ -67,7 +68,9 @@ public class RelationFusedView<E> implements IRelation<E> {
 
     /**
      * Note: You can not compute the exact element count for a fused view since
-     * there may be duplicate elements in the two source {@link IRelation}s.
+     * there may be duplicate elements in the two source {@link IRelation}s
+     * (well, you could merge the data in the views into a temporary view but
+     * that is hardly efficient).
      * 
      * @throws UnsupportedOperationException
      *             if <code>exact == true</code>.
@@ -97,48 +100,63 @@ public class RelationFusedView<E> implements IRelation<E> {
     
     }
 
-    /*
-     * FIXME All of these methods can not be implemented for the fused view.
-     * Perhaps either the code should use AbstractRelation or another interface
-     * should be introduced without these methods.
-     */
-
-    public long getTimestamp() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-
     public ExecutorService getExecutorService() {
         
         return relation1.getExecutorService();
         
     }
-
+    
     public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
 
         return relation1.newElement(predicate, bindingSet);
 
     }
 
+    /**
+     * The {@link IIndexManager} for the first relation in the view.
+     */
     public IIndexManager getIndexManager() {
 
-        throw new UnsupportedOperationException();
+        return relation1.getIndexManager();
 
     }
 
+    /*
+     * Note: These methods can not be implemented for the fused view.
+     */
+
+    /**
+     * Not implemented for a fused view. (The elements of the view can have
+     * different timestamps - this is especially true when one is a
+     * {@link TemporaryStore}.)
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public long getTimestamp() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * Not implemented for a fused view.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
     public String getNamespace() {
 
         throw new UnsupportedOperationException();
 
     }
 
-    public IDatabase getDatabase() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-
+    /**
+     * Not implemented for a fused view.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
     public String getContainerNamespace() {
     
         throw new UnsupportedOperationException();

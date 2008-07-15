@@ -32,14 +32,20 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
-import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.inf.Justification.VisitedSPOSet;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.rule.Constant;
+import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.Var;
+import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.Solution;
 
 /**
  * Test suite for writing, reading, chasing and retracting {@link Justification}s.
@@ -59,7 +65,7 @@ import com.bigdata.relation.rule.Rule;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestJustifications extends AbstractTripleStoreTestCase {
+public class TestJustifications extends AbstractRuleTestCase {
 
     /**
      * 
@@ -86,10 +92,10 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
     }
     
     /**
-     * Creates a {@link Justification}, writes it on the store using an
-     * {@link SPOAssertionBuffer}, verifies that we can read it back from the
-     * store, and then retracts the justified statement and verifies that the
-     * justification was also retracted.
+     * Creates a {@link Justification}, writes it on the store using
+     * {@link RDFJoinNexus#newInsertBuffer(IMutableRelation)}, verifies that we
+     * can read it back from the store, and then retracts the justified
+     * statement and verifies that the justification was also retracted.
      */
     public void test_writeReadRetract() {
 
@@ -97,6 +103,12 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
 
         try {
 
+            if (!store.isJustify()) {
+
+                log.warn("Test skipped - justifications not enabled");
+
+            }
+        
             /*
              * the explicit statement that is the support for the rule.
              */
@@ -105,59 +117,101 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
             long A = store.addTerm(new URIImpl("http://www.bigdata.com/A"));
             long Y = store.addTerm(new URIImpl("http://www.bigdata.com/Y"));
 
-            store.addStatements(new SPO[] { new SPO(U, A, Y,
-                    StatementEnum.Explicit) }, 1);
+            store.addStatements(new SPO[] {//
+                    new SPO(U, A, Y, StatementEnum.Explicit) //
+                    }, //
+                    1);
 
             assertTrue(store.hasStatement(U, A, Y));
             assertEquals(1, store.getStatementCount());
 
-            InferenceEngine inf = store.getInferenceEngine();
+            final InferenceEngine inf = store.getInferenceEngine();
 
             // the rule.
-            Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),inf);
+            final Rule rule = new RuleRdf01(store.getSPORelation().getNamespace(),inf);
 
-            // the entailment.
-            SPO head = new SPO(A, inf.rdfType.get(), inf.rdfProperty.get(),
+            final IJoinNexus joinNexus = store.newJoinNexusFactory(
+                    IJoinNexus.ALL, null/* filter */).newInstance(
+                            store.getIndexManager());
+            
+            /*
+             * The buffer that accepts solutions and causes them to be written
+             * onto the statement indices and the justifications index.
+             */
+            final IBuffer<ISolution> insertBuffer = joinNexus.newInsertBuffer(
+                    store.getSPORelation());
+            
+            // the expected justification (setup and verified below).
+            final Justification jst;
+
+            // the expected entailment.
+            final SPO expectedEntailment = new SPO(//
+                    A, inf.rdfType.get(), inf.rdfProperty.get(),
                     StatementEnum.Inferred);
 
-            long[] bindings = new long[] { U, A, Y };
+            {
+            
+                final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
-            Justification jst = new Justification(r, head, bindings);
+                bindingSet.set(Var.var("u"), new Constant<Long>(U));
+                bindingSet.set(Var.var("a"), new Constant<Long>(A));
+                bindingSet.set(Var.var("y"), new Constant<Long>(Y));
+                
+                final ISolution solution = new Solution(joinNexus, rule,
+                        bindingSet);
 
-            assertEquals(head, jst.getHead());
+                /*
+                 * Verify the justification that will be built from that
+                 * solution.
+                 */
+                {
 
-            assertEquals(
-                    new SPO[] { new SPO(U, A, Y, StatementEnum.Inferred) }, jst
-                            .getTail());
+                    jst = new Justification(solution);
 
-            SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store,
-                    null/* filter */, 100/* capacity */, true/* justified */);
+                    // verify the bindings on the head of the rule as represented by the justification.
+                    assertEquals(expectedEntailment, jst.getHead());
 
-            assertTrue(buf.add(head, jst));
+                    // verify the bindings on the tail of the rule as represented b the justification.
+                    assertEquals(//
+                            new SPO[] {//
+                                    new SPO(U, A, Y, StatementEnum.Inferred)//
+                            },//
+                            jst.getTail()//
+                            );
+
+                }
+                
+                // insert solution into the buffer.
+                insertBuffer.add(solution);
+                
+            }
+            
+//            SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store,
+//                    null/* filter */, 100/* capacity */, true/* justified */);
+//
+//            assertTrue(buf.add(head, jst));
 
             // no justifications before hand.
-            assertEquals(0, store.getJustificationIndex()
-                    .rangeCount(null, null));
+            assertEquals(0L, store.getJustificationIndex().rangeCount());
 
             // flush the buffer.
-            assertEquals(1, buf.flush());
+            assertEquals(1L, insertBuffer.flush());
 
             // one justification afterwards.
-            assertEquals(1, store.getJustificationIndex()
-                    .rangeCount(null, null));
+            assertEquals(1L, store.getJustificationIndex().rangeCount());
 
             /*
              * verify read back from the index.
              */
             {
 
-                ITupleIterator itr = store.getJustificationIndex()
-                        .rangeIterator(null, null);
+                final ITupleIterator itr = store.getJustificationIndex()
+                        .rangeIterator();
 
                 while (itr.hasNext()) {
 
                     // de-serialize the justification from the key.
-                    Justification tmp = new Justification(itr);
+                    Justification tmp = (Justification)itr.next().getObject();
                     
                     // verify the same.
                     assertEquals(jst, tmp);
@@ -174,37 +228,41 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              */
             {
              
-                FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(store,head);
+                final FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(
+                        store, expectedEntailment);
                 
                 assertTrue(itr.hasNext());
                 
-                Justification tmp = itr.next();
+                final Justification tmp = itr.next();
                 
-                assertEquals(jst,tmp);
+                assertEquals(jst, tmp);
                 
             }
             
             // an empty focusStore.
-            TempTripleStore focusStore = new TempTripleStore(store.getProperties());
+            final TempTripleStore focusStore = new TempTripleStore(store
+                    .getProperties(), store);
             
             /*
              * The inference (A rdf:type rdf:property) is grounded by the
              * explicit statement (U A Y).
              */
 
-            assertTrue(Justification.isGrounded(inf, focusStore, store, head,
+            assertTrue(Justification.isGrounded(inf, focusStore, store, expectedEntailment,
                     false/* testHead */, true/* testFocusStore */,
                     new VisitedSPOSet(focusStore.getIndexManager())));
 
             // add the statement (U A Y) to the focusStore.
-            focusStore.addStatements(new SPO[] { new SPO(U, A, Y,
-                    StatementEnum.Explicit) }, 1);
+            focusStore.addStatements(new SPO[] {//
+                    new SPO(U, A, Y, StatementEnum.Explicit) //
+                    },//
+                    1);
 
             /*
              * The inference is no longer grounded since we have declared that
              * we are also retracting its grounds.
              */
-            assertFalse(Justification.isGrounded(inf, focusStore, store, head,
+            assertFalse(Justification.isGrounded(inf, focusStore, store, expectedEntailment,
                     false/* testHead */, true/* testFocusStore */,
                     new VisitedSPOSet(focusStore.getIndexManager())));
             
@@ -212,15 +270,16 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              * remove the justified statements.
              */
 
-            assertEquals(1, store.getAccessPath(head.s, head.p, head.o)
-                    .removeAll());
+            assertEquals(1L, store.getAccessPath(expectedEntailment.s,
+                    expectedEntailment.p, expectedEntailment.o).removeAll());
 
             /*
              * verify that the justification for that statement is gone.
              */
             {
                 
-                ITupleIterator itr = store.getJustificationIndex().rangeIterator(null, null);
+                final ITupleIterator itr = store.getJustificationIndex()
+                        .rangeIterator(null, null);
                 
                 assertFalse(itr.hasNext());
                 

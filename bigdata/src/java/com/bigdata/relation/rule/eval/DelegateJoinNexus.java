@@ -30,6 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -101,8 +102,8 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getWriteTimestamp();
     }
 
-    public long getReadTimestamp() {
-        return delegate.getReadTimestamp();
+    public long getReadTimestamp(String relationName) {
+        return delegate.getReadTimestamp(relationName);
     }
 
     public int solutionFlags() {
@@ -114,8 +115,11 @@ public class DelegateJoinNexus implements IJoinNexus {
     }
 
     public IJoinNexusFactory getJoinNexusFactory() {
-        // TODO Auto-generated method stub
-        return null;
+        return delegate.getJoinNexusFactory();
+    }
+
+    public IRelation getReadRelationView(IPredicate pred) {
+        return delegate.getReadRelationView(pred);
     }
 
 }

@@ -94,15 +94,18 @@ public class MutationTask extends AbstractStepTask {
          * tasks will execute.
          */
 
-        final ProgramUtility util = new ProgramUtility();
-        
-        final Map<String, IRelation> relations = util
-                .getRelations(indexManager, step, joinNexus.getWriteTimestamp());
+        /*
+         * Note: This assumes that we are using the same write timestamp for
+         * each relation....  True for now, but consider if two transactions
+         * were being written on in conjunction.
+         */
+        final Map<String, IRelation> relations = getWriteRelations(
+                indexManager, step, joinNexus.getWriteTimestamp());
 
         assert !relations.isEmpty();
 
-        final Map<String, IBuffer<ISolution>> buffers = util
-                .getMutationBuffers(action, joinNexus, relations);
+        final Map<String, IBuffer<ISolution>> buffers = getMutationBuffers(
+                joinNexus, relations);
 
         assert !buffers.isEmpty();
 

@@ -356,13 +356,8 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
 
         }
 
-        // The name of the relation that the predicate will query.
-        final String relationName = predicate.getOnlyRelationName();
-        
         // Resolve the relation name to the IRelation object.
-        final IRelation relation = (IRelation) joinNexus.getIndexManager()
-                .getResourceLocator().locate(relationName,
-                        joinNexus.getReadTimestamp());
+        final IRelation relation = (IRelation) joinNexus.getReadRelationView(predicate);
         
         // find the best access path for the predicate for that relation.
         final IAccessPath accessPath = relation.getAccessPath(predicate);

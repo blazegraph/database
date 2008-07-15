@@ -101,10 +101,12 @@ public class Solution<E> implements ISolution<E>, Serializable {
             // the head of the rule.
             final IPredicate head = rule.getHead();
             
+            final String relationName = head.getOnlyRelationName();
+            
             // the relation named by the head of the rule.
             final IRelation relation = (IRelation) joinNexus.getIndexManager()
-                    .getResourceLocator().locate(head.getOnlyRelationName(),
-                            joinNexus.getReadTimestamp());
+                    .getResourceLocator().locate(relationName,
+                            joinNexus.getReadTimestamp(relationName));
 
             // use the relation's element factory.
             this.e = (E) relation.newElement(head, bindingSet);

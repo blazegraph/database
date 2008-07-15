@@ -59,7 +59,6 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RDF(S)+ inference and truth maintenance");
 
-        
         /*
          * test ability to insert, update, or remove elements from a relation
          * and the ability to select the right access path given a predicate for
@@ -112,6 +111,12 @@ public class TestAll extends TestCase {
         // Note: fast closure rules using the same base class.
         suite.addTestSuite(TestRuleFastClosure_3_5_6_7_9.class);
 
+        // test suite for fix point closure of some rule sets.
+        suite.addTestSuite(TestDatabaseAtOnceClosure.class);
+        
+        // test suite comparing the fix point and fast closure methods.
+        suite.addTestSuite(TestCompareFullAndFastClosure.class);
+        
         // owl:sameAs rules.
         suite.addTestSuite(TestRuleOwlSameAs.class);
 
@@ -144,17 +149,11 @@ public class TestAll extends TestCase {
 
         // test suite for owl:sameAs {2,3} (backward chaining).
         suite.addTestSuite( TestBackchainOwlSameAsPropertiesIterator.class );
-
-        /*
-         * @todo do some rigerous tests of the forward chainer to make sure that
-         * it is properly computing the RDFS entailments. There are tests of
-         * this in the bigdata-sails project, but they rely on testing against
-         * the Sesame in-memory repository as ground truth.  It would be nice to
-         * run some W3C test suites or the like here.
-         */
         
         /*
-         * test truth maintenance.
+         * Test truth maintenance. This examines the incremental assertion and
+         * retraction of statements buffered in a [focusStore] against the
+         * database.  Database-at-once closure is tested above.
          */
         
         // test suite for basic TM mechansism encapsulated by this class.

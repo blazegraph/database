@@ -53,8 +53,7 @@ import com.bigdata.rdf.store.TempTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestCompareOwlSameAsEntailments extends
-        AbstractInferenceEngineTestCase {
+public class TestCompareOwlSameAsEntailments extends AbstractRuleTestCase {
 
     /**
      * 
@@ -158,108 +157,4 @@ public class TestCompareOwlSameAsEntailments extends
         
     }
     
-    /**
-     * Compares two RDF graphs for equality (same statements) - does NOT handle
-     * bnodes, which much be treated as variables for RDF semantics.
-     * 
-     * @param expected
-     * 
-     * @param actual
-     * 
-     * @return true if all statements in the expected graph are in the actual
-     *         graph and if the actual graph does not contain any statements
-     *         that are not also in the expected graph.
-     * 
-     * FIXME refactor to {@link AbstractTestCase} and make sure that the same
-     * logic is not present in the rest of the test suite.
-     */
-    public static boolean modelsEqual(AbstractTripleStore expected,
-            AbstractTripleStore actual) throws SailException {
-
-        int actualSize = 0; 
-        boolean sameStatements1 = true;
-        {
-
-            BigdataStatementIterator it = actual.getStatements(null, null, null);
-
-            try {
-
-                while(it.hasNext()) {
-
-                    Statement stmt = it.next();
-
-                    if (!expected.hasStatement(stmt.getSubject(), stmt
-                            .getPredicate(), stmt.getObject())) {
-
-                        sameStatements1 = false;
-
-                        log("Not expecting: " + stmt);
-
-                    }
-
-                    actualSize++; // count #of statements actually visited.
-                    
-                }
-
-            } finally {
-
-                it.close();
-
-            }
-            
-            log("all the statements in actual in expected? " + sameStatements1);
-
-        }
-
-        int expectedSize = 0;
-        boolean sameStatements2 = true;
-        {
-
-            BigdataStatementIterator it = expected.getStatements(null, null, null);
-
-            try {
-
-                while(it.hasNext()) {
-
-                Statement stmt = it.next();
-
-                if (!actual.hasStatement(stmt.getSubject(),
-                        stmt.getPredicate(), stmt.getObject())) {
-
-                    sameStatements2 = false;
-
-                    log("    Expecting: " + stmt);
-
-                }
-                
-                expectedSize++; // counts statements actually visited.
-
-                }
-                
-            } finally {
-                
-                it.close();
-                
-            }
-
-            log("all the statements in expected in actual? " + sameStatements2);
-
-        }
-
-        final boolean sameSize = expectedSize == actualSize;
-        
-        log("size of 'expected' repository: " + expectedSize);
-
-        log("size of 'actual'   repository: " + actualSize);
-
-        return sameSize && sameStatements1 && sameStatements2;
-
-    }
-
-    private static void log(String s) {
-
-        System.err.println(s);
-
-    }
-
 }

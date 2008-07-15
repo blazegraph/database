@@ -266,7 +266,7 @@ public class JustificationIterator implements IJustificationIterator {
 
             while (src.hasNext()) {
 
-                Justification t = new Justification(src);
+                Justification t = (Justification)src.next().getObject();
 
                 try {
 
@@ -320,7 +320,8 @@ public class JustificationIterator implements IJustificationIterator {
 
             while (src.hasNext() && buffer.remainingCapacity() > 0) {
 
-                Justification jst = new Justification(src);
+                final Justification jst = (Justification) src.next()
+                        .getObject();
 
                 try {
 
@@ -342,9 +343,10 @@ public class JustificationIterator implements IJustificationIterator {
 
         } finally {
 
-            log.info("(Re-)filled buffer: size=" + buffer.size()
-                    + ", remainingCapacity=" + buffer.remainingCapacity()
-                    + ", done=" + !src.hasNext());
+            if (log.isInfoEnabled())
+                log.info("(Re-)filled buffer: size=" + buffer.size()
+                        + ", remainingCapacity=" + buffer.remainingCapacity()
+                        + ", done=" + !src.hasNext());
 
         }
 

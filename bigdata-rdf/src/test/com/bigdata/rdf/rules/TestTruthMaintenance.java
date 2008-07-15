@@ -90,7 +90,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
     }
 
     /**
-     * Test for {@link TMStatementBuffer#applyExistingStatements(AbstractTripleStore, AbstractTripleStore, ISPOFilter filter)}.
+     * Test for
+     * {@link TruthMaintenance#applyExistingStatements(AbstractTripleStore, AbstractTripleStore, IElementFilter filter)}.
      */
     public void test_filter_01() {
 

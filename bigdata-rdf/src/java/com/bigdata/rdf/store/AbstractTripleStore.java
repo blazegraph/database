@@ -235,20 +235,25 @@ abstract public class AbstractTripleStore extends
      * This is used to conditionally enable the logic to retract justifications
      * when the corresponding statements is retracted.
      * 
-     * @deprecated by {@link SPORelation#justify}
+     * @deprecated by {@link SPORelation#justify}?
      */
-    final protected boolean justify;
+    final private boolean justify;
+    
+    /**
+     * True iff justification chains are being recorded for entailments and used
+     * to support truth maintenance
+     */
+    final public boolean isJustify() {
+        
+        return justify;
+        
+    }
 
     /**
      * This is used to conditionally disable the lexicon support, principally in
      * conjunction with a {@link TempTripleStore}.
      */
     final protected boolean lexicon;
-
-//    /**
-//     * This is used to conditionally disable the free text index for literals.
-//     */
-//    final protected boolean textIndex;
 
     /**
      * This is used to conditionally disable all but a single statement index
@@ -257,13 +262,6 @@ abstract public class AbstractTripleStore extends
      * @deprecated by {@link SPORelation#oneAccessPath}
      */
     final protected boolean oneAccessPath;
-
-//    /**
-//     * The branching factor for indices registered by this class.
-//     * 
-//     * @see com.bigdata.journal.Options#BRANCHING_FACTOR
-//     */
-//    final protected int branchingFactor;
 
     /**
      * The #of term identifiers in the key for a statement index (3 is a triple
@@ -1777,13 +1775,13 @@ abstract public class AbstractTripleStore extends
 
         if (justifications && justify) {
 
-            IIndex ndx = getJustificationIndex();
+            final IIndex ndx = getJustificationIndex();
 
-            ITupleIterator itrj = ndx.rangeIterator(null, null);
+            final ITupleIterator itrj = ndx.rangeIterator();
 
             while (itrj.hasNext()) {
 
-                Justification jst = new Justification(itrj);
+                Justification jst = (Justification)itrj.next().getObject();
 
                 sb.append("#" + (njust + 1) + "\t"
                         + jst.toString(resolveTerms)+"\n");
@@ -2553,7 +2551,7 @@ abstract public class AbstractTripleStore extends
          */
         final long readTime = ITx.READ_COMMITTED;
 
-        return new RDFJoinNexusFactory(writeTime, readTime, justify,
+        return new RDFJoinNexusFactory(writeTime, readTime, isJustify(),
                 solutionFlags, filter);
         
     }

@@ -243,11 +243,6 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
             final long begin = System.currentTimeMillis();
 
-            final long timestamp = joinNexus.getReadTimestamp();
-
-            final IResourceLocator resourceLocator = joinNexus
-                    .getIndexManager().getResourceLocator();
-            
             /*
              * Note: Since this task is always applied to a single tail rule,
              * the {@link TMUtility} rewrite of the rule will always read from
@@ -255,8 +250,13 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
              * which to read easy - just read on whichever relation is specified
              * for tail[0].
              */
-            final SPORelation relation = (SPORelation) resourceLocator
-                    .locate(rule.getHead().getOnlyRelationName(), timestamp);
+            final String relationName = rule.getHead().getOnlyRelationName();
+            
+            final long timestamp = joinNexus.getReadTimestamp(relationName);
+
+            final SPORelation relation = (SPORelation) joinNexus
+                    .getIndexManager().getResourceLocator().locate(
+                            relationName, timestamp);
 
             /*
              * Query for the set {P} rather than requiring it as an input.
@@ -411,22 +411,25 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                  * Setup the [database] or [database + focusStore] view used to
                  * compute the closure.
                  */
-                
                 final IResourceLocator resourceLocator = joinNexus
                         .getIndexManager().getResourceLocator();
                 
-                final long timestamp = joinNexus.getReadTimestamp();
-                
                 if (focusStore == null) {
 
+                    final long timestamp = joinNexus.getReadTimestamp(database);
+                   
                     return (IRelation<SPO>)resourceLocator.locate(database, timestamp);
 
                 } else {
 
+                    final long timestamp0 = joinNexus.getReadTimestamp(database);
+
+                    final long timestamp1 = joinNexus.getReadTimestamp(focusStore);
+
                     return new RelationFusedView<SPO>(
                             //
-                            (IRelation<SPO>)resourceLocator.locate(database, timestamp),
-                            (IRelation<SPO>)resourceLocator.locate(focusStore, timestamp));
+                            (IRelation<SPO>)resourceLocator.locate(database, timestamp0),
+                            (IRelation<SPO>)resourceLocator.locate(focusStore, timestamp1));
 
                 }
                     // final IAccessPath accessPath = (focusStore == null //

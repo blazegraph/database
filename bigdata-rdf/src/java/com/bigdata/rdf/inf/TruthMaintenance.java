@@ -576,8 +576,9 @@ public class TruthMaintenance {
          */
         final int capacity = (int) Math.min(10000L, tempStoreCount);
 
-        log.info("Doing truth maintenance with " + tempStoreCount
-                + " statements : depth=" + depth);
+        if (INFO)
+            log.info("Doing truth maintenance with " + tempStoreCount
+                    + " statements : depth=" + depth);
         
         /*
          * Temp store used to absorb statements for which no grounded
@@ -714,7 +715,9 @@ public class TruthMaintenance {
                                     + spo.toString(database));
 
                     } else if (depth == 0
-                            && Justification.isGrounded(inferenceEngine, tempStore, database, spo, testHead, testFocusStore)) {
+                            && Justification.isGrounded(inferenceEngine,
+                                    tempStore, database, spo, testHead,
+                                    testFocusStore)) {
 
                         /*
                          * Add a variant of the statement that is marked as
@@ -743,17 +746,19 @@ public class TruthMaintenance {
                                     + spo.toString(database));
                         
                     } else if (depth > 0
-                            && Justification.isGrounded(inferenceEngine, tempStore, database, spo, testHead, testFocusStore)) {
-                        
+                            && Justification.isGrounded(inferenceEngine,
+                                    tempStore, database, spo, testHead,
+                                    testFocusStore)) {
+
                         /*
                          * Ignore.
                          */
-                        
+
                         if (INFO)
                             log.info(spo.toString(database) + " is grounded");
-                        
-                    } else if(!database.hasStatement(spo.s, spo.p, spo.o)) {
-                        
+
+                    } else if (!database.hasStatement(spo.s, spo.p, spo.o)) {
+
                         /*
                          * Ignore.
                          * 
@@ -761,10 +766,11 @@ public class TruthMaintenance {
                          * focusStore below rather than a set of point tests in
                          * this if-then-else block.
                          */
-                        
-                        if(INFO) {
-                            
-                            log.info("Statement not in database: "+spo.toString(database));
+
+                        if (INFO) {
+
+                            log.info("Statement not in database: "
+                                    + spo.toString(database));
                             
                         }
 
@@ -806,8 +812,9 @@ public class TruthMaintenance {
                        nretracted = retractionBuffer.flush();
             final int nungrounded = ungroundedBuffer.flush();
 
-            log.info("#downgraded=" + ndowngraded + ", #retracted="
-                    + nretracted + ", #ungrounded=" + nungrounded);
+            if (INFO)
+                log.info("#downgraded=" + ndowngraded + ", #retracted="
+                        + nretracted + ", #ungrounded=" + nungrounded);
 
         } finally {
 
@@ -910,7 +917,8 @@ public class TruthMaintenance {
             
             }
             
-            log.info("removed "+nremoved+" from focusStore");
+            if (INFO)
+                log.info("removed "+nremoved+" from focusStore");
             
         }
 
