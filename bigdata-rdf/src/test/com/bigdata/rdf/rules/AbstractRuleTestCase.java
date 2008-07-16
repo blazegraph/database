@@ -27,7 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.spo.SPO;
@@ -202,7 +207,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         boolean sameStatements1 = true;
         {
 
-            BigdataStatementIterator it = actual.getStatements(null, null, null);
+            BigdataStatementIterator it = actual.asStatementIterator(actual
+                    .getInferenceEngine().backchainIterator(NULL, NULL, NULL));
 
             try {
 
@@ -210,7 +216,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
                     Statement stmt = it.next();
 
-                    if (!expected.hasStatement(stmt.getSubject(), stmt
+                    if (!hasStatement(expected, stmt.getSubject(), stmt
                             .getPredicate(), stmt.getObject())) {
 
                         sameStatements1 = false;
@@ -246,7 +252,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         boolean sameStatements2 = true;
         {
 
-            BigdataStatementIterator it = expected.getStatements(null, null, null);
+            BigdataStatementIterator it = expected.asStatementIterator(expected
+                    .getInferenceEngine().backchainIterator(NULL, NULL, NULL));
 
             try {
 
@@ -254,8 +261,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
                 Statement stmt = it.next();
 
-                if (!actual.hasStatement(stmt.getSubject(),
-                        stmt.getPredicate(), stmt.getObject())) {
+                if (!hasStatement(actual, stmt.getSubject(), stmt
+                            .getPredicate(), stmt.getObject())) {
 
                     sameStatements2 = false;
 
@@ -296,6 +303,23 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
     private static void log(String s) {
 
         System.err.println(s);
+
+    }
+
+    static private boolean hasStatement(AbstractTripleStore database, Resource s,
+            URI p, Value o) {
+
+        if (RDF.TYPE.equals(p) && RDFS.RESOURCE.equals(o)) {
+
+            if (database.getTermId(s) != NULL) {
+
+                return true;
+
+            }
+
+        }
+
+        return database.hasStatement(s, p, o);
 
     }
 

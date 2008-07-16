@@ -457,11 +457,11 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * Resolve tuple to element type.
              */
             @Override
-            protected Object resolve(Object arg0) {
+            protected R resolve(Object arg0) {
 
                 final ITuple tuple = (ITuple) arg0;
 
-                return tuple.getObject();
+                return (R)tuple.getObject();
 
             }
         });

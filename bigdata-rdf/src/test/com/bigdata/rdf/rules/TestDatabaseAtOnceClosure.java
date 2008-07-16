@@ -66,6 +66,7 @@ import org.openrdf.sail.inferencer.fc.ForwardChainingRDFSInferencer;
 import org.openrdf.sail.memory.MemoryStore;
 
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.rule.Program;
@@ -108,11 +109,41 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     public void test_fixedPoint() throws SailException, RepositoryException, 
     	IOException, RDFParseException {
         
-        final AbstractTripleStore closure = 
-        	new TempTripleStore(new Properties());
-        	
-        final TempTripleStore groundTruth = 
-        	new TempTripleStore(new Properties());
+        /*
+         * Used to compute the entailments with out own rules engine.
+         */
+        final AbstractTripleStore closure; {
+            
+            Properties properties = new Properties();
+            
+//            properties
+//                    .setProperty(
+//                            InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
+//                            "true");
+            
+            properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+
+            properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,
+                    ForwardClosureEnum.Full.toString());
+            
+            // @todo should use the appropriate store class for testing.
+            closure = new TempTripleStore(properties);
+            
+        }
+
+        /*
+         * Gets loaded with the entailments computed by Sesame 2.
+         */
+        final TempTripleStore groundTruth;
+        {
+         
+            Properties properties = new Properties();
+            
+            properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+
+            groundTruth = new TempTripleStore(properties);
+            
+        }
         
         try {
 
@@ -168,26 +199,30 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         	
         	}
         	
-        	{ // load the same data into the closure store
+        	{ 
+                /*
+                 * Loads the same data into the closure store and computes the
+                 * closure.
+                 */
         		
         		closure.getDataLoader().loadData(
         				getClass().getResourceAsStream("small.rdf"), 
 	            		"", RDFFormat.RDFXML);
 
-                closure.commit();
-                
-                /*
-                 * compute the database at once closure.
-                 * 
-                 * Note: You can run either the full closure or the fast closure
-                 * method depending on how you setup the store. You can also use
-                 * an explicit InferenceEngine ctor to setup for either closure
-                 * method by overriding the appropriate property (it will be set
-                 * by the proxy test case otherwise which does not give you much
-                 * control).
-                 */
-                closure.getInferenceEngine()
-                        .computeClosure(null/* focusStore */);
+//                closure.commit();
+//                
+//                /*
+//                 * compute the database at once closure.
+//                 * 
+//                 * Note: You can run either the full closure or the fast closure
+//                 * method depending on how you setup the store. You can also use
+//                 * an explicit InferenceEngine ctor to setup for either closure
+//                 * method by overriding the appropriate property (it will be set
+//                 * by the proxy test case otherwise which does not give you much
+//                 * control).
+//                 */
+//                closure.getInferenceEngine()
+//                        .computeClosure(null/* focusStore */);
                 
                 if (log.isInfoEnabled()) {
 
