@@ -246,7 +246,7 @@ public class InferenceEngine extends RDFSVocabulary {
          */
         public static final String FORWARD_CLOSURE = "forwardClosure";
 
-        public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Fast.toString();
+        public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Full.toString();
         
         /**
          * When <code>true</code> (default <code>false</code>)
@@ -564,7 +564,7 @@ public class InferenceEngine extends RDFSVocabulary {
         return computeClosure(focusStore, isJustified());
         
     }
-    
+
     /**
      * This variant allows you to explicitly NOT generate {@link Justification}s
      * for the computed entailments. It is used by the {@link TruthMaintenance}
@@ -585,20 +585,79 @@ public class InferenceEngine extends RDFSVocabulary {
     public ClosureStats computeClosure(AbstractTripleStore focusStore,
             boolean justify) {
 
+        final MappedProgram program;
+
+        switch (forwardClosure) {
+
+        case Fast:
+            program = getFastForwardClosureProgram(
+                    //
+                    database.getSPORelation().getNamespace(),
+                    (focusStore == null ? null : focusStore.getSPORelation()
+                            .getNamespace()),//
+                    forwardChainRdfTypeRdfsResource, //
+                    rdfsOnly,//
+                    forwardChainOwlSameAsClosure, //
+                    forwardChainOwlSameAsProperties,//
+                    forwardChainOwlEquivalentProperty,//
+                    forwardChainOwlEquivalentClass//
+            );
+            break;
+
+        case Full:
+
+            program = getFullClosureProgram(
+                    //
+                    database.getSPORelation().getNamespace(),
+                    (focusStore == null ? null : focusStore.getSPORelation()
+                            .getNamespace()),//
+                    forwardChainRdfTypeRdfsResource, //
+                    rdfsOnly,//
+                    forwardChainOwlSameAsClosure, //
+                    forwardChainOwlSameAsProperties,//
+                    forwardChainOwlEquivalentProperty,//
+                    forwardChainOwlEquivalentClass//
+            );
+
+            break;
+
+        default:
+            throw new AssertionError("fowardClosure=" + forwardClosure);
+
+        }
+        
+        if(log.isInfoEnabled()) {
+            
+            log.info("\n\nforwardClosure=" + forwardClosure + ", program="
+                    + program);
+            
+        }
+        
         try {
 
-            switch (forwardClosure) {
+            final long begin = System.currentTimeMillis();
 
-            case Fast:
-                return fastForwardClosure(focusStore, justify);
+            /*
+             * FIXME remove IJoinNexus.RULE once we no longer need the rule to
+             * generate the justifications.
+             */
+            final int solutionFlags = IJoinNexus.ELEMENT//
+                    | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
+//                  | IJoinNexus.RULE  // iff debugging.
+                  ;
+          
+            final IJoinNexusFactory joinNexusFactory = database
+                    .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
+                            doNotAddFilter);
 
-            case Full:
-                return fullForwardClosure(focusStore, justify);
+            final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
+                    .getIndexManager());
+            
+            final long mutationCount = joinNexus.runMutation(program);
 
-            default:
-                throw new UnsupportedOperationException();
-
-            }
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            return new ClosureStats(mutationCount,elapsed);
 
         } catch (Exception ex) {
 
@@ -608,116 +667,159 @@ public class InferenceEngine extends RDFSVocabulary {
         
     }
     
-    /**
-     * Compute the complete forward closure of the store using a set-at-a-time
-     * inference strategy.
-     * <p>
-     * The general approach is a series of rounds in which each rule is applied
-     * to all data in turn. Entailments computed in each round are fed back into
-     * the source against which the rules can match their preconditions, so
-     * derived entailments may be computed in a succession of rounds. The
-     * process halts when no new entailments are computed in a given round.
-     * 
-     * @param focusStore
-     *            When non-<code>null</code> , the focusStore will be closed
-     *            against the database with the entailments written into the
-     *            database. When <code>null</code>, the entire database will
-     *            be closed.
-     */
-    protected ClosureStats fullForwardClosure(AbstractTripleStore focusStore,
-            boolean justify) throws Exception {
-
-        final long begin = System.currentTimeMillis();
-
-        final MappedProgram program = getFastForwardClosureProgram(//
-                database.getSPORelation().getNamespace(),
-                (focusStore == null ? null : focusStore.getSPORelation()
-                        .getNamespace()),//
-                forwardChainRdfTypeRdfsResource, //
-                rdfsOnly,//
-                forwardChainOwlSameAsClosure, //
-                forwardChainOwlSameAsProperties,//
-                forwardChainOwlEquivalentProperty,//
-                forwardChainOwlEquivalentClass//
-                );
-
-        /*
-         * FIXME remove IJoinNexus.RULE once we no longer need the rule to
-         * generate the justifications.
-         */
-        final int solutionFlags = IJoinNexus.ELEMENT//
-                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
-//              | IJoinNexus.RULE  // iff debugging.
-              ;
-      
-        final IJoinNexusFactory joinNexusFactory = database
-                .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
-                        doNotAddFilter);
-
-        final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
-                .getIndexManager());
-        
-        final long mutationCount = joinNexus.runMutation(program);
-
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        return new ClosureStats(mutationCount,elapsed);
-        
-    }
-
-    /**
-     * Fast forward closure of the store based on <a
-     * href="http://www.cs.iastate.edu/~tukw/waim05.pdf">"An approach to RDF(S)
-     * Query, Manipulation and Inference on Databases" by Lu, Yu, Tu, Lin, and
-     * Zhang</a>.
-     * 
-     * @param focusStore
-     *            When non-<code>null</code> , the focusStore will be closed
-     *            against the database with the entailments written into the
-     *            database. When <code>null</code>, the entire database will
-     *            be closed.
-     */
-    protected ClosureStats fastForwardClosure(AbstractTripleStore focusStore,
-            boolean justify) throws Exception {
-
-
-        final long begin = System.currentTimeMillis();
-
-        final MappedProgram program = getFastForwardClosureProgram(//
-                database.getSPORelation().getNamespace(),//
-                (focusStore == null ? null : focusStore.getSPORelation()
-                        .getNamespace()),//
-                forwardChainRdfTypeRdfsResource, //
-                rdfsOnly,//
-                forwardChainOwlSameAsClosure, //
-                forwardChainOwlSameAsProperties,//
-                forwardChainOwlEquivalentProperty,//
-                forwardChainOwlEquivalentClass//
-                );
-        
-        /*
-         * @todo remove IJoinNexus.RULE once we no longer need the rule to
-         * generate the justifications.
-         */
-        final int solutionFlags = IJoinNexus.ELEMENT//
-                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
-//      | IJoinNexus.RULE  // iff debugging.
-                ;
-        
-        final IJoinNexusFactory joinNexusFactory = database
-                .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
-                        doNotAddFilter);
-
-        final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
-                .getIndexManager());
-
-        final long mutationCount = joinNexus.runMutation(program);
-
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        return new ClosureStats(mutationCount, elapsed);
-        
-    }
+//    /**
+//     * This variant allows you to explicitly NOT generate {@link Justification}s
+//     * for the computed entailments. It is used by the {@link TruthMaintenance}
+//     * class as part of the algorithm for truth maintenance when retracting
+//     * statements from the database. It SHOULD NOT be used for any other purpose
+//     * or you may risk failing to generate justifications.
+//     * 
+//     * @param focusStore
+//     *            The data set that will be closed against the database.
+//     * @param justify
+//     *            {@link Justification}s will be generated iff this flag is
+//     *            <code>true</code>.
+//     * 
+//     * @return Statistics about the operation.
+//     * 
+//     * @see #computeClosure(AbstractTripleStore)
+//     */
+//    public ClosureStats computeClosure(AbstractTripleStore focusStore,
+//            boolean justify) {
+//
+//        try {
+//
+//            switch (forwardClosure) {
+//
+//            case Fast:
+//                return fastForwardClosure(focusStore, justify);
+//
+//            case Full:
+//                return fullForwardClosure(focusStore, justify);
+//
+//            default:
+//                throw new UnsupportedOperationException();
+//
+//            }
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Compute the complete forward closure of the store using a set-at-a-time
+//     * inference strategy.
+//     * <p>
+//     * The general approach is a series of rounds in which each rule is applied
+//     * to all data in turn. Entailments computed in each round are fed back into
+//     * the source against which the rules can match their preconditions, so
+//     * derived entailments may be computed in a succession of rounds. The
+//     * process halts when no new entailments are computed in a given round.
+//     * 
+//     * @param focusStore
+//     *            When non-<code>null</code> , the focusStore will be closed
+//     *            against the database with the entailments written into the
+//     *            database. When <code>null</code>, the entire database will
+//     *            be closed.
+//     */
+//    protected ClosureStats fullForwardClosure(AbstractTripleStore focusStore,
+//            boolean justify) throws Exception {
+//
+//        final long begin = System.currentTimeMillis();
+//
+//        final MappedProgram program = getFastForwardClosureProgram(//
+//                database.getSPORelation().getNamespace(),
+//                (focusStore == null ? null : focusStore.getSPORelation()
+//                        .getNamespace()),//
+//                forwardChainRdfTypeRdfsResource, //
+//                rdfsOnly,//
+//                forwardChainOwlSameAsClosure, //
+//                forwardChainOwlSameAsProperties,//
+//                forwardChainOwlEquivalentProperty,//
+//                forwardChainOwlEquivalentClass//
+//                );
+//
+//        /*
+//         * FIXME remove IJoinNexus.RULE once we no longer need the rule to
+//         * generate the justifications.
+//         */
+//        final int solutionFlags = IJoinNexus.ELEMENT//
+//                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
+////              | IJoinNexus.RULE  // iff debugging.
+//              ;
+//      
+//        final IJoinNexusFactory joinNexusFactory = database
+//                .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
+//                        doNotAddFilter);
+//
+//        final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
+//                .getIndexManager());
+//        
+//        final long mutationCount = joinNexus.runMutation(program);
+//
+//        final long elapsed = System.currentTimeMillis() - begin;
+//        
+//        return new ClosureStats(mutationCount,elapsed);
+//        
+//    }
+//
+//    /**
+//     * Fast forward closure of the store based on <a
+//     * href="http://www.cs.iastate.edu/~tukw/waim05.pdf">"An approach to RDF(S)
+//     * Query, Manipulation and Inference on Databases" by Lu, Yu, Tu, Lin, and
+//     * Zhang</a>.
+//     * 
+//     * @param focusStore
+//     *            When non-<code>null</code> , the focusStore will be closed
+//     *            against the database with the entailments written into the
+//     *            database. When <code>null</code>, the entire database will
+//     *            be closed.
+//     */
+//    protected ClosureStats fastForwardClosure(AbstractTripleStore focusStore,
+//            boolean justify) throws Exception {
+//
+//
+//        final long begin = System.currentTimeMillis();
+//
+//        final MappedProgram program = getFastForwardClosureProgram(//
+//                database.getSPORelation().getNamespace(),//
+//                (focusStore == null ? null : focusStore.getSPORelation()
+//                        .getNamespace()),//
+//                forwardChainRdfTypeRdfsResource, //
+//                rdfsOnly,//
+//                forwardChainOwlSameAsClosure, //
+//                forwardChainOwlSameAsProperties,//
+//                forwardChainOwlEquivalentProperty,//
+//                forwardChainOwlEquivalentClass//
+//                );
+//        
+//        /*
+//         * @todo remove IJoinNexus.RULE once we no longer need the rule to
+//         * generate the justifications.
+//         */
+//        final int solutionFlags = IJoinNexus.ELEMENT//
+//                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
+////      | IJoinNexus.RULE  // iff debugging.
+//                ;
+//        
+//        final IJoinNexusFactory joinNexusFactory = database
+//                .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
+//                        doNotAddFilter);
+//
+//        final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
+//                .getIndexManager());
+//
+//        final long mutationCount = joinNexus.runMutation(program);
+//
+//        final long elapsed = System.currentTimeMillis() - begin;
+//        
+//        return new ClosureStats(mutationCount, elapsed);
+//        
+//    }
     
     /**
      * Return true iff the fully bound statement is an axiom.

@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
+import java.util.Arrays;
+
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -254,6 +256,10 @@ public class SPOPredicate implements IPredicate<SPO> {
 
         sb.append("(");
 
+        sb.append(Arrays.toString(relationName));
+
+        sb.append(", ");
+        
         sb.append(s.isConstant() || bindingSet == null
                 || !bindingSet.isBound((IVariable) s) ? s.toString()
                 : bindingSet.get((IVariable) s));

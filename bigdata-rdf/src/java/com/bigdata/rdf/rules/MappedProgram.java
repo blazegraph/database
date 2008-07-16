@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.relation.rule.IProgram;
+import java.util.Iterator;
+
+import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Program;
 
 /**
@@ -77,16 +79,56 @@ public class MappedProgram extends Program {
      * Extended to add the N steps that map the given <i>step</i> across the
      * database and the focusStore.
      */
-    public void addStep(IProgram step) {
+    public void addStep(IStep step) {
+
+        if (step == null)
+            throw new IllegalArgumentException();
         
-        if(focusStore==null) {
+        if (focusStore == null) {
 
             super.addStep(step);
-            
+
         } else {
-        
-            addSteps( TMUtility.INSTANCE.mapProgramForTruthMaintenance(step, focusStore).steps() );
+
+            final Program subProgram = TMUtility.INSTANCE
+                    .mapForTruthMaintenance(step, focusStore);
+
+            /*
+             * FIXME I am not quite convinced that this is correct. The problems
+             * appear when used with the "full" vs "fast" closure programs.
+             * 
+             * For the full closure program, we have a set of rules that we want
+             * to fix point and we map those rules (individually) for truth
+             * maintenance and fix point the resulting set of rules
+             * 
+             * For the fast closure program, we have a sequence of steps. Some
+             * of those steps are closure operations. All of those steps need to
+             * be mapped for truth maintenance (if the focusStore is specified).
+             * 
+             * There is a test suite for this (TestMappedProgram) but it does
+             * not contain asserts and is not up to snuff.
+             */
+            if (this.isClosure()) {
+
+                /*
+                 * insert the individual rules into the closure program.
+                 */
+                
+                final Iterator<? extends IStep> steps = subProgram.steps();
+
+                while (steps.hasNext()) {
+
+                    super.addStep(steps.next());
+
+                }
             
+            } else {
+
+                // Note: invoke on super class to break recursion.
+                super.addStep(subProgram);
+
+            }
+
         }
         
     }

@@ -28,19 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IStep;
 
@@ -209,9 +200,9 @@ public class ProgramUtility {
 //    }
 
     /**
-     * <code>true</code> iff the program either is the fix point closure of a
-     * rule or contains a step (recursively) that is the fix point closure of
-     * one or more rules.
+     * <code>true</code> iff the program contains an embedded closure
+     * operation. <code>false</code> if the program is a rule or is itself a
+     * closure operation.
      * 
      * @param step
      *            The program.
@@ -224,7 +215,35 @@ public class ProgramUtility {
             throw new IllegalArgumentException();
 
         if(step.isRule()) return false;
+                
+        final IProgram program = (IProgram)step;
         
+        if (program.isClosure())
+            return false;
+
+        final Iterator<IStep> itr = program.steps();
+
+        while (itr.hasNext()) {
+
+            if (isClosureProgram2(itr.next()))
+                return true;
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * <code>true</code> iff this program is or contains a closure operation.
+     */
+    private boolean isClosureProgram2(IStep step) {
+
+        if (step == null)
+            throw new IllegalArgumentException();
+
+        if (step.isRule()) return false;
+                
         final IProgram program = (IProgram)step;
         
         if (program.isClosure())
@@ -234,7 +253,7 @@ public class ProgramUtility {
 
         while (itr.hasNext()) {
 
-            if (isClosureProgram(itr.next()))
+            if (isClosureProgram2(itr.next()))
                 return true;
 
         }

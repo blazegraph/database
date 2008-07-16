@@ -580,7 +580,7 @@ public class RDFJoinNexus implements IJoinNexus {
                     
                 }
                 
-                final ISolution<SPO> solution = (ISolution<SPO>)chunk[i];
+                final ISolution<SPO> solution = (ISolution<SPO>) chunk[i];
                 
                 a[i] = solution.get();
                 
