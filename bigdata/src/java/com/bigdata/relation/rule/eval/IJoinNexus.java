@@ -316,11 +316,9 @@ public interface IJoinNexus {
      */
     IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation);
 
-    
     /**
-     * Make the write sets from a mutation operation visible by committing the
-     * store(s) having buffered write sets. This is invoked after a top-level
-     * mutation operation and also after each round of a closure operation.
+     * Make the write sets visible, eg, by committing the store(s) having
+     * buffered write sets.
      */
     void makeWriteSetsVisible();
 

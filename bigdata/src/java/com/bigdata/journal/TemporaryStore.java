@@ -262,9 +262,9 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * Note: If {@link ITx#READ_COMMITTED} is requested, then the returned
      * {@link BTree} will reflect the state of the named index as of the last
      * commit point for that index - the view will be read-only and is NOT
-     * updated by {@link #commit()}.
+     * updated by {@link #checkpoint()}.
      * <p>
-     * Note that you must actually {@link #commit()} before a read-committed
+     * Note that you must actually {@link #checkpoint()} before a read-committed
      * view will be available.
      * 
      * @param name

@@ -81,16 +81,20 @@ import org.CognitiveWeb.generic.core.om.cache.WeakValueCache;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.DefaultKeyBuilderFactory;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.ThreadLocalKeyBuilderFactory;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Integration for bigdata.
@@ -312,11 +316,17 @@ public class PersistenceStore implements IPersistentStore
 
     }
 
+    /**
+     * A thread-local {@link IKeyBuilder} used for the default object index
+     * (formatting a long OID as an unsigned byte[] key).
+     */
     final protected IKeyBuilder getKeyBuilder() {
         
-        return m_journal.getKeyBuilder(); //@todo for the specific index.
+        return keyBuilderFactory.getKeyBuilder();
         
     }
+
+    private final ThreadLocalKeyBuilderFactory keyBuilderFactory;
     
     /**
      * Required constructor either opens the named store or creates a new store
@@ -373,6 +383,26 @@ public class PersistenceStore implements IPersistentStore
             
         }
 
+        /*
+         * @todo the property name map uses Unicode keys so the configuration
+         * here will effect how that index recognizes distinct property names
+         * and how it ordered properties. it should have an index local tuple
+         * serializer with its own index local key builder factory. the OID
+         * index should also use an index local key builder, but all it does is
+         * map Long to unsigned byte[8]. The stringId map also uses this key
+         * builder and should have its own configuration.
+         * 
+         * Note: The same key builder is used to map application attributes onto
+         * keys for the link set indices. Those link set indices should be made
+         * into scale-out indices per relation (link set family). It might be
+         * possible for each to have its own configured tuple serializer and key
+         * builder factory that handles the conversion of application objects
+         * into internal keys, however duplicate keys are handled in a fairly
+         * specialized manner so this needs to be looked into further.
+         */
+        keyBuilderFactory = new ThreadLocalKeyBuilderFactory(
+                new DefaultKeyBuilderFactory(properties));
+        
         /*
          * Initialize the object cache.
          */

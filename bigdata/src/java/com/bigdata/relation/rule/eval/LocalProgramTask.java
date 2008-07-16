@@ -38,6 +38,7 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -110,15 +111,6 @@ public class LocalProgramTask implements IProgramTask,
      * {@link DataService} from this field.
      */
     private final IJoinNexusFactory joinNexusFactory;
-    
-//    /**
-//     * Note: NOT serialized!
-//     */
-//    * <p>
-//    * Note: NOT <code>final</code> since this field must be patched when we
-//    * create an {@link AbstractTask} in order to resolve the named indices
-//    * using the {@link AbstractTask}.
-//    private transient IJoinNexus joinNexus;
     
     /**
      * Note: NOT serialized! The {@link IIndexManager} will be set by
@@ -197,7 +189,8 @@ public class LocalProgramTask implements IProgramTask,
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
      */
-    public LocalProgramTask(ActionEnum action, IStep step, IJoinNexusFactory joinNexusFactory, IIndexManager indexManager) {
+    public LocalProgramTask(ActionEnum action, IStep step,
+            IJoinNexusFactory joinNexusFactory, IIndexManager indexManager) {
 
         if (action == null)
             throw new IllegalArgumentException();
@@ -238,81 +231,54 @@ public class LocalProgramTask implements IProgramTask,
 
             final ProgramUtility util = new ProgramUtility();
 
-            if (util.isClosureProgram(step)) {
+            if (action.isMutation()) {
 
-                log.info("program uses closure operations");
-                
-                if (!action.isMutation()) {
+                if (!step.isRule() && ((IProgram) step).isClosure()) {
 
+                    /*
+                     * Compute closure of a flat set of rules.
+                     */
+                    
+                    return executeClosure((IProgram) step).mutationCount.get();
+
+                } else if (util.isClosureProgram(step)) {
+
+                    /*
+                     * Compute closure of a program that embedded closure
+                     * operations.
+                     */
+                    
+                    return executeProgramWithEmbeddedClosure((IProgram)step).mutationCount.get();
+
+                } else {
+
+                    /*
+                     * Execute a mutation operation that does not use closure.
+                     */
+                    
+                    return executeMutation(step).mutationCount.get();
+                    
+                }
+
+            } else {
+
+                if ((!step.isRule() && ((IProgram) step).isClosure())
+                        || util.isClosureProgram(step)) {
+
+                    /*
+                     * The step is either a closure program or embeds a closure
+                     * program.
+                     */
+                    
                     throw new UnsupportedOperationException(
-                            "closure requires mutation");
+                            "Closure only allowed for mutation.");
 
                 }
 
                 /*
-                 * There is a closure operation either at the top-level or in a
-                 * direct sub-program. We run all steps above the closure in a
-                 * sequence.
-                 * 
-                 * Note: The closure itself will consist of a flat set of rules.
-                 * 
-                 * Note: When we are running the program on a concurrency
-                 * manager, each round of the closure is submitted as a single
-                 * task. This allows us to do historical reads during the round
-                 * (more efficient than read-committed) and to update the
-                 * read-behind timestamp before each round. During the round,
-                 * the program will write on buffers that are flushed at the end
-                 * of the round. Those buffers will use unisolated writes onto
-                 * the appropriate relations.
-                 * 
-                 * Note: Any program that embeds a closure operation must be
-                 * sequential (this is enforced by the Program class).
-                 * 
-                 * Note: Programs that use closure operations are constrained to
-                 * either (a) a fix point of a (normally parallel) program
-                 * consisting solely of {@link IRule}s; or (b) a sequential
-                 * program containing some steps that are the fix point of a
-                 * (normally parallel) program consisting solely of
-                 * {@link IRule}s.
-                 * 
-                 * @todo this will not correctly handle programs use closure in
-                 * a sub-sub-program.
+                 * Execute a query.
                  */
                 
-                final RuleStats totals = new RuleStats(step);
-                
-                final Iterator<? extends IStep> itr = ((IProgram)step).steps();
-                
-                while(itr.hasNext()) {
-                    
-                    final IStep step = itr.next();
-                    
-                    if (!step.isRule() && ((IProgram) step).isClosure()) {
-                        
-                        final RuleStats stats = executeClosure((IProgram) step);
-                        
-                        totals.add( stats );
-                        
-                    } else {
-                        
-                        // A non-closure step.
-                        
-                        final RuleStats stats = executeMutation(step);
-                        
-                        totals.add(stats);
-                        
-                    }
-                    
-                }
-                
-                return totals.mutationCount.get();
-                
-            } else if (action.isMutation()) {
-
-                return executeMutation(step).mutationCount.get();
-
-            } else {
-
                 return executeQuery(step);
 
             }
@@ -325,51 +291,6 @@ public class LocalProgramTask implements IProgramTask,
 
     }
 
-//    /**
-//     * Run a task.  It will be submitted to the {@link #executorService} iff
-//     * it is defined and otherwise the {@link #dataService} must be defined
-//     * and it will be submitted to the {@link ConcurrencyManager} for the
-//     * {@link DataService}.
-//     */
-//    protected Future<RuleStats> submit(AbstractStepTask task) {
-//        
-//        if (executorService == null) {
-//
-//            if (dataService == null) {
-//
-//                throw new IllegalStateException();
-//
-//            }
-//
-//            /*
-//             * This condition occurs when this Callable is sent to the
-//             * DataService using IDataService#submit(Callable). In order to gain
-//             * access to the named indices for the relation, we have to wrap up
-//             * this Callable as an AbstractTask that declares the appropriate
-//             * timestamp and resources and set [service] to an ExecutorService
-//             * running on the DataService itself. The AbstractTask will then be
-//             * submitted to the ConcurrencyManager for execution. It will
-//             * delegate back to #call(). Since [service] will be non-null, the
-//             * other code branch will be followed.
-//             * 
-//             * Note: The [dataService] reference is set by the DataService
-//             * itself when it executes this Callable and notices the
-//             * IDataServiceAwareProcedure interface.
-//             * 
-//             * Note: The [service] field is NOT serializable and MUST NOT be set
-//             * if this task is to execute on the DataService.
-//             */
-//
-//            log.info("Will run on data service's concurrency manager.");
-//
-//            return task.submit();
-//
-//        }
-//
-//        return executorService.submit(task);
-//
-//    }
-    
     /**
      * Execute the {@link IProgram} as a query.
      * 
@@ -519,6 +440,13 @@ public class LocalProgramTask implements IProgramTask,
      * Solutions computed for each rule in each round written onto the relation
      * for the head of that rule. The process halts when no new solutions are
      * computed in a given round.
+     * <p>
+     * Note: When we are running the program on a {@link ConcurrencyManager},
+     * each round of the closure is submitted as a single {@link AbstractTask}.
+     * This allows us to do historical reads during the round and to update the
+     * read-behind timestamp before each round. During the round, the program
+     * will write on buffers that are flushed at the end of the round. Those
+     * buffers will use unisolated writes onto the appropriate relations.
      * 
      * <h2>mutation counts</h2>
      * 
@@ -543,15 +471,6 @@ public class LocalProgramTask implements IProgramTask,
      * @param program
      *            The program to be executed.
      * 
-     * @todo While there is nothing place to detect {@link IProgram} whose
-     *       closure will not terminate, it requires either a custom
-     *       {@link IStepTask} or added expressivity to produce an
-     *       {@link IProgram} whose closure is non-terminating.
-     *       <p>
-     *       If the caller has a Future for this {@link Callable} then they can
-     *       always cancel the {@link Future} or submit it with a timeout.
-     *       <p>
-     * 
      * @throws ExecutionException
      * @throws InterruptedException
      */
@@ -560,49 +479,6 @@ public class LocalProgramTask implements IProgramTask,
 
         if (program == null)
             throw new IllegalArgumentException();
-
-        if(!action.isMutation()) {
-
-            /*
-             * FIXME closure for query is valid, but you have to compute the
-             * closure over a temporary relation for the result set and then
-             * return the iterator that reads from an arbitrary access path for
-             * that relation.
-             * 
-             * The class relation of relation depends on the class of the
-             * relation for the head of each rule and there needs to be one
-             * temporary relation for each distinct relation for the heads of
-             * the rule.
-             * 
-             * The temporary relation only requires a single index, which ever
-             * is most efficient, since it only needs to enforce distinct.
-             * 
-             * The temporary relation(s) are dropped when the iterator is
-             * closed.
-             * 
-             * The temporary relation(s) can be backed by a TemporaryRawStore
-             * for local execution. For distributed execution there will have to
-             * be remote access for writing on that temporary relation, so it
-             * could be a scale-out index or the data service can be generalized
-             * to expose indices on temporary stores. Regardless, writes on the
-             * temporary relations need to be buffered and go through the
-             * IMutableRelation interface for the relation.
-             * 
-             * In fact, this is exactly what truth maintenance is doing. It is
-             * also handling additional wrinkles such as mapping the rules over
-             * the temporary store and the database. What it is not doing as
-             * well is generalizing the notion of a temporary relation into the
-             * basic program execution support. However, the caller does have
-             * more control over the life cycle of that temporary relation and
-             * that additional control is probably necessary if we are
-             * interested in more than just a single iterator pass over the
-             * temporary relation.
-             */
-            
-            throw new UnsupportedOperationException(
-                    "Closure only allowed for mutation.");
-            
-        }
 
         if(!program.isClosure())
             throw new IllegalArgumentException();
@@ -664,4 +540,78 @@ public class LocalProgramTask implements IProgramTask,
 
     }
 
+    /**
+     * Execute an {@link IProgram} containing one or more sub-{@link IProgram}
+     * that are closure operations. The top-level program must not be a closure
+     * operation. All steps above the closure operations will be run in a
+     * sequence. The closure operations themselves will be executed using
+     * {@link #executeClosure(IProgram)}.
+     * <p>
+     * Note: Any program that embeds a closure operation must be sequential
+     * (this is enforced by the Program class).
+     * 
+     * Note: Programs that use closure operations are constrained to either (a)
+     * a fix point of a (normally parallel) program consisting solely of
+     * {@link IRule}s; or (b) a sequential program containing some steps that
+     * are the fix point of a (normally parallel) program consisting solely of
+     * {@link IRule}s.
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     * 
+     * @todo this will not correctly handle programs use closure in a
+     *       sub-sub-program.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>program</i> is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if <i>program</i> is <em>itself</em> a closure operation.
+     * @throws IllegalStateException
+     *             unless the {@link ActionEnum} is a mutation operation.
+     */
+    protected RuleStats executeProgramWithEmbeddedClosure(IProgram program)
+            throws InterruptedException, ExecutionException {
+
+        if (program == null)
+            throw new IllegalArgumentException();
+        
+        if (program.isClosure())
+            throw new IllegalArgumentException();
+        
+        if(!action.isMutation()) {
+            throw new IllegalStateException();
+        }
+        
+        log.info("program embeds closure operations");
+        
+        final RuleStats totals = new RuleStats(step);
+        
+        final Iterator<? extends IStep> itr = ((IProgram)step).steps();
+        
+        while(itr.hasNext()) {
+            
+            final IStep step = itr.next();
+            
+            if (!step.isRule() && ((IProgram) step).isClosure()) {
+                
+                final RuleStats stats = executeClosure((IProgram) step);
+                
+                totals.add( stats );
+                
+            } else {
+                
+                // A non-closure step.
+                
+                final RuleStats stats = executeMutation(step);
+                
+                totals.add(stats);
+                
+            }
+            
+        }
+        
+        return totals;
+
+    }
+    
 }

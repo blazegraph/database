@@ -96,15 +96,14 @@ public interface IBTreeManager extends IIndexManager {
     public IIndex registerIndex(String name, IndexMetadata indexMetadata);
 
     /**
-     * Return the named index (unisolated). Writes on the returned index will be
-     * made restart-safe with the next {@link #commit()} unless discarded by
-     * {@link #abort()}.
+     * Return the unisolated view of the named index (the mutable view of the
+     * live index object).
      * 
      * @param name
      *            The name of the index.
      * 
-     * @return The named index or <code>null</code> iff there is no index
-     *         registered with that name.
+     * @return The unisolated view named index or <code>null</code> iff there
+     *         is no index registered with that name.
      * 
      * @exception IllegalArgumentException
      *                if <i>name</i> is <code>null</code>
