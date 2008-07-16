@@ -488,57 +488,25 @@ public class BigdataSail extends SailBase implements Sail {
             BigdataSailConnection view = readCommittedRef == null ? null
                     : readCommittedRef.get();
             
-            if(view == null) {
-                
-                if(database instanceof LocalTripleStore) {
+            if (view == null) {
 
-                    /*
-                     * Create the singleton using a read-committed view of the
-                     * database.
-                     */
-                    
-                    view = new BigdataSailConnection(((LocalTripleStore)database).asReadCommittedView()) {
-                        
-                        public void close() throws SailException {
-                            
-                            // NOP - close is ignored.
-                            
-                        }
-                        
-                    };
-                    
-                    readCommittedRef = new WeakReference<BigdataSailConnection>(view);
-                    
-                } else if(database instanceof ScaleOutTripleStore) {
-                    
-                    /*
-                     * The scale-out triple store already has read-committed
-                     * semantics since it uses unisolated writes on the data
-                     * service.
-                     * 
-                     * @todo make sure that the use of RdfKeyBuffer and any
-                     * other per-instance state is thread-safe.
-                     */
-                    
-                    view = new BigdataSailConnection(database) {
-                        
-                        public void close() throws SailException {
-                            
-                            // NOP - close is ignored.
-                            
-                        }
+                /*
+                 * Create the singleton using a read-committed view of the
+                 * database.
+                 */
 
-                    };
-                    
-                    readCommittedRef = new WeakReference<BigdataSailConnection>(view);
-                    
-                } else {
-                    
-                    throw new UnsupportedOperationException(BigdataSail.Options.STORE_CLASS + "="
-                            + database.getClass().getName());                    
+                view = new BigdataSailConnection(database.asReadCommittedView()) {
 
-                }
-                
+                    public void close() throws SailException {
+
+                        // NOP - close is ignored.
+
+                    }
+
+                };
+
+                readCommittedRef = new WeakReference<BigdataSailConnection>(view);
+                                    
             }
             
             return view; 
@@ -656,7 +624,7 @@ public class BigdataSail extends SailBase implements Sail {
          *       the {@link SailConnection}? Make concurrency safe if I do
          *       that?
          */
-        private Map<String,_BNode> bnodes = new HashMap<String,_BNode>(bufferCapacity);
+        private final Map<String,_BNode> bnodes;
         
         /**
          * Return the assertion buffer.
@@ -781,10 +749,14 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 tm = null;
                 
+                bnodes = null;
+                
             } else {
 
                 log.info("Read-write view");
 
+                bnodes = new HashMap<String,_BNode>(bufferCapacity);
+                
                 if (truthMaintenance) {
 
                     /*

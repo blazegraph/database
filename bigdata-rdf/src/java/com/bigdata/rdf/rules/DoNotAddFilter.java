@@ -82,11 +82,11 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
 
     public boolean accept(SPO spo) {
 
-        return !reject(spo);
-        
-    }
-    
-    private boolean reject(SPO spo) {
+//        return reject(spo);
+//        
+//    }
+//    
+//    private boolean reject(SPO spo) {
         
         if((spo.s & IRawTripleStore.TERMID_CODE_LITERAL) != 0L) {
             
