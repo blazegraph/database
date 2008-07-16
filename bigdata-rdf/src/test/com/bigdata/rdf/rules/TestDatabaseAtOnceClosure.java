@@ -108,8 +108,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     public void test_fixedPoint() throws SailException, RepositoryException, 
     	IOException, RDFParseException {
         
-        final AbstractTripleStore closure = getStore();
-        
+        final AbstractTripleStore closure = 
+        	new TempTripleStore(new Properties());
+        	
         final TempTripleStore groundTruth = 
         	new TempTripleStore(new Properties());
         
@@ -131,7 +132,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            
 	            try {
 	            	
-	            	cxn.add(getClass().getResourceAsStream("sample data.rdf"), 
+	            	cxn.add(getClass().getResourceAsStream("small.rdf"), 
 	            			"", RDFFormat.RDFXML);
 	            	
 	            	cxn.commit();
@@ -170,8 +171,10 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         	{ // load the same data into the closure store
         		
         		closure.getDataLoader().loadData(
-        				getClass().getResourceAsStream("sample data.rdf"), 
+        				getClass().getResourceAsStream("small.rdf"), 
 	            		"", RDFFormat.RDFXML);
+
+        		closure.commit();
         		
                 /*
                  * compute the database at once closure.
@@ -186,9 +189,16 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 closure.getInferenceEngine()
                         .computeClosure(null/* focusStore */);
                 
+                if (log.isInfoEnabled()) {
+
+                    log.info("\nclosure:\n" + closure.dumpStore());
+                    
+                }
+                
+                // -DdataLoader.closure=None
         	}
             
-        	assertTrue(modelsEqual(closure, groundTruth));
+        	assertTrue(modelsEqual(groundTruth, closure));
             
         } finally {
             
@@ -228,7 +238,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * 
      * @throws Exception 
      */
-    public void test_simpleFixPoint() throws Exception {
+    private void _test_simpleFixPoint() throws Exception {
         
         final AbstractTripleStore store = getStore();
         
