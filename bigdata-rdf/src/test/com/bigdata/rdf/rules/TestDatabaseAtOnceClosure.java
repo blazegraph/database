@@ -174,8 +174,6 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         				getClass().getResourceAsStream("small.rdf"), 
 	            		"", RDFFormat.RDFXML);
 
-        		closure.commit();
-        		
                 closure.commit();
                 
                 /*
@@ -240,7 +238,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * 
      * @throws Exception 
      */
-    public void test_simpleFixPoint() throws Exception {
+    private void test_simpleFixPoint() throws Exception {
         
         final AbstractTripleStore store = getStore();
         
