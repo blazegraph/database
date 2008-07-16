@@ -2138,9 +2138,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          * Methods which delegate directly to the live journal.
          */
 
-        public IKeyBuilder getKeyBuilder() {
-            return delegate.getKeyBuilder();
-        }
+//        public IKeyBuilder getKeyBuilder() {
+//            return delegate.getKeyBuilder();
+//        }
         
         public Object deserialize(byte[] b, int off, int len) {
             return delegate.deserialize(b, off, len);
@@ -2190,6 +2190,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             return delegate.getRootAddr(index);
         }
 
+        public long getLastCommitTime() {
+            return delegate.getLastCommitTime();
+        }
+        
         public IRootBlockView getRootBlockView() {
             return delegate.getRootBlockView();
         }
@@ -2458,9 +2462,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          * Methods that delegate directly to the backing journal.
          */
         
-        public IKeyBuilder getKeyBuilder() {
-            return delegate.getKeyBuilder();
-        }
+//        public IKeyBuilder getKeyBuilder() {
+//            return delegate.getKeyBuilder();
+//        }
         
         public Object deserialize(byte[] b, int off, int len) {
             return delegate.deserialize(b, off, len);
@@ -2506,6 +2510,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             return delegate.getRootAddr(index);
         }
 
+        public long getLastCommitTime() {
+            return delegate.getLastCommitTime();
+        }
+        
         public IRootBlockView getRootBlockView() {
             return delegate.getRootBlockView();
         }

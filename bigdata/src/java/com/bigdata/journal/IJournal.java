@@ -38,7 +38,7 @@ import com.bigdata.rawstore.IMRMW;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager, IKeyBuilderFactory {
+public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager {
 
     /**
      * A copy of the properties used to initialize this journal.

@@ -451,41 +451,23 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     private final int defaultBranchingFactor;
 
-    /**
-     * A thread-local key builder factory configured with the properties
-     * specified to the ctor.
-     */
-    private final IKeyBuilderFactory keyBuilderFactory;
-
 //    /**
-//     * A {@link ThreadLocal} variable providing access to thread-specific
-//     * instances of a configured {@link IKeyBuilder}.
-//     * <p>
-//     * Note: this {@link ThreadLocal} is not static since we need configuration
-//     * properties from the constructor - those properties can be different for
-//     * different {@link Journal}s on the same machine.
+//     * A thread-local key builder factory configured with the properties
+//     * specified to the ctor.
 //     */
-//    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
+//    private final IKeyBuilderFactory keyBuilderFactory;
 //
-//        protected synchronized IKeyBuilder initialValue() {
-//
-//            return KeyBuilder.newUnicodeInstance(properties);
-//
-//        }
-//
-//    };
-
-    /**
-     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
-     * using the properties specified to the journal constructor.
-     * 
-     * @see IndexMetadata#getKeyBuilder()
-     */
-    public IKeyBuilder getKeyBuilder() {
-        
-        return keyBuilderFactory.getKeyBuilder();
-        
-    }
+//    /**
+//     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
+//     * using the properties specified to the journal constructor.
+//     * 
+//     * @see IndexMetadata#getKeyBuilder()
+//     */
+//    public IKeyBuilder getKeyBuilder() {
+//        
+//        return keyBuilderFactory.getKeyBuilder();
+//        
+//    }
     
     /**
      * The default branching factor for indices created using
@@ -617,7 +599,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         this.properties = properties = (Properties) properties.clone();
 
         // a thread-local key builder factory configured with the caller's properties.
-        this.keyBuilderFactory = new ThreadLocalKeyBuilderFactory(new DefaultKeyBuilderFactory(properties));
+//        this.keyBuilderFactory = new ThreadLocalKeyBuilderFactory(new DefaultKeyBuilderFactory(properties));
         
         /*
          * "bufferMode" mode.
@@ -1581,15 +1563,16 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         
     }
     
-    /**
-     * Return a read-only view of the current root block.
-     * 
-     * @return The current root block.
-     */
     final public IRootBlockView getRootBlockView() {
 
         return _rootBlock;
 
+    }
+    
+    final public long getLastCommitTime() {
+        
+        return _rootBlock.getLastCommitTime();
+        
     }
 
     /**
