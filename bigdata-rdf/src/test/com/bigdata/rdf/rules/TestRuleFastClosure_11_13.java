@@ -98,7 +98,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             // entails:
             // store.addStatement(x, inf.rdfType.get(), b);
 
-            store.commit();
+//            store.commit();
 
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore());
@@ -119,7 +119,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             // check entailments.
             assertTrue(store.hasStatement(x, inf.rdfType.get(), b));
 
-            store.commit();
+//            store.commit();
 
         } finally {
 
@@ -168,7 +168,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             // entails:
             // store.addStatement(z, inf.rdfType.get(), b);
 
-            store.commit();
+//            store.commit();
 
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore());
@@ -189,7 +189,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             // check entailments.
             assertTrue(store.hasStatement(z, inf.rdfType.get(), b));
 
-            store.commit();
+//            store.commit();
 
         } finally {
 

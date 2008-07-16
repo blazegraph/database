@@ -148,12 +148,12 @@ public class TestMatch extends AbstractTripleStoreTestCase {
                 
             }
 
-            /*
-             * Note: Since the match rule will use a read-committed view, a
-             * commit is required in order for that view to reflect the writes
-             * that we just performed on the database.
-             */
-            store.commit();
+//            /*
+//             * Note: Since the match rule will use a read-committed view, a
+//             * commit is required in order for that view to reflect the writes
+//             * that we just performed on the database.
+//             */
+//            store.commit();
             
             /*
              * Do run the match rule for "bryan". There should be exactly one

@@ -92,7 +92,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             store.addStatement(X, A, Y);
             store.addStatement(X, A, Z);
             
-            store.commit();
+//            store.commit();
     
             final long a = store.getTermId(A);
             final long b = store.getTermId(B);
@@ -221,7 +221,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
                 
             store.addStatements(stmts, numStmts);
             
-            store.commit();
+//            store.commit();
     
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore(true, true, false));

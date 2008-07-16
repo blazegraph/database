@@ -152,10 +152,10 @@ abstract public class AbstractTestCase
              * Read properties from a hierarchy of sources and cache a
              * reference.
              */
-//            m_properties = super.getProperties();
+            m_properties = super.getProperties();
 
             // disregard the inherited properties.
-            m_properties = new Properties();
+//            m_properties = new Properties();
             
 //            m_properties = new Properties( m_properties );
 

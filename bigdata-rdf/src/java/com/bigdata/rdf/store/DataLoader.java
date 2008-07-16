@@ -918,18 +918,6 @@ public class DataLoader {
         // flush anything in the buffer.
         buffer.flush();
         
-        if (!(buffer.getStatementStore().getIndexManager() instanceof TemporaryStore)) {
-            
-            /*
-             * Make sure everything is committed before performing closure since
-             * we will be reading from the read-committed index views (except
-             * for a temporary store).
-             */
-            
-            buffer.getStatementStore().commit();
-            
-        }
-        
         final ClosureStats stats;
         
         switch (closureEnum) {
