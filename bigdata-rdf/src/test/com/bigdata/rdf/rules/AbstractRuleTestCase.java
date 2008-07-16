@@ -34,6 +34,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Rule;
@@ -194,7 +195,9 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
     public static boolean modelsEqual(AbstractTripleStore expected,
             AbstractTripleStore actual) throws SailException {
 
-        int actualSize = 0; 
+        int actualSize = 0;
+        int notExpecting = 0;
+        int expecting = 0;
         boolean sameStatements1 = true;
         {
 
@@ -212,6 +215,15 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
                         sameStatements1 = false;
 
                         log("Not expecting: " + stmt);
+                        
+                        if (expected.getAccessPath(stmt.getSubject(), stmt
+                                .getPredicate(), stmt.getObject()) instanceof EmptyAccessPath) {
+                        	
+                        	log("empty access path");
+                        	
+                        }
+                        
+                        notExpecting++;
 
                     }
 
@@ -247,6 +259,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
                     sameStatements2 = false;
 
                     log("    Expecting: " + stmt);
+                    
+                    expecting++;
 
                 }
                 
@@ -270,6 +284,10 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
         log("size of 'actual'   repository: " + actualSize);
 
+        log("# expected but not found: " + expecting);
+        
+        log("# not expected but found: " + notExpecting);
+        
         return sameSize && sameStatements1 && sameStatements2;
 
     }
