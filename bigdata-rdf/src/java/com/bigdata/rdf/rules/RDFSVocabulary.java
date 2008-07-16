@@ -191,6 +191,16 @@ public class RDFSVocabulary {
         final MappedProgram program = new MappedProgram("fullForwardClosure",
                 focusStore, true/* parallel */, true/* closure */);
 
+//        if(true) {
+//            
+//            log.error("********* ONLY RUNNING RDFS11 *************");
+//            
+//            program.addStep(new RuleRdfs11(db,this));
+//
+//            return program;
+//            
+//        }
+        
         program.addStep(new RuleRdf01(db,this));
         
         /*

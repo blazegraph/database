@@ -125,6 +125,22 @@ public interface IPredicate<E> extends Cloneable {
     public IPredicate<E> asBound(IBindingSet bindingSet);
 
     /**
+     * A copy of this {@link IPredicate} in which the <i>relationName</i>(s)
+     * replace the existing set of relation name(s).
+     * 
+     * @param relationName
+     *            The relation name(s).
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>relationName</i> is empty.
+     * @throws IllegalArgumentException
+     *             if <i>relationName</i> is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if any element of <i>relationName</i> is <code>null</code>
+     */
+    public IPredicate<E> setRelationName(String[] relationName);
+    
+    /**
      * Representation of the predicate without variable bindings.
      */
     public String toString();

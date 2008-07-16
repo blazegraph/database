@@ -122,6 +122,37 @@ public class SPOPredicate implements IPredicate<SPO> {
         
     }
 
+    /**
+     * Copy constructor overrides the relation name(s).
+     * 
+     * @param relationName
+     *            The new relation name(s).
+     */
+    protected SPOPredicate(SPOPredicate src, String[] relationName) {
+        
+        if (relationName == null)
+            throw new IllegalArgumentException();
+       
+        for(int i=0; i<relationName.length; i++) {
+            
+            if (relationName[i] == null)
+                throw new IllegalArgumentException();
+            
+        }
+        
+        if (relationName.length == 0)
+            throw new IllegalArgumentException();
+ 
+        this.s = src.s;
+        this.p = src.p;
+        this.o = src.o;
+        
+        this.relationName = relationName; // override.
+        
+        this.constraint = src.constraint;
+        
+    }
+
     public final IVariableOrConstant<Long> get(int index) {
         switch (index) {
         case 0:
@@ -241,6 +272,12 @@ public class SPOPredicate implements IPredicate<SPO> {
         }
         
         return new SPOPredicate(relationName, s, p, o, constraint);
+        
+    }
+
+    public SPOPredicate setRelationName(String[] relationName) {
+
+        return new SPOPredicate(this, relationName);
         
     }
     

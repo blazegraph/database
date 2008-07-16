@@ -33,7 +33,7 @@ import java.util.Arrays;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
- * A generic implementation.
+ * A generic implementation of an immutable {@link IPredicate}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -96,6 +96,45 @@ public class Predicate<E> implements IPredicate<E> {
         }
 
         this.nvars = nvars;
+        
+    }
+    
+    /**
+     * Copy constructor creates a new instance of this class replacing the
+     * existing relation name(s) with the given one(s).
+     * 
+     * @param src
+     *            The source predicate.
+     * @param relationName
+     *            The new relation name(s).
+     */
+    protected Predicate(Predicate<E> src, String[] relationName) {
+
+        if (relationName == null) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        for(int i=0; i<relationName.length; i++) {
+            
+            if (relationName[i] == null)
+                throw new IllegalArgumentException();
+            
+        }
+
+        if (relationName.length == 0)
+            throw new IllegalArgumentException();
+
+        this.arity = src.arity;
+
+        this.nvars = src.nvars;
+
+        this.relationName = relationName; // override.
+
+        this.values = src.values;
+
+        this.constraint = src.constraint;
         
     }
     
@@ -250,6 +289,12 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
 
+    public IPredicate<E> setRelationName(String[] relationName) {
+    
+        return new Predicate<E>(this, relationName);
+        
+    }
+    
     public String toString() {
         
         return toString(null/* bindingSet */);

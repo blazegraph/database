@@ -180,8 +180,9 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
         /*
          * Subquery iterator.
          */
-        final IChunkedOrderedIterator itr = state.getAccessPath(order,
-                bindingSet).iterator();
+        final IAccessPath accessPath = state.getAccessPath(order, bindingSet);
+        
+        final IChunkedOrderedIterator itr = accessPath.iterator();
         
         try {
 
