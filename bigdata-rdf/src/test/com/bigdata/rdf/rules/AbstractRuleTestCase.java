@@ -28,18 +28,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
-import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Rule;
@@ -214,21 +214,17 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
                 while(it.hasNext()) {
 
-                    Statement stmt = it.next();
+                    BigdataStatement stmt = it.next();
 
-                    if (!hasStatement(expected, stmt.getSubject(), stmt
-                            .getPredicate(), stmt.getObject())) {
+                    if (!hasStatement(expected,//
+                            (Resource)OptimizedValueFactory.INSTANCE.newValue(stmt.getSubject()),//
+                            (URI)OptimizedValueFactory.INSTANCE.newValue(stmt.getPredicate()),//
+                            (Value)OptimizedValueFactory.INSTANCE.newValue(stmt.getObject()))//
+                            ) {
 
                         sameStatements1 = false;
 
                         log("Not expecting: " + stmt);
-                        
-                        if (expected.getAccessPath(stmt.getSubject(), stmt
-                                .getPredicate(), stmt.getObject()) instanceof EmptyAccessPath) {
-                        	
-                        	log("empty access path");
-                        	
-                        }
                         
                         notExpecting++;
 
@@ -259,10 +255,13 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
                 while(it.hasNext()) {
 
-                Statement stmt = it.next();
+                BigdataStatement stmt = it.next();
 
-                if (!hasStatement(actual, stmt.getSubject(), stmt
-                            .getPredicate(), stmt.getObject())) {
+                if (!hasStatement(actual,//
+                        (Resource)OptimizedValueFactory.INSTANCE.newValue(stmt.getSubject()),//
+                        (URI)OptimizedValueFactory.INSTANCE.newValue(stmt.getPredicate()),//
+                        (Value)OptimizedValueFactory.INSTANCE.newValue(stmt.getObject()))//
+                        ) {
 
                     sameStatements2 = false;
 
@@ -306,8 +305,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
     }
 
-    static private boolean hasStatement(AbstractTripleStore database, Resource s,
-            URI p, Value o) {
+    static private boolean hasStatement(AbstractTripleStore database,
+            Resource s, URI p, Value o) {
 
         if (RDF.TYPE.equals(p) && RDFS.RESOURCE.equals(o)) {
 
