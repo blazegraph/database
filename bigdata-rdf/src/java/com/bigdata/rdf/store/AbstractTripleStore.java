@@ -59,6 +59,7 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleFilter;
@@ -81,6 +82,8 @@ import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -1236,23 +1239,111 @@ abstract public class AbstractTripleStore extends
      */
     final public boolean hasStatement(long s, long p, long o) {
 
-        final boolean isEmpty = getAccessPath(s, p, o).isEmpty();
+        if (s != NULL && p != NULL && o != NULL) {
+
+            final IIndex ndx = getSPORelation().getSPOIndex();
+
+            final SPO spo = new SPO(s, p, o);
+
+            final byte[] key = ndx.getIndexMetadata().getTupleSerializer()
+                    .serializeKey(spo);
+
+            final boolean found = ndx.contains(key);
+
+            if(log.isDebugEnabled()) {
+                
+                log.debug(spo + " : found=" + found + ", key="
+                        + BytesUtil.toString(key));
+                
+            }
+            
+            return found;
+
+        }
+
+        /*
+         * Use a range scan over the triple pattern and see if there are any
+         * matches.
+         */
         
-        return ! isEmpty;
+        final IAccessPath accessPath = getAccessPath(s, p, o);
+        
+        final boolean isEmpty = accessPath.isEmpty();
+
+        return !isEmpty;
 
     }
 
     final public boolean hasStatement(Resource s, URI p, Value o) {
 
-        final IAccessPath accessPath = getAccessPath(s, p, o);
+        /*
+         * convert other Value object types to our object types.
+         */
 
-        if (accessPath instanceof EmptyAccessPath) {
+        s = (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(s);
 
+        p = (URI) OptimizedValueFactory.INSTANCE.toSesameObject(p);
+
+        o = OptimizedValueFactory.INSTANCE.toSesameObject(o);
+
+        /*
+         * Convert our object types to internal identifiers.
+         * 
+         * Note: If a value was specified and it is not in the terms index then
+         * the statement can not exist in the KB.
+         */
+        final long _s = getTermId(s);
+
+        if (_s == NULL && s != null) {
+         
+            if(log.isDebugEnabled())
+                log.debug("Subject not in kb: "+s);
+            
             return false;
-
+            
         }
 
-        return !accessPath.isEmpty();
+        final long _p = getTermId(p);
+
+        if (_p == NULL && p != null) {
+
+            if(log.isDebugEnabled())
+                log.debug("Predicate not in kb: "+s);            
+            
+            return false;
+            
+        }
+        
+        final long _o = getTermId(o);
+
+        if (_o == NULL && o != null) {
+
+            if(log.isDebugEnabled())
+                log.debug("Object not in kb: "+s);
+            
+            return false;
+            
+        }
+
+        final boolean found = hasStatement(_s, _p, _o);
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug("<" + s + "," + p + "," + o + "> : found=" + found);
+            
+        }
+        
+        return found;
+        
+//        final IAccessPath accessPath = getAccessPath(s, p, o);
+//
+//        if (accessPath instanceof EmptyAccessPath) {
+//
+//            return false;
+//
+//        }
+//
+//        return !accessPath.isEmpty();
 
     }
 

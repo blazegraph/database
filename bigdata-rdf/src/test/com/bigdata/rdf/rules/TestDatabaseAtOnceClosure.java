@@ -68,7 +68,9 @@ import org.openrdf.sail.memory.MemoryStore;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -96,36 +98,67 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     public TestDatabaseAtOnceClosure(String name) {
 
         super(name);
-        
+
     }
 
-    /**
-     * Unit test for correct fix point closure of a known data set.
-     * 
-     * FIXME Things to watch out for here include the choice of the read times
-     * for the relation views and whether and if those read times are updated
-     * correctly after each round of closure.
-     */
-    public void test_fixedPoint() throws SailException, RepositoryException, 
-    	IOException, RDFParseException {
-        
+    public void test_fixedPoint_Small_Full() throws SailException,
+            RepositoryException, IOException, RDFParseException {
+
+        final String file = "small.rdf";
+
+        doFixedPointTest(file, ForwardClosureEnum.Full);
+
+    }
+
+    public void test_fixedPoint_Small_Fast() throws SailException,
+            RepositoryException, IOException, RDFParseException {
+
+        final String file = "small.rdf";
+
+        doFixedPointTest(file, ForwardClosureEnum.Fast);
+
+    }
+
+    public void test_fixedPoint_SampleData_Full() throws SailException,
+            RepositoryException, IOException, RDFParseException {
+
+        final String file = "sample data.rdf";
+
+        doFixedPointTest(file, ForwardClosureEnum.Full);
+
+    }
+
+    public void test_fixedPoint_SampleData_Fast() throws SailException,
+            RepositoryException, IOException, RDFParseException {
+
+        final String file = "sample data.rdf";
+
+        doFixedPointTest(file, ForwardClosureEnum.Fast);
+
+    }
+
+    protected void doFixedPointTest(String file, ForwardClosureEnum closureType) throws RepositoryException, RDFParseException, IOException, SailException {
+
         /*
          * Used to compute the entailments with out own rules engine.
          */
-        final AbstractTripleStore closure; {
-            
+        final AbstractTripleStore closure;
+        {
+
             Properties properties = new Properties();
-            
-//            properties
-//                    .setProperty(
-//                            InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
-//                            "true");
-            
+
             properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
 
             properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,
-                    ForwardClosureEnum.Full.toString());
-            
+                    closureType.toString());
+
+            /*
+             * Don't compute closure in the data loader since it does TM, not
+             * database at once closure.
+             */
+            properties.setProperty(DataLoader.Options.CLOSURE,
+                    ClosureEnum.None.toString());
+
             // @todo should use the appropriate store class for testing.
             closure = new TempTripleStore(properties);
             
@@ -144,7 +177,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
             groundTruth = new TempTripleStore(properties);
             
         }
-        
+
         try {
 
         	{ // use the Sesame2 inferencer to get ground truth
@@ -163,7 +196,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            
 	            try {
 	            	
-	            	cxn.add(getClass().getResourceAsStream("small.rdf"), 
+	            	cxn.add(getClass().getResourceAsStream(file), 
 	            			"", RDFFormat.RDFXML);
 	            	
 	            	cxn.commit();
@@ -206,23 +239,23 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                  */
         		
         		closure.getDataLoader().loadData(
-        				getClass().getResourceAsStream("small.rdf"), 
+        				getClass().getResourceAsStream(file), 
 	            		"", RDFFormat.RDFXML);
 
 //                closure.commit();
 //                
-//                /*
-//                 * compute the database at once closure.
-//                 * 
-//                 * Note: You can run either the full closure or the fast closure
-//                 * method depending on how you setup the store. You can also use
-//                 * an explicit InferenceEngine ctor to setup for either closure
-//                 * method by overriding the appropriate property (it will be set
-//                 * by the proxy test case otherwise which does not give you much
-//                 * control).
-//                 */
-//                closure.getInferenceEngine()
-//                        .computeClosure(null/* focusStore */);
+                /*
+                 * compute the database at once closure.
+                 * 
+                 * Note: You can run either the full closure or the fast closure
+                 * method depending on how you setup the store. You can also use
+                 * an explicit InferenceEngine ctor to setup for either closure
+                 * method by overriding the appropriate property (it will be set
+                 * by the proxy test case otherwise which does not give you much
+                 * control).
+                 */
+                closure.getInferenceEngine()
+                        .computeClosure(null/* focusStore */);
                 
                 if (log.isInfoEnabled()) {
 
@@ -273,7 +306,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * 
      * @throws Exception 
      */
-    private void test_simpleFixPoint() throws Exception {
+    public void test_simpleFixPoint() throws Exception {
         
         final AbstractTripleStore store = getStore();
         
