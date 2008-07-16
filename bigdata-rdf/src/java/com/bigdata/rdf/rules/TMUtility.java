@@ -28,24 +28,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.eval.DelegatePredicate;
 
 /**
  * A utility class for performing rule re-writes for RDF truth maintenance using
@@ -134,8 +129,8 @@ public class TMUtility {
         /*
          * The head of the rule is modified to write on the focusStore. 
          */
-        final IPredicate head = new MyDelegatePredicate(
-                new String[] { focusStore }, rule.getHead());
+        final IPredicate head = rule.getHead().setRelationName(
+                new String[] { focusStore });
 
         /*
          * Populate an array with the same predicate instances that are found
@@ -212,8 +207,7 @@ public class TMUtility {
                      * the tail.
                      */
 
-                    p2 = new MyDelegatePredicate<SPO>(
-                            new String[] { focusStore }, p);
+                    p2 = p.setRelationName(new String[]{focusStore});
 
                 } else {
 
@@ -222,8 +216,8 @@ public class TMUtility {
                      * view of the focusStore and the database.
                      */
 
-                    p2 = new MyDelegatePredicate<SPO>(new String[] {
-                            p.getOnlyRelationName(), focusStore }, p);
+                    p2 = p.setRelationName(new String[] {
+                            p.getOnlyRelationName(), focusStore });
 
                 }
 
@@ -324,92 +318,4 @@ public class TMUtility {
         
     }
 
-    /**
-     * Class overrides the relation name(s) and delegates all other operations.  By
-     * overriding the relation names rather than creating a new instance we preserve
-     * the implementation object in the delegate (if that matters). 
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <E>
-     */
-    private static class MyDelegatePredicate<E> extends DelegatePredicate<E> {
-        
-        private String[] relationName;
-        
-        public MyDelegatePredicate(String[] relationName,IPredicate<E> delegate) {
-            
-            super(delegate);
-            
-            this.relationName = relationName;
-            
-        }
-
-        @Override
-        public String getOnlyRelationName(){
-            
-            if (relationName.length != 1)
-                throw new IllegalStateException();
-            
-            return relationName[0];
-            
-        }
-
-        @Override
-        public String getRelationName(int index) {
-            
-            return relationName[index];
-            
-        }
-        
-        @Override
-        public int getRelationCount() {
-            
-            return relationName.length;
-            
-        }
-
-        /**
-         * Overriden to display the overriden relation names.
-         */
-        @Override
-        public String toString() {
-            return toString(null);
-        }
-
-        /**
-         * Overriden to display the overriden relation names.
-         */
-        @Override
-        public String toString(IBindingSet bindingSet) {
-
-            StringBuilder sb = new StringBuilder();
-
-            sb.append("(");
-
-            sb.append(Arrays.toString(relationName));
-            
-            final int arity = arity();
-            
-            for (int i = 0; i < arity; i++) {
-
-//                if (i > 0)
-                    sb.append(", ");
-
-                final IVariableOrConstant v = get(i);
-
-                sb.append(v.isConstant() || bindingSet == null
-                        || !bindingSet.isBound((IVariable) v) ? v.toString()
-                        : bindingSet.get((IVariable) v));
-
-            }
-
-            sb.append(")");
-
-            return sb.toString();
-
-        }
-     
-    }
-    
 }
