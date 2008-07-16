@@ -216,9 +216,9 @@ abstract public class AbstractTestCase
     // Test helpers.
     //
 
-    protected final long N = IRawTripleStore.N;
+    protected static final long N = IRawTripleStore.N;
 
-    protected final long NULL = IRawTripleStore.NULL;
+    protected static final long NULL = IRawTripleStore.NULL;
     
     abstract protected AbstractTripleStore getStore();
     

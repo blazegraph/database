@@ -1244,7 +1244,7 @@ abstract public class AbstractTripleStore extends
 
     final public boolean hasStatement(Resource s, URI p, Value o) {
 
-        IAccessPath accessPath = getAccessPath(s, p, o);
+        final IAccessPath accessPath = getAccessPath(s, p, o);
 
         if (accessPath instanceof EmptyAccessPath) {
 
