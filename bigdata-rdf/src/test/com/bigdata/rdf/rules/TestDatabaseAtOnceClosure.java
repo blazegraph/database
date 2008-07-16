@@ -115,8 +115,6 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         
         try {
 
-            final StatementBuffer sb = new StatementBuffer(closure,10000);
-            
         	{ // use the Sesame2 inferencer to get ground truth
         		
 	            StatementBuffer buf = new StatementBuffer(groundTruth ,10);
@@ -148,10 +146,6 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            		buf.add(stmt.getSubject(), stmt.getPredicate(), 
 	            				stmt.getObject());
 	            		
-                        // add to the statement buffer at the same time.
-                        sb.add(stmt.getSubject(), stmt.getPredicate(), 
-                                stmt.getObject());
-                        
 	            	}
 	            	
 	                buf.flush();
@@ -175,8 +169,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         	
         	{ // load the same data into the closure store
         		
-                // flush the statement buffer onto the closure store.
-        		sb.flush();
+        		closure.getDataLoader().loadData(
+        				getClass().getResourceAsStream("sample data.rdf"), 
+	            		"", RDFFormat.RDFXML);
         		
                 /*
                  * compute the database at once closure.
