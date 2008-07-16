@@ -573,6 +573,49 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     }
     
     /**
+     * Resources that hold hard references to local index objects MUST discarded
+     * during abort processing. Otherwise the same resource objects will be
+     * returned from the cache and buffered writes on the indices for those
+     * relations (if they are local index objects) will still be visible, this
+     * defeating the abort semantics.
+     */
+    public void discard(ILocatableResource<T> instance) {
+        
+        if (instance == null)
+            throw new IllegalArgumentException();
+
+        final String namespace = instance.getNamespace();
+        
+        final long timestamp = instance.getTimestamp();
+        
+        if (log.isInfoEnabled()) {
+
+            log.info("namespace=" + namespace+", timestamp="+timestamp);
+
+        }
+
+        // lock is only for the named relation.
+        final Lock lock = namedLock.acquireLock(namespace);
+
+        try {
+
+            final boolean found = clear(namespace, timestamp);
+            
+            if (log.isInfoEnabled()) {
+
+                log.info("instance=" + instance + ", found=" + found);
+                
+            }
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }        
+        
+    }
+    
+    /**
      * Causes the {@link IIndexManager} to be tested when attempting to resolve
      * a resource identifiers. The {@link IIndexManager} will be automatically
      * cleared from the set of {@link IIndexManager}s to be tested if its

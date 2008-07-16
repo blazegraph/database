@@ -186,13 +186,10 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     }
 
     /**
-     * This store is NOT safe for concurrent operations on an
-     * {@link ITx#UNISOLATED} index. However, it does support concurrent readers
-     * on the {@link ITx#READ_COMMITTED} view of an index. You can obtain a
-     * read-committed view using {@link #asReadCommittedView()}.
-     * 
-     * @todo provide {@link #asReadCommittedView()} for the
-     *       {@link TempTripleStore} as well?
+     * When using an {@link ITx#UNISOLATED} view, this store is NOT safe for
+     * write operations concurrent with either readers or writers. However, it
+     * does support concurrent readers for {@link ITx#READ_COMMITTED} and
+     * read-historical views.
      */
     public boolean isConcurrent() {
 

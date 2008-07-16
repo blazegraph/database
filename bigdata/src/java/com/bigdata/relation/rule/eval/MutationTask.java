@@ -36,9 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IJournal;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -173,10 +171,12 @@ public class MutationTask extends AbstractStepTask {
              * One buffer, so flush it in this thread.
              */
             
-            log.info("Flushing one buffer");
-            
-            final long mutationCount = buffers.values().iterator().next()
-                    .flush();
+            final IBuffer<ISolution> buffer = buffers.values().iterator().next();
+
+            if (log.isInfoEnabled())
+                log.info("Flushing one buffer: size="+buffer.size());
+
+            final long mutationCount = buffer.flush();
 
             totals.mutationCount.addAndGet(mutationCount);
 

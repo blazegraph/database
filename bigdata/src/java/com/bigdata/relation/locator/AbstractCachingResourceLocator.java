@@ -76,8 +76,7 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
     /**
      * Looks up the resource in the cache.
      * <p>
-     * Note: The caller MUST be synchronized across their
-     * {@link IResourceLocator#locate(IRelationName, long)} implementation.
+     * Note: The caller MUST be synchronized on the named resource.
      * 
      * @param namespace
      * 
@@ -99,8 +98,7 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
     /**
      * Places the resource in the cache.
      * <p>
-     * Note: The caller MUST be synchronized across their
-     * {@link IResourceLocator#locate(IRelationName, long)} implementation.
+     * Note: The caller MUST be synchronized on the named resource.
      * 
      * @param resource
      *            The relation.
@@ -118,4 +116,29 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
 
     }
 
+    /**
+     * Clears any resource having the same namespace and timestamp from the
+     * cache.
+     * <p>
+     * Note: The caller MUST be synchronized on the named resource.
+     * 
+     * @return <code>true</code> iff there was an entry in the cache for the
+     *         same resource namespace and timestamp, in which case it was
+     *         cleared from the cache.
+     */
+    protected boolean clear(String namespace, long timestamp) {
+        
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        
+        if(cache.remove(new NT(namespace,timestamp))!=null) {
+            
+            return true;
+            
+        }
+        
+        return false;
+        
+    }
+    
 }

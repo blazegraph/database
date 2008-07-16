@@ -132,9 +132,10 @@ public class TMUtility {
         final int tailCount = rule.getTailCount();
 
         /*
-         * The head of the rule is preserved unchanged. 
+         * The head of the rule is modified to write on the focusStore. 
          */
-        final IPredicate head = rule.getHead();
+        final IPredicate head = new MyDelegatePredicate(
+                new String[] { focusStore }, rule.getHead());
 
         /*
          * Populate an array with the same predicate instances that are found

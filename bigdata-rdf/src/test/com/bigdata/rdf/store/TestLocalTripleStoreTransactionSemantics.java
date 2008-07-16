@@ -1,7 +1,5 @@
 package com.bigdata.rdf.store;
 
-import junit.framework.AssertionFailedError;
-
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 
@@ -20,9 +18,9 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
     public TestLocalTripleStoreTransactionSemantics(String name) {
 
         super(name);
-        
+
     }
-    
+
     /**
      * Test the commit semantics in the context of a read-committed view of the
      * database.
@@ -38,49 +36,32 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
             final long s = 1, p = 2, o = 3;
 
-            try {
+            // add the statement.
+            store.addStatements(new SPO[] { //
+                    new SPO(s, p, o, StatementEnum.Explicit) //
+                    },//
+                    1);
 
-                // add the statement.
-                store.addStatements(new SPO[] { //
-                        new SPO(s, p, o, StatementEnum.Explicit) //
-                        },//
-                        1);
+            final boolean stmtInStore = store.hasStatement(s, p, o);
 
-                final boolean stmtInStore = store.hasStatement(s, p, o);
+            log.info("stmtInStore: " + stmtInStore);
 
-                log.info("stmtInStore: "+stmtInStore);
-                
-                final boolean stmtInView = view.hasStatement(s, p, o);
+            final boolean stmtInView = view.hasStatement(s, p, o);
 
-                log.info("stmtInView: "+stmtInView);
+            log.info("stmtInView: " + stmtInView);
 
-                // visible in the repo.
-                assertTrue( stmtInStore );
+            // visible in the repo.
+            assertTrue(stmtInStore);
 
-                // not visible in the view.
-                assertFalse( stmtInView );
+            // not visible in the view.
+            assertFalse(stmtInView);
 
-                // commit the transaction.
-                store.commit();
-
-            } catch (AssertionFailedError t) {
-                
-                throw t;
-                
-            } catch (Throwable t) {
-
-                log.error(t);
-
-                // discard the write set.
-                store.abort();
-
-                fail("Unexpected exception: " + t, t);
-
-            }
+            // commit the transaction.
+            store.commit();
 
             // now visible in the view.
             assertTrue(view.hasStatement(s, p, o));
-
+            
         } finally {
 
             store.closeAndDelete();

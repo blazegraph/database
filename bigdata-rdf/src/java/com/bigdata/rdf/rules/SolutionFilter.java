@@ -37,5 +37,11 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>>, Serializ
         return delegate.accept( e );
         
     }
+ 
+    public String toString() {
+        
+        return getClass().getSimpleName() + "{delegate=" + delegate + "}";
+        
+    }
     
 }

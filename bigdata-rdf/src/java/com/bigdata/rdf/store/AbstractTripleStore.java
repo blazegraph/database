@@ -670,10 +670,6 @@ abstract public class AbstractTripleStore extends
         
     }
     
-    /**
-     * Note: This may be used to force eager registration of the indices such
-     * that they are always on hand for {@link #asReadCommittedView()}.
-     */
     public void create() {
 
         assertWritable();
@@ -881,14 +877,35 @@ abstract public class AbstractTripleStore extends
 
         if (isReadOnly())
             throw new IllegalStateException();
-        
+
         /*
          * Relations have hard references to indices so they must be discarded.
+         * Note only do we need to release our hard references to those
+         * relations but we need to inform the relation locator that they should
+         * be discarded from its cache as well. Otherwise the same objects will
+         * be returned from the cache and buffered writes on the indices for
+         * those relations (if they are local index objects) will still be
+         * visible.
          */
 
-        lexiconRelation = null;
-        
-        spoRelation = null;
+        final DefaultResourceLocator locator = (DefaultResourceLocator) getIndexManager()
+                .getResourceLocator();
+
+        if (lexiconRelation != null) {
+
+            locator.discard(lexiconRelation);
+
+            lexiconRelation = null;
+
+        }
+
+        if (spoRelation != null) {
+
+            locator.discard(spoRelation);
+
+            spoRelation = null;
+
+        }
         
     }
 
