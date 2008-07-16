@@ -657,11 +657,11 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
                         .newInstance(store.getIndexManager());
 
-                /*
-                 * Note: We commit before running the Query since the writes
-                 * will not otherwise be present in the read-committed view.
-                 */
-                store.commit();
+//                /*
+//                 * Note: We commit before running the Query since the writes
+//                 * will not otherwise be present in the read-committed view.
+//                 */
+//                store.commit();
                 
                 log.info("\n\nQuery with data in KB\n");
 

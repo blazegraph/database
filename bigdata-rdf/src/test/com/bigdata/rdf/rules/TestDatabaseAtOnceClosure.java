@@ -176,6 +176,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         		closure.commit();
         		
+                closure.commit();
+                
                 /*
                  * compute the database at once closure.
                  * 
@@ -238,7 +240,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * 
      * @throws Exception 
      */
-    private void _test_simpleFixPoint() throws Exception {
+    public void test_simpleFixPoint() throws Exception {
         
         final AbstractTripleStore store = getStore();
         
@@ -268,8 +270,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 if (log.isInfoEnabled())
                     log.info("\n" + store.dumpStore());
                 
-                // make the data visible to a read-committed view.
-                store.commit();
+//                // make the data visible to a read-committed view.
+//                store.commit();
                 
             }
             

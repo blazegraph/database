@@ -137,8 +137,6 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
             store.addTerms(terms, terms.length);
 
-            store.commit();
-
             dumpTerms(store);
 
             /*
@@ -146,7 +144,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
              * restart safe.
              */
             if (store.isStable()) {
-                
+
+                store.commit();
+
                 store = reopenStore(store);
 
                 store.textSearch("", "abc"); // finds plain literals (@todo

@@ -169,7 +169,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             doAddTermTest(store, new _BNode(UUID.randomUUID().toString()));
             doAddTermTest(store, new _BNode("a12"));
     
-            store.commit();
+//            store.commit();
     
             dumpTerms(store);
 
@@ -226,7 +226,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     
             store.addTerms(terms, terms.length);
     
-            store.commit();
+//            store.commit();
             
             for (int i = 0; i < terms.length; i++) {
     
@@ -432,7 +432,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
             assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
     
-            store.commit();
+            store.commit();// Note: Should not make any difference.
     
             assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(null,
                     null));
@@ -672,7 +672,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             buffer.flush();
 
-            store.commit();
+//            store.commit();
             
             assertSameSPOs(new SPO[] {
                     new SPO(store.getTermId(A), store
@@ -692,7 +692,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
 //            store.dumpStore();
             
-            store.commit();
+//            store.commit();
             
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore());
@@ -736,7 +736,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
 //            buffer.flush();
 
-            store.commit();
+//            store.commit();
             
             assertSameSPOs(new SPO[] {//
                     new SPO(1, 2, 3, StatementEnum.Explicit),//

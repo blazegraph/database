@@ -36,7 +36,6 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
@@ -843,6 +842,16 @@ public class RDFJoinNexus implements IJoinNexus {
             log.info("Running local program: action=" + action + ", program="
                     + step.getName());
 
+        /*
+         * If there are uncommitted writes then they need to be made visible
+         * before we run the operation so that the read-committed relation views
+         * have access to the most recent state. (This is not necessary when
+         * using the scale-out API since all client operations are auto-commit
+         * unisolated writes).
+         */
+
+        makeWriteSetsVisible();
+        
         final IProgramTask innerTask = new LocalProgramTask(action, step,
                 getJoinNexusFactory(), getIndexManager());
 
@@ -916,61 +925,66 @@ public class RDFJoinNexus implements IJoinNexus {
 
     public void makeWriteSetsVisible() {
         
-        assert action.isMutation();
+//        assert action.isMutation();
         
         assert getWriteTimestamp() == ITx.UNISOLATED;
         
         if (indexManager instanceof Journal) {
         
             /*
-             * A journal utilized without concurrency controls (the currency
-             * controls are imposed by the data service API, at least for the
-             * RDF DB).
+             * The RDF KB runs against a LocalTripleStore without concurrency
+             * controls.
+             * 
+             * Commit the Journal before running the operation in order to make
+             * sure that the read-committed views are based on the most recently
+             * written data (the caller is responsible for flushing any buffers,
+             * but this makes sure that the buffered index writes are
+             * committed).
              */
             
-            final long timestamp = ((AbstractJournal)indexManager).commit();
-            
-            if(timestamp != 0L) {
-                
-                /*
-                 * Note: A timestamp of ZERO is return if there was nothing to
-                 * commit.  We ignore ZEROs and only update the commit time when
-                 * it is actually advancing.
-                 */
-                
-                assert lastCommitTime < timestamp;
-                
-                lastCommitTime = timestamp;
-                
-                if(log.isInfoEnabled()) {
-                    
-                    log.info("Committed local journal: lastCommitTime="
-                            + lastCommitTime);
-                    
-                }
-                
-            }
+            // commit.
+            ((Journal)getIndexManager()).commit();
 
+            // current read-behind timestamp.
+            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
+                
         } else if(indexManager instanceof IJournal) {
             
             /*
              * An IJournal object exposed by the AbstractTask. We don't have to
              * commit anything since the writes were performed under the control
-             * of the ConcurrencyManager.
+             * of the ConcurrencyManager. However, we can advance the
+             * read-behind time to the most recent commit timestamp.
              */
+            
+            // current read-behind timestamp.
+            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
 
         } else if(indexManager instanceof TemporaryStore) {
             
             /*
-             * We don't bother with a checkpoint for the temporary store.
-             * Instead we use UNISOLATED reads.
+             * This covers the case where the database itself (as opposed to the
+             * focusStore) is a TempTripleStore on a TemporaryStore.
+             * 
+             * Checkpoint the TemporaryStore before running the operation so
+             * that the read-committed views of the relations will be up to
+             * date.
+             * 
+             * Note: The value returned by checkpoint() is a checkpoint record
+             * address NOT a timestamp. The only index views that are supported
+             * for a TemporaryStore are UNISOLATED and READ_COMMITTED.
              */
+            
+            ((TemporaryStore)getIndexManager()).checkpoint();
             
         } else if(indexManager instanceof IBigdataFederation) {
             
             /*
              * The federation API auto-commits unisolated writes.
              */
+            
+            // current read-behind timestamp.
+            lastCommitTime = ((IBigdataFederation)indexManager).lastCommitTime();
             
         } else {
             

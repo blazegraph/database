@@ -2587,3 +2587,93 @@ B49 := systap
 #5	Explicit     : < B45(45), rdfs:label(20), java(30) > : id=67
 #6	Explicit     : < B49(49), http://purl.org/dc/terms/creator(4), B41(41) > : id=71
 #7	Explicit     : < B49(49), rdfs:label(20), SYSTAP, LLC(34) > : id=75
+
+
+============================================================
+
+- (Done). Simplified locators to String identifier/namespace.
+
+- (Done). Added "view" concept - an ordered array of resource
+  identifiers.
+
+- Done. Review code and tests for correct handling of views.  Must
+  process as views.  Should remove the getRelationName() in favor of
+  always enumerating the parts of the view.  The evaluation plan and
+  the rule execution class are the two places where we choose the
+  relation view for a rule.  If the relation view has two (or more)
+  elements then we need to use a fused view (or do a union of the
+  power set of the rules).
+
+- Done. Found a bug where the default index manager was being used
+  such that the relation views on a temporary store were not able to
+  find their own indices.
+
+* Finish the TestDefaultResourceLocator
+
+* (defer) I am not happy with the manner in which concerns about
+  commit processing has been raised into the application layer by the
+  introduction of read-behind views for computing closure with high
+  parallelism.
+
+  One possible solutions is to introduce full read-write concurrency
+  into the B+Tree so that readers may run concurrent with a single
+  writer.
+
+  Another is to explore how full transactions would change things.
+
+  Yet another is to isolate more of the decision making about commits
+  (almost checkpoints) for closure within variants on the IJoinNexus
+  for handling the different deployment scenarios and truth
+  maintenance (requires reading on a TemporaryStore in addition to the
+  main database).  Perhaps this is the easiest.  Since we do not have
+  full transactions at this point, the IJoinNexus can simply force a
+  commit before computing the closure (that takes the concern out of
+  the applications hands) and after each round of closure.  
+
+* Parallelism free text indexing so that it does not add linear
+  latency.  Also review for obvious performance hits.
+
+* Verify full db-at-once closure.
+
+- Done. Verify that the justifications are being computed and written
+  on the index correctly. See the Justifications class and the
+  TestJustifications test suite.
+
+  ? Optimize by assigning variables in a rule a positional index?
+
+* Verify TM.
+
+* Extract times on all indices by read and write using a post-mortem
+  utility or bookmarkable view.
+
+* Fixed? Big problem is the read-committed read on the temp triple
+  store and the choice of the new read-timestamp when computing
+  closure.  This is the main place where inconsistencies arise.
+  
+  Done. Modify IJoinNexus to allow per-relation override of the read
+  time.  This will let choose UNISOLATED for everything read from thee
+  temporary store.
+
+  Done. When choosing the new read timestamp for the next round of
+  closure only update the read timestamp if the previous read
+  timestamp was an actual commit time rather than UNISOLATED or
+  READ_COMMITTED.
+
+* Sesame 2 TCK integration.
+
+
+* The lexicon (StatementBuffer and addTerms) *REALLY* needs a rewrite.
+
+ TestRDFXMLInterchangeWithStatementIdentifiers.doStatementIdentifiersTest(TestRDFXMLInterchangeWithStatementIdentifiers.java:612)
+
+
+                // ground statements using BNodes for statement identifiers.
+                buf.add(x, rdfType, A, sid1);
+                buf.add(y, rdfType, B, sid2);
+                buf.add(z, rdfType, C, sid3);
+
+                // statements about statements using statement identifiers.
+                buf.add(sid1, dcCreator, bryan);
+                buf.add(sid2, dcCreator, bryan);
+                buf.add(sid2, dcCreator, mike);
+                buf.add(sid3, dcCreator, mike);
