@@ -181,8 +181,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
     
-        if (log.isDebugEnabled())
-            log.debug("program=" + program.getName()+", #tasks="+tasks.size());
+        if (log.isInfoEnabled())
+            log.info("program=" + program.getName()+", #tasks="+tasks.size());
         
         if (indexManager == null)
             throw new IllegalStateException();
@@ -203,8 +203,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     
         }
     
-        if (log.isDebugEnabled())
-            log.debug("program=" + program.getName()+", #tasks="+tasks.size()+" - done");
+        if (log.isInfoEnabled())
+            log.info("program=" + program.getName()+", #tasks="+tasks.size()+" - done");
     
         return totals;
     
@@ -226,8 +226,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     
         final int ntasks = tasks.size();
         
-        if (log.isDebugEnabled())
-            log.debug("program=" + program.getName()+", #tasks="+ntasks);
+        if (log.isInfoEnabled())
+            log.info("program=" + program.getName()+", #tasks="+ntasks);
     
         if (indexManager == null)
             throw new IllegalStateException();
@@ -265,8 +265,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             
         }
     
-        if (log.isDebugEnabled())
-            log.debug("program=" + program.getName()+", #tasks="+ntasks+" - done");
+        if (log.isInfoEnabled())
+            log.info("program=" + program.getName()+", #tasks="+ntasks+" - done");
     
         return totals;
     
@@ -320,8 +320,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         {
 
-            if (!step.isRule() && !((IProgram) step).isClosure()
-                    && util.isClosureProgram(step)) {
+            if (util.isClosureProgram(step)) {
 
                 /*
                  * If this is not a rule, and it is not a closure of a flat rule

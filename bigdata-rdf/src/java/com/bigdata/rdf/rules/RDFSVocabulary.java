@@ -177,7 +177,7 @@ public class RDFSVocabulary {
      * @todo the returned program can be cached for a given database and
      *       focusStore (or for the database if no focusStore is used).
      */
-    public IStep getRDFSClosureProgram(//
+    public MappedProgram getFullClosureProgram(//
             String db,//
             String focusStore,//
             boolean forwardChainRdfTypeRdfsResource,//
@@ -188,7 +188,7 @@ public class RDFSVocabulary {
             boolean forwardChainOwlEquivalentClass
             ) {
 
-        MappedProgram program = new MappedProgram("fullForwardClosure",
+        final MappedProgram program = new MappedProgram("fullForwardClosure",
                 focusStore, true/* parallel */, true/* closure */);
 
         program.addStep(new RuleRdf01(db,this));

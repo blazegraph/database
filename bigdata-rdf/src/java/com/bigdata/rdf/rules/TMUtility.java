@@ -310,7 +310,7 @@ public class TMUtility {
     }
     
     public Program mapForTruthMaintenance(IStep step, String focusStore) {
-        
+
         if(step.isRule()) {
             
             return mapRuleForTruthMaintenance((IRule)step, focusStore);

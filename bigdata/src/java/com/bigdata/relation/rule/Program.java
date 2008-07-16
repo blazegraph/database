@@ -201,8 +201,27 @@ public class Program implements IProgram, Serializable {
         if (rules.length == 0)
             throw new IllegalArgumentException();
         
-        final Program subProgram = new Program("closure", true/* parallel */,
-                true/* closure */);
+        final String label;
+        if(true) {
+            
+            String[] a = new String[rules.length];
+            
+            int i = 0;
+            
+            for(IRule r : rules) {
+                
+                a[i++] = r.getName();
+                
+            }
+            
+            label = "closure" + Arrays.toString(a);
+            
+        } else {
+            
+            label = "closure(nrules=" + rules.length + ")";
+        }
+        
+        final Program subProgram = new Program(label, true/* parallel */, true/* closure */);
 
         // add the rules whose closure will be computed into the sub-program.
         subProgram.addSteps(Arrays.asList(rules).iterator());
@@ -210,8 +229,8 @@ public class Program implements IProgram, Serializable {
         /*
          * Add the sub-program to this program.
          * 
-         * Note: it will be mapped for truth maintenance if a focus store was
-         * specified.
+         * Note: it will be mapped for truth maintenance if the instance is a
+         * MappedProgram and a focus store was specified.
          */
         addStep(subProgram);
         
@@ -238,4 +257,55 @@ public class Program implements IProgram, Serializable {
 
     }
 
+    protected StringBuilder toString(int depth) {
+
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(ws, 0, depth);
+
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{ name="+getName());
+        
+        sb.append(", parallel="+isParallel());
+
+        sb.append(", closure="+isClosure());
+        
+        sb.append(", nsteps="+stepCount());
+        
+//        sb.append(", steps=" + Arrays.toString(toArray()));
+
+        sb.append("}");
+        
+        for(IStep step : steps) {
+            
+            sb.append("\n");
+
+            if (step.isRule()) {
+
+                sb.append(ws, 0, depth + inc);
+
+                sb.append(step.toString());
+
+            } else {
+
+                sb.append(((Program) step).toString(depth + inc));
+                
+            }
+            
+        }
+        
+        return sb;
+        
+    }
+    
+    private static final transient int inc = 1;
+    private static final transient String ws = "...............................................";
+    
+    public String toString() {
+    
+        return toString(0).toString();
+        
+    }
+    
 }

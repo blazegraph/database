@@ -78,6 +78,9 @@ public class TestAll extends TestCase {
         // test suite for rule re-writes for RDF DB truth maintenance.
         suite.addTestSuite(TestTMUtility.class);
 
+        // test suite for rule re-writes.
+        suite.addTestSuite(TestMappedProgram.class);
+
         // test suite for writing, reading, chasing and retracting justifications.
         suite.addTestSuite(TestJustifications.class);
         

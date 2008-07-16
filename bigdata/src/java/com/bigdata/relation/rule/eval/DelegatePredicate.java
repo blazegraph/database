@@ -1,11 +1,8 @@
 package com.bigdata.relation.rule.eval;
 
-import java.util.Arrays;
-
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
