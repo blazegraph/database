@@ -1894,7 +1894,7 @@ abstract public class AbstractTripleStore extends
 
         {
 
-            final ITupleIterator itr = getSPOIndex().rangeIterator(null, null);
+            final ITupleIterator itr = getSPOIndex().rangeIterator();
 
             int i = 0;
 

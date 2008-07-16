@@ -30,7 +30,7 @@ import com.bigdata.rdf.inf.Axioms;
 import com.bigdata.rdf.inf.BaseAxioms;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
@@ -81,14 +81,8 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
     }
 
     public boolean accept(SPO spo) {
-
-//        return reject(spo);
-//        
-//    }
-//    
-//    private boolean reject(SPO spo) {
         
-        if((spo.s & IRawTripleStore.TERMID_CODE_LITERAL) != 0L) {
+        if(AbstractTripleStore.isLiteral(spo.s)) {
             
             /*
              * Note: Explicitly toss out entailments that would place a
@@ -96,7 +90,7 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
              * the database via rdfs3 and rdfs4b.
              */
 
-            return true;
+            return false;
             
         }
         
@@ -104,7 +98,7 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
             
             // Accept all explicit statements.
             
-            return false;
+            return true;
             
         }
         
@@ -120,7 +114,7 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
              * Axiom to Inferred.
              */
             
-            return true;
+            return false;
             
         }
 
@@ -129,13 +123,13 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
             
             // reject (?x, rdf:type, rdfs:Resource ) 
             
-            return true;
+            return false;
             
         }
         
         // Accept everything else.
         
-        return false;
+        return true;
         
     }
     
