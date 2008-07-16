@@ -41,6 +41,7 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.rio.LoadStats;
@@ -916,6 +917,18 @@ public class DataLoader {
         
         // flush anything in the buffer.
         buffer.flush();
+        
+        if (!(buffer.getStatementStore().getIndexManager() instanceof TemporaryStore)) {
+            
+            /*
+             * Make sure everything is committed before performing closure since
+             * we will be reading from the read-committed index views (except
+             * for a temporary store).
+             */
+            
+            buffer.getStatementStore().commit();
+            
+        }
         
         final ClosureStats stats;
         
