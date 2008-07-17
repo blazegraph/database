@@ -295,8 +295,12 @@ abstract public class AbstractTripleStore extends
      * 
      * @see Options#BUFFER_CAPACITY
      * @see #newJoinNexusFactory(ActionEnum, int, IElementFilter)
+     * 
+     * FIXME Re-evaluate the effect of the buffer capacity for the chunked
+     * iterators. When we are running parallel rules and asynchronous iterators
+     * it could make sense to use much smaller buffers (10k vs 200k).
      */
-    private final int bufferCapacity;
+    final public int bufferCapacity;
 
     /**
      * When <code>true</code> the database will support statement identifiers.

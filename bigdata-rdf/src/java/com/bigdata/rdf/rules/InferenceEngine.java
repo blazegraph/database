@@ -139,10 +139,6 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
  *       assertion). If you take this approach then you must also re-write all
  *       existing assertions using the term whose term identifier is changed to
  *       be that of another term.
- * 
- * @todo if we are not storing rules or magic facts in the main statement
- *       indices then get rid of the leading byte used in all keys for the
- *       statement indices.
  */
 public class InferenceEngine extends RDFSVocabulary {
 
@@ -340,13 +336,6 @@ public class InferenceEngine extends RDFSVocabulary {
 
         public static final String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "true";
 
-//        /**
-//         * Used by some unit tests to defer the load of the axioms into the
-//         * database. This option MUST NOT be used by applications as inference
-//         * depends on the axioms being available.
-//         */
-//        String NOAXIOMS = "noAxioms";
-        
     }
 
     /**
@@ -639,7 +628,7 @@ public class InferenceEngine extends RDFSVocabulary {
 
             /*
              * FIXME remove IJoinNexus.RULE once we no longer need the rule to
-             * generate the justifications.
+             * generate the justifications (esp. for scale-out).
              */
             final int solutionFlags = IJoinNexus.ELEMENT//
                     | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
@@ -666,160 +655,6 @@ public class InferenceEngine extends RDFSVocabulary {
         }
         
     }
-    
-//    /**
-//     * This variant allows you to explicitly NOT generate {@link Justification}s
-//     * for the computed entailments. It is used by the {@link TruthMaintenance}
-//     * class as part of the algorithm for truth maintenance when retracting
-//     * statements from the database. It SHOULD NOT be used for any other purpose
-//     * or you may risk failing to generate justifications.
-//     * 
-//     * @param focusStore
-//     *            The data set that will be closed against the database.
-//     * @param justify
-//     *            {@link Justification}s will be generated iff this flag is
-//     *            <code>true</code>.
-//     * 
-//     * @return Statistics about the operation.
-//     * 
-//     * @see #computeClosure(AbstractTripleStore)
-//     */
-//    public ClosureStats computeClosure(AbstractTripleStore focusStore,
-//            boolean justify) {
-//
-//        try {
-//
-//            switch (forwardClosure) {
-//
-//            case Fast:
-//                return fastForwardClosure(focusStore, justify);
-//
-//            case Full:
-//                return fullForwardClosure(focusStore, justify);
-//
-//            default:
-//                throw new UnsupportedOperationException();
-//
-//            }
-//
-//        } catch (Exception ex) {
-//
-//            throw new RuntimeException(ex);
-//            
-//        }
-//        
-//    }
-//    
-//    /**
-//     * Compute the complete forward closure of the store using a set-at-a-time
-//     * inference strategy.
-//     * <p>
-//     * The general approach is a series of rounds in which each rule is applied
-//     * to all data in turn. Entailments computed in each round are fed back into
-//     * the source against which the rules can match their preconditions, so
-//     * derived entailments may be computed in a succession of rounds. The
-//     * process halts when no new entailments are computed in a given round.
-//     * 
-//     * @param focusStore
-//     *            When non-<code>null</code> , the focusStore will be closed
-//     *            against the database with the entailments written into the
-//     *            database. When <code>null</code>, the entire database will
-//     *            be closed.
-//     */
-//    protected ClosureStats fullForwardClosure(AbstractTripleStore focusStore,
-//            boolean justify) throws Exception {
-//
-//        final long begin = System.currentTimeMillis();
-//
-//        final MappedProgram program = getFastForwardClosureProgram(//
-//                database.getSPORelation().getNamespace(),
-//                (focusStore == null ? null : focusStore.getSPORelation()
-//                        .getNamespace()),//
-//                forwardChainRdfTypeRdfsResource, //
-//                rdfsOnly,//
-//                forwardChainOwlSameAsClosure, //
-//                forwardChainOwlSameAsProperties,//
-//                forwardChainOwlEquivalentProperty,//
-//                forwardChainOwlEquivalentClass//
-//                );
-//
-//        /*
-//         * FIXME remove IJoinNexus.RULE once we no longer need the rule to
-//         * generate the justifications.
-//         */
-//        final int solutionFlags = IJoinNexus.ELEMENT//
-//                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
-////              | IJoinNexus.RULE  // iff debugging.
-//              ;
-//      
-//        final IJoinNexusFactory joinNexusFactory = database
-//                .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
-//                        doNotAddFilter);
-//
-//        final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
-//                .getIndexManager());
-//        
-//        final long mutationCount = joinNexus.runMutation(program);
-//
-//        final long elapsed = System.currentTimeMillis() - begin;
-//        
-//        return new ClosureStats(mutationCount,elapsed);
-//        
-//    }
-//
-//    /**
-//     * Fast forward closure of the store based on <a
-//     * href="http://www.cs.iastate.edu/~tukw/waim05.pdf">"An approach to RDF(S)
-//     * Query, Manipulation and Inference on Databases" by Lu, Yu, Tu, Lin, and
-//     * Zhang</a>.
-//     * 
-//     * @param focusStore
-//     *            When non-<code>null</code> , the focusStore will be closed
-//     *            against the database with the entailments written into the
-//     *            database. When <code>null</code>, the entire database will
-//     *            be closed.
-//     */
-//    protected ClosureStats fastForwardClosure(AbstractTripleStore focusStore,
-//            boolean justify) throws Exception {
-//
-//
-//        final long begin = System.currentTimeMillis();
-//
-//        final MappedProgram program = getFastForwardClosureProgram(//
-//                database.getSPORelation().getNamespace(),//
-//                (focusStore == null ? null : focusStore.getSPORelation()
-//                        .getNamespace()),//
-//                forwardChainRdfTypeRdfsResource, //
-//                rdfsOnly,//
-//                forwardChainOwlSameAsClosure, //
-//                forwardChainOwlSameAsProperties,//
-//                forwardChainOwlEquivalentProperty,//
-//                forwardChainOwlEquivalentClass//
-//                );
-//        
-//        /*
-//         * @todo remove IJoinNexus.RULE once we no longer need the rule to
-//         * generate the justifications.
-//         */
-//        final int solutionFlags = IJoinNexus.ELEMENT//
-//                | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
-////      | IJoinNexus.RULE  // iff debugging.
-//                ;
-//        
-//        final IJoinNexusFactory joinNexusFactory = database
-//                .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
-//                        doNotAddFilter);
-//
-//        final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
-//                .getIndexManager());
-//
-//        final long mutationCount = joinNexus.runMutation(program);
-//
-//        final long elapsed = System.currentTimeMillis() - begin;
-//        
-//        return new ClosureStats(mutationCount, elapsed);
-//        
-//    }
     
     /**
      * Return true iff the fully bound statement is an axiom.
@@ -873,12 +708,12 @@ public class InferenceEngine extends RDFSVocabulary {
      * 
      * @return An iterator that will visit the statements in database matching
      *         the triple pattern query plus any necessary entailments.
-     * 
-     * @todo configure buffer sizes.
      */
-    public IChunkedOrderedIterator<SPO> backchainIterator(long s, long p, long o, IElementFilter<SPO> filter) {
-        
-        final IChunkedOrderedIterator<SPO> src = database.getAccessPath(s, p, o, filter).iterator();
+    public IChunkedOrderedIterator<SPO> backchainIterator(long s, long p,
+            long o, IElementFilter<SPO> filter) {
+
+        final IChunkedOrderedIterator<SPO> src = database.getAccessPath(s, p,
+                o, filter).iterator();
         
         final IChunkedOrderedIterator<SPO> ret;
 
@@ -911,7 +746,7 @@ public class InferenceEngine extends RDFSVocabulary {
          */
 
         IChunkedOrderedIterator<SPO> itr = (ret == null ? src
-                : new ChunkedWrappedIterator<SPO>(ret, 10000,
+                : new ChunkedWrappedIterator<SPO>(ret, database.bufferCapacity,
                         null/*keyOrder*/, filter));
 
         if (!forwardChainRdfTypeRdfsResource) {
