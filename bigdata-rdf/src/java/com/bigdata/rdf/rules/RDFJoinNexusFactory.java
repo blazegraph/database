@@ -54,6 +54,8 @@ import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 
 /**
+ * Factory for {@link RDFJoinNexus} objects.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -63,14 +65,16 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      * 
      */
     private static final long serialVersionUID = 8270873764858640472L;
-    
-    private final ActionEnum action;
-    private final long writeTime;
-    private final long readTime;
-    private final boolean justify;
-    private final int bufferCapacity;
-    private final int solutionFlags;
-    private final IElementFilter filter;
+   
+    final RuleContextEnum ruleContext;
+    final ActionEnum action;
+    final long writeTimestamp;
+    final long readTimestamp;
+    final boolean justify;
+    final int bufferCapacity;
+    final int solutionFlags;
+    @SuppressWarnings("unchecked")
+	final IElementFilter filter;
 
     public String toString() {
         
@@ -78,11 +82,13 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         sb.append(getClass().getSimpleName());
         
-        sb.append("{ action="+action);
+        sb.append("{ ruleContext="+ruleContext);
 
-        sb.append(", writeTime="+writeTime);
+        sb.append(", action="+action);
+
+        sb.append(", writeTime="+writeTimestamp);
         
-        sb.append(", readTime="+readTime);
+        sb.append(", readTime="+readTimestamp);
         
         sb.append(", justify="+justify);
         
@@ -97,27 +103,32 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         return sb.toString();
         
     }
-    
-    /**
-     * 
-     * @param writeTime
-     * @param readTime
-     * @param justify
-     * @param solutionFlags
-     * @param filter
-     */
-    public RDFJoinNexusFactory(ActionEnum action, long writeTime,
-            long readTime, boolean justify, int bufferCapacity,
-            int solutionFlags, IElementFilter filter) {
+
+	/**
+	 * 
+	 * @param writeTime
+	 * @param readTime
+	 * @param justify
+	 * @param solutionFlags
+	 * @param filter
+	 */
+	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
+			long writeTime, long readTime, boolean justify, int bufferCapacity,
+			int solutionFlags, IElementFilter filter) {
+
+        if (ruleContext == null)
+            throw new IllegalArgumentException();
 
         if (action == null)
             throw new IllegalArgumentException();
-        
+
+        this.ruleContext = ruleContext;
+
         this.action = action;
         
-        this.writeTime = writeTime;
+        this.writeTimestamp = writeTime;
 
-        this.readTime = readTime;
+        this.readTimestamp = readTime;
 
         this.justify = justify;
 
@@ -131,8 +142,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
     public IJoinNexus newInstance(IIndexManager indexManager) {
 
-        return new RDFJoinNexus(this, indexManager, action, writeTime,
-                readTime, justify, bufferCapacity, solutionFlags, filter);
+        return new RDFJoinNexus(this, indexManager);
 
     }
 

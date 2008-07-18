@@ -46,6 +46,8 @@ import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -91,10 +93,6 @@ import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 /**
  * {@link IProgram} execution support for the RDF DB.
  * 
- * FIXME The handling of the various deployment scenarios (local {@link Journal},
- * {@link TemporaryStore}, and {@link IBigdataFederation}) is a bit messy and
- * it is going to be difficult to generalize to full transaction support.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -118,7 +116,8 @@ public class RDFJoinNexus implements IJoinNexus {
     
     private final int solutionFlags;
     
-    private final IElementFilter filter;
+    @SuppressWarnings("unchecked")
+	private final IElementFilter filter;
 
     /**
      * The default factory for rule evaluation.
@@ -126,41 +125,37 @@ public class RDFJoinNexus implements IJoinNexus {
      * @todo configure for scale-out variants?
      */
     private final IRuleTaskFactory defaultTaskFactory;
-    
-    /**
-     * @param joinNexusFactory
-     *            The object used to create this instance and which can be used
-     *            to create other instances as necessary for distributed rule
-     *            execution.
-     * @param indexManager
-     *            The object used to resolve indices, relations, etc.
-     * @param action
-     *            Indicates whether this is a Query, Insert, or Delete
-     *            operation.
-     * @param writeTimestamp
-     *            The timestamp of the relation view(s) using to write on the
-     *            {@link IMutableRelation}s (ignored if you are not execution
-     *            mutation programs).
-     * @param readTimestamp
-     *            The timestamp of the relation view(s) used to read from the
-     *            access paths.
-     * @param bufferCapacity
-     *            The capacity of the buffers used to support chunked iterators
-     *            and efficient ordered writes.
-     * @param solutionFlags
-     *            Flags controlling the behavior of
-     *            {@link #newSolution(IRule, IBindingSet)}.
-     * @param filter
-     *            An optional filter that will be applied to keep matching
-     *            elements out of the {@link IBuffer} for Query or Mutation
-     *            operations.
-     * 
-     * @todo collapse the executor service and index manager?
-     */
-    public RDFJoinNexus(RDFJoinNexusFactory joinNexusFactory,
-            IIndexManager indexManager, ActionEnum action, long writeTimestamp,
-            long readTimestamp, boolean justify, int bufferCapacity,
-            int solutionFlags, IElementFilter filter) {
+
+	/**
+	 * @param joinNexusFactory
+	 *            The object used to create this instance and which can be used
+	 *            to create other instances as necessary for distributed rule
+	 *            execution.
+	 * @param indexManager
+	 *            The object used to resolve indices, relations, etc.
+	 * @param action
+	 *            Indicates whether this is a Query, Insert, or Delete
+	 *            operation.
+	 * @param writeTimestamp
+	 *            The timestamp of the relation view(s) using to write on the
+	 *            {@link IMutableRelation}s (ignored if you are not execution
+	 *            mutation programs).
+	 * @param readTimestamp
+	 *            The timestamp of the relation view(s) used to read from the
+	 *            access paths.
+	 * @param bufferCapacity
+	 *            The capacity of the buffers used to support chunked iterators
+	 *            and efficient ordered writes.
+	 * @param solutionFlags
+	 *            Flags controlling the behavior of
+	 *            {@link #newSolution(IRule, IBindingSet)}.
+	 * @param filter
+	 *            An optional filter that will be applied to keep matching
+	 *            elements out of the {@link IBuffer} for Query or Mutation
+	 *            operations.
+	 */
+	public RDFJoinNexus(RDFJoinNexusFactory joinNexusFactory,
+			IIndexManager indexManager) {
 
         if (joinNexusFactory == null)
             throw new IllegalArgumentException();
@@ -168,26 +163,23 @@ public class RDFJoinNexus implements IJoinNexus {
         if (indexManager == null)
             throw new IllegalArgumentException();
 
-        if (action == null)
-            throw new IllegalArgumentException();
-
         this.joinNexusFactory = joinNexusFactory;
         
         this.indexManager = indexManager;
         
-        this.action = action;
+        this.action = joinNexusFactory.action;
         
-        this.writeTimestamp = writeTimestamp;
+        this.writeTimestamp = joinNexusFactory.writeTimestamp;
 
-        this.readTimestamp = readTimestamp;
+        this.readTimestamp = joinNexusFactory.readTimestamp;
 
-        this.justify = justify;
+        this.justify = joinNexusFactory.justify;
         
-        this.bufferCapacity = bufferCapacity;
+        this.bufferCapacity = joinNexusFactory.bufferCapacity;
         
-        this.solutionFlags = solutionFlags;
+        this.solutionFlags = joinNexusFactory.solutionFlags;
 
-        this.filter = filter;
+        this.filter = joinNexusFactory.filter;
         
         this.defaultTaskFactory = new IRuleTaskFactory() {
 
@@ -219,20 +211,17 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-    /**
-     * When the relation is the focusStore SPORelation choose
-     * {@link ITx#UNISOLATED}. Otherwise choose whatever was specified to the
-     * {@link RDFJoinNexusFactory}. This is because we avoid doing a commit on
-     * the focusStore and instead just its its UNISOLATED indices. This is more
-     * efficient since they are already buffered and since we can avoid touching
-     * disk at all for small data sets.
-     * 
-     * FIXME Rather than parsing the relation name, it would be better to have
-     * the temporary store UUIDs explicitly declared.
-     */
-    public long getReadTimestamp(String relationName) {
-        
-        /* This is a typical UUID-based temporary store relation name.
+	/**
+	 * Return <code>true</code> if the <i>relationName</i> is on a
+	 * {@link TempTripleStore}
+	 * 
+	 * @todo Rather than parsing the relation name, it would be better to have
+	 *       the temporary store UUIDs explicitly declared.
+	 */
+    protected boolean isTempStore(String relationName) {
+       
+    	/* This is a typical UUID-based temporary store relation name.
+    	 * 
          *           1         2         3
          * 01234567890123456789012345678901234567
          * 81ad63b9-2172-45dc-bd97-03b63dfe0ba0kb.spo
@@ -254,13 +243,39 @@ public class RDFJoinNexus implements IJoinNexus {
                  * Pretty certain to be a relation on a temporary store.
                  */
                 
-                return ITx.UNISOLATED;
+                return true;
                 
             }
             
         }
         
-        if (lastCommitTime != 0L) {
+        return false;
+
+    }
+
+//    protected AbstractTripleStore getMutationTarget() {
+//    	
+//    	return mutationTarget;
+//    	
+//    }
+    
+    /**
+     * When the relation is the focusStore SPORelation choose
+     * {@link ITx#UNISOLATED}. Otherwise choose whatever was specified to the
+     * {@link RDFJoinNexusFactory}. This is because we avoid doing a commit on
+     * the focusStore and instead just its its UNISOLATED indices. This is more
+     * efficient since they are already buffered and since we can avoid touching
+     * disk at all for small data sets.
+     */
+    public long getReadTimestamp(String relationName) {
+        
+    	if(isTempStore(relationName)) {
+    		
+    		return ITx.UNISOLATED;
+    		
+    	}
+        
+        if (lastCommitTime != 0L && action.isMutation()) {
             
             /*
              * Note: This advances the read-behind timestamp for a local Journal
@@ -416,10 +431,6 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-    /*
-     * @todo the element type should probably be unspecified <? extends Object>
-     * since we can also materialize stuff from the lexicon relation.
-     */
     public ISolution newSolution(IRule rule, IBindingSet bindingSet) {
 
         final Solution solution = new Solution(this, rule, bindingSet);
@@ -525,6 +536,14 @@ public class RDFJoinNexus implements IJoinNexus {
         @Override
         protected long flush(IChunkedOrderedIterator<ISolution<E>> itr) {
 
+			/*
+			 * FIXME If no concurrency control then acquire write lock here and
+			 * release in finally {}.
+			 * 
+			 * The IAccessPath iterators MUST also acquire a read lock using the
+			 * same lock object for the relation. 
+			 */
+        	
             try {
 
                 /*
@@ -862,7 +881,7 @@ public class RDFJoinNexus implements IJoinNexus {
     /**
      * Runs a distributed {@link IProgram}. This covers both the
      * {@link EmbeddedFederation} (which uses key-range partitioned indices) and
-     * {@link AbstractDistributedFederation}s that are truely multi-machine and
+     * {@link AbstractDistributedFederation}s that are truly multi-machine and
      * use RMI.
      * 
      * FIXME This is not optimized for distributed joins. It is actually using

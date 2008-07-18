@@ -55,15 +55,14 @@ import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 
 /**
- * Rule used in steps 3, 5, 6, 7, and 9 of
- * {@link InferenceEngine#fastForwardClosure()}.
+ * Rule used in steps 3, 5, 6, 7, and 9 of the fast forward closure program.
  * 
  * <pre>
  *    (?x, {P}, ?y) -&gt; (?x, propertyId, ?y)
  * </pre>
  * 
- * where <code>{P}</code> is the closure of the subproperties of one of the
- * FIVE (5) reserved keywords:
+ * where <code>{P}</code> is the closure of the subproperties of one of the FIVE
+ * (5) reserved keywords:
  * <ul>
  * <li><code>rdfs:subPropertyOf</code></li>
  * <li><code>rdfs:subClassOf</code></li>
@@ -72,8 +71,9 @@ import com.bigdata.relation.rule.eval.RuleStats;
  * <li><code>rdf:type</code></li>
  * </ul>
  * 
- * The caller MUST provide a current version of "{P}" when they instantiate this
- * rule.
+ * The caller MUST define an {@link IRuleTaskFactory} that provides a concrete
+ * implementation of {@link FastClosureRuleTask} which knows how to compute
+ * "{P}" when they instantiate this rule.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -144,7 +144,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
         
         private final IRule rule;
 
-        private final IJoinNexus joinNexus; // Note: Not serializable
+        private final IJoinNexus joinNexus; // Note: Not serializable.
 
         private final IBuffer<ISolution> buffer; // Note: Not serializable.
 
@@ -258,7 +258,8 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 //                    .getIndexManager().getResourceLocator().locate(
 //                            relationName, timestamp);
 
-            final SPORelation relation = (SPORelation)joinNexus.getTailRelationView(rule.getTail(0));
+            final SPORelation relation = (SPORelation) joinNexus
+					.getTailRelationView(rule.getTail(0));
 
             /*
              * Query for the set {P} rather than requiring it as an input.

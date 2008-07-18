@@ -32,13 +32,14 @@ import com.bigdata.concurrent.TimeoutException;
 
 /**
  * Interface for a low latency global lock service. Resources are identified by
- * a namespace and locks are granted for a <em>resource hierarchy</em>. A
- * lock is either <em>exclusive</em> or <em>shared</em>. A exclusive lock
- * is exclusive of all other locks on the resource hierarchy, including shared
- * locks and other exclusive locks. Exclusive locks are normally used to create
- * or destroy a resource hierarchy. A shared lock simply prevents a process from
- * acquiring an exclusive lock and thereby ensures that the resource hierarchy
- * remains available.
+ * a namespace and locks are granted for a <em>resource hierarchy</em>.The
+ * resource hierarchy is defined as all strings having the namespace as a
+ * prefix. A lock is either <em>exclusive</em> or <em>shared</em>. A exclusive
+ * lock is exclusive of all other locks on the resource hierarchy, including
+ * shared locks and other exclusive locks. Exclusive locks are normally used to
+ * create or destroy a resource hierarchy. A shared lock simply prevents a
+ * process from acquiring an exclusive lock and thereby ensures that the
+ * resource hierarchy remains available.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

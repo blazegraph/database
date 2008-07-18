@@ -356,8 +356,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
             {
                 
                 final IJoinNexusFactory joinNexusFactory = store
-                        .newJoinNexusFactory(ActionEnum.Insert, IJoinNexus.ALL,
-                                null/*filter*/);
+						.newJoinNexusFactory(
+								RuleContextEnum.DatabaseAtOnceClosure,
+								ActionEnum.Insert, IJoinNexus.ALL, null/* filter */);
             
                 final long mutationCount = joinNexusFactory.newInstance(
                         store.getIndexManager()).runMutation(program);

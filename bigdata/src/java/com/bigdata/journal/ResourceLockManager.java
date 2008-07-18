@@ -47,7 +47,7 @@ import com.bigdata.service.IServiceShutdown;
  * relations, such as create/destroy vs use and lock of the relation owner for
  * db create / destroy. However, the resource hierarchy is conceptual and locks
  * may be obtained that bear no relationship to actual indices or relations.
- * This can be convienent for coordinating distributed processes.
+ * This can be convenient for coordinating distributed processes.
  * 
  * FIXME Implement!
  * <p>
