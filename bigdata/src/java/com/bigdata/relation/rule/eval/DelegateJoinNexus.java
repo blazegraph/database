@@ -31,6 +31,7 @@ package com.bigdata.relation.rule.eval;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -131,8 +132,17 @@ public class DelegateJoinNexus implements IJoinNexus {
     }
 
     public void makeWriteSetsVisible() {
-        // TODO Auto-generated method stub
-        
+    	delegate.makeWriteSetsVisible();
     }
+
+	@Override
+	public boolean forceSerialExecution() {
+		return delegate.forceSerialExecution();
+	}
+
+	@Override
+	public IAccessPath getTailAccessPath(IPredicate pred) {
+		return delegate.getTailAccessPath(pred);
+	}
 
 }

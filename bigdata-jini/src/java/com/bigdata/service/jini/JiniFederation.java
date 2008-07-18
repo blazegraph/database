@@ -480,7 +480,7 @@ public class JiniFederation extends AbstractDistributedFederation {
      * (There could be another method for the last transaction commit time. This
      * method reflects commits by unisolated operations).
      */
-    public long lastCommitTime() {
+    public long getLastCommitTime() {
 
         final ITimestampService timestampService = getTimestampService();
 

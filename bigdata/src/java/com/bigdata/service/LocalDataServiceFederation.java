@@ -513,7 +513,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
      
     }
 
-    public long lastCommitTime() {
+    public long getLastCommitTime() {
 
         assertOpen();
         

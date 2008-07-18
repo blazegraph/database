@@ -75,7 +75,7 @@ import com.bigdata.service.IBigdataFederation;
  * </p>
  * <p>
  * We can do two things to avoid violating the {@link BTree} concurrency
- * contract
+ * contract:
  * <ol>
  * <li>Read using a read-committed view (for the source on which the rules will
  * write) and write on the unisolated view. The main drawback with this approach
@@ -231,11 +231,12 @@ public enum RuleContextEnum {
 	 * execution of the rule(s).
 	 * </p>
 	 * <p>
-	 * The generated rule SHOULD be executed against a read-consistent view of
-	 * the knowledge base. In a scenario where the knowledge base is unchanging,
-	 * this is very efficient as it allows full concurrency with less (no)
-	 * overhead for concurrency control. In addition, concurrent writes on the
-	 * knowledge base are allowed.
+	 * The generated rule SHOULD be executed against a <em>read-consistent</em>
+	 * view of the knowledge base (NOT read-committed since that can result in
+	 * dirty reads). In a scenario where the knowledge base is unchanging, this
+	 * is very efficient as it allows full concurrency with less (no) overhead
+	 * for concurrency control. In addition, concurrent writes on the knowledge
+	 * base are allowed.
 	 * </p>
 	 * <p>
 	 * New readers SHOULD use a read-consistent timestamp that reflects the

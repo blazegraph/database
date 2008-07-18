@@ -72,6 +72,12 @@ public interface IJoinNexus {
      * The kind of operation that is being executed (Query, Insert, or Delete).
      */
     ActionEnum getAction();
+
+	/**
+	 * Turn off rule level parallelism. This can be enabled if you are exploring
+	 * apparent concurrency problems with the rules.
+	 */
+    boolean forceSerialExecution();
     
     /**
      * Copy values the values from the visited element corresponding to the
@@ -248,6 +254,22 @@ public interface IJoinNexus {
      */
     IRelation getTailRelationView(IPredicate pred);
 
+	/**
+	 * Obtain an access path reading from the view for the relation associated
+	 * with the specified predicate (from the tail of some rule).
+	 * 
+	 * @param pred
+	 *            The predicate.
+	 * 
+	 * @return The access path.
+	 * 
+	 * @todo the use of this method is recommended over
+	 *       {@link #getTailRelationView(IPredicate)} since the latter is not
+	 *       capable of interposing a reentrant read-write lock to force
+	 *       concurrency control on a journal or temporary store.
+	 */
+    IAccessPath getTailAccessPath(IPredicate pred);
+    
     /**
      * Used to locate indices, relations and relation containers.
      */

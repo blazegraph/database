@@ -356,15 +356,8 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
 
         }
 
-        // Resolve the relation name to the IRelation object.
-        final IRelation relation = (IRelation) joinNexus.getTailRelationView(predicate);
+        return joinNexus.getTailAccessPath(predicate);
         
-        // find the best access path for the predicate for that relation.
-        final IAccessPath accessPath = relation.getAccessPath(predicate);
-        
-        // return that access path.
-        return accessPath;
-
     }
 
 //  if (focusStore != null && focusIndex > 0) {

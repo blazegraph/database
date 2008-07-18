@@ -586,14 +586,7 @@ public class RuleState {
         // based on the given bindings.
         final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
 
-        // Resolve the relation name to the IRelation object.
-        final IRelation relation = (IRelation) joinNexus.getTailRelationView(predicate);
-
-        // find the best access path for the predicate for that relation.
-        final IAccessPath accessPath = relation.getAccessPath(predicate);
-
-        // return that access path.
-        return accessPath;
+        return joinNexus.getTailAccessPath(predicate);
 
     }
 

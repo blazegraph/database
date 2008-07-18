@@ -870,7 +870,7 @@ public class EmbeddedFederation extends AbstractFederation {
      *       services during start, much like we are doing here). This approach
      *       generalizes towards the distributed systems approach.
      */
-    public long lastCommitTime() {
+    public long getLastCommitTime() {
 
         assertOpen();
         
