@@ -137,6 +137,24 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
+    public void test_fixedPoint_TestOwlSameAs_Full() throws SailException,
+        RepositoryException, IOException, RDFParseException {
+    
+        final String file = "testOwlSameAs.rdf";
+        
+        doFixedPointTest(file, ForwardClosureEnum.Full);
+    
+    }
+    
+    public void test_fixedPoint_TestOwlSameAs_Fast() throws SailException,
+        RepositoryException, IOException, RDFParseException {
+    
+        final String file = "testOwlSameAs.rdf";
+        
+        doFixedPointTest(file, ForwardClosureEnum.Fast);
+    
+    }
+
     protected void doFixedPointTest(String file, ForwardClosureEnum closureType) throws RepositoryException, RDFParseException, IOException, SailException {
 
         /*
@@ -182,6 +200,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         	{ // use the Sesame2 inferencer to get ground truth
         		
+                int numSesame2Stmts = 0;
+                
 	            StatementBuffer buf = new StatementBuffer(groundTruth ,10);
 	            
 	            Repository sesame2 = new SailRepository(
@@ -210,6 +230,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            		
 	            		buf.add(stmt.getSubject(), stmt.getPredicate(), 
 	            				stmt.getObject());
+                        
+                        numSesame2Stmts++;
 	            		
 	            	}
 	            	
@@ -221,6 +243,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                         
                     }
 	                
+                    log.error("num sesame 2 stmts: " + numSesame2Stmts);
+                    
 	                // make the data visible to a read-committed view.
 	                groundTruth.commit();
 	                

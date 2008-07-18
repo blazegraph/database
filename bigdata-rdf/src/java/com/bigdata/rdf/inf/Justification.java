@@ -630,7 +630,7 @@ public class Justification implements Comparable<Justification> {
 
         VisitedSPOSet visited = new VisitedSPOSet(focusStore.getIndexManager());        
         
-        try {
+        // try {
 
             boolean ret = isGrounded(inf, focusStore, db, head, testHead, testFocusStore, visited);
 
@@ -647,13 +647,13 @@ public class Justification implements Comparable<Justification> {
              */
             
             return ret;
-            
+/* naughty, naughty
         } finally {
             
             visited.close();
             
         }
-        
+*/        
     }
     
     public static boolean isGrounded(
