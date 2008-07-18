@@ -642,7 +642,7 @@ public class InferenceEngine extends RDFSVocabulary {
             
             final IJoinNexusFactory joinNexusFactory = database
                     .newJoinNexusFactory(ruleContext, ActionEnum.Insert,
-							solutionFlags, doNotAddFilter);
+							solutionFlags, doNotAddFilter, justify);
 
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
                     .getIndexManager());

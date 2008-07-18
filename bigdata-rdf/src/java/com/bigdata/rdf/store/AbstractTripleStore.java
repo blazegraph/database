@@ -2712,7 +2712,24 @@ abstract public class AbstractTripleStore extends
      * @return
      */
     public IJoinNexusFactory newJoinNexusFactory(RuleContextEnum ruleContext,
-			ActionEnum action, int solutionFlags, IElementFilter filter) {
+            ActionEnum action, int solutionFlags, IElementFilter filter) {
+        
+        return newJoinNexusFactory(ruleContext, action, solutionFlags, filter, 
+                isJustify());
+        
+    }
+    
+    /**
+     * 
+     * @param solutionFlags
+     *            See {@link IJoinNexus#ELEMENT} and friends.
+     * @param filter
+     *            Optional filter.
+     * @return
+     */
+    public IJoinNexusFactory newJoinNexusFactory(RuleContextEnum ruleContext,
+			ActionEnum action, int solutionFlags, IElementFilter filter,
+            boolean justify) {
         
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -2737,7 +2754,7 @@ abstract public class AbstractTripleStore extends
         final long readTimestamp = ITx.READ_COMMITTED;
 
         return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
-				readTimestamp, isJustify(), bufferCapacity, solutionFlags, filter);
+				readTimestamp, justify, bufferCapacity, solutionFlags, filter);
         
     }
     
