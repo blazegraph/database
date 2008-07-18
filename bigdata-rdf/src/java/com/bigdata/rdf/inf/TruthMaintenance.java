@@ -826,7 +826,9 @@ public class TruthMaintenance {
         }
 
         // drop the tempStore.
-        tempStore.closeAndDelete();
+        if (tempStore.isOpen() == false) {
+            tempStore.closeAndDelete();
+        }
 
         if (nretracted == 0) {
             
