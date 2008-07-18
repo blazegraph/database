@@ -320,6 +320,6 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      * series of requests against a single {@link DataService} that must use a
      * consistent view.
      */
-    public long lastCommitTime();
+    public long getLastCommitTime();
 
 }

@@ -384,7 +384,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
     final protected void assertOpen() {
         
         if (!isOpen())
-            throw new IllegalArgumentException();
+            throw new IllegalStateException();
         
     }
     

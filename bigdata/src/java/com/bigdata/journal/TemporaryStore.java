@@ -378,5 +378,16 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         super.close();
         
     }
+
+	/**
+	 * Always returns ZERO (0L) since you can not perform a commit on a
+	 * {@link TemporaryRawStore} (it supports checkpoints but not commits).
+	 */
+	@Override
+	public long getLastCommitTime() {
+
+		return 0L;
+		
+	}
     
 }

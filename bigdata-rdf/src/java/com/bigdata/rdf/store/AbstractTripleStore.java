@@ -2747,11 +2747,10 @@ abstract public class AbstractTripleStore extends
         final long writeTimestamp = getTimestamp();
         
         /*
-         * Note: closure advances the read-consistent timestamp with each round
-         * by identifying the most recently committed state for the backing
-         * store / federation.
-         */
-        final long readTimestamp = ITx.READ_COMMITTED;
+		 * The default is to read from the last committed state for the
+		 * database.
+		 */
+        final long readTimestamp = getIndexManager().getLastCommitTime();
 
         return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
 				readTimestamp, justify, bufferCapacity, solutionFlags, filter);

@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
@@ -46,13 +47,13 @@ import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.ChunkedArrayIterator;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedIterator;
@@ -198,6 +199,12 @@ public class RDFJoinNexus implements IJoinNexus {
         return joinNexusFactory;
         
     }
+
+    public boolean forceSerialExecution() {
+    	
+    	return false; // FIXME make sure that this is [false]!
+    	
+    }
     
     public ActionEnum getAction() {
         
@@ -253,11 +260,13 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
-//    protected AbstractTripleStore getMutationTarget() {
-//    	
-//    	return mutationTarget;
-//    	
-//    }
+	/**
+	 * A per-relation reentrant read-write lock allows either concurrent readers
+	 * or an writer on the unisolated view of a relation. When we use this lock
+	 * we also use {@link ITx#UNISOLATED} reads and writes and
+	 * {@link #makeWriteSetsVisible()} is a NOP.
+	 */
+    final private static boolean useReentrantReadWriteLockAndUnisolatedReads = false;
     
     /**
      * When the relation is the focusStore SPORelation choose
@@ -268,31 +277,51 @@ public class RDFJoinNexus implements IJoinNexus {
      * disk at all for small data sets.
      */
     public long getReadTimestamp(String relationName) {
-        
-    	if(isTempStore(relationName)) {
-    		
-    		return ITx.UNISOLATED;
-    		
-    	}
-        
-        if (lastCommitTime != 0L && action.isMutation()) {
-            
-            /*
-             * Note: This advances the read-behind timestamp for a local Journal
-             * configuration without the ConcurrencyManager (the only scenario
-             * where we do an explicit commit).
-             * 
-             * @issue negative timestamp for historical read.
-             */
-            
-            return -lastCommitTime;
-            
-        }
-        
-        return readTimestamp;
+
+		if (useReentrantReadWriteLockAndUnisolatedReads) {
+
+			if (action.isMutation()) {
+				
+				return ITx.UNISOLATED;
+
+			} else {
+
+				return readTimestamp;
+
+			}
+
+		} else {
+
+			if (isTempStore(relationName)) {
+
+				return ITx.UNISOLATED;
+
+			}
+
+			if (lastCommitTime != 0L && action.isMutation()) {
+
+				/*
+				 * Note: This advances the read-behind timestamp for a local
+				 * Journal configuration without the ConcurrencyManager (the
+				 * only scenario where we do an explicit commit).
+				 * 
+				 * @issue negative timestamp for historical read.
+				 */
+
+				return -lastCommitTime;
+
+			}
+
+			return readTimestamp;
+
+		}
         
     }
-    
+
+	/**
+	 * The head relation is what we write on for mutation operations and is also
+	 * responsible for minting new elements from computed {@link ISolution}s.
+	 */
     public IRelation getHeadRelationView(IPredicate pred) {
         
         if (pred == null)
@@ -319,6 +348,9 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
     
+    /**
+     * The tail relations are the views from which we read.
+     */
     public IRelation getTailRelationView(IPredicate pred) {
 
         if (pred == null)
@@ -369,6 +401,24 @@ public class RDFJoinNexus implements IJoinNexus {
         
         return relation;
         
+    }
+
+	/**
+	 * FIXME {@link ReentrantReadWriteLock} for iterators to coordinate with
+	 * {@link #getHeadRelationView(IPredicate)} writers on an unisolated
+	 * relation.
+	 */
+    public IAccessPath getTailAccessPath(IPredicate predicate) {
+    	
+        // Resolve the relation name to the IRelation object.
+        final IRelation relation = getTailRelationView(predicate);
+
+        // find the best access path for the predicate for that relation.
+        final IAccessPath accessPath = relation.getAccessPath(predicate);
+
+        // return that access path.
+        return accessPath;
+
     }
     
     public IIndexManager getIndexManager() {
@@ -943,7 +993,17 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     public void makeWriteSetsVisible() {
-        
+
+    	if(useReentrantReadWriteLockAndUnisolatedReads) {
+    		
+    		/*
+    		 * NOP
+    		 */
+    		
+    		return;
+    		
+    	}
+    	
 //        assert action.isMutation();
         
         assert getWriteTimestamp() == ITx.UNISOLATED;
@@ -1003,7 +1063,7 @@ public class RDFJoinNexus implements IJoinNexus {
              */
             
             // current read-behind timestamp.
-            lastCommitTime = ((IBigdataFederation)indexManager).lastCommitTime();
+            lastCommitTime = ((IBigdataFederation)indexManager).getLastCommitTime();
             
         } else {
             

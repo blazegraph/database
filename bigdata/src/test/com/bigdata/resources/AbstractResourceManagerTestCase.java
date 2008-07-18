@@ -474,7 +474,7 @@ public class AbstractResourceManagerTestCase extends
             return false;
         }
 
-        public long lastCommitTime() {
+        public long getLastCommitTime() {
             // TODO Auto-generated method stub
             return 0;
         }
