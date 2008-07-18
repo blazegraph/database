@@ -82,14 +82,13 @@ import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
+import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -2712,23 +2711,33 @@ abstract public class AbstractTripleStore extends
      *            Optional filter.
      * @return
      */
-    public IJoinNexusFactory newJoinNexusFactory(ActionEnum action,
-            int solutionFlags, IElementFilter filter) {
+    public IJoinNexusFactory newJoinNexusFactory(RuleContextEnum ruleContext,
+			ActionEnum action, int solutionFlags, IElementFilter filter) {
         
+        if (ruleContext == null)
+            throw new IllegalArgumentException();
+
         if (action == null)
             throw new IllegalArgumentException();
         
-        final long writeTime = getTimestamp();
+        if(action.isMutation()) {
+        	
+        	assertWritable();
+        	
+        }
+
+        // use the timestamp for the database view.
+        final long writeTimestamp = getTimestamp();
         
         /*
          * Note: closure advances the read-consistent timestamp with each round
          * by identifying the most recently committed state for the backing
          * store / federation.
          */
-        final long readTime = ITx.READ_COMMITTED;
+        final long readTimestamp = ITx.READ_COMMITTED;
 
-        return new RDFJoinNexusFactory(action, writeTime, readTime,
-                isJustify(), bufferCapacity, solutionFlags, filter);
+        return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
+				readTimestamp, isJustify(), bufferCapacity, solutionFlags, filter);
         
     }
     
@@ -2837,9 +2846,11 @@ abstract public class AbstractTripleStore extends
         final int solutionFlags = IJoinNexus.ELEMENT;
 
         // @todo any filter to apply here?
-        final IJoinNexus joinNexus = newJoinNexusFactory(ActionEnum.Query,
-                solutionFlags, null/* filter */)
-                .newInstance(getIndexManager());
+		final IJoinNexus joinNexus = newJoinNexusFactory(
+				RuleContextEnum.HighLevelQuery, 
+				ActionEnum.Query,
+				solutionFlags, null/* filter */)
+				.newInstance(getIndexManager());
 
         /*
          * Resolve ISolutions to their SPO elements in chunks, SPO[] chunks to

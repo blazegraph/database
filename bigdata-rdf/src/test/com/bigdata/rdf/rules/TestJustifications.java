@@ -134,6 +134,7 @@ public class TestJustifications extends AbstractRuleTestCase {
             final Rule rule = new RuleRdf01(store.getSPORelation().getNamespace(),inf);
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
+            		RuleContextEnum.DatabaseAtOnceClosure,
                     ActionEnum.Insert, IJoinNexus.ALL, null/* filter */)
                     .newInstance(store.getIndexManager());
             

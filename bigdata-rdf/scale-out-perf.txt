@@ -2553,6 +2553,9 @@ B49 := systap
       db.  This means that we can use the unisolated views of the db
       for the readers since those views are safe for concurrent
       readers.
+      
+      There is a significant difference between database-at-once closure
+      and truth maintenance.  
 
 - *** Look at justifications for bad entailments in the fast closure.
   

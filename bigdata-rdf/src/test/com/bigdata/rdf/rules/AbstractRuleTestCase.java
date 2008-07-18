@@ -119,6 +119,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         {
 
             final IJoinNexus joinNexus = db.newJoinNexusFactory(
+            		RuleContextEnum.HighLevelQuery,
                     ActionEnum.Query, IJoinNexus.ALL, filter).newInstance(
                     db.getIndexManager());
 
@@ -163,6 +164,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         {
 
             final IJoinNexus joinNexus = db.newJoinNexusFactory(
+            		RuleContextEnum.DatabaseAtOnceClosure,
                     ActionEnum.Insert, IJoinNexus.ALL, filter).newInstance(
                     db.getIndexManager());
 

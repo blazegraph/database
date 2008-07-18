@@ -158,6 +158,8 @@ import com.sun.corba.se.spi.orbutil.fsm.State;
  * @todo derive a string index that uses patricia trees in the leaves per
  *       several published papers.
  * 
+ * @todo consider the use of a high-level 
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

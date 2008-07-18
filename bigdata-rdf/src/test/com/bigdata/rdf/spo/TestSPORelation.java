@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.relation.accesspath.ChunkedArrayIterator;
@@ -79,77 +80,6 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
         
     }
 
-//    File dataDir;
-//    IBigdataClient client;
-//    IBigdataFederation fed;
-//    ExecutorService service;
-////    LocalTripleStore kb;
-//    SPORelation spoRelation;
-//    final String namespace = "test.";
-//    IRelationName<SPO> relationName;
-//    IRelationLocator<SPO> relationLocator;
-//    IJoinNexus joinNexus;
-
-//    /**
-//     * FIXME Also do setup using simple Journal without concurrency control
-//     * layer so that we can continue to compare the performance for the (more or
-//     * less) single-threaded case. There is enough overhead introduced by the
-//     * {@link DataServiceIndex} that the TempTripleStore should continue to use
-//     * a local Journal and therefore we can easily maintain the LocalTripleStore
-//     * as well.
-//     */
-//    public void setUp() throws Exception {
-//
-//        super.setUp();
-//        
-//        Properties properties = new Properties(/*getProperties()*/);
-//
-//        dataDir = File.createTempFile(getName(), ".tmp");
-//        
-//        dataDir.delete();
-//        
-//        dataDir.mkdirs();
-//        
-//        properties.setProperty(Options.DATA_DIR, dataDir.toString());
-//        
-//        // use a temporary store.
-////        properties.setProperty(Options.BUFFER_MODE,BufferMode.Temporary.toString());
-//
-//        client = new LocalDataServiceClient(properties);
-//        
-//        fed = client.connect();
-//
-//        service = fed.getThreadPool();
-//
-//        spoRelation = new SPORelation(fed.getThreadPool(), fed, namespace,
-//                ITx.UNISOLATED, properties);
-//        
-//        spoRelation.create();
-//        
-////        kb = new LocalTripleStore(properties);//fed, namespace, ITx.UNISOLATED, properties);
-////
-////        kb.create();
-//        
-//        relationName = new RelationName<SPO>(namespace);
-//        
-//        relationLocator = new DefaultRelationLocator<SPO>(fed); 
-//        
-//        joinNexus = new RDFJoinNexus(service, relationLocator,
-//                ITx.UNISOLATED/* writeTime */,
-//                ITx.READ_COMMITTED/* readTime */, IJoinNexus.ALL/* solutionFlags */);
-//        
-//    }
-//
-//    public void tearDown() throws Exception {
-//
-//        client.getFederation().destroy();
-//        
-//        client.disconnect(true/*immediateShutdown*/);
-//        
-//        super.tearDown();
-//        
-//    }
-
     protected final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
             1L);
     
@@ -175,10 +105,11 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    @SuppressWarnings("serial")
+    @SuppressWarnings({ "serial", "unchecked" })
     static protected class TestRuleRdfs9 extends Rule {
         
-        public TestRuleRdfs9(String relation) {
+        @SuppressWarnings("unchecked")
+		public TestRuleRdfs9(String relation) {
             
             super(  "rdfs9",//
                     new P(relation,var("v"), rdfType, var("x")), //
@@ -231,6 +162,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                     .getNamespace();
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
+            		RuleContextEnum.HighLevelQuery,
                     ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
                     .newInstance(store.getIndexManager());
             
@@ -347,6 +279,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                     .getNamespace();
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
+            		RuleContextEnum.HighLevelQuery,
                     ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
                     .newInstance(store.getIndexManager());
             
@@ -571,6 +504,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                 log.info("\n\nQuery w/o data in KB\n");
 
                 final IJoinNexus joinNexus = store.newJoinNexusFactory(
+                		RuleContextEnum.HighLevelQuery,
                         ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
                         .newInstance(store.getIndexManager());
 
@@ -654,6 +588,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             {
 
                 final IJoinNexus joinNexus = store.newJoinNexusFactory(
+                		RuleContextEnum.HighLevelQuery,
                         ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
                         .newInstance(store.getIndexManager());
 
@@ -713,14 +648,11 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
              * Execute the rule as a mutation (insert) and then verify the
              * mutation count (1L) and the data actually written on the relation
              * (the SPO from the solution that we verified above).
-             * 
-             * @todo test delete.
-             * 
-             * FIXME test fixed point.
              */
             {
 
                 final IJoinNexus joinNexus = store.newJoinNexusFactory(
+                		RuleContextEnum.DatabaseAtOnceClosure,
                         ActionEnum.Insert, IJoinNexus.ALL, null/* filter */)
                         .newInstance(store.getIndexManager());
 

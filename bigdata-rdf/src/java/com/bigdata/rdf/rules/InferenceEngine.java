@@ -635,9 +635,14 @@ public class InferenceEngine extends RDFSVocabulary {
 //                  | IJoinNexus.RULE  // iff debugging.
                   ;
           
+            final RuleContextEnum ruleContext = focusStore == null
+            	? RuleContextEnum.DatabaseAtOnceClosure
+            	: RuleContextEnum.TruthMaintenance
+            	;
+            
             final IJoinNexusFactory joinNexusFactory = database
-                    .newJoinNexusFactory(ActionEnum.Insert, solutionFlags,
-                            doNotAddFilter);
+                    .newJoinNexusFactory(ruleContext, ActionEnum.Insert,
+							solutionFlags, doNotAddFilter);
 
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
                     .getIndexManager());
