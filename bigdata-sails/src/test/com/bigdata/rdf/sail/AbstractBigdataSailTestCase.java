@@ -90,6 +90,8 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
      
         sail = new BigdataSail(getProperties());
         
+//        sail.database.create();
+        
     }
     
     protected void tearDown() throws Exception {
