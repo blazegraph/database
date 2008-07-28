@@ -2507,6 +2507,9 @@ B49 := systap
 * Parallelism free text indexing so that it does not add linear
   latency.  Also review for obvious performance hits.
 
+* Run all inference test suites that do closure with both full and
+  fast variants.
+
 - Done. Verify full db-at-once closure.
 
 - Done. Verify that the justifications are being computed and written
