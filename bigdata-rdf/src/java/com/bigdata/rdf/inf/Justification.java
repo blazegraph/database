@@ -37,6 +37,7 @@ import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.rules.TestJustifications;
 import com.bigdata.rdf.spo.JustificationTupleSerializer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -630,30 +631,36 @@ public class Justification implements Comparable<Justification> {
 
         VisitedSPOSet visited = new VisitedSPOSet(focusStore.getIndexManager());        
         
-        // try {
+         try {
 
             boolean ret = isGrounded(inf, focusStore, db, head, testHead, testFocusStore, visited);
 
             log.info("head=" + head + " is " + (ret ? "" : "NOT ")
                     + "grounded : testHead=" + testHead + ", testFocusStore="
                     + testFocusStore + ", #visited=" + visited.size());
-            
-            /*
-             * FIXME we could also memoize goals that have been proven false at
-             * this level since we know the outcome for a specific head (fully
-             * bound or a query pattern). experiment with this and see if it
-             * reduces the costs of TM.  it certainly should if we are running
-             * the same query a lot!
-             */
-            
-            return ret;
-/* naughty, naughty
-        } finally {
-            
-            visited.close();
-            
-        }
-*/        
+
+			/*
+			 * FIXME we could also memoize goals that have been proven false at
+			 * this level since we know the outcome for a specific head (fully
+			 * bound or a query pattern). experiment with this and see if it
+			 * reduces the costs of TM. it certainly should if we are running
+			 * the same query a lot!
+			 */
+
+			return ret;
+
+		} finally {
+
+			/*
+			 * Note: This "closes" the visited set (dicards the BTree), but the
+			 * visited set is backed by the [focusStore] and that MUST NOT be
+			 * closed since it is still in use by the caller!
+			 */
+			
+			visited.close();
+
+		}
+        
     }
     
     public static boolean isGrounded(
@@ -840,20 +847,43 @@ public class Justification implements Comparable<Justification> {
         return false;
         
     }
-    
-    /**
-     * A collection of {@link SPO} objects (either fully bound or query
-     * patterns) that have already been visited.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
+
+	/**
+	 * A collection of {@link SPO} objects (either fully bound or query
+	 * patterns) that have already been visited.
+	 * <p>
+	 * Note: This is a very specialized {@link SPO} set implementation. How it
+	 * is created and destroyed is tightly integrated with how
+	 * {@link TruthMaintenance} works. 
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id$
+	 * 
+	 * @todo this class is public only because of {@link TestJustifications}.
+	 * it should be private.
+	 */
     public static class VisitedSPOSet {
        
         private BTree btree;
 
         private SPOTupleSerializer tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO);
-        
+
+		/**
+		 * Create an {@link SPO} set backed by a {@link BTree} on the temporary
+		 * store associated with the [focusStore] on which truth maintenance is
+		 * being performed. The data written on this set will not last longer
+		 * than
+		 * {@link Justification#isGrounded(InferenceEngine, TempTripleStore, AbstractTripleStore, SPO, boolean, boolean)}
+		 * . When that method exists it {@link #close()}s this
+		 * {@link VisitedSPOSet} which causes the {@link BTree} to be discarded
+		 * but DOES NOT close the backing store since it is still in use by
+		 * {@link TruthMaintenance}.
+		 * 
+		 * @param tempStore
+		 *            The backing store on which the set will be maintained.
+		 *            This is the [focusStore] for {@link TruthMaintenance}.
+		 */
         public VisitedSPOSet(TemporaryRawStore tempStore) {
             
             IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
@@ -903,11 +933,23 @@ public class Justification implements Comparable<Justification> {
 
             if (btree != null) {
 
+            	// discards the data in the btree, creating a new root.
                 btree.removeAll();
 
-                tupleSer = null;
+                // discard the hard reference.
+                btree = null;
                 
-                btree.getStore().close();
+                // discard the hard reference.
+                tupleSer = null;
+
+				/*
+				 * Note: !!!! DO NOT close the backing store here !!!!
+				 * 
+				 * Note: The visited set is backed by the [focusStore] and that
+				 * MUST NOT be closed since it is still in use by the caller!
+				 * See isGrounded() which is where this gets used.
+				 */
+//                btree.getStore().close();
                 
             }
             
