@@ -135,12 +135,10 @@ public class DelegateJoinNexus implements IJoinNexus {
     	delegate.makeWriteSetsVisible();
     }
 
-	@Override
 	public boolean forceSerialExecution() {
 		return delegate.forceSerialExecution();
 	}
 
-	@Override
 	public IAccessPath getTailAccessPath(IPredicate pred) {
 		return delegate.getTailAccessPath(pred);
 	}
