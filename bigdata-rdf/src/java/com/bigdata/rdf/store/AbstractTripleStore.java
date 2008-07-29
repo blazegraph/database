@@ -1954,7 +1954,7 @@ abstract public class AbstractTripleStore extends
 
                 Justification jst = (Justification)itrj.next().getObject();
 
-                sb.append("#" + (njust + 1) + "\t"
+                sb.append("#" + (njust + 1) //+ "\t"
                         + jst.toString(resolveTerms)+"\n");
 
                 njust++;

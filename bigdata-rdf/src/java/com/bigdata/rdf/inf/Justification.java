@@ -634,7 +634,7 @@ public class Justification implements Comparable<Justification> {
 
             boolean ret = isGrounded(inf, focusStore, db, head, testHead, testFocusStore, visited);
 
-            log.info("head=" + head + " is " + (ret ? "" : "NOT ")
+            if(log.isInfoEnabled()) log.info("head=" + head + " is " + (ret ? "" : "NOT ")
                     + "grounded : testHead=" + testHead + ", testFocusStore="
                     + testFocusStore + ", #visited=" + visited.size());
 
@@ -676,7 +676,7 @@ public class Justification implements Comparable<Justification> {
 
         if(DEBUG) {
             log.debug("head=" + head + ", testHead=" + testHead
-                        + ", testFocusStore=" + testFocusStore + "#visited="
+                        + ", testFocusStore=" + testFocusStore + ", #visited="
                         + visited.size());
         }
         
@@ -710,13 +710,15 @@ public class Justification implements Comparable<Justification> {
              */
             
             final IChunkedOrderedIterator<SPO> itr = db.getAccessPath(head.s,
-                    head.p, head.o).iterator(0,0);
+                    head.p, head.o).iterator();
             
             try {
             
             while(itr.hasNext()) {
                 
-                SPO spo = itr.next();
+                final SPO spo = itr.next();
+
+                if(inf.isAxiom(spo.s, spo.p, spo.o)) return true;
                 
                 if (spo.getType() == StatementEnum.Explicit) {
 
@@ -802,6 +804,9 @@ public class Justification implements Comparable<Justification> {
                  */
                 
                 final Justification jst = itr.next();
+                
+                if (DEBUG)
+                    log.debug("Considering:\n" + jst.toString(db));
                 
                 final SPO[] tail = jst.getTail();
                 
