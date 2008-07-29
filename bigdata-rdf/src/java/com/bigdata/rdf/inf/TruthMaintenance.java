@@ -476,14 +476,14 @@ public class TruthMaintenance {
             
         }
         
-        log.info("Computing closure of the temporary store with "
+        if(log.isInfoEnabled()) log.info("Computing closure of the temporary store with "
                 + ngiven+ " statements");
 
         if(database.getStatementIdentifiers()) {
             
             AbstractTripleStore.fixPointStatementIdentifiers(database, tempStore);
 
-            log.info("Computing closure of the temporary store with " + ngiven
+            if(log.isInfoEnabled()) log.info("Computing closure of the temporary store with " + ngiven
                     + " statements (after fix point of statement identifiers)");
             
         }
@@ -497,7 +497,7 @@ public class TruthMaintenance {
        
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Retracted " + ngiven
+        if(log.isInfoEnabled()) log.info("Retracted " + ngiven
                 + " given and updated closure on the database in " + elapsed
                 + " ms");
         
