@@ -103,9 +103,9 @@ public class TestLocalTripleStore extends AbstractTestCase {
         
     }
     
-    protected AbstractTripleStore getStore() {
+    protected AbstractTripleStore getStore(Properties properties) {
         
-        return new LocalTripleStore( getProperties() );
+        return new LocalTripleStore( properties );
         
     }
  
@@ -134,13 +134,13 @@ public class TestLocalTripleStore extends AbstractTestCase {
         }
         
         // Note: clone to avoid modifying!!!
-        Properties properties = (Properties)getProperties().clone();
+        final Properties properties = (Properties)getProperties().clone();
         
         // Turn this off now since we want to re-open the same store.
         properties.setProperty(Options.CREATE_TEMP_FILE,"false");
         
         // The backing file that we need to re-open.
-        File file = ((LocalTripleStore) store).store.getFile();
+        final File file = ((LocalTripleStore) store).store.getFile();
         
         assertNotNull(file);
         

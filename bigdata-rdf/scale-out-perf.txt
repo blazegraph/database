@@ -2349,7 +2349,7 @@ Caused by: java.lang.NullPointerException
          and Truth Maintenance since the JOINs will be mostly
          executing against live index objects.
 
-       - Verify serialziation of the JoinNexusFactory, setup of the
+       - Verify serialization of the JoinNexusFactory, setup of the
          JoinNexus on the data service, and distributed execution.
 
        - Axioms need to be serialized for the DoNotAddFilter for
@@ -2363,7 +2363,21 @@ Caused by: java.lang.NullPointerException
          instead of creating a proxy (have to wait to figure that
          out).
 
-       - Unroll loops for faster distributed joins.
+       - Unroll loops for faster distributed joins
+
+         The main change is to unroll the inner loop for each chunk of
+         the outer loop and parallelize the inner loop queries.  Be
+         careful with the parallelization as the thread pools are
+         typically uncapped and a large #of elements are in each
+         chunk.  However, the maximum parallelization will be the #of
+         index partitions and the ClientIndexView should provide that
+         parallelization automatically if I unroll the loop.
+
+         This could also improve performance for the LTS since it is
+         now using the UnisolatedReadWriteIndex for better concurrency
+         and therefore must acquire locks for its operations.
+
+         Compare the performance for LTS, LDS, and JDS.
 
        - Scale-out version of distinct term scan (rdf01, rdfs4a,
          rdfs4b), the closure over the various property sets
@@ -2371,35 +2385,17 @@ Caused by: java.lang.NullPointerException
          scan against the full text index with join to the
          SPORelation).  This MAY require driving through the CURSOR
          and ITupleFilter changes.
-
-       - Modify the JOIN to be more efficient for the scale-out case
-         and compare the performance for LTS, LDS, and JDS.  The main
-         change is to unroll the inner loop for each chunk of the
-         outer loop and parallelize the inner loop queries.  Be
-         careful with the parallelization as the thread pools are
-         typically uncapped and a large #of elements are in each
-         chunk.  However, the maximum parallelization will be the #of
-         index partitions and the ClientIndexView should provide that
-         parallelization automatically if I unroll the loop.
      
-      - Modify TM to remove constraints on scaling imposed by the use
-        of fully buffered iterators to avoid concurrency problems.
+       - Modify TM to remove constraints on scaling imposed by the use
+         of fully buffered iterators to avoid concurrency problems.
 
-      - BlockingBuffer - tune for effective chunk sizes.  The buffer
-        sizes can be easily configured by the IJoinNexusFactory, as
-        can parameters for timeouts, etc. for the blocking buffer's
-        iterator.
+	 Consider the use of magic sets as an alternative to "fixing"
+	 justifications tracking for scale-out.
 
-      - verify concurrency
-
-      - verify read-committed view of kb is of the last closure
-        checkpoint, not the last commit.
-
-	Extend the federation to allow communication of the commit
-        timestamp corresponding to the last closure of the kb.
-
-      - Run some performance tests, specifically of the
-        LocalTripleStore against the LDS for closure rates.
+       - BlockingBuffer - tune for effective chunk sizes.  The buffer
+         sizes can be easily configured by the IJoinNexusFactory, as
+         can parameters for timeouts, etc. for the blocking buffer's
+         iterator.
 
 Translate Sesame2 queries to Rules dynamically so that they can
 execute on the native rule engine.
@@ -2417,6 +2413,8 @@ execute on the native rule engine.
 
    - filters that require JOINs to the lexicon and ordered scans by
      datatype literals.
+
+   * LUBM performance numbers.
 
 - Snapshot release:
 
@@ -2455,33 +2453,7 @@ B49 := systap
 
 ============================================================
 
-- Done. Simplified locators to String identifier/namespace.
-
-- Done. Added "view" concept - an ordered array of resource
-  identifiers.
-
-- Done. Review code and tests for correct handling of views.  Must
-  process as views.  Should remove the getRelationName() in favor of
-  always enumerating the parts of the view.  The evaluation plan and
-  the rule execution class are the two places where we choose the
-  relation view for a rule.  If the relation view has two (or more)
-  elements then we need to use a fused view (or do a union of the
-  power set of the rules).
-
-- Done. Found a bug where the default index manager was being used
-  such that the relation views on a temporary store were not able to
-  find their own indices.
-
 * Finish the TestDefaultResourceLocator
-
-- Done. I am not happy with the manner in which concerns about commit
-  processing has been raised into the application layer by the
-  introduction of read-behind views for computing closure with high
-  parallelism.  I addressed this by isolating more of the decision
-  making about commits for closure and query within RDFJoinNexus for
-  handling the different deployment scenarios and truth maintenance
-  (requires reading on a TemporaryStore in addition to the main
-  database).
 
 - Done. Problem with "hasStatement()" and other API methods exists
   when the BigdataValue objects from one DB are used on a DB with a
@@ -2512,58 +2484,45 @@ B49 := systap
 
 - Done. Verify full db-at-once closure.
 
-- Done. Verify that the justifications are being computed and written
-  on the index correctly. See the Justifications class and the
-  TestJustifications test suite.
-
-  (defer) Optimize by assigning variables in a rule a positional index
+- (defer) Optimize by assigning variables in a rule a positional index
   and use a long[] for bindings for SPORelation self-joins.
 
-- Done. Modify IJoinNexus to allow per-relation override of the read
-  time.  This will let choose UNISOLATED for everything read from thee
-  temporary store.
+- Performance testing of Fast vs Full and then set the default closure
+  method appropriately.
 
-- Done. When choosing the new read timestamp for the next round of
-  closure only update the read timestamp if the previous read
-  timestamp was an actual commit time rather than UNISOLATED or
-  READ_COMMITTED.
+  Re-evaluate the effect of the buffer capacity for the chunked
+  iterators.  When we are running parallel rules and asynchronous
+  iterators it could make sense to use much smaller buffers (10k vs
+  200k).
 
-- *** Performance testing of Fast vs Full and then set the default
-      closure method appropriately.
+- Done. Integrate the UnisolatedReadWriteIndex into the access paths
+  exposed by the SPORelation (and LexiconRelation) when using a
+  LocalTripleStore or TempTripleStore.  Verify that the exposed index
+  is always an instance of this class for those use cases and examine
+  the code (perhaps via logging) to verify that we are not doing a lot
+  of point tests.  Make sure that the DistinctTermScan winds up using
+  the same class so that it obeys the necessary concurrency
+  constraints.
 
-      Re-evaluate the effect of the buffer capacity for the chunked
-      iterators.  When we are running parallel rules and asynchronous
-      iterators it could make sense to use much smaller buffers (10k
-      vs 200k).
+  * This change broke the CompletionScan which is relying on
+    ITupleCursor.  The AbstractChunkedRangeIterator needs to be
+    modified (as does a lot of other code) to drill through the
+    ITupleCursor interface.
 
-      The Full method forces one commit per round.
-
-      Consider forcing full sequential execution for the Fast closure,
-      using the UNISOLATED views for both reads and writes and NOT
-      doing commits after each step.  This might be significantly
-      faster.
-
-      Argh!  If TM writes on the focusStore then either (a) the rules
-      need to be run sequentially in order to avoid concurrent
-      modification problems (thread-safety reasons) -or- (b) we need
-      to checkpoint the focusStore before each round and use
-      read-committed reads (from the last checkpoint addr) and
-      unisolated writes - this then becomes the same use case as
-      database-at-once closure.
-      
-      Since TM does not write on the database until after all
-      inferences have been drawn, we do not need to do commits on the
-      db.  This means that we can use the unisolated views of the db
-      for the readers since those views are safe for concurrent
-      readers.
-      
-      There is a significant difference between database-at-once closure
-      and truth maintenance.  
+    Also, when ITupleCursor is specified, then we can handled
+    REMOVEALL without buffering the keys first.
 
 - *** Look at justifications for bad entailments in the fast closure.
   
       Try a unit test for the fast closure property sets where it is
       reading from a fused view.
+
+* Test concurrent data loader on multiple servers
+
+  - with and without closure
+
+  - with and without overflow enabled (e.g., with and without
+    autopartitining)
 
 * Verify TM.
 
@@ -2584,3 +2543,33 @@ B49 := systap
                 buf.add(sid2, dcCreator, bryan);
                 buf.add(sid2, dcCreator, mike);
                 buf.add(sid3, dcCreator, mike);
+
+------------------------------------------------------------
+
+#1	Inferred     : < http://www.bigdata.com/a(136), rdf:type(8), rdfs:Class(12) >
+#2	Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), rdfs:Resource(40) >
+#3	Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/a(136) >
+#4	Explicit     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) > : sid=151
+#5	Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/c(144) >
+#6	Inferred     : < http://www.bigdata.com/b(140), rdf:type(8), rdfs:Class(12) >
+#7	Inferred     : < http://www.bigdata.com/b(140), rdfs:subClassOf(44), rdfs:Resource(40) >
+#8	Inferred     : < http://www.bigdata.com/b(140), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
+#9	Explicit     : < http://www.bigdata.com/b(140), rdfs:subClassOf(44), http://www.bigdata.com/c(144) > : sid=155
+#10	Inferred     : < http://www.bigdata.com/c(144), rdf:type(8), rdfs:Class(12) >
+#11	Inferred     : < http://www.bigdata.com/c(144), rdfs:subClassOf(44), rdfs:Resource(40) >
+#12	Inferred     : < http://www.bigdata.com/c(144), rdfs:subClassOf(44), http://www.bigdata.com/c(144) >
+
+Should prove that (a type Class) is still grounded.
+
+DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:815): Considering:
+	(rdfs:subClassOf(44), rdfs:domain(24), rdfs:Class(12)), 
+	(http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140))
+	-> (http://www.bigdata.com/a(136), rdf:type(8), rdfs:Class(12))
+DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:678): head=Inferred     : < rdfs:subClassOf(44), rdfs:domain(24), rdfs:Class(12) >, testHead=true, testFocusStore=false, #visited=9
+DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:678): head=Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >, testHead=true, testFocusStore=false, #visited=9
+DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:700): Already visited: Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
+DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:842): Not grounded: tail=Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
+
+// FIXME examine when the following makes it into the visitedSet the first time.
+
+Already visited: Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >

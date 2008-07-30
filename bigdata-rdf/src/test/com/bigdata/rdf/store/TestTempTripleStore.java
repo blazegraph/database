@@ -88,9 +88,9 @@ public class TestTempTripleStore extends AbstractTestCase {
 
     }
     
-    protected AbstractTripleStore getStore() {
+    protected AbstractTripleStore getStore(Properties properties) {
         
-        return new TempTripleStore( getProperties() );
+        return new TempTripleStore( properties );
         
     }
  

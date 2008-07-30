@@ -37,17 +37,20 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 /**
+ * <p>
  * A buffer that will block when it is full. You write elements on the buffer
  * and they can be read using {@link #iterator()}. This class is safe for
  * concurrent writes (multiple threads can use {@link #add(Object)}) but the
  * {@link #iterator()} is not thread-safe (it assumes a single reader).
- * 
+ * </p>
  * <p>
- * <strong>Make sure that the thread that sets up the {@link BlockingBuffer} and
- * submits a task that writes on the buffer sets the {@link Future} on the
- * {@link BlockingBuffer} so that the iterator can monitor the future, detect if
- * it has been cancelled, and throw out the exception from the future back to
- * the client. Failure to do this can lead to the iterator not terminating!</strong>
+ * <strong>You MUST make sure that the thread that sets up the
+ * {@link BlockingBuffer} and which submits a task that writes on the buffer
+ * also sets the {@link Future} on the {@link BlockingBuffer} so that the
+ * iterator can monitor the {@link Future}, detect if it has been cancelled,
+ * and throw out the exception from the {@link Future} back to the client.
+ * Failure to do this can lead to the iterator not terminating!</strong>
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -155,7 +158,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * @param filter
      *            An optional filter for elements to be kept out of the buffer.
      */
-    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder, IElementFilter filter) {
+    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder, IElementFilter<E> filter) {
        
         this(capacity, keyOrder, filter, DEFAULT_MIN_CHUNK_SIZE, DEFAULT_CHUNK_TIMEOUT);
         
@@ -184,7 +187,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            to satisify the minimum chunk size.
      */
     public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder,
-            IElementFilter filter, int minChunkSize, long chunkTimeout) {
+            IElementFilter<E> filter, int minChunkSize, long chunkTimeout) {
 
         if (capacity <= 0)
             throw new IllegalArgumentException();
@@ -231,7 +234,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         }
         
     }
-    
+
     public boolean isEmpty() {
 
         return queue.isEmpty();

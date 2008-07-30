@@ -273,8 +273,7 @@ public class TestDefaultResourceLocator extends TestCase2 {
 
             if (ndx == null) {
 
-                ndx = getIndexManager().getIndex(getNamespace() + indexName,
-                        getTimestamp());
+                ndx = getIndex(getNamespace() + indexName);
 
             }
 

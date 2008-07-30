@@ -42,18 +42,6 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * class so they have a dependency on this test suite to get it right for the
  * base class.
  * 
- * @deprecated This class existed to test {@link ChunkedLocalRangeIterator} but
- *             that class is no longer used since we are able to gain REMOVEALL
- *             with less confusion by simply copying a tuple at a time into an
- *             internal Tuple buffer. This is now done by the
- *             {@link Removerator} and that is applied by
- *             {@link AbstractBTree#rangeIterator(byte[], byte[], int, int, ITupleFilter)}.
- *             <p>
- *             Note: The {@link AbstractChunkedRangeIterator} class is still
- *             used for its original purpose - progressing scans through an
- *             index partition by a remote client as part of a scale-out index
- *             scan.
- * 
  * @todo Test {@link IBlock} read through semantics.
  * 
  * @todo Test when version timestamps are supported.

@@ -30,6 +30,7 @@ package com.bigdata.service;
 
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 
 /**
@@ -55,7 +56,8 @@ public interface IClientIndex extends IIndex {
     
     /**
      * Counters are local to a specific index partition and are only available
-     * to unisolated procedures running locally on an {@link IDataService}.
+     * to unisolated procedures running inside of an {@link IConcurrencyManager}
+     * (which includes procedures run on an {@link IDataService}).
      * 
      * @throws UnsupportedOperationException
      *             always

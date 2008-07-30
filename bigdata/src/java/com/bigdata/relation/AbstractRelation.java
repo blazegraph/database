@@ -31,8 +31,15 @@ package com.bigdata.relation;
 import java.util.Properties;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * Base class for {@link IRelation} and {@link IMutableRelation} impls.
@@ -71,17 +78,81 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
     abstract public String getFQN(IKeyOrder<? extends E> keyOrder);
     
     /**
-     * The index.
+     * Return the index for the {@link IKeyOrder} the timestamp for this view of
+     * the relation.
      * 
      * @param keyOrder
      *            The natural index order.
-     *            
-     * @return The index.
+     * 
+     * @return The index -or- <code>null</code> iff the index does not exist
+     *         as of the timestamp for this view of the relation.
+     * 
+     * @see #getIndex(String)
      */
     public IIndex getIndex(IKeyOrder<? extends E> keyOrder) {
 
-        return getIndexManager().getIndex(getFQN(keyOrder), getTimestamp());
+        return getIndex(getFQN(keyOrder));
         
+    }
+
+    /**
+     * Return the named index using the timestamp for this view of the relation
+     * (core impl).
+     * <p>
+     * While both the {@link IBigdataFederation} imposes the
+     * {@link ConcurrencyManager} on all access to a named index, neither the
+     * {@link Journal} nor the {@link TemporaryRawStore} does this. Therefore
+     * this method encapsulates the unisolated index for the latter classes in
+     * order to impose the correct concurrency constraints. It does this using
+     * an {@link UnisolatedReadWriteIndex}. This allows the caller to use the
+     * returned index view without regard to concurrency controls (it will
+     * appear to be a thread-safe object).
+     * 
+     * @param name
+     *            The fully qualified name of the index.
+     * 
+     * @return The named index -or- <code>null</code> iff the named index does
+     *         not exist as of that timestamp.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
+     * 
+     * @todo hard references to the indices must be dropped when an abort is
+     *       processed. this is a bit awkward. the abort() could be raised into
+     *       the relation container (it is for the AbstractTripleStore) and into
+     *       the relation itself to facilitate this. alternatively the index
+     *       objects themselves could be notified of an abort and make
+     *       themselves invalid (this really only applies to the unisolated
+     *       index and to indices isolated by a transaction).
+     */
+    protected IIndex getIndex(String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        final IIndexManager indexManager = getIndexManager();
+
+        final long timestamp = getTimestamp();
+
+        IIndex ndx = indexManager.getIndex(name, timestamp);
+
+        if (ndx != null
+                && timestamp == ITx.UNISOLATED
+                && (indexManager instanceof Journal || indexManager instanceof TemporaryStore)) {
+
+            if(log.isDebugEnabled()) {
+                
+                log.debug("Imposing read-write concurrency controls on index: name="
+                                + name);
+                
+            }
+            
+            ndx = new UnisolatedReadWriteIndex(ndx);
+
+        }
+
+        return ndx;
+
     }
 
 }

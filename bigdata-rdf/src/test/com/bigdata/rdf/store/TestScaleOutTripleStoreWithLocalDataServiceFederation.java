@@ -173,12 +173,14 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
         
     }
     
-    protected AbstractTripleStore getStore() {
+    protected AbstractTripleStore getStore(Properties properties) {
         
         // connect to the database.
         AbstractTripleStore store = new ScaleOutTripleStore(client
-                .getFederation(), "test", ITx.UNISOLATED, client
-                .getProperties());
+                .getFederation(), "test", ITx.UNISOLATED,
+                properties
+//                client.getProperties()
+                );
         
         store.create();
         
@@ -201,22 +203,24 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
      */
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
-        // Note: properties we need to re-start the client.
-        final Properties properties = client.getProperties();
+//        // Note: properties we need to re-start the client.
+//        final Properties properties = client.getProperties();
         
         // Note: also shutdown the embedded federation.
         client.disconnect(true/*immediateShutdown*/);
 
         // new client.
-        client = new LocalDataServiceClient( properties );
+        client = new LocalDataServiceClient( client.getProperties() );
         
         // re-connect.
         client.connect();
         
         // Obtain view on the triple store.
         return new ScaleOutTripleStore(client
-                .getFederation(), "test", ITx.UNISOLATED, client
-                .getProperties());
+                .getFederation(), "test", ITx.UNISOLATED,
+                store.getProperties()
+//                client.getProperties()
+                );
 
     }
 

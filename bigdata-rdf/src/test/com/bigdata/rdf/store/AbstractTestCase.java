@@ -220,7 +220,7 @@ abstract public class AbstractTestCase
 
     protected static final long NULL = IRawTripleStore.NULL;
     
-    abstract protected AbstractTripleStore getStore();
+    abstract protected AbstractTripleStore getStore(Properties properties);
     
     abstract protected AbstractTripleStore reopenStore(AbstractTripleStore store);
 

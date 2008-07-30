@@ -39,13 +39,11 @@ import com.bigdata.rawstore.IRawStore;
 /**
  * Chunked range iterator running against a local index or index view.
  * <p>
- * When {@link IRangeQuery#REMOVEALL} is specified the iterator will populate
- * its buffers up to the capacity and then delete behind once the buffer is full
- * or as soon as the iterator is exhausted.
- * 
- * @deprecated This is only used for delete-behind semantics ({@link IRangeQuery#REMOVEALL})
- *             on a local index and that will be redone using the new iterator
- *             shortly.
+ * Note: When {@link IRangeQuery#REMOVEALL} is specified the iterator will
+ * populate its buffers up to the capacity and then delete behind once the
+ * buffer is full or as soon as the iterator is exhausted. This approach works
+ * with the somewhat faster {@link ITupleIterator} construct. Otherwise an
+ * {@link ITupleCursor} would be required.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

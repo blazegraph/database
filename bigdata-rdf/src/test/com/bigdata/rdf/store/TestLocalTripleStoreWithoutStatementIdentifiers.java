@@ -107,9 +107,9 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
         
     }
     
-    protected AbstractTripleStore getStore() {
+    protected AbstractTripleStore getStore(Properties properties) {
         
-        return new LocalTripleStore( getProperties() );
+        return new LocalTripleStore(properties);
         
     }
  

@@ -2746,11 +2746,24 @@ abstract public class AbstractTripleStore extends
         // use the timestamp for the database view.
         final long writeTimestamp = getTimestamp();
         
+//        /*
+//		 * The default is to read from the last committed state for the
+//		 * database.
+//         * 
+//         * @issue negative timestamp
+//		 */
+//        final long readTimestamp = -getIndexManager().getLastCommitTime();
+        
         /*
-		 * The default is to read from the last committed state for the
-		 * database.
-		 */
-        final long readTimestamp = getIndexManager().getLastCommitTime();
+         * Use the timestamp for the database view.
+         * 
+         * Note: The choice here reflects the use of the
+         * UnisolatedReadWriteIndex to allow interleaved reads and writes on the
+         * unisolated indices when using a Journal or Temporary(Raw)Store. When
+         * running against an IBigdataFederation, the ConcurrencyManager will be
+         * interposed and unisolated writes will result in commits.
+         */
+        final long readTimestamp = getTimestamp();
 
         return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
 				readTimestamp, justify, bufferCapacity, solutionFlags, filter);
