@@ -27,13 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import org.openrdf.model.Statement;
-import org.openrdf.sail.SailException;
-
-import com.bigdata.rdf.store.AbstractTestCase;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.store.BigdataStatementIterator;
 
 /**
  * Base class for test suites for inference engine and the magic sets

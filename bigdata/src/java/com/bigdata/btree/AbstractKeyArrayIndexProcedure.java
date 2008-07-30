@@ -37,6 +37,7 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Level;
@@ -663,6 +664,45 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         public ResultBitBuffer getResult() {
 
             return new ResultBitBuffer(results.length, results);
+
+        }
+
+    }
+
+    /**
+     * Counts the #of <code>true</code> bits in the {@link ResultBitBuffer}(s).
+     */
+    public static class ResultBitBufferCounter implements
+            IResultHandler<ResultBitBuffer, Long> {
+
+        private final AtomicLong ntrue = new AtomicLong();
+
+        public ResultBitBufferCounter() {
+
+        }
+
+        public void aggregate(ResultBitBuffer result, Split split) {
+
+            int delta = 0;
+
+            for (int i = 0; i < result.n; i++) {
+
+                if (result.a[i])
+                    delta++;
+
+            }
+
+            this.ntrue.addAndGet(delta);
+
+        }
+
+        /**
+         * The #of <code>true</code> values observed in the aggregated
+         * {@link ResultBitBuffer}s.
+         */
+        public Long getResult() {
+
+            return ntrue.get();
 
         }
 

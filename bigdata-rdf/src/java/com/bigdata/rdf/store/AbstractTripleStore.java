@@ -1797,7 +1797,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public String predicateUsage() {
+    final public StringBuilder predicateUsage() {
 
         return predicateUsage(this);
 
@@ -1812,19 +1812,26 @@ abstract public class AbstractTripleStore extends
      *            dump a {@link TempTripleStore} that is using the term
      *            dictionary of the main database).
      */
-    final public String predicateUsage(AbstractTripleStore resolveTerms) {
+    final public StringBuilder predicateUsage(AbstractTripleStore resolveTerms) {
 
         // visit distinct term identifiers for the predicate position.
         final IChunkedIterator<Long> itr = getSPORelation().distinctTermScan(SPOKeyOrder.POS);
 
+        // resolve term identifiers to terms efficiently during iteration.
+        final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
+                resolveTerms, itr);
+        
         try {
         
             final StringBuilder sb = new StringBuilder();
 
             while (itr.hasNext()) {
 
-                final long p = itr.next();
+//                final long p = itr.next();
+                final BigdataValue term = itr2.next();
 
+                final long p = term.getTermId();
+                
                 final long n = getAccessPath(NULL, p, NULL)
                         .rangeCount(false/* exact */);
 
@@ -1832,11 +1839,23 @@ abstract public class AbstractTripleStore extends
 
             }
         
-            return sb.toString();
+            return sb;
         
+        } catch (SailException e) {
+
+            throw new RuntimeException(e);
+
         } finally {
-            
-            itr.close();
+
+            try {
+
+                itr2.close();
+                
+            } catch (SailException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
             
         }
 
@@ -2237,11 +2256,6 @@ abstract public class AbstractTripleStore extends
         
     }
 
-    /**
-     * This method fills out the statement metadata (type and sid) for SPOs that
-     * are present in the database. SPOs not present in the database are left
-     * as-is.
-     */
     public IChunkedOrderedIterator<SPO> bulkCompleteStatements(final IChunkedOrderedIterator<SPO> itr) {
         
         return new SPOConvertingIterator(itr, new BulkCompleteConverter(

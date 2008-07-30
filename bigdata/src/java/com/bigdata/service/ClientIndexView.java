@@ -391,7 +391,7 @@ public class ClientIndexView implements IClientIndex {
     public boolean contains(byte[] key) {
         
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 
@@ -409,7 +409,7 @@ public class ClientIndexView implements IClientIndex {
     public byte[] insert(byte[] key, byte[] value) {
 
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 
@@ -428,7 +428,7 @@ public class ClientIndexView implements IClientIndex {
     public byte[] lookup(byte[] key) {
 
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 
@@ -446,7 +446,7 @@ public class ClientIndexView implements IClientIndex {
     public byte[] remove(byte[] key) {
 
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 

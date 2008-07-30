@@ -290,7 +290,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
             }
             
             // exists, so create view.
-            ndx = new DataServiceIndex( name, timestamp, dataService );
+            ndx = new DataServiceIndex( this, name, timestamp );
             
             // put view in the cache.
             indexCache.put(nt,ndx,false/*dirty*/);

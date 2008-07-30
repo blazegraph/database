@@ -141,9 +141,19 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
         try {
             
+            if(log.isDebugEnabled()) {
+                
+                log.debug("acquiring lock: "+ndx);
+                
+            }
+            
 //            writeLock.lock();
             
-            writeLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            if(!writeLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                
+                throw new RuntimeException("Timeout");
+                
+            }
             
         } catch(InterruptedException ex) {
             
@@ -167,10 +177,20 @@ public class UnisolatedReadWriteIndex implements IIndex {
         final Lock readLock = readWriteLock.readLock();
 
         try {
+
+            if(log.isDebugEnabled()) {
+                
+                log.debug("acquiring lock: "+ndx);
+                
+            }
             
 //            readLock.lock();
             
-            readLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            if(!readLock.tryLock( LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                
+                throw new RuntimeException("Timeout");
+
+            }
             
         } catch(InterruptedException ex) {
             

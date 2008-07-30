@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
@@ -46,9 +47,13 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.BatchContains.BatchContainsConstructor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.model.StatementEnum;
@@ -59,6 +64,7 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.service.Split;
 
 /**
  * <p>
@@ -720,6 +726,14 @@ abstract public class AbstractTestCase
     /**
      * Verify all statements reported by one access path are found on another
      * access path.
+     * <p>
+     * Note: This is basically a JOIN. If there is an expected tuple that is not
+     * found then it is an error. Like a JOIN, we need to process a chunk at a
+     * time for efficiency and unroll the inner loop (this is necessary for
+     * efficiency not only when using scale-out, but also to avoid doing a whole
+     * bunch of point tests against an {@link UnisolatedReadWriteIndex}).
+     * Unlike a normal JOIN, the join order is fixed - we visit the expected
+     * access path and then join against the actual access path.
      * 
      * @param db
      *            The database.
@@ -727,74 +741,128 @@ abstract public class AbstractTestCase
      *            Scan this statement index.
      * @param keyOrderActual
      *            Verifying that each statement is also present in this index.
+     * @param nerrs
+     *            Used to report the #of errors.
      */
-    private void assertSameStatements(AbstractTripleStore db,
-            SPOKeyOrder keyOrderExpected, SPOKeyOrder keyOrderActual,
-            AtomicInteger nerrs) {
+    private void assertSameStatements(//
+            final AbstractTripleStore db,//
+            final SPOKeyOrder keyOrderExpected,//
+            final SPOKeyOrder keyOrderActual,//
+            final AtomicInteger nerrs//
+    ) {
 
-        log.info("Verifying "+keyOrderExpected+" against "+keyOrderActual);
+        log.info("Verifying " + keyOrderExpected + " against "
+                        + keyOrderActual);
 
-        final IIndex ndx = db.getSPORelation().getIndex(keyOrderActual);
+        // the access path that is being tested.
+        final IIndex actualIndex = db.getSPORelation().getIndex(keyOrderActual);
 
-        final SPOTupleSerializer tupleSer = (SPOTupleSerializer)ndx.getIndexMetadata().getTupleSerializer();
-        
-        final IChunkedOrderedIterator<SPO> itre = db.getAccessPath(keyOrderExpected).iterator();
-        
+        // the serializer for the access path that is being tested.
+        final SPOTupleSerializer tupleSer = (SPOTupleSerializer) actualIndex
+                .getIndexMetadata().getTupleSerializer();
+
+        /*
+         * An iterator over the access path whose statements are being treated
+         * as ground true for this pass over the data.
+         */
+        final IChunkedOrderedIterator<SPO> itre = db.getAccessPath(
+                keyOrderExpected).iterator();
+
         try {
-        
-        while(itre.hasNext()) {
 
-            if (nerrs.get() > 10)
-                throw new RuntimeException("Too many errors");
-            
-            final SPO expectedSPO = itre.next();
-            
-            final byte[] fromKey = tupleSer.statement2Key(keyOrderActual,
-                        expectedSPO);
+            while (itre.hasNext()) {
 
-            final byte[] toKey = null;
-
-            ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
-
-            if (!itr.hasNext()) {
+                if (nerrs.get() > 10)
+                    throw new RuntimeException("Too many errors");
 
                 /*
-                 * This happens when the statement is not in the index AND there
-                 * is no successor of the statement in the index.
+                 * This is a chunk of expected statements in the natural order
+                 * for the "actual" access path.
                  */
-                
-                log.error("Statement not found" + ": index="
-                        + keyOrderActual + ", stmt=" + expectedSPO);
-            
-                nerrs.incrementAndGet();
+                final SPO[] expectedChunk = itre.nextChunk(keyOrderActual);
 
-                return;
+                /*
+                 * Construct a batch contains test for those statements and
+                 * submit it to the actual index. The aggregator will verify
+                 * that each expected statement exists in the actual index and
+                 * report an error for those that were not found.
+                 */
+                final int fromIndex = 0;
+                final int toIndex = expectedChunk.length;
+                final byte[][] keys = new byte[expectedChunk.length][];
+                final byte[][] vals = null;
+
+                for(int i=0; i<expectedChunk.length; i++) {
+                    
+                    keys[i] = tupleSer.serializeKey( expectedChunk[i] );
+                    
+                }
                 
+                final AtomicLong nfound = new AtomicLong();
+
+                final IResultHandler resultHandler = new IResultHandler<ResultBitBuffer, Long>() {
+
+                    public void aggregate(ResultBitBuffer result, Split split) {
+
+                        // #of elements in this split.
+                        final int n = result.getResultCount();
+
+                        // flag indicating found/not found for each tuple.
+                        final boolean[] a = result.getResult();
+
+                        int delta = 0;
+
+                        for (int i = 0; i < n; i++) {
+
+                            if (a[i]) {
+
+                                // found.
+                                delta++;
+
+                            } else {
+
+                                /*
+                                 * This happens when the statement is not in the
+                                 * index AND there is no successor of the
+                                 * statement in the index.
+                                 */
+
+                                final SPO expectedSPO = expectedChunk[i];
+
+                                log.error("Statement not found" + ": index="
+                                        + keyOrderActual + ", stmt="
+                                        + expectedSPO);
+
+                                nerrs.incrementAndGet();
+
+                            }
+
+                        }
+
+                        nfound.addAndGet(delta);
+
+                    }
+
+                    /**
+                     * The #of statements found.
+                     */
+                    public Long getResult() {
+
+                        return nfound.get();
+
+                    }
+
+                };
+
+                actualIndex.submit(fromIndex, toIndex, keys, vals,
+                        BatchContainsConstructor.INSTANCE, resultHandler);
+
             }
 
-            final SPO actualSPO = (SPO)itr.next().getObject();
-
-            if (!expectedSPO.equals(actualSPO)) {
-
-                /*
-                 * This happens when the statement is not in the
-                 * index but there is a successor of the
-                 * statement in the index.
-                 */
-                log.error("Statement not found" + ": index="
-                        + keyOrderActual + ", expected=" + expectedSPO
-                        + ", nextInIndexOrder=" + actualSPO);
-                
-                nerrs.incrementAndGet();
-                
-            }            
-            
-        }
-        
         } finally {
-            
+
             itre.close();
-            
+
         }
 
     }
@@ -803,7 +871,8 @@ abstract public class AbstractTestCase
      * Recursively removes any files and subdirectories and then removes the
      * file (or directory) itself.
      * 
-     * @param f A file or directory.
+     * @param f
+     *            A file or directory.
      */
     protected void recursiveDelete(File f) {
         

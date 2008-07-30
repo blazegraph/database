@@ -104,22 +104,22 @@ public class DataServiceIndex implements IClientIndex {
     
     /**
      * The capacity for the range query iterator.
-     * 
-     * @todo should be a ctor option.
      */
-    private final int capacity = 100000;
+    private final int capacity;
 
     /**
      * This may be used to disable the non-batch API, which is quite convenient
      * for location code that needs to be re-written to use
      * {@link IIndexProcedure}s.
      */
-    private final boolean batchOnly = false;
+    private final boolean batchOnly;
     
     /**
      * Creates a view onto an unpartitioned index living on an embedded data
      * service.
      * 
+     * @param fed
+     *            The {@link LocalDataServiceFederation}.
      * @param name
      *            The index name.
      * @param timestamp
@@ -127,20 +127,23 @@ public class DataServiceIndex implements IClientIndex {
      *            index view is unisolated -or- <code>- timestamp</code> for a
      *            historical read of the most recent committed state not later
      *            than <i>timestamp</i>.
-     * @param dataService
-     *            The data service (a local object, not a proxy for a remote
-     *            data service).
      * 
      * @throws NoSuchIndexException
      *             if the named index does not exist.
      */
-    public DataServiceIndex(String name, long timestamp, DataService dataService) {
+    public DataServiceIndex(LocalDataServiceFederation fed, String name, long timestamp) {
 
+        if(fed == null) throw new IllegalArgumentException();
+        
         this.name = name;
         
         this.timestamp = timestamp;
         
-        this.dataService = dataService;
+        this.dataService = fed.getDataService();
+
+        this.capacity = fed.getClient().getDefaultRangeQueryCapacity();
+
+        this.batchOnly = fed.getClient().getBatchApiOnly();
         
     }
     
@@ -195,7 +198,7 @@ public class DataServiceIndex implements IClientIndex {
     public boolean contains(byte[] key) {
         
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 
@@ -213,7 +216,7 @@ public class DataServiceIndex implements IClientIndex {
     public byte[] insert(byte[] key, byte[] value) {
 
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 
@@ -232,7 +235,7 @@ public class DataServiceIndex implements IClientIndex {
     public byte[] lookup(byte[] key) {
 
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 
@@ -250,7 +253,7 @@ public class DataServiceIndex implements IClientIndex {
     public byte[] remove(byte[] key) {
 
         if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
+            log.error(NON_BATCH_API,new RuntimeException());
         else
             log.warn(NON_BATCH_API);
 

@@ -154,7 +154,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         doFixedPointTest(file, ForwardClosureEnum.Fast);
     
     }
-
+    
     /**
      * Compares ground truth for the closure of the source RDF/XML file (as
      * computed by Sesame 2) against the closure as computed by bigdata.

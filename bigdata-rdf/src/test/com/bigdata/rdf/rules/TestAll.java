@@ -114,11 +114,8 @@ public class TestAll extends TestCase {
         // Note: fast closure rules using the same base class.
         suite.addTestSuite(TestRuleFastClosure_3_5_6_7_9.class);
 
-        // test suite for fix point closure of some rule sets.
+        // test suite for fix point closure of some rule sets (full and fast).
         suite.addTestSuite(TestDatabaseAtOnceClosure.class);
-        
-        // test suite comparing the fix point and fast closure methods.
-        suite.addTestSuite(TestCompareFullAndFastClosure.class);
         
         // owl:sameAs rules.
         suite.addTestSuite(TestRuleOwlSameAs.class);

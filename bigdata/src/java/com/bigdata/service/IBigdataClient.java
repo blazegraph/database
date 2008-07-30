@@ -271,10 +271,10 @@ public interface IBigdataClient {
 
         /**
          * A boolean property which controls whether or not the non-batch API
-         * will be disabled (default is <code>false</code>). This may be used
-         * to disable the non-batch API, which is quite convenient for locating
-         * code that needs to be re-written to use {@link IIndexProcedure}s in
-         * order to obtain high performance.
+         * will log errors complete with stack traces (default is
+         * <code>false</code>). This may be used to locating code that needs
+         * to be re-written to use {@link IIndexProcedure}s in order to obtain
+         * high performance.
          */
         String CLIENT_BATCH_API_ONLY = "client.batchOnly";
 

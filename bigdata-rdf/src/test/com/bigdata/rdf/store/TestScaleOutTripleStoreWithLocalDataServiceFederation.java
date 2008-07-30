@@ -118,6 +118,8 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
 
 //        properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
+//        properties.setProperty(IBigdataClient.Options.CLIENT_BATCH_API_ONLY,"true");
+        
         /*
          * Note: there are also properties to control the #of data services
          * created in the embedded federation.

@@ -144,12 +144,12 @@ public class LocalProgramTask implements IProgramTask,
      * be local, but the indices must not be partitioned and must all exist on
      * the target {@link DataService}).
      * <p>
-     * Note: the caller MUST submit using DataService#submit() in which case
-     * {@link #dataService} will be set after the ctor is done by the
-     * {@link DataService} itself. The {@link DataService} will be used to
-     * identify an {@link ExecutorService} and the {@link IJoinNexusFactory}
-     * will be used to establish access to indices, relations, etc. that first
-     * resolves against the {@link AbstractTask} - see
+     * Note: the caller MUST submit the {@link LocalProgramTask} using
+     * {@link DataService#submit(Callable)} in which case {@link #dataService}
+     * field will be set (after the ctor) by the {@link DataService} itself. The
+     * {@link DataService} will be used to identify an {@link ExecutorService}
+     * and the {@link IJoinNexusFactory} will be used to establish access to
+     * indices, relations, etc. in the context of the {@link AbstractTask} - see
      * {@link AbstractStepTask#submit()}.
      * 
      * @param action
