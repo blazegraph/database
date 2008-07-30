@@ -2763,7 +2763,28 @@ abstract public class AbstractTripleStore extends
          * running against an IBigdataFederation, the ConcurrencyManager will be
          * interposed and unisolated writes will result in commits.
          */
-        final long readTimestamp = getTimestamp();
+        final long readTimestamp;
+        if (writeTimestamp == ITx.UNISOLATED
+                && getIndexManager() instanceof IBigdataFederation) {
+           
+            /*
+             * We reading against a federation we use the READ_COMMITTED view in
+             * order to permit higher concurrency (writers will obtain a lock on
+             * the unisolated view, but readers will not block if they are
+             * reading from the read-committed view).
+             */
+            
+            readTimestamp = ITx.READ_COMMITTED;
+            
+        } else {
+
+            /*
+             * Otherwise, just use the same view as the resource container.
+             */
+            
+            readTimestamp = getTimestamp();
+            
+        }
 
         return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
 				readTimestamp, justify, bufferCapacity, solutionFlags, filter);
