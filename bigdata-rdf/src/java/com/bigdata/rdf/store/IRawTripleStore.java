@@ -356,6 +356,17 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     public IChunkedOrderedIterator<SPO> bulkFilterStatements(IChunkedOrderedIterator<SPO> itr, boolean present);
     
     /**
+     * This method fills out the statement metadata (type and sid) for SPOs that
+     * are present in the database. SPOs not present in the database are left
+     * as-is.
+     * 
+     * @return An iterator visiting the completed {@link SPO}s. Any {@link SPO}s
+     *         that were not found will be present but their statement metadata
+     *         (type and sid) will be unchanged.
+     */
+    public IChunkedOrderedIterator<SPO> bulkCompleteStatements(final IChunkedOrderedIterator<SPO> itr);
+    
+    /**
      * Externalizes a statement using an appreviated syntax.
      */
     public String toString(long s, long p, long o);

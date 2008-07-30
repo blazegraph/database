@@ -1552,7 +1552,12 @@ abstract public class DataService extends AbstractService
 
         try {
 
-            final AbstractTask task = new AbstractTask(concurrencyManager, timestamp,
+            // Choose READ_COMMITTED iff UNISOLATED was requested.
+            final long startTime = (timestamp == ITx.UNISOLATED
+                    ? ITx.READ_COMMITTED
+                    : timestamp);
+
+            final AbstractTask task = new AbstractTask(concurrencyManager, startTime,
                     name) {
 
                 protected Object doTask() throws Exception {
