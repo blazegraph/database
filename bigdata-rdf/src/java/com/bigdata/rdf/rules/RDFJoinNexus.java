@@ -218,47 +218,47 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-	/**
-	 * Return <code>true</code> if the <i>relationName</i> is on a
-	 * {@link TempTripleStore}
-	 * 
-	 * @todo Rather than parsing the relation name, it would be better to have
-	 *       the temporary store UUIDs explicitly declared.
-	 */
-    protected boolean isTempStore(String relationName) {
-       
-    	/* This is a typical UUID-based temporary store relation name.
-    	 * 
-         *           1         2         3
-         * 01234567890123456789012345678901234567
-         * 81ad63b9-2172-45dc-bd97-03b63dfe0ba0kb.spo
-         */
-        
-        if (relationName.length() > 37) {
-         
-            /*
-             * Could be a relation on a temporary store.
-             */
-            if (       relationName.charAt( 8) == '-' //
-                    && relationName.charAt(13) == '-' //
-                    && relationName.charAt(18) == '-' //
-                    && relationName.charAt(23) == '-' //
-                    && relationName.charAt(38) == '.' //
-            ) {
-                
-                /*
-                 * Pretty certain to be a relation on a temporary store.
-                 */
-                
-                return true;
-                
-            }
-            
-        }
-        
-        return false;
-
-    }
+//	/**
+//	 * Return <code>true</code> if the <i>relationName</i> is on a
+//	 * {@link TempTripleStore}
+//	 * 
+//	 * @todo Rather than parsing the relation name, it would be better to have
+//	 *       the temporary store UUIDs explicitly declared.
+//	 */
+//    protected boolean isTempStore(String relationName) {
+//       
+//    	/* This is a typical UUID-based temporary store relation name.
+//    	 * 
+//         *           1         2         3
+//         * 01234567890123456789012345678901234567
+//         * 81ad63b9-2172-45dc-bd97-03b63dfe0ba0kb.spo
+//         */
+//        
+//        if (relationName.length() > 37) {
+//         
+//            /*
+//             * Could be a relation on a temporary store.
+//             */
+//            if (       relationName.charAt( 8) == '-' //
+//                    && relationName.charAt(13) == '-' //
+//                    && relationName.charAt(18) == '-' //
+//                    && relationName.charAt(23) == '-' //
+//                    && relationName.charAt(38) == '.' //
+//            ) {
+//                
+//                /*
+//                 * Pretty certain to be a relation on a temporary store.
+//                 */
+//                
+//                return true;
+//                
+//            }
+//            
+//        }
+//        
+//        return false;
+//
+//    }
 
 //	/**
 //	 * A per-relation reentrant read-write lock allows either concurrent readers
@@ -268,18 +268,15 @@ public class RDFJoinNexus implements IJoinNexus {
 //	 */
 //    final private static boolean useReentrantReadWriteLockAndUnisolatedReads = true;
     
-    /**
-     * @todo javadoc and simplify.
-     */
     public long getReadTimestamp(String relationName) {
 
 //		if (useReentrantReadWriteLockAndUnisolatedReads) {
 
-			if (action.isMutation()) {
-				
-                assert readTimestamp == ITx.UNISOLATED : "readTimestamp="+readTimestamp;
-                
-			}
+//			if (action.isMutation()) {
+//				
+//                assert readTimestamp == ITx.UNISOLATED : "readTimestamp="+readTimestamp;
+//                
+//			}
 
             return readTimestamp;
 
