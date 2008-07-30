@@ -256,9 +256,13 @@ public class ClientIndexView implements IClientIndex {
      * @see #getRecursionDepth()
      */
     private ThreadLocal<AtomicInteger> recursionDepth = new ThreadLocal<AtomicInteger>() {
+   
         protected synchronized AtomicInteger initialValue() {
+        
             return new AtomicInteger();
+            
         }
+        
     };
 
     /**
@@ -375,72 +379,6 @@ public class ClientIndexView implements IClientIndex {
         
         return counterSet;
         
-//        StringBuilder sb = new StringBuilder();
-//
-//        sb.append("scale-out index: name="+name);
-//
-//        /*
-//         * Statistics for the metadata index.
-//         */
-//        try {
-//            
-//            String _name = MetadataService.getMetadataIndexName(name);
-//            
-//            sb.append("\n" + _name + " : "
-//                    + getMetadataService().getStatistics(_name));
-//
-//        } catch (Exception ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
-//
-//        /*
-//         * Statistics for the index partitions (at least those that are cached
-//         * by the client).
-//         */
-//        {
-//            
-//            final IMetadataIndex mdi = getMetadataIndex();
-//            
-//            final ITupleIterator itr = mdi.rangeIterator(null, null);
-//            
-//            while(itr.hasNext()) {
-//                
-//                final ITuple tuple = itr.next();
-//                
-//                final PartitionLocator pmd = (PartitionLocator) SerializerUtil.deserialize(tuple.getValue());
-//                
-//                final String _name = DataService.getIndexPartitionName(name, pmd.getPartitionId());
-//                
-//                sb.append("\npartition: " + _name);
-//                sb.append("\ndataServices: " + Arrays.toString(pmd.getDataServices()));
-//                
-//                String _stats;
-//                try {
-//                    
-//                    _stats = getDataService(pmd).getStatistics( _name);
-//                
-//                } catch (NoSuchIndexException e) {
-//                    
-//                    log.info("Index not found on data service, presumed moved: "+_name);
-//
-//                    continue;
-//                    
-//                } catch (Exception e) {
-//                    
-//                    _stats = "Could not obtain index partition statistics: "+e.toString();
-//                    
-//                }
-//                
-//                sb.append( "\nindexStats: "+_stats);
-//                
-//            }
-//            
-//        }
-//        
-//        return sb.toString();
-        
     }
     private CounterSet counterSet;
     
@@ -459,17 +397,10 @@ public class ClientIndexView implements IClientIndex {
 
         final byte[][] keys = new byte[][] { key };
         
-//        final BatchContains proc = new BatchContains(//
-//                1, // n,
-//                0, // offset
-//                keys
-//        );
-//
-//        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
-        
         final IResultHandler resultHandler = new IdentityHandler();
-        
-        submit(0/*fromIndex*/,1/*toIndex*/, keys, null/*vals*/,BatchContainsConstructor.INSTANCE, resultHandler);
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
+                BatchContainsConstructor.INSTANCE, resultHandler);
 
         return ((ResultBitBuffer) resultHandler.getResult()).getResult()[0];
         
@@ -485,22 +416,11 @@ public class ClientIndexView implements IClientIndex {
         final byte[][] keys = new byte[][] { key };
         final byte[][] vals = new byte[][] { value };
         
-//        final BatchInsert proc = new BatchInsert(//
-//                1, // n,
-//                0, // offset
-//                new byte[][] { key }, // keys
-//                new byte[][] { value }, // vals
-//                true // returnOldValues
-//        );
-//
-//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
-//
-//        return ret[0];
-
         final IResultHandler resultHandler = new IdentityHandler();
-        
-        submit(0/*fromIndex*/,1/*toIndex*/,keys,vals,BatchInsertConstructor.RETURN_OLD_VALUES,resultHandler);
-     
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
+                BatchInsertConstructor.RETURN_OLD_VALUES, resultHandler);
+
         return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
@@ -514,20 +434,11 @@ public class ClientIndexView implements IClientIndex {
 
         final byte[][] keys = new byte[][]{key};
         
-//        final BatchLookup proc = new BatchLookup(//
-//                1, // n,
-//                0, // offset
-//                new byte[][] { key } // keys
-//        );
-//
-//        final byte[][] ret = ((ResultBuffer)submit(key, proc)).getResult();
-//
-//        return ret[0];
-
         final IResultHandler resultHandler = new IdentityHandler();
-        
-        submit(0/*fromIndex*/,1/*toIndex*/,keys,null/*vals*/,BatchLookupConstructor.INSTANCE,resultHandler);
-     
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
+                BatchLookupConstructor.INSTANCE, resultHandler);
+
         return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
@@ -541,21 +452,11 @@ public class ClientIndexView implements IClientIndex {
 
         final byte[][] keys = new byte[][]{key};
         
-//        final BatchRemove proc = new BatchRemove(//
-//                1, // n,
-//                0, // offset
-//                new byte[][] { key }, // keys
-//                true // returnOldValues
-//        );
-//
-//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
-//
-//        return ret[0];
-
         final IResultHandler resultHandler = new IdentityHandler();
-        
-        submit(0/*fromIndex*/,1/*toIndex*/,keys,null/*vals*/,BatchRemoveConstructor.RETURN_OLD_VALUES,resultHandler);
-     
+
+        submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
+                BatchRemoveConstructor.RETURN_OLD_VALUES, resultHandler);
+
         return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
@@ -622,8 +523,8 @@ public class ClientIndexView implements IClientIndex {
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         
-        return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
-                | IRangeQuery.VALS/* flags */, null/*filter*/);
+        return rangeIterator(fromKey, toKey, capacity,
+                IRangeQuery.DEFAULT /* flags */, null/* filter */);
         
     }
 

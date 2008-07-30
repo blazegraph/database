@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.File;
+import java.util.Properties;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -405,12 +406,14 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         
     }
     
-    protected AbstractTripleStore getStore() {
+    protected AbstractTripleStore getStore(Properties properties) {
         
         // Connect to the triple store.
         AbstractTripleStore store = new ScaleOutTripleStore(client
-                .getFederation(), "test", ITx.UNISOLATED, client
-                .getProperties());
+                .getFederation(), "test", ITx.UNISOLATED,
+                properties
+//                client.getProperties()
+                );
         
         store.create();
         
@@ -436,6 +439,8 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
         store.close();
+
+//        final Properties properties = store.getProperties();
         
         // close the client connection to the federation.
         client.disconnect(true/*immediateShutdown*/);
@@ -445,8 +450,10 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         
         // obtain view of the triple store.
         return new ScaleOutTripleStore(client
-                .getFederation(), "test", ITx.UNISOLATED, client
-                .getProperties());
+                .getFederation(), "test", ITx.UNISOLATED,
+                store.getProperties()
+//                client.getProperties()
+                );
         
     }
 

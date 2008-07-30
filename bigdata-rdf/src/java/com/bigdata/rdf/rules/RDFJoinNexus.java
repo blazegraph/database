@@ -260,61 +260,63 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
-	/**
-	 * A per-relation reentrant read-write lock allows either concurrent readers
-	 * or an writer on the unisolated view of a relation. When we use this lock
-	 * we also use {@link ITx#UNISOLATED} reads and writes and
-	 * {@link #makeWriteSetsVisible()} is a NOP.
-	 */
-    final private static boolean useReentrantReadWriteLockAndUnisolatedReads = false;
+//	/**
+//	 * A per-relation reentrant read-write lock allows either concurrent readers
+//	 * or an writer on the unisolated view of a relation. When we use this lock
+//	 * we also use {@link ITx#UNISOLATED} reads and writes and
+//	 * {@link #makeWriteSetsVisible()} is a NOP.
+//	 */
+//    final private static boolean useReentrantReadWriteLockAndUnisolatedReads = true;
     
     /**
-     * When the relation is the focusStore SPORelation choose
-     * {@link ITx#UNISOLATED}. Otherwise choose whatever was specified to the
-     * {@link RDFJoinNexusFactory}. This is because we avoid doing a commit on
-     * the focusStore and instead just its its UNISOLATED indices. This is more
-     * efficient since they are already buffered and since we can avoid touching
-     * disk at all for small data sets.
+     * @todo javadoc and simplify.
      */
     public long getReadTimestamp(String relationName) {
 
-		if (useReentrantReadWriteLockAndUnisolatedReads) {
+//		if (useReentrantReadWriteLockAndUnisolatedReads) {
 
 			if (action.isMutation()) {
 				
-				return ITx.UNISOLATED;
-
-			} else {
-
-				return readTimestamp;
-
+                assert readTimestamp == ITx.UNISOLATED : "readTimestamp="+readTimestamp;
+                
 			}
 
-		} else {
+            return readTimestamp;
 
-			if (isTempStore(relationName)) {
-
-				return ITx.UNISOLATED;
-
-			}
-
-			if (lastCommitTime != 0L && action.isMutation()) {
-
-				/*
-				 * Note: This advances the read-behind timestamp for a local
-				 * Journal configuration without the ConcurrencyManager (the
-				 * only scenario where we do an explicit commit).
-				 * 
-				 * @issue negative timestamp for historical read.
-				 */
-
-				return -lastCommitTime;
-
-			}
-
-			return readTimestamp;
-
-		}
+//		} else {
+//
+//            /*
+//             * When the relation is the focusStore choose {@link ITx#UNISOLATED}.
+//             * Otherwise choose whatever was specified to the
+//             * {@link RDFJoinNexusFactory}. This is because we avoid doing a
+//             * commit on the focusStore and instead just its its UNISOLATED
+//             * indices. This is more efficient since they are already buffered
+//             * and since we can avoid touching disk at all for small data sets.
+//             */
+//            
+//			if (isTempStore(relationName)) {
+//
+//				return ITx.UNISOLATED;
+//
+//			}
+//
+//			if (lastCommitTime != 0L && action.isMutation()) {
+//
+//				/*
+//				 * Note: This advances the read-behind timestamp for a local
+//				 * Journal configuration without the ConcurrencyManager (the
+//				 * only scenario where we do an explicit commit).
+//				 * 
+//				 * @issue negative timestamp for historical read.
+//				 */
+//
+//				return -lastCommitTime;
+//
+//			}
+//
+//			return readTimestamp;
+//
+//		}
         
     }
 
@@ -403,11 +405,6 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-	/**
-	 * FIXME {@link ReentrantReadWriteLock} for iterators to coordinate with
-	 * {@link #getHeadRelationView(IPredicate)} writers on an unisolated
-	 * relation.
-	 */
     public IAccessPath getTailAccessPath(IPredicate predicate) {
     	
         // Resolve the relation name to the IRelation object.
@@ -586,14 +583,6 @@ public class RDFJoinNexus implements IJoinNexus {
         @Override
         protected long flush(IChunkedOrderedIterator<ISolution<E>> itr) {
 
-			/*
-			 * FIXME If no concurrency control then acquire write lock here and
-			 * release in finally {}.
-			 * 
-			 * The IAccessPath iterators MUST also acquire a read lock using the
-			 * same lock object for the relation. 
-			 */
-        	
             try {
 
                 /*
@@ -994,91 +983,93 @@ public class RDFJoinNexus implements IJoinNexus {
 
     public void makeWriteSetsVisible() {
 
-    	if(useReentrantReadWriteLockAndUnisolatedReads) {
-    		
-    		/*
-    		 * NOP
-    		 */
-    		
-    		return;
-    		
-    	}
-    	
-//        assert action.isMutation();
+        return;
         
-        assert getWriteTimestamp() == ITx.UNISOLATED;
-        
-        if (indexManager instanceof Journal) {
-        
-            /*
-             * The RDF KB runs against a LocalTripleStore without concurrency
-             * controls.
-             * 
-             * Commit the Journal before running the operation in order to make
-             * sure that the read-committed views are based on the most recently
-             * written data (the caller is responsible for flushing any buffers,
-             * but this makes sure that the buffered index writes are
-             * committed).
-             */
-            
-            // commit.
-            ((Journal)getIndexManager()).commit();
-
-            // current read-behind timestamp.
-            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
-                
-        } else if(indexManager instanceof IJournal) {
-            
-            /*
-             * An IJournal object exposed by the AbstractTask. We don't have to
-             * commit anything since the writes were performed under the control
-             * of the ConcurrencyManager. However, we can advance the
-             * read-behind time to the most recent commit timestamp.
-             */
-            
-            // current read-behind timestamp.
-            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
-
-        } else if(indexManager instanceof TemporaryStore) {
-            
-            /*
-             * This covers the case where the database itself (as opposed to the
-             * focusStore) is a TempTripleStore on a TemporaryStore.
-             * 
-             * Checkpoint the TemporaryStore before running the operation so
-             * that the read-committed views of the relations will be up to
-             * date.
-             * 
-             * Note: The value returned by checkpoint() is a checkpoint record
-             * address NOT a timestamp. The only index views that are supported
-             * for a TemporaryStore are UNISOLATED and READ_COMMITTED.
-             */
-            
-            ((TemporaryStore)getIndexManager()).checkpoint();
-            
-        } else if(indexManager instanceof IBigdataFederation) {
-            
-            /*
-             * The federation API auto-commits unisolated writes.
-             */
-            
-            // current read-behind timestamp.
-            lastCommitTime = ((IBigdataFederation)indexManager).getLastCommitTime();
-            
-        } else {
-            
-            throw new AssertionError("Not expecting: "
-                    + indexManager.getClass());
-            
-        }
+//    	if(useReentrantReadWriteLockAndUnisolatedReads) {
+//    		
+//    		/*
+//    		 * NOP
+//    		 */
+//    		
+//    		return;
+//    		
+//    	}
+//    	
+////        assert action.isMutation();
+//        
+//        assert getWriteTimestamp() == ITx.UNISOLATED;
+//        
+//        if (indexManager instanceof Journal) {
+//        
+//            /*
+//             * The RDF KB runs against a LocalTripleStore without concurrency
+//             * controls.
+//             * 
+//             * Commit the Journal before running the operation in order to make
+//             * sure that the read-committed views are based on the most recently
+//             * written data (the caller is responsible for flushing any buffers,
+//             * but this makes sure that the buffered index writes are
+//             * committed).
+//             */
+//            
+//            // commit.
+//            ((Journal)getIndexManager()).commit();
+//
+//            // current read-behind timestamp.
+//            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
+//                
+//        } else if(indexManager instanceof IJournal) {
+//            
+//            /*
+//             * An IJournal object exposed by the AbstractTask. We don't have to
+//             * commit anything since the writes were performed under the control
+//             * of the ConcurrencyManager. However, we can advance the
+//             * read-behind time to the most recent commit timestamp.
+//             */
+//            
+//            // current read-behind timestamp.
+//            lastCommitTime = ((IJournal)indexManager).getLastCommitTime();
+//
+//        } else if(indexManager instanceof TemporaryStore) {
+//            
+//            /*
+//             * This covers the case where the database itself (as opposed to the
+//             * focusStore) is a TempTripleStore on a TemporaryStore.
+//             * 
+//             * Checkpoint the TemporaryStore before running the operation so
+//             * that the read-committed views of the relations will be up to
+//             * date.
+//             * 
+//             * Note: The value returned by checkpoint() is a checkpoint record
+//             * address NOT a timestamp. The only index views that are supported
+//             * for a TemporaryStore are UNISOLATED and READ_COMMITTED.
+//             */
+//            
+//            ((TemporaryStore)getIndexManager()).checkpoint();
+//            
+//        } else if(indexManager instanceof IBigdataFederation) {
+//            
+//            /*
+//             * The federation API auto-commits unisolated writes.
+//             */
+//            
+//            // current read-behind timestamp.
+//            lastCommitTime = ((IBigdataFederation)indexManager).getLastCommitTime();
+//            
+//        } else {
+//            
+//            throw new AssertionError("Not expecting: "
+//                    + indexManager.getClass());
+//            
+//        }
         
     }
 
-    /**
-     * Updated each time {@link #makeWriteSetsVisible()} does a commit (which
-     * only occurs for the local {@link Journal} scenario) and used instead of
-     * {@link ITx#READ_COMMITTED} for the read time for the {@link Journal}.
-     */
-    private long lastCommitTime = 0L;
+//    /**
+//     * Updated each time {@link #makeWriteSetsVisible()} does a commit (which
+//     * only occurs for the local {@link Journal} scenario) and used instead of
+//     * {@link ITx#READ_COMMITTED} for the read time for the {@link Journal}.
+//     */
+//    private long lastCommitTime = 0L;
 
 }

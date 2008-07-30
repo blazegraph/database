@@ -153,14 +153,32 @@ public abstract class ProxyTestCase
         getOurDelegate().tearDown(this);
     }
 
+    /**
+     * The properties as configured by the delegate.
+     */
     public Properties getProperties() {
         return getOurDelegate().getProperties();
     }
 
+    /**
+     * Create a triple store instance using the delegate and using the
+     * properties as configured by the delegate.
+     */
     protected AbstractTripleStore getStore() {
-        return getOurDelegate().getStore();
+        return getOurDelegate().getStore(getProperties());
     }
     
+    /**
+     * Create a triple store instance using the delegate using the specified
+     * properties (typically overriding one or more properties).
+     */
+    protected AbstractTripleStore getStore(Properties properties) {
+        return getOurDelegate().getStore(properties);
+    }
+    
+    /**
+     * Close and then re-open the triple store.
+     */
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
         return getOurDelegate().reopenStore(store);
     }

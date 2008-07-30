@@ -83,7 +83,7 @@ public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
      */
     public void test_loadNCIOncology() throws IOException {
 
-        AbstractTripleStore store = getStore();
+        AbstractTripleStore store = getStore(getProperties());
 
         try {
 
@@ -124,7 +124,7 @@ public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
       String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
 //      String baseURL = "";
       
-        AbstractTripleStore store = getStore();
+        AbstractTripleStore store = getStore(getProperties());
 
         try {
 

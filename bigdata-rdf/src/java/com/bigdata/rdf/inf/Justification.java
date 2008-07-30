@@ -628,9 +628,9 @@ public class Justification implements Comparable<Justification> {
             boolean testFocusStore
             ) {
 
-        VisitedSPOSet visited = new VisitedSPOSet(focusStore.getIndexManager());        
+        final VisitedSPOSet visited = new VisitedSPOSet(focusStore.getIndexManager());        
         
-         try {
+        try {
 
             boolean ret = isGrounded(inf, focusStore, db, head, testHead, testFocusStore, visited);
 
@@ -675,7 +675,7 @@ public class Justification implements Comparable<Justification> {
         assert focusStore != null;
 
         if(DEBUG) {
-            log.debug("head=" + head + ", testHead=" + testHead
+            log.debug("head=" + head.toString(db) + ", testHead=" + testHead
                         + ", testFocusStore=" + testFocusStore + ", #visited="
                         + visited.size());
         }
@@ -696,6 +696,8 @@ public class Justification implements Comparable<Justification> {
                  * consideration in order to avoid entering into an infinite
                  * loop among the justification chains.
                  */
+
+                if(DEBUG) log.debug("Already visited: "+head.toString(db));
                 
                 return false;
                 
@@ -707,6 +709,8 @@ public class Justification implements Comparable<Justification> {
              * it is explicit) and the case when it has unbound positions (where
              * we need to scan them and see if any matching statements in the
              * database are explicit).
+             * 
+             * @todo could be optimized for a point test when fully bound?
              */
             
             final IChunkedOrderedIterator<SPO> itr = db.getAccessPath(head.s,
@@ -718,6 +722,8 @@ public class Justification implements Comparable<Justification> {
                 
                 final SPO spo = itr.next();
 
+                if(DEBUG) log.debug("considering: "+spo.toString(db));
+                
                 if(inf.isAxiom(spo.s, spo.p, spo.o)) return true;
                 
                 if (spo.getType() == StatementEnum.Explicit) {
@@ -832,6 +838,9 @@ public class Justification implements Comparable<Justification> {
                         
                         ok = false;
                         
+                        if(DEBUG)
+                            log.debug("Not grounded: tail="+t.toString(db));
+                        
                         break;
                         
                     }
@@ -839,7 +848,10 @@ public class Justification implements Comparable<Justification> {
                 }
 
                 if(ok) {
-                    
+
+                    if(DEBUG)
+                        log.debug("Grounded:\n"+jst.toString(db));
+
                     return true;
                     
                 }
@@ -847,7 +859,9 @@ public class Justification implements Comparable<Justification> {
             } // next justification.
 
         } // head.isFullyBound()
-            
+        
+        if(DEBUG) log.debug("Not grounded: "+head.toString(db));
+        
         return false;
         
     }
@@ -908,7 +922,10 @@ public class Justification implements Comparable<Justification> {
          *         element (i.e., if the element was added to the set).
          */
         public boolean add(SPO spo) {
-           
+
+            if (DEBUG)
+                log.debug(spo.toString());
+            
             final byte[] key = tupleSer.statement2Key(SPOKeyOrder.SPO, spo);
 
             if (!btree.contains(key)) {

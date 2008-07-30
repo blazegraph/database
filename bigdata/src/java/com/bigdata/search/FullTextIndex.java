@@ -420,7 +420,7 @@ public class FullTextIndex extends AbstractRelation {
         }
         
         // resolve index (might not exist, in which case this will be null).
-        ndx = getIndexManager().getIndex(getNamespace()+NAME_SEARCH, getTimestamp());
+        ndx = getIndex(getNamespace()+NAME_SEARCH);
         
     }
 
@@ -461,7 +461,7 @@ public class FullTextIndex extends AbstractRelation {
             if (log.isInfoEnabled())
                 log.info("Registered new text index: name=" + name);
 
-            ndx = indexManager.getIndex(name, getTimestamp());
+            ndx = getIndex(name);
 
         } finally {
 
@@ -1186,11 +1186,10 @@ public class FullTextIndex extends AbstractRelation {
             
         }
 
-        final ExecutorService threadPool = getIndexManager()
-                .getExecutorService();
+        final ExecutorService executorService = getExecutorService();
 
         // run on the client's thread pool.
-        final List<Future<Object>> futures = threadPool.invokeAll(tasks,
+        final List<Future<Object>> futures = executorService.invokeAll(tasks,
                 timeout, TimeUnit.MILLISECONDS);
 
         for (Future f : futures) {

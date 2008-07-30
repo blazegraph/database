@@ -155,7 +155,23 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     
     }
 
-    protected void doFixedPointTest(String file, ForwardClosureEnum closureType) throws RepositoryException, RDFParseException, IOException, SailException {
+    /**
+     * Compares ground truth for the closure of the source RDF/XML file (as
+     * computed by Sesame 2) against the closure as computed by bigdata.
+     * 
+     * @param file
+     *            The RDF/XML file.
+     * @param closureType
+     *            The closure program to be applied by bigdata.
+     * 
+     * @throws RepositoryException
+     * @throws RDFParseException
+     * @throws IOException
+     * @throws SailException
+     */
+    protected void doFixedPointTest(String file, ForwardClosureEnum closureType)
+            throws RepositoryException, RDFParseException, IOException,
+            SailException {
 
         /*
          * Used to compute the entailments with out own rules engine.
@@ -163,7 +179,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         final AbstractTripleStore closure;
         {
 
-            Properties properties = new Properties();
+            final Properties properties = getProperties();
 
             properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
 
@@ -177,8 +193,11 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
             properties.setProperty(DataLoader.Options.CLOSURE,
                     ClosureEnum.None.toString());
 
-            // @todo should use the appropriate store class for testing.
-            closure = new TempTripleStore(properties);
+            /*
+             * Note: using variant method so that we can override some
+             * properties for this test in a proxy test suite.
+             */
+            closure = getStore(properties);
             
         }
 
@@ -243,7 +262,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                         
                     }
 	                
-                    log.error("num sesame 2 stmts: " + numSesame2Stmts);
+                    log.error("# Sesame2 stmts: " + numSesame2Stmts);
                     
 	                // make the data visible to a read-committed view.
 	                groundTruth.commit();

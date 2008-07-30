@@ -183,16 +183,6 @@ public class DataServiceIndex implements IClientIndex {
         
         return counterSet;
         
-        //        try {
-//
-//            return dataService.getStatistics(name);
-//
-//        } catch (IOException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
-
     }
     private CounterSet counterSet;
 
@@ -210,14 +200,6 @@ public class DataServiceIndex implements IClientIndex {
             log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][] { key };
-        
-//        final BatchContains proc = new BatchContains(//
-//                1, // n,
-//                0, // offset
-//                keys
-//        );
-//
-//        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
         
         final IResultHandler resultHandler = new IdentityHandler();
         
@@ -238,18 +220,6 @@ public class DataServiceIndex implements IClientIndex {
         final byte[][] keys = new byte[][] { key };
         final byte[][] vals = new byte[][] { value };
         
-//        final BatchInsert proc = new BatchInsert(//
-//                1, // n,
-//                0, // offset
-//                new byte[][] { key }, // keys
-//                new byte[][] { value }, // vals
-//                true // returnOldValues
-//        );
-//
-//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
-//
-//        return ret[0];
-
         final IResultHandler resultHandler = new IdentityHandler();
         
         submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
@@ -268,16 +238,6 @@ public class DataServiceIndex implements IClientIndex {
 
         final byte[][] keys = new byte[][]{key};
         
-//        final BatchLookup proc = new BatchLookup(//
-//                1, // n,
-//                0, // offset
-//                new byte[][] { key } // keys
-//        );
-//
-//        final byte[][] ret = ((ResultBuffer)submit(key, proc)).getResult();
-//
-//        return ret[0];
-
         final IResultHandler resultHandler = new IdentityHandler();
         
         submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
@@ -296,17 +256,6 @@ public class DataServiceIndex implements IClientIndex {
 
         final byte[][] keys = new byte[][]{key};
         
-//        final BatchRemove proc = new BatchRemove(//
-//                1, // n,
-//                0, // offset
-//                new byte[][] { key }, // keys
-//                true // returnOldValues
-//        );
-//
-//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
-//
-//        return ret[0];
-
         final IResultHandler resultHandler = new IdentityHandler();
         
         submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
@@ -372,17 +321,18 @@ public class DataServiceIndex implements IClientIndex {
     
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
-        return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
-                | IRangeQuery.VALS, null/* filter */);
+        return rangeIterator(fromKey, toKey, capacity, IRangeQuery.DEFAULT,
+                null/* filter */);
 
     }
 
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) {
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter) {
 
         // @todo make this a ctor argument or settable property?
         final boolean readConsistent = (timestamp == ITx.UNISOLATED ? false
                 : true);
-        
+
         return new RawDataServiceRangeIterator(dataService, name, timestamp,
                 readConsistent, fromKey, toKey, capacity, flags, filter);
 

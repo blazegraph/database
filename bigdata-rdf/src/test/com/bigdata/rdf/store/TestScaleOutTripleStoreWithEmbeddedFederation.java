@@ -177,14 +177,16 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         
     }
     
-    protected AbstractTripleStore getStore() {
+    protected AbstractTripleStore getStore(Properties properties) {
         
         // connect to the database.
 //        return new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
         
         AbstractTripleStore store = new ScaleOutTripleStore(client
-                .getFederation(), "test_", ITx.UNISOLATED, client
-                .getProperties());
+                .getFederation(), "test_", ITx.UNISOLATED,
+                properties
+//                client.getProperties()
+                );
         
         store.create();
         
@@ -207,21 +209,24 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
      */
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
-        // Note: properties we need to re-start the client.
-        final Properties properties = client.getProperties();
+//        // Note: properties we need to re-start the client.
+//        final Properties properties = client.getProperties();
         
         // Note: also shutdown the embedded federation.
         client.disconnect(true/*immediateShutdown*/);
 
         // new client.
-        client = new EmbeddedClient( properties );
+        client = new EmbeddedClient( client.getProperties() );
      
         // connect.
         client.connect();
         
         // Obtain view on the triple store.
         return new ScaleOutTripleStore(client.getFederation(), "test_",
-                ITx.UNISOLATED, client.getProperties());
+                ITx.UNISOLATED,
+                store.getProperties()
+//                client.getProperties()
+                );
         
     }
 

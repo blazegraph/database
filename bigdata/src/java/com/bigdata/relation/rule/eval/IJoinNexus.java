@@ -31,7 +31,10 @@ package com.bigdata.relation.rule.eval;
 import java.io.Serializable;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -74,9 +77,12 @@ public interface IJoinNexus {
     ActionEnum getAction();
 
 	/**
-	 * Turn off rule level parallelism. This can be enabled if you are exploring
-	 * apparent concurrency problems with the rules.
-	 */
+     * When <code>true</code>, rule level parallelism is disabled and the
+     * {@link ISolution} buffers are flushed after after every {@link IStep}.
+     * This can be enabled if you are exploring apparent concurrency problems
+     * with the rules. It should normally be <code>false</code> for better
+     * performance.
+     */
     boolean forceSerialExecution();
     
     /**
@@ -262,11 +268,6 @@ public interface IJoinNexus {
 	 *            The predicate.
 	 * 
 	 * @return The access path.
-	 * 
-	 * @todo the use of this method is recommended over
-	 *       {@link #getTailRelationView(IPredicate)} since the latter is not
-	 *       capable of interposing a reentrant read-write lock to force
-	 *       concurrency control on a journal or temporary store.
 	 */
     IAccessPath getTailAccessPath(IPredicate pred);
     
@@ -341,6 +342,10 @@ public interface IJoinNexus {
     /**
      * Make the write sets visible, eg, by committing the store(s) having
      * buffered write sets.
+     * 
+     * @deprecated by the use of {@link UnisolatedReadWriteIndex} when running a
+     *             rule set as a mutation operation on a local {@link Journal}
+     *             or {@link TemporaryStore}
      */
     void makeWriteSetsVisible();
 

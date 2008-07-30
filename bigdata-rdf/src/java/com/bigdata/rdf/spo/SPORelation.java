@@ -209,21 +209,21 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         if(oneAccessPath) {
             
-            spo      = indexManager.getIndex(getFQN(SPOKeyOrder.SPO), timestamp);
+            spo      = getIndex(SPOKeyOrder.SPO);
             pos      = null;
             osp      = null;
             
         } else {
             
-            spo      = indexManager.getIndex(getFQN(SPOKeyOrder.SPO), timestamp);
-            pos      = indexManager.getIndex(getFQN(SPOKeyOrder.POS), timestamp);
-            osp      = indexManager.getIndex(getFQN(SPOKeyOrder.OSP), timestamp);
+            spo      = getIndex(SPOKeyOrder.SPO);
+            pos      = getIndex(SPOKeyOrder.POS);
+            osp      = getIndex(SPOKeyOrder.OSP);
             
         }
 
         if(justify) {
 
-            just     = indexManager.getIndex(getNamespace()+NAME_JUST, timestamp);
+            just     = getIndex(getNamespace()+NAME_JUST);
             
         } else {
             
@@ -232,7 +232,7 @@ public class SPORelation extends AbstractRelation<SPO> {
         }
 
     }
-
+    
     /**
      * Strengthened return type.
      */
@@ -282,8 +282,7 @@ public class SPORelation extends AbstractRelation<SPO> {
 
                 indexManager.registerIndex(spoMetadata);
 
-                spo = indexManager.getIndex(getFQN(SPOKeyOrder.SPO),
-                        getTimestamp());
+                spo = getIndex(SPOKeyOrder.SPO);
 
             } else {
 
@@ -299,14 +298,11 @@ public class SPORelation extends AbstractRelation<SPO> {
 
                 indexManager.registerIndex(ospMetadata);
 
-                spo = indexManager.getIndex(getFQN(SPOKeyOrder.SPO),
-                        getTimestamp());
+                spo = getIndex(SPOKeyOrder.SPO);
 
-                pos = indexManager.getIndex(getFQN(SPOKeyOrder.POS),
-                        getTimestamp());
+                pos = getIndex(SPOKeyOrder.POS);
 
-                osp = indexManager.getIndex(getFQN(SPOKeyOrder.OSP),
-                        getTimestamp());
+                osp = getIndex(SPOKeyOrder.OSP);
 
             }
 
@@ -317,8 +313,7 @@ public class SPORelation extends AbstractRelation<SPO> {
 
                 indexManager.registerIndex(justMetadata);
 
-                just = indexManager.getIndex(getNamespace() + NAME_JUST,
-                        getTimestamp());
+                just = getIndex(getNamespace() + NAME_JUST);
 
             }
 
@@ -529,6 +524,13 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         final IndexMetadata metadata = getIndexMetadata(getFQN(keyOrder));
 
+        /*
+         * FIXME performance comparison of this key compression technique with
+         * some others, including leading value compression, huffman
+         * compression, and hu-tucker compression (the latter offers no benefit
+         * since we will fully de-serialize the keys before performing search in
+         * a leaf).
+         */
         metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
 
         if (!statementIdentifiers) {

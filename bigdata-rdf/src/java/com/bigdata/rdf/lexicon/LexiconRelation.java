@@ -120,6 +120,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.resources.DefaultSplitHandler;
@@ -266,11 +267,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         }
 
-        term2id = indexManager.getIndex(getFQN(LexiconKeyOrder.TERM2ID),
-                getTimestamp());
+        term2id = getIndex(LexiconKeyOrder.TERM2ID);
 
-        id2term = indexManager.getIndex(getFQN(LexiconKeyOrder.ID2TERM),
-                getTimestamp());
+        id2term = getIndex(LexiconKeyOrder.ID2TERM);
 
         if(textIndex) {
             
@@ -305,11 +304,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             indexManager.registerIndex(id2TermMetadata);
 
-            term2id = indexManager.getIndex(getFQN(LexiconKeyOrder.TERM2ID),
-                    getTimestamp());
+            term2id = getIndex(LexiconKeyOrder.TERM2ID);
 
-            id2term = indexManager.getIndex(getFQN(LexiconKeyOrder.ID2TERM),
-                    getTimestamp());
+            id2term = getIndex(LexiconKeyOrder.ID2TERM);
 
             if (textIndex) {
 
@@ -386,6 +383,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     /**
      * A factory returning the softly held singleton for the
      * {@link FullTextIndex}.
+     * 
+     * @todo replace with the use of the {@link IResourceLocator} since it
+     *       already imposes a canonicalizing mapping within for the index name
+     *       and timestamp inside of a JVM.
      */
     public FullTextIndex getSearchEngine() {
 
@@ -638,7 +639,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         }
 
-        final BTree ndx = (BTree) getTerm2IdIndex();
+        final IIndex ndx = getTerm2IdIndex();
 
         final Iterator<Long> termIdIterator = new Striterator(new CompletionScan(//
                 (ITupleCursor) ndx
