@@ -13,7 +13,7 @@
 </rdf:Description>
 
 <rdf:Description rdf:about="http://bigdata.com/test/data#mike">
-	<rdfs:label>Michael Personick</rdfs:label>
+<!--	<rdfs:label>Michael Personick</rdfs:label> -->
 	<rdf:type rdf:resource="http://bigdata.com/test/ontology#Person"/>
 </rdf:Description>
 
