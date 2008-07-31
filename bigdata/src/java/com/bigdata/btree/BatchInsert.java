@@ -38,7 +38,7 @@ import java.io.ObjectOutput;
  * @version $Id$
  */
 public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
-        IBatchOperation, IParallelizableIndexProcedure {
+        IParallelizableIndexProcedure {
 
     /**
      * 
@@ -57,6 +57,12 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
         
     }
 
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * Factory for {@link BatchInsert} procedures.
      * 

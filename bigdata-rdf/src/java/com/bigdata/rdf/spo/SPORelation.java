@@ -209,21 +209,24 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         if(oneAccessPath) {
             
-            spo      = getIndex(SPOKeyOrder.SPO);
+            // attempt to resolve the index and set the index reference.
+            spo      = super.getIndex(SPOKeyOrder.SPO);
             pos      = null;
             osp      = null;
             
         } else {
             
-            spo      = getIndex(SPOKeyOrder.SPO);
-            pos      = getIndex(SPOKeyOrder.POS);
-            osp      = getIndex(SPOKeyOrder.OSP);
+            // attempt to resolve the index and set the index reference.
+            spo      = super.getIndex(SPOKeyOrder.SPO);
+            pos      = super.getIndex(SPOKeyOrder.POS);
+            osp      = super.getIndex(SPOKeyOrder.OSP);
             
         }
 
         if(justify) {
 
-            just     = getIndex(getNamespace()+NAME_JUST);
+            // attempt to resolve the index and set the index reference.
+            just     = super.getIndex(getNamespace()+NAME_JUST);
             
         } else {
             
@@ -280,9 +283,11 @@ public class SPORelation extends AbstractRelation<SPO> {
 
                 final IndexMetadata spoMetadata = getStatementIndexMetadata(SPOKeyOrder.SPO);
 
+                // register the index.
                 indexManager.registerIndex(spoMetadata);
 
-                spo = getIndex(SPOKeyOrder.SPO);
+                // resolve the index and set the index reference.
+                spo = super.getIndex(SPOKeyOrder.SPO);
 
             } else {
 
@@ -292,17 +297,19 @@ public class SPORelation extends AbstractRelation<SPO> {
 
                 final IndexMetadata ospMetadata = getStatementIndexMetadata(SPOKeyOrder.OSP);
 
+                // register the index.
                 indexManager.registerIndex(spoMetadata);
 
                 indexManager.registerIndex(posMetadata);
 
                 indexManager.registerIndex(ospMetadata);
 
-                spo = getIndex(SPOKeyOrder.SPO);
+                // resolve the index and set the index reference.
+                spo = super.getIndex(SPOKeyOrder.SPO);
 
-                pos = getIndex(SPOKeyOrder.POS);
+                pos = super.getIndex(SPOKeyOrder.POS);
 
-                osp = getIndex(SPOKeyOrder.OSP);
+                osp = super.getIndex(SPOKeyOrder.OSP);
 
             }
 
@@ -313,6 +320,7 @@ public class SPORelation extends AbstractRelation<SPO> {
 
                 indexManager.registerIndex(justMetadata);
 
+                // resolve the index and set the index reference.
                 just = getIndex(getNamespace() + NAME_JUST);
 
             }
@@ -430,6 +438,31 @@ public class SPORelation extends AbstractRelation<SPO> {
         
     }
 
+    /**
+     * Overriden to return the hard reference for the index.
+     */
+    public IIndex getIndex(SPOKeyOrder keyOrder) {
+
+        if (keyOrder == SPOKeyOrder.SPO) {
+     
+            return getSPOIndex();
+            
+        } else if (keyOrder == SPOKeyOrder.POS) {
+            
+            return getPOSIndex();
+            
+        } else if (keyOrder == SPOKeyOrder.OSP) {
+            
+            return getOSPIndex();
+            
+        } else {
+            
+            throw new AssertionError("keyOrder=" + keyOrder);
+            
+        }
+
+    }
+    
     final public IIndex getSPOIndex() {
 
         if (spo == null)

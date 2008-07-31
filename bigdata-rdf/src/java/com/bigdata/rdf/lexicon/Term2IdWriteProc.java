@@ -176,6 +176,12 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     private boolean readOnly;
     
+    public final boolean isReadOnly() {
+        
+        return readOnly;
+        
+    }
+    
     /**
      * De-serialization constructor.
      */

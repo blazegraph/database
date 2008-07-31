@@ -121,7 +121,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
     }
 
-    public boolean add(E e) {
+    public void add(E e) {
 
         if (e == null)
             throw new IllegalArgumentException();
@@ -132,37 +132,78 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
             
         }
         
-        if (!accept(e)) {
+        if (accept(e)) {
 
-            return false;
-            
-        }
-        
-        synchronized(this) {
+            synchronized (this) {
 
-            if(buffer == null) {
-                
-                buffer = (E[]) java.lang.reflect.Array.newInstance(
-                        e.getClass(), capacity);
+                if (buffer == null) {
+
+                    buffer = (E[]) java.lang.reflect.Array.newInstance(e
+                            .getClass(), capacity);
+
+                } else if (n == buffer.length) {
+
+                    flush();
+
+                }
+
+                buffer[n++] = e;
 
             }
-            
-            if (n == buffer.length) {
 
-                flush();
-                
-                n = 0;
-                
-            }
-            
-            buffer[ n++ ] = e;
-            
         }
-        
-        return false;
-        
+
     }
 
+    public void add(int n, E[] a) {
+
+        if (n == 0)
+            return;
+
+        if (a == null)
+            throw new IllegalArgumentException();
+
+        if (a.length < n)
+            throw new IllegalArgumentException();
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("n=" + n + ", a=" + a);
+
+        }
+        
+        synchronized (this) {
+
+            for (int i = 0; i < n; i++) {
+
+                final E e = a[i];
+
+                if (e == null)
+                    throw new IllegalArgumentException("null @ index=" + i);
+
+                if (accept(e)) {
+
+                    if (buffer == null) {
+
+                        buffer = (E[]) java.lang.reflect.Array.newInstance(e
+                                .getClass(), capacity);
+
+                    } else if (n == buffer.length) {
+
+                        flush();
+
+                    }
+
+                    buffer[n++] = e;
+
+                }
+                
+            }
+
+        }
+
+    }
+    
     synchronized public long flush() {
 
         if (n > 0) {
@@ -204,8 +245,6 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         
         clearBuffer();
         
-        n = 0;
-
         counter = 0L;
         
     }
@@ -218,6 +257,9 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
             buffer[i] = null;
             
         }
+
+        // the buffer is now empty.
+        n = 0;
 
     }
 

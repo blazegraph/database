@@ -59,6 +59,22 @@ public class DelegateIndex implements IIndex {
         
     }
 
+    public String toString() {
+     
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{ ");
+
+        sb.append(delegate.toString());
+        
+        sb.append("}");
+        
+        return sb.toString();
+
+    }
+    
     public boolean contains(byte[] key) {
         return delegate.contains(key);
     }

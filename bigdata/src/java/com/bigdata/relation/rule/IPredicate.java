@@ -61,8 +61,6 @@ public interface IPredicate<E> extends Cloneable {
      * 
      * @throws IllegalStateException
      *             if there is more than on element in the view.
-     * 
-     * @deprecated by {@link #getRelationName(int)}
      */
     public String getOnlyRelationName();
 

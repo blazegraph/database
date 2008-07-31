@@ -102,6 +102,24 @@ public class DataServiceIndex implements IClientIndex {
         
     }
     
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append(getClass().getSimpleName());
+
+        sb.append("{ ");
+
+        sb.append("name=" + name);
+
+        sb.append(", timestamp=" + timestamp);
+
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+   
     /**
      * The capacity for the range query iterator.
      */
@@ -144,12 +162,6 @@ public class DataServiceIndex implements IClientIndex {
         this.capacity = fed.getClient().getDefaultRangeQueryCapacity();
 
         this.batchOnly = fed.getClient().getBatchApiOnly();
-        
-    }
-    
-    public String toString() {
-        
-        return name+" @ "+timestamp;
         
     }
     

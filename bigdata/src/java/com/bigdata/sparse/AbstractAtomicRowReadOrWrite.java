@@ -48,8 +48,8 @@ import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 
 /**
  * Abstract class implements the atomic read operation. However, it does NOT
- * declare itself to be an {@link IReadOnlyOperation} since this class is
- * extended by both {@link AtomicRowRead} and {@link AtomicRowWriteRead}.
+ * declare itself to be a read-only operation since this class is extended by
+ * both {@link AtomicRowRead} and {@link AtomicRowWriteRead}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

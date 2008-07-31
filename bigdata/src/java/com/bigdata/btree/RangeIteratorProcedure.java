@@ -48,8 +48,7 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RangeIteratorProcedure extends AbstractKeyRangeIndexProcedure
-        implements IReadOnlyOperation{
+public class RangeIteratorProcedure extends AbstractKeyRangeIndexProcedure {
 
     /**
      * 
@@ -115,6 +114,13 @@ public class RangeIteratorProcedure extends AbstractKeyRangeIndexProcedure
             int flags, ITupleFilter filter) {
 
         super(fromKey, toKey);
+        
+    }
+
+    public final boolean isReadOnly() {
+        
+        // @todo probably also require !(CURSOR)
+        return (flags & IRangeQuery.REMOVEALL) == 0;
         
     }
 

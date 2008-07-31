@@ -147,7 +147,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
                 
             }
             
-            ndx = new UnisolatedReadWriteIndex(ndx);
+//            ndx = new UnisolatedReadWriteIndex(ndx);
 
         }
 

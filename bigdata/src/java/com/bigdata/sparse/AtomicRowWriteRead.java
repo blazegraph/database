@@ -36,6 +36,12 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
     
     private Map<String,Object> propertySet;
     
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * De-serialization ctor.
      */

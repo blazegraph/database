@@ -53,6 +53,12 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     private static final long serialVersionUID = -5480378815444534653L;
 
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * De-serialization constructor.
      */

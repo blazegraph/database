@@ -68,6 +68,12 @@ public class PrefixScanProc extends AbstractKeyArrayIndexProcedure implements
 
     protected static final Logger log = Logger.getLogger(PrefixScanProc.class);
     
+    public final boolean isReadOnly() {
+        
+        return true;
+        
+    }
+    
     /**
      * De-serialization constructor.
      */

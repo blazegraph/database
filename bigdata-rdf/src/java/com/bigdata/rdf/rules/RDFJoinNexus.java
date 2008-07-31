@@ -33,21 +33,17 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IJournal;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -200,9 +196,20 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-    public boolean forceSerialExecution() {
-    	
-    	return false; // FIXME make sure that this is [false]!
+    /**
+     * Note: This MUST be [false] for a release!
+     */
+    final private transient boolean forceSerialExecution = true;
+    
+    final public boolean forceSerialExecution() {
+
+        if(!forceSerialExecution) {
+            
+            log.warn("Forcing serial execution of rule sets.");
+            
+        }
+        
+        return forceSerialExecution;
     	
     }
     

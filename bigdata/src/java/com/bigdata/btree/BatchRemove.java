@@ -39,7 +39,7 @@ import java.io.ObjectOutput;
  * @version $Id$
  */
 public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
-        IBatchOperation, IParallelizableIndexProcedure {
+        IParallelizableIndexProcedure {
 
     /**
      * 
@@ -69,6 +69,12 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
 
     }
 
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * Factory for {@link BatchRemove} procedures.
      * 

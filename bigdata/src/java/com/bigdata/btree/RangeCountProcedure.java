@@ -33,7 +33,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
  * This procedure computes a range count on an index.
  */
 public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
-        implements IReadOnlyOperation, IParallelizableIndexProcedure {
+        implements IParallelizableIndexProcedure {
 
     private static final long serialVersionUID = 5856712176446915328L;
 
@@ -65,6 +65,12 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
         
     }
 
+    public final boolean isReadOnly() {
+        
+        return true;
+        
+    }
+    
     /**
      * <p>
      * Range count of entries in a key range for the index.

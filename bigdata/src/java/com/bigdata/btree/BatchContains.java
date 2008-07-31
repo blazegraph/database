@@ -36,8 +36,8 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchContains extends AbstractKeyArrayIndexProcedure implements IBatchOperation,
-        IReadOnlyOperation, IParallelizableIndexProcedure {
+public class BatchContains extends AbstractKeyArrayIndexProcedure implements
+        IParallelizableIndexProcedure {
 
     /**
      * 
@@ -94,6 +94,12 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements IBa
 
     }
 
+    public final boolean isReadOnly() {
+        
+        return true;
+        
+    }
+    
     /**
      * Applies the operation using {@link ISimpleBTree#contains(byte[])}.
      * 

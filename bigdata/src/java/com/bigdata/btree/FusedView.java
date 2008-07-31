@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.apache.log4j.Level;
@@ -123,6 +124,22 @@ public class FusedView implements IIndex, ILocalBTreeView {
         }
         
     };
+    
+    public String toString() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{ ");
+
+        sb.append(Arrays.toString(srcs));
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
     
     final public AbstractBTree[] getSources() {
 

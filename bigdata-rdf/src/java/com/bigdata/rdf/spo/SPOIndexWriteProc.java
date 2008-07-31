@@ -102,6 +102,12 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     }
 
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * De-serialization constructor.
      */
