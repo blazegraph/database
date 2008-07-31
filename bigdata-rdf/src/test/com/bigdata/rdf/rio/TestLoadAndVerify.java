@@ -31,31 +31,15 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.openrdf.model.Statement;
-import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFHandler;
-import org.openrdf.rio.helpers.RDFHandlerBase;
 
-import com.bigdata.rdf.model.BigdataResource;
-import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.relation.accesspath.AbstractArrayBuffer;
-import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 
 /**
  * Test loads an RDF/XML resource into a database and then verifies by re-parse
@@ -143,36 +127,63 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
         assertTrue("File not found? file=" + file, new File(file).exists());
 
-        AbstractTripleStore store = getStore();
+        AbstractTripleStore store;
+        {
 
+            /*
+             * Note: This allows an override of the properties that effect the
+             * data load, in particular whether or not the full text index and
+             * statement identifiers are maintained. It can be useful to disable
+             * those features in order to estimate the best load rate for a data
+             * set.
+             */
+            
+            final Properties properties = new Properties(getProperties());
+
+//            properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX,
+//                    "false");
+//
+//            properties.setProperty(
+//                    AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
+
+            store = getStore(properties);
+            
+        }
+        
         try {
 
-            // if(store instanceof ScaleOutTripleStore) {
-            //
-            // /*
-            // * FIXME The test needs to use the batch API to verify the
-            // * statements in the scale-out triple store.
-            // */
-            // fail("Test needs batch verification method for data service
-            // versions.");
-            //              
-            // }
-
-            /* Load the file. */
+            /*
+             * Load the file.
+             * 
+             * Note: Normally we disable closure for this test, but that is not
+             * critical. If you compute the closure of the data set then there
+             * will simply be additional statements whose self-consistency among
+             * the statement indices will be verified, but it will not verify
+             * the correctness of the closure.
+             * 
+             * What is actually verified is that all statements that are
+             * re-parsed are found in the KB, that the lexicon is
+             * self-consistent, and that the statement indices are
+             * self-consistent. The test does NOT reject a KB which has
+             * statements not found during the re-parse since there can be
+             * axioms and other stuff in the KB.
+             */
             {
 
                 // avoid modification of the properties.
                 final Properties properties = new Properties(getProperties());
 
                 // turn off RDFS closure for this test.
-                properties.setProperty(DataLoader.Options.CLOSURE,
-                        ClosureEnum.None.toString());
-
+                properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
+                
                 final DataLoader dataLoader = new DataLoader(properties, store);
 
                 // load into the datbase.
                 dataLoader.loadData(file, "" /* baseURI */, RDFFormat.RDFXML);
 
+//                // database-at-once closure (optional for this test).
+//                store.getInferenceEngine().computeClosure(null/*focusStore*/);
+                
             }
 
             store.commit();
@@ -183,436 +194,44 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
             }
 
-            if (log.isInfoEnabled())
+            if (log.isInfoEnabled()) {
+                log.info("computing predicate usage.");
                 log.info("\n" + store.predicateUsage());
+            }
 
             /*
              * re-parse and verify all statements exist in the db using each
              * statement index.
              */
             final AtomicInteger nerrs = new AtomicInteger(0);
+            final int maxerrors = 20;
             {
 
-                final IRioLoader loader = new StatementVerifier(store, nerrs);
+                log.info("Verifying all statements found using reparse: file="+file);
+                
+                // buffer capacity (#of statements per batch).
+                final int capacity = 100000;
+
+                final IRioLoader loader = new StatementVerifier(store,
+                        capacity, nerrs, maxerrors);
 
                 loader.loadRdf(new BufferedReader(new InputStreamReader(
                         new FileInputStream(file))), ""/* baseURI */,
                         RDFFormat.RDFXML, false/* verify */);
 
+                log.info("End of reparse: nerrors="+nerrs+", file="+file);
+                
             }
 
             assertEquals("nerrors", 0, nerrs.get());
 
-            assertStatementIndicesConsistent(store);
+            assertStatementIndicesConsistent(store,maxerrors);
 
         } finally {
 
             store.closeAndDelete();
 
         }
-
-    }
-
-    protected class StatementVerifier extends BasicRioLoader {
-
-        final private AbstractTripleStore db;
-
-        final private AtomicInteger nerrs;
-        
-        final private int MAX_ERRORS = 20;
-
-        final IBuffer<Statement> buffer;
-        
-        public StatementVerifier(AbstractTripleStore db, AtomicInteger nerrs) {
-
-            this.db = db;
-
-            this.nerrs = nerrs;
-
-            this.buffer = new AbstractArrayBuffer<Statement>(
-                    10000/* capacity */, null/*filter*/) {
-
-                @Override
-                protected long flush(int n, Statement[] a) {
-
-                    verifyStatements( n , a );
-                    
-                    return n;
-
-                }
-                
-            };
-
-        }
-
-        /**
-         * Report an error.
-         * 
-         * @param msg
-         *            The error message.
-         */
-        private void error(String msg) {
-
-            log.error(msg);
-            
-            if (nerrs.incrementAndGet() > MAX_ERRORS) {
-
-                throw new RuntimeException("Too many errors");
-
-            }
-
-        }
-        
-        public RDFHandler newRDFHandler() {
-
-            return new RDFHandlerBase() {
-
-                public void handleStatement(Statement stmt) {
-                    
-                    buffer.add(stmt);
-                    
-                }
-
-            };
-
-        }
-
-        private void verifyStatements(int n, Statement[] a) {
-
-            final HashMap<Value,_Value> termSet = new HashMap<Value,_Value>(n);
-            {
-
-                for (Statement stmt : a) {
-
-                    termSet.put(stmt.getSubject(),OptimizedValueFactory.INSTANCE
-                            .toNativeValue(stmt.getSubject()));
-
-                    termSet.put(stmt.getPredicate(),OptimizedValueFactory.INSTANCE
-                            .toNativeValue(stmt.getPredicate()));
-
-                    termSet.put(stmt.getObject(),OptimizedValueFactory.INSTANCE
-                            .toNativeValue(stmt.getObject()));
-
-                }
-
-                final int nterms = termSet.size();
-
-                final _Value[] terms = new _Value[nterms];
-
-                int i = 0;
-                for (_Value term : termSet.values()) {
-
-                    terms[i++] = term;
-
-                }
-
-                db.getLexiconRelation()
-                        .addTerms(terms, nterms, true/* readOnly */);
-
-                int nunknown = 0;
-                for (_Value term : terms) {
-
-                    if (term.termId == 0L) {
-
-                        error("Unknown term: " + term);
-                        
-                        nunknown++;
-
-                    }
-
-                }
-
-                if (nunknown > 0) {
-                    
-                    log.warn("" + nunknown + " out of " + nterms
-                            + " terms were not found.");
-                    
-                }
-                
-            }
-            
-            /*
-             * Now verify reverse lookup for those terms.
-             */
-            {
-                
-                final HashSet<Long> ids  = new HashSet<Long>(termSet.size());
-                
-                for(_Value term : termSet.values()) {
-                    
-                    final long id = term.termId;
-                    
-                    if (id == NULL) {
-
-                        // ignore terms that we know were not found.
-                        continue;
-                        
-                    }
-                    
-                    ids.add(id);
-                    
-                }
-
-                // batch resolve ids to terms.
-                final Map<Long,BigdataValue> reverseMap = db.getLexiconRelation().getTerms(ids);
-                
-                for(_Value expectedTerm : termSet.values()) {
-                    
-                    final long id = expectedTerm.termId;
-                    
-                    if (id == NULL) {
-
-                        // ignore terms that we know were not found.
-                        continue;
-                        
-                    }
-
-                    final BigdataValue actualTerm = reverseMap.get(id);
-
-                    if (actualTerm == null || !actualTerm.equals(expectedTerm)) {
-
-                        error("expectedTerm=" + expectedTerm
-                                        + ", assigned termId=" + id
-                                        + ", but reverse lookup reports: "
-                                        + actualTerm);
-                        
-                    }
-                    
-                }
-                
-            }
-            
-// Resource s = stmt.getSubject();
-// URI p = stmt.getPredicate();
-//            Value o = stmt.getObject();
-//            Resource c = stmt.getContext();
-//
-//            // convert to Sesame objects.
-//            s = (Resource) db.asValue(s);
-//            p = (URI) db.asValue(p);
-//            o = (Value) db.asValue(o);
-//            c = (Resource) db.asValue(c);
-//
-//            final long _s = assertTerm(s);
-//            final long _p = assertTerm(p);
-//            final long _o = assertTerm(o);
-//            final long _c = (c == null ? NULL : assertTerm(c)); // FIXME consider context in asserts.
-
-            
-            
-            /*
-             * Now verify the statements using the assigned term identifiers.
-             * 
-             * @todo not handling the context position - it is either unbound or
-             * a statement identifier.
-             */
-            
-//            if (_s != NULL && _p != NULL && _o != NULL) {
-//
-//                assertStatement(db, SPOKeyOrder.SPO, _s, _p, _o, stmt);
-//
-//                assertStatement(db, SPOKeyOrder.OSP, _s, _p, _o, stmt);
-//
-//                assertStatement(db, SPOKeyOrder.POS, _s, _p, _o, stmt);
-//
-//            }
-
-            {
-
-                final SPO[] b = new SPO[n];
-
-                int n2 = 0;
-                for(Statement stmt : a) {
-                    
-                    final BigdataResource s = (BigdataResource) db.asValue(termSet.get(stmt.getSubject()));
-                    
-                    final BigdataURI p = (BigdataURI) db.asValue(termSet.get(stmt.getPredicate()));
-                    
-                    final BigdataValue o = (BigdataValue) db.asValue(termSet.get(stmt.getObject()));
-                    
-                    boolean ok = true;
-                    if(s == null) {
-                        
-                        log.error("Subject not found: "+stmt.getSubject());
-                        ok = false;
-                        
-                    }
-                    if(p == null) {
-                        
-                        log.error("Predicate not found: "+stmt.getPredicate());
-                        ok = false;
-                        
-                    }
-                    if(o == null) {
-                        
-                        log.error("Object not found: "+stmt.getObject());
-                        ok = false;
-
-                    }
-                 
-                    if(!ok) {
-                        
-                        log.error("Unable to resolve statement with unresolvable terms: "+stmt);
-                        
-                    } else {
-
-                        // Leave the StatementType blank for bulk complete.
-                        b[n2++] = new SPO(s.getTermId(), p.getTermId(), o
-                                .getTermId() /*, StatementType */);
-
-                    }
-                    
-                }
-
-                final IChunkedOrderedIterator<SPO> itr = db
-                        .bulkCompleteStatements(b, n2);
-
-                try {
-
-                    while (itr.hasNext()) {
-
-                        final SPO spo = itr.next();
-
-                        if (!spo.hasStatementType()) {
-
-                            error("Statement not found: " + spo.toString(db));
-
-                        }
-
-                    }
-
-                } finally {
-
-                    itr.close();
-
-                }
-                
-            }
-
-        }
-        
-// /**
-// * Verify the {@link Value} is in both the forward and
-// * reverse indices.
-// *
-//         * @param v
-//         *            The value.
-//         * 
-//         * @return the term identifier for that value -or-
-//         *         <code>null</code> if it was not propertly
-//         *         found in both the forward and reverse
-//         *         indices.
-//         */
-//        private long assertTerm(Value v) {
-//
-//            boolean ok = true;
-//
-//            // lookup in the term:id index.
-//            long termId = db.getTermId(v);
-//
-//            if (termId == NULL) {
-//
-//                log.error("Term not in forward index: " + v);
-//
-//                nerrs.incrementAndGet();
-//
-//                ok = false;
-//
-//            } else {
-//
-//                // lookup in the id:term index.
-//                Value v2 = db.asValue(db.getTerm(termId));
-//
-//                if (v2 == null) {
-//
-//                    log.error("Term not in reverse index: " + v);
-//
-//                    nerrs.incrementAndGet();
-//
-//                    ok = false;
-//
-//                    //                            } else if(v.compareTo(v2)!=0) {
-//                } else if (!v.equals(v2)) {
-//
-//                    log.error("Wrong term in reverse index: expected="
-//                            + v + ", but actual=" + v2);
-//
-//                    nerrs.incrementAndGet();
-//
-//                    ok = false;
-//
-//                }
-//
-//            }
-//
-//            return ok ? termId : NULL;
-//
-//        }
-//
-//        /**
-//         * Verify that statements are found in the specified statement indices.
-//         * 
-//         * @param db
-//         * @param keyOrder
-//         * @param n
-//         * @param a
-//         */
-//        private void assertStatement(AbstractTripleStore db,
-//                IKeyOrder<SPO> keyOrder, long s, long p, long o,
-//                Statement stmt) {
-//
-//            final IIndex ndx = db.getStatementIndex(keyOrder);
-//
-//            final SPOTupleSerializer tupleSer = (SPOTupleSerializer) ndx
-//                    .getIndexMetadata().getTupleSerializer();
-//
-//            final SPO expectedSPO = new SPO(s, p, o,
-//                    StatementEnum.Explicit);
-//
-//            final byte[] fromKey = tupleSer.statement2Key(keyOrder,
-//                    expectedSPO);
-//
-//            final byte[] toKey = null;
-//
-//            final ITupleIterator itr = ndx
-//                    .rangeIterator(fromKey, toKey);
-//
-//            if (!itr.hasNext()) {
-//
-//                /*
-//                 * This happens when the statement is not in the
-//                 * index AND there is no successor of the
-//                 * statement in the index.
-//                 */
-//
-//                log.error("Statement not found" + ": index=" + keyOrder
-//                        + ", stmt=" + stmt + expectedSPO);
-//
-//                nerrs.incrementAndGet();
-//
-//                return;
-//
-//            }
-//
-//            final SPO actualSPO = (SPO) itr.next().getObject();
-//
-//            if (!expectedSPO.equals(actualSPO)) {
-//
-//                /*
-//                 * This happens when the statement is not in the
-//                 * index but there is a successor of the
-//                 * statement in the index.
-//                 */
-//                log.error("Statement not found" + ": index=" + keyOrder
-//                        + ", stmt=" + stmt + ", expected="
-//                        + expectedSPO + ", nextInIndexOrder="
-//                        + actualSPO);
-//
-//                nerrs.incrementAndGet();
-//
-//            }
-//
-//        }
 
     }
 

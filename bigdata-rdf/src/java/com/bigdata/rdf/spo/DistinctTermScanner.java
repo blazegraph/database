@@ -175,10 +175,24 @@ public class DistinctTermScanner {
 
         private final IIndex ndx;
         
-        private final int capacity;
+        /**
+         * FIXME The capacity from the ctor is ignored for now since we only
+         * obtain a single term identifier per iterator and then create a new
+         * iterator for the successor of that term identifier. This parameter
+         * SHOULD be used when a scale-out distinct term scan is written since
+         * the logic to advance the iterator to the successor will be send to
+         * the index partition and we can therefore get back a buffer full of
+         * results at a time.
+         */
+        private final int capacity = 1;
 
         private final IBlockingBuffer<Long> buffer;
 
+        /**
+         * @param ndx
+         * @param capacity
+         * @param buffer
+         */
         public DistinctTermScanTask(IIndex ndx, int capacity,
                 IBlockingBuffer<Long> buffer) {
 
@@ -190,14 +204,85 @@ public class DistinctTermScanner {
 
             this.ndx = ndx;
             
-            this.capacity = capacity;
+//            this.capacity = capacity;
 
             this.buffer = buffer;
 
         }
 
+//        /**
+//         * FIXME Finish variant using an {@link ITupleCursor}. The problem(s)
+//         * with this are (1) {@link UnisolatedReadWriteIndex} wraps the
+//         * {@link ITupleCursor} and does not pass along its full interface; (2)
+//         * the {@link AbstractChunkedRangeIterator} buffers up visited tuples
+//         * before giving the caller a chance to
+//         * {@link ITupleCursor#seek(byte[])} to a successor - the logic to
+//         * advance the cursor needs to be send into the iterator and executed
+//         * against the index, just like {@link ITupleFilter} is today.
+//         */
+//        public Long call() {
+//
+//            final long begin = System.currentTimeMillis();
+//            
+//            final long NULL = IRawTripleStore.NULL;
+//            
+//            byte[] fromKey = null;
+//
+//            final byte[] toKey = null;
+//
+//            final SPOTupleSerializer tupleSer = (SPOTupleSerializer) ndx
+//                    .getIndexMetadata().getTupleSerializer();
+//            
+//            final ITupleCursor itr = (ITupleCursor) ndx
+//                    .rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
+//                            | IRangeQuery.CURSOR, null/* filter */);
+//
+//            long nterms = 0L;
+//
+//            while (itr.hasNext()) {
+//
+//                final ITuple tuple = itr.next();
+//
+//                final long id = KeyBuilder.decodeLong(tuple.getKeyBuffer()
+//                        .array(), 0);
+//
+//                // add to the buffer.
+//                buffer.add(id);
+//
+//                // log.debug(ids.size() + " : " + id + " : "+ toString(id));
+//
+//                // restart scan at the next possible term id.
+//                final long nextId = id + 1;
+//
+//                fromKey = tupleSer.statement2Key(nextId, NULL, NULL);
+//
+//                itr.seek(fromKey);
+//                
+////                // new iterator.
+////                itr = ndx.rangeIterator(fromKey, toKey, capacity,
+////                        IRangeQuery.KEYS, null/* filter */);
+//
+//                nterms++;
+//
+//            } // while
+//
+//            if (log.isInfoEnabled()) {
+//
+//                final long elapsed = System.currentTimeMillis() - begin;
+//                
+//                log.info("#terms=" + nterms + ", elapsed=" + elapsed + ", ndx="
+//                        + ndx.getIndexMetadata().getName());
+//
+//            }
+//
+//            return nterms;
+//
+//        } // call()
+
         public Long call() {
 
+            final long begin = System.currentTimeMillis();
+            
             final long NULL = IRawTripleStore.NULL;
             
             byte[] fromKey = null;
@@ -206,7 +291,7 @@ public class DistinctTermScanner {
 
             final SPOTupleSerializer tupleSer = (SPOTupleSerializer) ndx
                     .getIndexMetadata().getTupleSerializer();
-
+            
             ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
                     IRangeQuery.KEYS, null/* filter */);
 
@@ -237,18 +322,19 @@ public class DistinctTermScanner {
 
             } // while
 
-            if (log.isDebugEnabled()) {
+            if (log.isInfoEnabled()) {
 
-                log.debug("Distinct key scan: ndx="
-                        + ndx.getIndexMetadata().getName() + ", #terms="
-                        + nterms);
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                log.info("#terms=" + nterms + ", elapsed=" + elapsed + ", ndx="
+                        + ndx.getIndexMetadata().getName());
 
             }
 
             return nterms;
 
         } // call()
-
+        
     }
 
 }

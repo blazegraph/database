@@ -30,6 +30,8 @@ package com.bigdata.rdf.store;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
@@ -43,6 +45,8 @@ import junit.framework.TestCase2;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.rio.RDFHandler;
+import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BytesUtil;
@@ -56,12 +60,20 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.BatchContains.BatchContainsConstructor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.BasicRioLoader;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
+import com.bigdata.relation.accesspath.AbstractArrayBuffer;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.service.Split;
@@ -701,23 +713,23 @@ abstract public class AbstractTestCase
      * Validates that the same statements are found in each of the statement
      * indices.
      */
-    public void assertStatementIndicesConsistent(AbstractTripleStore db) {
+    public void assertStatementIndicesConsistent(AbstractTripleStore db, final int maxerrors) {
 
         log.info("Verifying statement indices");
         
         AtomicInteger nerrs = new AtomicInteger(0);
 
         // scan SPO, checking...
-        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.POS, nerrs);
-        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.OSP, nerrs);
+        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.POS, nerrs, maxerrors);
+        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.OSP, nerrs, maxerrors);
 
         // scan POS, checking...
-        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.SPO, nerrs);
-        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.OSP, nerrs);
+        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.SPO, nerrs, maxerrors);
+        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.OSP, nerrs, maxerrors);
         
         // scan OSP, checking...
-        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.SPO, nerrs);
-        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.POS, nerrs);
+        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.SPO, nerrs, maxerrors);
+        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.POS, nerrs, maxerrors);
         
         assertEquals(0,nerrs.get());
         
@@ -748,7 +760,8 @@ abstract public class AbstractTestCase
             final AbstractTripleStore db,//
             final SPOKeyOrder keyOrderExpected,//
             final SPOKeyOrder keyOrderActual,//
-            final AtomicInteger nerrs//
+            final AtomicInteger nerrs,//
+            final int maxerrors
     ) {
 
         log.info("Verifying " + keyOrderExpected + " against "
@@ -763,7 +776,7 @@ abstract public class AbstractTestCase
 
         /*
          * An iterator over the access path whose statements are being treated
-         * as ground true for this pass over the data.
+         * as ground truth for this pass over the data.
          */
         final IChunkedOrderedIterator<SPO> itre = db.getAccessPath(
                 keyOrderExpected).iterator();
@@ -867,6 +880,306 @@ abstract public class AbstractTestCase
 
     }
     
+    /**
+     * Helper class verifies that all statements identified by a re-parse of
+     * some RDF/XML file are present in the KB.
+     * 
+     * @todo the self-consistency of the {@link LexiconRelation} should be
+     *       checked by another class in order to have complete coverage of the
+     *       lexicon, just like we have a method to check the self-consistency
+     *       of the statement indices.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class StatementVerifier extends BasicRioLoader {
+
+        final private AbstractTripleStore db;
+
+        final private AtomicInteger nerrs;
+        
+        final private int maxerrors;
+
+        final IBuffer<Statement> buffer;
+        
+        /**
+         * 
+         * @param db
+         *            The database.
+         * @param capacity
+         *            The buffer capacity (the maximum #of statements to be
+         *            processed in a batch).
+         * @param nerrs
+         *            Used to track and report the #of errors as a side-effect.
+         * @param maxerrors
+         *            The maximum #of errors before the test will abort.
+         */
+        public StatementVerifier(AbstractTripleStore db, int capacity,
+                AtomicInteger nerrs, final int maxerrors) {
+
+            this.db = db;
+
+            this.nerrs = nerrs;
+
+            this.maxerrors = maxerrors;
+            
+            this.buffer = new AbstractArrayBuffer<Statement>(capacity, null/* filter */) {
+
+                @Override
+                protected long flush(int n, Statement[] a) {
+
+                    verifyStatements( n , a );
+                    
+                    return n;
+
+                }
+                
+            };
+
+        }
+
+        /**
+         * Report an error.
+         * 
+         * @param msg
+         *            The error message.
+         */
+        private void error(String msg) {
+
+            log.error(msg);
+            
+            if (nerrs.incrementAndGet() > maxerrors) {
+
+                throw new RuntimeException("Too many errors");
+
+            }
+
+        }
+
+        /**
+         * Extended to flush the {@link #buffer}.
+         */
+        protected void success() {
+
+            super.success();
+            
+            buffer.flush();
+            
+        }
+        
+        public RDFHandler newRDFHandler() {
+
+            return new RDFHandlerBase() {
+
+                public void handleStatement(Statement stmt) {
+                    
+                    buffer.add(stmt);
+                    
+                }
+
+            };
+
+        }
+
+        private void verifyStatements(int n, Statement[] a) {
+
+            final HashMap<Value,_Value> termSet = new HashMap<Value,_Value>(n);
+            {
+
+                for (int i = 0; i < n; i++) {
+
+                    final Statement stmt = a[i];
+                    
+                    termSet.put(stmt.getSubject(),OptimizedValueFactory.INSTANCE
+                            .toNativeValue(stmt.getSubject()));
+
+                    termSet.put(stmt.getPredicate(),OptimizedValueFactory.INSTANCE
+                            .toNativeValue(stmt.getPredicate()));
+
+                    termSet.put(stmt.getObject(),OptimizedValueFactory.INSTANCE
+                            .toNativeValue(stmt.getObject()));
+
+                }
+
+                final int nterms = termSet.size();
+
+                final _Value[] terms = new _Value[nterms];
+
+                int i = 0;
+                for (_Value term : termSet.values()) {
+
+                    terms[i++] = term;
+
+                }
+
+                db.getLexiconRelation()
+                        .addTerms(terms, nterms, true/* readOnly */);
+
+                int nunknown = 0;
+                for (_Value term : terms) {
+
+                    if (term.termId == 0L) {
+
+                        error("Unknown term: " + term);
+                        
+                        nunknown++;
+
+                    }
+
+                }
+
+                if (nunknown > 0) {
+                    
+                    log.warn("" + nunknown + " out of " + nterms
+                            + " terms were not found.");
+                    
+                }
+                
+            }
+            
+            TestCase2.log.info("There are "+termSet.size()+" distinct terms in the parsed statements.");
+            
+            /*
+             * Now verify reverse lookup for those terms.
+             */
+            {
+                
+                final HashSet<Long> ids  = new HashSet<Long>(termSet.size());
+                
+                for(_Value term : termSet.values()) {
+                    
+                    final long id = term.termId;
+                    
+                    if (id == NULL) {
+
+                        // ignore terms that we know were not found.
+                        continue;
+                        
+                    }
+                    
+                    ids.add(id);
+                    
+                }
+
+                // batch resolve ids to terms.
+                final Map<Long,BigdataValue> reverseMap = db.getLexiconRelation().getTerms(ids);
+                
+                for(_Value expectedTerm : termSet.values()) {
+                    
+                    final long id = expectedTerm.termId;
+                    
+                    if (id == NULL) {
+
+                        // ignore terms that we know were not found.
+                        continue;
+                        
+                    }
+
+                    final BigdataValue actualTerm = reverseMap.get(id);
+
+                    if (actualTerm == null || !actualTerm.equals(expectedTerm)) {
+
+                        error("expectedTerm=" + expectedTerm
+                                        + ", assigned termId=" + id
+                                        + ", but reverse lookup reports: "
+                                        + actualTerm);
+                        
+                    }
+                    
+                }
+                
+            }
+            
+            /*
+             * Now verify the statements using the assigned term identifiers.
+             * 
+             * @todo not handling the context position - it is either unbound or
+             * a statement identifier.
+             */
+            {
+
+                final SPO[] b = new SPO[n];
+
+                int n2 = 0;
+                for (int i = 0; i < n; i++) {
+
+                    final Statement stmt = a[i];
+                    
+                    final BigdataResource s = (BigdataResource) db.asValue(termSet.get(stmt.getSubject()));
+                    
+                    final BigdataURI p = (BigdataURI) db.asValue(termSet.get(stmt.getPredicate()));
+                    
+                    final BigdataValue o = (BigdataValue) db.asValue(termSet.get(stmt.getObject()));
+                    
+                    boolean ok = true;
+                    if(s == null) {
+                        
+                        log.error("Subject not found: "+stmt.getSubject());
+                        ok = false;
+                        
+                    }
+                    if(p == null) {
+                        
+                        log.error("Predicate not found: "+stmt.getPredicate());
+                        ok = false;
+                        
+                    }
+                    if(o == null) {
+                        
+                        log.error("Object not found: "+stmt.getObject());
+                        ok = false;
+
+                    }
+                 
+                    if(!ok) {
+                        
+                        log.error("Unable to resolve statement with unresolvable terms: "+stmt);
+                        
+                    } else {
+
+                        // Leave the StatementType blank for bulk complete.
+                        b[n2++] = new SPO(s.getTermId(), p.getTermId(), o
+                                .getTermId() /*, StatementType */);
+
+                    }
+                    
+                }
+
+                final IChunkedOrderedIterator<SPO> itr = db
+                        .bulkCompleteStatements(b, n2);
+
+                try {
+
+                    int i = 0;
+                    
+                    while (itr.hasNext()) {
+
+                        final SPO spo = itr.next();
+
+                        if (!spo.hasStatementType()) {
+
+                            error("Statement not found: " + spo.toString(db));
+
+                        }
+                        
+                        i++;
+
+                    }
+                    
+                    TestCase2.log.info("Verified "+i+" statements parsed from file.");
+
+                } finally {
+
+                    itr.close();
+
+                }
+                
+            }
+
+        }
+
+    }
+
     /**
      * Recursively removes any files and subdirectories and then removes the
      * file (or directory) itself.

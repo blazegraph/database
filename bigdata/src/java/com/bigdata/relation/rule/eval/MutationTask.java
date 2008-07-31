@@ -40,6 +40,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
@@ -116,9 +117,9 @@ public class MutationTask extends AbstractStepTask {
         final RuleStats totals;
 
         if (!joinNexus.forceSerialExecution() && !step.isRule()
-				&& ((IProgram) step).isParallel()) {
+                && ((IProgram) step).isParallel()) {
 
-            totals = runParallel( step, tasks);
+            totals = runParallel(step, tasks);
 
             flushBuffers(joinNexus, totals, buffers);
 
@@ -248,10 +249,16 @@ public class MutationTask extends AbstractStepTask {
 
             final IRule rule = (IRule) step;
 
-            final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getOnlyRelationName());
+            final IBuffer<ISolution> sharedBuffer = buffers.get(rule.getHead().getOnlyRelationName());
+            
+//            final IBuffer<ISolution> localBuffer = new UnsynchronizedArrayBuffer<ISolution>(
+//                    1000, sharedBuffer);
             
             final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(false/*parallel*/,
-                    rule).newTask(rule, joinNexus, buffer);
+                    rule).newTask(rule, joinNexus, 
+//                            localBuffer
+                            sharedBuffer
+                            );
    
             tasks.add(task);
 

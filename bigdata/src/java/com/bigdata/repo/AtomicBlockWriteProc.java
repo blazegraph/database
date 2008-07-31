@@ -51,6 +51,12 @@ public class AtomicBlockWriteProc implements ISimpleIndexProcedure,
     private int len;
     private byte[] b;
     
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * 
      * @param id

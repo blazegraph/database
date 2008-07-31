@@ -33,7 +33,7 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IBatchOperation, IReadOnlyOperation, IParallelizableIndexProcedure {
+public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IParallelizableIndexProcedure {
 
     /**
      * 
@@ -89,6 +89,12 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IBatc
         
     }
 
+    public final boolean isReadOnly() {
+       
+        return true;
+        
+    }
+    
     /**
      * @return {@link ResultBuffer}
      */

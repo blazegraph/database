@@ -91,11 +91,20 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @see IReadOnlyOperation
  */
 public interface IIndexProcedure extends Serializable {
 
+    /**
+     * Return <code>true</code> iff the procedure asserts that it will not
+     * write on the index. When <code>true</code>, the procedure may be run
+     * against a view of the index that is read-only or which allows concurrent
+     * processes to read on the same index object. When <code>false</code> the
+     * procedure will be run against a mutable view of the index (assuming that
+     * the procedure is executed in a context that has access to a mutable index
+     * view).
+     */
+    public boolean isReadOnly();
+    
     /**
      * Run the procedure.
      * <p>

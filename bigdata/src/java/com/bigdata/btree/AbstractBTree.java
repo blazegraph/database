@@ -725,6 +725,39 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     protected IndexMetadata metadata;
     
     /**
+     * Fast summary information about the B+Tree.
+     */
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{ ");
+        
+        if (metadata.getName() != null) {
+
+            sb.append("name=" + metadata.getName());
+
+        } else {
+
+            sb.append("uuid=" + metadata.getIndexUUID());
+            
+        }
+        
+        sb.append(", m="+getBranchingFactor());
+
+        sb.append(", n="+getEntryCount());
+        
+        sb.append(", h="+getHeight());
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+    
+    /**
      * Iff the B+Tree is an index partition then verify that the key lies within
      * the key range of an index partition.
      * <p>

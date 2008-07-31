@@ -279,7 +279,6 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         private String sourceIndexName;
         private long lastCommitTime;
 
-        
         private transient DataService dataService;
         
         public void setDataService(DataService dataService) {
@@ -305,6 +304,12 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 throw new IllegalStateException();
 
             return dataService;
+            
+        }
+        
+        public final boolean isReadOnly() {
+            
+            return false;
             
         }
         
@@ -385,7 +390,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             final IDataService sourceDataService = fed.getDataService(sourceDataServiceUUIDs[0]);
             assert sourceDataService != null;
             
-            // iterator reading from the source index partition.
+            // iterator reading from the (remote) source index partition.
             final ITupleIterator itr = new RawDataServiceRangeIterator(
                     sourceDataService, //
                     sourceIndexName, //
@@ -644,6 +649,12 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 throw new IllegalArgumentException();
             
             this.rset = rset;
+            
+        }
+        
+        public final boolean isReadOnly() {
+            
+            return false;
             
         }
         

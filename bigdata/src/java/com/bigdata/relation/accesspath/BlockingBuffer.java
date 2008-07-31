@@ -300,8 +300,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         return true;
         
     }
+
+    /**
+     * @todo this is not optimized. see if query is faster when single threaded.
+     *       if so, then this will need to be optimized and we will need to use
+     *       rule-local unsynchronized buffers that flush onto the solution
+     *       buffer.
+     */
+    public void add(int n, E[] a) {
+
+        for (int i = 0; i < n; i++) {
+
+            add(a[i]);
+
+        }
+
+    }
     
-    public boolean add(E e) {
+    public void add(E e) {
 
         assertOpen();
 
@@ -310,7 +326,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             if (log.isDebugEnabled())
                 log.debug("reject: " + e.toString());
 
-            return false;
+            return;
 
         }
 
@@ -329,7 +345,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     if (log.isDebugEnabled())
                         log.debug("added: " + e.toString());
                     
-                    return true;
+                    return;
                     
                 }
                 

@@ -51,6 +51,12 @@ public class WriteJustificationsProc
      */
     private static final long serialVersionUID = -7469842097766417950L;
 
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * De-serialization constructor.
      *

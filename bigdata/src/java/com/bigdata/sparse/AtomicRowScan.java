@@ -50,7 +50,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.service.ClientIndexView;
 
 /**
- * The {@link AtomicRowScan} is identifes the set of tuples in the index that
+ * The {@link AtomicRowScan} identifes the set of tuples in the index that
  * corresponds to a logical row (having the same primary key) as an atomic
  * operation. It is capable of scanning all logical rows within a key range,
  * where the key range identifies a span of primary keys. Individual rows are
@@ -129,6 +129,16 @@ public class AtomicRowScan extends AbstractKeyRangeIndexProcedure implements Ext
     protected long timestamp;
     protected INameFilter filter;
 
+    /**
+     * The scan is read-only (it does not support atomic delete of the visited
+     * logical rows or other mutation operations on those rows during the scan).
+     */
+    public final boolean isReadOnly() {
+        
+        return true;
+        
+    }
+    
     /**
      * De-serialization ctor.
      */

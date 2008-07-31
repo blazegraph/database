@@ -9,14 +9,19 @@ import com.bigdata.btree.IReadOnlyOperation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AtomicRowRead extends AbstractAtomicRowReadOrWrite implements
-        IReadOnlyOperation {
+public class AtomicRowRead extends AbstractAtomicRowReadOrWrite {
 
     /**
      * 
      */
     private static final long serialVersionUID = 7240920229720302721L;
 
+    public final boolean isReadOnly() {
+        
+        return true;
+        
+    }
+        
     /**
      * De-serialization ctor.
      */

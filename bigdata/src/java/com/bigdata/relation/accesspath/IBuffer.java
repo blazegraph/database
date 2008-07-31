@@ -58,11 +58,28 @@ public interface IBuffer<E> {
      * 
      * @param e
      *            The element
-     * 
-     * @return <code>true</code> unless the buffer has a filter that excludes
-     *         this solution.
      */
-    public boolean add(E e);
+//    * 
+//    * @return <code>true</code> if the element was allowed into the buffer
+//    *         (i.e., <code>true</code> unless the buffer has a filter that
+//    *         excludes this element).
+    public void add(E e);
+
+    /**
+     * Add a set of elements to the buffer. This operation is potentially more
+     * efficient than invoking {@link #add(Object)} for each element in turn.
+     * 
+     * @param n
+     *            The #of elements in the set.
+     * 
+     * @param a
+     *            The set of elements.
+     */
+//    * 
+//    * @return The #of elements that were added to the buffer (if the buffer has
+//    *         a filter then some of the caller's elements may have been
+//    *         excluded by that filter).
+    public void add(int n, E[] a);
     
     /**
      * Flush the buffer and return the #of elements written on the backing

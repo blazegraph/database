@@ -1581,8 +1581,8 @@ abstract public class DataService extends AbstractService
     /**
      * Note: This chooses {@link ITx#READ_COMMITTED} if the the index has
      * {@link ITx#UNISOLATED} isolation and the {@link IIndexProcedure} is an
-     * {@link IReadOnlyOperation} operation. This provides better concurrency on
-     * the {@link DataService} by moving read-only operations off of the
+     * read-only operation. This provides better concurrency on the
+     * {@link DataService} by moving read-only operations off of the
      * {@link WriteExecutorService}.
      */
     public Object submit(long tx, String name, IIndexProcedure proc)
@@ -1600,7 +1600,7 @@ abstract public class DataService extends AbstractService
             
             // Choose READ_COMMITTED iff proc is read-only and UNISOLATED was requested.
             final long startTime = (tx == ITx.UNISOLATED
-                        && proc instanceof IReadOnlyOperation ? ITx.READ_COMMITTED
+                        && proc.isReadOnly() ? ITx.READ_COMMITTED
                         : tx);
 
             // wrap the caller's task.

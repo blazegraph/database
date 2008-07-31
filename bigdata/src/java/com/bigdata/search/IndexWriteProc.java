@@ -82,6 +82,12 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
         
     }
 
+    public final boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     /**
      * @return The #of pre-existing tuples that were updated as an
      *         {@link Integer}.

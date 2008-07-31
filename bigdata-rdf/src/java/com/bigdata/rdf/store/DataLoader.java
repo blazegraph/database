@@ -41,7 +41,6 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.rio.LoadStats;
@@ -537,7 +536,9 @@ public class DataLoader {
         if (resource.length != rdfFormat.length)
             throw new IllegalArgumentException();
 
-        log.info("commit="+commitEnum+", closure="+closureEnum+", resource="+Arrays.toString(resource));
+        if (log.isInfoEnabled())
+            log.info("commit=" + commitEnum + ", closure=" + closureEnum
+                    + ", resource=" + Arrays.toString(resource));
 
         LoadStats totals = new LoadStats();
         
@@ -566,9 +567,10 @@ public class DataLoader {
             
         }
         
-        if (commitEnum==CommitEnum.Batch) {
+        if (commitEnum == CommitEnum.Batch) {
 
-            log.info("Commit after batch of "+resource.length+" resources");
+            if (log.isInfoEnabled())
+                log.info("Commit after batch of "+resource.length+" resources");
 
             long beginCommit = System.currentTimeMillis();
             
@@ -576,11 +578,13 @@ public class DataLoader {
 
             totals.commitTime += System.currentTimeMillis() - beginCommit;
 
-            log.info("commit: latency="+totals.commitTime+"ms");
+            if (log.isInfoEnabled())
+                log.info("commit: latency="+totals.commitTime+"ms");
 
         }
 
-        log.info("Loaded "+resource.length+" resources: "+totals);
+        if (log.isInfoEnabled())
+            log.info("Loaded " + resource.length+" resources: "+totals);
         
         return totals;
         
@@ -682,7 +686,8 @@ public class DataLoader {
     protected LoadStats loadData2(String resource, String baseURL,
             RDFFormat rdfFormat, boolean endOfBatch) throws IOException {
 
-        log.info("loading: " + resource);
+        if (log.isInfoEnabled())
+            log.info("loading: " + resource);
 
         // try the classpath
         InputStream rdfStream = getClass().getResourceAsStream(resource);
@@ -762,7 +767,7 @@ public class DataLoader {
 
         final long begin = System.currentTimeMillis();
         
-        LoadStats stats = new LoadStats();
+        final LoadStats stats = new LoadStats();
         
         // Note: allocates a new buffer iff the [buffer] is null.
         getAssertionBuffer();
@@ -781,7 +786,7 @@ public class DataLoader {
         }
         
         // Setup the loader.
-        PresortRioLoader loader = new PresortRioLoader(buffer);
+        final PresortRioLoader loader = new PresortRioLoader(buffer);
 
         // @todo review: disable auto-flush - caller will handle flush of the buffer.
 //        loader.setFlush(false);
@@ -832,7 +837,8 @@ public class DataLoader {
                  * Also, batch closure logically belongs in the outer method.
                  */
                 
-                log.info("Computing closure.");
+                if (log.isInfoEnabled())
+                    log.info("Computing closure.");
                 
                 stats.closureStats.add(doClosure());
                 

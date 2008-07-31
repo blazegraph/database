@@ -38,6 +38,8 @@ import com.bigdata.journal.AbstractTask;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by IIndexProcedure#isReadOnly()
  */
 public interface IReadOnlyOperation {
 

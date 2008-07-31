@@ -135,7 +135,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * 
      * @return The acquired lock.
      */
-    private Lock acquireExclusiveWriteLock() {
+    private Lock writeLock() {
        
         final Lock writeLock = readWriteLock.writeLock();
         
@@ -143,7 +143,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
             if(log.isDebugEnabled()) {
                 
-                log.debug("acquiring lock: "+ndx);
+                log.debug(ndx.toString());
                 
             }
             
@@ -172,7 +172,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * 
      * @return The acquired lock.
      */
-    private Lock acquireSharedReadLock() {
+    private Lock readLock() {
         
         final Lock readLock = readWriteLock.readLock();
 
@@ -180,7 +180,9 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
             if(log.isDebugEnabled()) {
                 
-                log.debug("acquiring lock: "+ndx);
+                log.debug(ndx.toString()
+//                        , new RuntimeException()
+                        );
                 
             }
             
@@ -204,28 +206,40 @@ public class UnisolatedReadWriteIndex implements IIndex {
     
     /**
      * Acquire an appropriate lock depending on whether or not the procedure
-     * declares {@link IReadOnlyOperation}.
+     * asserts that it is read-only.
      * 
      * @param proc
      *            The procedure.
      *            
      * @return The acquired lock.
      */
-    private Lock acquireLock(IIndexProcedure proc) {
+    private Lock lock(IIndexProcedure proc) {
      
         if (proc == null)
             throw new IllegalArgumentException();
         
-        if(proc instanceof IReadOnlyOperation) {
+        if(proc.isReadOnly()) {
             
-            return acquireSharedReadLock();
+            return readLock();
             
         }
         
-        return acquireExclusiveWriteLock();
+        return writeLock();
         
     }
 
+    private void unlock(Lock lock) {
+        
+        lock.unlock();
+        
+        if(log.isDebugEnabled()) {
+            
+            log.debug(ndx.toString());
+            
+        }
+
+    }
+    
     /**
      * The unisolated index partition. This is either a {@link BTree} or a
      * {@link FusedView}.
@@ -366,7 +380,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     
     public boolean contains(byte[] key) {
 
-        final Lock lock = acquireSharedReadLock();
+        final Lock lock = readLock();
         
         try {
             
@@ -374,7 +388,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
         
@@ -382,7 +396,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     
     public byte[] lookup(byte[] key) {
 
-        final Lock lock = acquireSharedReadLock();
+        final Lock lock = readLock();
         
         try {
             
@@ -390,7 +404,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
         
@@ -398,7 +412,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     public byte[] insert(byte[] key, byte[] value) {
 
-        final Lock lock = acquireExclusiveWriteLock();
+        final Lock lock = writeLock();
         
         try {
             
@@ -406,7 +420,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
         
@@ -414,7 +428,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     public byte[] remove(byte[] key) {
 
-        final Lock lock = acquireExclusiveWriteLock();
+        final Lock lock = writeLock();
         
         try {
             
@@ -422,7 +436,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
 
@@ -430,7 +444,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     public long rangeCount() {
 
-        final Lock lock = acquireSharedReadLock();
+        final Lock lock = readLock();
 
         try {
         
@@ -438,7 +452,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
         
@@ -446,7 +460,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     
     public long rangeCount(byte[] fromKey, byte[] toKey) {
 
-        final Lock lock = acquireSharedReadLock();
+        final Lock lock = readLock();
 
         try {
         
@@ -454,7 +468,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
 
@@ -462,7 +476,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     public long rangeCountExact(byte[] fromKey, byte[] toKey) {
 
-        final Lock lock = acquireSharedReadLock();
+        final Lock lock = readLock();
 
         try {
         
@@ -470,7 +484,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
         
@@ -497,8 +511,6 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * exclusive write lock) before it fetches reads the next chunk of tuples
      * from the underlying index. Likewise, the mutation methods on the iterator
      * will acquire the exclusive write lock.
-     * 
-     * FIXME Handle {@link ITupleCursor} as well as {@link ITupleIterator}.
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, ITupleFilter filter) {
@@ -562,7 +574,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         @Override
         protected void deleteBehind(int n, Iterator<byte[]> keys) {
 
-            final Lock lock = acquireExclusiveWriteLock();
+            final Lock lock = writeLock();
             
             try {
             
@@ -570,7 +582,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
                 
             } finally {
                 
-                lock.unlock();
+                unlock(lock);
                 
             }
             
@@ -582,7 +594,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         @Override
         protected void deleteLast(byte[] key) {
 
-            final Lock lock = acquireExclusiveWriteLock();
+            final Lock lock = writeLock();
             
             try {
             
@@ -590,7 +602,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
                 
             } finally {
                 
-                lock.unlock();
+                unlock(lock);
                 
             }
             
@@ -606,8 +618,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
             final boolean mutation = (flags & IRangeQuery.REMOVEALL) != 0;
 
-            final Lock lock = mutation ? acquireExclusiveWriteLock()
-                    : acquireSharedReadLock();
+            final Lock lock = mutation ? writeLock() : readLock();
 
             try {
 
@@ -616,7 +627,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
                 
             } finally {
                 
-                lock.unlock();
+                unlock(lock);
                 
             }
             
@@ -626,7 +637,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     
     public Object submit(byte[] key, ISimpleIndexProcedure proc) {
 
-        final Lock lock = acquireLock(proc);
+        final Lock lock = lock(proc);
 
         try {
 
@@ -639,7 +650,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
         } finally {
 
-            lock.unlock();
+            unlock(lock);
 
         }
 
@@ -648,7 +659,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     public void submit(byte[] fromKey, byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
-        final Lock lock = acquireLock(proc);
+        final Lock lock = lock(proc);
 
         try {
 
@@ -661,7 +672,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
         } finally {
 
-            lock.unlock();
+            unlock(lock);
 
         }
 
@@ -678,7 +689,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         final IIndexProcedure proc = ctor.newInstance(this, fromIndex, toIndex,
                 keys, vals);
 
-        final Lock lock = acquireLock(proc);
+        final Lock lock = lock(proc);
 
         try {
             
@@ -697,7 +708,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         } finally {
             
-            lock.unlock();
+            unlock(lock);
             
         }
         

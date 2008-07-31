@@ -1551,9 +1551,11 @@ abstract public class AbstractTripleStore extends
 
         final SPORelation r = getSPORelation();
         
-        final SPOPredicate p = new SPOPredicate(
-                new String[] { r.getNamespace() }, Var.var("s"), Var.var("p"),
-                Var.var("o"), filter);
+        final SPOPredicate p = new SPOPredicate(//
+                new String[] { r.getNamespace() },//
+                Var.var("s"), Var.var("p"), Var.var("o"),//
+                filter//
+        );
 
         return getSPORelation().getAccessPath(keyOrder, p);
 

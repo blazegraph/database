@@ -292,6 +292,24 @@ public class ClientIndexView implements IClientIndex {
         
     }
     
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append(getClass().getSimpleName());
+
+        sb.append("{ ");
+
+        sb.append("name=" + name);
+
+        sb.append(", timestamp=" + timestamp);
+
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+   
     /**
      * Create a view on a scale-out index.
      * 
