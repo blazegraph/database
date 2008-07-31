@@ -174,7 +174,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
             /*
              * Backchain will generate one statement for each distinct subject
-             * in the store.
+             * or object in the store.
              * 
              * @todo This is Ok as long as you are forward chaining all of the
              * rules that put a predicate or an object into the subject position
@@ -547,7 +547,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
         public boolean hasNext() {
 
-            return src1.hasNext() || src1.hasNext();
+            return src1.hasNext() || src2.hasNext();
             
         }
         
@@ -589,32 +589,34 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
                 return tmp;
 
             }
-            
-            if(tmp1.equals(tmp2)) {
-            
+
+            final int cmp = tmp1.compareTo(tmp2);
+
+            if (cmp == 0) {
+
                 final T tmp = tmp1;
-                
+
                 tmp1 = tmp2 = null;
-                
+
                 return tmp;
-                
-            }
-            
-            if (tmp1.compareTo(tmp2) < 0) {
+
+            } else if (tmp1.compareTo(tmp2) < 0) {
 
                 final T tmp = tmp1;
-                
+
                 tmp1 = null;
-                
+
+                return tmp;
+
+            } else {
+
+                final T tmp = tmp2;
+
+                tmp2 = null;
+
                 return tmp;
 
             }
-            
-            final T tmp = tmp2;
-            
-            tmp2 = null;
-            
-            return tmp;
             
         }
 
