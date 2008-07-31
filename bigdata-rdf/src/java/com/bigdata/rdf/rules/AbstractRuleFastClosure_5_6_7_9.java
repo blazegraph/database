@@ -92,7 +92,16 @@ public abstract class AbstractRuleFastClosure_5_6_7_9 extends
 
                     public Set<Long> getSet() {
 
-                        return getSubPropertiesOf(propertyId);
+                        final Set<Long> set = getSubPropertiesOf(propertyId);
+                        
+                        if(log.isDebugEnabled()) {
+
+                            log.debug("propertyId=" + propertyId + ", set="
+                                    + set.toString());
+                            
+                        }
+                        
+                        return set;
 
                     }
 

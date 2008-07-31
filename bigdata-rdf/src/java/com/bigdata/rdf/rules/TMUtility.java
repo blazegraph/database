@@ -227,7 +227,7 @@ public class TMUtility {
             } // next tail.
 
             final Rule newRule = new Rule(rule.getName() + "[" + i + "]", head,
-                    tail2, constraints);
+                    tail2, constraints, rule.getTaskFactory());
 
             rules.add(newRule);
 

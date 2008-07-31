@@ -393,7 +393,6 @@ public class RDFSVocabulary {
             subProgram.addStep(new RuleFastClosure5(db,focusStore,this));//, D));
 
             // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
-
             subProgram.addStep(new RuleFastClosure6(db,focusStore,this));//, R));
 
             program.addStep(subProgram);
