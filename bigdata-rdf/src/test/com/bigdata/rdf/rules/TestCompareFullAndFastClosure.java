@@ -115,9 +115,6 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
         properties.setProperty(DataLoader.Options.CLOSURE,
                 DataLoader.ClosureEnum.Batch.toString());
 
-        properties.setProperty(DataLoader.Options.CLOSURE,
-                DataLoader.ClosureEnum.Batch.toString());
-
         { // use the "full" forward closure.
 
             Properties tmp = new Properties(properties);
@@ -128,7 +125,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
             tmp.setProperty(DataLoader.Options.CLOSURE,
                     ClosureEnum.None.toString());
 */
-            store1 = new TempTripleStore(tmp);
+            store1 = getStore(tmp);
 
         }
 
@@ -142,7 +139,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
             tmp.setProperty(DataLoader.Options.CLOSURE,
                     ClosureEnum.None.toString());
 */
-            store2 = new TempTripleStore(tmp);
+            store2 = getStore(tmp);
 
         }
         

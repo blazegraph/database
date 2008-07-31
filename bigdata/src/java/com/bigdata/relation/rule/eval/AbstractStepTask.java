@@ -244,29 +244,34 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     
             final Callable<RuleStats> task = itr.next();
     
-            /* Submit and wait for the future.
+            /*
+             * Submit and wait for the future.
              * 
-             * Note: tasks that are run in a sequential program are required
-             * to flush the buffer so that all solutions are available for the
-             * next step of the program.  This is critical for programs that
-             * have dependencies between their steps.
+             * Note: tasks that are run in a sequential program are required to
+             * flush the buffer so that all solutions are available for the next
+             * step of the program. This is critical for programs that have
+             * dependencies between their steps.
+             * 
+             * Note: This is handled by the task factory.
              */
             final RuleStats tmp = service.submit(task).get();
     
-            totals.add( tmp );
-    
+            totals.add(tmp);
+
             n++;
-            
-            if(log.isDebugEnabled()) {
-                
-                log.debug("program="+program.getName()+", finished "+n+" of "+ntasks+" seqential tasks.");
-                
+
+            if (log.isDebugEnabled()) {
+
+                log.debug("program=" + program.getName() + ", finished " + n
+                        + " of " + ntasks + " seqential tasks.");
+
             }
-            
+
         }
-    
+
         if (log.isInfoEnabled())
-            log.info("program=" + program.getName()+", #tasks="+ntasks+" - done");
+            log.info("program=" + program.getName() + ", #tasks=" + ntasks
+                    + " - done");
     
         return totals;
     

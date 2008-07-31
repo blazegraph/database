@@ -125,7 +125,7 @@ public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
         
     }
 
-    public void add(int n, E[] a) {
+    public void add(final int n, final E[] a) {
 
         if(n == 0) return;
         
