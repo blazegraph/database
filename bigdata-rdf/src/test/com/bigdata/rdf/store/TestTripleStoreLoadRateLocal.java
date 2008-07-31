@@ -33,6 +33,8 @@ import java.util.Properties;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
@@ -65,7 +67,11 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
-
+        
+        // choice of fast vs full closure (iff enabled below).
+        properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Full.toString());
+//        properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Fast.toString());
+        
         // turn off the full text index for literals.
         properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
 
@@ -77,9 +83,11 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
     }
 
     /**
-     * Option to compute the database-at-once closure.
+     * Option to compute the database-at-once closure using either
+     * {@link ForwardClosureEnum#Fast} or {@link ForwardClosureEnum#Full} as
+     * specified in {@link #getProperties()}.
      */
-    protected final boolean computeClosure = false;
+    protected final boolean computeClosure = true;
 
     public void test_loadNCIOncology() throws IOException {
 

@@ -199,7 +199,7 @@ public class RDFJoinNexus implements IJoinNexus {
     /**
      * Note: This MUST be [false] for a release!
      */
-    final private transient boolean forceSerialExecution = false;
+    final private transient boolean forceSerialExecution = true;
     
     final public boolean forceSerialExecution() {
 

@@ -242,7 +242,7 @@ public class InferenceEngine extends RDFSVocabulary {
          */
         public static final String FORWARD_CLOSURE = "forwardClosure";
 
-        public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Full.toString();
+        public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Fast.toString();
         
         /**
          * When <code>true</code> (default <code>false</code>)
