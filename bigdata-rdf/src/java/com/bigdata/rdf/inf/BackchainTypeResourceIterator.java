@@ -517,7 +517,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      * @version $Id$
      * @param <T>
      */
-    private static class MergedOrderedIterator<T extends Long> implements IChunkedIterator<T> {
+    private static class MergedOrderedIterator<T extends Comparable> implements IChunkedIterator<T> {
        
         private final IChunkedIterator<T> src1;
         private final IChunkedIterator<T> src2;
@@ -600,7 +600,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
                 return tmp;
 
-            } else if (tmp1.compareTo(tmp2) < 0) {
+            } else if (cmp < 0) {
 
                 final T tmp = tmp1;
 
