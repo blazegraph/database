@@ -140,7 +140,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     public void test_fixedPoint_TestOwlSameAs_Full() throws SailException,
         RepositoryException, IOException, RDFParseException {
     
-        final String file = "testOwlSameAs.rdf";
+        // final String file = "testOwlSameAs.rdf";
+        final String file = "small owlSameAs.rdf";
         
         doFixedPointTest(file, ForwardClosureEnum.Full);
     
@@ -192,6 +193,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
              */
             properties.setProperty(DataLoader.Options.CLOSURE,
                     ClosureEnum.None.toString());
+            
+            // properties.setProperty(InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "true");
 
             /*
              * Note: using variant method so that we can override some
