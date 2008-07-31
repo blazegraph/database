@@ -43,7 +43,7 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
+public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
     /**
      * 
@@ -64,11 +64,12 @@ public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
         Properties properties = new Properties(super.getProperties());
 
         // turn off incremental truth maintenance.
-        properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None
-                .toString());
+        properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
 
+        // turn off the full text index for literals.
         properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
 
+        // turn off statement identifiers.
         properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
         
         return properties;
@@ -76,65 +77,87 @@ public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
     }
 
     /**
-     * Note: You have to explicitly run test test or the suite will get picked
-     * up on the parent class.
-     * 
-     * @throws IOException
+     * Option to compute the database-at-once closure.
      */
+    protected final boolean computeClosure = false;
+
     public void test_loadNCIOncology() throws IOException {
 
-        AbstractTripleStore store = getStore(getProperties());
+        doTest("../rdf-data/nciOncology.owl","",RDFFormat.RDFXML);
+        
+    }
 
-        try {
+    public void test_alibaba() throws IOException {
 
-            // load the data set.
-            store.getDataLoader().loadData("../rdf-data/nciOncology.owl", "",
-                    RDFFormat.RDFXML);
-            // store.getDataLoader().loadData("../rdf-data/Thesaurus.owl", "",
-            // RDFFormat.RDFXML);
+        doTest("../rdf-data/alibaba_v41.rdf","",RDFFormat.RDFXML);
 
-            // compute the database at once closure.
-            store.getInferenceEngine().computeClosure(null/* focusStore */);
+    }
 
-            store.commit();
+    public void test_loadThesaurus() throws IOException {
 
-        } finally {
-
-            store.closeAndDelete();
-
-        }
-
+        doTest("../rdf-data/Thesaurus.owl","",RDFFormat.RDFXML);
+        
     }
 
     /**
-     * FIXME This refuses to load the files found in a directory.  it is currently
-     * loading a thesaurus instead.
-     * @throws InterruptedException
-     * @throws IOException
+     * Note: The order does not matter since we are using database-at-once
+     * closure (assuming that closure is enabled).
      */
-    public void test_U1() throws InterruptedException, IOException {
+    public void test_loadWordnet() throws IOException {
+
+        doTest(//
+                new String[] { "../rdf-data/wordnet_nouns-20010201.rdf",
+                        "../rdf-data/wordnet-20000620.rdfs"
+                        },
+                //
+                new String[] { "", "" },
+                //
+                new RDFFormat[] { RDFFormat.RDFXML, RDFFormat.RDFXML });
+        
+    }
+
+    /**
+     * FIXME This refuses to load the files found in a directory. it is
+     * currently loading a single file instead.
+     */
+    public void test_U1() throws IOException {
         
 //        String file = "../rdf-data/lehigh/U1";
       String file = "../rdf-data/lehigh/U10/University0_0.owl";
-//        String file = "../rdf-data/wordnet_nouns-20010201.rdf";
-//      String file = "../rdf-data/Thesaurus.owl";
       
       // FIXME correct baseURL for leigh?
-//      String baseURL = "http://www.bigdata.com";
       String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
-//      String baseURL = "";
       
+      doTest(file, baseURL, RDFFormat.RDFXML);
+      
+    }
+    
+    protected void doTest(String file, String baseURL, RDFFormat rdfFormat)
+            throws IOException {
+
+        doTest(new String[] { file }, new String[] { baseURL },
+                new RDFFormat[] { rdfFormat });
+
+    }
+
+    protected void doTest(String[] file, String[] baseURL, RDFFormat[] rdfFormat)
+            throws IOException {
+
         AbstractTripleStore store = getStore(getProperties());
 
         try {
 
             // load the data set.
-//            store.getDataLoader().loadData("../rdf-data/lehigh/U1", "",
-//                    RDFFormat.RDFXML);
-             store.getDataLoader().loadData(file, baseURL, RDFFormat.RDFXML);
+            System.out.println(store.getDataLoader().loadData(file, baseURL,
+                    rdfFormat).toString());
 
-            // compute the database at once closure.
-//            store.getInferenceEngine().computeClosure(null/* focusStore */);
+            if(computeClosure) {
+                
+                // compute the database at once closure.
+                System.out.println(store.getInferenceEngine().computeClosure(
+                        null/* focusStore */).toString());
+                
+            }
 
             store.commit();
 
@@ -143,7 +166,7 @@ public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
             store.closeAndDelete();
 
         }
-        
+
     }
-    
+
 }
