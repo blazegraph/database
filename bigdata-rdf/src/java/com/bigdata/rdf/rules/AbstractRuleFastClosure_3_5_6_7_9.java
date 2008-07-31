@@ -239,6 +239,10 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
         public RuleStats call() {
 
+            if (log.isInfoEnabled())
+                log.info("running: rule=" + rule.getName() + ", propertyId="
+                        + propertyId);
+            
             final RuleStats stats = new RuleStats(rule);
 
             final long begin = System.currentTimeMillis();
@@ -740,12 +744,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                         boolean added = tmp.add(spo.s);
 
-                        if (log.isDebugEnabled()) {
-
+                        if (log.isDebugEnabled())
                             log.debug(spo.toString(/* database */)
                                     + ", added subject=" + added);
-
-                        }
 
                     }
 

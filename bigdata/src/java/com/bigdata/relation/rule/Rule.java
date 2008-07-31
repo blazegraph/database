@@ -252,7 +252,7 @@ public class Rule<E> implements IRule<E>, Serializable {
      *            Optional override for rule evaluation (MAY be
      *            <code>null</code>).
      */
-    protected Rule(String name, IPredicate head, IPredicate[] tail,
+    public Rule(String name, IPredicate head, IPredicate[] tail,
             IConstraint[] constraints, IRuleTaskFactory taskFactory) {
 
         if (name == null)
