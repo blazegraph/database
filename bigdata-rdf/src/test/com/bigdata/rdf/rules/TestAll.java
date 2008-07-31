@@ -127,7 +127,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestRuleOwlEquivalentProperty.class);
 
         // compare two means of computing owl:sameAs for equivilence.
-        suite.addTestSuite(TestCompareOwlSameAsEntailments.class);
+        suite.addTestSuite(TestCompareFullAndFastClosure.class);
         
         /*
          * Test entailments that are computed at query time rather than when the
