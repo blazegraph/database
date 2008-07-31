@@ -74,7 +74,7 @@ public class ClosureStats {
     public String toString() {
 
         return getClass().getSimpleName() + "{mutationCount=" + mutationCount
-                + ",elapsed=" + elapsed + "ms}";
+                + ", elapsed=" + elapsed + "ms}";
         
     }
     

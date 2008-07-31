@@ -82,7 +82,7 @@ public class LoadStats {
                 + ", commitLatency="
                 + commitTime
                 + "ms"
-                + (closureStats != null ? "\n"+closureStats.toString() : "");
+                + (closureStats.elapsed!=0L? "\n"+closureStats.toString() : "");
 
     }
     

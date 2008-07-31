@@ -40,6 +40,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.ClosableEmptyIterator;
 import com.bigdata.relation.accesspath.ClosableSingleItemIterator;
+import com.bigdata.relation.accesspath.IChunkedIterator;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IClosableIterator;
 import com.bigdata.relation.accesspath.IKeyOrder;
@@ -184,7 +185,10 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
              * resources that are no longer in use by the KB.
              */
 
-            resourceIds = db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO);
+            resourceIds = new MergedOrderedIterator(
+                    db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO),
+                    db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP)
+                    );
 
             /*
              * Reading (? rdf:Type rdfs:Resource) using the POS index.
@@ -503,6 +507,121 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
         
         current = null;
         
+    }
+    
+    /**
+     * Reads on two iterators visiting elements in some natural order and visits
+     * their order preserving merge (no duplicates).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <T>
+     */
+    private static class MergedOrderedIterator<T extends Long> implements IChunkedIterator<T> {
+       
+        private final IChunkedIterator<T> src1;
+        private final IChunkedIterator<T> src2;
+        
+        public MergedOrderedIterator(IChunkedIterator<T> src1,IChunkedIterator<T> src2) {
+
+            this.src1 = src1;
+            
+            this.src2 = src2;
+            
+        }
+        
+        public void close() {
+            
+            src1.close();
+            
+            src2.close();
+            
+        }
+
+        /**
+         * Note: Not implemented since not used above and this class is private.
+         */
+        public T[] nextChunk() {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean hasNext() {
+
+            return src1.hasNext() || src1.hasNext();
+            
+        }
+        
+        private T tmp1;
+        private T tmp2;
+        
+        public T next() {
+
+            if(!hasNext()) throw new NoSuchElementException();
+            
+            if (tmp1 == null && src1.hasNext()) {
+
+                tmp1 = src1.next();
+
+            }
+ 
+            if (tmp2 == null && src2.hasNext()) {
+
+                tmp2 = src2.next();
+
+            }
+            
+            if (tmp1 == null) {
+
+                final T tmp = tmp2;
+
+                tmp2 = null;
+
+                return tmp;
+
+            }
+            
+            if (tmp2 == null) {
+
+                final T tmp = tmp1;
+
+                tmp1 = null;
+
+                return tmp;
+
+            }
+            
+            if(tmp1.equals(tmp2)) {
+            
+                final T tmp = tmp1;
+                
+                tmp1 = tmp2 = null;
+                
+                return tmp;
+                
+            }
+            
+            if (tmp1.compareTo(tmp2) < 0) {
+
+                final T tmp = tmp1;
+                
+                tmp1 = null;
+                
+                return tmp;
+
+            }
+            
+            final T tmp = tmp2;
+            
+            tmp2 = null;
+            
+            return tmp;
+            
+        }
+
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+
     }
     
 }
