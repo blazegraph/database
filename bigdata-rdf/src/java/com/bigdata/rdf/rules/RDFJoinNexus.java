@@ -203,7 +203,7 @@ public class RDFJoinNexus implements IJoinNexus {
     
     final public boolean forceSerialExecution() {
 
-        if(!forceSerialExecution) {
+        if(forceSerialExecution) {
             
             log.warn("Forcing serial execution of rule sets.");
             
