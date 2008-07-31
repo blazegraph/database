@@ -199,7 +199,7 @@ public class RDFJoinNexus implements IJoinNexus {
     /**
      * Note: This MUST be [false] for a release!
      */
-    final private transient boolean forceSerialExecution = true;
+    final private transient boolean forceSerialExecution = false;
     
     final public boolean forceSerialExecution() {
 
@@ -523,12 +523,13 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
-        if (!parallel) {
+        if (!parallel || forceSerialExecution()) {
 
             /*
              * Tasks for sequential steps are always wrapped to ensure that the
              * buffer is flushed when the task completes.
              */
+            
             taskFactory = new RunRuleAndFlushBufferTaskFactory(taskFactory);
 
         }

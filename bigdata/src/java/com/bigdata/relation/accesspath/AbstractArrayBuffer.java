@@ -44,7 +44,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     private final int capacity;
     private final IElementFilter<E> filter;
     
-    private int n;
+    private int size;
     private E[] buffer;
     
     /**
@@ -80,7 +80,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
      */
     public boolean isEmpty() {
 
-        return n == 0;
+        return size == 0;
         
     }
 
@@ -89,7 +89,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
      */
     public int size() {
 
-        return n;
+        return size;
         
     }
 
@@ -105,15 +105,19 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
         if (filter != null) {
 
-            // rejected by the filter.
-            
-            if(log.isDebugEnabled()) {
+            if(!filter.accept(e)) {
                 
-                log.debug("rejected: element="+e+", filter="+filter);
+                // rejected by the filter.
                 
+                if(log.isDebugEnabled()) {
+                    
+                    log.debug("rejected: element="+e+", filter="+filter);
+                    
+                }
+
+                return false;
+
             }
-            
-            return filter.accept(e);
             
         }
         
@@ -141,13 +145,13 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
                     buffer = (E[]) java.lang.reflect.Array.newInstance(e
                             .getClass(), capacity);
 
-                } else if (n == buffer.length) {
+                } else if (size == buffer.length) {
 
                     flush();
 
                 }
 
-                buffer[n++] = e;
+                buffer[size++] = e;
 
             }
 
@@ -155,7 +159,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
     }
 
-    public void add(int n, E[] a) {
+    public void add(final int n, final E[] a) {
 
         if (n == 0)
             return;
@@ -188,13 +192,13 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
                         buffer = (E[]) java.lang.reflect.Array.newInstance(e
                                 .getClass(), capacity);
 
-                    } else if (n == buffer.length) {
+                    } else if (size == buffer.length) {
 
                         flush();
 
                     }
 
-                    buffer[n++] = e;
+                    buffer[size++] = e;
 
                 }
                 
@@ -206,15 +210,15 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     
     synchronized public long flush() {
 
-        if (n > 0) {
+        if (size > 0) {
 
             if (log.isInfoEnabled()) {
 
-                log.info("flushing buffer with " + n + " elements");
+                log.info("flushing buffer with " + size + " elements");
                 
             }
             
-            final long nwritten = flush(n, buffer);
+            final long nwritten = flush(size, buffer);
             
             counter += nwritten;
             
@@ -252,14 +256,14 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     /** Clear hard references from the buffer for better GC. */
     private void clearBuffer() {
 
-        for(int i=0; i<n; i++) {
+        for(int i=0; i<size; i++) {
             
             buffer[i] = null;
             
         }
 
         // the buffer is now empty.
-        n = 0;
+        size = 0;
 
     }
 

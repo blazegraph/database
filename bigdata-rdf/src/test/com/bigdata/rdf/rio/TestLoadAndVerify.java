@@ -182,7 +182,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                 dataLoader.loadData(file, "" /* baseURI */, RDFFormat.RDFXML);
 
 //                // database-at-once closure (optional for this test).
-//                store.getInferenceEngine().computeClosure(null/*focusStore*/);
+                store.getInferenceEngine().computeClosure(null/*focusStore*/);
                 
             }
 
