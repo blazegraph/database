@@ -42,7 +42,7 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
-    protected static transient final int DEFAULT_CHUNK_SIZE = 10000;
+    public static transient final int DEFAULT_CHUNK_SIZE = 10000;
     
     private boolean open = true;
 

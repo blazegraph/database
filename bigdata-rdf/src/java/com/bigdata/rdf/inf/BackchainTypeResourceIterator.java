@@ -38,11 +38,13 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
 import com.bigdata.relation.accesspath.ClosableEmptyIterator;
 import com.bigdata.relation.accesspath.ClosableSingleItemIterator;
 import com.bigdata.relation.accesspath.IChunkedIterator;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IClosableIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.IKeyOrder;
 
 import cutthecrap.utils.striterators.Filter;
@@ -187,8 +189,21 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
             resourceIds = new MergedOrderedIterator(
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO),
-                    db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP)
-                    );
+                    /*
+                     * FIXME filter out literals on OSP in the distinct term
+                     * scan rather than the iterator.
+                     */
+                    new ChunkedWrappedIterator<Long>(
+                            db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP),
+                            ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE,
+                            null/*keyOrder*/,
+                            new IElementFilter() {
+                                public boolean accept(Object e) {
+                                    long termId = (Long)e;
+                                    return !AbstractTripleStore.isLiteral(termId);
+                                }
+                            }
+                    ));
 
             /*
              * Reading (? rdf:Type rdfs:Resource) using the POS index.
@@ -522,7 +537,8 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
         private final IChunkedIterator<T> src1;
         private final IChunkedIterator<T> src2;
         
-        public MergedOrderedIterator(IChunkedIterator<T> src1,IChunkedIterator<T> src2) {
+        public MergedOrderedIterator(IChunkedIterator<T> src1,
+                IChunkedIterator<T> src2) {
 
             this.src1 = src1;
             
