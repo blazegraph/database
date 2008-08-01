@@ -2363,15 +2363,50 @@ Caused by: java.lang.NullPointerException
          instead of creating a proxy (have to wait to figure that
          out).
 
+       - *** The LDS is running each round as a separate procedure
+         submitted to the concurrency manager.  Why not run all rounds
+         as a single procedure?
+
+	 Ah.  This was being done so that we could update the read
+	 behind point after (or before) each round of closure.
+	 However, we do NOT need to do that if we are using
+	 UnisolatedReadWriteIndex.
+
+	 If I go this way, then need to change AbstractRelation to use
+	 the UnisolatedReadWrite index in this case as well.  However,
+	 that could decrease performance if there are point tests
+	 since the locks would be requested per point test.
+
+	 *** Perhaps this could be an option to the AbstractTask?
+   	     I.e., whether or not the procedure itself will use
+   	     concurrent threads and therefore needs the unisolated
+   	     indices to be thread-safe.
+
+       - Done. (Rewrote the test code.) The UnisolatedReadWriteIndex
+         sucks hard when it comes to the assertSameStatements() method
+         in test_loadAndVerify.  The problem is that this code uses a
+         lot of point tests, which is why we don't run it for the
+         scale-out database.  Those point tests must acquire a lock
+         when using the UnisolatedReadWriteIndex, which really hurts
+         performance.
+
+	 This could be fixed by exposing the lock and acquiring for
+	 the duration of the point test intensive method.
+
+	 It could also be fixed by re-writing the code to be
+	 efficient, e.g., by using iterators rather than point test
+	 and basically doing a JOIN (nested loop with the inner loop
+	 unrolled).
+
        - Unroll loops for faster distributed joins
 
-         The main change is to unroll the inner loop for each chunk of
-         the outer loop and parallelize the inner loop queries.  Be
-         careful with the parallelization as the thread pools are
-         typically uncapped and a large #of elements are in each
-         chunk.  However, the maximum parallelization will be the #of
-         index partitions and the ClientIndexView should provide that
-         parallelization automatically if I unroll the loop.
+         Unroll the inner loop for each chunk of the outer loop and
+         parallelize the inner loop queries.  Be careful with the
+         parallelization as the thread pools are typically uncapped
+         and a large #of elements are in each chunk.  However, the
+         maximum parallelization will be the #of index partitions and
+         the ClientIndexView should provide that parallelization
+         automatically if I unroll the loop.
 
          This could also improve performance for the LTS since it is
          now using the UnisolatedReadWriteIndex for better concurrency
@@ -2573,3 +2608,102 @@ DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justificat
 // FIXME examine when the following makes it into the visitedSet the first time.
 
 Already visited: Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
+
+============================================================
+
+Priority list:
+
+1. unroll loops for faster distributed joins.
+
+   How am I going to benchmark this?
+
+   Completion scans, distinct term scans, and match rule all need to
+   use ITupleCursor to operate in a scale-out context.
+
+2. fix the lexicon
+
+3. fix justifications and misc closure problems with MikeP
+
+   *** Filter out literals on OSP in the distinct term scan rather
+       than the iterator (for the type resource backchainer).  Also,
+       add a unit test for this case to
+       TestBackchainTypeResourceIterator.
+
+4. performance testing for data load and closure
+
+   try w/o UnisolatedReadWriteIndex 
+
+   alibaba: 7/31
+
+   w/ text index and sids, no closure, DPP2 workstation.
+   Loaded 1 resources: 45655 stmts added in 8.375 secs, rate= 5451, commitLatency=250ms
+
+   w/o text index or sids, no closure, DPP2 workstation.
+   Loaded 1 resources: 45655 stmts added in 6.485 secs, rate= 7040, commitLatency=265ms
+
+   w/o text index or sids, database-at-once closure, forceSerial=false, DPP2 workstation.
+   Loaded 1 resources: 45655 stmts added in 6.375 secs, rate= 7161, commitLatency=203ms
+   Computed fixed point: program=fullForwardClosure, rounds=3, elapsed=11922ms
+
+   w/o text index or sids, database-at-once closure, forceSerial=true, DPP2 workstation.
+   Loaded 1 resources: 45655 stmts added in 6.516 secs, rate= 7006, commitLatency=234ms
+   Computed fixed point: program=fullForwardClosure, rounds=1, elapsed=3468ms
+
+   * Verify correct handling migration of elements from the
+     Unsynchronized buffer to the target buffer.
+   
+   * Hypothesis for poor performance when using parallel rule
+     execution is lock contention for the buffer on which the
+     solutions are being written by the rule set.
+
+     One solution is to give each thread (this equates to each rule
+     instance that is being executed) its own local buffer (100s to
+     1000s of solutions for the local buffer) and to flush those
+     buffers onto the shared buffer when they overflow.  Make sure
+     that the per-rule buffers are not larger than the global buffer,
+     and probably not larger than 1/10 of the global buffer.
+
+     When the local buffer is flushed, we need to acquire and hold a
+     lock on the shared buffer as 100s to 1000s of solution references
+     are copied (and to flush if this would overflow the shared
+     buffer).  This means that we can't use the BlockingQueue since it
+     will always acquire a lock per add().
+
+     A variant is to have the BlockingBuffer collection ISolution[]s.
+     That way each local buffer is copied in its entirety into the
+     next ISolution[] and we only acquire a single lock.
+
+     Also make sure that there is no lock contention when flushing the
+     shared buffer during execution.  This is possible since
+     concurrent threads are still writing on the shared buffer.  (It
+     is not possible when the shared buffer is flushed after a round
+     since there are no threads writing on the buffer at that time.)
+
+   * Details missing for fast closure programs (total and details).
+
+5. performance testing for query (LUBM with native rule rewrites of
+   queries) for LTS, LDS, and JDS.
+
+6. performance testing for owl:sameAs processing at scale.
+
+7. provenance query problems (MikeP)
+
+x. misc scaling pain points
+
+   - TestTruthMaintenance -- needs a scalable solution for selecting
+     the statements to be retracted.  See
+     TestTruthMaintenance#selectRandomExplicitStatements()
+
+   - TruthMaintenance performance should be vetted.  Handling TM at
+     scale is its own issue and might be best solved using: (a) a
+     magic sets integration; and (b) periodic map/reduce style updates
+     with closure.  (Or database at once closure on a new data set,
+     which is similar to how scale-out text indices are built.)
+
+   - Look for other things which have become painful with the
+     introduction of the UnisolatedReadWriteIndex class.
+
+
+DEBUG: 3156 pool-1-thread-31         com.bigdata.relation.accesspath.AbstractArrayBuffer.add(AbstractArrayBuffer.java:135): element=Solution{ element=< 136U, 24U, 140U : Inferred >, rule=fastClosure5[0][0] : ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, {P}, y) -> ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, 24, y), bindingSet={x=136, {P}=8, y=140}}
+
+DEBUG: 3203 pool-1-thread-30         com.bigdata.rdf.rules.RDFJoinNexus$InsertSPOAndJustificationBuffer.writeChunk(RDFJoinNexus.java:641): chunk[1] = Solution{ element=< 136U, 24U, 12U : Inferred >, rule=fastClosure5[0][0] : ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, {P}, y) -> ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, 24, y), bindingSet={x=136, {P}=48, y=12}}
