@@ -46,6 +46,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.DataServiceRangeIterator;
 
@@ -54,6 +55,12 @@ import com.bigdata.service.DataServiceRangeIterator;
  * introduces the concept of a {@link #continuationQuery()} so that the iterator
  * can materialize the tuples using a sequence of queries that progresses
  * through the index until all tuples in the key range have been visited.
+ * 
+ * @todo Rewrite the iterators based on the {@link ResultSet} to implement
+ *       {@link ITupleCursor}? Note that this should not be necessary if we
+ *       instead notice the direction in which the underlying (source) iterator
+ *       was being traversed. Even that can be ignored in favor of using REVERSE
+ *       to achieve reverse traversal.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -299,12 +306,8 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
 
         /*
          * Note: will be 0L if reading on a local index.
-         * 
-         * Note: converts a non-zero commitTime to a historical read.
-         * 
-         * @issue HistoricalRead
          */
-        commitTime = -rset.getCommitTime();
+        commitTime = TimestampUtility.asHistoricalRead(rset.getCommitTime());
         
         // reset index into the ResultSet.
         lastVisited = -1;

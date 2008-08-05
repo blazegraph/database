@@ -81,5 +81,40 @@ public class TimestampUtility {
         return timestamp == ITx.UNISOLATED;
         
     }
+
+    /**
+     * Temporary method accepts a commitTime and returns a timestamp that will
+     * be interpreted as a historical read.
+     * 
+     * FIXME At the moment, the transform is <code>-timestamp</code>.
+     * However, historical read timestamps are being modified such that NO
+     * transform will be required. A precondition for that change is to
+     * encapsulate all locations in the code base that use historical reads such
+     * that they use this method instead. Once the code base is safely
+     * encapsulated, then the interpretation of negative timestamps as
+     * historical reads can be changed.
+     * <p>
+     * As a follow on, an algorithm will be specified for full transaction
+     * identifiers that assigns them using the available interval following the
+     * desired transaction effective time. See {@link ITransactionManager}
+     * 
+     * @param commitTime
+     *            The commit time from {@link IIndexStore#getLastCommitTime()},
+     *            etc.
+     * @return The corresponding timestamp that will be interpreted as a
+     *         historical read against the state of the database having that
+     *         commit time.
+     * @throws IllegalArgumentException
+     *             if <i>commitTime</i> is negative (zero is permitted for some
+     *             edge cases).
+     */
+    static public long asHistoricalRead(long commitTime) {
+    
+        if (commitTime < 0)
+            throw new IllegalArgumentException("commitTime: " + commitTime);
+        
+        return -commitTime;
+        
+    }
     
 }

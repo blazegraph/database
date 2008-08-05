@@ -59,6 +59,14 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
     private static final long serialVersionUID = 2211020411074955099L;
 
     /**
+     * The default for {@link IKeyBuilderFactory}.
+     */
+    static public final IKeyBuilderFactory getDefaultKeyBuilderFactory() {
+        
+        return new DefaultKeyBuilderFactory(new Properties());
+    }
+    
+    /**
      * The default for {@link #getLeafKeySerializer()} (compression for the keys
      * stored in a leaf).
      */
@@ -134,8 +142,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      */
     public static ITupleSerializer newInstance() {
 
-        return new DefaultTupleSerializer(new DefaultKeyBuilderFactory(
-                new Properties()));
+        return new DefaultTupleSerializer(getDefaultKeyBuilderFactory());
         
     }
 

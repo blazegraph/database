@@ -4,6 +4,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.io.SerializerUtil;
 
 /**
@@ -18,7 +19,7 @@ public class TPSTupleSerializer extends DefaultTupleSerializer<Void,TPS> {
 
     public static ITupleSerializer<Void, TPS> newInstance() {
         
-        return new TPSTupleSerializer();
+        return new TPSTupleSerializer(getDefaultKeyBuilderFactory());
         
     }
     
@@ -26,6 +27,12 @@ public class TPSTupleSerializer extends DefaultTupleSerializer<Void,TPS> {
      * De-serializator ctor.
      */
     public TPSTupleSerializer() {
+        
+    }
+
+    public TPSTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
+        
+        super(keyBuilderFactory);
         
     }
     

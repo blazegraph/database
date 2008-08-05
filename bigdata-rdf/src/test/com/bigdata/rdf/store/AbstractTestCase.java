@@ -618,7 +618,7 @@ abstract public class AbstractTestCase
                     continue;
                 }
 
-                log.info("actual: " + actualSPO.toString(store));
+                if(log.isInfoEnabled()) log.info("actual: " + actualSPO.toString(store));
 
                 SPO expectedSPO = map.remove(actualSPO);
 
@@ -637,7 +637,11 @@ abstract public class AbstractTestCase
                 StatementEnum actualType =
                         actualSPO.hasStatementType() ? actualSPO.getType()
                                 : null;
-                assertEquals(expectedType, actualType);
+                if (expectedType != actualType) {
+                    // defer message generation until assert fails.
+                    assertEquals("expected=" + expectedSPO + ",actual="
+                            + actualSPO, expectedType, actualType);
+                }
 
                 i++;
 
