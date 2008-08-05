@@ -30,6 +30,10 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
+import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.Journal;
@@ -85,74 +89,22 @@ import com.bigdata.service.IMetadataService;
 public interface ITupleSerializer<K extends Object, V extends Object> extends
         IKeyBuilderFactory, Serializable {
 
-//    /**
-//     * This method is invoked to notify the implementation of the backing store.
-//     * This provides an opportunity for a reuse of thread-local buffers or the
-//     * use of additional persistent state in a serialization protocol.
-//     * <p>
-//     * Note: There are three basic cases which can arise here depending on the
-//     * {@link IRawStore} implementation.
-//     * <dl>
-//     * <dt>{@link ManagedJournal}</dt>
-//     * <dd>This corresponds to a scale-out configuration. You can access the
-//     * {@link IMetadataService} using
-//     * {@link ManagedJournal#getMetadataService()}. </dd>
-//     * <dt>{@link Journal}</dt>
-//     * <dd>This corresponds to an scale-up configuration.</dd>
-//     * <dt>{@link TemporaryRawStore}</dt>
-//     * <dd>A temporary store.</dd>
-//     * </dl>
-//     * <p>
-//     * Note: {@link ITupleSerializer}s are stored in the {@link IndexMetadata}.
-//     * An instance therefore has a life-cycle corresponding more or less to that
-//     * of a {@link BTree} or {@link FusedView}. It is often convenient to
-//     * access the thread-local {@link KeyBuilder} or {@link DataOutputBuffer}
-//     * associated with the live {@link AbstractJournal}.
-//     * <p>
-//     * Note: There are also a several simple {@link IRawStore} implementations.
-//     * While the {@link BTree} can be used with any of them, they are mostly
-//     * used in unit tests. E.g., {@link SimpleMemoryRawStore}.
-//     * 
-//     * @param store
-//     *            The backing store.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if <i>store</i> is <code>null</code>.
-//     * @throws IllegalStateException
-//     *             if the store has already been set on this object.
-//     */
-//    void setStore(IRawStore store);
-
-//    /**
-//     * Automatically invoked to set the {@link IKeyBuilder} configured for the
-//     * {@link IIndex} when an {@link ITupleSerializer} is de-serialized from an
-//     * {@link IndexMetadata} object.
-//     * 
-//     * @todo if defined, then I also need to do this when de-serializing the
-//     *       {@link ITupleSerializer} for a {@link ResultSet}.
-//     * 
-//     * @todo an alternative is to define getKeyBuilderFactory() and a protocol
-//     *       to make sure that the factory is set on the
-//     *       {@link ITupleSerializer} if it is set on the owning
-//     *       {@link IndexMetadata}. Then the factory will stick with the
-//     *       {@link ITupleSerializer} without further troubles.
-//     * 
-//     * FIXME Best yet, have the factory on the {@link ITupleSerializer} directly
-//     * and have the {@link IndexMetadata} just read it off of the
-//     * {@link ITupleSerializer}! (Modify SPOTupleSerializer and DefaultTupleSerializer).
-//     */
-//    IKeyBuilderFactory getKeyBuilder();
-//    void setKeyBuilderFactory(IKeyBuilderFactory keyBuilderFactory);
-
     /**
+     * <p>
      * Factory for thread-safe {@link IKeyBuilder} objects for use by
      * {@link ITupleSerializer#serializeKey(Object)} and possibly others.
+     * </p>
      * <p>
      * Note: A mutable B+Tree is always single-threaded. However, read-only
      * B+Trees allow concurrent readers. Therefore, thread-safety requirement
      * for this {@link IKeyBuilderFactory} is
-     * <em>safe for either a single writers -or-
-     * for concurrent readers</em>.
+     * <em>safe for either a single writers -or- for concurrent readers</em>.
+     * </p>
+     * <p>
+     * Note: If you change this value in a manner that is not backward
+     * compatable once entries have been written on the index then you may be
+     * unable to any read data already written.
+     * </p>
      */
     public IKeyBuilder getKeyBuilder();
     
@@ -241,4 +193,35 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
      */
     K deserializeKey(ITuple tuple);
     
+    /**
+     * The object used to (de-)serialize/(de-)compress an ordered array of keys
+     * such as found in a B+Tree leaf or in a {@link ResultSet}.
+     * <p>
+     * Note: This handles the "serialization" of the <code>byte[][]</code>
+     * containing all of the keys for some leaf of the index. As such it may be
+     * used to provide compression across the already serialized keys in the
+     * leaf.
+     * <p>
+     * Note: If you change this value in a manner that is not backward
+     * compatable once entries have been written on the index then you may be
+     * unable to any read data already written.
+     */
+    IDataSerializer getLeafKeySerializer();
+    
+    /**
+     * The object used to (de-)serialize/(de-)compress an unordered array of
+     * values ordered array of keys such as found in a B+Tree leaf or in a
+     * {@link ResultSet}
+     * <p>
+     * Note: This handles the "serialization" of the <code>byte[][]</code>
+     * containing all of the values for some leaf of the index. As such it may
+     * be used to provide compression across the already serialized values in
+     * the leaf.
+     * <p>
+     * Note: If you change this value in a manner that is not backward
+     * compatable once entries have been written on the index then you may be
+     * unable to any read data already written.
+     */
+    IDataSerializer getLeafValueSerializer();
+   
 }

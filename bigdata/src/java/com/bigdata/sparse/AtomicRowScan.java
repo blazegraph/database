@@ -39,13 +39,13 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractChunkedRangeIterator;
-import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.SuccessorUtil;
+import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+import com.bigdata.btree.keys.SuccessorUtil;
+import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
+import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.ClientIndexView;
 
@@ -110,6 +110,8 @@ import com.bigdata.service.ClientIndexView;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link AtomicRowFilter}
  */
 public class AtomicRowScan extends AbstractKeyRangeIndexProcedure implements Externalizable {
 
@@ -474,159 +476,3 @@ public class AtomicRowScan extends AbstractKeyRangeIndexProcedure implements Ext
     }
     
 }
-
-//    /**
-//     * Atomic read.
-//     * 
-//     * @return A {@link TPS} instance containing the selected data from the
-//     *         logical row identified by the {@link #primaryKey} -or-
-//     *         <code>null</code> iff the primary key was NOT FOUND in the
-//     *         index. I.e., iff there are NO entries for that primary key
-//     *         regardless of whether or not they were selected.
-//     */
-//    public Object apply(IIndex ndx) {
-//
-//        return atomicRead(ndx, schema, primaryKey, timestamp, filter);
-//        
-//    }
-//            
-//    /**
-//     * Atomic read on the index.
-//     * 
-//     * @param ndx
-//     *            The index on which the data are stored.
-//     * @param schema
-//     *            The schema governing the row.
-//     * @param primaryKey
-//     *            The primary key identifies the logical row of interest.
-//     * @param timestamp
-//     *            A timestamp to obtain the value for the named property
-//     *            whose timestamp does not exceed <i>timestamp</i> -or-
-//     *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most
-//     *            recent value for the property.
-//     * @param filter
-//     *            An optional filter used to select the values for property
-//     *            names accepted by that filter.
-//     * 
-//     * @return The logical row for that primary key.
-//     */
-//    protected TPS atomicRead(IIndex ndx, Schema schema, Object primaryKey,
-//            long timestamp, INameFilter filter) {
-//
-//        final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
-//        
-//        final byte[] fromKey = schema.fromKey(keyBuilder,primaryKey).getKey(); 
-//
-//        final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
-//        
-//        if (DEBUG) {
-//            log.info("read: fromKey=" + Arrays.toString(fromKey));
-//            log.info("read:   toKey=" + Arrays.toString(toKey));
-//        }
-//
-//        // Result set object.
-//        
-//        final TPS tps = new TPS(schema, timestamp);
-//
-//        /*
-//         * Scan all entries within the fromKey/toKey range populating [tps]
-//         * as we go.
-//         */
-//
-//        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
-//
-//        // #of entries scanned for that primary key.
-//        int nscanned = 0;
-//        
-//        while(itr.hasNext()) {
-//            
-//            final ITuple tuple = itr.next();
-//            
-//            final byte[] key = tuple.getKey();
-//
-//            final byte[] val = tuple.getValue();
-//            
-//            nscanned++;
-//            
-//            /*
-//             * Decode the key so that we can get the column name. We have the
-//             * advantage of knowing the last byte in the primary key. Since the
-//             * fromKey was formed as [schema][primaryKey], the length of the
-//             * fromKey is the index of the 1st byte in the column name.
-//             */
-//
-//            final KeyDecoder keyDecoder = new KeyDecoder(schema,key,fromKey.length);
-//
-//            // The column name.
-//            final String col = keyDecoder.col;
-//            
-//            if (filter != null && !filter.accept(col)) {
-//
-//                // Skip property names that have been filtered out.
-//                
-//                log.debug("Skipping property: name="+col);
-//
-//                continue;
-//                
-//            }
-//            
-//            /*
-//             * Skip column values having a timestamp strictly greater than
-//             * the given value.
-//             */
-//            final long columnValueTimestamp = keyDecoder.getTimestamp();
-//            {
-//
-//                if (columnValueTimestamp > timestamp) {
-//
-//                    if (DEBUG) {
-//
-//                        log.debug("Ignoring newer revision: col=" + col
-//                                + ", timestamp=" + columnValueTimestamp);
-//                        
-//                    }
-//                    
-//                    continue;
-//
-//                }
-//
-//            }
-//            
-//            /*
-//             * Decode the value. A [null] indicates a deleted property
-//             * value.
-//             */
-//            
-//            final Object v = ValueType.decode(val);
-//            
-//            /*
-//             * Add to the representation of the row.
-//             */
-//
-//            tps.set(col, columnValueTimestamp, v);
-//            
-//            log.info("Read: name=" + col + ", timestamp="
-//                    + columnValueTimestamp + ", value=" + v);
-//
-//        }
-//
-//        if (nscanned == 0) {
-//            
-//            /*
-//             * Return null iff there are no column values for that primary
-//             * key.
-//             */
-//            
-//            log.info("No data for primaryKey: " + primaryKey);
-//        
-//            // Note: [null] return since no data for the primary key.
-//            
-//            return null;
-//            
-//        }
-//        
-//        // Note: MAY be empty.
-//        
-//        return tps;
-//        
-//    }

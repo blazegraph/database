@@ -1051,8 +1051,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         // the key for the last visited tuple.
         final byte[] key = currentKey();
         
-        if (log.isDebugEnabled())
-            log.debug("key="+BytesUtil.toString(key));
+//        if (log.isDebugEnabled())
+            log.error("key="+BytesUtil.toString(key));
         
         /*
          * Remove the last visited tuple.
@@ -1329,7 +1329,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
             this.kbuf = new DataOutputBuffer(p.kbuf.capacity());
             
-            this.kbuf.copy(p.kbuf);
+            this.kbuf.copyAll(p.kbuf);
             
             this.leafCursor = p.leafCursor.clone();
             
@@ -1363,7 +1363,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
             leafCursor.seek(src.leafCursor);
             
-            kbuf.reset().copy(src.kbuf);
+            kbuf.reset().copyAll(src.kbuf);
             
         }
         
@@ -2149,45 +2149,6 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         protected ReadOnlyCursorPosition<E> newTemporaryPosition(ICursorPosition<Leaf, E> p) {
 
             return new ReadOnlyCursorPosition<E>( (ReadOnlyCursorPosition<E>) p );
-
-        }
-
-    }
-
-    /**
-     * Return an iterator that traverses the tuples in the reverse of the
-     * natural index order. The iterator is backed by the {@link ITupleCursor}
-     * and operations on the iterator effect the state of the cursor and visa
-     * versa.
-     */
-    public static class Reverserator<E> implements ITupleIterator<E> {
-
-        private final ITupleCursor<E> src;
-
-        public Reverserator(ITupleCursor<E> src) {
-
-            if (src == null)
-                throw new IllegalArgumentException();
-
-            this.src = src;
-
-        }
-
-        public ITuple<E> next() {
-
-            return src.prior();
-
-        }
-
-        public boolean hasNext() {
-
-            return src.hasPrior();
-
-        }
-
-        public void remove() {
-
-            src.remove();
 
         }
 

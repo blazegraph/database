@@ -28,8 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 
@@ -119,7 +122,7 @@ public class DelegateIndex implements IIndex {
         return rangeIterator(null,null);
     }
 
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) {
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
         return delegate.rangeIterator(fromKey, toKey, capacity, flags, filter);
     }
 

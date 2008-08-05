@@ -62,9 +62,10 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.ITupleFilter;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
@@ -992,14 +993,14 @@ abstract public class AbstractTripleStore extends
      * have to actually do a range scan and figure out for each statement
      * whether or not it is explicit.
      * 
-     * @todo modify IAccessPath so that we can send the filter to the data and
-     *       just do a rangeCount(). That way we can avoid sending back the keys
-     *       or values. In fact, this operation could be parallelized, just like
-     *       the standard {@link IRangeQuery#rangeCount(byte[], byte[])}, so
-     *       perhaps just add an optional {@link ITupleFilter} to the latter and
-     *       then it. also, the operation does not require that the keys are
-     *       materialized from the index as long as we do not try to materialize
-     *       SPO objects and just treat the index values.
+     * @todo Re-write using an {@link ITupleFilter} that gets evaluated local to
+     *       the statement indices and avoids sending back either the keys or
+     *       the values. All we need is the count of the #of tuples that
+     *       satisify an {@link ExplicitSPOFilter}. This will have to be
+     *       written to the {@link IAccessPath#rangeIterator()} method either
+     *       that method will have to accept a {@link IFilterConstructor} or we
+     *       can generate an {@link SPOPredicate} and specify a predicate
+     *       constraint that will do what we want directly.
      */
     public long getExplicitStatementCount() {
 
@@ -2973,7 +2974,7 @@ abstract public class AbstractTripleStore extends
     protected Program getMatchProgram(Literal[] lits, long[] _preds,
             long _cls) {
         
-        final Iterator<Long> termIdIterator = getLexiconRelation().completionScan(lits);
+        final Iterator<Long> termIdIterator = getLexiconRelation().prefixScan(lits);
 
         // the term identifier for the completed literal.
         final IVariable<Long>lit = Var.var("lit");

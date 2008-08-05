@@ -27,6 +27,8 @@
 
 package com.bigdata.rdf.store;
 
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.Properties;
 
@@ -87,7 +89,7 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
      * {@link ForwardClosureEnum#Fast} or {@link ForwardClosureEnum#Full} as
      * specified in {@link #getProperties()}.
      */
-    protected final boolean computeClosure = true;
+    protected final boolean computeClosure = false;
 
     public void test_loadNCIOncology() throws IOException {
 
@@ -124,20 +126,54 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
         
     }
 
-    /**
-     * FIXME This refuses to load the files found in a directory. it is
-     * currently loading a single file instead.
-     */
     public void test_U1() throws IOException {
         
-//        String file = "../rdf-data/lehigh/U1";
-      String file = "../rdf-data/lehigh/U10/University0_0.owl";
+        String file = "../rdf-data/lehigh/U1";
+//      String file = "../rdf-data/lehigh/U10/University0_0.owl";
       
       // FIXME correct baseURL for leigh?
       String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
       
-      doTest(file, baseURL, RDFFormat.RDFXML);
+      doTest(new File(file), baseURL, RDFFormat.RDFXML,
+              new FilenameFilter() {
+
+                public boolean accept(File dir, String name) {
+                    return ! name.endsWith(".txt");
+                }
+        });
       
+    }
+    
+    public void test_U5() throws IOException {
+
+        String file = "../rdf-data/lehigh/U5";
+
+        // FIXME correct baseURL for leigh?
+        String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
+
+        doTest(new File(file), baseURL, RDFFormat.RDFXML, new FilenameFilter() {
+
+            public boolean accept(File dir, String name) {
+                return !name.endsWith(".txt");
+            }
+        });
+
+    }
+    
+    public void test_U10() throws IOException {
+
+        String file = "../rdf-data/lehigh/U10";
+
+        // FIXME correct baseURL for leigh?
+        String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
+
+        doTest(new File(file), baseURL, RDFFormat.RDFXML, new FilenameFilter() {
+
+            public boolean accept(File dir, String name) {
+                return !name.endsWith(".txt");
+            }
+        });
+
     }
     
     protected void doTest(String file, String baseURL, RDFFormat rdfFormat)
@@ -165,6 +201,35 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
                 System.out.println(store.getInferenceEngine().computeClosure(
                         null/* focusStore */).toString());
                 
+            }
+
+            store.commit();
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    protected void doTest(File file, String baseURL, RDFFormat rdfFormat,
+            FilenameFilter filter) throws IOException {
+
+        AbstractTripleStore store = getStore(getProperties());
+
+        try {
+
+            // load the data set.
+            System.out.println(store.getDataLoader().loadFiles(file, baseURL,
+                    rdfFormat, filter).toString());
+
+            if (computeClosure) {
+
+                // compute the database at once closure.
+                System.out.println(store.getInferenceEngine().computeClosure(
+                        null/* focusStore */).toString());
+
             }
 
             store.commit();

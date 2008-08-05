@@ -27,10 +27,10 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;

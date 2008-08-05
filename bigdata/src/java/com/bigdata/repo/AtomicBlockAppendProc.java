@@ -14,10 +14,10 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ILinearList;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
@@ -74,7 +74,8 @@ public class AtomicBlockAppendProc implements ISimpleIndexProcedure,
      * @param len
      *            The #of bytes to be written.
      */
-    public AtomicBlockAppendProc(BigdataRepository repo, String id, int version, byte[] b, int off, int len) {
+    public AtomicBlockAppendProc(BigdataRepository repo, String id,
+            int version, byte[] b, int off, int len) {
 
         assert id != null && id.length() > 0;
         assert version >= 0;

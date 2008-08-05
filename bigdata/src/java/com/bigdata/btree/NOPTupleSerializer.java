@@ -33,6 +33,10 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Properties;
 
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
+
 /**
  * Default implementation uses the {@link KeyBuilder} to format the object as a
  * key and requires that the values are byte[]s which it passes on without
@@ -42,14 +46,14 @@ import java.util.Properties;
  * @version $Id$
  */
 public class NOPTupleSerializer extends DefaultTupleSerializer {
-// implements ITupleSerializer, Externalizable {
 
     /**
      * 
      */
     private static final long serialVersionUID = 2211020411074955099L;
 
-    public static transient final ITupleSerializer INSTANCE = new NOPTupleSerializer(new DefaultKeyBuilderFactory(new Properties()));
+    public static transient final ITupleSerializer INSTANCE = new NOPTupleSerializer(
+            new DefaultKeyBuilderFactory(new Properties()));
 
     /**
      * De-serialization ctor.

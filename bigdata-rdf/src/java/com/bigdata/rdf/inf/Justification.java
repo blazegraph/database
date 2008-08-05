@@ -31,9 +31,10 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -885,7 +886,7 @@ public class Justification implements Comparable<Justification> {
        
         private BTree btree;
 
-        private SPOTupleSerializer tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO);
+        private final SPOTupleSerializer tupleSer;
 
 		/**
 		 * Create an {@link SPO} set backed by a {@link BTree} on the temporary
@@ -907,9 +908,14 @@ public class Justification implements Comparable<Justification> {
             IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
             
             metadata.setBranchingFactor(32);
+
+            // Note: keys are SPOs; no values stored for the tuples.
+            tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO,
+                    DefaultTupleSerializer.getDefaultLeafKeySerializer(),
+                    NoDataSerializer.INSTANCE);
             
-            metadata.setLeafValueSerializer(NoDataSerializer.INSTANCE);
-  
+            metadata.setTupleSerializer(tupleSer);
+            
             btree = BTree.create(tempStore, metadata);
             
         }
@@ -960,9 +966,6 @@ public class Justification implements Comparable<Justification> {
                 // discard the hard reference.
                 btree = null;
                 
-                // discard the hard reference.
-                tupleSer = null;
-
 				/*
 				 * Note: !!!! DO NOT close the backing store here !!!!
 				 * 

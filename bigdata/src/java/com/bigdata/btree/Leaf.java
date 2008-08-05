@@ -35,6 +35,8 @@ import java.util.WeakHashMap;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.filter.EmptyTupleIterator;
+
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
 

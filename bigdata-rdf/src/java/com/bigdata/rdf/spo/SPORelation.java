@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -44,18 +45,24 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.LongAggregator;
-import com.bigdata.btree.IDataSerializer.NoDataSerializer;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.BatchRemove;
+import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.WriteJustificationsProc.WriteJustificationsProcConstructor;
@@ -63,6 +70,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IChunkedIterator;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
@@ -80,6 +88,9 @@ import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffe
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IClientIndex;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * The {@link SPORelation} handles all things related to the indices
@@ -557,15 +568,25 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         final IndexMetadata metadata = getIndexMetadata(getFQN(keyOrder));
 
-        /*
-         * FIXME performance comparison of this key compression technique with
-         * some others, including leading value compression, huffman
-         * compression, and hu-tucker compression (the latter offers no benefit
-         * since we will fully de-serialize the keys before performing search in
-         * a leaf).
-         */
-        metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
+        final IDataSerializer leafKeySer;
+        if(true) {
+            
+            /*
+             * FIXME performance comparison of this key compression technique with
+             * some others, including leading value compression, huffman
+             * compression, and hu-tucker compression (the latter offers no benefit
+             * since we will fully de-serialize the keys before performing search in
+             * a leaf).
+             */
+            leafKeySer = FastRDFKeyCompression.N3;
+            
+        } else {
 
+            leafKeySer = DefaultTupleSerializer.getDefaultLeafKeySerializer();
+            
+        }
+
+        final IDataSerializer leafValSer;
         if (!statementIdentifiers) {
 
             /*
@@ -575,11 +596,16 @@ public class SPORelation extends AbstractRelation<SPO> {
              * statement indices when statement identifiers are enabled.
              */
 
-            metadata.setLeafValueSerializer(new FastRDFValueCompression());
+            leafValSer = new FastRDFValueCompression();
 
+        } else {
+            
+            leafValSer = DefaultTupleSerializer.getDefaultValueKeySerializer();
+            
         }
         
-        metadata.setTupleSerializer(new SPOTupleSerializer(keyOrder));
+        metadata.setTupleSerializer(new SPOTupleSerializer(keyOrder,
+                leafKeySer, leafValSer));
 
         return metadata;
 
@@ -592,9 +618,8 @@ public class SPORelation extends AbstractRelation<SPO> {
 
         final IndexMetadata metadata = getIndexMetadata(name);
 
-        metadata.setLeafValueSerializer(NoDataSerializer.INSTANCE);
-
-        metadata.setTupleSerializer(new JustificationTupleSerializer(IRawTripleStore.N));
+        metadata.setTupleSerializer(new JustificationTupleSerializer(
+                IRawTripleStore.N));
 
         return metadata;
 
@@ -775,9 +800,76 @@ public class SPORelation extends AbstractRelation<SPO> {
      */
     public IChunkedIterator<Long> distinctTermScan(IKeyOrder<SPO> keyOrder) {
 
-        return new DistinctTermScanner(getExecutorService(), getIndex(keyOrder))
-                .iterator();
+        return distinctTermScan(keyOrder,/* termIdFilter */null);
+        
+    }
+    
+    /**
+     * Efficient scan of the distinct term identifiers that appear in the first
+     * position of the keys for the statement index corresponding to the
+     * specified {@link IKeyOrder}. For example, using {@link SPOKeyOrder#POS}
+     * will give you the term identifiers for the distinct predicates actually
+     * in use within statements in the {@link SPORelation}.
+     * 
+     * @param keyOrder
+     *            The selected index order.
+     * 
+     * @return An iterator visiting the distinct term identifiers.
+     */
+    public IChunkedIterator<Long> distinctTermScan(
+            final IKeyOrder<SPO> keyOrder, final ITermIdFilter termIdFilter) {
 
+//        return new DistinctTermScanner(getExecutorService(), getIndex(keyOrder))
+//                .iterator();
+
+        final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
+        
+        /*
+         * Layer in the logic to advance to the tuple that will have the
+         * next distinct term identifier in the first position of the key.
+         */
+        filter.addFilter(new DistinctTermAdvancer());
+
+        if (termIdFilter != null) {
+
+            /*
+             * Layer in a filter for only the desired term types.
+             */
+            
+            filter.addFilter(new TupleFilter<SPO>() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                protected boolean isValid(ITuple<SPO> tuple) {
+
+                    final long id = KeyBuilder.decodeLong(tuple
+                            .getKeyBuffer().array(), 0);
+
+                    return termIdFilter.isValid(id);
+
+                }
+
+            });
+
+        }
+
+        final Iterator<Long> itr = new Striterator(getIndex(keyOrder)
+                .rangeIterator(null/* fromKey */, null/* toKey */,
+                        0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
+                        filter)).addFilter(new Resolver() {
+                    /**
+                     * Resolve SPO key to Long.
+                     */
+                    @Override
+                    protected Long resolve(Object obj) {
+                        return KeyBuilder.decodeLong(((ITuple) obj)
+                                .getKeyBuffer().array(), 0);
+                    }
+                });
+
+        return new ChunkedWrappedIterator<Long>(itr);
+                
     }
     
     @SuppressWarnings("unchecked")

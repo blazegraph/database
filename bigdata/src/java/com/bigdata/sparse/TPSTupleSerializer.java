@@ -1,24 +1,26 @@
 package com.bigdata.sparse;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.AbstractTupleFilterator.AtomicRowIterator2;
 import com.bigdata.io.SerializerUtil;
 
 /**
- * Helper class for <em>de-serializing</em> logical rows from an
- * {@link AtomicRowIterator2}.
+ * Helper class for (de-)serializing logical rows for {@link AtomicRowFilter}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TPSTupleSerializer implements ITupleSerializer<Void,TPS> {
+public class TPSTupleSerializer extends DefaultTupleSerializer<Void,TPS> {
 
     private static final long serialVersionUID = -2467715806323261423L;
 
-    public static transient final ITupleSerializer INSTANCE = new TPSTupleSerializer(); 
+    public static ITupleSerializer<Void, TPS> newInstance() {
+        
+        return new TPSTupleSerializer();
+        
+    }
     
     /**
      * De-serializator ctor.
@@ -27,25 +29,6 @@ public class TPSTupleSerializer implements ITupleSerializer<Void,TPS> {
         
     }
     
-    public TPS deserialize(ITuple tuple) {
-
-        return (TPS) SerializerUtil.deserialize(tuple.getValueStream());
-        
-    }
-
-    /**
-     * You can get the {@link Schema} and the primary key from
-     * {@link #deserialize(ITuple)}.
-     * 
-     * @throws UnsupportedOperationException
-     *             always.
-     */
-    public Void deserializeKey(ITuple tuple) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
     /**
      * This method is not used since we do not store {@link TPS} objects
      * directly in a {@link BTree}.
@@ -59,21 +42,30 @@ public class TPSTupleSerializer implements ITupleSerializer<Void,TPS> {
         
     }
 
+    public byte[] serializeVal(TPS obj) {
+        
+        return SerializerUtil.serialize(obj);
+        
+    }
+
+    public TPS deserialize(ITuple tuple) {
+
+        return (TPS) SerializerUtil.deserialize(
+//                tuple.getValueStream()
+                tuple.getValue() // FIXME use getValueStream() instead - serialization problem
+                );
+        
+    }
+
     /**
-     * This method is not used since we do not store {@link TPS} objects
-     * directly in a {@link BTree}.
+     * You can get the {@link Schema} and the primary key from
+     * {@link #deserialize(ITuple)}.
      * 
      * @throws UnsupportedOperationException
      *             always.
      */
-    public byte[] serializeVal(TPS obj) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
+    public Void deserializeKey(ITuple tuple) {
 
-    public IKeyBuilder getKeyBuilder() {
-        
         throw new UnsupportedOperationException();
         
     }

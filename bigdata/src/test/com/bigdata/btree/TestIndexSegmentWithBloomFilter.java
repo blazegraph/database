@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rawstore.IRawStore;

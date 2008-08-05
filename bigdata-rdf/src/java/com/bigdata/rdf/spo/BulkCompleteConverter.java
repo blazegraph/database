@@ -50,9 +50,9 @@ package com.bigdata.rdf.spo;
 import java.util.Arrays;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
-import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
+import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
 
@@ -101,6 +101,7 @@ public class BulkCompleteConverter implements SPOConverter {
         final ResultBufferHandler resultHandler =
                 new ResultBufferHandler(keys.length, ndx
                         .getIndexMetadata()
+                        .getTupleSerializer()
                         .getLeafValueSerializer());
         
         // submit the batch contains procedure to the SPO index

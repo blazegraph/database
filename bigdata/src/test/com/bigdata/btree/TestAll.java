@@ -57,29 +57,24 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("BTree");
         
-        /*
-         * test key encoding and comparison support.
-         */
-        // test methods that compute the successor for various data types.
-        suite.addTestSuite( TestSuccessorUtil.class );
         // test low level variable length byte[] operations.
         suite.addTestSuite( TestBytesUtil.class );
-        // test key encoding operations.
-        suite.addTestSuite(TestKeyBuilder.class);
-        suite.addTestSuite(TestJDKUnicodeKeyBuilder.class);
-        suite.addTestSuite(TestICUUnicodeKeyBuilder.class);
+        
+        // unsigned byte[] key encoding and decoding.
+        suite.addTest(com.bigdata.btree.keys.TestAll.suite());
+
         // test mutable key buffer.
         suite.addTestSuite(TestMutableKeyBuffer.class);
         // test immutable key buffer.
         suite.addTestSuite(TestImmutableKeyBuffer.class);
         // test key search routines on the key buffer implementations.
-        suite.addTestSuite( TestKeyBufferSearch.class );
-        
+        suite.addTestSuite(TestKeyBufferSearch.class);
+
         /*
          * test record compression support.
          */
         // test bulk data compression.
-        suite.addTestSuite( TestRecordCompressor.class );
+        suite.addTestSuite(TestRecordCompressor.class);
 
         /*
          * test btree fundementals.
@@ -108,10 +103,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestIterators.class);
         suite.addTestSuite(TestReadOnlyBTreeCursors.class);
         suite.addTestSuite(TestMutableBTreeCursors.class);
-        suite.addTestSuite(TestReverserator.class);
-        suite.addTestSuite(TestRemoverator.class);
-        // test chunked iterator semantics (note: was replaced by the cursors stuff).
-//        suite.addTestSuite(TestChunkedIterators.class);
+        // stackable tuple filters
+        suite.addTest(com.bigdata.btree.filter.TestAll.suite());
 
         // test delete semantics (also see the isolation package).
         suite.addTestSuite( TestRemoveAll.class );
@@ -145,11 +138,11 @@ public class TestAll extends TestCase {
          * test persistence protocols. 
          */
         // test the commit protocol.
-        suite.addTestSuite( TestCommit.class );
+        suite.addTestSuite(TestCommit.class);
         // test the dirty event protocol.
         suite.addTestSuite(TestDirtyListener.class);
         // test the close/reopen protocol for releasing index buffers.
-        suite.addTestSuite( TestReopen.class );
+        suite.addTestSuite(TestReopen.class);
 
         /*
          * test index segment builds.
@@ -191,13 +184,10 @@ public class TestAll extends TestCase {
 
         // FIXME this test belongs in the isolation package.
 //      suite.addTestSuite(TestIsolatedFusedViewCursors.class);
-        
-        /*
-         * tests of various iterators or cursors that provide a facility, such
-         * as the completion scan, on which the core B+Tree has no dependency.
-         */
-        suite.addTestSuite( TestCompletionScan.class );
 
+        // test index procedures.
+        suite.addTest( com.bigdata.btree.proc.TestAll.suite());
+        
         return suite;
         
     }

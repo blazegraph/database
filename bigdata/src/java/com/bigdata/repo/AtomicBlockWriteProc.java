@@ -11,8 +11,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;

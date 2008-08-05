@@ -5,7 +5,7 @@ import java.util.Map;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ILocalTransactionManager;
 

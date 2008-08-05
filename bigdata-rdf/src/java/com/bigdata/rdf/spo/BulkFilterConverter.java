@@ -50,8 +50,8 @@ package com.bigdata.rdf.spo;
 import java.util.Arrays;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
-import com.bigdata.btree.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
+import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
 
 /**

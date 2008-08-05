@@ -29,6 +29,10 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.keys.KeyBuilder;
+
 /**
  * Test suite for iterators. The tests are presented from the least dependencies
  * to the most dependencies ((traversal of the entries for a single leaf, then
@@ -74,8 +78,6 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         final Leaf root = (Leaf) btree.root;
         
-        final ITupleFilter filter = null;
-        
         final byte[] k1 = i2k(1); // before any used key.
         final byte[] k3 = i2k(3);
         final byte[] k5 = i2k(5);
@@ -98,11 +100,11 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new Object[]{root},root.postOrderIterator(null,null));
         assertSameIterator(new Object[]{root},root.postOrderIterator(k1,k8));
         // entry range iterator tests.
-        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(null,null,flags,filter));
-        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(k3, k8,flags,filter));
-        assertSameIterator(new Object[]{v3,v5},root.rangeIterator(k3, k7,flags,filter));
-        assertSameIterator(new Object[]{v5},root.rangeIterator(k5, k7,flags,filter));
-        assertSameIterator(new Object[]{v5,v7},root.rangeIterator(k5, k8,flags,filter));
+        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(null,null,flags));
+        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(k3, k8,flags));
+        assertSameIterator(new Object[]{v3,v5},root.rangeIterator(k3, k7,flags));
+        assertSameIterator(new Object[]{v5},root.rangeIterator(k5, k7,flags));
+        assertSameIterator(new Object[]{v5,v7},root.rangeIterator(k5, k8,flags));
         
         try {
             /*
@@ -112,7 +114,7 @@ public class TestIterators extends AbstractBTreeTestCase {
              * EntryIterator that actually detects the search key ordering
              * problem.
              */
-            root.rangeIterator(k8, k3,flags,filter).next();
+            root.rangeIterator(k8, k3,flags).next();
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
@@ -129,10 +131,10 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new Object[]{root},root.postOrderIterator(null,null));
         assertSameIterator(new Object[]{root},root.postOrderIterator(k1,k8));
         // entry range iterator tests.
-        assertSameIterator(new Object[]{},root.rangeIterator(k3, k8,flags,filter));
-        assertSameIterator(new Object[]{},root.rangeIterator(k3, k7,flags,filter));
-        assertSameIterator(new Object[]{},root.rangeIterator(k5, k7,flags,filter));
-        assertSameIterator(new Object[]{},root.rangeIterator(k5, k8,flags,filter));
+        assertSameIterator(new Object[] {}, root.rangeIterator(k3, k8, flags));
+        assertSameIterator(new Object[] {}, root.rangeIterator(k3, k7, flags));
+        assertSameIterator(new Object[] {}, root.rangeIterator(k5, k7, flags));
+        assertSameIterator(new Object[] {}, root.rangeIterator(k5, k8, flags));
 
     }
 
@@ -446,88 +448,75 @@ public class TestIterators extends AbstractBTreeTestCase {
     }
 
     /**
-     * Test the use of an {@link TupleFilter} to visit only certain values.
+     * Test the use stacked iterators to visit only select values.
      */
-    public void test_entryFilter() {
+    public void test_filters() {
         
         final byte[] k3 = i2k(3);
         final byte[] k5 = i2k(5);
         final byte[] k7 = i2k(7);
 
-        final byte[] v3 = new byte[]{3};
-        final byte[] v5 = new byte[]{5};
-        final byte[] v7 = new byte[]{7};
+        final byte[] v3 = new byte[] { 3 };
+        final byte[] v5 = new byte[] { 5 };
+        final byte[] v7 = new byte[] { 7 };
 
-        BTree btree = getBTree(3,NOPTupleSerializer.INSTANCE);
+        BTree btree = getBTree(3, NOPTupleSerializer.INSTANCE);
 
-        btree.insert(k3,v3);
-        btree.insert(k5,v5);
-        btree.insert(k7,v7);
+        btree.insert(k3, v3);
+        btree.insert(k5, v5);
+        btree.insert(k7, v7);
         
-        final Leaf a = (Leaf) btree.root;
+//        final Leaf a = (Leaf) btree.root;
         
         // visit everything in the root leaf.
         assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator());
 
-        // visit everything in the root leaf.
-        assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator(null,null));
-
-        // visit everything in the root leaf using an explicit EntryIterator ctor.
-        assertSameIterator(new byte[][] { v3, v5, v7 }, new LeafTupleIterator(a,
-                new Tuple(btree,IRangeQuery.DEFAULT), null, null, null));
+//        // visit everything in the root leaf.
+//        assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator(null,null));
+//
+//        // visit everything in the root leaf using an explicit EntryIterator ctor.
+//        assertSameIterator(new byte[][] { v3, v5, v7 }, new LeafTupleIterator(a,
+//                new Tuple(btree,IRangeQuery.DEFAULT), null, null, null));
         
         // visit everything except v3.
         assertSameIterator(new byte[][] { v5, v7 },//
-                a.rangeIterator(null, null, flags, new TupleFilter() {
-                    private static final long serialVersionUID = 1L;
+                btree.rangeIterator(null/* fromKey */, null/* toKey */,
+                        0/* capacity */, flags, new FilterConstructor()
+                                .addFilter(new TupleFilter() {
+                                    private static final long serialVersionUID = 1L;
 
-                    public boolean isValid(ITuple tuple) {
-                        return !BytesUtil.bytesEqual(v3, tuple.getValue());
-//                        return BytesUtil.compareBytesWithLenAndOffset(0,
-//                                v3.length, v3, 0, v3.length, tuple.getValue()) != 0;
-                    }
-                }));
+                                    public boolean isValid(ITuple tuple) {
+                                        return !BytesUtil.bytesEqual(v3, tuple
+                                                .getValue());
+                                    }
+                                })));
         
         // visit everything except v5.
-        assertSameIterator(new byte[][]{v3,v7},//
-                a.rangeIterator(null, null, flags, new TupleFilter() {
-                    private static final long serialVersionUID = 1L;
-                    public boolean isValid(ITuple tuple) {
-                        return !BytesUtil.bytesEqual(v5, tuple.getValue());
-//                        return BytesUtil.compareBytesWithLenAndOffset(0,
-//                                v5.length, v5, 0, v5.length, tuple.getValue()) != 0;
-                    }
-                    }
-                ));
-//        new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
-//            private static final long serialVersionUID = 1L;
-//            public boolean isValid(Object value) {
-//                        if (value.equals(v5))
-//                            return false;
-//                        return true;
-//                    }
-//        }));
+        assertSameIterator(new byte[][] { v3, v7 },//
+                btree.rangeIterator(null/* fromKey */, null/* toKey */,
+                        0/* capacity */, flags, new FilterConstructor()
+                                .addFilter(new TupleFilter() {
+                                    private static final long serialVersionUID = 1L;
+
+                                    public boolean isValid(ITuple tuple) {
+                                        return !BytesUtil.bytesEqual(v5, tuple
+                                                .getValue());
+                                    }
+                                })));
         
         // visit everything except v7.
-        assertSameIterator(new byte[][]{v3,v5},//
-                a.rangeIterator(null, null, flags, new TupleFilter() {
-                    private static final long serialVersionUID = 1L;
-                    public boolean isValid(ITuple tuple) {
-                        return !BytesUtil.bytesEqual(v7, tuple.getValue());
-//                        compareBytesWithLenAndOffset(0,
-//                                v7.length, v7, 0, v7.length, tuple.getValue()) != 0;
-                    }
-                    }
-                ));
-//                new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
-//            private static final long serialVersionUID = 1L;
-//            public boolean isValid(Object value) {
-//                        if (value.equals(v7))
-//                            return false;
-//                        return true;
-//                    }
-//        }));
-        
+        assertSameIterator(new byte[][] { v3, v5 },//
+                btree.rangeIterator(null/* fromKey */, null/* toKey */,
+                        0/* capacity */, flags, new FilterConstructor()
+                                .addFilter(new TupleFilter() {
+                                    private static final long serialVersionUID = 1L;
+
+                                    public boolean isValid(ITuple tuple) {
+                                        return !BytesUtil.bytesEqual(v7, tuple
+                                                .getValue());
+                                    }
+                                })));
+
     }
     
 }

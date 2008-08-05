@@ -81,13 +81,13 @@ import org.CognitiveWeb.generic.core.om.cache.WeakValueCache;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.DefaultKeyBuilderFactory;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.ThreadLocalKeyBuilderFactory;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.ThreadLocalKeyBuilderFactory;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;

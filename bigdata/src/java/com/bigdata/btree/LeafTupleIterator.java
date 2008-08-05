@@ -28,6 +28,8 @@ package com.bigdata.btree;
 
 import java.util.NoSuchElementException;
 
+import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+
 /**
  * Visits the values of a {@link Leaf} in the external key ordering. There is
  * exactly one value per key for a leaf node.
@@ -40,8 +42,6 @@ public class LeafTupleIterator implements ITupleIterator {
     private final Leaf leaf;
 
     private final Tuple tuple;
-    
-    private final ITupleFilter filter;
     
     private int index;
 
@@ -59,22 +59,16 @@ public class LeafTupleIterator implements ITupleIterator {
 
     public LeafTupleIterator(Leaf leaf) {
 
-        this(leaf, new Tuple(leaf.btree,IRangeQuery.DEFAULT), null, null, null);
+        this(leaf, new Tuple(leaf.btree,IRangeQuery.DEFAULT), null, null);
 
     }
 
     public LeafTupleIterator(Leaf leaf, Tuple tuple) {
 
-        this(leaf, tuple, null, null, null);
+        this(leaf, tuple, null, null);
 
     }
 
-    public LeafTupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
-
-        this(leaf, tuple, fromKey, toKey, null/*filter*/);
-
-    }
-    
     /**
      * 
      * @param leaf
@@ -91,15 +85,11 @@ public class LeafTupleIterator implements ITupleIterator {
      * @param flags
      *            Flags specifying whether the keys and/or values will be
      *            materialized.
-     * @param filter
-     *            An optional filter used to test and exclude elements from the
-     *            iteration.
      * 
      * @exception IllegalArgumentException
      *                if fromKey is given and is greater than toKey.
      */
-    public LeafTupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey,
-            ITupleFilter filter) {
+    public LeafTupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
 
         assert leaf != null;
 
@@ -112,8 +102,6 @@ public class LeafTupleIterator implements ITupleIterator {
 //        this.fromKey = fromKey; // may be null (no lower bound).
 //        
 //        this.toKey = toKey; // may be null (no upper bound).
-        
-        this.filter = filter; // MAY be null.
         
         { // figure out the first index to visit.
 
@@ -172,31 +160,6 @@ public class LeafTupleIterator implements ITupleIterator {
         // starting index is the lower bound.
         index = fromIndex;
         
-//        if (tuple != null && tuple.needKeys
-//                && leaf.keys instanceof ImmutableKeyBuffer) {
-//
-//            /*
-//             * Immutable key buffers break the key into a shared prefix and a
-//             * per-key remainder. We copy the shared prefix into the buffer and
-//             * set the mark on the buffer. We then rewind to the mark for each
-//             * visited key and append the remainder such that the full key is
-//             * materialized in the buffer without doing any allocations on the
-//             * heap.
-//             */
-//
-//            final ImmutableKeyBuffer keys = ((ImmutableKeyBuffer) leaf.keys);
-//
-//            // reset the buffer.
-//            tuple.kbuf.reset();
-//
-//            // copy the shared prefix into the buffer.
-//            tuple.kbuf.put(keys.buf, 0, keys.getPrefixLength());
-//            
-//            // set the mark - we will reuse the shared prefix for each visited key.
-//            tuple.kbuf.mark();
-//                
-//        }
-        
     }
 
     /**
@@ -204,10 +167,6 @@ public class LeafTupleIterator implements ITupleIterator {
      * entry to visit then return true. Otherwise increment the {@link #index}
      * until either all entries in this leaf have been exhausted -or- the an
      * entry is identified that passes the various criteria.
-     * <p>
-     * Note: Criteria include (a) the optional {@link ITupleFilter}; and (b)
-     * deleted entries are skipped unless {@link IRangeQuery#DELETED} has
-     * been specified.
      */
     public boolean hasNext() {
 
@@ -231,40 +190,6 @@ public class LeafTupleIterator implements ITupleIterator {
                 continue;
                 
             }
-            
-            if (filter != null) {
-
-                /*
-                 * Copy the value from the index entry that is to be considered
-                 * by the filter into a buffer and then expose that buffer as an
-                 * input stream so that the filter can read the value.
-                 * 
-                 * Note: The filter is considering a value that is a successor
-                 * in the leaf order of the last tuple returned by next() (if
-                 * any). We can not reuse the tuple to expose the value to the
-                 * filter since it is already in use exposing the last visited
-                 * value to the iterator consumer.
-                 */
-                
-                if (tmp == null) {
-
-                    // temp tuple copies all available data about the index entry.
-                    tmp = new Tuple(leaf.btree,IRangeQuery.KEYS|IRangeQuery.VALS);
-
-                }
-                
-                // copy data from the index entry.
-                tmp.copy(index, leaf);
-                
-                if (!filter.isValid(tmp)) {
-
-                    // skip entry rejected by the filter.
-
-                    continue;
-
-                }
-
-            }
 
             // entry @ index is next to visit.
             
@@ -278,11 +203,6 @@ public class LeafTupleIterator implements ITupleIterator {
         
     }
     
-    /**
-     * Used iff an {@link ITupleFilter} was specified.
-     */
-    private Tuple tmp = null;
-    
     public ITuple next() {
 
         if (!hasNext()) {
@@ -293,37 +213,24 @@ public class LeafTupleIterator implements ITupleIterator {
 
         lastVisited = index++;
 
-        tuple.copy(lastVisited,leaf);
-        
-        if (filter != null) {
-            
-            filter.rewrite(tuple);
-            
-        }
+        tuple.copy(lastVisited, leaf);
         
         return tuple;
         
     }
 
     /**
-     * FIXME Support removal. This is tricky because we have to invoke
-     * copy-on-write if the leaf is not dirty. Since copy-on-write can cause the
-     * leaf and its parents to be cloned, and since the entry must be removed in
-     * the mutable copy, this means that the {@link Leaf} that we have may be
-     * the wrong object. The simplest way to handle that is to re-start the
-     * iterator from the current key and then invoke delete on that entry.
-     * However, that is not that simple :-) <br>
-     * The other twist with removal is that it can cause the leaf to underflow,
-     * which results in a structural change in the btree.
+     * This operation is not supported.
+     * <p>
+     * Note: There are two ways in which you can achieve the semantics of
+     * {@link #remove()}. One is to use an {@link ITupleCursor}, which
+     * correctly handles traversal with concurrent modification. The other is to
+     * use a {@link AbstractChunkedRangeIterator}, which buffers the tuples
+     * first and then does a "delete" behind in order to avoid concurrent
+     * modification during traversal.
      * 
-     * @todo Also support update of the value during traversal? This has the
-     *       same problems with needing to invoke copy-on-write if the leaf is
-     *       not dirty.
-     * 
-     * @see ChunkedRangeIterator, which does support removal using a batch
-     *      delete-behind approach
-     * 
-     * @exception UnsupportedOperationException
+     * @throws UnsupportedOperationException
+     *             always.
      */
     public void remove() {
 

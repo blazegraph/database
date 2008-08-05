@@ -7,11 +7,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ILocalTransactionManager;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
 import com.bigdata.sparse.ValueType.AutoIncLongCounter;
 
@@ -116,44 +113,10 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
     public TPS apply(final IIndex ndx) {
 
         final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
-        
-        /*
-         * Choose the timestamp.
-         * 
-         * When auto-timestamping is used the timestamp is assigned by the
-         * data service.
-         * 
-         * Note: Timestamps can be locally generated on the server since
-         * they must be consistent solely within a row, and all revisions of
-         * column values for the same row will always be in the same index
-         * partition and hence on the same server. The only way in which
-         * time could go backward is if there is a failover to another
-         * server for the partition and the other server has a different
-         * clock time. If the server clocks are kept synchronized then this
-         * should not be a problem.
-         * 
-         * Note: Revisions written with the same timestamp as a pre-existing
-         * column value will overwrite the existing column value rather that
-         * causing new revisions with their own distinct timestamp to be
-         * written. There is therefore a choice for "auto" vs "auto-unique"
-         * for timestamps.
-         */
-        long timestamp = this.timestamp;
-        
-        if (timestamp == SparseRowStore.AUTO_TIMESTAMP) {
 
-            timestamp = System.currentTimeMillis();
-            
-        } else if (timestamp == SparseRowStore.AUTO_TIMESTAMP_UNIQUE) {
-
-            final AbstractJournal journal = ((AbstractJournal) ((AbstractBTree) ndx)
-                    .getStore());
-            
-            final ILocalTransactionManager transactionManager = journal.getLocalTransactionManager();
-
-            timestamp = transactionManager.nextTimestampRobust();
-            
-        }
+        // choose the timestamp for any writes.
+        final long timestamp = TimestampChooser.chooseTimestamp(ndx,
+                this.timestamp);
         
         /*
          * Precondition test.
@@ -341,7 +304,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
         return counter;
 
     }
-    
+
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
         super.readExternal(in);

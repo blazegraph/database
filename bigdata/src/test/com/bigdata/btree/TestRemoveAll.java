@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.TestRestartSafe;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;

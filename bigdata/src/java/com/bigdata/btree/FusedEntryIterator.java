@@ -29,6 +29,8 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.filter.IFilterConstructor;
+
 /**
  * <p>
  * An aggregate iterator view of the one or more source {@link ITupleIterator}s.
@@ -37,7 +39,7 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FusedEntryIterator implements ITupleIterator {
+public class FusedEntryIterator<E> implements ITupleIterator<E> {
 
     protected static final Logger log = Logger.getLogger(FusedEntryIterator.class);
 
@@ -81,7 +83,7 @@ public class FusedEntryIterator implements ITupleIterator {
      * This is achieved by setting the elements in this array to
      * <code>null</code> for any iterator having a tuple for the same key.
      */
-    private final ITuple[] sourceTuples;
+    private final ITuple<E>[] sourceTuples;
 
     /**
      * Index into {@link #itrs} and {@link #sourceTuples} of the iterator whose
@@ -97,7 +99,7 @@ public class FusedEntryIterator implements ITupleIterator {
     private int lastVisited = -1;
     
     public FusedEntryIterator(AbstractBTree[] srcs, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, ITupleFilter filter) {
+            byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
 
         FusedView.checkSources(srcs);
         
@@ -319,7 +321,7 @@ public class FusedEntryIterator implements ITupleIterator {
 
     }
 
-    public ITuple next() {
+    public ITuple<E> next() {
 
         if (!hasNext())
             throw new NoSuchElementException();
@@ -329,7 +331,7 @@ public class FusedEntryIterator implements ITupleIterator {
         // save index of the iterator whose tuple is to be visited.
         lastVisited = current;
         
-        final ITuple tuple = new DelegateTuple(sourceTuples[current]) {
+        final ITuple<E> tuple = new DelegateTuple<E>(sourceTuples[current]) {
 
             /** return the total visited count. */
             @Override

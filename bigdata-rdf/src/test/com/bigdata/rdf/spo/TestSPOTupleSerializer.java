@@ -60,6 +60,7 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 
 /**
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

@@ -57,7 +57,7 @@ import org.CognitiveWeb.generic.core.om.ObjectManager;
 import org.CognitiveWeb.generic.core.om.RuntimeOptions;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 

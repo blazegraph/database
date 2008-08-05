@@ -34,6 +34,9 @@ import java.util.UUID;
 
 import junit.framework.TestCase;
 
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -163,24 +166,21 @@ public class TestBigdataMap extends TestCase {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class StringSerializer implements ITupleSerializer<String, String> {
+    static class StringSerializer extends DefaultTupleSerializer<String, String> {
 
         private static final long serialVersionUID = -3916736517088617622L;
-
-        private final IKeyBuilderFactory keyBuilderFactory;
+        
+        /**
+         * De-serialization ctor.
+         */
+        public StringSerializer() {}
         
         public StringSerializer(IKeyBuilderFactory keyBuilderFactory) {
             
-            this.keyBuilderFactory = keyBuilderFactory;
+            super(keyBuilderFactory);
             
         }
 
-        public IKeyBuilder getKeyBuilder() {
-
-            return keyBuilderFactory.getKeyBuilder();
-            
-        }
-        
         /**
          * Note: The key is materialized from the value since the encoding to
          * the unsigned byte[] is not reversable.
@@ -193,7 +193,7 @@ public class TestBigdataMap extends TestCase {
 
         public byte[] serializeKey(Object key) {
             
-            return KeyBuilder.asSortKey((String)key);
+            return getKeyBuilder().reset().append((String) key).getKey();
             
         }
 

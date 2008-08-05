@@ -26,17 +26,20 @@ package com.bigdata.sparse;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.AbstractTupleFilterator.AtomicRowIterator2;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.repo.BigdataRepository;
-import com.bigdata.sparse.AtomicRowScan.TPSList;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A client-side class that knows how to use an {@link IIndex} to provide an
@@ -156,12 +159,6 @@ import com.bigdata.sparse.AtomicRowScan.TPSList;
  *       for a property. Also, the returned
  *       {@link ITPS timestamped property sets} make it relatively easy to find
  *       the value of interest.
- * 
- * @todo It would be nice to allow blob references in the {@link SparseRowStore}.
- *       That will require another {@link ValueType} and the {@link TPS} will
- *       need to carry the additional metadata for the blob (the source resource
- *       from which the block may be read). This effects the
- *       {@link AtomicRowScan} or {@link AtomicRowIterator2} as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -586,14 +583,14 @@ public class SparseRowStore {
      *            will be ignored (i.e., the maximum timestamp that will be
      *            returned for a property value). Use {@link #MAX_TIMESTAMP} to
      *            obtain all values for a property, including the most recent.
-     * @param filter
+     * @param nameFilter
      *            An optional filter used to select the property(s) of interest.
      * 
      * @return An iterator visiting each logical row in the specified key range.
      */
     public Iterator<? extends ITPS> rangeQuery(Schema schema,
             Object fromKey, Object toKey, int capacity, long timestamp,
-            INameFilter filter) {
+            INameFilter nameFilter) {
         
         final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
 
@@ -610,22 +607,34 @@ public class SparseRowStore {
             
         }
 
-        AtomicRowScan proc = new AtomicRowScan(schema, (byte[]) fromKey,
-                (byte[]) toKey, timestamp, filter, capacity);
-
-        /*
-         * FIXME This is how it needs to be invoked to be mapped across more
-         * than one index partition.
-         */
-//        ndx.submit((byte[]) fromKey, (byte[]) toKey, proc, null/* resultHandler */);
-        /*
-         * FIXME This is forcing a direct call on a local index and will fail if
-         * the index is remote, etc. I am just doing this to test the procedure
-         * logic.
-         */
-        final TPSList results = proc.apply(ndx);
-        
-        return results.iterator();
+//        if (false) {
+//            
+//            /*
+//             * FIXME This is forcing a direct call on a local index and will
+//             * fail if the index is remote, etc. I am just doing this to test
+//             * the procedure logic.
+//             */
+//            
+//            AtomicRowScan proc = new AtomicRowScan(schema, (byte[]) fromKey,
+//                    (byte[]) toKey, timestamp, nameFilter, capacity);
+//
+//            final TPSList results = proc.apply(ndx);
+//
+//            return results.iterator();
+//
+//        } else {
+            
+            return new Striterator(ndx.rangeIterator((byte[]) fromKey, (byte[]) toKey, capacity,
+                    IRangeQuery.DEFAULT,
+                    new FilterConstructor<ITPV>()
+                            .addFilter(new AtomicRowFilter(schema, timestamp,
+                                    nameFilter)))).addFilter(new Resolver(){
+                                        @Override
+                                        protected Object resolve(Object obj) {
+                                            return ((ITuple<TPS>)obj).getObject();
+                                        }});
+            
+//        }
         
     }
 

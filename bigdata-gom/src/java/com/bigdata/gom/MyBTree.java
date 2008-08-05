@@ -61,8 +61,8 @@ import org.CognitiveWeb.generic.core.om.BaseObject;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.IJournal;
 import com.bigdata.rawstore.Bytes;
 

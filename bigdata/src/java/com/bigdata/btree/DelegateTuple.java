@@ -39,11 +39,11 @@ import com.bigdata.rawstore.IBlock;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DelegateTuple implements ITuple {
+public class DelegateTuple<E> implements ITuple<E> {
     
-    protected final ITuple delegate;
+    protected final ITuple<E> delegate;
     
-    public DelegateTuple(ITuple delegate) {
+    public DelegateTuple(ITuple<E> delegate) {
         
         this.delegate = delegate;
         
@@ -113,7 +113,7 @@ public class DelegateTuple implements ITuple {
         return delegate.readBlock(addr);
     }
     
-    public Object getObject() {
+    public E getObject() {
         return delegate.getObject();
     }
 

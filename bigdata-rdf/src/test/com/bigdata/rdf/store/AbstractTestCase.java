@@ -51,13 +51,13 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
-import com.bigdata.btree.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -648,7 +648,7 @@ abstract public class AbstractTestCase
                 // @todo convert term identifiers before rendering.
                 log.info("Iterator empty but still expecting: " + map.values());
 
-                fail("Expecting: " + map.size() + " more statements");
+                fail("Expecting: " + map.size() + " more statements: "+map.values());
 
             }
 

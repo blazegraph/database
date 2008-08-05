@@ -27,10 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+
 import junit.framework.TestCase2;
 
 /**
  * Test suite for low-level operations on variable length byte[]s.
+ * 
+ * @see BytesUtil
  * 
  * @todo test with JNI integration.
  * 

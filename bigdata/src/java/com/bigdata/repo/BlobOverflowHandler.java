@@ -6,7 +6,7 @@ import java.io.InputStream;
 
 import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;

@@ -49,10 +49,10 @@ package com.bigdata.rdf.lexicon;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
