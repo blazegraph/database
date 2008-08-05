@@ -33,10 +33,10 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;

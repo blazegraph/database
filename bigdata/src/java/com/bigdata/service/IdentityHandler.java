@@ -1,6 +1,6 @@
 package com.bigdata.service;
 
-import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.proc.IResultHandler;
 
 /**
  * Hands back the object visited for a single index partition.

@@ -42,11 +42,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
@@ -287,7 +287,7 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
-        public ResultSet rangeIterator(long tx, String name, byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) throws InterruptedException, ExecutionException, IOException {
+        public ResultSet rangeIterator(long tx, String name, byte[] fromKey, byte[] toKey, int capacity, int flags, IFilterConstructor filter) throws InterruptedException, ExecutionException, IOException {
             throw new UnsupportedOperationException();
         }
 

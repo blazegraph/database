@@ -38,8 +38,10 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
 
@@ -68,7 +70,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     /**
      * The filter derived from the {@link IElementFilter}.
      */
-    final private ITupleFilter filter;
+    final private FilterConstructor<R> filter;
 
     /**
      * Used to detect failure to call {@link #init()}.
@@ -186,44 +188,29 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         } else {
 
-            this.filter = new ITupleFilter() {
+            /*
+             * Align the predicate's constraint with the striterator filter
+             * constructor.
+             * 
+             * @todo redefined IElementFilter as IFilter
+             */
+            
+            this.filter = new FilterConstructor<R>();
+            
+            this.filter.addFilter(new TupleFilter<R>(){
                 
                 private static final long serialVersionUID = 1L;
 
-                public void add(ITupleFilter filter) {
-
-                    throw new UnsupportedOperationException();
-                    
-                }
-
                 @SuppressWarnings("unchecked")
-                public boolean isValid(ITuple tuple) {
+                public boolean isValid(ITuple<R> tuple) {
                     
-                    final Object obj = tuple.getObject();
-                    
-                    try {
-
-                        return constraint.accept((R) obj);
-                        
-                    } catch (ClassCastException ex) {
-                        
-                        log.error(this + " : Found class=" + obj.getClass()
-                                + " using tupleSer="
-                                + tuple.getTupleSerializer().getClass());
-
-                        throw ex;
-                        
-                    }
+                    final R obj = (R) tuple.getObject();
+                
+                    return constraint.accept( obj );
                     
                 }
 
-                public void rewrite(ITuple tuple) {
-                    
-                    // NOP.
-                    
-                }
-
-            };
+            });
 
         }
         
@@ -638,7 +625,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     }
     
     @SuppressWarnings({ "unchecked" })
-    protected ITupleIterator<R> rangeIterator(int capacity,int flags, ITupleFilter filter) {
+    protected ITupleIterator<R> rangeIterator(int capacity,int flags, IFilterConstructor<R> filter) {
 
         assertInitialized();
         

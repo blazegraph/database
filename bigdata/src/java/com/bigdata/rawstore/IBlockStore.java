@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rawstore;
 
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.IDataService;
 

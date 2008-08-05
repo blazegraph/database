@@ -318,7 +318,7 @@ public class TestCopyStream extends AbstractRepositoryTestCase {
      */
     public void test_copyStream_largeRandomStreams() throws IOException {
 
-        final int LIMIT = 20;
+        final int LIMIT = 5;
         
         final Random r = new Random();
 

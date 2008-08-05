@@ -40,7 +40,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;

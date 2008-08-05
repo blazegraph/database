@@ -32,9 +32,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IKeyBuilderFactory;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.AbstractJournal;

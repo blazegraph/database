@@ -51,13 +51,12 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.Banner;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IReadOnlyOperation;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
@@ -1705,7 +1704,7 @@ abstract public class DataService extends AbstractService
     }
     
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, ITupleFilter filter)
+            byte[] toKey, int capacity, int flags, IFilterConstructor filter)
             throws InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -1838,11 +1837,11 @@ abstract public class DataService extends AbstractService
         private final byte[] toKey;
         private final int capacity;
         private final int flags;
-        private final ITupleFilter filter;
+        private final IFilterConstructor filter;
         
         public RangeIteratorTask(ConcurrencyManager concurrencyManager,
                 long startTime, String name, byte[] fromKey, byte[] toKey,
-                int capacity, int flags, ITupleFilter filter) {
+                int capacity, int flags, IFilterConstructor filter) {
 
             super(concurrencyManager, startTime, name);
 

@@ -6,12 +6,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rawstore.Bytes;
 

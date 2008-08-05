@@ -33,7 +33,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.ITx;
 import com.bigdata.resources.StaleLocatorException;

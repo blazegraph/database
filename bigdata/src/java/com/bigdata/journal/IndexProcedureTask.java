@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal;
 
-import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.proc.IIndexProcedure;
 
 /**
  * Class provides an adaptor allowing a {@link IIndexProcedure} to be executed

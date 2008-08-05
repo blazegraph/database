@@ -30,7 +30,7 @@ package com.bigdata.service;
 
 import java.util.Properties;
 
-import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractTask;
 

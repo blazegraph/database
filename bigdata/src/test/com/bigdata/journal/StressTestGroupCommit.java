@@ -46,7 +46,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;

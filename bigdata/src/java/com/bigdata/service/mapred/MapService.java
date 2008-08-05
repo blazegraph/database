@@ -36,8 +36,8 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.proc.BatchInsert;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;

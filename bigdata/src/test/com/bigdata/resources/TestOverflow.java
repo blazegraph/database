@@ -38,7 +38,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IJournal;

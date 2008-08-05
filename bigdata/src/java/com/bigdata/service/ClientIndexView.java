@@ -43,30 +43,31 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
-import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.LongAggregator;
-import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
-import com.bigdata.btree.BatchContains.BatchContainsConstructor;
-import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
-import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
-import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
-import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
-import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
+import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
+import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.btree.proc.RangeCountProcedure;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.OneShotInstrument;
@@ -554,9 +555,14 @@ public class ClientIndexView implements IClientIndex {
      * on a given index partition. Once the iterator is exhausted on a given
      * index partition it is then applied to the next index partition spanned by
      * the key range.
+     * 
+     * @todo If the return iterator implements {@link ITupleCursor} then this
+     *       will need be modified to defer request of the initial result set
+     *       until the caller uses first(), last(), seek(), hasNext(), or
+     *       hasPrior().
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, ITupleFilter filter ) {
+            int capacity, int flags, IFilterConstructor filter ) {
 
         if (capacity == 0) {
 

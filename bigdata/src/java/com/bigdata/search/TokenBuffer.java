@@ -7,9 +7,9 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Token;
 
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IntegerAggregator;
-import com.bigdata.btree.KV;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KV;
+import com.bigdata.btree.proc.IntegerAggregator;
 import com.bigdata.io.ByteArrayBuffer;
 
 /**

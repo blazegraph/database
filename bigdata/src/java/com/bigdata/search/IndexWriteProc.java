@@ -4,10 +4,10 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 
 /**
  * Writes on the text index.

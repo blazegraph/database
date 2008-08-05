@@ -30,11 +30,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
@@ -377,8 +377,11 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      *            One or more flags formed by bitwise OR of zero or more of the
      *            constants defined by {@link IRangeQuery}.
      * @param filter
-     *            An optional filter that may be used to filter the keys to be
-     *            visited by the iterator.
+     *            An optional object that may be used to layer additional
+     *            semantics onto the iterator. The filter will be constructed on
+     *            the server and in the execution context for the iterator, so
+     *            it will execute directly against the index for the maximum
+     *            efficiency.
      * 
      * @exception InterruptedException
      *                if the operation was interrupted.
@@ -388,7 +391,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      *                error.
      */
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, ITupleFilter filter)
+            byte[] toKey, int capacity, int flags, IFilterConstructor filter)
             throws InterruptedException, ExecutionException, IOException;
     
     /**

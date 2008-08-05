@@ -307,7 +307,7 @@ public class TestAppendBlock extends AbstractRepositoryTestCase {
      */
     public void test_atomicAppendStressTest() throws IOException {
         
-        final int LIMIT = 100;
+        final int LIMIT = 25;
         
         final Random r = new Random();
 
