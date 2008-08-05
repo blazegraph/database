@@ -190,6 +190,8 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
              * resources that are no longer in use by the KB.
              */
 
+//            resourceIds = db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO);
+            
             resourceIds = new MergedOrderedIterator(//
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO), //
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP, new ITermIdFilter() {
