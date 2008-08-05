@@ -35,7 +35,7 @@ package com.bigdata.btree;
  */
 public class Tuple<E> extends AbstractTuple<E> {
 
-    protected final AbstractBTree btree;
+    public final AbstractBTree btree;
     
     public int getSourceIndex() {
         

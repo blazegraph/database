@@ -1,6 +1,5 @@
 package com.bigdata.sparse;
 
-import com.bigdata.btree.IReadOnlyOperation;
 
 /**
  * Atomic read of the logical row associated with some {@link Schema} and

@@ -53,7 +53,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.LongAggregator;
+import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.spo.SPOIndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.relation.accesspath.IElementFilter;

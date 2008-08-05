@@ -30,6 +30,7 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
+import com.bigdata.btree.keys.KeyBuilder;
 
 /**
  * Test suite based on a small btree with known keys and values.

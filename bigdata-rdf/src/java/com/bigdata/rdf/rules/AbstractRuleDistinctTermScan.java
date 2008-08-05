@@ -264,8 +264,6 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
             final IBindingSet bindingSet = new ArrayBindingSet(1/*capacity*/);
 
             final IChunkedIterator<Long> itr = relation.distinctTermScan(keyOrder); 
-//                new DistinctTermScanner(
-//                    relation.getExecutorService(), accessPath.getIndex()).iterator();
             
             try {
 

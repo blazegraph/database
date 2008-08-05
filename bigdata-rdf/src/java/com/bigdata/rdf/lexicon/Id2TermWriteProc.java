@@ -26,13 +26,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.lexicon;
 
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
-import com.bigdata.btree.IParallelizableIndexProcedure;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;

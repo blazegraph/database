@@ -22,16 +22,15 @@ import java.util.Vector;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractTupleFilterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
@@ -43,10 +42,8 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
-import com.bigdata.sparse.KeyDecoder;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.sparse.ValueType;
 import com.bigdata.sparse.TPS.TPV;
 import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
 
@@ -922,13 +919,17 @@ public class BigdataRepository implements ContentRepository {
 
             /*
              * Delete the file version metadata for each document in the key
-             * range by replacing its VERSION column value with a null value.
+             * range by replacing its VERSION column value with a null value
+             * (and updating the timestamp in the key).
              */
-//            getMetadataIndex().getIndex().rangeIterator(fromKey, toKey,
-//                    0/* capacity */, IRangeQuery.CURSOR,
-//                    new FileVersionDeleteProc());
-            
-            if(true) throw new UnsupportedOperationException();
+            getMetadataIndex().getIndex().rangeIterator(
+                    fromKey,
+                    toKey,
+                    0/* capacity */,
+                    IRangeQuery.CURSOR,
+                    new FilterConstructor<TPV>()
+                            .addFilter(new FileVersionDeleter(
+                                    SparseRowStore.AUTO_TIMESTAMP_UNIQUE)));
             
         }
         
@@ -955,67 +956,6 @@ public class BigdataRepository implements ContentRepository {
         
     }
 
-    /**
-     * A procedure that performs a key range scan, marking all non-deleted
-     * versions within the key range as deleted (by storing a null property
-     * value for the {@link MetadataSchema#VERSION}).
-     * 
-     * @todo Make sure that overflow handling for the {@link SparseRowStore}
-     *       causes the deleted file versions to be left behind eventually.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class FileVersionDeleteProc extends AbstractTupleFilterator<TPV> {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -31946508577453575L;
-
-        private final ITupleCursor<TPV> src;
-        
-        protected FileVersionDeleteProc(ITupleCursor<TPV> src) {
-
-            super(src);
-            
-            this.src = src;
-            
-        }
-
-        /**
-         * Visits the {@link MetadataSchema#VERSION} columns of the version
-         * that were deleted.
-         */
-        public ITuple<TPV> next() {
-            
-            ITuple<TPV> tuple = super.next();
-
-            // FIXME This does not update the timestamp which is part of the key!
-            src.getIndex().insert(tuple.getKey(), ValueType.encode(null));
-            
-            return tuple;
-            
-        }
-        
-        /**
-         * Only visits the {@link MetadataSchema#VERSION} columns.
-         */
-        @Override
-        protected boolean isValid(ITuple<TPV> tuple) {
-
-            KeyDecoder keyDecoder = new KeyDecoder(tuple.getKey());
-            
-            String name = keyDecoder.getColumnName();
-            
-            if(!name.equals(MetadataSchema.VERSION)) return false;
-
-            return true;
-            
-        }
-        
-    }
-    
     /**
      * FIXME Integrate with {@link FullTextIndex} to providing indexing and
      * search of file versions. Deleted file versions should be removed from the
@@ -1570,8 +1510,8 @@ public class BigdataRepository implements ContentRepository {
         }
 
         // construct the atomic append operation.
-        final ISimpleIndexProcedure proc = new AtomicBlockAppendProc(this, id, version, b,
-                off, len);
+        final ISimpleIndexProcedure proc = new AtomicBlockAppendProc(this, id,
+                version, b, off, len);
 
         // the last possible key for this file
         final byte[] key = getKeyBuilder().reset().appendText(id,

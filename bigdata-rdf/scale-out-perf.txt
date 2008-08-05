@@ -1045,58 +1045,24 @@ Short term tasks:
        a full transaction.  If not, then we will need to use a full
        transaction to avoid this issue.
 
+  - Support hash partitioned indices.  The index would be marked in
+    the IndexMetadata as being hash partitioned, including the #of
+    index partitions (N) and a hash function (can be defaulted).  A
+    data service UUID is assigned to each index partition.  Write a
+    ClientHashPartitionedIndex (vs the ClientIndexView, which could be
+    renamed as KeyRangePartitionedIndex)
+
   - (*****) Iterator refactor
 
      - Cursor based tuple:
 
-       - BTree (uses listeners to support concurrent modification).
+       - Done. BTree (uses listeners to support concurrent modification).
 
-       - IndexSegment (uses prior/next leaf and data are immutable).
-
-       - FusedView
+       - Done. IndexSegment (uses prior/next leaf and data are immutable).
 
      - Modify the procedure logic to abstract a 'next key/val'
        iterator using a shared buffer for de-compression in order to
        minimize heap churn on the data server.
-
-     - **** Modify IndexSegment to use fast forward and fast reverse
-	    scans.  I need to override or replace the iterator to do
-	    this.  It should use a priorLeaf/nextLeaf method in order
-	    for this to be easy to do.
-
-	    Ah. There is a protected [AbstractBTree#leafIterator()]
-	    method, but it is not being used.  Perhaps this could be
-	    modified to accept a fromKey and toKey and then used to
-	    allow replacement of the striterator-based
-	    postOrderNodeIterator().
-
-	    Modify the iterator to support prior/next and modification
-	    with concurrent traversal.  This really should not be any
-	    more complicated than the case for the GOM link set
-	    iterator.
-
-     - **** I have seen the index segment store closed during iterator
-	    traversal.  I've modified the class slightly to re-open the
-	    store transparently and we will see how that goes.
-
-	    *** The observed problem was during iterator traversal.  I
-	    suspect that iterator traversal should not allow the index
-	    to be closed since it requires valid hard references to the
-	    stack of nodes being traversed.  Figure out who is closing
-	    the index.  We may have to ignore the close if there is an
-	    open iterator.
-
-	    If the iterator is modified to use prior/next leaf methods
-	    for traversal and those methods are robust, then they can
-	    simply reopen() the index if it has been asynchronously
-	    closed.  The version for the index segment will not need
-	    the node stack.  A version that does not rely on a node
-	    stack could also be written for the BTree using lookup() to
-	    re-discover the current leaf and tuple.
-
-	    * Consider modifying the leaf iterator to require calling
-	      next() for the first leaf.  Consider changing next() to
-	      nextLeafInScanOrder().
 
      - Support copy in/out of keys and vals in lookup(), insert(),
        remove(), and rangeIterator so that we can (a) be more
@@ -1108,59 +1074,6 @@ Short term tasks:
 
      - Turn off sendVals for rangeIterators if we recognize the value
        serialized as the NoDataSerializer?
-
-     - (***) The distinct term scan (really, the prefix scan) needs to
-       be optimized for the data service and the federation use cases.
-       This also effects the sparse row store.  Also, the sparse row
-       store needs to use an extended split handler that always
-       chooses a split point which is on a logical row boundary.
-
-     - (*) Need ability to request a rangeIterator that reads in
-       reverse key order and the ability to visit the prior or next
-       key.  This requirement arises in particular for the bigdata
-       repository which is currently using the ILinearList API for the
-       AtomicAppend.  This will also help us to replace the
-       requirement for the ILinearList API in the metadata index.
-       
-       The change needs to occur at several levels and should include
-       a prior() method on ITupleIterator and the ability to acquire
-       an ITupleIterator for ITuple returned from lookup(), insert(),
-       etc. so that it can be turned into an iterator for prior/next
-       visitation.
-
-       This is a good time to do efficient prior/next leaf operations
-       for the IndexSegment and to make that more efficient for the
-       BTree as well.
-
-     * There are some heavy costs for the tuple iterator for the
-       distributed mode because it is sending around more data than is
-       strictly required.
-
-     - (*****) The consistentRead option used by the
-       PartitionedIndexRangeIterator needs to use the most recent
-       commit time for the federation.
-
-       Currently it uses the lastCommitTime for the first index
-       partition which it scans.  However, it is quite possible that
-       there have been writes on other index partitions since which
-       would not be reflected in BTree#lastCommitTime.  The
-       consistentRead would therefore reflect an older history rather
-       than the most recent writes when it moved onto the other index
-       partitions.
-
-       In order to fix this the data services MUST discover and use a
-       centralized timeservice.  This can be essentially a stripped
-       down centralized transaction manager.  The data services will
-       obtain their commitTime timestamps from this centralized time
-       service and MUST also notify the centralized timeservice once
-       they have successfully committed.  The PartitionedRangeIterator
-       will then query the centralized time service for the last
-       commit time for the federation as a whole and use that as the
-       time for a consistentRead operation.
-
-       As an alternative, the data services could periodically publish
-       their commit times.  I need to see how much of a bottleneck it
-       is for clients calling nextTimestamp().
 
    - LocalTripleStoreWithEmbeddedDataService
 
@@ -1316,11 +1229,11 @@ Short term tasks:
 
        - Done. Analyzers are not thread-safe.
 
+       - Compare performance with lucene and mg4j on indexing and
+         search, at least for the RDF DB application.
+
        - Try out an mg4j integration for an alternative text indexer
          and search.
-
-   - Consider thread pool size defaults, especially for the Temporary
-     Journal mode.  What is a good policy?
 
    - Done.  Either never retry an error task when the queue is likely
      to be full or make the retry itself robust.  Otherwise the CDL
@@ -1837,15 +1750,23 @@ Main issues:
 
 (*) Optimize JOINs
 
-    (-) LDS optimization (all indices are local, use read-committed
-        view).
+    (Done) LDS optimization (all indices are local, use read-committed
+           view).
+
+	   - Might be able to further optimize the closure rounds -
+             currently each round is submitted as a separate task.
 
     (-) Scale-out optimization (essentially unrolling the loops).
 
     (-) Integrate optimized JOINs with Sesame 2.
 
-    (-) Generalize the JOIN paradigm so that it can be used for things
-        other than RDF.
+    (Done) Generalize the JOIN paradigm so that it can be used for
+           things other than RDF.
+
+	   - Explore lexicon + SPO joins.
+
+	   - Explore distinct term scan as a filter on an SPO
+             predicate.
 
     (-) Original LUBM benchmark.
 
@@ -2579,36 +2500,6 @@ B49 := systap
                 buf.add(sid2, dcCreator, mike);
                 buf.add(sid3, dcCreator, mike);
 
-------------------------------------------------------------
-
-#1	Inferred     : < http://www.bigdata.com/a(136), rdf:type(8), rdfs:Class(12) >
-#2	Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), rdfs:Resource(40) >
-#3	Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/a(136) >
-#4	Explicit     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) > : sid=151
-#5	Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/c(144) >
-#6	Inferred     : < http://www.bigdata.com/b(140), rdf:type(8), rdfs:Class(12) >
-#7	Inferred     : < http://www.bigdata.com/b(140), rdfs:subClassOf(44), rdfs:Resource(40) >
-#8	Inferred     : < http://www.bigdata.com/b(140), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
-#9	Explicit     : < http://www.bigdata.com/b(140), rdfs:subClassOf(44), http://www.bigdata.com/c(144) > : sid=155
-#10	Inferred     : < http://www.bigdata.com/c(144), rdf:type(8), rdfs:Class(12) >
-#11	Inferred     : < http://www.bigdata.com/c(144), rdfs:subClassOf(44), rdfs:Resource(40) >
-#12	Inferred     : < http://www.bigdata.com/c(144), rdfs:subClassOf(44), http://www.bigdata.com/c(144) >
-
-Should prove that (a type Class) is still grounded.
-
-DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:815): Considering:
-	(rdfs:subClassOf(44), rdfs:domain(24), rdfs:Class(12)), 
-	(http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140))
-	-> (http://www.bigdata.com/a(136), rdf:type(8), rdfs:Class(12))
-DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:678): head=Inferred     : < rdfs:subClassOf(44), rdfs:domain(24), rdfs:Class(12) >, testHead=true, testFocusStore=false, #visited=9
-DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:678): head=Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >, testHead=true, testFocusStore=false, #visited=9
-DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:700): Already visited: Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
-DEBUG: 3641 main         com.bigdata.rdf.inf.Justification.isGrounded(Justification.java:842): Not grounded: tail=Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
-
-// FIXME examine when the following makes it into the visitedSet the first time.
-
-Already visited: Inferred     : < http://www.bigdata.com/a(136), rdfs:subClassOf(44), http://www.bigdata.com/b(140) >
-
 ============================================================
 
 Priority list:
@@ -2617,17 +2508,104 @@ Priority list:
 
    How am I going to benchmark this?
 
-   Completion scans, distinct term scans, and match rule all need to
+   There is a strong relationship between a byte[][] keys iterator
+   such as the {@link PrefixFilter} and an unrolled JOIN operator.
+   This is especially true when the unrolled N is small, since it is
+   cheap to send the tuples that we want to JOIN to the target data
+   service.
+
+x. Completion scans, distinct term scans, and match rule all need to
    use ITupleCursor to operate in a scale-out context.
+
+   * Track down ITupleSerializer.INSTANCEs and replace with
+     newInstance() or the like.  NOPTupleSerializer and
+     TPSTupleSerializer
+
+   *** FileVersionDeleter is not quite correct yet.  Make sure that we
+       have good tests for the fence posts on this one.
+
+   Done. The logical row scan needs to be fixed so that it will cross
+         index partitions.
+     
+   *** Rewrite FusedView's iterator to implement {@link ITupleCursor}.
+       I might narrow the ITupleCursor API to do this, moving more
+       into the abstract base class or an implementation convenience
+       interface.
+      
+   - Done. Support for TupleTransformer in ResultSet (serialization)
+
+   - Defer. Rewrite the iterators based on the {@link ResultSet} to
+     implement {@link ITupleCursor}?  This should not be necessary if
+     we instead notice the direction in which the underlying (source)
+     iterator was being traversed.  Even that can be ignored in favor
+     of using REVERSE to achieve reverse traversal.
+     
+   - {@link PartitionedRangeQueryIterator}
+
+     - Should not always require KEYS.
+
+     - Should use read-consistent semantics (getLastCommitTime()).
+
+   * Problems with LDS closure.
+
+   * Problems with (x type resource) backchainer (related perhaps to
+     overgeneration for that we are reading on both the SPO and the
+     OSP access paths).
+
+   - Done. Replace use of ITupleFilter with the FilterConstructor
+           construct.
+
+     Done. Remove ITupleFilter from the BTree impl (LeafIterator,
+           TupleIterator).
+
+     Done. The Filterator is reusing the same Tuple instance for its
+           one step lookahead.  This is broken since the state of the
+           value to be returned is being overwritten by the state of
+           the next value to be returned!!!
+
+     Done. com.bigdata.service.TestRangeQuery#test_removeAll() is
+           failing.
+
+     Done. Problem showing up with corrupt stream header for
+           test_removeAll().  This may have been related to copy the
+           tuple is copied, specifically how the key and value are
+           copied.  Or I may be failing to correctly isolate the
+           filter test from the returned tuple's data.
+
+     Done. Filter out literals on OSP in the distinct term scan rather
+           than the iterator (for the type resource backchainer).
+           Also, add a unit test for this case to
+           TestBackchainTypeResourceIterator.
+
+     * Replace IElementFilter with ITupleFilter or ITupleFilter[].
+       
+       This will allow us to use the prefix scan and distinct term
+       scans directly from an IRule by specifying the appropriate
+       predicate filter(s)!
+
+     * Test DistinctTermScan on scale-out problems (partitioned
+       indices).  One way to test is to set the split point very low
+       and then test on a small data set.
+     
+       * FusedView MUST implement ITupleCursor!
+
+       * Make sure that we can cross from chunk to chunk and partition
+         to partition.
+
+       * Write test for a reverse scan over the scale-out index and
+         for reverse scans starting at the fence posts around a
+         partition boundary.  Also do this for logical row scans.
+
+     - Uses of the REVERSE iterator:
+
+       * Bigdata repository (currently using the ILinearList API for
+       the AtomicAppend).
+
+       * MetadataIndex (also uses the ILinearList API).
 
 2. fix the lexicon
 
 3. fix justifications and misc closure problems with MikeP
-
-   *** Filter out literals on OSP in the distinct term scan rather
-       than the iterator (for the type resource backchainer).  Also,
-       add a unit test for this case to
-       TestBackchainTypeResourceIterator.
 
 4. performance testing for data load and closure
 
@@ -2649,12 +2627,20 @@ Priority list:
    Loaded 1 resources: 45655 stmts added in 6.516 secs, rate= 7006, commitLatency=234ms
    Computed fixed point: program=fullForwardClosure, rounds=1, elapsed=3468ms
 
+   D620 after loading several other files.
+   WordnetN+S:  273681 stmts added in 15.407 secs, rate= 17763, commitLatency=266ms
+   Alibaba:      45655 stmts added in 1.672 secs, rate= 27305, commitLatency=172ms
+   NCIOncology: 464841 stmts added in 26.187 secs, rate= 17750, commitLatency=266ms
+
    * Verify correct handling migration of elements from the
      Unsynchronized buffer to the target buffer.
    
    * Hypothesis for poor performance when using parallel rule
      execution is lock contention for the buffer on which the
-     solutions are being written by the rule set.
+     solutions are being written by the rule set (or possible,
+     contention for the index locks).  If true, then there should be
+     less effect for the fastClosure method since that is mostly a
+     sequential program (it has a few fix point steps).
 
      One solution is to give each thread (this equates to each rule
      instance that is being executed) its own local buffer (100s to
@@ -2690,10 +2676,6 @@ Priority list:
 
 x. misc scaling pain points
 
-   - TestTruthMaintenance -- needs a scalable solution for selecting
-     the statements to be retracted.  See
-     TestTruthMaintenance#selectRandomExplicitStatements()
-
    - TruthMaintenance performance should be vetted.  Handling TM at
      scale is its own issue and might be best solved using: (a) a
      magic sets integration; and (b) periodic map/reduce style updates
@@ -2702,8 +2684,3 @@ x. misc scaling pain points
 
    - Look for other things which have become painful with the
      introduction of the UnisolatedReadWriteIndex class.
-
-
-DEBUG: 3156 pool-1-thread-31         com.bigdata.relation.accesspath.AbstractArrayBuffer.add(AbstractArrayBuffer.java:135): element=Solution{ element=< 136U, 24U, 140U : Inferred >, rule=fastClosure5[0][0] : ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, {P}, y) -> ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, 24, y), bindingSet={x=136, {P}=8, y=140}}
-
-DEBUG: 3203 pool-1-thread-30         com.bigdata.rdf.rules.RDFJoinNexus$InsertSPOAndJustificationBuffer.writeChunk(RDFJoinNexus.java:641): chunk[1] = Solution{ element=< 136U, 24U, 12U : Inferred >, rule=fastClosure5[0][0] : ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, {P}, y) -> ([22f0e80a-dd2a-4ca8-b958-783bc6981596kb.spo.], x, 24, y), bindingSet={x=136, {P}=48, y=12}}

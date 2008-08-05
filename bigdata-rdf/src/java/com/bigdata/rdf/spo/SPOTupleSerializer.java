@@ -28,19 +28,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
-import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IKeyBuilderFactory;
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.ThreadLocalKeyBuilderFactory;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
@@ -60,16 +59,20 @@ import com.bigdata.relation.accesspath.IKeyOrder;
  * The tuple value encodes the {@link StatementEnum}, indicating whether the
  * statement is {explicit, inferred, or an axiom}, and optionally the unique
  * statement identifier.
+ * <p>
+ * Note: While the static methods used to decode an existing key are safe for
+ * concurrent readers, concurrent readers also form keys using
+ * {@link #statement2Key(long, long, long)} and therefore require a thread-local
+ * {@link IKeyBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externalizable {
+public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
     private static final long serialVersionUID = 2893830958762265104L;
 
-    // @todo refactor.
-    private static transient int N = 3;
+    private static transient final int N = IRawTripleStore.N;
     
     /**
      * The natural order for the index.
@@ -81,22 +84,17 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
      */
     private final transient ByteArrayBuffer buf = new ByteArrayBuffer(0);
 
-    /**
-     * Used to format the key.
-     * <p>
-     * Note: While the static methods used to decode an existing key are safe
-     * for concurrent readers, concurrent readers also form keys using
-     * {@link #statement2Key(long, long, long)} and therefore require a
-     * thread-local {@link IKeyBuilder}.
-     */
-    private final transient IKeyBuilderFactory keyBuilderFactory = new ThreadLocalKeyBuilderFactory(
-            new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG));
-
-    public IKeyBuilder getKeyBuilder() {
-      
-        return keyBuilderFactory.getKeyBuilder();
-        
-    };
+//    /**
+//     * Used to format the key.
+//     */
+//    private final transient IKeyBuilderFactory keyBuilderFactory = new ThreadLocalKeyBuilderFactory(
+//            new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG));
+//
+//    public IKeyBuilder getKeyBuilder() {
+//      
+//        return keyBuilderFactory.getKeyBuilder();
+//        
+//    };
     
     /**
      * De-serialization constructor.
@@ -112,6 +110,25 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
      *            The access path.
      */
     public SPOTupleSerializer(SPOKeyOrder keyOrder) {
+
+        this(keyOrder, getDefaultLeafKeySerializer(),
+                getDefaultValueKeySerializer());
+
+    }
+    
+    /**
+     * Create an {@link ITupleSerializer} for the indicated access path.
+     * 
+     * @param keyOrder
+     *            The access path.
+     * @param leafKeySer
+     * @param leafValSer
+     */
+    public SPOTupleSerializer(SPOKeyOrder keyOrder, IDataSerializer leafKeySer,
+            IDataSerializer leafValSer) {
+
+        super(new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG), leafKeySer,
+                leafValSer);
         
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -359,12 +376,16 @@ public class SPOTupleSerializer implements ITupleSerializer<SPO,SPO>, Externaliz
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
+        super.readExternal(in);
+        
         keyOrder = SPOKeyOrder.valueOf(in.readByte());
 
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
+        super.writeExternal(out);
+        
         out.writeByte(keyOrder.index());
 
     }

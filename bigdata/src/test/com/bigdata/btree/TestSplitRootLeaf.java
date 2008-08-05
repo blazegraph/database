@@ -29,6 +29,8 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.keys.KeyBuilder;
+
 /**
  * Test split of the root leaf.
  * 

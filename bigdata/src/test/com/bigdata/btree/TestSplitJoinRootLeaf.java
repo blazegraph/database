@@ -29,6 +29,7 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 
 /**

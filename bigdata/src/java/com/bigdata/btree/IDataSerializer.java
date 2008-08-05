@@ -42,7 +42,7 @@ import java.io.Serializable;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 
 /**
  * Interface for custom serialization of logical <code>byte[][]</code> data

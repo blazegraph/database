@@ -33,9 +33,12 @@ import java.util.Properties;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.KeyBuilder.CollatorEnum;
-import com.bigdata.btree.KeyBuilder.Options;
-import com.bigdata.btree.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder.CollatorEnum;
+import com.bigdata.btree.keys.KeyBuilder.Options;
+import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 
 /**
  * Base class for the test suites that examine support for Unicode sort keys in

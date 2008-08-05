@@ -57,7 +57,7 @@ import org.CognitiveWeb.generic.core.LinkSetIndex;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 
 /**
  * <p>

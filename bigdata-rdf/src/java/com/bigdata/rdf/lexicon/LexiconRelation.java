@@ -69,23 +69,23 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.DefaultKeyBuilderFactory;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
-import com.bigdata.btree.AbstractTupleFilterator.CompletionScan;
-import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
-import com.bigdata.btree.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.PrefixFilter;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
+import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataInputBuffer;
@@ -123,6 +123,7 @@ import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.TokenBuffer;
@@ -549,8 +550,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
 
     /**
-     * A completion scan of all literals having any of the given literal as a
-     * prefix.
+     * A scan of all literals having any of the given literal as a prefix.
      * 
      * @param lit
      *            A literal.
@@ -558,32 +558,31 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @return An iterator visiting the term identifiers for the matching
      *         {@link Literal}s.
      */
-    public Iterator<Long> completionScan(Literal lit) {
+    public Iterator<Long> prefixScan(Literal lit) {
 
         if (lit == null)
             throw new IllegalArgumentException();
         
-        return completionScan(new Literal[] { lit });
+        return prefixScan(new Literal[] { lit });
         
     }
     
     /**
-     * A completion scan of all literals having any of the given literals as a
-     * prefix.
+     * A scan of all literals having any of the given literals as a prefix.
      * 
-     * @param lits An array of literals.
+     * @param lits
+     *            An array of literals.
      * 
      * @return An iterator visiting the term identifiers for the matching
      *         {@link Literal}s.
      * 
-     * FIXME Re-factor into an operation that can run against the scale-out
-     * indices and then migrate into the {@link AbstractTripleStore}.
-     * <p>
-     * The {@link #completionScan(Literal[])} presumes that it has a local
-     * {@link BTree}, but the rest of the code should already scale-out.
+     * @todo The prefix scan can be refactored as an {@link IElementFilter}
+     *       applied to the lexicon. This would let it be used directly from
+     *       {@link IRule}s. (There is no direct dependency on this class other
+     *       than for access to the index, and the rules already provide that).
      */
     @SuppressWarnings("unchecked")
-    public Iterator<Long> completionScan(Literal[] lits) {
+    public Iterator<Long> prefixScan(Literal[] lits) {
 
         if (lits == null || lits.length == 0)
             throw new IllegalArgumentException();
@@ -641,39 +640,44 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         final IIndex ndx = getTerm2IdIndex();
 
-        final Iterator<Long> termIdIterator = new Striterator(new CompletionScan(//
-                (ITupleCursor) ndx
-                                .rangeIterator(null/* fromKey */,
-                                        null/* toKey */, 0/* capacity */,
-                                        IRangeQuery.DEFAULT
-                                                | IRangeQuery.CURSOR, null/* filter */), //
-                keys)).addFilter(new Resolver() {
+        final Iterator<Long> termIdIterator = new Striterator(
+                ndx
+                        .rangeIterator(
+                                null/* fromKey */,
+                                null/* toKey */,
+                                0/* capacity */,
+                                IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
+                                // prefix filter.
+                                new FilterConstructor<BigdataValue>()
+                                        .addFilter(new PrefixFilter<BigdataValue>(
+                                                keys))))
+                .addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 1L;
 
                     /**
                      * Decode the value, which is the term identifier.
                      */
-            @Override
-            protected Object resolve(Object arg0) {
+                    @Override
+                    protected Object resolve(Object arg0) {
 
-                final ITuple tuple = (ITuple)arg0;
-                
-                final long tid;
-                try {
+                        final ITuple tuple = (ITuple) arg0;
 
-                    tid = LongPacker.unpackLong(tuple.getValueStream());
-                    
-                } catch (IOException e) {
-                    
-                    throw new RuntimeException(e);
-                    
-                }
-                
-                return tid;
-                
-            }
-        });
+                        final long tid;
+                        try {
+
+                            tid = LongPacker.unpackLong(tuple.getValueStream());
+
+                        } catch (IOException e) {
+
+                            throw new RuntimeException(e);
+
+                        }
+
+                        return tid;
+
+                    }
+                });
 
         return termIdIterator;
             
@@ -1318,7 +1322,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
-                    numNotFound, ndx.getIndexMetadata().getLeafValueSerializer());
+                    numNotFound, ndx.getIndexMetadata().getTupleSerializer()
+                            .getLeafValueSerializer());
 
             // batch lookup
             ndx.submit(0/* fromIndex */, numNotFound/* toIndex */, keys,

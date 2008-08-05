@@ -34,6 +34,7 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 
 import cutthecrap.utils.striterators.Resolver;

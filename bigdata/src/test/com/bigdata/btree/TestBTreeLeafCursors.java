@@ -33,6 +33,7 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree.Stack;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**

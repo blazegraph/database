@@ -28,7 +28,11 @@
 package com.bigdata.btree;
 
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.TupleRemover;
 import com.bigdata.repo.BigdataRepository;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 
 import cutthecrap.utils.striterators.Striterator;
@@ -128,7 +132,13 @@ public interface IRangeQuery {
      * Flag specifies that entries visited by the iterator in the key range will
      * be <em>removed</em> from the index. This flag may be combined with
      * {@link #KEYS} or {@link #VALS} in order to return the keys and/or values
-     * for the deleted entries.
+     * for the deleted entries. When a {@link FilterConstructor} is specified,
+     * the filter stack will be applied first and then {@link #REMOVEALL} will
+     * cause a {@link TupleRemover} to be layered on top. You can achieve other
+     * stacked iterator semantics using {@link FilterConstructor}, including
+     * causing {@link ITuple}s to be removed at a different layer in the stack.
+     * Note however, that removal for a local {@link BTree} will require that
+     * the {@link TupleRemover} is stacked directly over an {@link ITupleCursor}.
      * <p>
      * Note: This semantics of this flag require that the entries are atomically
      * removed within the isolation level of the operation. In particular, if
@@ -153,24 +163,25 @@ public interface IRangeQuery {
     public static final int REMOVEALL = 1 << 4;
     
     /**
-     * Flag specifies that the iterator will support the full
-     * {@link ITupleCursor} API, including bi-directional tuple navigation and
-     * random seeks within the key range. In addition, this flag enables
-     * traveral with concurrent modification when used with a local
-     * {@link BTree} (scale-out iterators buffer always support traversal with
-     * concurrent modification because they heavily buffer the iterator with
-     * {@link ResultSet}s).
-     * <p>
-     * Note: There are several pragmatic reasons why you would or would not
-     * specify this flag. Most importantly, the original {@link Striterator}
-     * construction for the {@link BTree} uses recursion and is in fact
-     * <em>faster</em> than the newer {@link AbstractBTreeTupleCursor}. It is
-     * used by default when this flag is NOT specified and the iterator is
-     * running across a {@link BTree}. However, the
-     * {@link IndexSegmentTupleCursor} is used regardless of the value of this
-     * flag since it exploits the double-linked leaves of the
-     * {@link IndexSegment} and is therefore MORE efficient than the
-     * {@link Striterator} based construct.
+     * Flag specifies that the base iterator will support the full
+     * {@link ITupleCursor} API, including traversal with concurrent
+     * modification, bi-directional tuple navigation and random seeks within the
+     * key range. There are several pragmatic reasons why you would or would not
+     * specify this flag.
+     * <ol>
+     * <li>The original {@link Striterator} construction for the {@link BTree}
+     * is <em>faster</em> than the newer {@link AbstractBTreeTupleCursor}. It
+     * is used by default when this flag is NOT specified and the iterator is
+     * running across a {@link BTree}. (The {@link IndexSegmentTupleCursor} is
+     * used for {@link IndexSegment}s regardless of the value of this flag
+     * since it exploits the double-linked leaves of the {@link IndexSegment}
+     * and is therefore MORE efficient than the {@link Striterator} based
+     * construct.)</li>
+     * <li> This flag enables traveral with concurrent modification (i.e.,
+     * {@link Iterator#remove()}) when used with a local {@link BTree}.
+     * Scale-out iterators always support traversal with concurrent modification
+     * since they heavily buffer the iterator with {@link ResultSet}s.</li>
+     * </ol>
      */
     public static final int CURSOR = 1 << 5;
 
@@ -254,13 +265,22 @@ public interface IRangeQuery {
      * @param capacity
      *            The #of entries to buffer at a time. This is a hint and MAY be
      *            zero (0) to use an implementation specific <i>default</i>
-     *            capacity. The capacity is intended to limit the burden on the
-     *            heap imposed by the iterator if it needs to buffer data, e.g.,
-     *            before sending it across a network interface.
+     *            capacity. A non-zero value may be used if you know that you
+     *            want at most N results or if you want to override the default
+     *            #of results to be buffered before sending them across a
+     *            network interface. (Note that you can control the default
+     *            value using
+     *            {@link IBigdataClient.Options#DEFAULT_CLIENT_RANGE_QUERY_CAPACITY}).
      * @param flags
      *            A bitwise OR of {@link #KEYS}, {@link #VALS}, etc.
-     * @param filter
-     *            An optional filter and/or resolver.
+     * @param filterCtor
+     *            An optional object used to construct a stacked iterator. When
+     *            {@link #CURSOR} is specified in <i>flags</i>, the base
+     *            iterator will implement {@link ITupleCursor} and the first
+     *            filter in the stack can safely cast the source iterator to an
+     *            {@link ITupleCursor}. If the outermost filter in the stack
+     *            does not implement {@link ITupleIterator}, then it will be
+     *            wrapped an {@link ITupleIterator}.
      * 
      * @see SuccessorUtil, which may be used to compute the successor of a value
      *      before encoding it as a component of a key.
@@ -268,11 +288,11 @@ public interface IRangeQuery {
      * @see BytesUtil#successor(byte[]), which may be used to compute the
      *      successor of an encoded key.
      * 
-     * @see EntryFilter, which may be used to filter the entries visited by the
-     *      iterator.
+     * @see IFilterConstructor, which may be used to construct an iterator stack
+     *      performing filtering or other operations.
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, ITupleFilter filter);
+            int capacity, int flags, IFilterConstructor filterCtor);
 
 //    /**
 //     * An iterator that is mapped over a set of key ranges.

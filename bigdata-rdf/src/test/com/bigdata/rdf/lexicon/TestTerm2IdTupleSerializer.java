@@ -35,7 +35,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
 

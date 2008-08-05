@@ -40,6 +40,9 @@ import junit.framework.TestCase2;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KV;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
@@ -492,7 +495,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     public BTree getBTree(int branchingFactor) {
         
-        return getBTree(branchingFactor , DefaultTupleSerializer.INSTANCE);
+        return getBTree(branchingFactor , DefaultTupleSerializer.newInstance());
         
     }
     

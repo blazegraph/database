@@ -58,13 +58,13 @@ import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
-import com.bigdata.btree.DefaultKeyBuilderFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IKeyBuilderFactory;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;

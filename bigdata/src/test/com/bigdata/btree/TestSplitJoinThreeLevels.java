@@ -31,6 +31,8 @@ import java.util.Arrays;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.keys.KeyBuilder;
+
 /**
  * Test suite using {@link IIndex#insert(int, Object)} to split a tree to height
  * two (2) (three levels) and then using {@link IIndex#remove(int)} to reduce

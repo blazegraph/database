@@ -55,7 +55,6 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -69,6 +68,8 @@ import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
  * 
  * @todo add a stress test where we assert random statements and then back out
  *       those assertions verifying that we recover the original closure?
+ * 
+ * @todo run for both full and fast closure programs.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -88,6 +89,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
     public TestTruthMaintenance(String name) {
         super(name);
     }
+
+    final private Random r = new Random();
 
     /**
      * Test for
@@ -797,12 +800,6 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
         
         try {
             
-            if(store instanceof ScaleOutTripleStore) {
-                
-                fail("Waiting on batch api procedure for distinct term scan");
-                
-            }
-            
             final Properties properties = store.getProperties();
 
             /*
@@ -1044,10 +1041,6 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      */
     public SPO[] selectRandomExplicitStatements(AbstractTripleStore db, int N) {
         
-        Random r = new Random();
-        
-//        RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(Bytes.SIZEOF_LONG));
-
         /*
          * Count the #of distinct subjects in the graph.
          */
@@ -1079,13 +1072,14 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
         }
 
-        log.info("There are "+nsubjects+" distinct subjects");
+        if (log.isInfoEnabled())
+            log.info("There are " + nsubjects + " distinct subjects");
 
         /*
          * Choose N distinct subjects from the graph at random.
          */
 
-        Set<Long> subjects = new HashSet<Long>(N);
+        final Set<Long> subjects = new HashSet<Long>(N);
 
         for (int i = 0; i < nsubjects && subjects.size() < N; i++) {
 
@@ -1115,7 +1109,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             
         }
 
-        log.info("Selected "+subjects.size()+" distinct subjects: "+subjects);
+        if (log.isInfoEnabled())
+            log.info("Selected " + subjects.size() + " distinct subjects: "
+                    + subjects);
 
         /*
          * Choose one explicit statement at random for each distinct subject.
@@ -1139,12 +1135,13 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                     continue;
 
                 // a chunk of explicit statements for that subject.
-                SPO[] chunk = itr.nextChunk();
+                final SPO[] chunk = itr.nextChunk();
 
                 // statement randomly choosen from that chunk.
-                SPO tmp = chunk[r.nextInt(chunk.length)];
+                final SPO tmp = chunk[r.nextInt(chunk.length)];
 
-                log.info("Selected at random: " + tmp.toString(db));
+                if (log.isInfoEnabled())
+                    log.info("Selected at random: " + tmp.toString(db));
 
                 stmts.add(tmp);
             
@@ -1156,7 +1153,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             
         }
         
-        log.info("Selected "+stmts.size()+" distinct statements: "+stmts);
+        if (log.isInfoEnabled())
+            log.info("Selected " + stmts.size() + " distinct statements: "
+                    + stmts);
         
         return stmts.toArray(new SPO[stmts.size()]);
         

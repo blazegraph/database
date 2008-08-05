@@ -33,8 +33,8 @@ import java.util.Comparator;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;

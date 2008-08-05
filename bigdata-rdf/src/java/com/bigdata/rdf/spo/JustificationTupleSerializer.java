@@ -28,18 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
-import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IKeyBuilderFactory;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.ThreadLocalKeyBuilderFactory;
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
@@ -56,12 +54,17 @@ import com.bigdata.rdf.inf.Justification;
  * <p>
  * Note: No values are stored for this index - all the information is in the
  * keys.
+ * <p>
+ * Note: While the static methods used to decode an existing key are safe for
+ * concurrent readers, concurrent readers also form keys using
+ * {@link Justification#getKey(IKeyBuilder, Justification)} and therefore
+ * require a thread-local {@link IKeyBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JustificationTupleSerializer implements
-        ITupleSerializer<Justification, Justification>, Externalizable {
+public class JustificationTupleSerializer extends
+        DefaultTupleSerializer<Justification, Justification> {
 
     /**
      * 
@@ -70,21 +73,13 @@ public class JustificationTupleSerializer implements
 
     private int N;
 
-    /**
-     * Used to format the key.
-     * <p>
-     * Note: While the static methods used to decode an existing key are safe
-     * for concurrent readers, concurrent readers also form keys using
-     * {@link #statement2Key(long, long, long)} and therefore require a
-     * thread-local {@link IKeyBuilder}.
-     */
-    private transient IKeyBuilderFactory keyBuilderFactory;
-
-    public IKeyBuilder getKeyBuilder() {
-      
-        return keyBuilderFactory.getKeyBuilder();
-        
-    };
+//    private transient IKeyBuilderFactory keyBuilderFactory;
+//
+//    public IKeyBuilder getKeyBuilder() {
+//      
+//        return keyBuilderFactory.getKeyBuilder();
+//        
+//    };
     
     /**
      * De-serialization constructor.
@@ -99,13 +94,18 @@ public class JustificationTupleSerializer implements
      */
     public JustificationTupleSerializer(int N) {
         
+        super(new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG),
+                getDefaultLeafKeySerializer(), //
+                NoDataSerializer.INSTANCE // no values
+        );
+
         if (N != 3 && N != 4)
             throw new IllegalArgumentException();
         
         this.N = N;
 
-        this.keyBuilderFactory = new ThreadLocalKeyBuilderFactory(
-                new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG));
+//        this.keyBuilderFactory = new ThreadLocalKeyBuilderFactory(
+//                new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG));
 
     }
 
@@ -176,15 +176,16 @@ public class JustificationTupleSerializer implements
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
+        super.readExternal(in);
+        
         N = in.readByte();
-
-        this.keyBuilderFactory = new ThreadLocalKeyBuilderFactory(
-                new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG));
 
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
+        super.writeExternal(out);
+        
         out.writeByte(N);
 
     }

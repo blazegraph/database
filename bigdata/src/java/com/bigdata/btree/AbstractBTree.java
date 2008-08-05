@@ -41,11 +41,16 @@ import org.apache.log4j.Logger;
 import com.bigdata.Banner;
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
-import com.bigdata.btree.AbstractBTreeTupleCursor.Reverserator;
-import com.bigdata.btree.AbstractTupleFilterator.Removerator;
-import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.Reverserator;
+import com.bigdata.btree.filter.TupleRemover;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
@@ -57,11 +62,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.service.ClientIndexView;
-import com.bigdata.service.PartitionedRangeQueryIterator;
 import com.bigdata.service.Split;
-
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * <p>
@@ -1533,215 +1534,168 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
-    /**
-     * Return an iterator based on the post-order {@link Striterator}. This
-     * iterator does not support random seeks, reverse scans, or concurrent
-     * modification during traversal but it is <em>faster</em> than the
-     * {@link AbstractBTreeTupleCursor} when all you need is a forward
-     * visitation of the tuples in the key range.
-     * <p>
-     * This iterator is automatically used for a {@link BTree} unless one of the
-     * following flags is specified:
-     * <ul>
-     * <li>{@link IRangeQuery#CURSOR}</li>
-     * <li>{@link IRangeQuery#REVERSE}</li>
-     * <li>{@link IRangeQuery#REMOVEALL}</li>
-     * </ul>
-     * This iterator is NOT be used for an {@link IndexSegment} since it does
-     * not exploit the double-linked leaves and is therefore slower than the
-     * {@link IndexSegmentTupleCursor}.
-     */
-    protected ITupleIterator fastForwardIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, ITupleFilter filter) {
-
-        counters.nrangeIterator++;
-
-        // conditional range check on the key.
-        
-        if (fromKey != null)
-            assert rangeCheck(fromKey,false);
-
-        if (toKey != null)
-            assert rangeCheck(toKey,true);
-
-        final ITupleIterator src = getRoot().rangeIterator(fromKey, toKey,
-                flags, filter);
-
-        return src;
-        
-//        if (isReadOnly()) {
+//    /**
+//     * Return an iterator based on the post-order {@link Striterator}. This
+//     * iterator does not support random seeks, reverse scans, or concurrent
+//     * modification during traversal but it is <em>faster</em> than the
+//     * {@link AbstractBTreeTupleCursor} when all you need is a forward
+//     * visitation of the tuples in the key range.
+//     * <p>
+//     * This iterator is automatically used for a {@link BTree} unless one of the
+//     * following flags is specified:
+//     * <ul>
+//     * <li>{@link IRangeQuery#CURSOR}</li>
+//     * <li>{@link IRangeQuery#REVERSE}</li>
+//     * <li>{@link IRangeQuery#REMOVEALL}</li>
+//     * </ul>
+//     * This iterator is NOT be used for an {@link IndexSegment} since it does
+//     * not exploit the double-linked leaves and is therefore slower than the
+//     * {@link IndexSegmentTupleCursor}.
+//     */
+//    protected ITupleIterator fastForwardIterator(byte[] fromKey, byte[] toKey,
+//            int capacity, int flags) {
 //
-//            /*
-//             * Must explicitly disable Iterator#remove().
-//             */
+//        // conditional range check on the key.
+//        
+//        if (fromKey != null)
+//            assert rangeCheck(fromKey,false);
 //
-//            return new ReadOnlyEntryIterator(src);
+//        if (toKey != null)
+//            assert rangeCheck(toKey,true);
 //
-//        } else {
+//        final ITupleIterator src = getRoot().rangeIterator(fromKey, toKey,
+//                flags);
 //
-//            /*
-//             * Iterator#remove() MAY be supported.
-//             */
-//
-//            return src;
-//
-//        }
-
-    }
+//        return src;
+//        
+//    }
 
     /**
      * Core implementation.
      * <p>
-     * Note: The returned iterator supports traversal with concurrent
-     * modification by a single-threaded process (the {@link BTree} is NOT
-     * thread-safe for writers) if the {@link BTree} allows writes.
+     * Note: If {@link IRangeQuery#CURSOR} is specified the returned iterator
+     * supports traversal with concurrent modification by a single-threaded
+     * process (the {@link BTree} is NOT thread-safe for writers). Write are
+     * permitted iff {@link AbstractBTree} allows writes.
      * <p>
      * Note: {@link IRangeQuery#REVERSE} is handled here by wrapping the
      * underlying {@link ITupleCursor}.
      * <p>
      * Note: {@link IRangeQuery#REMOVEALL} is handled here by wrapping the
      * iterator.
-     * 
-     * FIXME Rewrite FusedView's iterator to implement {@link ITupleCursor}.
-     * 
-     * FIXME Rewrite the iterators based on the {@link ResultSet} to implement
-     * {@link ITupleCursor}.
-     * 
-     * FIXME Modify {@link PartitionedRangeQueryIterator} to not always require
-     * KEYS.
-     * 
-     * FIXME change the return type of
-     * {@link AbstractBTree#rangeIterator(byte[], byte[], int, int, ITupleFilter)}
-     * to {@link ITupleCursor} in order to allow access handle prior/next
-     * access. This will require an {@link ITupleCursor} implementation that
-     * delegates to an {@link ITupleIterator} and throws an
-     * {@link UnsupportedOperationException} for the methods not found on that
-     * interface.  The {@link AbstractTupleFilterator} should use that delegate
-     * class.
-     * 
-     * FIXME The {@link ClientIndexView} will need be modified to defer request
-     * of the initial result set until the caller uses first(), last(), seek(),
-     * hasNext(), or hasPrior().
-     * 
-     * FIXME See {@link AbstractTupleFilterator} for many, many notes about the
-     * new interator constructs and things that can be changed once they are
-     * running, including the implementation of the prefix scans, etc.
-     * 
-     * FIXME When iterators are stacked make sure that remove() semantics are
-     * not broken by buffering - it should always remove the "current" tuple.
-     * The problem mainly arises with look-ahead (1) constructions.
      */
     public ITupleIterator rangeIterator(final byte[] fromKey,
             final byte[] toKey, final int capacity, final int flags,
-            final ITupleFilter filter) {
+            final IFilterConstructor filter) {
 
         counters.nrangeIterator++;
 
-        if (true && (this instanceof BTree) && ((flags & REVERSE) == 0)
+        /*
+         * Figure out what base iterator implementation to use.  We will layer
+         * on the optional filter(s) below. 
+         */
+        ITupleIterator src;
+
+        if ((this instanceof BTree) && ((flags & REVERSE) == 0)
                 && ((flags & REMOVEALL) == 0) && ((flags & CURSOR) == 0)) {
 
             /*
              * Use the faster recursion-based striterator.
+             * 
+             * Note: The recursion-based striterator does not support remove()!
+             * 
+             * @todo we could pass in the Tuple here to make the APIs a bit more
+             * consistent across the recursion-based and the cursor based
+             * iterators.
              */
-            
-            return fastForwardIterator(fromKey, toKey, capacity, flags, filter);
-            
-        }
-        
-        final Tuple tuple = new Tuple(this, flags);
 
-        ITupleIterator src;
+//            src = fastForwardIterator(fromKey, toKey, capacity, flags);
 
-        if (this instanceof IndexSegment) {
+            src = getRoot().rangeIterator(fromKey, toKey, flags);
 
-            src = new IndexSegmentTupleCursor((IndexSegment) this, tuple,
-                    fromKey, toKey);
+        } else {
 
-        } else if (this instanceof BTree) {
+            final Tuple tuple = new Tuple(this, flags);
 
-            if (isReadOnly()) {
+            if (this instanceof IndexSegment) {
 
-                // Note: this iterator does not allow removal.
-                src = new ReadOnlyBTreeTupleCursor(((BTree) this), tuple,
+                src = new IndexSegmentTupleCursor((IndexSegment) this, tuple,
                         fromKey, toKey);
+
+            } else if (this instanceof BTree) {
+
+                if (isReadOnly()) {
+
+                    // Note: this iterator does not allow removal.
+                    src = new ReadOnlyBTreeTupleCursor(((BTree) this), tuple,
+                            fromKey, toKey);
+
+                } else {
+
+                    // Note: this iterator supports traversal with concurrent
+                    // modification.
+                    src = new MutableBTreeTupleCursor(((BTree) this),
+                            new Tuple(this, flags), fromKey, toKey);
+
+                }
 
             } else {
 
-                // Note: this iterator supports traversal with concurrent
-                // modification.
-                src = new MutableBTreeTupleCursor(((BTree) this), new Tuple(
-                        this, flags), fromKey, toKey);
+                throw new UnsupportedOperationException(
+                        "Unknown B+Tree implementation: "
+                                + this.getClass().getName());
 
             }
 
-        } else {
-            
-            throw new UnsupportedOperationException(
-                    "Unknown B+Tree implementation: "
-                            + this.getClass().getName());
-            
-        }
-        
-        if ((flags & REVERSE) != 0) {
+            if ((flags & REVERSE) != 0) {
 
-            /*
-             * Reverse scan iterator.
-             * 
-             * Note: The reverse scan MUST be layered directly over the
-             * ITupleCursor. Most critically, REMOVEALL combined with a REVERSE
-             * scan needs to process the tuples in reverse index order and then
-             * delete them as it goes.
-             * 
-             * @todo As an alternative the ITupleCursor could be used in place
-             * of the ITupleIterator return type throughout the system and then
-             * you can just do whatever you want from the client.
-             */
-            
-            src = new Reverserator((ITupleCursor)src);
-            
+                /*
+                 * Reverse scan iterator.
+                 * 
+                 * Note: The reverse scan MUST be layered directly over the
+                 * ITupleCursor. Most critically, REMOVEALL combined with a
+                 * REVERSE scan needs to process the tuples in reverse index
+                 * order and then delete them as it goes.
+                 */
+
+                src = new Reverserator((ITupleCursor) src);
+
+            }
+
         }
-        
+
         if (filter != null) {
 
             /*
              * Apply the optional filter.
              * 
              * Note: This needs to be after the reverse scan and before
-             * REMOVEALL (those are the assumptions for the flags - in fact a
-             * general purpose layering of iterators or cursors would allow
-             * other stackings here such as remove everything but only pass
-             * back to me those things that pass this filter).
-             * 
-             * FIXME ITupleFilter is slated for replacement by a more general
-             * purpose layering of iterators and/or cursors.
-             * 
-             * @todo there should be explicit unit tests for the filter.
+             * REMOVEALL (those are the assumptions for the flags).
              */
-            src = new AbstractTupleFilterator(src) {
-
-                @Override
-                protected boolean isValid(ITuple tuple) {
-
-                    return filter.isValid(tuple);
-                    
-                }
-                
-            };
+            
+            src = filter.newInstance(src);
             
         }
         
         if ((flags & REMOVEALL) != 0) {
             
             assertNotReadOnly();
-
+            
             /*
              * Note: This iterator removes each tuple that it visits from the
              * source iterator.
              */
-            src = new Removerator(src);
+            
+            src = new TupleRemover() {
+                @Override
+                protected boolean remove(ITuple e) {
+                    // remove all visited tuples.
+                    return true;
+                }
+            }.filter(src);
 
         }
-
+        
         return src;
 
     }

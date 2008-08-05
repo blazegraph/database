@@ -120,7 +120,8 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
                 // term identifers will be in ascending order.
                 Arrays.sort(expected);
 
-                assertSameItr(expected, store.getSPORelation().distinctTermScan(SPOKeyOrder.SPO));
+                assertSameItr(expected, store.getSPORelation()
+                        .distinctTermScan(SPOKeyOrder.SPO));
 
             }
 

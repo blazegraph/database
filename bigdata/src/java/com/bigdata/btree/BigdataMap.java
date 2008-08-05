@@ -37,6 +37,10 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedMap;
 
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.keys.KeyBuilder;
+
 /**
  * A flyweight {@link SortedMap} wrapping a B+Tree.
  * <p>
@@ -355,7 +359,8 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
     }
 
     /**
-     * Note: This performs an index scan but stops as soon as a match is found.
+     * Note: This performs an index scan (since the values of the map are
+     * unordered) but stops as soon as a match is found.
      */
     public boolean containsValue(Object value) {
 
@@ -363,16 +368,17 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
 
         final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.VALS/* flags */,
-                new TupleFilter(val) {
+                new FilterConstructor().addFilter(new TupleFilter() {
 
                     private static final long serialVersionUID = 1L;
 
-                    public boolean isValid(ITuple tuple) {
+                    @Override
+                    protected boolean isValid(ITuple tuple) {
 
-                        return BytesUtil.bytesEqual(tuple.getValue(),val);
-                        
+                        return BytesUtil.bytesEqual(tuple.getValue(), val);
+
                     }
-                });
+                }));
 
         while(itr.hasNext()) {
 

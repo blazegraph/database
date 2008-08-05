@@ -34,7 +34,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 
 /**
  * Flyweight implementation for wrapping a <code>byte[][]</code> with

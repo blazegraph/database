@@ -28,11 +28,11 @@
 
 package com.bigdata.rdf.spo;
 
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.rdf.inf.Justification;
 
 /**

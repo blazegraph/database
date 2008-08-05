@@ -717,6 +717,7 @@ public class InferenceEngine extends RDFSVocabulary {
     public IChunkedOrderedIterator<SPO> backchainIterator(long s, long p,
             long o, IElementFilter<SPO> filter) {
 
+        // pass the filter to the server(s)
         final IChunkedOrderedIterator<SPO> src = database.getAccessPath(s, p,
                 o, filter).iterator();
         
@@ -748,6 +749,12 @@ public class InferenceEngine extends RDFSVocabulary {
          * 
          * Note: If we are not adding any entailments then we just use the
          * source iterator directly.
+         * 
+         * @todo why is the filter being passed in here? Can the backchaining
+         * iterators produce entailments that would violate the filter? If so,
+         * then shouldn't the filter be applied by the backchainers themselves
+         * so that they do not overgenerate? (This comment also applies for the
+         * type resource backchainer, below).
          */
 
         IChunkedOrderedIterator<SPO> itr = (ret == null ? src

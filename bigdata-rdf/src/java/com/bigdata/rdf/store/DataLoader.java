@@ -28,12 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Properties;
@@ -698,26 +699,12 @@ public class DataLoader {
              * If we do not find as a Resource then try the file system.
              */
             
-            rdfStream = new FileInputStream(resource);
-//            rdfStream = new BufferedInputStream(new FileInputStream(resource));
-
-            if (rdfStream == null) {
+            final File file = new File(resource);
+            
+            if(file.exists()) {
                 
-                // try as a URL
-                URL url;
-                try {
-
-                    url = new URL(resource);
-                    
-                } catch(MalformedURLException ex) {
-                    
-                    throw new IOException(
-                            "Could not find {classpath, file, URL}: "
-                                    + resource);
-                    
-                }
-                
-                rdfStream = url.openStream();
+                return loadFiles(0/* depth */, file, baseURL, rdfFormat,
+                        null/* filter */, endOfBatch);
                 
             }
             
@@ -728,7 +715,7 @@ public class DataLoader {
          */
 
         // @todo reuse the backing buffer to minimize heap churn. 
-        Reader reader = new BufferedReader(
+        final Reader reader = new BufferedReader(
                 new InputStreamReader(rdfStream)
 //               , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
                 );
@@ -749,6 +736,71 @@ public class DataLoader {
 
         }
         
+    }
+
+    public LoadStats loadFiles(File file, String baseURL, RDFFormat rdfFormat,
+            FilenameFilter filter) throws IOException {
+
+        return loadFiles(0/* depth */, file, baseURL, rdfFormat, filter, true/* endOfBatch */
+        );
+
+    }
+
+    protected LoadStats loadFiles(int depth, File file, String baseURL,
+            RDFFormat rdfFormat, FilenameFilter filter, boolean endOfBatch)
+            throws IOException {
+
+        if (file.isDirectory()) {
+
+            final LoadStats loadStats = new LoadStats();
+
+            final File[] files = (filter != null ? file.listFiles(filter)
+                    : file.listFiles());
+
+            for (int i = 0; i < files.length; i++) {
+
+                final File f = files[i];
+
+                final RDFFormat fmt = RDFFormat.forFileName(f.toString(),
+                        rdfFormat);
+
+                loadStats.add(loadFiles(depth + 1, f, baseURL, fmt, filter,
+                        (depth == 0 && i < files.length ? false : endOfBatch)));
+                
+            }
+            
+            return loadStats;
+            
+        }
+        
+        final InputStream rdfStream = new FileInputStream(file);
+
+        /* 
+         * Obtain a buffered reader on the input stream.
+         */
+
+        // @todo reuse the backing buffer to minimize heap churn. 
+        final Reader reader = new BufferedReader(
+                new InputStreamReader(rdfStream)
+//               , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
+                );
+        
+        try {
+
+            return loadData3(reader, baseURL, rdfFormat, endOfBatch);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException("While loading: " + file, ex);
+
+        } finally {
+
+            reader.close();
+
+            rdfStream.close();
+
+        }
+
     }
     
     /**

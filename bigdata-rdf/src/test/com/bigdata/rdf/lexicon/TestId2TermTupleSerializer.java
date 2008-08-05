@@ -47,8 +47,8 @@ Modifications:
 
 package com.bigdata.rdf.lexicon;
 
-import com.bigdata.btree.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.Id2TermTupleSerializer;
 

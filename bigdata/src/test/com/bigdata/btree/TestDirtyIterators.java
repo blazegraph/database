@@ -29,6 +29,8 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.keys.KeyBuilder;
+
 /**
  * Test suite for iterators that visit only dirty nodes or leaves. This test
  * suite was factored apart from {@link TestIterators} since this suite relies

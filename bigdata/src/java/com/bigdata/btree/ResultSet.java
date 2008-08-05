@@ -39,16 +39,13 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractTupleFilterator.AbstractTransformingTupleIterator;
+import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
 
 /**
  * An object used to stream key scan results back to the client.
- * 
- * FIXME support {@link AbstractTransformingTupleIterator} - must apply its
- * compression and serialization handlers and serialize them for the client.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -58,8 +55,6 @@ public class ResultSet implements Externalizable {
     private static final long serialVersionUID = -390738836663476282L;
 
     protected static final Logger log = Logger.getLogger(ResultSet.class);
-
-//  protected int rangeCountx;
 
     /** true iff keys were requested. */
     private boolean sendKeys;
@@ -88,29 +83,12 @@ public class ResultSet implements Externalizable {
     private long commitTime;
     
     /**
-     * Set automatically based on the {@link IndexMetadata}.
-     */
-    private IDataSerializer leafKeySerializer;
-
-    /**
-     * Set automatically based on the {@link IndexMetadata}.
-     */
-    private IDataSerializer leafValSerializer;
-    
-    /**
-     * Set automatically based on the {@link IndexMetadata}.
+     * Set automatically based on the first visited {@link ITuple} (this allows
+     * the {@link ITupleSerializer} to be overriden by an {@link ITupleFilter}
+     * chain).
      */
     private ITupleSerializer tupleSerializer;
     
-//    /**
-//     * Total #of key-value pairs within the key range (approximate).
-//     */
-//    public int getRangeCount() {
-//       
-//        return rangeCount;
-//        
-//    }
-
     /**
      * Actual #of key-value pairs in the {@link ResultSet}
      */
@@ -165,24 +143,6 @@ public class ResultSet implements Externalizable {
 
     }
 
-    /**
-     * The {@link IDataSerializer} used to (de-)compress the {@link #keys}.
-     */
-    final public IDataSerializer getLeafKeySerializer() {
-        
-        return leafKeySerializer;
-        
-    }
-    
-    /**
-     * The {@link IDataSerializer} used to (de-)compress the {@link #vals}.
-     */
-    final public IDataSerializer getLeafValueSerializer() {
-        
-        return leafValSerializer;
-        
-    }
-    
     /**
      * The {@link ITupleSerializer} that may be used to de-serialize the tuples
      * in the {@link ResultSet}.
@@ -427,12 +387,12 @@ public class ResultSet implements Externalizable {
         if (limit < 0)
             limit = -limit;
 
-        // @todo restore info level once working smoothly.
-//        if (log.isInfoEnabled()) {
+        if (log.isInfoEnabled()) {
 
-            log.warn("resizing buffers: ntuples=" + ntuples + ", new limit=" + limit);
+            log.info("resizing buffers: ntuples=" + ntuples + ", new limit="
+                    + limit);
 
-        // }
+        }
 
         if (this.keys != null) {
 
@@ -665,11 +625,7 @@ public class ResultSet implements Externalizable {
             sources[i] = (IResourceMetadata) in.readObject();
 
         }
-        
-        leafKeySerializer = (IDataSerializer)in.readObject();
 
-        leafValSerializer = (IDataSerializer)in.readObject();
-        
         tupleSerializer = (ITupleSerializer)in.readObject();
         
 // if (ntuples == 0) {
@@ -681,17 +637,28 @@ public class ResultSet implements Externalizable {
 //        }
         
         if (haveKeys) {
+            
             keys = new RandomAccessByteArray( 0, 0, new byte[ntuples][] );
-            leafKeySerializer.read(in, keys);
+            
+            
+            tupleSerializer.getLeafKeySerializer().read(in, keys);
+            
         } else {
+            
             keys = null;
+            
         }
 
         if (haveVals) {
+            
             vals = new RandomAccessByteArray(0, 0, new byte[ntuples][]);
-            leafValSerializer.read(in, vals);
+            
+            tupleSerializer.getLeafValueSerializer().read(in, vals);
+            
         } else {
+            
             vals = null;
+            
         }
         
         if (haveDeleteMarkers) {
@@ -781,10 +748,6 @@ public class ResultSet implements Externalizable {
 
         }
         
-        out.writeObject(leafKeySerializer);
-
-        out.writeObject(leafValSerializer);
-
         out.writeObject(tupleSerializer);
         
 // if (ntuples == 0) {
@@ -797,13 +760,13 @@ public class ResultSet implements Externalizable {
             
         if (keys != null) {
 
-            leafKeySerializer.write(out, keys);
+            tupleSerializer.getLeafKeySerializer().write(out, keys);
             
         }
 
         if (vals != null) {
 
-            leafValSerializer.write(out, vals);
+            tupleSerializer.getLeafValueSerializer().write(out, vals);
 
         }
         
@@ -819,7 +782,7 @@ public class ResultSet implements Externalizable {
         
         /*
          * @todo reuse the timestamp serialization logic from the NodeSerializer
-         * once something efficient has been identifier, e.g., huffman encoding
+         * once something efficient has been identified, e.g., huffman encoding
          * of timestamps.
          * 
          * @todo config on IndexMetadata along with serialization for the
@@ -879,7 +842,7 @@ public class ResultSet implements Externalizable {
      * @param flags
      *            The flags specified for the iterator. See {@link IRangeQuery}.
      */
-    public ResultSet(IIndex ndx, int flags) {
+    protected ResultSet(IIndex ndx, int flags) {
 
         if (ndx == null)
             throw new IllegalArgumentException();
@@ -890,11 +853,7 @@ public class ResultSet implements Externalizable {
 
         indexMetadata = ndx.getIndexMetadata();
         
-        leafKeySerializer = indexMetadata.getLeafKeySerializer();
-        
-        leafValSerializer = indexMetadata.getLeafValueSerializer();
-        
-        tupleSerializer = indexMetadata.getTupleSerializer();
+//        tupleSerializer = indexMetadata.getTupleSerializer();
         
         sources = ndx.getResourceMetadata();
 
@@ -936,7 +895,15 @@ public class ResultSet implements Externalizable {
 
         while (!isFull() && itr.hasNext()) {
 
-            copyTuple(tuple = itr.next());
+            tuple = itr.next();
+
+            if (tupleSerializer == null) {
+
+                tupleSerializer = tuple.getTupleSerializer();
+
+            }
+
+            copyTuple(tuple);
             
         }
 

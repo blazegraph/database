@@ -31,11 +31,11 @@ import java.io.IOException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.StatementEnum;

@@ -386,7 +386,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      * @param key
      * @param val
      */
-    protected void copyTuple(byte[] key, byte[] val) {
+    public void copyTuple(byte[] key, byte[] val) {
         
         copyTuple(key, val, false/* deleted */, 0L/* timestamp */);
         
@@ -400,7 +400,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      * @param deleted
      * @param timestamp
      */
-    protected void copyTuple(byte[] key, byte[] val, boolean deleted, long timestamp) {
+    public void copyTuple(byte[] key, byte[] val, boolean deleted, long timestamp) {
         
         this.nvisited++;
         
@@ -435,46 +435,54 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         }
 
     }
-    
-//    /**
-//     * Sets all fields and increments the tuple visited counter.
-//     * 
-//     * @param t
-//     *            Some tuple.
-//     */
-//    protected void copyTuple(ITuple t) {
-//        
-//        this.nvisited++;
-//        
-//        this.versionDeleted = t.isDeletedVersion();
-//        
-//        this.versionTimestamp = t.getVersionTimestamp();
-//
-//        if (needKeys) {
-//
-//            kbuf.reset().copy(t.getKeyBuffer());
-//
-//        }
-//
-//        if (needVals) {
-//
-//            vbuf.reset();
-//
-//            if (!versionDeleted) {
-//             
-//                isNull = t.isNull();
-//
-//                if (!isNull) {
-//
-//                    vbuf.copy(t.getValueBuffer());
+
+    /**
+     * Sets all fields and increments the tuple visited counter.
+     * 
+     * @param t
+     *            Some tuple.
+     */
+    public void copyTuple(ITuple t) {
+
+        this.nvisited++;
+
+        this.versionDeleted = t.isDeletedVersion();
+
+        this.versionTimestamp = t.getVersionTimestamp();
+
+        if (needKeys) {
+
+            kbuf.reset().copyAll(t.getKeyBuffer());
+            
+//          final ByteArrayBuffer tmp = t.getKeyBuffer();
+            
+//            kbuf.put(tmp.array(), 0/* offset */, tmp.limit());
+
+        }
+
+        if (needVals) {
+
+            vbuf.reset();
+
+            if (!versionDeleted) {
+
+                isNull = t.isNull();
+
+                if (!isNull) {
+
+                    vbuf.reset().copyAll(t.getValueBuffer());
+                    
+//                    final ByteArrayBuffer tmp = t.getValueBuffer();
 //                    
-//                }
-//                
-//            }
-//
-//        }
-//
-//    }
+//                    vbuf.put(tmp.array(), 0/* offset */, tmp.limit());
+
+                }
+
+            }
+
+        }
+
+    }
 
     /**
      * Clears the buffered data copied into the {@link AbstractTuple} from the
@@ -513,7 +521,20 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
                 
     }
 
+    /**
+     * Note: A de-serialization problem thrown out of {@link #toString()} MAY
+     * indicate that the {@link ITupleSerializer} was not overriden and a raw
+     * byte[] was stored as the tuple's value. In this case,
+     * {@link #getObject()} will attempt to use Java standard de-serialization
+     * on the byte[] value, which will, of course, fail. The fix for this
+     * problem is to specify the {@link NOPTupleSerializer} for the index. This
+     * problem may still show up in some of the test suites when the trace level
+     * is turned up since many of the tests were written before the
+     * {@link ITupleSerializer} abstraction was addeded.
+     */
     public String toString() {
+        
+        final Object obj = getObject();
         
         return super.toString()+
         "{nvisited="+nvisited+
@@ -521,7 +542,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
         (versionTimestamp == 0L ? "" : ", timestamp="+ getVersionTimestamp())+
         ", key="+(getKeysRequested()?Arrays.toString(getKey()):"N/A")+
         ", val="+(getValuesRequested()?(isNull()?"null":Arrays.toString(getValue())):"N/A")+
-        ", obj="+getObject()+
+        ", obj="+(obj instanceof byte[]?Arrays.toString((byte[])obj):obj)+
         "}";
         
     }

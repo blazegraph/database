@@ -25,8 +25,12 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
+import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;

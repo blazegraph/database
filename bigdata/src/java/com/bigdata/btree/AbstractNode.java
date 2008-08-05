@@ -36,6 +36,7 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.Expander;
@@ -593,7 +594,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     public ITupleIterator entryIterator() {
 
         return rangeIterator(null/* fromKey */, null/* toKey */,
-                IRangeQuery.DEFAULT, null/*filter*/);
+                IRangeQuery.DEFAULT);
         
     }
 
@@ -615,10 +616,10 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      *            they are visited by the returned iterator.
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int flags, ITupleFilter filter) {
+            int flags) {
 
-        return new PostOrderEntryIterator(btree,postOrderIterator(fromKey, toKey),
-                fromKey, toKey, flags, filter);
+        return new PostOrderEntryIterator(btree, postOrderIterator(fromKey,
+                toKey), fromKey, toKey, flags);
 
     }
 
@@ -645,20 +646,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * FIXME when using an {@link IndexSegment} provide for direct leaf
-     * successor scans.
-     * 
-     * FIXME Support update of the current value for an entry, delete of the
-     * entry, and insert of an entry into the current leaf.
-     * <p>
-     * <p>
-     * Note that if there are persistent nodes in the tree, then copy-on-write
-     * is triggered during traversal. In order for us to write an iterator-based
-     * delete of the existing keys (causing them to become "delete" markers) we
-     * need the iterator to handle concurrent modification, at least to the
-     * extent that it can follow the change from the persistent reference for a
-     * node to the new mutable reference for that node.
      */
     private static class PostOrderEntryIterator implements ITupleIterator {
         
@@ -687,11 +674,11 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         
         public PostOrderEntryIterator(AbstractBTree btree,
                 Iterator postOrderNodeIterator, final byte[] fromKey,
-                final byte[] toKey, int flags, final ITupleFilter filter) {
+                final byte[] toKey, int flags) {
             
             assert postOrderNodeIterator != null;
             
-            this.tuple = new Tuple(btree,flags);
+            this.tuple = new Tuple(btree, flags);
             
             this.src = new Striterator(postOrderNodeIterator);
             
@@ -718,7 +705,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
                         }
 
-                        return new LeafTupleIterator(leaf, tuple, fromKey, toKey, filter );
+                        return new LeafTupleIterator(leaf, tuple, fromKey, toKey);
 
 //                        return ((Leaf)child).entryIterator();
 

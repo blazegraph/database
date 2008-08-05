@@ -61,7 +61,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Unit tests for
- * {@link LexiconRelation#completionScan(org.openrdf.model.Literal[])}.
+ * {@link LexiconRelation#prefixScan(org.openrdf.model.Literal[])}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -85,8 +85,6 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
      * Unit test for a completion scan.
      */
     public void test_completionScan() {
-
-//        LocalTripleStore store = new LocalTripleStore(getProperties());
         
         AbstractTripleStore store = getStore();
 
@@ -117,7 +115,7 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
              */
             {
                 
-                Set<Literal> expected = new HashSet<Literal>();
+                final Set<Literal> expected = new HashSet<Literal>();
                 
                 expected.add(new LiteralImpl("minor"));
 
@@ -127,7 +125,8 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
 
                 expected.add(new LiteralImpl("minority report"));
                 
-                Iterator<Long> itr = store.getLexiconRelation().completionScan(new LiteralImpl("minor"));
+                final Iterator<Long> itr = store.getLexiconRelation()
+                        .prefixScan(new LiteralImpl("minor"));
 
                 while(itr.hasNext()) {
                     

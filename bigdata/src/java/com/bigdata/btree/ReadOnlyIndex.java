@@ -29,6 +29,10 @@ package com.bigdata.btree;
 
 import java.util.Iterator;
 
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
@@ -102,7 +106,7 @@ public class ReadOnlyIndex extends DelegateIndex {
      * {@link IRangeQuery#REMOVEALL} and {@link Iterator#remove()} are disabled.
      */
     final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, ITupleFilter filter) {
+            int capacity, int flags, IFilterConstructor filter) {
 
         if ((flags & REMOVEALL) != 0) {
 

@@ -31,23 +31,19 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
 import com.bigdata.btree.IDataSerializer.SimplePrefixSerializer;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.DefaultSplitHandler;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -196,24 +192,6 @@ import com.bigdata.sparse.SparseRowStore;
  *       serializers, etc. while the existing objects will still have their old
  *       key/val serializers and therefore can still be read.
  * 
- * @todo it would be nice to add an object to the {@link IndexMetadata} and this
- *       class that know how to convert an Object into a byte[] value and a
- *       byte[] value into an Object. This would let us hide much of the
- *       complexity of managing byte[]s from applications that are not
- *       interested in that sort of thing.
- * 
- * @todo it would be nice to add an object to the {@link IndexMetadata} and this
- *       class that know how to convert an Object into a key (keys can not be
- *       easily reversed for most indices).
- * 
- * @todo it would be nice to have {@link Set} and {@link Map} implementations
- *       wrapping an {@link AbstractBTree} (or an {@link IIndex}). These might
- *       be written using objects such as described above for converting
- *       application objects to unsigned byte[] keys and application objects
- *       to/from byte[] values.  In order to be able to visit the keySet the
- *       caller must provide a suitable {@link IKeySerializer}.
- *       <p>
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -259,8 +237,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
     private String checkpointClassName;
     private IAddressSerializer addrSer;
     private IDataSerializer nodeKeySer;
-    private IDataSerializer leafKeySer;
-    private IDataSerializer leafValSer;
     private ITupleSerializer tupleSer;
     private IConflictResolver conflictResolver;
     private boolean deleteMarkers;
@@ -389,40 +365,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
      * used to provide compression across the already serialized node for the
      * leaf.
      * 
-     * @see #getKeySerializer()
+     * @see #getTupleSerializer()
      */
     public final IDataSerializer getNodeKeySerializer() {return nodeKeySer;}
     
     /**
-     * The object used to (de-)serialize/(de-)compress the values in a leaf.
+     * The object used to form unsigned byte[] keys from Java objects, to
+     * (de-)serialize Java object stored in the index, and to (de-)compress the
+     * keys and values when stored in a leaf or {@link ResultSet}.
      * <p>
-     * Note: This handles the "serialization" of the <code>byte[][]</code>
-     * containing all of the keys for some leaf of the index. As such it may be
-     * used to provide compression across the already serialized keys in the
-     * leaf.
-     * 
-     * @see #getKeySerializer()
-     */
-    public final IDataSerializer getLeafValueSerializer() {return leafValSer;}
-   
-    /**
-     * The object used to (de-)serialize/(de-)compress the keys in a leaf.
-     * <p>
-     * Note: This handles the "serialization" of the <code>byte[][]</code>
-     * containing all of the values for some leaf of the index. As such it may
-     * be used to provide compression across the already serialized values in
-     * the leaf.
-     * 
-     * @see #getValueSerializer()
-     */
-    public final IDataSerializer getLeafKeySerializer() {return leafKeySer;}
-    
-    /**
-     * The object form unsigned byte[] keys from Java objects and to
-     * (de-)serialize Java object stored in the index.
-     * <p>
-     * Note: If you NOT change this value in a manner that is not backward
-     * compatable once entries have been written on the index then you will be
+     * Note: If you change this value in a manner that is not backward
+     * compatable once entries have been written on the index then you may be
      * unable to any read data already written.
      */
     public final ITupleSerializer getTupleSerializer() {return tupleSer;}
@@ -514,24 +467,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
             throw new IllegalArgumentException();
         
         this.nodeKeySer = nodeKeySer;
-        
-    }
-
-    public void setLeafKeySerializer(IDataSerializer leafKeySer) {
-
-        if (leafKeySer == null)
-            throw new IllegalArgumentException();
-
-        this.leafKeySer = leafKeySer;
-        
-    }
-
-    public void setLeafValueSerializer(IDataSerializer valueSer) {
-        
-        if (valueSer == null)
-            throw new IllegalArgumentException();
-
-        this.leafValSer = valueSer;
         
     }
 
@@ -725,17 +660,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
         
-        this.leafKeySer = SimplePrefixSerializer.INSTANCE;
-        
-        this.leafValSer = DefaultDataSerializer.INSTANCE;
-        
-        /*
-         * Note: The IKeyBuilderFactory uses whatever default is in place on the
-         * host/JVM where the IndexMetadata is created. That factory object will
-         * then be serialized so that the specific configuration values are
-         * maintained for all users of the index.
-         */
-        this.tupleSer = new DefaultTupleSerializer(new DefaultKeyBuilderFactory(new Properties()));
+        this.tupleSer = DefaultTupleSerializer.newInstance();
 
         this.conflictResolver = null;
         
@@ -846,8 +771,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         sb.append(", checkpointClass=" + checkpointClassName);
         sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
-        sb.append(", leafKeySerializer=" + leafKeySer.getClass().getName());
-        sb.append(", leafValueSerializer=" + leafValSer.getClass().getName());
         sb.append(", tupleSerializer=" + tupleSer.getClass().getName());
         sb.append(", conflictResolver="
                 + (conflictResolver == null ? "N/A" : conflictResolver
@@ -908,10 +831,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         nodeKeySer = (IDataSerializer)in.readObject();
 
-        leafKeySer = (IDataSerializer)in.readObject();
-
-        leafValSer = (IDataSerializer)in.readObject();
-
         tupleSer = (ITupleSerializer)in.readObject();
         
         conflictResolver = (IConflictResolver)in.readObject();
@@ -962,10 +881,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
         
         out.writeObject(nodeKeySer);
 
-        out.writeObject(leafKeySer);
-
-        out.writeObject(leafValSer);
-        
         out.writeObject(tupleSer);
         
         out.writeObject(conflictResolver);
