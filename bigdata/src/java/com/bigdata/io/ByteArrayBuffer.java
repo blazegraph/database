@@ -697,14 +697,17 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     }
     
     /**
-     * Relative copy of data into <i>this</i> buffer. 
+     * Relative copy data from the <strong>current position</strong> of the
+     * source buffer up to its read limit into <i>this</i> buffer.
      * 
      * @param src
-     *            The source.
+     *            The source buffer.
      * 
      * @return The #of bytes copied.
+     * 
+     * @see #copyAll(ByteArrayBuffer)
      */
-    final public int copy(ByteArrayBuffer src) {
+    final public int copyRest(ByteArrayBuffer src) {
         
         final int n = src.remaining();
 
@@ -716,6 +719,31 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         
         return n;
         
+    }
+    
+    /**
+     * Relative copy data from the <strong>origin</strong> (offset ZERO) of the
+     * source buffer up to its read limit into <i>this</i> buffer.
+     * 
+     * @param src
+     *            The source buffer.
+     * 
+     * @return The #of bytes copied.
+     * 
+     * @see #copyRest(ByteArrayBuffer)
+     */
+    final public int copyAll(ByteArrayBuffer src) {
+
+        final int n = src.limit;
+
+        if (n > 0) {
+
+            put(src.buf, 0/* offset */, n);
+
+        }
+
+        return n;
+
     }
     
     /**

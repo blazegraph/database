@@ -32,7 +32,7 @@ import java.io.Reader;
 import java.io.StreamTokenizer;
 import java.util.UUID;
 
-import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.service.mapred.AbstractFileInputMapTask;
 import com.bigdata.service.mapred.IHashFunction;
 

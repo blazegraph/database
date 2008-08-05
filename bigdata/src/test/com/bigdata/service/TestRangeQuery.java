@@ -33,12 +33,14 @@ import java.util.UUID;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.TupleFilter;
-import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.NOPTupleSerializer;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
 
@@ -573,6 +575,8 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
         metadata.setDeleteMarkers(true);
+        
+        metadata.setTupleSerializer(NOPTupleSerializer.INSTANCE);
 
         fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
@@ -600,31 +604,30 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
             
         }
 
-        ndx.submit(0/*fromIndex*/,nentries/*toIndex*/, keys, vals,
+        ndx.submit(0/* fromIndex */, nentries/* toIndex */, keys, vals,
                 BatchInsertConstructor.RETURN_NO_VALUES, null/* handler */);
 
-        /*
-         * Filter selects only the even keys.
-         */
-        ITupleFilter filter = new TupleFilter() {
+        final IFilterConstructor filter = new FilterConstructor()
+                .addFilter(new TupleFilter() {
 
-            private static final long serialVersionUID = 1L;
+                    private static final long serialVersionUID = 1L;
 
-            public boolean isValid(ITuple tuple) {
+                    protected boolean isValid(ITuple tuple) {
+
+                        final byte[] key = tuple.getKey();
+
+                        final int i = KeyBuilder.decodeInt(key, 0);
+
+                        // delete only the even keys.
+                        if (i % 2 == 0)
+                            return true;
+
+                        return false;
+
+                    }
+
+                });
                 
-                byte[] key = tuple.getKey();
-                
-                int i = KeyBuilder.decodeInt(key, 0);
-                
-                // delete only the even keys.
-                if(i % 2 == 0) return true;
-                
-                return false;
-                
-            }
-            
-        };
-        
         /*
          * Range delete the keys matching the filter.
          */

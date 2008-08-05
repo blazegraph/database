@@ -30,12 +30,12 @@ package com.bigdata.sparse;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 
 /**
  * Test suite for round trip of keys as encoded by
- * {@link Schema#fromKey(com.bigdata.btree.IKeyBuilder, Object)}, by
+ * {@link Schema#fromKey(com.bigdata.btree.keys.IKeyBuilder, Object)}, by
  * {@link AtomicRowWriteRead}, and as decoded by the {@link KeyDecoder}.
  * <p>
  * Note: Not all information can be fully decoded. In particular, the exact

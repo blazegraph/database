@@ -25,7 +25,7 @@ package com.bigdata.journal;
 
 import java.util.Properties;
 
-import com.bigdata.btree.IKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rawstore.IMRMW;
 
 /**

@@ -2,9 +2,9 @@ package com.bigdata.relation.accesspath;
 
 import java.util.Collections;
 
-import com.bigdata.btree.EmptyTupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.relation.rule.IPredicate;
 
 /**

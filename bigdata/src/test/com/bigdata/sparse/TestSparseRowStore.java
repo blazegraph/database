@@ -40,11 +40,11 @@ import java.util.Vector;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -475,8 +475,9 @@ public class TestSparseRowStore extends TestCase2 {
      * Test of a logical row scan.
      * 
      * @todo Write a variant in which we test with multiple index partitions to
-     *       verify that the {@link AtomicRowScan} is correctly mapped across
-     *       the various index partitions.
+     *       verify that the logical row scan correctly crosses the various
+     *       index partitions.  Do this for reverse traversal of logical rows
+     *       also.
      */
     public void test_rowScan() {
      
@@ -508,7 +509,7 @@ public class TestSparseRowStore extends TestCase2 {
 
         }
 
-        Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
+        final Iterator<? extends ITPS> itr = srs.rangeQuery(schema,
                 null/* fromKey */, null/* toKey */);
         
         {
@@ -619,9 +620,6 @@ public class TestSparseRowStore extends TestCase2 {
     /**
      * Test of a logical row scan requiring continuation queries by forcing the
      * capacity to 1 when there are in fact two logical rows.
-     * 
-     * FIXME This test fails for a known reason - continuation query semantics
-     * have not been implemented yet. See {@link AtomicRowScan}.
      */
     public void test_rowScan_continuationQuery() {
      
@@ -674,10 +672,10 @@ public class TestSparseRowStore extends TestCase2 {
         {
 
             /*
-             * FIXME The test will fail here since continuation queries are not
+             * The test will fail here if continuation queries are not
              * implemented.
              */
-            assertTrue(itr.hasNext());
+            assertTrue("Did not issue continuation query?",itr.hasNext());
 
             final ITPS tps = itr.next();
          

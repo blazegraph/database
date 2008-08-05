@@ -27,14 +27,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.RangeCountProcedure;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.btree.proc.RangeCountProcedure;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
@@ -445,17 +445,17 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
          */
         // not so interesting to cache, but could cache the iterator results on the scale-out index.
         public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-                int capacity, int flags, ITupleFilter filter) {
+                int capacity, int flags, IFilterConstructor filter) {
 
             return new RawDataServiceRangeIterator(getMetadataService(),//
                     MetadataService.getMetadataIndexName(name), //
                     (timestamp==ITx.UNISOLATED?ITx.READ_COMMITTED:timestamp),//
                     true, // read-consistent semantics.
-                    null, // fromKey
-                    null, // toKey
-                    0, // capacity
+                    fromKey,//
+                    toKey,//
+                    capacity,//
                     IRangeQuery.KEYS | IRangeQuery.VALS, //
-                    null // filter
+                    filter
             );
 
         }

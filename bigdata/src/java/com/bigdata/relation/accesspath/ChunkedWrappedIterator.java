@@ -91,6 +91,11 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      * @param filter
      *            Optional filter. When non-<code>null</code> only elements
      *            accepted by the filter will be visited by this iterator.
+     *            <p>
+     *            Note: This filter will be applied on the client side after
+     *            tuples have already been resolved to relation elements. Where
+     *            possible, you are better off passing the filter into the
+     *            source iterator running on the server(s).
      */
     @SuppressWarnings("unchecked")
     public ChunkedWrappedIterator(Iterator<E> src, int chunkSize,
@@ -111,7 +116,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         
         this.src = (filter == null //
                 ? src //
-                : new Striterator(src).addFilter(new Filter(filter){
+                : new Striterator(src).addFilter(new Filter(){
 
                     private static final long serialVersionUID = 1L;
 

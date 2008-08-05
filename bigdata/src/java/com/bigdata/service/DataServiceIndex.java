@@ -29,23 +29,23 @@ package com.bigdata.service;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IResultHandler;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.RangeCountProcedure;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
-import com.bigdata.btree.BatchContains.BatchContainsConstructor;
-import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
-import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
-import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
-import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.btree.proc.RangeCountProcedure;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.OneShotInstrument;
@@ -342,7 +342,7 @@ public class DataServiceIndex implements IClientIndex {
     }
 
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, ITupleFilter filter) {
+            int capacity, int flags, IFilterConstructor filter) {
 
         // @todo make this a ctor argument or settable property?
         final boolean readConsistent = (timestamp == ITx.UNISOLATED ? false

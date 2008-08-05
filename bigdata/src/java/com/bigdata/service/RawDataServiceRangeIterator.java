@@ -33,11 +33,11 @@ import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractChunkedRangeIterator;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
@@ -116,7 +116,7 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      */
     public RawDataServiceRangeIterator(IDataService dataService, String name,
             long timestamp, boolean readConsistent, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, ITupleFilter filter) {
+            byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
 
         super(fromKey, toKey, capacity, flags, filter);
         
@@ -165,7 +165,7 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      */
     @Override
     protected ResultSet getResultSet(long timestamp, byte[] _fromKey, byte[] toKey, int capacity,
-            int flags, ITupleFilter filter) {
+            int flags, IFilterConstructor filter) {
 
         if(log.isInfoEnabled()) log.info("name=" + name + ", fromKey=" + BytesUtil.toString(_fromKey)
                 + ", toKey=" + BytesUtil.toString(toKey)+", dataService="+dataService);

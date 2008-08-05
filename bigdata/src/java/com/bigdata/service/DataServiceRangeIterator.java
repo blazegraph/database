@@ -31,8 +31,8 @@ import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.ITupleFilter;
-import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
@@ -73,7 +73,7 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
             IDataService dataService, String name, long timestamp,
             boolean readConsistent,
             byte[] fromKey, byte[] toKey, int capacity, int flags,
-            ITupleFilter filter) {
+            IFilterConstructor filter) {
 
         super(dataService, name, timestamp, readConsistent, fromKey, toKey,
                 capacity, flags, filter);
@@ -107,7 +107,7 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
      * <p>
      * Note: The {@link StaleLocatorException} CAN NOT arise from any other
      * method since only
-     * {@link #getResultSet(byte[], byte[], int, int, ITupleFilter)} actually
+     * {@link #getResultSet(byte[], byte[], int, int, IFilterConstructor)} actually
      * reads from the {@link IDataService} and ALL calls to that method are
      * driven by {@link #hasNext()}.
      * <p>

@@ -32,7 +32,6 @@ import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.rule.IPredicate;
 
@@ -134,8 +133,6 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
     // FIXME These need to be raised in the API so that they can be passed down.
     final private int flags = IRangeQuery.DEFAULT;
 
-    final private ITupleFilter filter = null;
-
     /**
      * @throws UnsupportedOperationException
      *             always.
@@ -151,11 +148,11 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
     
     public ITupleIterator<E> rangeIterator() {
 
-        return rangeIterator(0, flags, filter);
+        return rangeIterator(0, flags);
         
     }
     
-    protected ITupleIterator<E> rangeIterator(int capacity, int flags, ITupleFilter filter) {
+    protected ITupleIterator<E> rangeIterator(int capacity, int flags) {
 
         /*
          * @todo The modification to drive the range iterator capacity, flags
@@ -168,7 +165,7 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
          * discard a historical undeleted entry later in the predence order for
          * the view.
          */
-        return new FusedEntryIterator(
+        return new FusedEntryIterator<E>(
                 false, // ALLVERSIOSN
                 new ITupleIterator[] {
                 path1.rangeIterator(),//
@@ -180,15 +177,15 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     public IChunkedOrderedIterator<E> iterator() {
 
-        return iterator(0,0);
+        return iterator(0, 0);
 
     }
 
     public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
 
         // @todo optimizations for point tests and small limits.
-        return new ChunkedWrappedIterator<E>(new Striterator(rangeIterator(capacity,
-                flags, filter)).addFilter(new Resolver() {
+        return new ChunkedWrappedIterator<E>(new Striterator(rangeIterator(
+                capacity, flags)).addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 0L;
 

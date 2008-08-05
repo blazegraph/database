@@ -67,12 +67,12 @@ import org.apache.lucene.analysis.th.ThaiAnalyzer;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IKeyBuilderFactory;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;

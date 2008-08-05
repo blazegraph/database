@@ -29,8 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 
 /**

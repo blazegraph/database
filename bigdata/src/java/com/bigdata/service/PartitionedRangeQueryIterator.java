@@ -27,14 +27,15 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DelegateTuple;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.ITupleFilter;
+import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
@@ -102,7 +103,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      */
     private final int flags;
     
-    private final ITupleFilter filter;
+    private final IFilterConstructor filter;
     
     /**
      * The last key that was visited on the {@link #src} iterator. This is used
@@ -211,7 +212,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      */
     public PartitionedRangeQueryIterator(ClientIndexView ndx,
             boolean readConsistent, byte[] fromKey, byte[] toKey, int capacity,
-            int flags, ITupleFilter filter) {
+            int flags, IFilterConstructor filter) {
 
         if (ndx == null) {
 
