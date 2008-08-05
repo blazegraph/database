@@ -31,6 +31,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -47,6 +49,8 @@ import com.bigdata.relation.accesspath.IClosableIterator;
 import com.bigdata.relation.accesspath.IKeyOrder;
 
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -69,6 +73,8 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */ 
 public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SPO> {
+
+    protected static final Logger log = Logger.getLogger(BackchainTypeResourceIterator.class);
     
     protected final static transient long NULL = IRawTripleStore.NULL;
     
@@ -83,15 +89,16 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      * The subject(s) whose (s rdf:type rdfs:Resource) entailments will be
      * visited.
      */
-    private IClosableIterator<Long> resourceIds;
+    private PushbackIterator<Long> resourceIds;
     
     /**
-     * An iterator reading on the {@link SPOKeyOrder#POS} index. The predicate is
-     * bound to <code>rdf:type</code> and the object is bound to
+     * An iterator reading on the {@link SPOKeyOrder#POS} index. The predicate
+     * is bound to <code>rdf:type</code> and the object is bound to
      * <code>rdfs:Resource</code>. If the subject was given to the ctor, then
-     * it will also be bound.
+     * it will also be bound. The iterator visits the term identifier for the
+     * <em>subject</em> position.
      */
-    private IChunkedOrderedIterator<SPO> posItr;
+    private PushbackIterator<Long> posItr;
     
     private boolean sourceExhausted = false;
     
@@ -134,6 +141,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      *            The term identifier that corresponds to rdf:Resource for the
      *            database.
      */
+    @SuppressWarnings({ "unchecked", "serial" })
     public BackchainTypeResourceIterator(IChunkedOrderedIterator<SPO> src,
             long s, long p, long o, AbstractTripleStore db, final long rdfType,
             final long rdfsResource) {
@@ -192,22 +200,29 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
 //            resourceIds = db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO);
             
-            resourceIds = new MergedOrderedIterator(//
+            resourceIds = new PushbackIterator<Long>(new MergedOrderedIterator(//
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO), //
-                    db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP, new ITermIdFilter() {
-                        private static final long serialVersionUID = 1L;
-                        public boolean isValid(long termId) {
-                            // filter out literals from the OSP scan.
-                            return !AbstractTripleStore.isLiteral(termId);
-                        }
-                    }));
+                    db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP,
+                            new ITermIdFilter() {
+                                public boolean isValid(long termId) {
+                                    // filter out literals from the OSP scan.
+                                    return !AbstractTripleStore
+                                            .isLiteral(termId);
+                                }
+                            })));
 
             /*
              * Reading (? rdf:Type rdfs:Resource) using the POS index.
              */
 
-            posItr = db.getAccessPath(NULL, rdfType, rdfsResource,
-                    ExplicitSPOFilter.INSTANCE).iterator();
+            posItr = new PushbackIterator<Long>(new Striterator(db.getAccessPath(
+                    NULL, rdfType, rdfsResource, ExplicitSPOFilter.INSTANCE)
+                    .iterator()).addFilter(new Resolver() {
+                @Override
+                protected Object resolve(Object obj) {
+                    return Long.valueOf(((SPO) obj).s);
+                }
+            }));
 
         } else if ((p == NULL || p == rdfType)
                 && (o == NULL || o == rdfsResource)) {
@@ -217,15 +232,21 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
              * rdfs:Resource).
              */
 
-            resourceIds = new ClosableSingleItemIterator<Long>(s);
+            resourceIds = new PushbackIterator<Long>(new ClosableSingleItemIterator<Long>(s));
 
             /*
              * Reading a single point (s type resource), so this will actually
              * use the SPO index.
              */
 
-            posItr = db.getAccessPath(s, rdfType, rdfsResource,
-                    ExplicitSPOFilter.INSTANCE).iterator();
+            posItr = new PushbackIterator<Long>(new Striterator(db.getAccessPath(s,
+                    rdfType, rdfsResource, ExplicitSPOFilter.INSTANCE)
+                    .iterator()).addFilter(new Resolver() {
+                @Override
+                protected Object resolve(Object obj) {
+                    return Long.valueOf(((SPO) obj).s);
+                }
+            }));
 
         } else {
 
@@ -233,14 +254,12 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
              * Backchain will not generate any statements.
              */
 
-            resourceIds = new ClosableEmptyIterator<Long>();
+            resourceIds = new PushbackIterator<Long>(new ClosableEmptyIterator<Long>());
 
             posItr = null;
             
         }
 
-//        this.db = db;
-        
         this.rdfType = rdfType;
         
         this.rdfsResource = rdfsResource;
@@ -345,32 +364,95 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
         if (src.hasNext()) {
 
-            current = src.next();
-
-        } else {
-
-            final long s = resourceIds.next();
-            /*
-             * FIXME should have member field of last visiting posItr and scan
-             * from that until GTE [s]. if GT then emit inference else emit
-             * explicit. and write unit test for this.
-             */
-            final SPO tmp = (posItr.hasNext() ? posItr.next() : null);
+            return current = src.next();
             
-            if (tmp != null) {
+        } else if(resourceIds.hasNext()) {
+
+            /*
+             * Examine resourceIds and posItr.
+             */
+            
+            // resourceIds is the source for _inferences_
+            final Long s1 = resourceIds.next();
+            
+            if(posItr.hasNext()) {
                 
-                current = tmp;
+                // posItr is the source for _explicit_ statements.
+                final Long s2 = posItr.next();
+                
+                final int cmp = s1.compareTo(s2);
+                
+                if (cmp < 0) {
+
+                    /*
+                     * Consuming from [resourceIds] (the term identifier ordered
+                     * LT the next term identifier from [posItr]).
+                     * 
+                     * There is NOT an explicit statement from [posItr], so emit
+                     * as an inference and pushback on [posItr].
+                     */
+                    
+                    current = new SPO(s1, rdfType, rdfsResource,
+                            StatementEnum.Inferred);
+
+                    posItr.pushback();
+                    
+                } else {
+                 
+                    /*
+                     * Consuming from [posItr].
+                     * 
+                     * There is an explicit statement for the current term
+                     * identifer from [resourceIds].
+                     */
+                    
+                    if (cmp != 0) {
+                        
+                        /*
+                         * Since [resourceIds] and [posItr] are NOT visiting the
+                         * same term identifier, we pushback on [resourceIds].
+                         * 
+                         * Note: When they DO visit the same term identifier
+                         * then we only emit the explicit statement and we
+                         * consume (rather than pushback) from [resourceIds].
+                         */
+                        
+                        resourceIds.pushback();
+                        
+                    }
+                    
+                    current = new SPO(s2, rdfType, rdfsResource,
+                            StatementEnum.Explicit);
+
+                }
                 
             } else {
-            
-                current = new SPO(s, rdfType, rdfsResource,
-                        StatementEnum.Inferred);
                 
+                /*
+                 * [posItr] is exhausted so just emit inferences based on
+                 * [resourceIds].
+                 */
+                
+                current = new SPO(s1, rdfType, rdfsResource,
+                        StatementEnum.Inferred);
+            
             }
 
+            return current;
+
+        } else {
+            
+            /*
+             * Finish off the [posItr]. Anything from this source is an explicit (?
+             * type resource) statement.
+             */
+            
+            assert posItr.hasNext();
+            
+            return new SPO(posItr.next(), rdfType, rdfsResource,
+                    StatementEnum.Explicit);
+            
         }
-    
-        return current;
         
     }
 
@@ -529,7 +611,8 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      * @version $Id$
      * @param <T>
      */
-    private static class MergedOrderedIterator<T extends Comparable> implements IChunkedIterator<T> {
+    private static class MergedOrderedIterator<T extends Comparable<T>>
+            implements IChunkedIterator<T> {
        
         private final IChunkedIterator<T> src1;
         private final IChunkedIterator<T> src2;
@@ -585,6 +668,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
             
             if (tmp1 == null) {
 
+                // src1 is exhausted so deliver from src2.
                 final T tmp = tmp2;
 
                 tmp2 = null;
@@ -595,6 +679,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
             
             if (tmp2 == null) {
 
+                // src2 is exhausted so deliver from src1.
                 final T tmp = tmp1;
 
                 tmp1 = null;
@@ -634,9 +719,136 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
         }
 
         public void remove() {
+
             throw new UnsupportedOperationException();
+            
         }
 
     }
-    
+
+    /**
+     * Filterator style construct that allows push back of a single visited
+     * element.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    public static class PushbackFilter<E> implements IFilter {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -8010263934867149205L;
+
+        @SuppressWarnings("unchecked")
+        public PushbackIterator<E> filter(Iterator src) {
+
+            return new PushbackIterator<E>((Iterator<E>) src);
+
+        }
+
+    }
+
+    /**
+     * Implementation class for {@link PushbackFilter}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    public static class PushbackIterator<E> implements Iterator<E>,
+            IClosableIterator<E> {
+
+        private final Iterator<E> src;
+
+        /**
+         * The most recent element visited by the iterator.
+         */
+        private E current;
+        
+        /**
+         * When non-<code>null</code>, this element was pushed back and
+         * is the next element to be visited.
+         */
+        private E buffer;
+
+        public PushbackIterator(Iterator<E> src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            this.src = src;
+
+        }
+
+        public boolean hasNext() {
+
+            return buffer != null || src.hasNext();
+
+        }
+
+        public E next() {
+
+            if (!hasNext())
+                throw new NoSuchElementException();
+
+            final E tmp;
+
+            if (buffer != null) {
+
+                tmp = buffer;
+
+                buffer = null;
+
+            } else {
+
+                tmp = src.next();
+
+            }
+
+            current = tmp;
+            
+            return tmp;
+
+        }
+
+        /**
+         * Push the value onto the internal buffer. It will be returned by the
+         * next call to {@link #next()}.
+         * 
+         * @param value
+         *            The value.
+         * 
+         * @throws IllegalStateException
+         *             if there is already a value pushed back.
+         */
+        public void pushback() {
+
+            if (buffer != null)
+                throw new IllegalStateException();
+            
+            // pushback the last visited element.
+            buffer = current;
+            
+        }
+        
+        public void remove() {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        public void close() {
+
+            if(src instanceof IClosableIterator) {
+
+                ((IClosableIterator<E>)src).close();
+                
+            }
+            
+        }
+
+    }
+
 }

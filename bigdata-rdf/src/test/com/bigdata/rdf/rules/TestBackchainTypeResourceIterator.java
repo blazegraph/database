@@ -226,9 +226,9 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             // adds rdf:Type and rdfs:Resource to the store.
             RDFSVocabulary vocab = new RDFSVocabulary(store);
 
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI B = new URIImpl("http://www.foo.org/B");
-            URI C = new URIImpl("http://www.foo.org/C");
+            final URI A = new URIImpl("http://www.foo.org/A");
+            final URI B = new URIImpl("http://www.foo.org/B");
+            final URI C = new URIImpl("http://www.foo.org/C");
 
             /*
              * add statements to the store.
@@ -238,17 +238,18 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
              * statements and also the (s type resource) entailments for both
              * distinct subjects.
              */
-            
-            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
-            
-            buffer.add(A, RDF.TYPE, B);
-            
-            buffer.add(A, RDF.TYPE, RDFS.RESOURCE);
-            
-            buffer.add(B, RDF.TYPE, C);
-            
-            buffer.flush();
+            {
+                final IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
 
+                buffer.add(A, RDF.TYPE, B);
+
+                buffer.add(A, RDF.TYPE, RDFS.RESOURCE);
+
+                buffer.add(B, RDF.TYPE, C);
+
+                buffer.flush();
+            }
+            
             IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(NULL, NULL, NULL).iterator(),//
                     NULL, NULL, NULL,//
@@ -281,8 +282,20 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                             store.getTermId(B), //
                             store.getTermId(RDF.TYPE), //
                             store.getTermId(RDFS.RESOURCE), //
-                            StatementEnum.Inferred)
+                            StatementEnum.Inferred),
                     
+                    new SPO(//
+                            store.getTermId(C), //
+                            store.getTermId(RDF.TYPE), //
+                            store.getTermId(RDFS.RESOURCE), //
+                            StatementEnum.Inferred),
+                    
+                    new SPO(//
+                            store.getTermId(RDFS.RESOURCE), //
+                            store.getTermId(RDF.TYPE), //
+                            store.getTermId(RDFS.RESOURCE), //
+                            StatementEnum.Inferred)
+
             },
             
             itr);
