@@ -33,6 +33,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.ITx;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
@@ -62,7 +64,13 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
      * @param name
      *            The name of an index partition of that scale-out index on the
      *            data service.
-     * @param timestamp The timestamp for that scale-out index view.
+     * @param timestamp
+     *            The timestamp used for the reads. If
+     *            {@link ITx#READ_COMMITTED}, then each read will be against
+     *            the most recent commit point on the database. If you want
+     *            read-consistent, then use
+     *            {@link IIndexStore#getLastCommitTime()} rather than
+     *            {@link ITx#READ_COMMITTED}.
      * @param fromKey
      * @param toKey
      * @param capacity
@@ -71,12 +79,11 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
      */
     public DataServiceRangeIterator(ClientIndexView ndx,
             IDataService dataService, String name, long timestamp,
-            boolean readConsistent,
             byte[] fromKey, byte[] toKey, int capacity, int flags,
             IFilterConstructor filter) {
 
-        super(dataService, name, timestamp, readConsistent, fromKey, toKey,
-                capacity, flags, filter);
+        super(dataService, name, timestamp, false/*readConsistent*/, fromKey,
+                toKey, capacity, flags, filter);
         
         if (ndx == null) {
 
@@ -84,11 +91,11 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
 
         }
 
-        if (timestamp != ndx.getTimestamp()) {
-
-            throw new IllegalArgumentException();
-        
-        }
+//        if (timestamp != ndx.getTimestamp()) {
+//
+//            throw new IllegalArgumentException();
+//        
+//        }
 
         this.ndx = ndx;
 

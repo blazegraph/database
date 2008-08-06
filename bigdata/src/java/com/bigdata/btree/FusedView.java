@@ -52,20 +52,11 @@ import com.bigdata.service.Split;
  * support deletion markers. The order of the sources MUST correspond to the
  * recency of their data. Writes will be directed to the first source in the
  * sequence (the most recent source). Deletion markers are used to prevent a
- * miss on a source from reading through to an older source. If a deletion
- * marker is encoutered the index entry will be understood as "not found" in the
- * fused view rather than reading through to an older source where it might
- * still have a binding.
+ * miss on a key for a source from reading through to an older source. If a
+ * deletion marker is encoutered the index entry will be understood as "not
+ * found" in the fused view rather than reading through to an older source where
+ * it might still have a binding.
  * </p>
- * 
- * @todo There is no efficient way to implement the {@link ILinearList} API for
- *       a fused view. Unlike a range-partitioned view, the keys in a fused view
- *       may be in any of the source indices. The only way to find the
- *       {@link ILinearList#keyAt(int)} an index is to use an iterator over the
- *       fused view and scan until the #of tuples traversed is equal to the
- *       given index. Likewise, the only way to find the
- *       {@link ILinearList#indexOf(byte[])} a key is to use an iterator over
- *       the fused view and scan until the key is matched.
  * 
  * @todo consider implementing {@link ILocalBTree} here and collapsing
  *       {@link ILocalBTreeView} and {@link ILocalBTree}.

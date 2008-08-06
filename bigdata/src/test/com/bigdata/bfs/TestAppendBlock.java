@@ -26,14 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 17, 2008
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.IOException;
 import java.util.Random;
 
+import com.bigdata.bfs.BigdataFileSystem;
+
 /**
  * Test atomic append operations on the file data index for the
- * {@link BigdataRepository}. This also tests the correct assignment of block
+ * {@link BigdataFileSystem}. This also tests the correct assignment of block
  * identifiers, the ability to count the #of blocks in a file version, the
  * ability to visit the block identifiers for a file version, the ability to
  * read a specific block for a file version, and the ability to read all data

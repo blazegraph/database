@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.mdi;
 
-import java.util.Iterator;
-
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.DelegateIndex;
 import com.bigdata.btree.ICounter;
@@ -37,7 +35,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ReadOnlyCounter;
-import com.bigdata.btree.ReadOnlyEntryIterator;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
@@ -110,27 +107,11 @@ public class ReadOnlyMetadataIndexView extends MetadataIndexView {
         
     }
 
-    /**
-     * {@link IRangeQuery#REMOVEALL} and {@link Iterator#remove()} are disabled.
-     */
     final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IFilterConstructor filter) {
 
-        if ((flags & REMOVEALL) != 0) {
-
-            /*
-             * Note: Must be explicitly disabled!
-             */
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
-        /*
-         * Must explicitly disable Iterator#remove().
-         */
-        return new ReadOnlyEntryIterator(super.rangeIterator(fromKey, toKey,
-                capacity, flags, filter));
+        return super.rangeIterator(fromKey, toKey, capacity, flags
+                | IRangeQuery.READONLY, filter);
         
     }
     

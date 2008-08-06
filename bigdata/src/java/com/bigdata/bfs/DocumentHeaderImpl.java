@@ -1,4 +1,4 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -50,7 +50,7 @@ public class DocumentHeaderImpl implements DocumentHeader
     
     public void setId(String id) {
 
-        properties.put(MetadataSchema.ID, id);
+        properties.put(FileMetadataSchema.ID, id);
 
     }
 
@@ -62,31 +62,31 @@ public class DocumentHeaderImpl implements DocumentHeader
      */
     void getVersion(int version) {
         
-        properties.put(MetadataSchema.VERSION,Integer.valueOf(version));
+        properties.put(FileMetadataSchema.VERSION,Integer.valueOf(version));
         
     }
 
     public void setContentType(String contentType) {
 
-        properties.put(MetadataSchema.CONTENT_TYPE, contentType);
+        properties.put(FileMetadataSchema.CONTENT_TYPE, contentType);
 
     }
     
     public void setContentEncoding(String contentEncoding) {
 
-        properties.put(MetadataSchema.CONTENT_ENCODING, contentEncoding);
+        properties.put(FileMetadataSchema.CONTENT_ENCODING, contentEncoding);
 
     }
 
     public String getId() {
 
-        return (String) properties.get(MetadataSchema.ID);
+        return (String) properties.get(FileMetadataSchema.ID);
         
     }
 
     public int getVersion() {
         
-        Integer version = (Integer) properties.get(MetadataSchema.VERSION);
+        Integer version = (Integer) properties.get(FileMetadataSchema.VERSION);
 
         if (version == null)
             throw new IllegalStateException("No version");
@@ -97,14 +97,14 @@ public class DocumentHeaderImpl implements DocumentHeader
     
     public String getContentType() {
 
-        return (String) properties.get(MetadataSchema.CONTENT_TYPE);
+        return (String) properties.get(FileMetadataSchema.CONTENT_TYPE);
 
     }
 
     public String getContentEncoding()
     {
         
-        return (String) properties.get(MetadataSchema.CONTENT_ENCODING);
+        return (String) properties.get(FileMetadataSchema.CONTENT_ENCODING);
         
     }
 

@@ -1,4 +1,4 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
@@ -15,7 +15,7 @@ import com.bigdata.sparse.TPS.TPV;
 /**
  * A procedure that performs a key range scan, marking all non-deleted
  * versions within the key range as deleted (by storing a null property
- * value for the {@link MetadataSchema#VERSION}).
+ * value for the {@link FileMetadataSchema#VERSION}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -53,7 +53,7 @@ public class FileVersionDeleter extends TupleUpdater<TPV> {
     }
     
     /**
-     * Only visits the {@link MetadataSchema#VERSION} columns.
+     * Only visits the {@link FileMetadataSchema#VERSION} columns.
      */
     @Override
     protected boolean isValid(ITuple<TPV> tuple) {
@@ -62,7 +62,7 @@ public class FileVersionDeleter extends TupleUpdater<TPV> {
         
         String name = keyDecoder.getColumnName();
         
-        if(!name.equals(MetadataSchema.VERSION)) return false;
+        if(!name.equals(FileMetadataSchema.VERSION)) return false;
 
         return true;
         

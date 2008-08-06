@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 4, 2007
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

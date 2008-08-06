@@ -151,10 +151,11 @@ public interface IMetadataService extends IDataService, Remote {
      *            empty byte[]. The entries MUST be in sorted order.
      * @param dataServiceUUIDs
      *            The array of data services onto which each partition defined
-     *            by a separator key will be mapped (optional). The #of entries
-     *            in this array MUST agree with the #of entries in the
-     *            <i>separatorKeys</i> array. When <code>null</code>, the
-     *            index paritions will be auto-assigned to data services.
+     *            by a separator key will be mapped (optional). When given, the
+     *            #of entries in this array MUST agree with the #of entries in
+     *            the <i>separatorKeys</i> array and all entries must be non-<code>null</code>.
+     *            When not given, the index partitions will be auto-assigned to
+     *            the discovered data services.
      * 
      * @return The UUID of the scale-out index.
      * 

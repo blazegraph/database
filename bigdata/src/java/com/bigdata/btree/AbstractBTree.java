@@ -1010,13 +1010,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * Private instance used for mutation operations (insert, remove) which are
      * single threaded.
      */
-    protected final Tuple writeTuple = new Tuple(this,/*KEYS|*/VALS);
+    public final Tuple writeTuple = new Tuple(this,/*KEYS|*/VALS);
 
     /**
      * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
      * associated with a key out of the btree during lookup operations.
      */
-    protected final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
+    public final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
 
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
@@ -1035,7 +1035,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * is examined to determine if the matching entry is flagged as deleted in
      * which case contains() will report "false".
      */
-    protected final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
+    public final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
 
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
@@ -1381,7 +1381,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
-    final public byte[] valueAt(int index,Tuple tuple) {
+    final public Tuple valueAt(int index,Tuple tuple) {
 
         if (index < 0)
             throw new IndexOutOfBoundsException("less than zero");
@@ -1396,7 +1396,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         getRoot().valueAt(index, tuple);
 
-        return tuple.isDeletedVersion() ? null : tuple.getValue();
+        return tuple.isDeletedVersion() ? null : tuple;
 
     }
 
@@ -1584,11 +1584,26 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * Note: {@link IRangeQuery#REMOVEALL} is handled here by wrapping the
      * iterator.
      */
-    public ITupleIterator rangeIterator(final byte[] fromKey,
-            final byte[] toKey, final int capacity, final int flags,
-            final IFilterConstructor filter) {
+    public ITupleIterator rangeIterator(//
+            final byte[] fromKey,//
+            final byte[] toKey,//
+            final int capacityIsIgnored,//
+            final int flags,//
+            final IFilterConstructor filter//
+            ) {
 
         counters.nrangeIterator++;
+
+        /*
+         * Does the iterator declare that it will not write back on the index?
+         */
+        final boolean readOnly = ((flags & IRangeQuery.READONLY) != 0);
+
+        if (readOnly && ((flags & IRangeQuery.REMOVEALL) != 0)) {
+
+            throw new IllegalArgumentException();
+
+        }
 
         /*
          * Figure out what base iterator implementation to use.  We will layer
@@ -1607,6 +1622,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
              * @todo we could pass in the Tuple here to make the APIs a bit more
              * consistent across the recursion-based and the cursor based
              * iterators.
+             * 
+             * @todo when the capacity is one and REVERSE is specified then we
+             * can optimize this using a reverse traversal striterator - this 
+             * will have lower overhead than the cursor for the BTree (but not
+             * for an IndexSegment).
              */
 
 //            src = fastForwardIterator(fromKey, toKey, capacity, flags);

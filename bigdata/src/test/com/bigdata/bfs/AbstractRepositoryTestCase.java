@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 17, 2008
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,9 +35,10 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.util.Properties;
 
-import com.bigdata.journal.BufferMode;
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.BigdataFileSystem.Options;
+import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.service.AbstractEmbeddedFederationTestCase;
 
 /**
@@ -79,20 +80,22 @@ public class AbstractRepositoryTestCase extends
     
     protected int BLOCK_SIZE;     
 
-    protected BigdataRepository repo;
+    protected BigdataFileSystem repo;
     
     public void setUp() throws Exception {
 
         super.setUp();
 
-        // setup the repository
-        repo = new BigdataRepository(client);
-        
-        BLOCK_SIZE = repo.getBlockSize();
+        // setup the repository view.
+        repo = new BigdataFileSystem(fed, "test", ITx.UNISOLATED, fed
+                .getClient().getProperties());
         
         // register the indices.
-        repo.registerIndices();
-
+        repo.create();
+        
+        // note the block size in use by the repo.
+        BLOCK_SIZE = repo.getBlockSize();
+        
     }
 
     public void tearDown() throws Exception {

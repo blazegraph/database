@@ -1,4 +1,4 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.DataInput;
 import java.io.IOException;
@@ -121,7 +121,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
 
         } catch (IOException ex) {
 
-            BigdataRepository.log.warn("Problem copying block: addr=" + addr
+            BigdataFileSystem.log.warn("Problem copying block: addr=" + addr
                     + ", len=" + len, ex);
 
             throw new RuntimeException(ex);
@@ -137,7 +137,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
             try {
                 bin.close();
             } catch (IOException ex) {
-                BigdataRepository.log.warn(ex);
+                BigdataFileSystem.log.warn(ex);
             }
 
         }

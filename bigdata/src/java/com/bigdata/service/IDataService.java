@@ -29,6 +29,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
@@ -45,7 +46,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.repo.BigdataRepository;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 import com.bigdata.sparse.SparseRowStore;
@@ -356,6 +356,11 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      * {@link DataServiceRangeIterator} (unpartitioned indices), both of which
      * encapsulate this method.
      * </p>
+     * <p>
+     * Note: If the iterator can be determined to be read-only and it is
+     * submitted as {@link ITx#UNISOLATED} then it will be run as
+     * {@link ITx#READ_COMMITTED} to improve concurrency.
+     * </p>
      * 
      * @param tx
      *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
@@ -482,7 +487,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      * 
      * @todo This is a first try at adding support for reading low-level records
      *       from a journal or index segment in support of the
-     *       {@link BigdataRepository}.
+     *       {@link BigdataFileSystem}.
      *       <p>
      *       The API should provide a means to obtain a socket from which record
      *       data may be streamed. The client sends the resource identifier

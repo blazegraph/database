@@ -321,7 +321,8 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
          * @param name The name of the scale-out index.
          * @param timestamp
          */
-        public NoCacheMetadataIndexView(String name,long timestamp,MetadataIndexMetadata mdmd) {
+        public NoCacheMetadataIndexView(String name, long timestamp,
+                MetadataIndexMetadata mdmd) {
         
             assert name != null;
             assert mdmd != null;
@@ -371,10 +372,9 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
             
         }
 
-
         public long rangeCount() {
 
-            return rangeCount(null,null);
+            return rangeCount(null, null);
             
         }
 
@@ -454,7 +454,7 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
                     fromKey,//
                     toKey,//
                     capacity,//
-                    IRangeQuery.KEYS | IRangeQuery.VALS, //
+                    flags, //
                     filter
             );
 

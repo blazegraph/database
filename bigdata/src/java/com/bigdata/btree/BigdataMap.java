@@ -604,11 +604,9 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
     /**
      * The <strong>unsigned byte[]</strong> representation of the last key.
      * 
-     * @return The first key or <code>null</code> if there are no keys. (More
+     * @return The last key or <code>null</code> if there are no keys. (More
      *         precisely, if there are no undeleted tuples within the current
      *         key range constraint.)
-     * 
-     * FIXME Implement the reverse scan feature for {@link ITupleIterator}.
      */
     public byte[] lastInternalKey() {
 

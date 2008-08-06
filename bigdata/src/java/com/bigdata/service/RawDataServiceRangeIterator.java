@@ -38,6 +38,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
@@ -108,6 +109,28 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      * @param name
      *            The name of the index partition on that data service.
      * @param timestamp
+     *            The timestamp used for the reads.
+     * @param readConsistent
+     *            This option is only available for {@link ITx#READ_COMMITTED}.
+     *            When <code>true</code>, the first read will be against the
+     *            most recent commit point on the database and any continuation
+     *            queries will be against the <em>same</em> commit point. When
+     *            <code>false</code>, each read will be against the most
+     *            recent commit point (so the data can be drawn from multiple
+     *            commit points if there are concurrent commits).
+     *            <p>
+     *            The <i>readConsistent</i> option is a tweak available only at
+     *            this low level for the {@link RawDataServiceRangeIterator}.
+     *            It avoids a possible RMI to obtain the most recent global
+     *            commit point using {@link IIndexStore#getLastCommitTime()} in
+     *            favor of using the most recent commit point on the index
+     *            partition at the time that the query is actually executed. If
+     *            you are reading against a scale-out index, then similar
+     *            effects are obtained by choosing either
+     *            {@link ITx#READ_COMMITTED} or
+     *            {@link IIndexStore#getLastCommitTime()}. See
+     *            {@link ClientIndexView} and
+     *            {@link PartitionedRangeQueryIterator}.
      * @param fromKey
      * @param toKey
      * @param capacity
@@ -138,12 +161,12 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
             
         }
 
-        if (timestamp == ITx.UNISOLATED && readConsistent) {
-            
-            throw new IllegalArgumentException(
-                    "Read-consistent not available for unisolated operations");
-            
-        }
+//        if (timestamp == ITx.UNISOLATED && readConsistent) {
+//            
+//            throw new IllegalArgumentException(
+//                    "Read-consistent not available for unisolated operations");
+//            
+//        }
 
         this.dataService = dataService;
         
@@ -164,15 +187,18 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      * {@link ITx#READ_COMMITTED} operations.
      */
     @Override
-    protected ResultSet getResultSet(long timestamp, byte[] _fromKey, byte[] toKey, int capacity,
+    protected ResultSet getResultSet(long timestamp, byte[] fromKey, byte[] toKey, int capacity,
             int flags, IFilterConstructor filter) {
 
-        if(log.isInfoEnabled()) log.info("name=" + name + ", fromKey=" + BytesUtil.toString(_fromKey)
-                + ", toKey=" + BytesUtil.toString(toKey)+", dataService="+dataService);
+        if (log.isInfoEnabled())
+            log.info("name=" + name + ", fromKey="
+                    + BytesUtil.toString(fromKey) + ", toKey="
+                    + BytesUtil.toString(toKey) + ", dataService="
+                    + dataService);
 
         try {
 
-            return dataService.rangeIterator(timestamp, name, _fromKey, toKey,
+            return dataService.rangeIterator(timestamp, name, fromKey, toKey,
                     capacity, flags, filter);
             
         } catch (Exception e) {
@@ -256,7 +282,7 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
     }
 
     @Override
-    final public boolean getReadConsistent() {
+    final protected boolean getReadConsistent() {
         
         return readConsistent;
         

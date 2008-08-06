@@ -486,7 +486,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        log.info("name=" + name + ", timestamp=" + timestamp + ", store="
+        if(INFO) log.info("name=" + name + ", timestamp=" + timestamp + ", store="
                 + store + " : " + btree);
 
         return btree;

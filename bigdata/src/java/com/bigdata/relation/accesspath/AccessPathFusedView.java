@@ -30,7 +30,6 @@ package com.bigdata.relation.accesspath;
 import com.bigdata.btree.FusedEntryIterator;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.rule.IPredicate;
@@ -51,13 +50,14 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class AccessPathFusedView<E> implements IAccessPath<E> {
 
-    private final IAccessPath<E> path1;
-    private final IAccessPath<E> path2;
+    private final AbstractAccessPath<E> path1;
+    private final AbstractAccessPath<E> path2;
     
     /**
      * 
      */
-    public AccessPathFusedView(IAccessPath<E> path1, IAccessPath<E> path2) {
+    public AccessPathFusedView(AbstractAccessPath<E> path1,
+            AbstractAccessPath<E> path2) {
         
         if (path1 == null)
             throw new IllegalArgumentException();
@@ -88,8 +88,11 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
         }
         
         this.path1 = path1;
-        
+
         this.path2 = path2;
+
+//        // assume the flags from the first access path.
+//        this.flags = path1.flags;
         
     }
 
@@ -130,8 +133,7 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     }
 
-    // FIXME These need to be raised in the API so that they can be passed down.
-    final private int flags = IRangeQuery.DEFAULT;
+//    final private int flags;
 
     /**
      * @throws UnsupportedOperationException
@@ -148,28 +150,18 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
     
     public ITupleIterator<E> rangeIterator() {
 
-        return rangeIterator(0, flags);
+        return rangeIterator(0/*capacity*/);
         
     }
     
-    protected ITupleIterator<E> rangeIterator(int capacity, int flags) {
+    private ITupleIterator<E> rangeIterator(final int capacity) {
 
-        /*
-         * @todo The modification to drive the range iterator capacity, flags
-         * and filter through everywhere might have broken FusedEntryIterator
-         * for this call in the case where the source iterators are not
-         * requesting either the keys or the values.
-         * 
-         * FIXME This MUST specify ALLVERSIONS for the source iterators in order
-         * for the fused view to be able to recognize a deleted index entry and
-         * discard a historical undeleted entry later in the predence order for
-         * the view.
-         */
         return new FusedEntryIterator<E>(
-                false, // ALLVERSIOSN
+                path1.flags, // assume the flags from the first access path.
+                false, // we do not want to see the deleted tuples.
                 new ITupleIterator[] {
-                path1.rangeIterator(),//
-                path2.rangeIterator()//
+                path1.rangeIterator(capacity,path1.flags,path1.filter),//
+                path2.rangeIterator(capacity,path2.flags,path2.filter)//
                 }
         );
                 
@@ -181,11 +173,14 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     }
 
+    /**
+     * @todo optimizations for point tests and small limits. See
+     *       {@link AbstractAccessPath#iterator(int, int) for impl details.
+     */
     public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
 
-        // @todo optimizations for point tests and small limits.
         return new ChunkedWrappedIterator<E>(new Striterator(rangeIterator(
-                capacity, flags)).addFilter(new Resolver() {
+                capacity)).addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 0L;
 

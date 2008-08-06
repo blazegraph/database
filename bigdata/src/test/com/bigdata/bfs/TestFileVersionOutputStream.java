@@ -26,15 +26,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 21, 2008
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.IOException;
+
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.FileVersionOutputStream;
 
 
 /**
  * Tests some specifics of the {@link FileVersionOutputStream}. These behaviors
  * are only observable to callers that cast
- * {@link BigdataRepository#outputStream(String, int)} to a
+ * {@link BigdataFileSystem#outputStream(String, int)} to a
  * {@link FileVersionOutputStream}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

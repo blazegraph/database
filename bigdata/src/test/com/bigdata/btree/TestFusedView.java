@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.relation.accesspath.AccessPathFusedView;
 
 /**
  * Test suite for {@link FusedView}.
@@ -324,7 +325,7 @@ public class TestFusedView extends AbstractBTreeTestCase {
         assertTrue(view.contains(k7));
 
     }
-    
+
     /**
      * Test verifies some of the basic principles of the fused view, including
      * that a deleted entry in the first source will mask an undeleted entry in
@@ -452,6 +453,102 @@ public class TestFusedView extends AbstractBTreeTestCase {
 
     }
 
+    /**
+     * This tests the ability to traverse the tuples in the {@link FusedView} in
+     * reverse order. This ability is a requirement for several aspects of the
+     * total architecture, including atomic append for the bigdata file system,
+     * locating an index partition, and finding the last entry in a set or a
+     * map.
+     * 
+     * @see FusedEntryIterator
+     * 
+     * @todo write test of the alternative ctor for {@link FusedEntryIterator}
+     *       which is used by {@link AccessPathFusedView}.
+     */
+    public void test_reverseScan() {
+        
+        byte[] k3 = i2k(3);
+        byte[] k5 = i2k(5);
+        byte[] k7 = i2k(7);
+
+        byte[] v3a = new byte[]{3};
+        byte[] v5a = new byte[]{5};
+//        byte[] v7a = new byte[]{7};
+//        
+//        byte[] v3b = new byte[]{3,1};
+//        byte[] v5b = new byte[]{5,1};
+//        byte[] v7b = new byte[]{7,1};
+        
+        IRawStore store = new SimpleMemoryRawStore();
+        
+        // two btrees with the same index UUID.
+        final BTree btree1, btree2;
+        {
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            
+            md.setBranchingFactor(3);
+            
+            md.setDeleteMarkers(true);
+
+            btree1 = BTree.create(store, md);
+            
+            btree2 = BTree.create(store, md.clone());
+            
+        }
+        
+        /*
+         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
+         * will cause the search to halt. If the key is not in btree1 then
+         * btree2 will also be searched. A miss is reported if the key is not
+         * found in either btree.
+         * 
+         * Note: Since delete markers are enabled keys will be recognized when
+         * the index entry has been marked as deleted.
+         */
+        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
+                btree2 });
+        
+        /*
+         * btree1: {k5:=v5a}
+         * 
+         * btree2: {k3:=v3a}
+         */
+        btree1.insert(k5, v5a);
+        btree2.insert(k3, v3a);
+
+        // forward
+        assertSameIterator(new byte[][] { v3a, v5a }, view.rangeIterator(null,
+                null));
+
+        // reverse
+        assertSameIterator(new byte[][] { v5a, v3a }, view.rangeIterator(null,
+                null, 0/* capacity */,
+                IRangeQuery.DEFAULT | IRangeQuery.REVERSE, null/*filter*/));
+
+        /*
+         * Delete the key for an entry found in btree2 from btree1. This will
+         * insert a delete marker for that key into btree1. Btree1 will now
+         * report one more entry and the entry will not be visible in the view
+         * unless you use DELETED on the iterator.
+         * 
+         * btree1: {k3:=deleted; k5:=v5a}
+         * 
+         * btree2: {k3:=v3a}
+         */
+
+        btree1.remove(k3);
+        
+        // forward
+        assertSameIterator(new byte[][] { v5a }, view.rangeIterator(null,
+                null));
+
+        // reverse.
+        assertSameIterator(new byte[][] { v5a }, view.rangeIterator(null, null,
+                0/* capacity */, IRangeQuery.DEFAULT | IRangeQuery.REVERSE,
+                null/* filter */));
+
+    }
+    
 //    /**
 //     * Unit tests for the {@link ILinearList} API when the index is a view
 //     * composed of more than one index resource.

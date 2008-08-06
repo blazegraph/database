@@ -27,11 +27,12 @@
 
 package com.bigdata.btree;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleRemover;
-import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 
@@ -146,7 +147,7 @@ public interface IRangeQuery {
      * unisolated view then the entries MUST be buffered and removed as the
      * {@link ResultSet} is populated.
      * <p>
-     * Note: The {@link BigdataRepository#deleteHead(String, int)} relies on
+     * Note: The {@link BigdataFileSystem#deleteHead(String, int)} relies on
      * this atomic guarentee.
      * 
      * @todo define rangeRemove(fromKey,toKey,filter)? This method would return
@@ -198,6 +199,14 @@ public interface IRangeQuery {
      * key in the key range.
      */
     public static final int REVERSE = 1 << 6;
+    
+    /**
+     * Flag specifies that the iterator, including any {@link ITupleFilter}s,
+     * will not write on the index. Various optimizations may be applied when
+     * this flag is present. (Read only can be inferred if {@link #CURSOR} flag
+     * is NOT specified AND there are NO {@link ITupleFilter}s).
+     */
+    public static final int READONLY = 1 << 7;
     
     /**
      * The flags that should be used by default ({@link #KEYS},{@link #VALS})
@@ -347,59 +356,5 @@ public interface IRangeQuery {
 //     * @return The #of index entries that were removed.
 //     */
 //    public long removeAll(byte[] fromKey,byte[] toKey, long limit);
-    
-    // /**
-    // * Interface
-    // *
-    // * An alternative is to define an interface to recognize change in the
-    // * "logical row". This way the sense of the limit/capacity is
-    // * unchanged but we only would count logical rows rather than visited
-    // * index entries.
-    // *
-    // * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-    // Thompson</a>
-    // * @version $Id$
-    // */
-    // public static interface IRangeQueryLimit extends Serializable {
-    //        
-    // public void report(IEntryIterator itr);
-    //        
-    // public boolean isDone();
-    //        
-    // }
-    //    
-    // // Externalizable impl...
-    // public static class RangeQueryLimit implements IRangeQueryLimit {
-    //
-    // /**
-    // *
-    // */
-    // private static final long serialVersionUID = 6047061818958124788L;
-    //        
-    // private int n = 0;
-    //
-    // private int limit = 0;
-    //        
-    // public RangeQueryLimit(int limit) {
-    //            
-    // if(limit<=0) throw new IllegalArgumentException();
-    //            
-    // this.limit = limit;
-    //            
-    // }
-    //        
-    // public void report(IEntryIterator itr) {
-    //
-    // n++;
-    //            
-    // }
-    //        
-    // public boolean isDone() {
-    //
-    // return n >= limit;
-    //            
-    // }
-    //
-    // }
 
 }

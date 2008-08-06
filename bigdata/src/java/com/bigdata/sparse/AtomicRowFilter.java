@@ -140,7 +140,7 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> {
 
         current = null;
 
-        final AbstractTuple<TPS> tuple = new AbstractTuple<TPS>(IRangeQuery.ALL) {
+        final AbstractTuple<TPS> tuple = new AbstractTuple<TPS>(IRangeQuery.DEFAULT) {
 
             /**
              * @todo This can't be implemented since the tuples may have

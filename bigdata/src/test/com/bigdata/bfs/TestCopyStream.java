@@ -26,11 +26,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 19, 2008
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Random;
+
+import com.bigdata.bfs.FileVersionOutputStream;
 
 
 /**

@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
@@ -41,7 +42,6 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
-import com.bigdata.repo.BigdataRepository.Options;
 
 /**
  * Test suite for the ability to re-open an {@link EmbeddedFederation}.

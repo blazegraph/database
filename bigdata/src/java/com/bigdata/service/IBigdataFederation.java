@@ -33,8 +33,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.AbstractJournal;
@@ -51,7 +49,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
+public interface IBigdataFederation extends IIndexManager {
 
     public Logger log = Logger.getLogger(IBigdataFederation.class);
 
@@ -217,9 +215,11 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      *            empty byte[]. The entries MUST be in sorted order.
      * @param dataServiceUUIDs
      *            The array of data services onto which each partition defined
-     *            by a separator key will be mapped. The #of entries in this
-     *            array MUST agree with the #of entries in the <i>separatorKeys</i>
-     *            array.
+     *            by a separator key will be mapped (optional). When given, the
+     *            #of entries in this array MUST agree with the #of entries in
+     *            the <i>separatorKeys</i> array and all entries must be non-<code>null</code>.
+     *            When not given, the index partitions will be auto-assigned to
+     *            the discovered data services.
      * 
      * @return The UUID of the scale-out index.
      * 
@@ -252,18 +252,18 @@ public interface IBigdataFederation extends IIndexManager, IKeyBuilderFactory {
      */
     public IIndex getIndex(String name, long timestamp);
     
-    /**
-     * Return a thread-local {@link IKeyBuilder} configured using the properties
-     * specified for the {@link IBigdataClient}.
-     * 
-     * @see IndexMetadata#getKeyBuilder()
-     * 
-     * @deprecated by {@link IndexMetadata#getKeyBuilder()} which provides index
-     *             specific {@link IKeyBuilder} configurations making indices
-     *             more portable across machines in a federation (there is no
-     *             dependency on the machine locale configuration).
-     */
-    public IKeyBuilder getKeyBuilder();
+//    /**
+//     * Return a thread-local {@link IKeyBuilder} configured using the properties
+//     * specified for the {@link IBigdataClient}.
+//     * 
+//     * @see IndexMetadata#getKeyBuilder()
+//     * 
+//     * @deprecated by {@link IndexMetadata#getKeyBuilder()} which provides index
+//     *             specific {@link IKeyBuilder} configurations making indices
+//     *             more portable across machines in a federation (there is no
+//     *             dependency on the machine locale configuration).
+//     */
+//    public IKeyBuilder getKeyBuilder();
     
     /**
      * Return <code>true</code> iff the federation supports scale-out indices.

@@ -43,6 +43,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
@@ -289,7 +290,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             if (this.dataService != null)
                 throw new IllegalStateException();
 
-            log.info("Set dataService: " + dataService);
+            if(log.isInfoEnabled())
+                log.info("Set dataService: " + dataService);
 
             this.dataService = dataService;
 
@@ -394,7 +396,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             final ITupleIterator itr = new RawDataServiceRangeIterator(
                     sourceDataService, //
                     sourceIndexName, //
-                    -lastCommitTime,// Note: historical read.
+                    TimestampUtility.asHistoricalRead(lastCommitTime),// Note: historical read.
                     true, // readConsistent,
                     null, // fromKey
                     null, // toKey
@@ -431,7 +433,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 
             }
 
-            log.info("Copied " + ncopied + " index entries from "
+            if(log.isInfoEnabled())
+                log.info("Copied " + ncopied + " index entries from "
                     + sourceIndexName);
             
             return ncopied;
@@ -565,7 +568,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 
                 if (rset.isExhausted()) {
 
-                    log.info("Copied "+ncopied+" tuples in "+nchunks+" chunks");
+                    if(log.isInfoEnabled())
+                        log.info("Copied "+ncopied+" tuples in "+nchunks+" chunks");
                     
                     break;
 
@@ -596,7 +600,8 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                     pmd.getRightSeparatorKey()//
                     );
             
-            log.info("Updating metadata index: name=" + scaleOutIndexName
+            if(log.isInfoEnabled())
+                log.info("Updating metadata index: name=" + scaleOutIndexName
                     + ", oldLocator=" + oldLocator + ", newLocator=" + newLocator);
 
             // atomic update on the metadata server.

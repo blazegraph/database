@@ -618,7 +618,8 @@ abstract public class AbstractTestCase
                     continue;
                 }
 
-                if(log.isInfoEnabled()) log.info("actual: " + actualSPO.toString(store));
+                if (log.isInfoEnabled())
+                    log.info("actual: " + actualSPO.toString(store));
 
                 SPO expectedSPO = map.remove(actualSPO);
 

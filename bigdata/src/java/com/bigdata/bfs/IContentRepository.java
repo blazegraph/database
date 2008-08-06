@@ -1,14 +1,14 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.util.Iterator;
 
 /**
- * Interface for a rest-ful content repository.
+ * Document-centric interface for the {@link BigdataFileSystem}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ContentRepository 
+public interface IContentRepository 
 {
 
     /**
@@ -105,46 +105,10 @@ public interface ContentRepository
      * 
      * @todo register analyzers against MIME types and index those that are
      *       selected on index or update.
+     * 
+     * @todo refactor out of this API since more than one free text index could
+     *       be used over the repo.
      */
     Iterator<String> search(String query);
-    
-    /**
-     * Close the client's connection to the repository.
-     * 
-     * @throws Exception
-     */
-    void close();
-
-    /**
-     * Thrown when the identified document already exists.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ExistsException extends RuntimeException {
-        
-        public ExistsException(String id) {
-
-            super("id="+id);
-            
-        }
-        
-    }
-    
-    /**
-     * Thrown when the identified document was not found.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class NotFoundException extends RuntimeException {
-        
-        public NotFoundException(String id) {
-
-            super("id="+id);
-            
-        }
-        
-    }
     
 }

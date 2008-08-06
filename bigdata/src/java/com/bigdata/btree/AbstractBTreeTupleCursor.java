@@ -1051,8 +1051,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         // the key for the last visited tuple.
         final byte[] key = currentKey();
         
-//        if (log.isDebugEnabled())
-            log.error("key="+BytesUtil.toString(key));
+        if (log.isDebugEnabled())
+            log.debug("key="+BytesUtil.toString(key));
         
         /*
          * Remove the last visited tuple.

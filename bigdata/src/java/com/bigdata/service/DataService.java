@@ -1715,21 +1715,40 @@ abstract public class DataService extends AbstractService
                 throw new IllegalArgumentException();
             
             /*
-             * Choose READ_COMMITTED iff itr is read-only and UNISOLATED was
-             * requested.
-             * 
-             * FIXME There are new capabilities for concurrent mutation with the
-             * TupleCursor so the criteria here will have to be changed. Perhaps
-             * a READONLY flag could be introduced to make it explicit when
-             * using a tuple cursor that writes will not be perform (and hence
-             * will not be allowed)?
+             * Figure out if the iterator is read-only for the time that it
+             * executes on the data service. For this case, we ignore the CURSOR
+             * flag since modifications during iterator execution on the data
+             * service can only be introduced via a filter or the REMOVEALL
+             * flag. The caller will be used a chunked iterator. Therefore if
+             * they choose to delete tuples while visiting the elements in the
+             * ResultSet then the deletes will be issued as separate requests.
              */
-            final long startTime = (tx == ITx.UNISOLATED
-                        && ((flags & IRangeQuery.REMOVEALL)==0)? ITx.READ_COMMITTED
-                        : tx);
+            final boolean readOnly = ((flags & IRangeQuery.READONLY) != 0)
+                    || (filter == null &&
+//                       ((flags & IRangeQuery.CURSOR) == 0) &&
+                       ((flags & IRangeQuery.REMOVEALL) == 0)
+                       );
+
+            long timestamp = tx;
+
+            if (timestamp == ITx.UNISOLATED && readOnly) {
+
+                /*
+                 * If the iterator is readOnly then READ_COMMITTED has the same
+                 * semantics as UNISOLATED and provides better concurrency since
+                 * it reduces contention for the writeService.
+                 */
+
+                timestamp = ITx.READ_COMMITTED;
+
+            }
+
+//            final long startTime = (tx == ITx.UNISOLATED
+//                        && ((flags & IRangeQuery.REMOVEALL)==0)? ITx.READ_COMMITTED
+//                        : tx);
 
             final RangeIteratorTask task = new RangeIteratorTask(
-                    concurrencyManager, startTime, name, fromKey, toKey, capacity,
+                    concurrencyManager, tx, name, fromKey, toKey, capacity,
                     flags, filter);
     
             // submit the task and wait for it to complete.

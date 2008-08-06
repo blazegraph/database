@@ -348,6 +348,26 @@ public class DataServiceIndex implements IClientIndex {
         final boolean readConsistent = (timestamp == ITx.UNISOLATED ? false
                 : true);
 
+        final boolean readOnly = ((flags & IRangeQuery.READONLY) != 0)
+        || (filter == null &&
+           ((flags & IRangeQuery.CURSOR) == 0) &&
+           ((flags & IRangeQuery.REMOVEALL) == 0)
+           );
+        
+        long timestamp = getTimestamp();
+
+        if (timestamp == ITx.UNISOLATED && readOnly) {
+            
+            timestamp = ITx.READ_COMMITTED;
+            
+        }
+        
+//        if (timestamp == ITx.READ_COMMITTED && readConsistent) {
+//        
+//            timestamp = getFederation().getLastCommitTime();
+//            
+//        }
+        
         return new RawDataServiceRangeIterator(dataService, name, timestamp,
                 readConsistent, fromKey, toKey, capacity, flags, filter);
 

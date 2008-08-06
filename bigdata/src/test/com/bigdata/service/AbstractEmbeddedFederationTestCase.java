@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
@@ -41,8 +43,6 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.repo.BigdataRepository;
-import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.search.FullTextIndex;
 
@@ -57,7 +57,7 @@ import com.bigdata.search.FullTextIndex;
  * FIXME modify this and {@link AbstractLocalDataServiceFederationTestCase} to
  * be proxy test suites so that I can run tests against both with ease and make
  * use of them for testing the {@link FullTextIndex} and
- * {@link BigdataRepository}.
+ * {@link BigdataFileSystem}.
  */
 abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTestCase {
 
