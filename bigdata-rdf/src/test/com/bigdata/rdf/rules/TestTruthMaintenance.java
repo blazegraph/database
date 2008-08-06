@@ -772,6 +772,8 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      */
     public void test_stress() {
 
+        fail("enable test");
+        
         String[] resource = new String[] {
                 "../rdf-data/alibaba_data.rdf",
                 "../rdf-data/alibaba_schema.rdf" };

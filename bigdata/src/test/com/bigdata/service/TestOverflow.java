@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
@@ -45,7 +46,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.sparse.SparseRowStore;

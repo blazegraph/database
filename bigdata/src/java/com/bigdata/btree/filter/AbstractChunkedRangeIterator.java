@@ -45,10 +45,12 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.DataServiceRangeIterator;
+import com.bigdata.service.PartitionedRangeQueryIterator;
 
 /**
  * A chunked iterator that proceeds a {@link ResultSet} at a time. This
@@ -56,11 +58,10 @@ import com.bigdata.service.DataServiceRangeIterator;
  * can materialize the tuples using a sequence of queries that progresses
  * through the index until all tuples in the key range have been visited.
  * 
- * @todo Rewrite the iterators based on the {@link ResultSet} to implement
- *       {@link ITupleCursor}? Note that this should not be necessary if we
- *       instead notice the direction in which the underlying (source) iterator
- *       was being traversed. Even that can be ignored in favor of using REVERSE
- *       to achieve reverse traversal.
+ * @todo Rewrite to implement {@link ITupleCursor}? Note that this should not
+ *       be necessary if we instead notice the direction in which the underlying
+ *       (source) iterator was being traversed. Even that can be ignored in
+ *       favor of using REVERSE to achieve reverse traversal.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -117,17 +118,16 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
     /**
      * The current result set. For each index partition spanned by the overall
      * key range supplied by the client, we will issue at least one range query
-     * against the data service for that index partition. Once all entries in a
-     * result set have been consumed by the client, we test the result set to
-     * see whether or not it exhausted the entries that could be matched for
-     * that index partition. If not, then we will issue another "continuation"
-     * range query against the same index position starting from the successor
-     * of the last key scanned. If it is exhausted, then we will issue a new
-     * range query against the next index partition. If no more index partitions
-     * remain that are spanned by the key range specified by the client then we
-     * are done.
+     * against that index partition. Once all entries in a result set have been
+     * consumed by the client, we test the result set to see whether or not it
+     * exhausted the entries that could be matched for that index partition. If
+     * not, then we will issue "continuation" query against the same index
+     * position. If we are scanning forward, then the continuation query will
+     * start (toKey) from the successor of the last key scanned (if we are
+     * scanning backwards, then toKey will be the leftSeparator of the index
+     * partition and fromKey will be the last key scanned).
      * <p>
-     * Note: A result set will be empty if there are no entries (including after
+     * Note: A result set will be empty if there are no entries (after
      * filtering) that lie within the key range in a given index partition. It
      * is possible for any of the result sets to be empty. Consider a case of
      * static partitioning of an index into N partitions. When the index is
@@ -139,8 +139,13 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
      *       length for the keys and for the values. This could be used to right
      *       size the buffers which otherwise we have to let grow until they are
      *       of sufficient capacity.
+     * 
+     * @see #rangeQuery()
+     * @see #continuationQuery()
+     * 
+     * @todo make this protected again. See {@link PartitionedRangeQueryIterator}
      */
-    protected ResultSet rset = null;
+    public ResultSet rset = null;
 
     /**
      * The timestamp for the operation as specified by the ctor (this is used
@@ -154,9 +159,9 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
     private long commitTime = 0L;
     
     /**
-     * The timestamp returned by the initial {@link ResultSet}. 
+     * The timestamp returned by the initial {@link ResultSet}.
      */
-    public long getCommitTime() {
+    protected long getCommitTime() {
         
         return commitTime;
         
@@ -165,12 +170,15 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
     /**
      * When <code>true</code> the {@link #getCommitTime()} will be used to
      * ensure that {@link #continuationQuery()}s run against the same commit
-     * point thereby producing a consistent view even when the iterator is
-     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED}. When
-     * <code>false</code> {@link #continuationQuery()}s will use whatever
-     * value is returned by {@link #getTimestamp()}.
+     * point <em>for the local index partition</em> thereby producing a read
+     * consistent view even when the iterator is {@link ITx#READ_COMMITTED}.
+     * When <code>false</code> {@link #continuationQuery()}s will use
+     * whatever value is returned by {@link #getTimestamp()}. Read-consistent
+     * semantics for a partitioned index are achieved using the timestamp
+     * returned by {@link IIndexStore#getLastCommitTime()} rather than
+     * {@link ITx#READ_COMMITTED}.
      */
-    abstract public boolean getReadConsistent();
+    abstract protected boolean getReadConsistent();
     
     /**
      * Return the timestamp used for {@link #continuationQuery()}s. The value
@@ -185,9 +193,9 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
      *             the initial {@link ResultSet} has not been read since the
      *             commitTime for that {@link ResultSet} is not yet available.
      */
-    final public long getReadTime() {
+    final protected long getReadTime() {
         
-        if(getReadConsistent() ) {
+        if( getTimestamp() == ITx.READ_COMMITTED && getReadConsistent() ) {
             
             if (commitTime == 0L) {
 
@@ -199,7 +207,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
                 
             }
             
-            return commitTime;
+            return TimestampUtility.asHistoricalRead(commitTime);
             
         }
         
@@ -307,7 +315,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
         /*
          * Note: will be 0L if reading on a local index.
          */
-        commitTime = TimestampUtility.asHistoricalRead(rset.getCommitTime());
+        commitTime = rset.getCommitTime();
         
         // reset index into the ResultSet.
         lastVisited = -1;
@@ -329,25 +337,50 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
         assert !rset.isExhausted();
 
         /*
-         * Save the last visited key for #remove(). 
+         * Save the last visited key for #remove().
          */
         lastVisitedKeyInPriorResultSet = tuple.getKeysRequested() ? tuple
                 .getKey() : null;
-        
-        /*
-         * Start from the successor of the last key scanned by the previous
-         * result set.
-         */
 
-        final byte[] _fromKey = rset.successor();
+        if ((flags & IRangeQuery.REVERSE) == 0) {
+            
+            /*
+             * Forward scan.
+             * 
+             * Start from the successor of the last key scanned by the previous
+             * result set.
+             */
 
-        if (log.isInfoEnabled())
-            log.info("fromKey=" + BytesUtil.toString(_fromKey) + ", toKey="
-                    + BytesUtil.toString(toKey));
+            final byte[] _fromKey = rset.successor();
 
-        // continuation query.
-        rset = getResultSet(getReadTime(),_fromKey, toKey, capacity, flags, filter);
+            if (log.isInfoEnabled())
+                log.info("forwardScan: fromKey=" + BytesUtil.toString(_fromKey)
+                        + ", toKey=" + BytesUtil.toString(toKey));
 
+            // continuation query.
+            rset = getResultSet(getReadTime(), _fromKey, toKey, capacity,
+                    flags, filter);
+
+        } else {
+
+            /*
+             * Reverse scan.
+             * 
+             * The new upper bound is the last key that we visited. The lower
+             * bound is unchanged.
+             */
+
+            final byte[] _toKey = rset.getLastKey();
+
+            if (log.isInfoEnabled())
+                log.info("reverseScan: fromKey=" + BytesUtil.toString(fromKey)
+                        + ", toKey=" + BytesUtil.toString(_toKey));
+
+            // continuation query.
+            rset = getResultSet(getReadTime(), fromKey, _toKey, capacity,
+                    flags, filter);
+
+        }
         // reset index into the ResultSet.
         lastVisited = -1;
 

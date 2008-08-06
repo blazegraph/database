@@ -31,8 +31,10 @@ package com.bigdata.mdi;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.DelegateIndex;
 import com.bigdata.btree.ILinearList;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
@@ -62,17 +64,46 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
 
     public PartitionLocator get(byte[] key) {
 
-        return (PartitionLocator) SerializerUtil.deserialize(lookup(key));
+        // automatic de-serialization using the ITupleSerializer.
+        return (PartitionLocator)delegate.lookup((Object)key);
+        
+//        return (PartitionLocator) SerializerUtil.deserialize(lookup(key));
 
     }
 
     /**
-     * Note: It is this method which introduces the requirement for the
-     * {@link ILinearList} API for the {@link MetadataIndex}. The method is
-     * used to discover the locator for the index partition within which the
-     * <i>key</i> would be found.
+     * The method is used to discover the locator for the index partition within
+     * which the <i>key</i> would be found.
      */
     public PartitionLocator find(byte[] key) {
+
+        return find_with_indexOf(key);
+        
+    }
+    
+    /**
+     * The implementation uses an iterator with a capacity of ONE (1) and a
+     * {@link IRangeQuery#REVERSE} scan. This approach can be used with a
+     * key-range partitioned metadata index.
+     * 
+     * @todo test this variant and keep it on hand for the key-range partitioned
+     *       metadata index.
+     */
+    private PartitionLocator find_with_iterator(byte[] key) {
+
+        final ITupleIterator<PartitionLocator> itr = delegate.rangeIterator(
+                null/* fromKey */, key/* toKey */, 1/* capacity */,
+                IRangeQuery.DEFAULT | IRangeQuery.REVERSE, null/* filter */);
+        
+        return itr.next().getObject();
+        
+    }
+    
+    /**
+     * This implementation depends on the {@link ILinearList} API and therefore
+     * can not be used with a key-range partitioned metadata index.
+     */
+    private PartitionLocator find_with_indexOf(byte[] key) {
         
         final int index;
         
@@ -93,15 +124,22 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
             return null;
             
         }
+
+        final ITuple<PartitionLocator> tuple = delegate.valueAt(index,
+                delegate.lookupTuple.get());
+
+        return tuple.getObject();
         
-        final byte[] val = delegate.valueAt(index);
-        
-        return (PartitionLocator) SerializerUtil.deserialize(val);
+//        final byte[] val = delegate.valueAt(index);
+//        
+//        return (PartitionLocator) SerializerUtil.deserialize(val);
         
     }
     
     /**
-     * Find the index of the partition spanning the given key.
+     * Find the index of the partition spanning the given key. It is only used
+     * by {@link #find_with_indexOf(byte[])} and does not scale-out because of a
+     * dependency on the {@link ILinearList} API.
      * 
      * @return The index of the partition spanning the given key or
      *         <code>-1</code> iff there are no partitions defined.

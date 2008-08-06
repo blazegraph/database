@@ -28,9 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rawstore;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.proc.IIndexProcedure;
-import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.IDataService;
 
 /**
@@ -42,13 +42,13 @@ import com.bigdata.service.IDataService;
  * Note: This interface does not support arbitrary length BLOBs. The reason is
  * that the architecture always limits by design the size of the artifacts that
  * have to be moved around to support a scale-out database. However, support for
- * BLOBs may be build on {@link IBlockStore}s. See {@link BigdataRepository}.
+ * BLOBs may be build on {@link IBlockStore}s. See {@link BigdataFileSystem}.
  * 
  * @deprecated This interface was never put into place. Instead I have added a
  *             means to read a block from an {@link ITuple} and an
  *             {@link IDataService}.  Writes of blocks are performed through the
  *             standard {@link IIndexProcedure} mechansims at this time, e.g., 
- *             see the {@link BigdataRepository}.
+ *             see the {@link BigdataFileSystem}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

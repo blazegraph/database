@@ -49,13 +49,14 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.counters.CounterSet;
@@ -2080,6 +2081,29 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
         
+        /**
+         * Returns an {@link ITx#READ_COMMITTED} view if the file system exists
+         * -or- an {@link ITx#UNISOLATED} view IFF the {@link AbstractTask}
+         * declared the names of the backing indices as resources for which it
+         * acquired a lock.
+         */
+        public BigdataFileSystem getGlobalFileSystem() {
+            
+            // did the task declare the resource name?
+            final String namespace = GlobalFileSystemHelper.GLOBAL_FILE_SYSTEM_NAMESPACE;
+            if (isResource(namespace + BigdataFileSystem.FILE_METADATA_INDEX_BASENAME)
+                    && isResource(namespace + BigdataFileSystem.FILE_DATA_INDEX_BASENAME)) {
+
+                // unisolated view - will create if it does not exist.
+                return new GlobalFileSystemHelper(this).getGlobalFileSystem();
+
+            }
+
+            // read committed view IFF it exists otherwise [null]
+            return new GlobalFileSystemHelper(this).getReadCommitted();
+            
+        }
+        
         public IResourceLocator getResourceLocator() {
             
             return resourceLocator;
@@ -2361,7 +2385,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         }
 
         /**
-         * Returns an {@link ITx#READ_COMMITTED} view the index exists and
+         * Returns an {@link ITx#READ_COMMITTED} view iff the index exists and
          * <code>null</code> otherwise.
          */
         public SparseRowStore getGlobalRowStore() {
@@ -2389,6 +2413,39 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             }
             
             return null;
+            
+        }
+
+        /**
+         * Returns an {@link ITx#READ_COMMITTED} view iff the file system exists
+         * and <code>null</code> otherwise.
+         */
+        public BigdataFileSystem getGlobalFileSystem() {
+
+            /*
+             * Note: This goes around getIndex(name,timestamp) on this method
+             * and uses that method on the delegate. This is because of the
+             * restriction on access to declared indices. It's Ok to go around
+             * like this since you do not need a lock for a read-only view.
+             */
+            
+//            return new GlobalRowStoreHelper(this).getReadCommitted();
+
+            final IIndexManager tmp = new DelegateIndexManager(this) {
+
+                public IIndex getIndex(String name, long timestampIsIgnored) {
+
+                    // last commit time.
+                    final long timestamp = delegate.getRootBlockView()
+                            .getLastCommitTime();
+                    
+                    return delegate.getIndex(name, timestamp);
+
+                }
+
+            };
+
+            return new GlobalFileSystemHelper(tmp).getReadCommitted();
             
         }
 
@@ -2564,4 +2621,56 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
     }
 
+    /**
+     * Delegate pattern for {@link IIndexManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class DelegateIndexManager implements IIndexManager {
+     
+        private IIndexManager delegate;
+        
+        public DelegateIndexManager(IIndexManager delegate) {
+            this.delegate = delegate;
+        }
+
+        public void dropIndex(String name) {
+            delegate.dropIndex(name);
+        }
+
+        public ExecutorService getExecutorService() {
+            return delegate.getExecutorService();
+        }
+
+        public BigdataFileSystem getGlobalFileSystem() {
+            return delegate.getGlobalFileSystem();
+        }
+
+        public SparseRowStore getGlobalRowStore() {
+            return delegate.getGlobalRowStore();
+        }
+
+        public IIndex getIndex(String name, long timestamp) {
+            return delegate.getIndex(name, timestamp);
+        }
+
+        public long getLastCommitTime() {
+            return delegate.getLastCommitTime();
+        }
+
+        public IResourceLocator getResourceLocator() {
+            return delegate.getResourceLocator();
+        }
+
+        public IResourceLockManager getResourceLockManager() {
+            return delegate.getResourceLockManager();
+        }
+
+        public void registerIndex(IndexMetadata indexMetadata) {
+            delegate.registerIndex(indexMetadata);
+        }
+        
+    }
+    
 }

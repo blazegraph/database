@@ -45,10 +45,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.cache.ICacheEntry;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -935,150 +935,19 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     }
     
-    /*
-     * thread-local key builder. 
-     */
-
-    /**
-     * A {@link ThreadLocal} variable providing access to thread-specific
-     * instances of a configured {@link IKeyBuilder}.
-     * <p>
-     * Note: this {@link ThreadLocal} is not static since we need configuration
-     * properties from the constructor - those properties can be different for
-     * different {@link IBigdataClient}s on the same machine.
-     */
-    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
-
-        protected synchronized IKeyBuilder initialValue() {
-
-            return KeyBuilder.newUnicodeInstance(client.getProperties());
-
-        }
-
-    };
-
-    /**
-     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
-     * using the properties specified for the {@link IBigdataClient}.
-     */
-    public IKeyBuilder getKeyBuilder() {
-        
-        assertOpen();
-        
-        return threadLocalKeyBuilder.get();
-        
-    }
-    
-    /*
-     * named records
-     */
-
-    private final GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this);
-    
     public SparseRowStore getGlobalRowStore() {
         
         return globalRowStoreHelper.getGlobalRowStore();
         
     }
-    
-//    private final String GLOBAL_ROW_STORE_INDEX = "__global_namespace_index";
-//
-//    synchronized public SparseRowStore getGlobalRowStore() {
-//        
-//        log.info("");
-//
-//        if (globalRowStore == null) {
-//
-//            IIndex ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
-//
-//            if (ndx == null) {
-//
-//                log.info("Global row store does not exist - will try to register now");
-//                
-//                try {
-//
-//                    registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,
-//                            UUID.randomUUID()));
-//
-//                } catch (Exception ex) {
-//
-//                    throw new RuntimeException(ex);
-//
-//                }
-//
-//                ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
-//
-//                if (ndx == null) {
-//
-//                    throw new RuntimeException("Could not find index?");
-//
-//                }
-//
-//            }
-//
-//            globalRowStore = new SparseRowStore(ndx);
-//
-//        }
-//        
-//        return globalRowStore;
-//
-//    }
-//    private SparseRowStore globalRowStore;
-    
-//    public Object getNamedRecord(final String primaryKey) {
-//
-//        if (primaryKey == null)
-//            throw new IllegalArgumentException();
-//
-//        final ITPS tps = getGlobalRowStore().read(getKeyBuilder(),//
-//                GlobalRowStoreSchema.INSTANCE, //
-//                primaryKey,//
-//                Long.MAX_VALUE, // most recent value only
-//                null // filter
-//                );
-//        
-//        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
-//
-//        if (tpv.getValue() == null) {
-//
-//            // No value for that name.
-//            return null;        
-//            
-//        }
-//        
-//        return tpv;
-//        
-//    }
-//
-//    public Object putNamedRecord(String primaryKey, Object value) {
-//
-//        if (primaryKey == null)
-//            throw new IllegalArgumentException();
-//
-//        final Map<String,Object> row = new HashMap<String,Object>();
-//        
-//        row.put(primaryKey,value);
-//        
-//        final ITPS tps = getGlobalRowStore().write(//
-//                getKeyBuilder(), //
-//                GlobalRowStoreSchema.INSTANCE, //
-//                row,//
-//                SparseRowStore.AUTO_TIMESTAMP_UNIQUE,//
-//                null // filter
-//                );
-//
-//        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
-//
-//        if (tpv.getValue() == null) {
-//
-//            // No value for that name.
-//            return null;
-//
-//        }
-//
-//        return tpv;
-//
-//    }
+    private final GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this);
+
+    public BigdataFileSystem getGlobalFileSystem() {
+        
+        return globalFileSystemHelper.getGlobalFileSystem();
+        
+    }
+    private final GlobalFileSystemHelper globalFileSystemHelper = new GlobalFileSystemHelper(this);
 
     /**
      * Periodically send performance counter data to the

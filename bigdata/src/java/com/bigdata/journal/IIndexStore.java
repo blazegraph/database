@@ -25,6 +25,7 @@ package com.bigdata.journal;
 
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IIndex;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -59,6 +60,14 @@ public interface IIndexStore {
      * @see GlobalRowStoreSchema
      */
     public SparseRowStore getGlobalRowStore();
+    
+    /**
+     * Return the global file system used to store block-structured files and
+     * their metadata and as a source and sink for map/reduce processing.
+     * 
+     * @see BigdataFileSystem
+     */
+    public BigdataFileSystem getGlobalFileSystem();
     
     /**
      * Return the default locator for resources that are logical index

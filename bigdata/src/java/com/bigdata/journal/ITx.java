@@ -49,11 +49,16 @@ public interface ITx {
     public static final long UNISOLATED = 0L;
     
     /**
-     * A constant that SHOULD used as the timestamp for a
-     * <em>read-committed</em> (non-transactional) read-only operation. The
-     * value of this constant is ZERO (-1L) -- this value corresponds to
+     * A constant that SHOULD used as the timestamp for <em>read-committed</em>
+     * (non-transactional dirty reads) operations. The value of this constant is
+     * MINUS ONE (-1L) -- this value corresponds to
      * <code>Wed Dec 31 18:59:59 EST 1969</code> when interpreted as a
      * {@link Date}.
+     * <p>
+     * If you want a scale-out index to be read consistent over multiple
+     * operations, then use {@link IIndexStore#getLastCommitTime()} when you
+     * specify the timestamp for the view. The index will be as of the specified
+     * commit time and more recent commit points will not become visible.
      * <p>
      * {@link AbstractTask}s that run with read-committed isolation provide a
      * read-only view onto the most recently committed state of the indices on
@@ -69,6 +74,12 @@ public interface ITx {
      * very-long running read must be performed on the database. Since a
      * read-committed transaction does not allow writes, the commit and abort
      * protocols are identical.
+     * 
+     * @todo define another constant for "read consistent" semantics. it would
+     *       read from the last globally committed state consistently for each
+     *       operation. so, for example, an iterator scanning across multiple
+     *       index partitions will be read-consistent but another operation on
+     *       the same index could read from a different commit point.
      */
     public static final long READ_COMMITTED = -1L;
     

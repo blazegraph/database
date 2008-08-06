@@ -540,4 +540,88 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         
     }
     
+    /**
+     * Test progression of a chunked iterator scan in reverse order. The test
+     * verifies that the tuples within the index partitions are also visited in
+     * reverse order when more than one chunk must be fetched.
+     */
+    public void test_reverseScan() {
+        
+        final String name = "testIndex";
+
+        final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+
+        final BTree ndx = BTree.create(new SimpleMemoryRawStore(), metadata);
+        
+        ndx.insert(new byte[] { 1 }, new byte[] { 1 });
+        ndx.insert(new byte[] { 2 }, new byte[] { 2 });
+        ndx.insert(new byte[] { 3 }, new byte[] { 3 });
+        ndx.insert(new byte[] { 4 }, new byte[] { 4 });
+
+        ndx.insert(new byte[] { 5 }, new byte[] { 5 });
+        ndx.insert(new byte[] { 6 }, new byte[] { 6 });
+        ndx.insert(new byte[] { 7 }, new byte[] { 7 });
+        ndx.insert(new byte[] { 8 }, new byte[] { 8 });
+
+        /*
+         * Query the entire key range (reverse scan).
+         * 
+         * Note: This tests with a capacity of (2) in order to force the
+         * iterator to read in chunks of two tuples at a time. This helps verify
+         * that the base iterator is in reverse order, that the chunked iterator
+         * is moving backwards through the index partition, and that the total
+         * iterator is moving backwards through the index partitions.
+         */
+        {
+
+            final ITupleIterator itr = ndx.rangeIterator(null, null,
+                    1/* capacity */, IRangeQuery.DEFAULT
+                            | IRangeQuery.REVERSE, null/* filter */);
+
+            ITuple tuple;
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 8 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 8 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 7 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 7 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 6 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 6 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 5 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 5 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 4 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 4 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 3 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 3 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 2 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 2 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
+            
+        }
+
+    }
+
 }

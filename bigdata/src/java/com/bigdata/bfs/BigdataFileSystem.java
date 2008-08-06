@@ -1,7 +1,7 @@
 /*
  * Created on Jan 17, 2008
  */
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.DataInput;
 import java.io.IOException;
@@ -31,13 +31,18 @@ import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.relation.AbstractResource;
+import com.bigdata.relation.IDatabase;
+import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.search.FullTextIndex;
-import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.ITPS;
@@ -98,18 +103,18 @@ import cutthecrap.utils.striterators.Striterator;
  * The {@link #getMetadataIndex() metadata index} uses a {@link SparseRowStore}
  * design, similar to Google's bigtable or Hadoop's HBase. All updates to file
  * version metadata are atomic. The primary key in the metadata index for every
- * file is its {@link MetadataSchema#ID}. In addition, each version of a file
- * has a distinct {@link MetadataSchema#VERSION} property. File creation time,
+ * file is its {@link FileMetadataSchema#ID}. In addition, each version of a file
+ * has a distinct {@link FileMetadataSchema#VERSION} property. File creation time,
  * version creation time, and file version metadata update timestamps may be
  * recovered from the timestamps associated with the properties in the metadata
- * index. The use of the {@link MetadataSchema#CONTENT_TYPE} and
- * {@link MetadataSchema#CONTENT_ENCODING} properties is enforced by the
+ * index. The use of the {@link FileMetadataSchema#CONTENT_TYPE} and
+ * {@link FileMetadataSchema#CONTENT_ENCODING} properties is enforced by the
  * high-level {@link Document} interface. Applications are free to define
  * additional properties.
  * <p>
  * Each time a file is created a new version number is assigned. The data index
- * uses the {@link MetadataSchema#ID} as the first field in a compound key. The
- * second field is the {@link MetadataSchema#VERSION} - a 32-bit integer. The
+ * uses the {@link FileMetadataSchema#ID} as the first field in a compound key. The
+ * second field is the {@link FileMetadataSchema#VERSION} - a 32-bit integer. The
  * remainder of the key is a 64-bit signed block identifier (2^63-1 distinct
  * block identifiers). The block identifiers are strictly monotonic (e.g., up
  * one) and their sequence orders the blocks into the logical byte order of the
@@ -198,20 +203,22 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataRepository implements ContentRepository {
+public class BigdataFileSystem extends
+        AbstractResource<IDatabase<BigdataFileSystem>> implements
+        IContentRepository {
 
-    protected static Logger log = Logger.getLogger(BigdataRepository.class);
+    protected static Logger log = Logger.getLogger(BigdataFileSystem.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
     /**
@@ -250,12 +257,12 @@ public class BigdataRepository implements ContentRepository {
      * The maximum file length is <code>2^63 - 1 </code> blocks ( 536,870,912
      * Exabytes).
      * <p>
-     * Note: The {@link BigdataRepository} makes the <strong>assumption</strong>
+     * Note: The {@link BigdataFileSystem} makes the <strong>assumption</strong>
      * that the {@link com.bigdata.journal.Options#OFFSET_BITS} is the #of
      * offset bits configured for the {@link IDataService}s in the connected
      * {@link IBigdataFederation} and computes the
-     * {@link BigdataRepository#getBlockSize()} based on that assumption. It is
-     * NOT possible to write blocks on the {@link BigdataRepository} whose size
+     * {@link BigdataFileSystem#getBlockSize()} based on that assumption. It is
+     * NOT possible to write blocks on the {@link BigdataFileSystem} whose size
      * is greater than the maximum block size actually configured for the
      * {@link IDataService}s in the connected {@link IBigdataFederation}.
      * 
@@ -279,45 +286,33 @@ public class BigdataRepository implements ContentRepository {
     protected static final long MAX_BLOCK = Long.MAX_VALUE - 1;
     
     /**
-     * The connection to the bigdata federation.
+     * The basename of the index in which the file metadata are stored. The
+     * fully qualified name of the index uses {@link #getNamespace()} as a
+     * prefix.
+     * <p>
+     * Note: This is a {@link SparseRowStore} governed by the
+     * {@link FileMetadataSchema}.
      */
-    private IBigdataFederation fed;
+    public static final String FILE_METADATA_INDEX_BASENAME = "#fileMetadata";
     
     /**
-     * The name of the scale-out index in which the metadata are stored. This is
-     * a {@link SparseRowStore} governed by the {@link #metadataSchema}.
+     * The basename of the index in which the file data blocks are stored. The
+     * fully qualified name of the index uses {@link #getNamespace()} as a
+     * prefix.
+     * <p>
+     * Note: The entries in this index are a series of blocks for a file. Blocks
+     * are {@link #blockSize} bytes each and are assigned monotonically
+     * increasing block numbers by the atomic append operation. The final block
+     * may be smaller (there is no need to pad out the data with nulls). The
+     * keys are formed from two fields - a field containing the content
+     * identifier followed by an integer field containing the sequential block
+     * number. A range scan with a fromKey of the file identifier and a toKey
+     * computed using the successor of the file identifier will naturally visit
+     * all blocks in a file in sequence.
      */
-    private static final String METADATA_NAME = BigdataRepository.class.getSimpleName()+"#metadata";
+    public static final String FILE_DATA_INDEX_BASENAME = "#fileData";
     
-    /**
-     * The name of the scale-out index in which the data are stored. The entries
-     * in this index are a series of blocks for a file. Blocks are
-     * {@link #blockSize} bytes each and are assigned monotonically increasing
-     * block numbers by the atomic append operation. The final block may be
-     * smaller (there is no need to pad out the data with nulls). The keys are
-     * formed from two fields - a field containing the content identifier
-     * followed by an integer field containing the sequential block number. A
-     * range scan with a fromKey of the file identifier and a toKey computed
-     * using the successor of the file identifier will naturally visit all
-     * blocks in a file in sequence.
-     */
-    private static final String DATA_NAME = BigdataRepository.class.getSimpleName()+"#data";
-    
-    /**
-     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
-     * using the properties specified for the {@link IBigdataClient}.
-     * 
-     * @deprecated by {@link IndexMetadata#getKeyBuilder()}, at least for the
-     *             {@link SparseRowStore}. It is still valid for operations
-     *             that do not have dependencies on Unicode encoding behavior.
-     */
-    public IKeyBuilder getKeyBuilder() {
-        
-        return fed.getKeyBuilder();
-        
-    }
-        
-    public static final MetadataSchema metadataSchema = new MetadataSchema();
+    public static final FileMetadataSchema metadataSchema = new FileMetadataSchema();
     
     private SparseRowStore metadataIndex;
     
@@ -351,37 +346,22 @@ public class BigdataRepository implements ContentRepository {
     }
 
     /**
-     * Connect to a repository.
-     * 
-     * @param client
-     *            The client. Configuration information is obtained from the
-     *            client. See {@link Options} for configuration options.
-     * 
-     * @throws IllegalStateException
-     *             if the client is not connected.
+     * Ctor specified by {@link DefaultResourceLocator}.
      * 
      * @see Options
      */
-    public BigdataRepository(IBigdataClient client) {
+    public BigdataFileSystem(IIndexManager indexManager, String namespace,
+            Long timestamp, Properties properties) {
+
+        super(indexManager,namespace,timestamp,properties);
         
-        this.fed = client.getFederation();
-        
-        offsetBits = Integer.parseInt(client.getProperties()
-                .getProperty(Options.OFFSET_BITS,
-                        Options.DEFAULT_OFFSET_BITS));
+        offsetBits = Integer.parseInt(properties.getProperty(
+                Options.OFFSET_BITS, Options.DEFAULT_OFFSET_BITS));
         
         blockSize = WormAddressManager.getMaxByteCount(offsetBits) - 1;
         
-        log.info("offsetBits="+offsetBits+", blockSize="+blockSize);
-        
-    }
-
-    /**
-     * An object wrapping the properties provided to the {@link IBigdataClient}.
-     */
-    protected Properties getProperties() {
-        
-        return new Properties(fed.getClient().getProperties());
+        if (log.isInfoEnabled())
+            log.info("offsetBits=" + offsetBits + ", blockSize=" + blockSize);
         
     }
 
@@ -392,26 +372,22 @@ public class BigdataRepository implements ContentRepository {
 
         if (metadataIndex == null) {
 
-            IIndex ndx = fed.getIndex(METADATA_NAME,ITx.UNISOLATED);
-
-            metadataIndex = new SparseRowStore(ndx);
+            throw new IllegalStateException();
             
         }
 
         return metadataIndex;
-
+        
     }
 
     /**
-     * The index in which the file data is stored (the index must exist).
-     * 
-     * @todo pass in the timestamp?
+     * The index in which the file blocks are stored (the index must exist).
      */
     public IIndex getDataIndex() {
 
         if (dataIndex == null) {
 
-            dataIndex = fed.getIndex(DATA_NAME,ITx.UNISOLATED);
+            throw new IllegalStateException();
 
         }
 
@@ -420,81 +396,135 @@ public class BigdataRepository implements ContentRepository {
     }
     
     /**
-     * Registers the scale-out indices.
-     * 
-     * @todo make this an atomic operation ala the ScaleOutTripleStore and one
-     *       that is automatic.  The indices can exist in a namespace so that
-     *       more than one repository can be easily configured.
-     * 
-     * @todo parameterize the namespace for the file metadata and file data
-     *       indices so that you can have more than one repository instance.
+     * <code>true</code> unless {{@link #getTimestamp()} is {@link ITx#UNISOLATED}.
      */
-    public void registerIndices() {
+    public boolean isReadOnly() {
 
-        Properties properties = getProperties();
+        return getTimestamp() != ITx.UNISOLATED;
         
-        final int branchingFactor = Integer.parseInt(properties.getProperty(
-                Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
-
-        // setup metadata index.
-        {
-
-            /*
-             * FIXME specify an appropriate split handler (keeps the row
-             * together). This is a hard requirement. The atomic read/update
-             * guarentee depends on this.
-             */
-
-            IndexMetadata md = new IndexMetadata(METADATA_NAME, UUID
-                    .randomUUID());
-
-            md.setBranchingFactor(branchingFactor);
-
-            md.setDeleteMarkers(true);
-
-            fed.registerIndex(md);
-
-            IIndex ndx = fed.getIndex(METADATA_NAME,ITx.UNISOLATED);
-
-            metadataIndex = new SparseRowStore(ndx);
-
+    }
+    
+    final protected void assertWritable() {
+        
+        if(isReadOnly()) {
+            
+            throw new IllegalStateException("READ_ONLY");
+            
         }
+        
+    }
 
-        // setup data index.
-        {
+    /**
+     * Note: A commit is required in order for a read-committed view to have
+     * access to the registered indices. When running against an
+     * {@link IBigdataFederation}, {@link ITx#UNISOLATED} operations will take
+     * care of this for you. Otherwise you must do this yourself.
+     */
+    public void create() {
 
-            /*
-             * @todo specify split handler that tends to keep the blocks for a
-             * file together (soft requirement).
-             */
+        assertWritable();
+        
+        final IResourceLock resourceLock = getIndexManager()
+                .getResourceLockManager().acquireExclusiveLock(getNamespace());
 
-            IndexMetadata md = new IndexMetadata(DATA_NAME, UUID.randomUUID());
+        final Properties tmp = getProperties();
+        
+//        final int branchingFactor = Integer.parseInt(tmp.getProperty(
+//                Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
 
-            md.setBranchingFactor(branchingFactor);
+        // set property that will let the contained relations locate their container.
+        tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
+        
+        try {
 
-            md.setDeleteMarkers(true);
+            super.create();
             
-            /*
-             * @todo unit tests for correct copying of blobs during overflow.
-             * See {@link IOverflowHandler}.
-             */
-            md.setOverflowHandler(new BlobOverflowHandler());
+            final IIndexManager indexManager = getIndexManager();
             
-            // register the index.
-            fed.registerIndex(md);
+            // setup metadata index.
+            {
 
-            dataIndex = fed.getIndex(DATA_NAME,ITx.UNISOLATED);
+                /*
+                 * FIXME specify an appropriate split handler (keeps the row
+                 * together). This is a hard requirement. The atomic read/update
+                 * guarentee depends on this.
+                 */
+
+                final String name = getNamespace()+FILE_METADATA_INDEX_BASENAME;
+                
+                final IndexMetadata md = new IndexMetadata(name, UUID
+                        .randomUUID());
+
+//                md.setBranchingFactor(branchingFactor);
+
+//                md.setDeleteMarkers(true);
+
+                indexManager.registerIndex(md);
+
+                final IIndex ndx = indexManager.getIndex(name, getTimestamp());
+
+                metadataIndex = new SparseRowStore(ndx);
+
+            }
+
+            // setup data index.
+            {
+
+                /*
+                 * @todo specify split handler that tends to keep the blocks for a
+                 * file together (soft requirement).
+                 */
+
+                final String name = getNamespace()+FILE_DATA_INDEX_BASENAME;
+                
+                final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+//                md.setBranchingFactor(branchingFactor);
+
+//                md.setDeleteMarkers(true);
+                
+                /*
+                 * @todo unit tests for correct copying of blobs during overflow.
+                 * See {@link IOverflowHandler}.
+                 */
+                md.setOverflowHandler(new BlobOverflowHandler());
+                
+                // register the index.
+                indexManager.registerIndex(md);
+
+                dataIndex = indexManager.getIndex(name,getTimestamp());
+
+            }
+
+        } finally {
+
+            resourceLock.unlock();
 
         }
 
     }
 
-    /**
-     * NOP - the caller should disconnect their client from the federation when
-     * they are no longer using that connection.
-     */
-    public void close() {
-        
+    public void destroy() {
+
+        assertWritable();
+
+        final IResourceLock resourceLock = getIndexManager()
+                .getResourceLockManager().acquireExclusiveLock(getNamespace());
+
+        try {
+
+            getIndexManager().dropIndex(getNamespace()+FILE_METADATA_INDEX_BASENAME);
+
+            getIndexManager().dropIndex(getNamespace()+FILE_DATA_INDEX_BASENAME);
+            
+            super.destroy();
+            
+        } finally {
+
+            resourceLock.unlock();
+            
+        }
+
     }
 
     /**
@@ -513,21 +543,22 @@ public class BigdataRepository implements ContentRepository {
             throw new IllegalArgumentException();
 
         // check required properties.
-        assertString(metadata, MetadataSchema.ID);
+        assertString(metadata, FileMetadataSchema.ID);
 
         // clone the map since it may be unmodifiable.
         metadata = new HashMap<String, Object>(metadata);
         
         // auto-increment the last defined version counter.
-        metadata.put(MetadataSchema.VERSION, AutoIncIntegerCounter.INSTANCE);
+        metadata.put(FileMetadataSchema.VERSION, AutoIncIntegerCounter.INSTANCE);
         
         // write the metadata (atomic operation).
         final ITPS tps = getMetadataIndex().write(metadataSchema, metadata,
                 AUTO_TIMESTAMP, null/* filter */, null/*precondition*/);
 
-        final int version = (Integer) tps.get(MetadataSchema.VERSION).getValue();
+        final int version = (Integer) tps.get(FileMetadataSchema.VERSION).getValue();
 
-        log.info("Created new version: id=" + metadata.get(MetadataSchema.ID)
+        if(INFO)
+        log.info("Created new version: id=" + metadata.get(FileMetadataSchema.ID)
                 + ", version=" + version);
         
         return version;
@@ -542,7 +573,7 @@ public class BigdataRepository implements ContentRepository {
         final String id = doc.getId(); 
         
         if (id == null)
-            throw new RuntimeException("The " + MetadataSchema.ID
+            throw new RuntimeException("The " + FileMetadataSchema.ID
                     + " property must be defined.");
 
         final Map<String,Object> metadata = doc.asMap();
@@ -586,6 +617,7 @@ public class BigdataRepository implements ContentRepository {
 
             // no current version for that document.
             
+            if(INFO)
             log.info("No current version: id="+id);
             
             return null;
@@ -638,10 +670,10 @@ public class BigdataRepository implements ContentRepository {
         metadata = new HashMap<String,Object>(metadata);
         
         // set the id - this is required for the primary key.
-        metadata.put(MetadataSchema.ID, id);
+        metadata.put(FileMetadataSchema.ID, id);
 
         // remove the version identifier if any - we do not want this modified!
-        metadata.remove(MetadataSchema.VERSION);
+        metadata.remove(FileMetadataSchema.VERSION);
         
         return getMetadataIndex().write(metadataSchema, metadata,
                 AUTO_TIMESTAMP, null/* filter */,null/*precondition*/).asMap();
@@ -662,7 +694,7 @@ public class BigdataRepository implements ContentRepository {
         
         Map<String,Object> metadata = doc.asMap();
         
-        final String id = (String) metadata.get(MetadataSchema.ID); 
+        final String id = (String) metadata.get(FileMetadataSchema.ID); 
         
         // delete the existing file version (if any).
         delete( id );
@@ -713,10 +745,10 @@ public class BigdataRepository implements ContentRepository {
             final Map<String, Object> metadata = new HashMap<String, Object>();
 
             // primary key.
-            metadata.put(MetadataSchema.ID, id);
+            metadata.put(FileMetadataSchema.ID, id);
 
             // delete marker.
-            metadata.put(MetadataSchema.VERSION, null);
+            metadata.put(FileMetadataSchema.VERSION, null);
 
             getMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP,
                     null/* filter */, null/*precondition*/);
@@ -736,7 +768,7 @@ public class BigdataRepository implements ContentRepository {
 
         long blockCount = 0;
 
-        final IKeyBuilder keyBuilder = getKeyBuilder();
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
 
         // the key for {file,version}
         final byte[] fromKey = keyBuilder.reset().appendText(id,
@@ -759,6 +791,7 @@ public class BigdataRepository implements ContentRepository {
 
         }
 
+        if(INFO)
         log.info("Deleted " + blockCount + " blocks : id=" + id + ", version="
                 + version);
 
@@ -847,7 +880,7 @@ public class BigdataRepository implements ContentRepository {
             
             ITPV tpv = itr.next();
             
-            if(!tpv.getName().equals(MetadataSchema.VERSION)) {
+            if(!tpv.getName().equals(FileMetadataSchema.VERSION)) {
                 
                 // Not a version field.
                 
@@ -882,10 +915,10 @@ public class BigdataRepository implements ContentRepository {
                         
                         ITPS tps = (ITPS) arg0;
                         
-                        String id = (String) tps.get(MetadataSchema.ID).getValue();
+                        String id = (String) tps.get(FileMetadataSchema.ID).getValue();
                         
                         return new RepositoryDocumentImpl(
-                                BigdataRepository.this, id, tps);
+                                BigdataFileSystem.this, id, tps);
                         
                     }
 
@@ -902,7 +935,7 @@ public class BigdataRepository implements ContentRepository {
      */
     public long deleteAll(String fromId, String toId) {
         
-        IKeyBuilder keyBuilder = getKeyBuilder();
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
 
         // the key for {fromId}
         final byte[] fromKey = keyBuilder.reset().appendText(fromId,
@@ -973,7 +1006,7 @@ public class BigdataRepository implements ContentRepository {
      * should be indexed based on its metadata and how the document should be
      * processed if it is to be indexed. Those business rules would be
      * registered with the full text indexing service. (Alternatively, they can
-     * be configured with the {@link BigdataRepository} and applied locally as
+     * be configured with the {@link BigdataFileSystem} and applied locally as
      * the blocks of the file are written into the repository. That's certainly
      * easier right off the bat.)
      * 
@@ -1019,9 +1052,10 @@ public class BigdataRepository implements ContentRepository {
      * Note: This may be used to efficiently distribute blocks among a
      * population of clients, e.g., in a map/reduce paradigm.
      */
-    public Iterator<Long> blocks(String id,int version) {
-        
-        final IKeyBuilder keyBuilder = getKeyBuilder();
+    public Iterator<Long> blocks(String id, int version) {
+
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata()
+                .getKeyBuilder();
 
         final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
@@ -1171,8 +1205,10 @@ public class BigdataRepository implements ContentRepository {
         final ISimpleIndexProcedure proc = new AtomicBlockWriteProc(this, id, version,
                 block, b, off, len);
 
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+
         // the key for the {file,version,block}
-        final byte[] key = getKeyBuilder().reset().appendText(id,
+        final byte[] key = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .append(block).getKey();
 
@@ -1193,9 +1229,11 @@ public class BigdataRepository implements ContentRepository {
      */
     public long deleteHead(String id, int version) {
 
-        log.info("id="+id+", version="+version);
+        if (log.isInfoEnabled())
+            log.info("id=" + id + ", version=" + version);
 
-        IKeyBuilder keyBuilder = getKeyBuilder();
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata()
+                .getKeyBuilder();
 
         // the key for {file,version}
         final byte[] fromKey = keyBuilder.reset().appendText(id,
@@ -1232,6 +1270,7 @@ public class BigdataRepository implements ContentRepository {
         
         final long block = new BlockIdentifierIterator(id, version, itr).next();
             
+        if(INFO)
         log.info("id="+id+", version="+version+" : deleted block="+block);
 
         return block;
@@ -1268,7 +1307,9 @@ public class BigdataRepository implements ContentRepository {
             throw new IllegalArgumentException();
         }
 
-        final byte[] key = getKeyBuilder().reset().appendText(id,
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+
+        final byte[] key = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .append(block).getKey();
         
@@ -1302,11 +1343,14 @@ public class BigdataRepository implements ContentRepository {
          * are only interested in the first block, but this is how we get at its
          * data using an atomic read.
          */
-        final byte[] fromKey = getKeyBuilder().reset().appendText(id,
+
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+
+        final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .append(0L).getKey();
 
-        final byte[] toKey = getKeyBuilder().reset().appendText(id,
+        final byte[] toKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .append(Long.MAX_VALUE).getKey();
 
@@ -1319,7 +1363,8 @@ public class BigdataRepository implements ContentRepository {
 
         if (!itr.hasNext()) {
 
-            log.info("id=" + id + ", version=" + version + " : no blocks");
+            if (log.isInfoEnabled())
+                log.info("id=" + id + ", version=" + version + " : no blocks");
 
             return null;
 
@@ -1356,11 +1401,14 @@ public class BigdataRepository implements ContentRepository {
          * Note: This uses a range scan because a lookup will return the address
          * of the block rather than its data!
          */
-        final byte[] fromKey = getKeyBuilder().reset().appendText(id,
+
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+
+        final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .append(block).getKey();
 
-        final byte[] toKey = getKeyBuilder().reset().appendText(id,
+        final byte[] toKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .append(block + 1).getKey();
 
@@ -1373,8 +1421,9 @@ public class BigdataRepository implements ContentRepository {
 
         if (!itr.hasNext()) {
 
-            log.info("id=" + id + ", version=" + version + ", block=" + block
-                    + " : does not exist");
+            if (log.isInfoEnabled())
+                log.info("id=" + id + ", version=" + version + ", block="
+                        + block + " : does not exist");
 
             return null;
 
@@ -1421,6 +1470,7 @@ public class BigdataRepository implements ContentRepository {
              * their address.
              */
 
+            if(INFO)
             log.info("id=" + id + ", version=" + version + ", block=" + block
                     + " : empty block.");
 
@@ -1435,6 +1485,7 @@ public class BigdataRepository implements ContentRepository {
 
         final int len = tmp.length();
         
+        if(INFO)
         log.info("id=" + id + ", version=" + version + ", block=" + block
                 + " : " + len + " bytes");
 
@@ -1513,8 +1564,10 @@ public class BigdataRepository implements ContentRepository {
         final ISimpleIndexProcedure proc = new AtomicBlockAppendProc(this, id,
                 version, b, off, len);
 
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+        
         // the last possible key for this file
-        final byte[] key = getKeyBuilder().reset().appendText(id,
+        final byte[] key = keyBuilder.reset().appendText(id,
                 true/* unicode */, true/* successor */).append(version)
                 .append(-1L).getKey();
 
@@ -1560,17 +1613,21 @@ public class BigdataRepository implements ContentRepository {
      */
     public long getBlockCount(String id, int version) {
      
-        final byte[] fromKey = getKeyBuilder().reset().appendText(id,
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata()
+                .getKeyBuilder();
+
+        final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .getKey();
 
-        final byte[] toKey = getKeyBuilder().reset().appendText(id,
+        final byte[] toKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version + 1)
                 .getKey();
 
         final long nblocks = getDataIndex().rangeCount(fromKey, toKey);
 
-        log.info("id=" + id + ", version=" + version + ", nblocks=" + nblocks);
+        if (log.isInfoEnabled())
+            log.info("id=" + id + ", version=" + version + ", nblocks=" + nblocks);
 
         return nblocks;
         
@@ -1612,6 +1669,7 @@ public class BigdataRepository implements ContentRepository {
     public Writer writer(String id, int version, String encoding)
             throws UnsupportedEncodingException {
         
+        if(INFO)
         log.info("id="+id+", version="+version+", encoding="+encoding);
 
         return new OutputStreamWriter(outputStream(id, version), encoding);
@@ -1634,6 +1692,7 @@ public class BigdataRepository implements ContentRepository {
      */
     public Reader reader(String id, int version, String encoding) throws UnsupportedEncodingException {
 
+        if(INFO)
         log.info("id="+id+", version="+version+", encoding="+encoding);
         
         if (encoding == null) {
@@ -1698,7 +1757,7 @@ public class BigdataRepository implements ContentRepository {
      * <li> It is possible to issue transactional read requests, but you must
      * first open a transaction with an {@link ITransactionManagerService}. In general
      * the use of full transactions is discouraged as the
-     * {@link BigdataRepository} is designed for high throughput and high
+     * {@link BigdataFileSystem} is designed for high throughput and high
      * concurrency with weaker isolation levels suitable for scale-out
      * processing techniques including map/reduce.</li>
      * 
@@ -1725,7 +1784,8 @@ public class BigdataRepository implements ContentRepository {
      */
     public FileVersionInputStream inputStream(String id, int version, long tx) {
 
-        log.info("id=" + id + ", version=" + version + ", tx=" + tx);
+        if (log.isInfoEnabled())
+            log.info("id=" + id + ", version=" + version + ", tx=" + tx);
 
         /*
          * Range count the file and version on the federation - this is the
@@ -1739,7 +1799,8 @@ public class BigdataRepository implements ContentRepository {
 
         if (tx == ITx.UNISOLATED && getBlockCount(id, version) == 0L) {
 
-            log.info("No data: id=" + id + ", version=" + version);
+            if (log.isInfoEnabled())
+                log.info("No data: id=" + id + ", version=" + version);
 
             return null;
 
@@ -1749,11 +1810,14 @@ public class BigdataRepository implements ContentRepository {
          * Return an input stream that will progress through a range scan of the
          * blocks for that file and version.
          */
-        final byte[] fromKey = getKeyBuilder().reset().appendText(id,
+
+        final IKeyBuilder keyBuilder = getDataIndex().getIndexMetadata().getKeyBuilder();
+
+        final byte[] fromKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version)
                 .getKey();
 
-        final byte[] toKey = getKeyBuilder().reset().appendText(id,
+        final byte[] toKey = keyBuilder.reset().appendText(id,
                 true/* unicode */, false/* successor */).append(version + 1)
                 .getKey();
 
@@ -1797,7 +1861,7 @@ public class BigdataRepository implements ContentRepository {
              * by the specified transaction.
              */
 
-            dataIndex = fed.getIndex(DATA_NAME,tx);
+            dataIndex = getIndexManager().getIndex(getNamespace()+FILE_DATA_INDEX_BASENAME,tx);
             
         }
 
@@ -1832,6 +1896,7 @@ public class BigdataRepository implements ContentRepository {
      */
     public OutputStream outputStream(String id, int version) {
 
+        if(INFO)
         log.info("id="+id+", version="+version);
 
         return new FileVersionOutputStream(this, id, version);

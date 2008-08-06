@@ -1,4 +1,4 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -12,7 +12,7 @@ import com.bigdata.sparse.ITPV;
 
 /**
  * A read-only view of a {@link Document} that has been read from a
- * {@link BigdataRepository}.
+ * {@link BigdataFileSystem}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -20,7 +20,7 @@ import com.bigdata.sparse.ITPV;
 public class RepositoryDocumentImpl implements DocumentHeader, Document 
 {
     
-    final private BigdataRepository repo;
+    final private BigdataFileSystem repo;
     
     final private String id;
     
@@ -53,7 +53,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
      *            The logical row describing the metadata for some file in
      *            the repository.
      */
-    public RepositoryDocumentImpl(BigdataRepository repo, String id,
+    public RepositoryDocumentImpl(BigdataFileSystem repo, String id,
             ITPS tps) {
         
         if (repo == null)
@@ -70,7 +70,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
         
         if (tps != null) {
 
-            ITPV tmp = tps.get(MetadataSchema.VERSION);
+            ITPV tmp = tps.get(FileMetadataSchema.VERSION);
             
             if (tmp.getValue() != null) {
 
@@ -87,7 +87,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
                 
                 this.metadata = tps.asMap();
 
-                BigdataRepository.log.info("id="+id+", current version="+version);
+                BigdataFileSystem.log.info("id="+id+", current version="+version);
 
             } else {
                 
@@ -99,7 +99,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
 
                 this.metadata = null;
                 
-                BigdataRepository.log.warn("id="+id+" : no current version");
+                BigdataFileSystem.log.warn("id="+id+" : no current version");
 
             }
 
@@ -113,11 +113,11 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
             
             this.metadata = null;
             
-            BigdataRepository.log.warn("id="+id+" : no record of any version(s)");
+            BigdataFileSystem.log.warn("id="+id+" : no record of any version(s)");
 
         }
         
-        if (BigdataRepository.DEBUG && metadata != null) {
+        if (BigdataFileSystem.DEBUG && metadata != null) {
 
             Iterator<Map.Entry<String,Object>> itr = metadata.entrySet().iterator();
             
@@ -125,7 +125,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
                 
                 Map.Entry<String, Object> entry = itr.next();
                 
-                BigdataRepository.log.debug("id=" + id + ", version=" + getVersion() + ", ["
+                BigdataFileSystem.log.debug("id=" + id + ", version=" + getVersion() + ", ["
                         + entry.getKey() + "]=[" + entry.getValue() + "]");
                 
             }
@@ -141,11 +141,11 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
      * @param id
      *            The file identifier.
      */
-    public RepositoryDocumentImpl(BigdataRepository repo,String id)
+    public RepositoryDocumentImpl(BigdataFileSystem repo,String id)
     {
         
         this(repo, id, repo.getMetadataIndex()
-                .read(BigdataRepository.metadataSchema, id, Long.MAX_VALUE,
+                .read(BigdataFileSystem.metadataSchema, id, Long.MAX_VALUE,
                         null/* filter */));
         
     }
@@ -178,13 +178,13 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
 
         assertExists();
 
-        return (Integer)metadata.get(MetadataSchema.VERSION);
+        return (Integer)metadata.get(FileMetadataSchema.VERSION);
 
     }
 
     /**
      * Note: This is obtained from the earliest available timestamp of the
-     * {@link MetadataSchema#ID} property.
+     * {@link FileMetadataSchema#ID} property.
      */
     final public long getEarliestVersionCreateTime() {
         
@@ -196,7 +196,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
             
             ITPV tpv = itr.next();
             
-            if(tpv.getName().equals(MetadataSchema.ID)) {
+            if(tpv.getName().equals(FileMetadataSchema.ID)) {
                 
                 return tpv.getTimestamp();
                 
@@ -216,7 +216,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
          * The timestamp for the most recent value of the VERSION property.
          */
         
-        final long createTime = tps.get(MetadataSchema.VERSION)
+        final long createTime = tps.get(FileMetadataSchema.VERSION)
                 .getTimestamp();
         
         return createTime;
@@ -231,7 +231,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
          * The timestamp for the most recent value of the ID property.
          */
         
-        final long metadataUpdateTime = tps.get(MetadataSchema.ID)
+        final long metadataUpdateTime = tps.get(FileMetadataSchema.ID)
                 .getTimestamp();
         
         return metadataUpdateTime;
@@ -240,10 +240,10 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
 
     /**
      * Return an array containing all non-eradicated values of the
-     * {@link MetadataSchema#VERSION} property for this file as of the time
+     * {@link FileMetadataSchema#VERSION} property for this file as of the time
      * that this view was constructed.
      * 
-     * @see BigdataRepository#getAllVersionInfo(String)
+     * @see BigdataFileSystem#getAllVersionInfo(String)
      */
     final public ITPV[] getAllVersionInfo() {
         
@@ -271,7 +271,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
 
         assertExists();
         
-        return (String)metadata.get(MetadataSchema.CONTENT_ENCODING);
+        return (String)metadata.get(FileMetadataSchema.CONTENT_ENCODING);
         
     }
 
@@ -279,7 +279,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
      
         assertExists();
 
-        return (String)metadata.get(MetadataSchema.CONTENT_TYPE);
+        return (String)metadata.get(FileMetadataSchema.CONTENT_TYPE);
         
     }
 

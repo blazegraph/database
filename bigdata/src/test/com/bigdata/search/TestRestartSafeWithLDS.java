@@ -33,9 +33,9 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.Properties;
 
+import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
-import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.LocalDataServiceFederation;

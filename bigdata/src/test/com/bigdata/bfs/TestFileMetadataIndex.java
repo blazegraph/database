@@ -26,18 +26,23 @@
  * Created on Jan 17, 2008
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.Document;
+import com.bigdata.bfs.DocumentImpl;
+import com.bigdata.bfs.FileMetadataSchema;
+import com.bigdata.bfs.RepositoryDocumentImpl;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 
 /**
- * Test operations on the file metadata index for the {@link BigdataRepository}.
+ * Test operations on the file metadata index for the {@link BigdataFileSystem}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -148,13 +153,13 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
         final Map<String, Object> metadata = new HashMap<String, Object>();
 
-        metadata.put(MetadataSchema.ID, id);
+        metadata.put(FileMetadataSchema.ID, id);
 
         metadata.put("foo", "bar");
 
         final int version = repo.create(metadata);
 
-        metadata.put(MetadataSchema.VERSION, Integer.valueOf(version));
+        metadata.put(FileMetadataSchema.VERSION, Integer.valueOf(version));
 
         assertEquals("version", 0, version);
 
@@ -172,9 +177,9 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
         Map<String, Object> actual = doc.asMap();
 
-        assertEquals("id", id, actual.get(MetadataSchema.ID));
+        assertEquals("id", id, actual.get(FileMetadataSchema.ID));
 
-        assertEquals("version", version, actual.get(MetadataSchema.VERSION));
+        assertEquals("version", version, actual.get(FileMetadataSchema.VERSION));
 
         assertEquals("user property", "bar", actual.get("foo"));
 
@@ -195,7 +200,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
         final Map<String, Object> metadata = new HashMap<String, Object>();
 
-        metadata.put(MetadataSchema.ID, id);
+        metadata.put(FileMetadataSchema.ID, id);
 
         metadata.put("foo", "bar");
 
@@ -206,7 +211,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             version0 = repo.create(metadata);
 
-            metadata.put(MetadataSchema.VERSION, Integer.valueOf(version0));
+            metadata.put(FileMetadataSchema.VERSION, Integer.valueOf(version0));
 
             assertEquals("version", 0, version0);
 
@@ -216,10 +221,10 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             Map<String, Object> actual = doc.asMap();
 
-            assertEquals("id", id, actual.get(MetadataSchema.ID));
+            assertEquals("id", id, actual.get(FileMetadataSchema.ID));
 
             assertEquals("version", version0, actual
-                    .get(MetadataSchema.VERSION));
+                    .get(FileMetadataSchema.VERSION));
 
             assertEquals("user property", "bar", actual.get("foo"));
 
@@ -249,7 +254,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
             
             version1 = repo.update( doc1 );
             
-            metadata.put(MetadataSchema.VERSION, Integer.valueOf(version1));
+            metadata.put(FileMetadataSchema.VERSION, Integer.valueOf(version1));
 
             assertEquals("version", 1, version1);
 
@@ -263,10 +268,10 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             Map<String, Object> actual = doc.asMap();
 
-            assertEquals("id", id, actual.get(MetadataSchema.ID));
+            assertEquals("id", id, actual.get(FileMetadataSchema.ID));
 
             assertEquals("version", version1, actual
-                    .get(MetadataSchema.VERSION));
+                    .get(FileMetadataSchema.VERSION));
 
             assertEquals("user property", "baz", actual.get("foo"));
 
@@ -302,7 +307,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
                  * overwritten to be deleted (a null) immediately before the new
                  * file version was created.
                  */
-                ITPV tpv = tps.get(MetadataSchema.VERSION);
+                ITPV tpv = tps.get(FileMetadataSchema.VERSION);
 
                 assertEquals("version", null, tpv.getValue());
 
@@ -329,7 +334,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
         final Map<String, Object> metadata = new HashMap<String, Object>();
 
-        metadata.put(MetadataSchema.ID, id);
+        metadata.put(FileMetadataSchema.ID, id);
 
         metadata.put("foo", "bar");
 
@@ -340,7 +345,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             version0 = repo.create(metadata);
 
-            metadata.put(MetadataSchema.VERSION, Integer.valueOf(version0));
+            metadata.put(FileMetadataSchema.VERSION, Integer.valueOf(version0));
 
             assertEquals("version", 0, version0);
 
@@ -352,10 +357,10 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             Map<String, Object> actual = doc.asMap();
 
-            assertEquals("id", id, actual.get(MetadataSchema.ID));
+            assertEquals("id", id, actual.get(FileMetadataSchema.ID));
 
             assertEquals("version", version0, actual
-                    .get(MetadataSchema.VERSION));
+                    .get(FileMetadataSchema.VERSION));
 
             assertEquals("user property", "bar", actual.get("foo"));
 

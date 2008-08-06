@@ -35,6 +35,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
@@ -734,8 +736,23 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return globalRowStoreHelper.getGlobalRowStore();
 
     }
-
     private GlobalRowStoreHelper globalRowStoreHelper;
+
+    /*
+     * global file system.
+     */
+    synchronized public BigdataFileSystem getGlobalFileSystem() {
+
+        if (globalFileSystemHelper == null) {
+
+            globalFileSystemHelper = new GlobalFileSystemHelper(this);
+
+        }
+
+        return globalFileSystemHelper.getGlobalFileSystem();
+
+    }
+    private GlobalFileSystemHelper globalFileSystemHelper;
 
     protected void discardCommitters() {
 

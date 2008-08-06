@@ -32,6 +32,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -327,6 +329,15 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
     private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
+
+    public BigdataFileSystem getGlobalFileSystem() {
+
+        assertOpen();
+        
+        return globalFileSystemHelper.getGlobalFileSystem();
+        
+    }
+    private GlobalFileSystemHelper globalFileSystemHelper = new GlobalFileSystemHelper(this); 
 
     public DefaultResourceLocator getResourceLocator() {
 

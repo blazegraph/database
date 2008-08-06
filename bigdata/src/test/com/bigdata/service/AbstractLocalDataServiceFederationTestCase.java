@@ -32,8 +32,8 @@ import java.util.Properties;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.ResourceManager;
 
 /**

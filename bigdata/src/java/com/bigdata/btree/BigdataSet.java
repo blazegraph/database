@@ -237,8 +237,6 @@ public class BigdataSet<E> extends AbstractSet<E> implements SortedSet<E> {
     /**
      * Note: This is written using an {@link ITupleIterator} in order to decode
      * the entry.
-     * 
-     * FIXME Implement the reverse scan feature for {@link ITupleIterator}.
      */ 
     @SuppressWarnings("unchecked")
     public E last() {

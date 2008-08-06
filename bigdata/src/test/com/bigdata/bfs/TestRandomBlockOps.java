@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 19, 2008
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -34,6 +34,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.bigdata.bfs.BigdataFileSystem;
 
 import junit.framework.TestCase;
 
@@ -605,7 +607,7 @@ public class TestRandomBlockOps extends AbstractRepositoryTestCase {
             assert id != null;
             assert id.length() > 0;
             
-            assert block >= 0 && block <= BigdataRepository.MAX_BLOCK;
+            assert block >= 0 && block <= BigdataFileSystem.MAX_BLOCK;
             
             this.id = id;
             
@@ -677,7 +679,7 @@ public class TestRandomBlockOps extends AbstractRepositoryTestCase {
      */
     protected static class StressTest {
         
-        final BigdataRepository repo;
+        final BigdataFileSystem repo;
         
         final int limit;
         
@@ -708,7 +710,7 @@ public class TestRandomBlockOps extends AbstractRepositoryTestCase {
          */
         final AtomicLong blockCount = new AtomicLong(0L);
         
-        public StressTest(BigdataRepository repo,int limit,Op gen) {
+        public StressTest(BigdataFileSystem repo,int limit,Op gen) {
             
             this.repo = repo;
             

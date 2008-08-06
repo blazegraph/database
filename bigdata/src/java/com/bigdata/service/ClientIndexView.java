@@ -71,9 +71,10 @@ import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TaskCounters;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -110,12 +111,6 @@ import com.bigdata.util.InnerCause;
  * an index partition is split, joined, or moved - the historical states always
  * remain behind).
  * </p>
- * 
- * FIXME Add counters and report to the load balancer (a version for clients).
- * average responseTime, average queueLength, latency due to RMI (by also
- * obtaining the response time of the data service itself), #of procedures run
- * and the execution time for those procedures; #of splits; #of tuples in each
- * split; total #of tuples.
  * 
  * @todo If the index was dropped then that should cause the operation to abort
  *       (only possible for read committed or unisolated operations).
@@ -208,7 +203,7 @@ public class ClientIndexView implements IClientIndex {
      */
     private final long timestamp;
 
-    public long getTimestamp() {
+    final public long getTimestamp() {
         
         return timestamp;
         
@@ -219,7 +214,7 @@ public class ClientIndexView implements IClientIndex {
      */
     private final String name;
     
-    public String getName() {
+    final public String getName() {
         
         return name;
         
@@ -248,7 +243,7 @@ public class ClientIndexView implements IClientIndex {
      */
     final protected IMetadataIndex getMetadataIndex() {
         
-        return fed.getMetadataIndex(name,timestamp);
+        return fed.getMetadataIndex(name, timestamp);
         
     }
     
@@ -293,8 +288,26 @@ public class ClientIndexView implements IClientIndex {
         
     }
     
+    /**
+     * <code>true</code> iff globally consistent read operations are desired
+     * for iterators or index procedures mapped across more than one index
+     * partition. When <code>true</code> and the index is
+     * {@link ITx#READ_COMMITTED} or (if the index is {@link ITx#UNISOLATED} and
+     * the operation is read-only), {@link IIndexStore#getLastCommitTime()} is
+     * queried at the start of the operation and used as the timestamp for all
+     * requests made in support of that operation.
+     * <p>
+     * Note that {@link StaleLocatorException}s can not arise for
+     * read-consistent operations. Such operations use a read-consistent view of
+     * the {@link IMetadataIndex} and the locators therefore will not change
+     * during the operation.
+     * 
+     * @todo make this a ctor argument or settable property?
+     */
+    final private boolean readConsistent = true;
+
     public String toString() {
-        
+
         final StringBuilder sb = new StringBuilder();
 
         sb.append(getClass().getSimpleName());
@@ -306,11 +319,11 @@ public class ClientIndexView implements IClientIndex {
         sb.append(", timestamp=" + timestamp);
 
         sb.append("}");
-        
+
         return sb.toString();
-        
+
     }
-   
+
     /**
      * Create a view on a scale-out index.
      * 
@@ -380,9 +393,16 @@ public class ClientIndexView implements IClientIndex {
     }
 
     /**
-     * FIXME Since scale-out indices can be very large this method should report
-     * only on aspects of the clients access to the scale-out index rather than
-     * attempting to aggregate the data from the various index partitions.
+     * @todo Add counters and report to the load balancer (a version for
+     *       clients). average responseTime, average queueLength, latency due to
+     *       RMI (by also obtaining the response time of the data service
+     *       itself), #of procedures run and the execution time for those
+     *       procedures; #of splits; #of tuples in each split; total #of tuples.
+     * 
+     * @todo Report more informatiom, but since scale-out indices can be very
+     *       large, this method should report only on aspects of the clients
+     *       access to the scale-out index rather than attempting to aggregate
+     *       the data from the various index partitions.
      */
     synchronized public ICounterSet getCounters() {
 
@@ -513,8 +533,6 @@ public class ClientIndexView implements IClientIndex {
      * index partitions. The operation is parallelized.
      * 
      * @todo watch for overflow of {@link Long#MAX_VALUE}
-     * 
-     * @todo this must use a read-consistent timestamp for a read-committed view.
      */
     final public long rangeCountExact(byte[] fromKey, byte[] toKey) {
 
@@ -569,11 +587,35 @@ public class ClientIndexView implements IClientIndex {
             capacity = this.capacity;
 
         }
+
+        /*
+         * Does the iterator declare that it will not write back on the index?
+         */
+        final boolean readOnly = ((flags & READONLY) != 0);
+
+        if (readOnly && ((flags & REMOVEALL) != 0)) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        long timestamp = getTimestamp();
+
+        if (timestamp == ITx.UNISOLATED && readOnly) {
+
+            // run as read-committed.
+            timestamp = ITx.READ_COMMITTED;
+
+        }
         
-        // @todo make this a ctor argument or settable property?
-        final boolean readConsistent = (timestamp == ITx.UNISOLATED?false:true);
+        if (timestamp == ITx.READ_COMMITTED && readConsistent) {
         
-        return new PartitionedRangeQueryIterator(this, readConsistent, fromKey,
+            // run as globally consistent read.
+            timestamp = TimestampUtility.asHistoricalRead(fed.getLastCommitTime());
+            
+        }
+        
+        return new PartitionedRangeQueryIterator(this, timestamp, fromKey,
                 toKey, capacity, flags, filter);
         
     }
@@ -598,9 +640,9 @@ public class ClientIndexView implements IClientIndex {
             // required to get the result back from the procedure.
             final IResultHandler resultHandler = new IdentityHandler();
 
-            // run on the thread pool in order to limit client parallelism
+            // procedure is not mapped, so timestamp is always the index timestamp.
             final SimpleDataServiceProcedureTask task = new SimpleDataServiceProcedureTask(
-                    key, new Split(locator, 0, 0), proc, resultHandler);
+                    key, getTimestamp(), new Split(locator, 0, 0), proc, resultHandler);
 
             // submit procedure and await completion.
             getThreadPool().submit(task).get(taskTimeout, TimeUnit.MILLISECONDS);
@@ -628,11 +670,6 @@ public class ClientIndexView implements IClientIndex {
      * partitions spanned is very large, then this will allow a chunked
      * approach.
      * <p>
-     * The actual client parallelism is limited by
-     * {@link Options#CLIENT_THREAD_POOL_SIZE}. This value is typically smaller
-     * than the capacity of the chunked iterator used to read on the metadata
-     * index.
-     * <p>
      * Note: It is possible that a split or join could occur during the process
      * of mapping the procedure across the index partitions. When the view is
      * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} this could make the
@@ -643,6 +680,18 @@ public class ClientIndexView implements IClientIndex {
      * with respect to the commitTime for which the first locator
      * {@link ResultSet} was materialized.
      * 
+     * @param reverseScan
+     *            <code>true</code> if you need to visit the index partitions
+     *            in reverse key order (this is done when the partitioned
+     *            iterator is scanning backwards).
+     * @param timestamp
+     *            The iterator uses a read-consistent view of the MDI as of the
+     *            caller specified timestamp. In general, the timestamp is the
+     *            value returned by {@link #getTimestamp()} unless the index is
+     *            {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED}, in
+     *            which case you might use
+     *            {@link IIndexStore#getLastCommitTime()} for a globally
+     *            consistent read.
      * @param fromKey
      *            The scale-out index first key that will be visited
      *            (inclusive). When <code>null</code> there is no lower bound.
@@ -652,43 +701,54 @@ public class ClientIndexView implements IClientIndex {
      * 
      * @return The iterator. The value returned by {@link ITuple#getValue()}
      *         will be a serialized {@link PartitionLocator} object.
+     * 
+     * @todo we could use a different capacity for the locator scans. does it
+     *       matter?
      */
-//    * @param parallel
-//    *            <code>true</code> iff a parallelizable procedure will be
-//    *            mapped over the index partitions (this effects the #of cached
-//    *            locators).
-    public ITupleIterator locatorScan(final byte[] fromKey, final byte[] toKey ) {
-//            final boolean parallel) {
+    @SuppressWarnings("unchecked")
+    protected ITupleIterator<PartitionLocator> locatorScan(boolean reverseScan,
+            long timestamp, final byte[] fromKey, final byte[] toKey) {
         
-//        /*
-//         * When the view is either unisolated or read committed we restrict the
-//         * scan on the metadata index to buffer no more locators than can be
-//         * processed in parallel (if the task is not parallelizable then we only
-//         * read a few locators at a time). This keeps us from buffering locators
-//         * that may be made stale not by index partition splits, joins, or moves
-//         * but simply by concurrent writes of index entries since those writes
-//         * will be visible immediate with either unisolated or read committed
-//         * isolation.
-//         */
-//        final int capacity = (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED)//
-//            ? (parallel ? MAX_PARALLEL_TASKS : 5) // unisolated or read-committed.
-//            : 0 // historical read or fully isolated (default capacity)
-//            ;
+        if (INFO)
+            log.info("Querying metadata index: name=" + name + ", timestamp="
+                    + timestamp + ", reverseScan=" + reverseScan + ", fromKey="
+                    + BytesUtil.toString(fromKey) + ", toKey="
+                    + BytesUtil.toString(toKey) + ", capacity=" + capacity);
         
-        if(INFO)
-        log.info("Querying metadata index: name=" + name + ", fromKey="
-                + BytesUtil.toString(fromKey) + ", toKey="
-                + BytesUtil.toString(toKey) + ", capacity=" + capacity);
+        /*
+         * The iterator uses a read-consistent view of the MDI as of the
+         * caller specified timestamp.
+         */
+        final IMetadataIndex mdi = fed.getMetadataIndex(name, timestamp);
         
-        final ITupleIterator itr;
-        {
+        final ITupleIterator<PartitionLocator> itr;
+
+        if (reverseScan) {
          
-            final IMetadataIndex mdi = getMetadataIndex();
+            /*
+             * Reverse locator scan.
+             * 
+             * The first locator visited will be the first index partition whose
+             * leftSeparator is LT the optional toKey. (If the toKey falls on an
+             * index partition boundary then we use the prior index partition).
+             */
+
+            itr = mdi.rangeIterator(//
+                    fromKey,//
+                    toKey, //
+                    0, // capacity, //
+                    IRangeQuery.VALS|IRangeQuery.REVERSE,// the values are the locators.
+                    null // filter
+                    );
+
+        } else {
             
             /*
+             * Forward locator scan.
+             * 
              * Note: The scan on the metadata index needs to start at the index
-             * partition in which the fromKey would be located. Therefore when
-             * the fromKey is specified we replace it with the leftSeparator of
+             * partition in which the fromKey would be located. Therefore, when
+             * the fromKey is specified, we replace it with the leftSeparator of
              * the index partition which would contain that fromKey.
              */
 
@@ -697,7 +757,8 @@ public class ClientIndexView implements IClientIndex {
                 : mdi.find(fromKey).getLeftSeparatorKey()//
                 ;
 
-            itr = mdi.rangeIterator(_fromKey,//
+            itr = mdi.rangeIterator(//
+                    _fromKey,//
                     toKey, //
                     0, // capacity, //
                     IRangeQuery.VALS,// the values are the locators.
@@ -715,11 +776,11 @@ public class ClientIndexView implements IClientIndex {
      * into one task per index partition spanned by that key range.
      * <p>
      * Note: In order to avoid growing the task execution queue without bound,
-     * an upper bound of {@link #MAX_PARALLEL_TASKS} tasks will be placed onto
-     * the queue at a time. More tasks will be submitted once those tasks finish
-     * until all tasks have been executed. When the task is not parallelizable
-     * the tasks will be submitted to the corresponding index partitions at a
-     * time and in key order.
+     * an upper bound of {@link Options#CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST}
+     * tasks will be placed onto the queue at a time. More tasks will be
+     * submitted once those tasks finish until all tasks have been executed.
+     * When the task is not parallelizable the tasks will be submitted to the
+     * corresponding index partitions at a time and in key order.
      */
     public void submit(byte[] fromKey, byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler resultHandler) {
@@ -748,8 +809,15 @@ public class ClientIndexView implements IClientIndex {
         assert maxTasks > 0 : "maxTasks=" + maxTasks + ", poolSize=" + poolSize
                 + ", maxTasksPerRequest=" + maxTasksPerRequest;
         
-        // scan spanned index partition locators in key order.
-        final ITupleIterator itr = locatorScan(fromKey, toKey);
+        // choose globally consistent reads for the mapped procedure?
+        final long timestamp = readConsistent && proc.isReadOnly()
+                && TimestampUtility.isReadCommittedOrUnisolated(getTimestamp())
+                ? TimestampUtility.asHistoricalRead(fed.getLastCommitTime())
+                : getTimestamp(); 
+        
+        // scan visits index partition locators in key order.
+        final ITupleIterator<PartitionLocator> itr = locatorScan(
+                false/* reverseScan */, timestamp, fromKey, toKey);
         
         long nparts = 0;
         
@@ -772,15 +840,12 @@ public class ClientIndexView implements IClientIndex {
             
             for(int i=0; i<maxTasks && itr.hasNext(); i++) {
                 
-                final ITuple tuple = itr.next();
-                
-                final PartitionLocator locator = (PartitionLocator) SerializerUtil
-                        .deserialize(tuple.getValue());
+                final PartitionLocator locator = itr.next().getObject();
 
                 final Split split = new Split(locator, 0/* fromIndex */, 0/* toIndex */);                
 
-                tasks.add(new KeyRangeDataServiceProcedureTask(fromKey, toKey, split, proc,
-                        resultHandler));
+                tasks.add(new KeyRangeDataServiceProcedureTask(fromKey, toKey,
+                        timestamp, split, proc, resultHandler));
                 
                 nparts++;
                 
@@ -844,6 +909,9 @@ public class ClientIndexView implements IClientIndex {
         final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
                 nsplits);
         
+        // set iff required.
+        long lastCommitTime = -1L;
+        
         // assume true until proven otherwise.
         boolean parallel = true;
         {
@@ -863,8 +931,22 @@ public class ClientIndexView implements IClientIndex {
 
                 }
 
+                // choose globally consistent reads for the mapped procedure?
+                final long timestamp;
+                if (readConsistent
+                        && proc.isReadOnly()
+                        && TimestampUtility
+                                .isReadCommittedOrUnisolated(getTimestamp())) {
+                    if (lastCommitTime == -1L) {
+                        lastCommitTime = TimestampUtility.asHistoricalRead(fed.getLastCommitTime());
+                    }
+                    timestamp = lastCommitTime;
+                } else {
+                    timestamp = getTimestamp();
+                }
+
                 tasks.add(new KeyArrayDataServiceProcedureTask(keys, vals,
-                        split, proc, aggregator, ctor));
+                        timestamp, split, proc, aggregator, ctor));
                 
             }
             
@@ -1164,6 +1246,13 @@ public class ClientIndexView implements IClientIndex {
      */
     protected abstract class AbstractDataServiceProcedureTask implements Callable<Void> {
 
+        /**
+         * The timestamp for the operation. This will be the timestamp for the
+         * index view unless the operation is read-only, in which case a
+         * different timestamp may be choosen either to improve concurrency or
+         * to provide globally read-consistent operations.
+         */
+        protected final long timestamp;
         protected final Split split;
         protected final IIndexProcedure proc;
         protected final IResultHandler resultHandler;
@@ -1196,13 +1285,13 @@ public class ClientIndexView implements IClientIndex {
          * Variant used for procedures that are NOT instances of
          * {@link IKeyArrayIndexProcedure}.
          * 
+         * @param timestamp
          * @param split
          * @param proc
          * @param resultHandler
          */
-        public AbstractDataServiceProcedureTask(Split split,
-                IIndexProcedure proc,
-                IResultHandler resultHandler
+        public AbstractDataServiceProcedureTask(long timestamp, Split split,
+                IIndexProcedure proc, IResultHandler resultHandler
         ) {
             
             if (split.pmd == null)
@@ -1217,6 +1306,8 @@ public class ClientIndexView implements IClientIndex {
             if (proc == null)
                 throw new IllegalArgumentException();
 
+            this.timestamp = timestamp;
+            
             this.split = split;
             
             this.proc = proc;
@@ -1371,6 +1462,11 @@ public class ClientIndexView implements IClientIndex {
         @SuppressWarnings("unchecked")
         final private void submit(IDataService dataService, String name) throws Exception {
 
+            /*
+             * Note: The timestamp here is the one specified for the task. This
+             * allows us to realize read-consistent procedures by choosing the
+             * lastCommitTime of the federation for the procedure.
+             */
             final Object result = dataService.submit(timestamp, name, proc);
 
             if (resultHandler != null) {
@@ -1419,10 +1515,11 @@ public class ClientIndexView implements IClientIndex {
          * @param proc
          * @param resultHandler
          */
-        public SimpleDataServiceProcedureTask(byte[] key, Split split,
-                ISimpleIndexProcedure proc, IResultHandler resultHandler) {
+        public SimpleDataServiceProcedureTask(byte[] key, long timestamp,
+                Split split, ISimpleIndexProcedure proc,
+                IResultHandler resultHandler) {
 
-            super(split, proc, resultHandler);
+            super(timestamp, split, proc, resultHandler);
             
             if (key == null)
                 throw new IllegalArgumentException();
@@ -1483,10 +1580,10 @@ public class ClientIndexView implements IClientIndex {
          * @param resultHandler
          */
         public KeyRangeDataServiceProcedureTask(byte[] fromKey, byte[] toKey,
-                Split split, IKeyRangeIndexProcedure proc,
+                long timestamp, Split split, IKeyRangeIndexProcedure proc,
                 IResultHandler resultHandler) {
 
-            super(split, proc, resultHandler);
+            super(timestamp, split, proc, resultHandler);
             
             /*
              * Constrain the range to the index partition. This constraint will
@@ -1575,11 +1672,11 @@ public class ClientIndexView implements IClientIndex {
          *            to stale locator information.
          */
         public KeyArrayDataServiceProcedureTask(byte[][] keys, byte[][] vals,
-                Split split, IKeyArrayIndexProcedure proc,
+                long timestamp, Split split, IKeyArrayIndexProcedure proc,
                 IResultHandler resultHandler, AbstractIndexProcedureConstructor ctor
         ) {
             
-            super( split, proc, resultHandler );
+            super( timestamp, split, proc, resultHandler );
             
             if (ctor == null)
                 throw new IllegalArgumentException();

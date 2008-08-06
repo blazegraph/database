@@ -6,6 +6,7 @@ import java.util.concurrent.ExecutorService;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.AccessPathFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IBindingSet;
@@ -60,8 +61,8 @@ public class RelationFusedView<E> implements IRelation<E> {
     public IAccessPath<E> getAccessPath(IPredicate<E> predicate) {
 
         return new AccessPathFusedView<E>(//
-                relation1.getAccessPath(predicate),//
-                relation2.getAccessPath(predicate)//
+                (AbstractAccessPath<E>)relation1.getAccessPath(predicate),//
+                (AbstractAccessPath<E>)relation2.getAccessPath(predicate)//
         );
         
     }

@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -18,7 +19,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.repo.BigdataRepository;
 import com.bigdata.resources.SplitIndexPartitionTask.AtomicUpdateSplitIndexPartitionTask;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
@@ -36,7 +36,7 @@ import com.bigdata.service.Split;
  * index.
  * <p>
  * Note: The #of index entries is a good proxy for the space requirements of
- * most indices. The {@link BigdataRepository} is one case where the space
+ * most indices. The {@link BigdataFileSystem} is one case where the space
  * requirements could be quite different since 64M blocks may be stored
  * along with the index entries, however in that case you can also test for
  * the size of the index segment that is part of the view and decide that

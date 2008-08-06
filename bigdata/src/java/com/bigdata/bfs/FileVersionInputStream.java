@@ -1,4 +1,4 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.io.DataInput;
 import java.io.IOException;
@@ -102,7 +102,7 @@ public class FileVersionInputStream extends InputStream {
 
         if (!src.hasNext()) {
 
-            BigdataRepository.log.info("No more blocks: id=" + id
+            BigdataFileSystem.log.info("No more blocks: id=" + id
                     + ", version=" + version);
 
             b = null;
@@ -146,7 +146,7 @@ public class FileVersionInputStream extends InputStream {
 
             len = 0;
 
-            BigdataRepository.log.info("Read zero bytes: id=" + id
+            BigdataFileSystem.log.info("Read zero bytes: id=" + id
                     + ", version=" + version + ", block=" + block);
 
         } else {
@@ -186,7 +186,7 @@ public class FileVersionInputStream extends InputStream {
 
             }
 
-            BigdataRepository.log.info("Read " + b.length + " bytes: id=" + id
+            BigdataFileSystem.log.info("Read " + b.length + " bytes: id=" + id
                     + ", version=" + version + ", block=" + block);
 
         }

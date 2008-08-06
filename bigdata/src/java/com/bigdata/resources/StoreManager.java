@@ -52,6 +52,7 @@ import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
@@ -1793,6 +1794,12 @@ abstract public class StoreManager extends ResourceEvents implements
         public SparseRowStore getGlobalRowStore() {
             
             return getFederation().getGlobalRowStore();
+            
+        }
+        
+        public BigdataFileSystem getGlobalFileSystem() {
+            
+            return getFederation().getGlobalFileSystem();
             
         }
         

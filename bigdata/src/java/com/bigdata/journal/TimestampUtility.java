@@ -70,6 +70,12 @@ public class TimestampUtility {
         
     }
     
+    static public boolean isReadCommittedOrUnisolated(long timestamp) {
+        
+        return timestamp == ITx.READ_COMMITTED || timestamp == ITx.UNISOLATED;
+        
+    }
+
     static public boolean isReadCommitted(long timestamp) {
         
         return timestamp == ITx.READ_COMMITTED;

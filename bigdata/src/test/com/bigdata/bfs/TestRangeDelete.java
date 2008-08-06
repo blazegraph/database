@@ -26,35 +26,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 15, 2008
  */
 
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
-import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.bfs.BigdataFileSystem;
 
 /**
- * Test suite for {@link BigdataRepository#getDocumentHeaders(String, String)}.
- * <p>
- * Note: The correct behavior of this method depends on the
- * {@link SparseRowStore}'s logical row iterator.
+ * Test suite for {@link BigdataFileSystem#deleteAll(String, String)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRangeScan extends AbstractRepositoryTestCase {
+public class TestRangeDelete extends AbstractRepositoryTestCase {
 
     /**
      * 
      */
-    public TestRangeScan() {
+    public TestRangeDelete() {
     }
 
     /**
      * @param arg0
      */
-    public TestRangeScan(String arg0) {
+    public TestRangeDelete(String arg0) {
         super(arg0);
     }
 
-    public void test_rangeScan() {
+    public void test_rangeDelete() {
         
         fail("write test");
         

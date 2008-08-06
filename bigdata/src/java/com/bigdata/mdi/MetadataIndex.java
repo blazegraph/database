@@ -33,10 +33,10 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.FusedView;
-import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.io.SerializerUtil;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.rawstore.IRawStore;
@@ -80,63 +80,13 @@ import com.bigdata.service.MetadataService;
  *       value of that field on the 'meta-meta' index.
  *       <p>
  *       (b) how to locate the partitions of the metadata index itself.
- *       <p>
- *       (c) The {@link IMetadataIndex} defines some operations which depend on
- *       the {@link ILinearList} API. However, per {@link FusedView}, it is NOT
- *       possible to efficiently implementat that API for a fused view.
  * 
- * @todo Here are some options for scale-out on the metadata index.
- *       <p>
- *       In fact, while delete markers in the index partition views facilitate
- *       overflow processing they make it impossible to use the
- *       {@link ILinearList} API which we need for the metadata index. However,
- *       it is in fact possible to write the {@link ILinearList} API for a
- *       key-range partitioned index without delete markers in the index
- *       partitions (WRITE THIS CODE AND TEST IT BEFORE GOING FURTHER TO PROVE
- *       THE POINT). So, that is how to handle scale-out for the metadata index.
- *       <p>
- *       Getting this working will require somewhat different handling of
- *       scale-out indices when delete markers are not allowed. For one thing,
- *       overflow of an index without delete markers requires immediate copying
- *       of the index (partition) onto the new journal. if the index has too
- *       many entries then it must be split during that overflow processing. You
- *       can't use index segments since they imply deletion markers in the index
- *       views.
- *       <p>
- *       A split can be processed during overflow, and the new index partitions
- *       will wind up on the new journal. Likewise, an index partition can be
- *       sent to a different metadata service, but this will require a custom
- *       operation to send along everything from some historical commit point
- *       for the index partition and either deny writes on the index partition
- *       until we cut over to its new location (by far the easiest) or journal
- *       writes so that the index can be made current on the new location before
- *       we cut over (frought with potential problems).
- *       <p>
- *       A meta-metadata index might be necessary to locate the key-range
- *       partitions of a metadata index.
- *       <p>
- *       Overall it seems that the choice of delete markers provides more
- *       flexibility in overflow operations while working without delete markers
- *       allows the use of the {@link ILinearList} API. Probably both should be
- *       supported throughout so that the {@link MetadataIndex} is not a special
- *       case, but just an application that requires the {@link ILinearList} and
- *       hence does not use delete markers and pays some different costs for
- *       overflow and split operations and may have to handle replication
- *       differently.
- *       <p>
- *       Since there are no deletion markers, we can't use transactional
- *       isolation on the metadata index either. Probably we will have to make
- *       use of a mechanism to broadcast the read-behind time to clients for the
- *       metadata index and clients will have to update their cache when the
- *       index moves into its next consistent state.
- * 
- * @todo the metadata index can be hash partitioned and range queries can be
- *       flooded to all partitions so that we do not need a meta-metadata index
- *       to locate metadata index partitions. the #of metadata service nodes can
- *       be changed by a suitable broadcast event in which clients have to
- *       change to the new hash basis. this feature can be generalized to
- *       provide hash partitioned indices as well as key-range partitioned
- *       indices.
+ * @todo one way to locate the metadata-index partitions is to hash partition
+ *       the metadata index and range queries can be flooded to all partitions.
+ *       the #of metadata service nodes can be changed by a suitable broadcast
+ *       event in which clients have to change to the new hash basis. this
+ *       feature can be generalized to provide hash partitioned indices as well
+ *       as key-range partitioned indices.
  * 
  * @todo A metadata index can be recovered by a distributed process running over
  *       the data services. Each data service reports all index partitions. The
@@ -180,16 +130,6 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
         
     }
 
-//    /**
-//     * Return the current value of the internal restart-safe
-//     * <code>nextPartitionId</code> property.
-//     */
-//    public int getNextPartitionId() {
-//        
-//        return nextPartitionId;
-//        
-//    }
-    
     private int nextPartitionId;
     
     /**
@@ -225,6 +165,11 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
          * Override the checkpoint record implementation class.
          */
         metadata.setCheckpointClassName(MetadataIndexCheckpoint.class.getName());
+
+        /*
+         * Tuple serializer.
+         */
+        metadata.setTupleSerializer(PartitionLocatorTupleSerializer.newInstance());
         
         return (MetadataIndex) BTree.create(store, metadata);
         
@@ -455,7 +400,10 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     public PartitionLocator get(byte[] key) {
         
-        return (PartitionLocator)SerializerUtil.deserialize(lookup(key));
+//        return (PartitionLocator)SerializerUtil.deserialize(lookup(key));
+        
+        // automatic de-serialization using the ITupleSerializer.
+        return (PartitionLocator)super.lookup((Object)key);
         
     }
 
@@ -464,6 +412,46 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
         // @todo could retain the view reference.
         return new MetadataIndexView(this).find(key);
         
+    }
+
+    /**
+     * Used to (de-)serialize {@link PartitionLocator}s in the
+     * {@link MetadataIndex}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class PartitionLocatorTupleSerializer extends
+            DefaultTupleSerializer<byte[]/*key*/, PartitionLocator/*val*/> {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -4178430896409893596L;
+
+        public static PartitionLocatorTupleSerializer newInstance() {
+         
+            return new PartitionLocatorTupleSerializer(getDefaultKeyBuilderFactory());
+            
+        }
+        
+        /**
+         * De-serialization ctor <em>only</em>.
+         */
+        public PartitionLocatorTupleSerializer() {
+            
+        }
+        
+        /**
+         * @param keyBuilderFactory
+         */
+        public PartitionLocatorTupleSerializer(
+                IKeyBuilderFactory keyBuilderFactory) {
+
+            super(keyBuilderFactory);
+            
+        }
+
     }
 
 }

@@ -108,7 +108,7 @@ public class TestTupleFilters extends AbstractBTreeTestCase {
             int n = 0;
             
             final ITupleIterator itr = btree.rangeIterator(null/* fromKey */,
-                    null/* toKey */, 0/* capacity */, IRangeQuery.ALL
+                    null/* toKey */, 0/* capacity */, IRangeQuery.DEFAULT
                             | IRangeQuery.REMOVEALL, null/* filter */);
             
             while(itr.hasNext()) {
@@ -134,7 +134,7 @@ public class TestTupleFilters extends AbstractBTreeTestCase {
             
             final ITupleIterator itr = btree
                     .rangeIterator(null/* fromKey */, null/* toKey */,
-                            0/* capacity */, IRangeQuery.ALL, null/*filter*/);
+                            0/* capacity */, IRangeQuery.DEFAULT, null/*filter*/);
             
             while(itr.hasNext()) {
                 

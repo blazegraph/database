@@ -70,7 +70,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     /**
      * The filter derived from the {@link IElementFilter}.
      */
-    final private FilterConstructor<R> filter;
+    final protected FilterConstructor<R> filter;
 
     /**
      * Used to detect failure to call {@link #init()}.
@@ -331,7 +331,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     private final int FULLY_BUFFERED_READ_THRESHOLD = 1000;
     
     @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
+    final public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
 
         if(log.isDebugEnabled()) {
 
@@ -624,8 +624,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
     
-    @SuppressWarnings({ "unchecked" })
-    protected ITupleIterator<R> rangeIterator(int capacity,int flags, IFilterConstructor<R> filter) {
+    @SuppressWarnings( { "unchecked" })
+    protected ITupleIterator<R> rangeIterator(int capacity, int flags,
+            IFilterConstructor<R> filter) {
 
         assertInitialized();
         

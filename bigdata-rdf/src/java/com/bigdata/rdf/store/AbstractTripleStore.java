@@ -61,7 +61,6 @@ import org.openrdf.sail.SailException;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
@@ -708,6 +707,10 @@ abstract public class AbstractTripleStore extends
             /*
              * Note: A commit is required in order for a read-committed view to
              * have access to the registered indices.
+             * 
+             * @todo have the caller do this? It does not really belong here
+             * since you can not make a large operation atomic if you do a
+             * commit here.
              */
 
             commit();
@@ -738,7 +741,7 @@ abstract public class AbstractTripleStore extends
             getSPORelation().destroy();
             
             super.destroy();
-
+            
         } finally {
 
             resourceLock.unlock();

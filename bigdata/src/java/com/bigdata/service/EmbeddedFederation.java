@@ -862,9 +862,11 @@ public class EmbeddedFederation extends AbstractFederation {
     }
     
     /**
-     * @todo this scans the {@link DataService}s and reports the most recent
-     *       value. The data service initialization should be changed so that
-     *       the embedded data services are using a shared
+     * @todo This scans the {@link DataService}s and reports the most recent
+     *       value.
+     *       <p>
+     *       The data service initialization should be changed so that the
+     *       embedded data services are using a shared
      *       {@link AbstractLocalTransactionManager} and that class should note
      *       the most recent commit time (it will have to query the data
      *       services during start, much like we are doing here). This approach
@@ -875,18 +877,33 @@ public class EmbeddedFederation extends AbstractFederation {
         assertOpen();
         
         long maxValue = 0;
-        
+
+        // check each of the data services.
         for(int i=0; i<dataService.length; i++) {
 
             final long commitTime = dataService[i].getResourceManager()
                     .getLiveJournal().getRootBlockView().getLastCommitTime();
-            
-            if(commitTime>maxValue) {
-                
+
+            if (commitTime > maxValue) {
+
                 maxValue = commitTime;
                 
             }
             
+        }
+        
+        // and also check the metadata service
+        {
+
+            final long commitTime = metadataService.getResourceManager()
+                    .getLiveJournal().getRootBlockView().getLastCommitTime();
+
+            if (commitTime > maxValue) {
+
+                maxValue = commitTime;
+
+            }
+
         }
         
         return maxValue;

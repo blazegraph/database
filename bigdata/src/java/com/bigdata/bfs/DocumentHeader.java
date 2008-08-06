@@ -1,10 +1,10 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import java.util.Map;
 
 /**
  * Document header interface for {@link Document}s stored in the
- * {@link ContentRepository}.
+ * {@link IContentRepository}.
  * 
  * @author mike@systap.com
  * @version $Id$
@@ -14,7 +14,7 @@ public interface DocumentHeader
 
     /**
      * The unique identifier for the document within the
-     * {@link ContentRepository}.
+     * {@link IContentRepository}.
      */
     String getId();
     

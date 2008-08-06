@@ -54,6 +54,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -68,7 +69,6 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.ClientException;
 import com.bigdata.service.IBigdataClient;
@@ -92,7 +92,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * independently.</li>
  * 
  * <li> The data to be loaded are on Network Attached Storage (NAS) or in a
- * {@link BigdataRepository}. {@link #nclients} is set to the #of clients that
+ * {@link BigdataFileSystem}. {@link #nclients} is set to the #of clients that
  * will be run, each assigned a distinct {@link #clientNum}, and N clients are
  * started, typically each on its own host. Those clients will then read from
  * the central source and each client will accept the file for processing iff
@@ -133,12 +133,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       the other access paths (OSP, POS).
  * 
  * @todo refactor further and reconcile with map/reduce processsing, the
- *       {@link BigdataRepository}, etc.
+ *       {@link BigdataFileSystem}, etc.
  * 
- * @todo support a {@link BigdataRepository} as a source.
+ * @todo support a {@link BigdataFileSystem} as a source.
  * 
  * @todo support as a map/reduce job assigning files from a
- *       {@link BigdataRepository} to clients so the source is a queue of files
+ *       {@link BigdataFileSystem} to clients so the source is a queue of files
  *       assigned to that map task.
  * 
  * @todo reporting for tasks that fail after retry - perhaps on a file? Leave to

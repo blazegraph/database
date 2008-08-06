@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
@@ -500,6 +501,11 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public IResourceLockManager getResourceLockManager() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public BigdataFileSystem getGlobalFileSystem() {
             // TODO Auto-generated method stub
             return null;
         }

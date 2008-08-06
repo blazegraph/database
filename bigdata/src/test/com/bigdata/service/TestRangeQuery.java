@@ -53,6 +53,7 @@ import com.bigdata.mdi.PartitionLocator;
 public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
     public TestRangeQuery() {
+
     }
 
     public TestRangeQuery(String name) {
@@ -77,8 +78,6 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         final String name = "testIndex";
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-
-        metadata.setDeleteMarkers(true);
 
         /*
          * Register and statically partition an index.
@@ -150,8 +149,6 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
-        metadata.setDeleteMarkers(true);
-
         fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
@@ -160,31 +157,30 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
+        final IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
-        PartitionedRangeQueryIterator itr = null;
-        
         /*
          * Query entire key range.
          */
         {
             
-            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
+            final PartitionedRangeQueryIterator itr = (PartitionedRangeQueryIterator) ndx
+                    .rangeIterator(null, null);
 
             // nothing visited yet.
-            assertEquals("nvisited",0,itr.getVisitedCount());
-            
+            assertEquals("nvisited", 0, itr.getVisitedCount());
+
             // no partitions queried yet.
-            assertEquals("npartitions",0,itr.getPartitionCount());
-            
+            assertEquals("npartitions", 0, itr.getPartitionCount());
+
             // look for the first matching index entry (there are none).
-            assertFalse("hasNext",itr.hasNext());
-            
+            assertFalse("hasNext", itr.hasNext());
+
             // nothing was visisted.
-            assertEquals("nvisited",0,itr.getVisitedCount());
-            
+            assertEquals("nvisited", 0, itr.getVisitedCount());
+
             // we queried two index partitions.
-            assertEquals("npartitions",2,itr.getPartitionCount());
+            assertEquals("npartitions", 2, itr.getPartitionCount());
             
         }
         
@@ -202,8 +198,6 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
-        metadata.setDeleteMarkers(true);
-
         fed.registerIndex( metadata, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
@@ -212,9 +206,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
-
-        PartitionedRangeQueryIterator itr = null;
+        final IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         /*
          * Insert an entry into the first partition.
@@ -226,20 +218,15 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
+            final ITupleIterator itr = ndx.rangeIterator(null, null);
 
-            assertTrue("hasNext",
-                    itr.hasNext()
-                    );
-            assertEquals("nparts",1,itr.getPartitionCount());
-//            assertEquals("next()",new byte[]{1},(byte[])itr.next());
-            ITuple tuple = itr.next();
-            assertEquals("getKey()",new byte[]{1},tuple.getKey());
-            assertEquals("getValue()",new byte[]{1},tuple.getValue());
+            assertTrue("hasNext", itr.hasNext());
 
-            assertFalse("hasNext",
-                    itr.hasNext()
-                    );
+            final ITuple tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
+
+            assertFalse("hasNext", itr.hasNext());
 
         }
        
@@ -257,8 +244,6 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
-        metadata.setDeleteMarkers(true);
-
         fed.registerIndex( metadata, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
@@ -268,8 +253,6 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         });
         
         IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
-
-        PartitionedRangeQueryIterator itr = null;
 
         /*
          * Insert an entry into the 2nd partition.
@@ -281,20 +264,15 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
+            final ITupleIterator itr = ndx.rangeIterator(null, null);
 
-            assertTrue("hasNext",
-                    itr.hasNext()
-                    );
-            assertEquals("nparts",2,itr.getPartitionCount());
-//            assertEquals("next()",new byte[]{5},(byte[])itr.next());
-            ITuple tuple = itr.next();
-            assertEquals("getKey()",new byte[]{5},tuple.getKey());
-            assertEquals("getValue()",new byte[]{5},tuple.getValue());
+            assertTrue("hasNext", itr.hasNext());
 
-            assertFalse("hasNext",
-                    itr.hasNext()
-                    );
+            final ITuple tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 5 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 5 }, tuple.getValue());
+
+            assertFalse("hasNext", itr.hasNext());
 
         }
        
@@ -304,15 +282,13 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
      * Test unbounded range query with two entries in the index and two index
      * partitions. There is one entry in each partition.
      * 
-     * @throws IOException 
+     * @throws IOException
      */
     public void test_rangeQuery_staticPartitions_unbounded_2entries_2partitions_01() throws IOException {
                 
         final String name = "testIndex";
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-
-        metadata.setDeleteMarkers(true);
 
         fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
@@ -322,9 +298,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
-
-        PartitionedRangeQueryIterator itr = null;
+        final IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         /*
          * Insert an entry into the first partition.
@@ -341,29 +315,21 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null);
+            final ITupleIterator itr = ndx.rangeIterator(null, null);
 
-            assertTrue("hasNext",
-                    itr.hasNext()
-                    );
-            assertEquals("nparts",1,itr.getPartitionCount());
-//            assertEquals("next()",new byte[]{1},(byte[])itr.next());
+            assertTrue("hasNext", itr.hasNext());
+
             ITuple tuple = itr.next();
             assertEquals("getKey()",new byte[]{1},tuple.getKey());
             assertEquals("getValue()",new byte[]{1},tuple.getValue());
 
-            assertTrue("hasNext",
-                    itr.hasNext()
-                    );
-            assertEquals("nparts",2,itr.getPartitionCount());
-//            assertEquals("next()",new byte[]{5},(byte[])itr.next());
+            assertTrue("hasNext", itr.hasNext());
+
             tuple = itr.next();
             assertEquals("getKey()",new byte[]{5},tuple.getKey());
             assertEquals("getValue()",new byte[]{5},tuple.getValue());
 
-            assertFalse("hasNext",
-                    itr.hasNext()
-                    );
+            assertFalse("hasNext", itr.hasNext());
 
         }
        
@@ -381,8 +347,6 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
-        metadata.setDeleteMarkers(true);
-
         fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
@@ -391,9 +355,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        ClientIndexView ndx = (ClientIndexView) fed.getIndex(name,ITx.UNISOLATED);
-
-        PartitionedRangeQueryIterator itr = null;
+        final IIndex ndx = fed.getIndex(name, ITx.UNISOLATED);
 
         /*
          * Insert the entries into the first partition.
@@ -411,25 +373,22 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
             final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
 
-            itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null,
-                    capacity, flags, null/* filter */);
+            final ITupleIterator itr = ndx.rangeIterator(null, null, capacity,
+                    flags, null/* filter */);
 
             assertTrue("hasNext", itr.hasNext());
-            assertEquals("nparts",1,itr.getPartitionCount());
-//            assertEquals("next()",new byte[]{1},(byte[])itr.next());
+
             ITuple tuple = itr.next();
-            assertEquals("getKey()",new byte[]{1},tuple.getKey());
-            assertEquals("getValue()",new byte[]{1},tuple.getValue());
+            assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
 
             assertTrue("hasNext", itr.hasNext());
-            assertEquals("nparts",1,itr.getPartitionCount());
-//            assertEquals("next()",new byte[]{2},(byte[])itr.next());
+
             tuple = itr.next();
-            assertEquals("getKey()",new byte[]{2},tuple.getKey());
-            assertEquals("getValue()",new byte[]{2},tuple.getValue());
+            assertEquals("getKey()", new byte[] { 2 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 2 }, tuple.getValue());
 
             assertFalse("hasNext", itr.hasNext());
-            assertEquals("nparts",2,itr.getPartitionCount());
 
         }
        
@@ -449,8 +408,6 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
-        metadata.setDeleteMarkers(true);
-
         fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
                 KeyBuilder.asSortKey(5) // the half-way point.
@@ -459,7 +416,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
+        final IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
         
         final int nentries = 10;
         
@@ -515,25 +472,25 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
             int nremaining = 0;
 
             // iterator visits deleted entries too.
-            ITupleIterator itr = ndx.rangeIterator(null, null, 0/* capacity */,
-                    IRangeQuery.ALL, null/*filter*/);
+            final ITupleIterator itr = ndx.rangeIterator(null, null,
+                    0/* capacity */, IRangeQuery.ALL, null/* filter */);
 
             int index = 0;
             
             while(itr.hasNext()) {
                 
-                ITuple tuple = itr.next();
+                final ITuple tuple = itr.next();
 
-                byte[] key = tuple.getKey();
+                final byte[] key = tuple.getKey();
 
-                int i = KeyBuilder.decodeInt(key, 0);
+                final int i = KeyBuilder.decodeInt(key, 0);
 
-                assertEquals(index,i);
-                
+                assertEquals(index, i);
+
                 assertEquals(keys[i], key);
 
-                if(index==0) {
-                    
+                if (index == 0) {
+
                     assertTrue(tuple.isDeletedVersion());
                     
                 }
@@ -544,7 +501,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
                     
                 } else {
 
-                    byte[] val = tuple.getValue();
+                    final byte[] val = tuple.getValue();
 
                     assertEquals(vals[i], val);
 
@@ -573,9 +530,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         final String name = "testIndex";
 
         final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-
-        metadata.setDeleteMarkers(true);
-        
+       
         metadata.setTupleSerializer(NOPTupleSerializer.INSTANCE);
 
         fed.registerIndex(metadata, new byte[][]{//
@@ -699,5 +654,197 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         }
         
     }
-    
+
+    /**
+     * Test the ability to scan a partitioned index in forward and reverse
+     * order. The test verifies that index partitions are visited in the correct
+     * order, that the chunks within each index partition are visited in the
+     * correct order, and that the tuples within each chunk are visited in the
+     * correct order. One of the index partitions is deliberately left empty in
+     * order to verify that the iterator will correctly cross over an index
+     * partition in which the chunked iterator does not visit anything.
+     * 
+     * @throws IOException
+     */
+    public void test_reverseScan() throws IOException {
+        
+        final String name = "testIndex";
+
+        final IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+
+        /*
+         * Note: Run with the {7} partition defined but empty to verify that the
+         * iterator is robust to empty partitions!
+         */
+        
+        fed.registerIndex(metadata, new byte[][]{//
+                new byte[]{},
+                new byte[]{4},
+                new byte[]{7},
+                new byte[]{10},
+        }, null/* dataServiceUUIDs */
+        );
+        
+        final IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
+
+        /*
+         * Insert entries into the first partition.
+         */
+        ndx.insert(new byte[] { 1 }, new byte[] { 1 });
+        ndx.insert(new byte[] { 2 }, new byte[] { 2 });
+        ndx.insert(new byte[] { 3 }, new byte[] { 3 });
+        
+        /*
+         * Insert entries into the 2nd partition.
+         */
+        ndx.insert(new byte[] { 4 }, new byte[] { 4 });
+        ndx.insert(new byte[] { 5 }, new byte[] { 5 });
+        ndx.insert(new byte[] { 6 }, new byte[] { 6 });
+
+        /*
+         * The 3rd partition is left empty to check for fence posts.
+         */
+        
+        /*
+         * Insert entries into the 4th partition.
+         */
+        ndx.insert(new byte[] { 10 }, new byte[] { 10 });
+        ndx.insert(new byte[] { 11 }, new byte[] { 11 });
+        ndx.insert(new byte[] { 12 }, new byte[] { 12 });
+
+        /*
+         * Query the entire key range (forward scan).
+         * 
+         * Note: This tests with a capacity of (2) in order to force the
+         * iterator to read from each partition in chunks of no more than (2)
+         * tuples at a time. This helps verify that the base iterator is in
+         * forward order, that the chunked iterator is moving forwards through
+         * the index partition, and that the total iterator is moving forwards
+         * through the index partitions.
+         */
+        {
+
+            final ITupleIterator itr = ndx.rangeIterator(null, null,
+                    1/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
+
+            ITuple tuple;
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 2 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 2 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 3 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 3 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 4 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 4 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 5 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 5 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 6 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 6 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 10 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 10 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 11 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 11 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 12 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 12 }, tuple.getValue());
+
+            assertFalse("hasNext", itr.hasNext());
+
+        }
+
+        /*
+         * Query the entire key range (reverse scan).
+         * 
+         * Note: This tests with a capacity of (2) in order to force the
+         * iterator to read from each partition in chunks of no more than (2)
+         * tuples at a time. This helps verify that the base iterator is in
+         * reverse order, that the chunked iterator is moving backwards through
+         * the index partition, and that the total iterator is moving backwards
+         * through the index partitions.
+         */
+        {
+
+            final ITupleIterator itr = ndx.rangeIterator(null, null,
+                    1/* capacity */,
+                    IRangeQuery.DEFAULT | IRangeQuery.REVERSE, null/* filter */);
+
+            ITuple tuple;
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 12 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 12 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 11 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 11 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 10 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 10 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 6 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 6 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 5 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 5 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 4 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 4 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 3 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 3 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 2 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 2 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
+            
+            assertFalse("hasNext", itr.hasNext());
+
+        }
+
+    }
+
 }

@@ -45,7 +45,7 @@ import com.bigdata.journal.ITx;
  */
 public class GlobalRowStoreHelper {
 
-    static final public transient String GLOBAL_ROW_STORE_INDEX = "__global_namespace_index";
+    static final public transient String GLOBAL_ROW_STORE_INDEX = "__globalRowStore";
 
     private final IIndexManager indexManager;
     
@@ -62,7 +62,7 @@ public class GlobalRowStoreHelper {
     
     synchronized public SparseRowStore getGlobalRowStore() {
         
-        log.info("");
+        if(log.isInfoEnabled()) log.info("");
 
         if (globalRowStore == null) {
 
@@ -70,7 +70,8 @@ public class GlobalRowStoreHelper {
 
             if (ndx == null) {
 
-                log.info("Global row store does not exist - will try to register now");
+                if (log.isInfoEnabled())
+                    log.info("Global row store does not exist - will try to register now");
                 
                 try {
 
@@ -107,7 +108,7 @@ public class GlobalRowStoreHelper {
      */
     synchronized public SparseRowStore getReadCommitted() {
 
-        log.info("");
+        if(log.isInfoEnabled()) log.info("");
 
 //        if (globalRowStore == null) {
 
@@ -115,7 +116,8 @@ public class GlobalRowStoreHelper {
 
             if (ndx == null) {
 
-                log.info("Global row store does not exist - will try to register now");
+                if (log.isInfoEnabled())
+                    log.info("Global row store does not exist - will try to register now");
 
                 return null;
                 

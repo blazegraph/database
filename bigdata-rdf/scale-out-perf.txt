@@ -486,6 +486,9 @@ Notes on store level record checksums and record compression.
 
 	 - logical row scan for headers of documents in a key range.
 
+         - Write test for forward and reverse scans starting at the
+           fence posts around a partition boundary.
+
     - (**) Map/Reduce demo jobs.
 
       - Rework the map/reduce implementation to use local writes and
@@ -1074,6 +1077,16 @@ Short term tasks:
 
      - Turn off sendVals for rangeIterators if we recognize the value
        serialized as the NoDataSerializer?
+
+     - Write unit test for read-consistent semantics for key-range,
+       key-array, and rangeIterator (PartitionedRangeQueryIterator).
+       The test would perform concurrent writes and verify that those
+       writes were not visible to the operation.
+       
+       A stress test variant should also force concurrent overflow
+       operations and verify that the index is reading from a
+       read-consistent view of the metadata index and hence does not
+       see the locator updates.
 
    - LocalTripleStoreWithEmbeddedDataService
 
@@ -2514,68 +2527,30 @@ Priority list:
    cheap to send the tuples that we want to JOIN to the target data
    service.
 
-x. Completion scans, distinct term scans, and match rule all need to
-   use ITupleCursor to operate in a scale-out context.
+2. misc tests, performance problems and improvements for the RDF DB.
 
-   * Track down ITupleSerializer.INSTANCEs and replace with
-     newInstance() or the like.  NOPTupleSerializer and
-     TPSTupleSerializer
+   **** {@link ResultSet#getLastKey()} will return <code>null</code>
+        if there were no tuples to visit. This class does not appear
+        to handle that condition, but it is able to pass a unit test
+        where there is an empty partition in the middle of the key
+        range scan for both forward and reverse traversal.
 
-   *** FileVersionDeleter is not quite correct yet.  Make sure that we
-       have good tests for the fence posts on this one.
+        Try writing a test where the partition is non-empty, but a
+        filter causes at least one chunk in that partition to report
+        an empty result set. This might lead to either non-progression
+        of the iterator, early termination, or a thrown exception.
 
-   Done. The logical row scan needs to be fixed so that it will cross
-         index partitions.
-     
-   *** Rewrite FusedView's iterator to implement {@link ITupleCursor}.
-       I might narrow the ITupleCursor API to do this, moving more
-       into the abstract base class or an implementation convenience
-       interface.
-      
-   - Done. Support for TupleTransformer in ResultSet (serialization)
+   *** AbstractRuleTestCase#modelsEqual() needs to use bulk complete
+       to be efficient for scale out.  This means that it needs to run
+       the SPOs into a BigdataStatementIterator and then into a
+       StatementBuffer against the target database and finally into a
+       bulk complete (or perhaps a filter not found) operator to
+       figure out if everything is there as expected.
 
-   - Defer. Rewrite the iterators based on the {@link ResultSet} to
-     implement {@link ITupleCursor}?  This should not be necessary if
-     we instead notice the direction in which the underlying (source)
-     iterator was being traversed.  Even that can be ignored in favor
-     of using REVERSE to achieve reverse traversal.
-     
-   - {@link PartitionedRangeQueryIterator}
-
-     - Should not always require KEYS.
-
-     - Should use read-consistent semantics (getLastCommitTime()).
-
-   * Problems with LDS closure.
-
-   * Problems with (x type resource) backchainer (related perhaps to
-     overgeneration for that we are reading on both the SPO and the
-     OSP access paths).
-
-   - Done. Replace use of ITupleFilter with the FilterConstructor
-           construct.
-
-     Done. Remove ITupleFilter from the BTree impl (LeafIterator,
-           TupleIterator).
-
-     Done. The Filterator is reusing the same Tuple instance for its
-           one step lookahead.  This is broken since the state of the
-           value to be returned is being overwritten by the state of
-           the next value to be returned!!!
-
-     Done. com.bigdata.service.TestRangeQuery#test_removeAll() is
-           failing.
-
-     Done. Problem showing up with corrupt stream header for
-           test_removeAll().  This may have been related to copy the
-           tuple is copied, specifically how the key and value are
-           copied.  Or I may be failing to correctly isolate the
-           filter test from the returned tuple's data.
-
-     Done. Filter out literals on OSP in the distinct term scan rather
-           than the iterator (for the type resource backchainer).
-           Also, add a unit test for this case to
-           TestBackchainTypeResourceIterator.
+     - Refactor the bulk filter, statement buffer, bulk complete,
+       etc. operations as stackable, chunked, ordered, filtering
+       iterators using some stiterator extensions similar to what I
+       have done for the B+Tree.
 
      * Replace IElementFilter with ITupleFilter or ITupleFilter[].
        
@@ -2583,29 +2558,26 @@ x. Completion scans, distinct term scans, and match rule all need to
        scans directly from an IRule by specifying the appropriate
        predicate filter(s)!
 
-     * Test DistinctTermScan on scale-out problems (partitioned
-       indices).  One way to test is to set the split point very low
-       and then test on a small data set.
-     
-       * FusedView MUST implement ITupleCursor!
+     - Verify that the distinct term scan can correctly advance across
+       index partition boundaries.  One way to do this is by setting a
+       very small split point and then loading a known data set,
+       computing its closure, and comparing it to ground truth.
 
-       * Make sure that we can cross from chunk to chunk and partition
-         to partition.
+   *** Still some problems:
 
-       * Write test for a reverse scan over the scale-out index and
-         for reverse scans starting at the fence posts around a
-         partition boundary.  Also do this for logical row scans.
+       - TTS, LTS, LDS -- what is weird is that these tests only fail
+         when run as part of the total test suite.
+       
+	 - TestBackchainOwlSameAsPropertiesIterator
 
-     - Uses of the REVERSE iterator:
+	 - TestTruthMaintenance#test_closurecorrectness
 
-       * Bigdata repository (currently using the ILinearList API for
-       the AtomicAppend).
+       - LTS w/o statement identifiers
 
-       * MetadataIndex (also uses the ILinearList API).
+       	 - TestRDFXMLInterchangeWithStatementIdentifiers has blank
+           node handling problems.
 
-2. fix the lexicon
-
-3. fix justifications and misc closure problems with MikeP
+       - And try the TestTruthMaintenance stress test for all flavors.
 
 4. performance testing for data load and closure
 
@@ -2672,6 +2644,8 @@ x. Completion scans, distinct term scans, and match rule all need to
 
 6. performance testing for owl:sameAs processing at scale.
 
+x. performance testing for distinct term scan
+
 7. provenance query problems (MikeP)
 
 x. misc scaling pain points
@@ -2684,3 +2658,43 @@ x. misc scaling pain points
 
    - Look for other things which have become painful with the
      introduction of the UnisolatedReadWriteIndex class.
+
+x. GOM style "rows" for IRelation yeilding schema flexible JOINs.
+   Could even just use GOM for this, but I would also have to extend
+   JOINs to link vs attribute JOINs and make some decisions about
+   object state caching, invalidation and update (only applies if you
+   want an updatable view of the object).
+   
+   There is also a strong relationship to the solutions generated by
+   the rules, which are basically binding sets.
+
+x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
+   open sourcing the "web 3" framework.
+
+   *** FileVersionDeleter is not quite correct yet.  Make sure that we
+       have good tests for the fence posts on this one.
+
+   x. text indexer for the repo.
+
+   - define a schema property for the text index.  if the property
+     exists for a file then index the file when it is written (only
+     file at once, not block-based).
+
+   - perf test the text indexer.
+
+   - refactor ala {@link IRelation} and use a namespace. have a global
+     "bigdata file system" available from the {@link IIndexManager},
+     but you can create your own as well.  this will also let us place
+     the full text index into the same namespace.
+
+   * Handle "delete" from the full text index.  We need to do this
+     when a document is deleted whose indexText property was set.
+
+   * MetadataSchema#IndexText may be too blunt a device.  We may want
+     to specify a variety of metadata for the text indexer, including
+     the URI of the source document, the text index to be used (there
+     can be several, each corresponding to a collection), tokenization
+     preferences (local to the text index I guess), etc.
+
+   - Focus on two CONOPS: incremental updates (crud) and map/reduce
+     style index builds (bulk write).

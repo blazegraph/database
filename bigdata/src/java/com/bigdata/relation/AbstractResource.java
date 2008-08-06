@@ -231,6 +231,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
      *       federation) and so that they can release the lock when they are
      *       done. The lock can be per the notes above, but the protocol with
      *       the subclass will require some coordinating methods.
+     *       <p>
+     *       Full transactions are another way to solve this problem.
      */
     public void create() {
         

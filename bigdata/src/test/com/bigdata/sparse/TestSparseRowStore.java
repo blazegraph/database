@@ -39,6 +39,7 @@ import java.util.Vector;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -49,14 +50,13 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.repo.BigdataRepository;
 import com.bigdata.util.CSVReader;
 
 /**
  * Test suite for {@link SparseRowStore}.
  * <p>
  * Note: A lot of the pragmatic tests are being done by the
- * {@link BigdataRepository} which uses the {@link SparseRowStore} for its file
+ * {@link BigdataFileSystem} which uses the {@link SparseRowStore} for its file
  * metadata index.
  * 
  * FIXME clean up this test suite.

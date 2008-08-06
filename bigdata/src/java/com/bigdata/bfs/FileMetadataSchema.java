@@ -1,13 +1,13 @@
-package com.bigdata.repo;
+package com.bigdata.bfs;
 
 import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
- * The schema for metadata about file versions stored in the repository.
- * Some well known properties are always defined, but any property may be
- * stored - ideally within their own namespace!
+ * The schema for metadata about file versions stored in the
+ * {@link BigdataFileSystem}. Some well known properties are always defined,
+ * but any property may be stored - ideally within their own namespace!
  * <p>
  * Note: File version creation time and update times are available using the
  * {@link SparseRowStore}, which stores and reports the timestamp for each
@@ -15,17 +15,17 @@ import com.bigdata.sparse.SparseRowStore;
  * {@link RepositoryDocumentImpl} to report those timestamps. Timestamps for
  * file blocks can NOT be obtained.
  * <p>
- * Note: A content length property was deliberately NOT defined. The design
- * is geared towards very large file and asynchronous read/write of file
- * blocks. The length of short files may be readily computed by the
- * expediency of sucking their contents into a buffer. Large files should
- * always be processed using a stream-oriented technique or distributed to
- * concurrent clients in block sized pieces.
+ * Note: A content length property was deliberately NOT defined. The design is
+ * geared towards very large file and asynchronous read/write of file blocks.
+ * The length of short files may be readily computed by the expediency of
+ * sucking their contents into a buffer. Large files should always be processed
+ * using a stream-oriented technique or distributed to concurrent clients in
+ * block sized pieces.
  * 
  * @todo other obvious metadata would include the user identifier associated
  *       with each update request.
  */
-public class MetadataSchema extends Schema {
+public class FileMetadataSchema extends Schema {
     
     /**
      * 
@@ -62,8 +62,18 @@ public class MetadataSchema extends Schema {
      * is deleted.
      */
     public static transient final String VERSION = "Version";
+
+    /**
+     * Optional boolean property. When present, the text in the file version
+     * will be tokenized and indexed for free text search. Non-text files should
+     * not set this property. Instead, a workflow or map/reduce job should be
+     * written to generate a text-only variant for the indexer.
+     * 
+     * @todo need a property that is the "URI" of the indexed document?
+     */
+    public static transient final String INDEX_TEXT = "IndexText";
     
-    public MetadataSchema() {
+    public FileMetadataSchema() {
         
         super("metadata", ID, KeyType.Unicode);
         

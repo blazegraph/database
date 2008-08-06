@@ -30,13 +30,13 @@ import java.util.Map;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.repo.BigdataRepository;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -139,7 +139,7 @@ import cutthecrap.utils.striterators.Striterator;
  * any valid timestamp.
  * </p>
  * <p>
- * Note: Very large objects should be stored in the {@link BigdataRepository}
+ * Note: Very large objects should be stored in the {@link BigdataFileSystem}
  * (distributed, atomic, versioned, chunked file system) and the identifier for
  * that object can then be stored in the row store.
  * </p>
