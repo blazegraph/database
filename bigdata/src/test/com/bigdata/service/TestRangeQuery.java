@@ -164,7 +164,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
          */
         {
             
-            final PartitionedRangeQueryIterator itr = (PartitionedRangeQueryIterator) ndx
+            final PartitionedTupleIterator itr = (PartitionedTupleIterator) ndx
                     .rangeIterator(null, null);
 
             // nothing visited yet.
@@ -722,10 +722,11 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
          * the index partition, and that the total iterator is moving forwards
          * through the index partitions.
          */
+        final int capacity = 2;
         {
 
-            final ITupleIterator itr = ndx.rangeIterator(null, null,
-                    1/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
+            final ITupleIterator itr = ndx.rangeIterator(null, null, capacity,
+                    IRangeQuery.DEFAULT, null);
 
             ITuple tuple;
 
@@ -790,9 +791,9 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            final ITupleIterator itr = ndx.rangeIterator(null, null,
-                    1/* capacity */,
-                    IRangeQuery.DEFAULT | IRangeQuery.REVERSE, null/* filter */);
+            final ITupleIterator itr = ndx
+                    .rangeIterator(null, null, capacity, IRangeQuery.DEFAULT
+                            | IRangeQuery.REVERSE, null/* filter */);
 
             ITuple tuple;
 
@@ -841,6 +842,139 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
             assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
             assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
             
+            assertFalse("hasNext", itr.hasNext());
+
+        }
+
+        /*
+         * Insert entries into the 3rd partition.
+         */
+        ndx.insert(new byte[] { 7 }, new byte[] { 7 });
+        ndx.insert(new byte[] { 8 }, new byte[] { 8 });
+        ndx.insert(new byte[] { 9 }, new byte[] { 9 });
+        
+        /*
+         * Filter that excludes tuples in the 3rd index partition.
+         */
+        final FilterConstructor filter = new FilterConstructor().addFilter(new TupleFilter(){
+            @Override
+            protected boolean isValid(ITuple tuple) {
+                final byte[] key = tuple.getKey();
+                if (key[0] >= 7 && key[0] < 10)
+                    return false;
+                return true;
+            }});
+        
+        // forward scan w/ filter
+        {
+
+            final ITupleIterator itr = ndx.rangeIterator(null, null,
+                    capacity, IRangeQuery.DEFAULT, filter);
+
+            ITuple tuple;
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 2 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 2 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 3 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 3 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 4 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 4 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 5 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 5 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 6 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 6 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 10 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 10 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 11 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 11 }, tuple.getValue());
+            
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 12 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 12 }, tuple.getValue());
+
+            assertFalse("hasNext", itr.hasNext());
+
+        }
+        
+        // reverse scan w/ filter.
+        {
+            
+            final ITupleIterator itr = ndx.rangeIterator(null, null, capacity,
+                    IRangeQuery.DEFAULT | IRangeQuery.REVERSE, filter);
+
+            ITuple tuple;
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 12 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 12 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 11 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 11 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 10 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 10 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 6 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 6 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 5 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 5 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 4 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 4 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 3 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 3 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 2 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 2 }, tuple.getValue());
+
+            assertTrue("hasNext", itr.hasNext());
+            tuple = itr.next();
+            assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
+            assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
+
             assertFalse("hasNext", itr.hasNext());
 
         }

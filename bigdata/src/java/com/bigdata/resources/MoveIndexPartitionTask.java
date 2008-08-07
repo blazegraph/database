@@ -52,7 +52,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
-import com.bigdata.service.RawDataServiceRangeIterator;
+import com.bigdata.service.RawDataServiceTupleIterator;
 import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 
 /**
@@ -393,7 +393,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             assert sourceDataService != null;
             
             // iterator reading from the (remote) source index partition.
-            final ITupleIterator itr = new RawDataServiceRangeIterator(
+            final ITupleIterator itr = new RawDataServiceTupleIterator(
                     sourceDataService, //
                     sourceIndexName, //
                     TimestampUtility.asHistoricalRead(lastCommitTime),// Note: historical read.

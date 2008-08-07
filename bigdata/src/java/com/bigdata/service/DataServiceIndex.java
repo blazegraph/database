@@ -368,7 +368,7 @@ public class DataServiceIndex implements IClientIndex {
 //            
 //        }
         
-        return new RawDataServiceRangeIterator(dataService, name, timestamp,
+        return new RawDataServiceTupleIterator(dataService, name, timestamp,
                 readConsistent, fromKey, toKey, capacity, flags, filter);
 
     }

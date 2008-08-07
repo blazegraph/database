@@ -55,7 +55,7 @@ import com.bigdata.journal.AbstractInterruptsTestCase.InterruptMyselfTask;
 import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrencyManager.Options;
 import com.bigdata.service.DataService;
-import com.bigdata.service.DataServiceRangeIterator;
+import com.bigdata.service.DataServiceTupleIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -66,7 +66,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo write test cases that submit various kinds of operations and verify the
  *       correctness of those individual operations. refactor the services
  *       package to do this, including things such as the
- *       {@link DataServiceRangeIterator}. this will help to isolate the
+ *       {@link DataServiceTupleIterator}. this will help to isolate the
  *       correctness of the data service "api", including concurrency of
  *       operations, from the {@link DataService}.
  * 

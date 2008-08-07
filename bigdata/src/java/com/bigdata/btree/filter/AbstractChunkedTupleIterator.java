@@ -49,8 +49,7 @@ import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.IBlock;
-import com.bigdata.service.DataServiceRangeIterator;
-import com.bigdata.service.PartitionedRangeQueryIterator;
+import com.bigdata.service.DataServiceTupleIterator;
 
 /**
  * A chunked iterator that proceeds a {@link ResultSet} at a time. This
@@ -58,18 +57,13 @@ import com.bigdata.service.PartitionedRangeQueryIterator;
  * can materialize the tuples using a sequence of queries that progresses
  * through the index until all tuples in the key range have been visited.
  * 
- * @todo Rewrite to implement {@link ITupleCursor}? Note that this should not
- *       be necessary if we instead notice the direction in which the underlying
- *       (source) iterator was being traversed. Even that can be ignored in
- *       favor of using REVERSE to achieve reverse traversal.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
+abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
 
     public static final transient Logger log = Logger
-            .getLogger(DataServiceRangeIterator.class);
+            .getLogger(DataServiceTupleIterator.class);
 
     /**
      * Error message used by {@link #getKey()} when the iterator was not
@@ -142,10 +136,8 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
      * 
      * @see #rangeQuery()
      * @see #continuationQuery()
-     * 
-     * @todo make this protected again. See {@link PartitionedRangeQueryIterator}
      */
-    public ResultSet rset = null;
+    protected ResultSet rset = null;
 
     /**
      * The timestamp for the operation as specified by the ctor (this is used
@@ -262,7 +254,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
         
     }
     
-    public AbstractChunkedRangeIterator(byte[] fromKey, byte[] toKey,
+    public AbstractChunkedTupleIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IFilterConstructor filter) {
 
         if (capacity < 0) {
@@ -698,7 +690,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
 
             final int sourceIndex = getSourceIndex();
             
-            return AbstractChunkedRangeIterator.this.readBlock(sourceIndex,
+            return AbstractChunkedTupleIterator.this.readBlock(sourceIndex,
                     addr);
             
         }

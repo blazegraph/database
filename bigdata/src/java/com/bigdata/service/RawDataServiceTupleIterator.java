@@ -35,7 +35,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+import com.bigdata.btree.filter.AbstractChunkedTupleIterator;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.IIndexStore;
@@ -57,10 +57,10 @@ import com.bigdata.rawstore.IBlock;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
+public class RawDataServiceTupleIterator extends AbstractChunkedTupleIterator {
     
     public static final transient Logger log = Logger
-            .getLogger(RawDataServiceRangeIterator.class);
+            .getLogger(RawDataServiceTupleIterator.class);
 
     /**
      * Error message used by {@link #getKey()} when the iterator was not
@@ -120,7 +120,7 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      *            commit points if there are concurrent commits).
      *            <p>
      *            The <i>readConsistent</i> option is a tweak available only at
-     *            this low level for the {@link RawDataServiceRangeIterator}.
+     *            this low level for the {@link RawDataServiceTupleIterator}.
      *            It avoids a possible RMI to obtain the most recent global
      *            commit point using {@link IIndexStore#getLastCommitTime()} in
      *            favor of using the most recent commit point on the index
@@ -130,14 +130,14 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      *            {@link ITx#READ_COMMITTED} or
      *            {@link IIndexStore#getLastCommitTime()}. See
      *            {@link ClientIndexView} and
-     *            {@link PartitionedRangeQueryIterator}.
+     *            {@link PartitionedTupleIterator}.
      * @param fromKey
      * @param toKey
      * @param capacity
      * @param flags
      * @param filter
      */
-    public RawDataServiceRangeIterator(IDataService dataService, String name,
+    public RawDataServiceTupleIterator(IDataService dataService, String name,
             long timestamp, boolean readConsistent, byte[] fromKey,
             byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
 

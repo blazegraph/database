@@ -28,7 +28,7 @@ package com.bigdata.btree;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+import com.bigdata.btree.filter.AbstractChunkedTupleIterator;
 
 /**
  * Visits the values of a {@link Leaf} in the external key ordering. There is
@@ -225,7 +225,7 @@ public class LeafTupleIterator implements ITupleIterator {
      * Note: There are two ways in which you can achieve the semantics of
      * {@link #remove()}. One is to use an {@link ITupleCursor}, which
      * correctly handles traversal with concurrent modification. The other is to
-     * use a {@link AbstractChunkedRangeIterator}, which buffers the tuples
+     * use a {@link AbstractChunkedTupleIterator}, which buffers the tuples
      * first and then does a "delete" behind in order to avoid concurrent
      * modification during traversal.
      * 

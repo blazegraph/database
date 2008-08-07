@@ -353,7 +353,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, IService {
      * is returned or the {@link ResultSet#isLast()} flag is set, indicating
      * that all keys up to (but not including) the <i>startKey</i> have been
      * visited. See {@link ClientIndexView} (scale-out indices) and
-     * {@link DataServiceRangeIterator} (unpartitioned indices), both of which
+     * {@link DataServiceTupleIterator} (unpartitioned indices), both of which
      * encapsulate this method.
      * </p>
      * <p>

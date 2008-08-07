@@ -43,7 +43,7 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
- * Test suite for {@link AbstractChunkedRangeIterator} and its concrete
+ * Test suite for {@link AbstractChunkedTupleIterator} and its concrete
  * {@link ChunkedLocalRangeIterator} implementation.
  * <p>
  * Note: There are other implementations derived from the same abstract base

@@ -42,7 +42,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+import com.bigdata.btree.filter.AbstractChunkedTupleIterator;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
@@ -72,7 +72,7 @@ import com.bigdata.service.ClientIndexView;
  * FIXME In order for this method to correctly progress through an index
  * partition in a sequence of requests where at most N logical rows are
  * identified by request there must be an abstraction that can be used to
- * formulate the next request. The {@link AbstractChunkedRangeIterator} handles
+ * formulate the next request. The {@link AbstractChunkedTupleIterator} handles
  * this for {@link ITupleIterator} but there is not a general purpose approach
  * to handling this problem. As a result the actual behavior of this procedure
  * will be to read up to N logical rows from each index partition in order, but
