@@ -27,69 +27,98 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.util.UUID;
+
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.IUpdateStore;
 
 /**
- * An interface used to pipeline writes against index partitions over one or
- * more secondary data services providing high availability and failover for
- * that index partition.
+ * Replicates writes against a primary store by pipelining them onto one or more
+ * secondary stores in order to provide high availability and failover.
+ * Replication is handled at the level of the {@link IRawStore} and
+ * {@link IUpdateStore} APIs so that it may be tested in a local environment and
+ * even used to provide media failover. However, the primary use case is state
+ * replication, high availability, and failover for {@link DataService}s.
+ * <p>
+ * The write pipeline operates at the {@link IRawStore} API. All writes are
+ * directed to the primary. It simply streams writes down to the next service in
+ * the pipeline and that is the sole way in which writes are made on the
+ * secondaries. The result is that the secondaries are a bitwise replication of
+ * the primary store state. Secondaries must catch up no later than the next
+ * commit point. This allows writes on the pipeline to be asynchronous with
+ * respect to the writes on the primary (the application does not wait for the
+ * secondaries when writing on a store), but synchronous with respect to commit
+ * points on the primary. Internally this can be handled by queuing writes and
+ * blocking until the queue is empty at each commit point. Writes need not be
+ * ordered as long as commit point synchronization is maintained.
+ * <p>
+ * Concurrency control for writes and commit processing are solely handled by
+ * the primary. If a secondary fails, then it is taken out of the pipeline. In
+ * particular, an error when writing on a secondary will not cause a commit to
+ * fail.
+ * <p>
+ * Since secondaries are bitwise replications of the primary as of the most
+ * recent commit point, they are fully able to respond to requests for
+ * historical data. This provides high-availability by allowing read-committed
+ * and read-historical requests to be handled by secondaries in order to reduce
+ * the load on the primary.
+ * <p>
+ * At the {@link DataService} layer, replication requires not only replicating
+ * the state of the live journal, but also replicating the state of the managed
+ * resources (and the release) of those resources.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo define api for managing the write pipeline. any write operations on a
- *       data service should indicate the index partition (name + partitionId)
- *       on which they are writing and the write requests should be chained down
- *       the configured write pipeline.
+ * @todo we need a logical / physical distinction for data services. the
+ *       physical data service is a JINI service and has a JINI ServiceUUID. the
+ *       logical data service is a pipeline of physical data services. each
+ *       secondary data service is a faithful replicate of the corresponding
+ *       primary data service as of the most recent commit point.
+ *       <p>
+ *       The metadata index stores <em>logical</em> data service identifiers,
+ *       which are {@link UUID}s. This is necessary since many index partitions
+ *       can be mapped onto the logical data service and we do not want to
+ *       update all of those records if the failover pipeline is changed.
+ *       <p>
+ *       When the logical data service identifier is resolved to a physical data
+ *       service proxy we need to (a) always choose the primary if the operation
+ *       is a write; (b) share the read committed and historical read load out
+ *       over the secondaries; and (c) handle RMI IO errors by failing over to
+ *       (another) secondary.
  * 
- * @todo verify that conditional insert logic can not cause inconsistent data to
- *       appear depending on the order in which writes are received by the data
- *       services in a pipeline. For the pipeline to be consistent the order in
- *       which client operations execute MUST NOT differ on different data
- *       services in the pipeline for the same index partition. Consider that
- *       two clients are loading RDF documents whose terms overlap. If the order
- *       of the client operations differs on the different services for the
- *       pipeline, then different term identifiers could be assigned to the same
- *       term by different data services.
+ * @todo Recognize errors that are transients (route to host problems that do
+ *       not indicate a failed data service), that are application problems
+ *       (e.g., a class that is not serializable), and that indicate service
+ *       death.
  * 
- * @todo commit (and group commit) semantics must be respected by the pipeline.
- *       this is basically a (potentially special) case of a 2-phase commit. If
- *       the, e.g., the last data services in the pipeline suddenly runs out of
- *       disk or otherwise "hiccups" then then it will not be consistent with
- *       the other replicas of the index partition in that pipeline. I need to
- *       think through how to handle this further. For example, the commit could
- *       propagate along the pipeline, but that does not work if group commit is
- *       triggered by different events (latency and data volumn) on different
- *       data services.
+ * @todo Resolve a logical data service UUID to a physical data service. This
+ *       can be done easily enough by a variant of
+ *       com.bigdata.service.jini.ServiceCache that accepts a logical data
+ *       service UUID and returns a ServiceItem[] that is a snapshot of the
+ *       known physical data services for that logical data service.
  *       <p>
- *       A distributed file system solves this problem by having only a single
- *       data service that is the chokepoint for concurrency control (and hence
- *       for consistency control) for any given index partition. Essentially,
- *       the distributed file system provides media redundency - the same bytes
- *       in the same order appear in each copy of the file backing the journal.
- *       <p>
- *       So, it seems that a way to achieve that without a distributed file
- *       system is to have the write pipeline operate and the {@link IRawStore}
- *       API. It simply streams writes down to the next service in the pipeline
- *       and that is the sole way in which downstream services have their stores
- *       written. Since low-level writes can be 1 GB/sec on a transient buffer,
- *       this protocol could be separated from the data service and become a
- *       media redundency protocol only. Downstream writes would not even need
- *       to sync to disk on "sync" but only on buffer overflow since the data
- *       service at the head of the pipeline is already providing restart-safe
- *       state and they are providing redundency for the first point of failure.
- *       If the data service does fail, then the first media redundency service
- *       would sync its state to disk and take over as the data service.
- *       <p>
- *       Work through how the service accepts responsibility for media
- *       redundency for files, how it names its local files (source host /
- *       filename?), how replicated files are managed (close, closeAndDelete,
- *       bulk read, syncToDisk, etc.)
- *       <p>
- *       Work through how index partitions can be shed or picked up by data
- *       services in this media redundency model.
+ *       The clients information can be stale and in any case does not include
+ *       which physical data service is the master (primary). For read committed
+ *       and historical reads, the client should choose the physical data at
+ *       random among those provided. If the client requires the master, then it
+ *       should choose a physical data service from among those provided at
+ *       random and query it for the identity (ServiceUUID) of the master. The
+ *       client will store the ServiceUUID of the master in a secondary (or
+ *       outer) cache that permits fast resolution of the master for a logical
+ *       data service. The clients information regarding the secondaries and the
+ *       primary will remain valid until a service "leaves" (dies).
+ * 
+ * @todo Robust selection of a new primary if a primary dies (paxos territory -
+ *       zoo keeper?)
+ * 
+ * @todo Robust recruitment of secondaries to maintain replication levels.
+ * 
+ * @todo Robustness of applications during transients, especially when the
+ *       primary is not responding and no secondary has been nominated as the
+ *       new primary.
  */
-public interface IWritePipeline {
+public interface IWritePipeline { //extends IRawStore, IUpdateStore {
 
 //    /**
 //     * Write a record onto the pipeline (useful for the primary when a write is

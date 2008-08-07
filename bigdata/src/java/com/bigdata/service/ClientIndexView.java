@@ -100,7 +100,7 @@ import com.bigdata.util.InnerCause;
  * locator record(s). This behavior correctly handles index partition split,
  * merge, and move scenarios. The implementation of this policy is limited to
  * exactly three places in the code: {@link AbstractDataServiceProcedureTask},
- * {@link PartitionedRangeQueryIterator}, and {@link DataServiceRangeIterator}.
+ * {@link PartitionedTupleIterator}, and {@link DataServiceTupleIterator}.
  * </p>
  * <p>
  * Note that only {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED}
@@ -615,7 +615,7 @@ public class ClientIndexView implements IClientIndex {
             
         }
         
-        return new PartitionedRangeQueryIterator(this, timestamp, fromKey,
+        return new PartitionedTupleIterator(this, timestamp, fromKey,
                 toKey, capacity, flags, filter);
         
     }

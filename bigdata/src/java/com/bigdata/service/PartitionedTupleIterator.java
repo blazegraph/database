@@ -41,21 +41,20 @@ import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
 
 /**
- * Class supports range query across one or more index partitions.
- * <p>
- * Each partition is mapped onto a single {@link DataServiceRangeIterator}
- * query. In turn, the {@link DataServiceRangeIterator} may make several queries
- * to the data service per partition. The actual #of queries made to the data
- * service depends on the #of index entries that are visited per partition and
- * the capacity specified to the ctor.
+ * Class supports range query across one or more index partitions. Each
+ * partition is mapped onto a single {@link DataServiceTupleIterator} query. In
+ * turn, the {@link DataServiceTupleIterator} may make several queries to the
+ * data service per partition. The actual #of queries made to the data service
+ * depends on the #of index entries that are visited per partition and the
+ * capacity specified to the ctor.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionedRangeQueryIterator implements ITupleIterator {
+public class PartitionedTupleIterator implements ITupleIterator {
 
     protected static final transient Logger log = Logger
-            .getLogger(PartitionedRangeQueryIterator.class);
+            .getLogger(PartitionedTupleIterator.class);
     
     /**
      * The index on which the range query is being performed.
@@ -71,11 +70,6 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      * The timestamp from the ctor.
      */
     private final long timestamp;
-
-//    /**
-//     * From the {@link ClientIndexView}.
-//     */
-//    private final boolean readConsistent;
     
     /**
      * The first key to visit -or- <code>null</code> iff no lower bound (from
@@ -110,24 +104,6 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      * partitions as in reverse order within each index partition.
      */
     private final boolean reverseScan;
-    
-//    /**
-//     * The last key that was visited on the {@link #src} iterator. This is used
-//     * in case we trap a {@link StaleLocatorxception}. It provides the
-//     * exclusive lower bound for the query against the new index partitions
-//     * identified when we refresh our {@link PartitionLocator}s. This is
-//     * <code>null</code> initially and is set to the non-<code>null</code>
-//     * value of each key that we visit by {@link #next()}.
-//     * 
-//     * This adds a requirement that the {@link IRangeQuery#KEYS} are
-//     * always requested so that we can avoid double-counting. However,
-//     * {@link StaleLocatorException}s can only arise when we request the next
-//     * result set so we SHOULD be able to get by without the KEYS at this layer
-//     * (which means that we do not have to send them across the network) by
-//     * using {@link ResultSet#getLastKey()}.  Change this since we otherwise
-//     * will always send KEYS which can add significant NIO costs.
-//     */
-//    private byte[] lastKeyVisited = null;
 
     /**
      * The {@link #currentFromKey} and {@link #currentToKey} are updated each
@@ -149,12 +125,9 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      *       there were no tuples to visit. This class does not appear to handle
      *       that condition, but it is able to pass a unit test where there is
      *       an empty partition in the middle of the key range scan for both
-     *       forward and reverse traversal.
-     *       <p>
-     *       Try writing a test where the partition is non-empty, but a filter
-     *       causes at least one chunk in that partition to report an empty
-     *       result set. This might lead to either non-progression of the
-     *       iterator, early termination, or a thrown exception.
+     *       forward and reverse traversal and a test where there is a non-empty
+     *       partition whose tuples are filtered out such that it is effectively
+     *       empty. see {@link TestRangeQuery#test_reverseScan()}
      * 
      * @todo if we restart a locator scan and the index partition boundaries
      *       have changed, then what do we need to do in order to make sure that
@@ -187,7 +160,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     
     /**
      * The #of index partitions that have been queried so far. There will be one
-     * {@link DataServiceRangeIterator} query issued per partition.
+     * {@link DataServiceTupleIterator} query issued per partition.
      * 
      * @deprecated The #of partitions is a bit tricky since splits and introduce
      *             new partitions.
@@ -200,10 +173,10 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     private long nvisited = 0;
     
     /**
-     * The {@link DataServiceRangeIterator} reading from the current index
+     * The {@link DataServiceTupleIterator} reading from the current index
      * partition.
      */
-    private DataServiceRangeIterator src;
+    private DataServiceTupleIterator src;
    
     /**
      * When true, the entire key range specified by the client has been
@@ -236,7 +209,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     
     /**
      * <p>
-     * Note: The {@link PartitionedRangeQueryIterator} uses a sequential scan
+     * Note: The {@link PartitionedTupleIterator} uses a sequential scan
      * (rather than mapping across the index partitions in parallel) and always
      * picks up from the successor of the last key visited. Read-consistent is
      * achieved by specifying a commitTime for the <i>timestamp</i> rather than
@@ -256,7 +229,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      *             if readConsistent is requested and the index view is
      *             {@link ITx#UNISOLATED}.
      */
-    public PartitionedRangeQueryIterator(ClientIndexView ndx, long timestamp,
+    public PartitionedTupleIterator(ClientIndexView ndx, long timestamp,
             byte[] fromKey, byte[] toKey, int capacity, int flags,
             IFilterConstructor filter) {
 
@@ -271,28 +244,13 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
             throw new IllegalArgumentException();
             
         }
-
-//        if (ndx.getTimestamp() == ITx.UNISOLATED && readConsistent) {
-//            
-//            throw new IllegalArgumentException(
-//                    "Read-consistent not available for unisolated operations");
-//            
-//        }
         
         this.ndx = ndx;
         this.timestamp = timestamp;
-//        this.readConsistent = readConsistent;
         this.fromKey = this.currentFromKey = fromKey;
         this.toKey = this.currentToKey = toKey;
         this.capacity = capacity;
         
-//        // Note: need keys for REMOVEALL.
-//        this.flags = ((flags & IRangeQuery.REMOVEALL)==0) ? flags : flags|IRangeQuery.KEYS;
-
-        /*
-         * we used to need the KEYS in order to keep [lastKeyVisited] up to date.
-         */
-//        this.flags = IRangeQuery.KEYS | flags;
         this.flags = flags;
                 
         this.filter = filter;
@@ -428,24 +386,6 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
         
     }
 
-//    /**
-//     * The next [fromKey] that we are supposed to visit. If we have not visited
-//     * anything, then we are still on the original {@link #fromKey}. Otherwise
-//     * we take the successor of the {@link #lastKeyVisited}.
-//     */
-//    private byte[] currentFromKey() {
-//
-//        assert src != null;
-//        
-//        final byte[] currentFromKey = lastKeyVisited == null //
-//            ? this.fromKey//
-//            : BytesUtil.successor(lastKeyVisited)//
-//            ;
-//
-//        return currentFromKey;
-//        
-//    }
-    
     /**
      * Issues a new range query against the next index partititon.
      */
@@ -532,7 +472,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
              * happen until you call [src.hasNext()].
              */
             
-            src = new DataServiceRangeIterator(ndx, dataService, DataService
+            src = new DataServiceTupleIterator(ndx, dataService, DataService
                     .getIndexPartitionName(ndx.getName(), partitionId),
                     timestamp, _fromKey, _toKey, capacity, flags, filter) {
                 
@@ -614,10 +554,6 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
         
         final ITuple sourceTuple = src.next();
 
-//        this.lastKeyVisited = sourceTuple.getKey();
-//
-//        assert lastKeyVisited != null;
-        
         return new DelegateTuple( sourceTuple ) {
             
             public long getVisitCount() {
@@ -633,7 +569,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     /**
      * Batch delete behind semantics.
      * 
-     * @see DataServiceRangeIterator#remove()
+     * @see DataServiceTupleIterator#remove()
      */
     public void remove() {
         

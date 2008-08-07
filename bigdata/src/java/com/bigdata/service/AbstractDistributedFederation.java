@@ -273,7 +273,7 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
          */
         {
         
-            final ITupleIterator itr = new RawDataServiceRangeIterator(
+            final ITupleIterator itr = new RawDataServiceTupleIterator(
                     getMetadataService(),//
                     MetadataService.getMetadataIndexName(name), //
                     timestamp,//
@@ -447,7 +447,7 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
         public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
                 int capacity, int flags, IFilterConstructor filter) {
 
-            return new RawDataServiceRangeIterator(getMetadataService(),//
+            return new RawDataServiceTupleIterator(getMetadataService(),//
                     MetadataService.getMetadataIndexName(name), //
                     (timestamp==ITx.UNISOLATED?ITx.READ_COMMITTED:timestamp),//
                     true, // read-consistent semantics.

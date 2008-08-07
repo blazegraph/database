@@ -44,10 +44,10 @@ import com.bigdata.resources.StaleLocatorException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
+public class DataServiceTupleIterator extends RawDataServiceTupleIterator {
     
     public static final transient Logger log = Logger
-            .getLogger(DataServiceRangeIterator.class);
+            .getLogger(DataServiceTupleIterator.class);
 
     /**
      * Used to submit delete requests to the scale-out index in a robust
@@ -77,7 +77,7 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
      * @param flags
      * @param filter
      */
-    public DataServiceRangeIterator(ClientIndexView ndx,
+    public DataServiceTupleIterator(ClientIndexView ndx,
             IDataService dataService, String name, long timestamp,
             byte[] fromKey, byte[] toKey, int capacity, int flags,
             IFilterConstructor filter) {

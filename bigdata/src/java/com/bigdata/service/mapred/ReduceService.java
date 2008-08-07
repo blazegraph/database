@@ -45,7 +45,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.service.RawDataServiceRangeIterator;
+import com.bigdata.service.RawDataServiceTupleIterator;
 
 /**
  * A service for {@link IReduceTask} processing. Those tasks are distributed by
@@ -149,7 +149,7 @@ abstract public class ReduceService
             final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
 
             // index scan. @todo this is not a robust scan, but all of this needs to be reworked anyway.
-            ITupleIterator itr = new RawDataServiceRangeIterator(ds, name,
+            ITupleIterator itr = new RawDataServiceTupleIterator(ds, name,
                     ITx.UNISOLATED, false/* readConsistent */,
                     null/* fromKey */, null/* toKey */, capacity, flags, null/* filter */);
 

@@ -358,7 +358,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      */
     protected int getPartitionCount(String name) {
         
-        final ITupleIterator itr = new RawDataServiceRangeIterator(
+        final ITupleIterator itr = new RawDataServiceTupleIterator(
                 metadataService,//
                 MetadataService.getMetadataIndexName(name), //
                 ITx.READ_COMMITTED,//

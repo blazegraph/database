@@ -55,7 +55,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ChunkedLocalRangeIterator extends AbstractChunkedRangeIterator {
+public class ChunkedLocalRangeIterator extends AbstractChunkedTupleIterator {
 
     protected final IIndex ndx;
     

@@ -30,7 +30,7 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.filter.AbstractChunkedRangeIterator;
+import com.bigdata.btree.filter.AbstractChunkedTupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -73,7 +73,7 @@ import com.bigdata.service.IMetadataService;
  * The critical point is being able to recover the reference to the (potentially
  * remote) extSer object from within both the {@link AbstractBTree} and the
  * various {@link ITupleIterator} implementations, including the
- * {@link AbstractChunkedRangeIterator}. Further, the recovered object must
+ * {@link AbstractChunkedTupleIterator}. Further, the recovered object must
  * cache the extSer state, must have a resonable life cycle so that it is
  * efficient, and must be linked into the commit protocol such that assigned
  * class identifiers are always made persistent if a commit could have included
