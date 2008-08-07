@@ -643,7 +643,8 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
         public boolean hasNext() {
 
-            return src1.hasNext() || src2.hasNext();
+            return tmp1 != null || tmp2 != null || src1.hasNext()
+                    || src2.hasNext();
             
         }
         
