@@ -40,7 +40,6 @@ import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -53,6 +52,7 @@ import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.RuleStats;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Rule used in steps 3, 5, 6, 7, and 9 of the fast forward closure program.

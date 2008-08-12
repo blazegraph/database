@@ -30,7 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import java.util.concurrent.Callable;
 
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Interface for a task that executes a (complex) program (vs a single rule).

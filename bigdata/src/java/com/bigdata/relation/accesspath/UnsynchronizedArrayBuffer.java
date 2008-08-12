@@ -28,27 +28,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
-import org.apache.log4j.Logger;
 
 /**
- * An unsynchronized buffer backed by a fixed capacity array that flushes onto a
- * (normally synchronized) buffer supplied by the caller using
- * {@link IBuffer#add(int, Object[])}. This class may be useful in reducing
- * contention for locks or synchronized blocks of code by reducing the frequency
- * with which those methods are invoked.
+ * An unsynchronized buffer backed by a fixed capacity array that migrates
+ * references onto the caller's buffer (which may be synchronized) using
+ * {@link IBuffer#add(int, Object[])}. This class may be useful when the code
+ * is single threaded or and in reducing contention for locks or synchronized
+ * blocks of code by reducing the frequency with which those methods are
+ * invoked.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
+public class UnsynchronizedArrayBuffer<E> extends AbstractUnsynchronizedArrayBuffer<E> {
 
-    protected static final Logger log = Logger.getLogger(UnsynchronizedArrayBuffer.class);
-    
-    private final int capacity;
     private final IBuffer<E> target;
-    
-    private int size;
-    private E[] buffer;
     
     /**
      * @param capacity
@@ -57,141 +51,40 @@ public class UnsynchronizedArrayBuffer<E> implements IBuffer<E> {
      *            The target buffer onto which the elements will be flushed.
      */
     public UnsynchronizedArrayBuffer(int capacity, IBuffer<E> target) {
+    
+        super(capacity);
         
-        if (capacity <= 0)
-            throw new IllegalArgumentException();
-
         if (target == null)
             throw new IllegalArgumentException();
-        
-        this.capacity = capacity;
 
         this.target = target;
-        
-        /*
-         * Note: The backing array is allocated once we receive the first
-         * element so we can get the array component type right.
-         * 
-         * @todo this could be a problem if the element type was in fact Object
-         * since we should allocate an Object[] but we will in fact allocate an
-         * array of whatever type that first object is. This could in turn cause
-         * runtime errors. If it is then we need to pass in an object (or an
-         * empty array) of the correct type.
-         */
         
     }
     
     /**
-     * If {@link #size()} reports zero(0).
+     * Adds all references in the internal buffer to the target buffer using
+     * {@link IBuffer#add(int, Object[])} and sets the #of elements in the
+     * internal buffer to ZERO (0).
      */
-    public boolean isEmpty() {
+    protected void overflow() {
 
-        return size == 0;
-        
-    }
+        if (size > 0) {
 
-    /**
-     * The exact #of elements currently in the buffer.
-     */
-    public int size() {
+            if (log.isInfoEnabled())
+                log.info("size=" + size);
 
-        return size;
-        
-    }
+            target.add(size, buffer);
 
-    public void add(E e) {
-
-        if (e == null)
-            throw new IllegalArgumentException();
-
-        if(log.isDebugEnabled()) {
-            
-            log.debug("element="+e);
-            
-        }
-
-        if (buffer == null) {
-
-            buffer = (E[]) java.lang.reflect.Array.newInstance(e.getClass(),
-                    capacity);
-
-        } else if (size == buffer.length) {
-
-            flush();
+            size = 0;
 
         }
-
-        buffer[size++] = e;
         
-    }
-
-    public void add(final int n, final E[] a) {
-
-        if(n == 0) return;
-        
-        if (a == null)
-            throw new IllegalArgumentException();
-
-        if (a.length < n)
-            throw new IllegalArgumentException();
-        
-        if(log.isDebugEnabled()) {
-            
-            log.debug("n=" + n + ", a=" + a);
-
-        }
-
-        for (int i = 0; i < n; i++) {
-
-            final E e = a[i];
-
-            if (e == null)
-                throw new IllegalArgumentException("null @ index=" + i);
-
-            if (buffer == null) {
-
-                buffer = (E[]) java.lang.reflect.Array.newInstance(
-                        e.getClass(), capacity);
-
-            } else if (size == buffer.length) {
-
-                if(log.isInfoEnabled()) {
-                 
-                    log.info("moving references to target buffer: size="+size);
-                    
-                }
-                
-                // add all references to the target buffer.
-                target.add(size, buffer);
-                
-                // reset the #of references in this buffer.
-                size = 0;
-
-            }
-
-            buffer[size++] = e;
-
-        }
-
     }
     
     public long flush() {
 
-        if (size > 0) {
-
-            if (log.isInfoEnabled()) {
-
-                log.info("flushing buffer with " + size + " elements");
-                
-            }
-
-            // add all references to the target buffer.
-            target.add(size, buffer);
-            
-            // reset the #of references in this buffer.
-            size = 0;
-            
-        }
+        // move everthing onto the target buffer.
+        overflow();
         
         // tell the target buffer to flush itself.
         final long nwritten = target.flush();

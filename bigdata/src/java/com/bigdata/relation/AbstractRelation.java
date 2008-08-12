@@ -38,8 +38,8 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Base class for {@link IRelation} and {@link IMutableRelation} impls.

@@ -40,7 +40,7 @@ import com.bigdata.rdf.rules.RDFSVocabulary;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Test suite for {@link BackchainTypeResourceIterator}.

@@ -72,6 +72,21 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements BigdataLiter
     private final String language;
     private final BigdataURIImpl datatype;
 
+    /**
+     * Create a new {@link BigdataLiteral} having the same data and NO term
+     * identifier.
+     * 
+     * @param lit
+     *            A literal.
+     */
+    public BigdataLiteralImpl(Literal lit) {
+
+        this(lit.getLabel(), lit.getLanguage(),
+                (lit.getDatatype() == null ? null : new BigdataURIImpl(lit
+                        .getDatatype())), NULL);
+
+    }
+    
     public BigdataLiteralImpl(_Literal lit) {
         
         this(lit.term, lit.language, (lit.datatype == null ? null : new BigdataURIImpl(

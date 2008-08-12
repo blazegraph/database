@@ -125,9 +125,24 @@ public interface IRangeQuery {
     public static final int DELETED = 1 << 2;
 
     /**
-     * Shorthand for {@link #KEYS} and {@link #VALS} and {@link #DELETED}.`
+     * The flags that should be used by default [{@link #KEYS}, {@link #VALS}]
+     * in contexts where the flags are not explicitly specified by the
+     * appliction such as {@link #rangeIterator(byte[], byte[])}.
+     */
+    public static final int DEFAULT = KEYS | VALS;
+
+    /**
+     * Shorthand for [{@link #KEYS}, {@link #VALS}, {@link #DELETED}].
      */
     public static final int ALL = (KEYS | VALS | DELETED);
+    
+    /**
+     * Flag specifies that the iterator, including any {@link ITupleFilter}s,
+     * will not write on the index. Various optimizations may be applied when
+     * this flag is present. (Read only can be inferred if {@link #CURSOR} flag
+     * is NOT specified AND there are NO {@link ITupleFilter}s).
+     */
+    public static final int READONLY = 1 << 3;
     
     /**
      * Flag specifies that entries visited by the iterator in the key range will
@@ -200,21 +215,6 @@ public interface IRangeQuery {
      */
     public static final int REVERSE = 1 << 6;
     
-    /**
-     * Flag specifies that the iterator, including any {@link ITupleFilter}s,
-     * will not write on the index. Various optimizations may be applied when
-     * this flag is present. (Read only can be inferred if {@link #CURSOR} flag
-     * is NOT specified AND there are NO {@link ITupleFilter}s).
-     */
-    public static final int READONLY = 1 << 7;
-    
-    /**
-     * The flags that should be used by default ({@link #KEYS},{@link #VALS})
-     * in contexts where the flags are not explicitly specified by the
-     * appliction such as {@link #rangeIterator(byte[], byte[])}.
-     */
-    public static final int DEFAULT = KEYS | VALS;
-
     /**
      * Visits all tuples in key order. This is identical to
      * 

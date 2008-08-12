@@ -5,10 +5,10 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * {@link IAccessPath} implementation for an {@link SPORelation}.

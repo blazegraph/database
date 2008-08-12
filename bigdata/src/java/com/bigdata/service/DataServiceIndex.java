@@ -32,6 +32,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
@@ -207,6 +208,27 @@ public class DataServiceIndex implements IClientIndex {
         
     }
     
+    private volatile ITupleSerializer tupleSer = null;
+
+    protected ITupleSerializer getTupleSerializer() {
+        if(tupleSer==null) {
+            synchronized(this) {
+                if(tupleSer==null) {
+                    tupleSer = getIndexMetadata().getTupleSerializer();
+                }
+            }
+        }
+        return tupleSer;
+    }
+    
+    public boolean contains(Object key) {
+
+        key = getTupleSerializer().serializeKey(key);
+        
+        return contains((byte[])key);
+        
+    }
+    
     public boolean contains(byte[] key) {
         
         if (batchOnly)
@@ -222,6 +244,21 @@ public class DataServiceIndex implements IClientIndex {
                 BatchContainsConstructor.INSTANCE, resultHandler);
 
         return ((ResultBitBuffer) resultHandler.getResult()).getResult()[0];
+        
+    }
+    
+    public Object insert(Object key,Object val) {
+        
+        final ITupleSerializer tupleSer = getTupleSerializer();
+        
+        key = tupleSer.serializeKey(key);
+        
+        val = tupleSer.serializeKey(val);
+        
+        final byte[] oldval = insert((byte[])key, (byte[])val);
+        
+        // FIXME decode tuple to old value.
+        throw new UnsupportedOperationException();
         
     }
     
@@ -244,6 +281,17 @@ public class DataServiceIndex implements IClientIndex {
 
     }
 
+    public Object lookup(Object key) {
+        
+        key = getTupleSerializer().serializeKey(key);
+
+        final byte[] val = lookup((byte[])key);
+        
+        // FIXME decode tuple to old value.
+        throw new UnsupportedOperationException();
+        
+    }
+
     public byte[] lookup(byte[] key) {
 
         if (batchOnly)
@@ -262,6 +310,17 @@ public class DataServiceIndex implements IClientIndex {
 
     }
 
+    public Object remove(Object key) {
+        
+        key = getTupleSerializer().serializeKey(key);
+        
+        final byte[] oldval = remove((byte[])key);
+        
+        // FIXME decode tuple to old value.
+        throw new UnsupportedOperationException();
+
+    }
+    
     public byte[] remove(byte[] key) {
 
         if (batchOnly)

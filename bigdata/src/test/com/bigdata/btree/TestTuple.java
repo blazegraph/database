@@ -1,5 +1,7 @@
 package com.bigdata.btree;
 
+import java.util.Arrays;
+
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rawstore.IBlock;
@@ -62,6 +64,19 @@ public class TestTuple<E> implements ITuple<E> {
 
     }
 
+    public String toString() {
+        
+        return super.toString()+
+        "{flags="+AbstractTuple.flagString(flags)+
+        (isDeletedVersion()? ", deleted" : "")+
+        (getVersionTimestamp() == 0L ? "" : ", timestamp="+ getVersionTimestamp())+
+        ", key="+(getKeysRequested()?Arrays.toString(getKey()):"N/A")+
+        ", val="+(getValuesRequested()?(isNull()?"null":Arrays.toString(getValue())):"N/A")+
+        ", obj="+getObject()+
+        "}";
+        
+    }
+    
     public int flags() {
 
         return flags;

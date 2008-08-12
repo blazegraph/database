@@ -34,6 +34,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * An abstraction for efficient reads on an {@link IRelation} using the index

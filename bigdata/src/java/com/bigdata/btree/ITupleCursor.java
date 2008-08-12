@@ -37,12 +37,9 @@ import java.util.NoSuchElementException;
  * {@link Iterator} for forward sequential scans and also provides symmetric
  * methods for reverse sequential scans using {@link #hasPrior()} and
  * {@link #prior()}. Random access is supported using {@link #seek(byte[])}.
- * When {@link #first()}, {@link #last()}, or {@link #seek(byte[])} return
- * <code>null</code> this is an indication that there is no visitable tuple in
- * the index corresponding to that request. Likewise {@link #tuple()} will
- * return <code>null</code> if the cursor position does not correspond to a
- * tuple in the index or if the tuple at that cursor position has since been
- * deleted.
+ * This interface is intentially kept small and does not include methods such as
+ * first() or last() whose semantics would be misleading when applied to an
+ * index partition vs a partitioned index.
  * <p>
  * Note: Normally {@link ITupleCursor}s are provisioned such that deleted
  * tuples are not visited (they are skipped over if delete markers are used by
@@ -60,82 +57,8 @@ public interface ITupleCursor<E> extends ITupleIterator<E> {
 
     /**
      * The backing index being traversed by the {@link ITupleCursor}.
-     * 
-     * @todo Make {@link IIndex} into a generic type for the backing index?
      */
     IIndex getIndex();
-
-    /**
-     * The optional inclusive lower bound imposed by the {@link ITupleCursor}.
-     */
-    byte[] getFromKey();
-
-    /**
-     * The optional exclusive upper bound imposed by the {@link ITupleCursor}.
-     */
-    byte[] getToKey();
-
-    /**
-     * Return <code>true</code> if the cursor is willing to visit deleted
-     * tuples. In order to observe deleted tuples the index must have been
-     * provisioned with support for delete markers enabled.
-     * <p>
-     * Note: When delete markers are enabled in the index and a tuple is
-     * deleted, the tuple is NOT removed from the index. Instead a "delete"
-     * marker is set and the value associated with the key is cleared to
-     * <code>null</code>.
-     * 
-     * @see IndexMetadata#getDeleteMarkers()
-     */
-    public boolean isDeletedTupleVisitor();
-    
-    /**
-     * Return <code>true</code> if the cursor position is defined.
-     * <p>
-     * Note: Use {@link #currentKey()} to obtain the key corresponding to the
-     * current cursor position and {@link #tuple()} to obtain the visitable
-     * tuple in the index corresponding to that cursor position (if any).
-     */
-    boolean isCursorPositionDefined();
-
-    /**
-     * Return the key corresponding to the current cursor position (even if
-     * there is no tuple in the index for that key).
-     * 
-     * @return The key corresponding to the current current position -or-
-     *         <code>null</code> iff the cursor position is undefined.
-     */
-    byte[] currentKey();
-    
-    /**
-     * The tuple reflecting the data in the index at the current cursor
-     * position.
-     * 
-     * @return The tuple associated with the current cursor position -or-
-     *         <code>null</code> either if there is no visitable tuple
-     *         corresponding to the current cursor position or if the current
-     *         cursor position is undefined.
-     */
-    ITuple<E> tuple();
-
-    /**
-     * Position the cursor on the first visitable tuple in the natural index
-     * order.  If there are no visitable tuples then the cursor position will
-     * be undefined.
-     * 
-     * @return The current tuple -or- <code>null</code> iff there is no
-     *         visitable tuple corresponding to the current cursor position.
-     */
-    ITuple<E> first();
-
-    /**
-     * Position the cursor on the last visitable tuple in the natural index
-     * order. If there are no visitable tuples then the cursor position will be
-     * undefined.
-     * 
-     * @return <code>true</code> if the cursor was positioned on a tuple.
-     */
-    ITuple<E> last();
 
     /**
      * Positions the cursor on the specified key.
@@ -163,32 +86,6 @@ public interface ITupleCursor<E> extends ITupleIterator<E> {
      */
     ITuple<E> seek(byte[] key);
     
-//    /**
-//     * Change the half-open range for the cursor. This can be useful if you want
-//     * to perform a series of key-range scans. If the {@link #currentKey()} is
-//     * no longer within the bounds for the cursor it will not be on a visitable
-//     * tuple after invoking this method and you must {@link #seek(byte[])} to a
-//     * key in the new half-open range before you can use the sequential access
-//     * methods or visit the current tuple.
-//     * <p>
-//     * Note: The bounds may be constrained or relaxed, but never relaxed beyond
-//     * those given when the cursor was provisioned. For example, if you
-//     * initially specify neither a lower bound nor an upper bound then the
-//     * bounds may be set to any half-open range. However, if there is a lower
-//     * bound then you can never shift the lower bound to a lessor value so as to
-//     * expose additional keys. Likewise, if there is an upper bound then you can
-//     * never shift the upper bound to a greater value so as to expose additional
-//     * keys.
-//     * 
-//     * @param fromKey
-//     *            The optional inclusive lower bound imposed by the
-//     *            {@link ITupleCursor}.
-//     * @param toKey
-//     *            The optional exclusive upper bound imposed by the
-//     *            {@link ITupleCursor}.
-//     */
-//    void bounds(byte[] fromKey, byte[] toKey);
-
     /**
      * Variant that first encodes the key using the object returned by
      * {@link IndexMetadata#getTupleSerializer()} for the backing index.
@@ -231,16 +128,6 @@ public interface ITupleCursor<E> extends ITupleIterator<E> {
     ITuple<E> next();
 
     /**
-     * Position the cursor on the first visitable tuple ordered greater than the
-     * current cursor position in the natural key order of the index and return
-     * that tuple.
-     * 
-     * @return The tuple -or- <code>null</code> iff there is no such visitable
-     *         tuple.
-     */
-    ITuple<E> nextTuple();
-    
-    /**
      * Return <code>true</code> if there is another tuple that orders before
      * the current cursor position in the natural order of the index and that
      * lies within the optional key-range constraints on the cursor or on the
@@ -268,23 +155,13 @@ public interface ITupleCursor<E> extends ITupleIterator<E> {
     ITuple<E> prior();
 
     /**
-     * Position the cursor on the first visitable tuple ordered less than the
-     * current cursor position in the natural key order of the index and return
-     * that tuple.
-     * 
-     * @return The tuple -or- <code>null</code> iff there is no such visitable
-     *         tuple.
-     */
-    ITuple<E> priorTuple();
-    
-    /**
      * Removes the tuple (if any) from the index corresponding to the current
      * cursor position. The cursor position is NOT changed by this method. After
-     * removing the current tuple, {@link #tuple()} will return
+     * removing the current tuple, {@link ITupleCursor2#tuple()} will return
      * <code>null</code> to indicate that there is no tuple in the index
      * corresponding to the deleted tuple. (When delete markers are enabled and
-     * deleted tuples are being visited, then {@link #tuple()} will return the
-     * new state of the tuple with its delete marker set.)
+     * deleted tuples are being visited, then {@link ITupleCursor2#tuple()} will
+     * return the new state of the tuple with its delete marker set.)
      * 
      * @throws IllegalStateException
      *             if the cursor position is not defined.

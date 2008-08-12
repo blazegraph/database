@@ -45,7 +45,6 @@ import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
@@ -53,6 +52,7 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * <p>

@@ -5,8 +5,8 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Supports the bulk statement filter and bulk statement completion operations.

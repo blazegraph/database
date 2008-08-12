@@ -82,7 +82,7 @@ import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Test suite for correct handling of blank nodes and statement identifiers

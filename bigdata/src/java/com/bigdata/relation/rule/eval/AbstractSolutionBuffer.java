@@ -1,14 +1,17 @@
 package com.bigdata.relation.rule.eval;
 
+import java.util.Iterator;
+
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractArrayBuffer;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
-import com.bigdata.relation.accesspath.ChunkedResolvingIterator;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedIterator;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedOrderedStriterator;
+import com.bigdata.striterator.ChunkedResolvingIterator;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 
 /**
@@ -146,6 +149,17 @@ abstract public class AbstractSolutionBuffer<R> extends
         @Override
         protected long flush(IChunkedOrderedIterator<ISolution<E>> itr) {
 
+//            final IChunkedOrderedIterator<E> itr2 = new ChunkedOrderedStriterator(
+//                    itr)
+//                    .addFilter(new com.bigdata.striterator.Resolver<Iterator<ISolution<E>>, ISolution<E>, E>() {
+//
+//                        protected E resolve(ISolution<E> e) {
+//
+//                            return e.get();
+//
+//                        }
+//                    });
+            
             final IChunkedOrderedIterator<E> itr2 = new ChunkedResolvingIterator<E, ISolution<E>>(
                     itr) {
 

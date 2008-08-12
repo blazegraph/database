@@ -44,7 +44,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * (De-)serializes {@link SPO}s for statement indices.

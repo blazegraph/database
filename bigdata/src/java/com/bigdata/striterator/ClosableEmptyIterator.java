@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,28 +20,45 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Jul 7, 2008
  */
 
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
 
-import java.util.Comparator;
+import java.util.NoSuchElementException;
+
 
 /**
- * An interface representing the natural traversal orders for the different
- * indices for some class of relation.<p>
+ * A closable iterator that visits nothing.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IKeyOrder<E> {
+public class ClosableEmptyIterator<E> implements ICloseableIterator<E> {
 
-    /**
-     * Return the comparator that places elements into the natural order for the
-     * associated index.
-     */
-    public Comparator<E> getComparator();
+    public void close() {
+        // NOP
+    }
+
+    public boolean hasNext() {
+        
+        return false;
+        
+    }
+
+    public E next() {
+        
+        throw new NoSuchElementException();
+        
+    }
+
+    public void remove() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
 
 }

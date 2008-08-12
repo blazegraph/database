@@ -7,7 +7,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueIdComparator;
-import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Natural index orders for the {@link LexiconRelation}.

@@ -33,7 +33,7 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Test bulk filter API.

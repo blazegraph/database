@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Iterator visits {@link SPO}s.

@@ -10,7 +10,6 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 
@@ -291,14 +290,14 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
             // make a note of the exclusive upper bound for that prefix.
             toKey = SuccessorUtil.successor(prefix.clone());
 
-            // seek to the inclusive lower bound for that key prefix.
-            src.seek(prefix);
-
             /*
+             * Seek to the inclusive lower bound for that key prefix.
+             * 
              * Note: if we seek to a key that has a visitable tuple then that
              * will be the next tuple to be returned.
              */
-            current = src.tuple();
+            current = src.seek(prefix);
+//            current = src.tuple();
 
             if (log.isInfoEnabled()) {
 

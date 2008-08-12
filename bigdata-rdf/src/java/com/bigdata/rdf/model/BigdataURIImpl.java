@@ -68,6 +68,19 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
     
     /** lazily assigned. */
     private int indexOf = -1;
+
+    /**
+     * Create a new {@link BigdataURI} having the same data and NO term
+     * identifier.
+     * 
+     * @param uri
+     *            A {@link URI}.
+     */
+    public BigdataURIImpl(URI uri) {
+        
+        this(uri.stringValue(), NULL);
+        
+    }
     
     public BigdataURIImpl(_URI uri) {
 

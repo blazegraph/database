@@ -107,7 +107,7 @@ import com.bigdata.service.Split;
  * 
  * @see KeyBuilder
  */
-abstract public class AbstractBTree implements IIndex, ILocalBTree {
+abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearList  {
 
     /**
      * Log for btree opeations.
@@ -1048,17 +1048,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     
     final public Object insert(Object key, Object value) {
 
-        if (!(key instanceof byte[])) {
+        key = metadata.getTupleSerializer().serializeKey(key);
 
-            key = metadata.getTupleSerializer().serializeKey(key);
-
-        }
-
-        if( !(value instanceof byte[])) {
-            
-            value = metadata.getTupleSerializer().serializeVal(value);
-            
-        }
+        value = metadata.getTupleSerializer().serializeVal(value);
         
         final ITuple tuple = insert((byte[]) key, (byte[]) value,
                 false/* delete */, 0L/* timestamp */, writeTuple);
@@ -1071,7 +1063,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         }
         
         // de-serialize the old tuple.
-        return metadata.getTupleSerializer().deserialize(tuple);
+        return tuple.getObject();
         
     }
 
@@ -1141,37 +1133,44 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     final public Object remove(Object key) {
 
-        if (!(key instanceof byte[])) {
-
-            key = metadata.getTupleSerializer().serializeKey(key);
-
-        }
+        key = metadata.getTupleSerializer().serializeKey(key);
         
-        final ITuple tuple = remove((byte[]) key, writeTuple);
-
-        if (tuple == null || tuple.isDeletedVersion()) {
-
-            // no old value under that key.
-            return null;
+        final ITuple tuple;
+        if (getIndexMetadata().getDeleteMarkers()) {
+        
+            // set the delete marker.
+            tuple = insert((byte[]) key, null/* val */, true/* delete */,
+                    0L/* timestamp */, writeTuple);
             
+        } else {
+        
+            // remove the tuple.
+            tuple = remove((byte[]) key, writeTuple);
+
         }
 
-        // de-serialize the old value under that key.
-        return metadata.getTupleSerializer().deserialize(tuple);
+        return tuple == null || tuple.isDeletedVersion() ? null : tuple
+                .getObject();
         
     }
 
+    /**
+     * Remove the tuple under that key (will write a delete marker if delete
+     * markers are enabled).
+     */
     final public byte[] remove(byte[] key) {
 
         final Tuple tuple;
         
         if (getIndexMetadata().getDeleteMarkers()) {
-            
+
+            // set the delete marker.
             tuple = insert(key, null/* val */, true/* delete */,
                     0L/* timestamp */, writeTuple);
             
         } else {
         
+            // remove the tuple.
             tuple = remove(key, writeTuple);
             
         }
@@ -1236,11 +1235,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     
     public Object lookup(Object key) {
 
-        if (!(key instanceof byte[])) {
-
-            key = metadata.getTupleSerializer().serializeKey(key);
-
-        }
+        key = metadata.getTupleSerializer().serializeKey(key);
 
         final ITuple tuple = lookup((byte[]) key, lookupTuple.get());
 
@@ -1252,7 +1247,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         }
 
         // de-serialize the value under that key.
-        return metadata.getTupleSerializer().deserialize(tuple);
+        return tuple.getObject();
 
     }
 
@@ -1302,11 +1297,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     public boolean contains(Object key) {
         
-        if (!(key instanceof byte[])) {
-
-            key = metadata.getTupleSerializer().serializeKey(key);
-
-        }
+        key = metadata.getTupleSerializer().serializeKey(key);
  
         return contains((byte[]) key);
         
@@ -1583,6 +1574,12 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * <p>
      * Note: {@link IRangeQuery#REMOVEALL} is handled here by wrapping the
      * iterator.
+     * <p>
+     * Note:
+     * {@link FusedView#rangeIterator(byte[], byte[], int, int, IFilterConstructor)}
+     * is also responsible for constructing an {@link ITupleIterator} in a
+     * manner similar to this method. If you are updating the logic here, then
+     * check the logic in that method as well!
      */
     public ITupleIterator rangeIterator(//
             final byte[] fromKey,//

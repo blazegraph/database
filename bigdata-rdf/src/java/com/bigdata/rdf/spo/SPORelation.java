@@ -70,12 +70,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedIterator;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
@@ -88,6 +84,10 @@ import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffe
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IClientIndex;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

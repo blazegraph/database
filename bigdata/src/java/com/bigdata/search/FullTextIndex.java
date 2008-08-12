@@ -80,13 +80,13 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Full text indexing and search support.

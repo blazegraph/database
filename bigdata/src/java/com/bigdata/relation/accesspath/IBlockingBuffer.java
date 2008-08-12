@@ -30,6 +30,8 @@ package com.bigdata.relation.accesspath;
 
 import java.util.concurrent.Future;
 
+import com.bigdata.striterator.IChunkedOrderedIterator;
+
 /**
  * An interface that provides an iterator to drain the {@link IBuffer}. This
  * interface is useful where one (or more) processes will write asynchronously

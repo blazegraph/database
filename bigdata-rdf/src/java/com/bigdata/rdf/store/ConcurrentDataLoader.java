@@ -68,12 +68,12 @@ import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.ClientException;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 

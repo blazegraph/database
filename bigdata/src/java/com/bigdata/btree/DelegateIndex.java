@@ -146,4 +146,20 @@ public class DelegateIndex implements IIndex {
         delegate.submit(fromIndex, toIndex, keys, vals, ctor, handler);
     }
 
+    public boolean contains(Object key) {
+        return delegate.contains(key);
+    }
+
+    public Object insert(Object key, Object value) {
+        return delegate.insert(key, value);
+    }
+
+    public Object lookup(Object key) {
+        return delegate.lookup(key);
+    }
+
+    public Object remove(Object key) {
+        return delegate.remove(key);
+    }
+
 }

@@ -45,7 +45,8 @@ Modifications:
  * Created on Apr 10, 2008
  */
 
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
+
 
 /**
  * Abstract class for delegation patterns for chunked iterators.

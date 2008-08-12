@@ -64,6 +64,19 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements BigdataBNod
     
     private final String id;
 
+    /**
+     * Create a new {@link BigdataBNode} having the same data and NO term
+     * identifier.
+     * 
+     * @param bnode
+     *            A blank node.
+     */
+    public BigdataBNodeImpl(BNode bnode) {
+        
+        this(bnode.getID(), NULL);
+        
+    }
+    
     public BigdataBNodeImpl(_BNode bnode) {
         
         this(bnode.term, bnode.termId);

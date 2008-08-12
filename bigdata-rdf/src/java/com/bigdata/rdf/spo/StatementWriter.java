@@ -4,8 +4,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Writes statements on all the statement indices in parallel.

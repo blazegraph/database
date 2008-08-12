@@ -6,7 +6,7 @@ import java.util.TreeSet;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedIterator<SPO> {
     

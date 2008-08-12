@@ -41,12 +41,12 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.relation.accesspath.ClosableEmptyIterator;
-import com.bigdata.relation.accesspath.ClosableSingleItemIterator;
-import com.bigdata.relation.accesspath.IChunkedIterator;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.accesspath.IClosableIterator;
-import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.striterator.ClosableEmptyIterator;
+import com.bigdata.striterator.ClosableSingleItemIterator;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IFilter;
@@ -759,7 +759,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      * @param <E>
      */
     public static class PushbackIterator<E> implements Iterator<E>,
-            IClosableIterator<E> {
+            ICloseableIterator<E> {
 
         private final Iterator<E> src;
 
@@ -842,9 +842,9 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
 
         public void close() {
 
-            if(src instanceof IClosableIterator) {
+            if(src instanceof ICloseableIterator) {
 
-                ((IClosableIterator<E>)src).close();
+                ((ICloseableIterator<E>)src).close();
                 
             }
             

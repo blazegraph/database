@@ -43,10 +43,15 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
 /**
  * Test suite for {@link BigdataMap}.
  * 
+ * @todo write tests where delete markers are and are not enabled or make these
+ *       tests run against all variants.
+ * 
+ * @todo test for FusedView
+ * 
+ * @todo test for scale-out indices.
+ * 
  * @todo add unit tests entrySet() - the behavior of keySet() and values() is
  *       fully determined by the behavior of entrySet().
- * 
- * @todo add unit tests for the firstKey() and lastKey() methods.
  * 
  * @todo add unit tests for the sub-map methods.
  * 
@@ -83,13 +88,8 @@ public class TestBigdataMap extends TestCase {
          * the keys and the values are the same (basically, that you are using
          * the map like a set).
          */
-        indexMetadata.setTupleSerializer(new StringSerializer(new DefaultKeyBuilderFactory(new Properties())));
-        
-        /*
-         * @todo write tests where delete markers are and are not enabled or
-         * make these tests run against all variants.
-         */
-//        indexMetadata.setIsolatable(true);
+        indexMetadata.setTupleSerializer(new StringSerializer(
+                new DefaultKeyBuilderFactory(new Properties())));
         
         map = new BigdataMap<String, String>(BTree.create(
                 new SimpleMemoryRawStore(), indexMetadata));
@@ -134,11 +134,10 @@ public class TestBigdataMap extends TestCase {
 
         assertEquals("abc", map.get("abc"));
 
-        assertEquals("abc",map.firstKey());
+        assertEquals("abc", map.firstKey());
 
-        // @todo uncomment when reverse scan is implemented.
-//        assertEquals("abc",map.lastKey());
-        
+        assertEquals("abc", map.lastKey());
+
         assertEquals("abc", map.remove("abc"));
 
         assertEquals(null, map.remove("abc"));

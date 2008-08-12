@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 14, 2007
  */
 
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -54,8 +54,13 @@ import com.bigdata.btree.IRangeQuery;
  *            The generic type for the [E]lements visited by the
  *            {@link Iterator}.
  */
-public interface IChunkedIterator<E> extends IClosableIterator<E> {
+public interface IChunkedIterator<E> extends ICloseableIterator<E> {
 
+    /**
+     * The default chunk size.
+     */
+    int DEFAULT_CHUNK_SIZE = 10000;
+    
     /**
      * The next element available from the iterator.
      * 

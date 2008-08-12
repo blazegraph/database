@@ -30,9 +30,9 @@ package com.bigdata.rdf.inf;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.AbstractElementBuffer.DeleteBuffer;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.DeleteSolutionBuffer;
+import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
  * A buffer for {@link SPO}s which causes the corresponding statements (and

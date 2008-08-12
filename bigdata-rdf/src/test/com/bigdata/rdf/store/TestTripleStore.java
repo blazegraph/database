@@ -54,7 +54,7 @@ import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
  * Test basic features of the {@link ITripleStore} API.

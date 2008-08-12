@@ -55,6 +55,7 @@ public abstract class BigdataResourceImpl extends BigdataValueImpl implements Bi
 
     /**
      * @param termId
+     *            The term identifier (optional).
      */
     public BigdataResourceImpl(long termId) {
 

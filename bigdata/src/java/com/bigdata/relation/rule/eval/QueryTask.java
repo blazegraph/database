@@ -8,11 +8,11 @@ import java.util.concurrent.Callable;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IClosableIterator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Asynchronous task writes {@link ISolution}s for an {@link IRule} or
@@ -21,7 +21,7 @@ import com.bigdata.service.DataService;
  * iterator will report that is has been exhausted once it finishes draining the
  * {@link IBlockingBuffer}'s internal queue.
  * <p>
- * Note: If the iterator is {@link IClosableIterator#close()}ed then it MUST
+ * Note: If the iterator is {@link ICloseableIterator#close()}ed then it MUST
  * cause the backing {@link IBlockingBuffer} to also be closed (you have to wrap
  * up the iterator before returning it to the client).  {@link BlockingBuffer}
  * handles this automatically.

@@ -71,7 +71,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      * 
      * @return An {@link ITupleCursor} for that B+Tree.
      */
-    abstract protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags,
+    abstract protected ITupleCursor2<String> newCursor(AbstractBTree btree, int flags,
             byte[] fromKey, byte[] toKey);
     
     /**
@@ -81,7 +81,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      * 
      * @return
      */
-    protected ITupleCursor<String> newCursor(AbstractBTree btree) {
+    protected ITupleCursor2<String> newCursor(AbstractBTree btree) {
 
         return newCursor(btree, IRangeQuery.DEFAULT, null/* fromKey */, null/* toKey */);
         
@@ -118,7 +118,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
         // test first()
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
+            ITupleCursor2<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
                     null/* fromKey */, null/* toKey */);
 
             assertEquals(new TestTuple<String>(10, "Bryan"), cursor.first());
@@ -128,7 +128,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
         // test last()
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
+            ITupleCursor2<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
                     null/* fromKey */, null/* toKey */);
 
             assertEquals(new TestTuple<String>(30, "James"), cursor.last());
@@ -138,7 +138,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
         // test tuple()
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
+            ITupleCursor2<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
                     null/* fromKey */, null/* toKey */);
 
             // current tuple is initially not defined.
@@ -155,7 +155,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
         // test next()
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
+            ITupleCursor2<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
                     null/* fromKey */, null/* toKey */);
 
             assertTrue(cursor.hasNext());
@@ -200,7 +200,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
         // test prior()
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
+            ITupleCursor2<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
                     null/* fromKey */, null/* toKey */);
 
             assertTrue(cursor.hasPrior());
@@ -281,7 +281,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
 
             // seek to a probe key that does not exist.
             assertEquals(null, cursor.seek(29));
@@ -372,7 +372,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
                 
                 final byte[] toKey = KeyBuilder.asSortKey(20);
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertTrue(cursor.hasNext());
@@ -415,7 +415,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
                 
                 final byte[] toKey = KeyBuilder.asSortKey(30);
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertTrue(cursor.hasNext());
@@ -475,7 +475,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // first()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertNull(cursor.first());
 
@@ -497,7 +497,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // last()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertNull(cursor.last());
 
@@ -519,7 +519,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // tuple()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertNull(cursor.tuple());
 
@@ -585,7 +585,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // first()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertNull(cursor.first());
@@ -608,7 +608,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // last()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertNull(cursor.last());
@@ -631,7 +631,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // tuple()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertNull(cursor.tuple());
@@ -722,7 +722,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // first()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertEquals(new TestTuple<String>(10, "Bryan"), cursor.first());
 
@@ -737,7 +737,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // last()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertEquals(new TestTuple<String>(10, "Bryan"), cursor.last());
 
@@ -752,7 +752,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // tuple()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertNull(cursor.tuple());
 
@@ -761,7 +761,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // hasNext(), next().
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertTrue(cursor.hasNext());
 
@@ -783,7 +783,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // hasPrior(), prior().
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertTrue(cursor.hasPrior());
 
@@ -805,7 +805,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // seek() (found)
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertEquals(new TestTuple<String>(10, "Bryan"), cursor
                         .seek(10));
@@ -819,7 +819,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // seek() (not found before a valid tuple)
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertNull(cursor.seek(1));
 
@@ -836,7 +836,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // seek() (not found after a valid tuple)
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree);
+                final ITupleCursor2<String> cursor = newCursor(btree);
 
                 assertNull(cursor.seek(11));
 
@@ -864,7 +864,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // first()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertEquals(null, cursor.first());
@@ -884,7 +884,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // last()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertEquals(null, cursor.last());
@@ -904,7 +904,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // tuple()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertNull(cursor.tuple());
@@ -914,7 +914,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // hasNext(), next().
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertFalse(cursor.hasNext());
@@ -931,7 +931,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // hasPrior(), prior().
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertFalse(cursor.hasPrior());
@@ -948,7 +948,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // seek() (not found)
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertNull(cursor.seek(7));
@@ -977,7 +977,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // first()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertEquals(null, cursor.first());
@@ -991,7 +991,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // last()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertEquals(null, cursor.last());
@@ -1005,7 +1005,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // tuple()
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertNull(cursor.tuple());
@@ -1015,7 +1015,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // hasNext(), next().
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertFalse(cursor.hasNext());
@@ -1032,7 +1032,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // hasPrior(), prior().
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertFalse(cursor.hasPrior());
@@ -1049,7 +1049,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
             // seek() (not found)
             {
 
-                final ITupleCursor<String> cursor = newCursor(btree,
+                final ITupleCursor2<String> cursor = newCursor(btree,
                         IRangeQuery.DEFAULT, fromKey, toKey);
 
                 assertNull(cursor.seek(17));
@@ -1095,10 +1095,26 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
                 ((expected.flags() & IRangeQuery.VALS) != 0),
                 ((actual.flags() & IRangeQuery.VALS) != 0));
 
-        assertEquals("flags.DELETED",
-                ((expected.flags() & IRangeQuery.DELETED) != 0), ((actual
-                        .flags() & IRangeQuery.DELETED) != 0));
+        assertEquals("flags.DELETED",//
+                ((expected.flags() & IRangeQuery.DELETED) != 0),//
+                ((actual.flags() & IRangeQuery.DELETED) != 0));
 
+        assertEquals("flags.REMOVEALL",//
+                ((expected.flags() & IRangeQuery.REMOVEALL) != 0),//
+                ((actual.flags() & IRangeQuery.REMOVEALL) != 0));
+
+        assertEquals("flags.CURSOR",//
+                ((expected.flags() & IRangeQuery.CURSOR) != 0),//
+                ((actual.flags() & IRangeQuery.CURSOR) != 0));
+        
+        assertEquals("flags.REVERSE",//
+                ((expected.flags() & IRangeQuery.REVERSE) != 0),//
+                ((actual.flags() & IRangeQuery.REVERSE) != 0));
+        
+        assertEquals("flags.READONLY",//
+                ((expected.flags() & IRangeQuery.READONLY) != 0),//
+                ((actual.flags() & IRangeQuery.READONLY) != 0));
+        
         assertEquals("flags", expected.flags(), actual.flags());
 
         assertEquals("key", expected.getKey(), actual.getKey());

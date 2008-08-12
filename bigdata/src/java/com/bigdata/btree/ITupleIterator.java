@@ -30,6 +30,8 @@ package com.bigdata.btree;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import com.bigdata.btree.filter.TupleFilter;
+
 /**
  * Interface visits {@link ITuple}s populated with the data and metadata for
  * visited index entries.
@@ -48,7 +50,8 @@ public interface ITupleIterator<E> extends Iterator<ITuple<E>> {
      * Note: An {@link ITupleIterator}s will generally return the <em>same</em>
      * {@link ITuple} reference on on each invocation of this method. The caller
      * is responsible for copying out any data or metadata of interest before
-     * calling {@link #next()} again.
+     * calling {@link #next()} again. See {@link TupleFilter} which is aware of
+     * this and can be used to stack filters safely.
      * 
      * @return The {@link ITuple} containing the data and metadata for the
      *         current index entry.
@@ -57,5 +60,5 @@ public interface ITupleIterator<E> extends Iterator<ITuple<E>> {
      *             if there is no next entry.
      */
     public ITuple<E> next();
-    
+        
 }

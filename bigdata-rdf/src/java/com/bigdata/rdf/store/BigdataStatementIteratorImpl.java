@@ -26,6 +26,7 @@ package com.bigdata.rdf.store;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -39,7 +40,7 @@ import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Wraps the raw iterator that traverses a statement index and exposes each
@@ -74,7 +75,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
     private final AbstractTripleStore db;
     
     /**
-     * The source iterator.
+     * The source iterator (will be closed when this iterator is closed).
      */
     private final IChunkedOrderedIterator<SPO> src;
     
@@ -100,7 +101,8 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
      * @param db
      *            Used to resolve term identifiers to {@link Value} objects.
      * @param src
-     *            The source iterator.
+     *            The source iterator (will be closed when this iterator is
+     *            closed).
      */
 //    * @param bnodes
 //    *            An bnode cache which is used to ensure that a term identifier
@@ -147,13 +149,14 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
         if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
 
-            log.info("Fetching next chunk");
+            if (INFO)
+                log.info("Fetching next chunk");
             
             // fetch the next chunk of SPOs.
             chunk = src.nextChunk();
 
-            if(log.isInfoEnabled())
-            log.info("Fetched chunk: size="+chunk.length);
+            if (log.isInfoEnabled())
+                log.info("Fetched chunk: size=" + chunk.length);
 
             /*
              * Create a collection of the distinct term identifiers used in this
@@ -178,8 +181,8 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
             }
 
-            if(log.isInfoEnabled())
-            log.info("Resolving "+ids.size()+" term identifiers");
+            if (log.isInfoEnabled())
+                log.info("Resolving " + ids.size() + " term identifiers");
             
             // batch resolve term identifiers to terms.
             terms = db.getLexiconRelation().getTerms(ids);
@@ -220,23 +223,25 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
                 .get(spo.getStatementIdentifier())
                 : null);
         
-        if(spo.hasStatementType() == false) {
-            
-            log.error("statement with no type: " + new BigdataStatementImpl(s, p, o, c, null));
-            
+        if (spo.hasStatementType() == false) {
+
+            log.error("statement with no type: "
+                    + new BigdataStatementImpl(s, p, o, c, null));
+
         }
         
         // the statement.
-        final BigdataStatement stmt = new BigdataStatementImpl(s, p, o, c, spo.getType()); 
-        
-        if(DEBUG) {
+        final BigdataStatement stmt = new BigdataStatementImpl(s, p, o, c, spo
+                .getType());
+
+        if (DEBUG) {
             
-            log.debug("stmt="+stmt);
-            
+            log.debug("stmt=" + stmt);
+
         }
 
         return stmt;
-        
+
     }
 
     /**
@@ -246,14 +251,15 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
      *       {@link SPO} visited.
      */
     public void remove() {
-        
+
         throw new UnsupportedOperationException();
-        
+
     }
-    
+
     public void close() {
-    
-        log.info("");
+
+        if (INFO)
+            log.info("");
         
         src.close();
 

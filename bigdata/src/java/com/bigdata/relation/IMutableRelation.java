@@ -30,7 +30,7 @@ package com.bigdata.relation;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * A mutable {@link IRelation}. The relation must maintain any secondary

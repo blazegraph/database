@@ -69,8 +69,8 @@ import com.bigdata.rdf.rio.StatementBuffer.UnificationException;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Test of the statement identifier semantics.

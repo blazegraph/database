@@ -27,11 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bigdata.btree.filter.Advancer;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.relation.accesspath.AccessPathFusedView;
+import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.striterator.Resolver;
+import com.bigdata.striterator.Striterator;
 
 /**
  * Test suite for {@link FusedView}.
@@ -157,6 +165,8 @@ public class TestFusedView extends AbstractBTreeTestCase {
             md.setBranchingFactor(3);
             
             md.setDeleteMarkers(true);
+
+            md.setTupleSerializer(NOPTupleSerializer.INSTANCE);
 
             btree1 = BTree.create(store, md);
             
@@ -332,31 +342,36 @@ public class TestFusedView extends AbstractBTreeTestCase {
      * a secondary source.
      * 
      * @todo explore rangeIterator with N > 2 indices.
+     * 
+     * @todo explore where one of the indices are {@link IndexSegment}s.
      */
     public void test_rangeIterator() {
         
-        byte[] k3 = i2k(3);
-        byte[] k5 = i2k(5);
-        byte[] k7 = i2k(7);
+        final byte[] k3 = i2k(3);
+        final byte[] k5 = i2k(5);
+        final byte[] k7 = i2k(7);
 
-        byte[] v3a = new byte[]{3};
-        byte[] v5a = new byte[]{5};
+        final byte[] v3a = new byte[]{3};
+        final byte[] v5a = new byte[]{5};
 //        byte[] v7a = new byte[]{7};
 //        
 //        byte[] v3b = new byte[]{3,1};
 //        byte[] v5b = new byte[]{5,1};
 //        byte[] v7b = new byte[]{7,1};
         
-        IRawStore store = new SimpleMemoryRawStore();
+        final IRawStore store = new SimpleMemoryRawStore();
         
         // two btrees with the same index UUID.
         final BTree btree1, btree2;
         {
-            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
             
             md.setBranchingFactor(3);
             
             md.setDeleteMarkers(true);
+
+            md.setTupleSerializer(NOPTupleSerializer.INSTANCE);
 
             btree1 = BTree.create(store, md);
             
@@ -454,41 +469,348 @@ public class TestFusedView extends AbstractBTreeTestCase {
     }
 
     /**
+     * Test of the bit manipulation required under java to turn off the
+     * {@link IRangeQuery#REMOVEALL} flag.
+     */
+    public void test_bitMath() {
+
+        final int flags1 = IRangeQuery.REMOVEALL;
+
+        System.err.println("flags1="+Integer.toBinaryString(flags1));
+        
+        assertEquals(true, (flags1 & IRangeQuery.REMOVEALL) != 0);
+        
+        // turn off the bit.
+        final int flags2 = flags1 & (~IRangeQuery.REMOVEALL);
+
+        System.err.println("flags1="+Integer.toBinaryString(flags2));
+
+        assertEquals(false, (flags2 & IRangeQuery.REMOVEALL) != 0);
+        
+    }
+    
+    /**
+     * Test of {@link FusedTupleIterator#remove()}. Note that tuples are
+     * removed by writing a delete marker into the first B+Tree in the ordered
+     * sources.
+     */
+    public void test_remove() {
+
+        final byte[] k3 = new byte[]{3};
+        final byte[] k5 = new byte[]{5};
+        final byte[] k7 = new byte[]{7};
+        final byte[] k9 = new byte[]{9};
+
+        final byte[] v3 = new byte[]{3};
+        final byte[] v5 = new byte[]{5};
+        final byte[] v7 = new byte[]{7};
+        final byte[] v9 = new byte[]{9};
+
+        final IRawStore store = new SimpleMemoryRawStore();
+
+        // two btrees with the same index UUID.
+        final BTree btree1, btree2;
+        {
+
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+            md.setBranchingFactor(3);
+
+            md.setDeleteMarkers(true);
+
+            md.setTupleSerializer(NOPTupleSerializer.INSTANCE);
+            
+            btree1 = BTree.create(store, md);
+
+            btree2 = BTree.create(store, md.clone());
+
+        }
+
+        /*
+         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
+         * will cause the search to halt. If the key is not in btree1 then
+         * btree2 will also be searched. A miss is reported if the key is not
+         * found in either btree.
+         * 
+         * Note: Since delete markers are enabled keys will be recognized when
+         * the index entry has been marked as deleted.
+         */
+        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
+                btree2 });
+
+        /*
+         * Setup the view.
+         * 
+         * Note: k5 is found in both source B+Trees but with a different value
+         * stored under the key.
+         */
+        btree2.insert(k3, v3);
+        btree1.insert(k5, v5);
+        btree2.insert(k7, v7);
+        btree1.insert(k9, v9);
+
+        // Note: CURSOR specified so that remove() will be supported.
+        final ITupleIterator itr = view.rangeIterator(null/* fromKey */,
+                null/* toKey */, 0/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.CURSOR, null/* filter */);
+
+        {
+            ITuple tuple;
+
+            // k3 : found in btree2, but write delete marker in btree1.
+            assertTrue(itr.hasNext());
+            tuple = itr.next();
+            assertEquals(k3, tuple.getKey());
+            assertEquals(v3, tuple.getValue());
+            assertFalse(btree1.contains(k3)); // not found in btree1
+            assertTrue(btree2.contains(k3)); // found in btree2
+            // tuple not found in btree1.
+            assertNull(btree1.lookup(k3, btree1.lookupTuple.get()));
+            itr.remove();
+            assertFalse(btree1.contains(k3)); // not found in btree1
+            assertTrue(btree2.contains(k3)); // found in btree2
+            // deleted tuple now found in btree1.
+            assertTrue(btree1.lookup(k3, btree1.lookupTuple.get()).isDeletedVersion());
+
+            // k5 : found in btree1, write delete marker in btree1.
+            assertTrue(itr.hasNext());
+            tuple = itr.next();
+            assertEquals(k5, tuple.getKey());
+            assertEquals(v5, tuple.getValue());
+            assertTrue(btree1.contains(k5)); // found in btree1
+            assertFalse(btree2.contains(k5)); // not found in btree2
+            // undeleted tuple found in btree1.
+            assertFalse(btree1.lookup(k5, btree1.lookupTuple.get()).isDeletedVersion());
+            itr.remove();
+            assertFalse(btree1.contains(k5)); // not found in btree1
+            assertFalse(btree2.contains(k5)); // not found in btree2
+            // deleted tuple found in btree1.
+            assertTrue(btree1.lookup(k5, btree1.lookupTuple.get()).isDeletedVersion());
+            
+        }
+
+    }
+
+    /**
+     * Test of {@link IRangeQuery#REMOVEALL}. Note that tuples are removed by
+     * writing a delete marker into the first B+Tree in the ordered sources.
+     */
+    public void test_removeAll() {
+        
+        final byte[] k3 = new byte[]{3};
+        final byte[] k5 = new byte[]{5};
+        final byte[] k7 = new byte[]{7};
+        final byte[] k9 = new byte[]{9};
+
+        final byte[] v3 = new byte[]{3};
+        final byte[] v5 = new byte[]{5};
+        final byte[] v7 = new byte[]{7};
+        final byte[] v9 = new byte[]{9};
+        
+        final IRawStore store = new SimpleMemoryRawStore();
+        
+        // two btrees with the same index UUID.
+        final BTree btree1, btree2;
+        {
+
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            
+            md.setBranchingFactor(3);
+            
+            md.setDeleteMarkers(true);
+
+            md.setTupleSerializer(NOPTupleSerializer.INSTANCE);
+            
+            btree1 = BTree.create(store, md);
+            
+            btree2 = BTree.create(store, md.clone());
+            
+        }
+        
+        /*
+         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
+         * will cause the search to halt. If the key is not in btree1 then
+         * btree2 will also be searched. A miss is reported if the key is not
+         * found in either btree.
+         * 
+         * Note: Since delete markers are enabled keys will be recognized when
+         * the index entry has been marked as deleted.
+         */
+        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
+                btree2 });
+        
+        /*
+         * Setup the view.
+         * 
+         * Note: k5 is found in both source B+Trees but with a different value
+         * stored under the key.
+         */
+        btree2.insert(k3, v3);
+        btree1.insert(k5, v5);
+        btree2.insert(k7, v7);
+        btree1.insert(k9, v9);
+
+        final ITupleIterator itr = view
+                .rangeIterator(null/* fromKey */, null/* toKey */,
+                        0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);
+
+        // remove all tuples.
+        while (itr.hasNext()) {
+
+            itr.next();
+            
+        }
+
+        // still found in btree2 since not overwritten there.
+        assertTrue(btree2.contains(k3));
+        assertTrue(btree2.contains(k7));
+        
+        // not found in btree1 since overwritten.
+        assertFalse(btree1.contains(k5));
+        assertFalse(btree1.contains(k9));
+        
+        /*
+         * now verify that btree1 does in fact contain a deleted tuple for each
+         * of the original keys regardles of which of the source indices that
+         * tuple was in before it was deleted.
+         */
+        assertTrue(btree1.lookup(k3, btree1.lookupTuple.get()).isDeletedVersion());
+        assertTrue(btree1.lookup(k5, btree1.lookupTuple.get()).isDeletedVersion());
+        assertTrue(btree1.lookup(k7, btree1.lookupTuple.get()).isDeletedVersion());
+        assertTrue(btree1.lookup(k9, btree1.lookupTuple.get()).isDeletedVersion());
+        
+    }
+
+    /**
+     * Test of {@link IRangeQuery#REMOVEALL} with a filter verifies that only
+     * those tuples which satisify the filter are visited and removed.
+     */
+    public void test_removeAll_filter() {
+        
+        final byte[] k3 = new byte[]{3};
+        final byte[] k5 = new byte[]{5};
+        final byte[] k7 = new byte[]{7};
+        final byte[] k9 = new byte[]{9};
+
+        final byte[] v3 = new byte[]{3};
+        final byte[] v5 = new byte[]{5};
+        final byte[] v7 = new byte[]{7};
+        final byte[] v9 = new byte[]{9};
+        
+        final IRawStore store = new SimpleMemoryRawStore();
+        
+        // two btrees with the same index UUID.
+        final BTree btree1, btree2;
+        {
+
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            
+            md.setBranchingFactor(3);
+            
+            md.setDeleteMarkers(true);
+
+            md.setTupleSerializer(NOPTupleSerializer.INSTANCE);
+            
+            btree1 = BTree.create(store, md);
+            
+            btree2 = BTree.create(store, md.clone());
+            
+        }
+        
+        /*
+         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
+         * will cause the search to halt. If the key is not in btree1 then
+         * btree2 will also be searched. A miss is reported if the key is not
+         * found in either btree.
+         * 
+         * Note: Since delete markers are enabled keys will be recognized when
+         * the index entry has been marked as deleted.
+         */
+        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
+                btree2 });
+        
+        /*
+         * Setup the view.
+         * 
+         * Note: k5 is found in both source B+Trees but with a different value
+         * stored under the key.
+         */
+        btree2.insert(k3, v3);
+        btree1.insert(k5, v5);
+        btree2.insert(k7, v7);
+        btree1.insert(k9, v9);
+
+        final FilterConstructor filter = new FilterConstructor().addFilter(new TupleFilter(){
+            private static final long serialVersionUID = 1L;
+            @Override
+            protected boolean isValid(ITuple tuple) {
+                System.out.println("Considering tuple: " + tuple);
+                if (BytesUtil.compareBytes(k5, tuple.getKey()) == 0) {
+                    System.err.println("Skipping tuple: " + tuple);
+                    return false;
+                }
+                return true;
+            }});
+
+        assertTrue(view.contains(k3));
+        assertTrue(view.contains(k5));
+        assertTrue(view.contains(k7));
+        assertTrue(view.contains(k9));
+        
+        final ITupleIterator itr = view
+                .rangeIterator(null/* fromKey */, null/* toKey */,
+                        0/* capacity */, IRangeQuery.REMOVEALL, filter);
+
+        // remove all tuples matching the filter.
+        while (itr.hasNext()) {
+
+            itr.next();
+            
+        }
+
+        assertFalse(view.contains(k3));
+        assertTrue(view.contains(k5)); // note: tuple was NOT deleted!
+        assertFalse(view.contains(k7));
+        assertFalse(view.contains(k9));
+        
+    }
+    
+    /**
      * This tests the ability to traverse the tuples in the {@link FusedView} in
      * reverse order. This ability is a requirement for several aspects of the
      * total architecture, including atomic append for the bigdata file system,
      * locating an index partition, and finding the last entry in a set or a
      * map.
      * 
-     * @see FusedEntryIterator
-     * 
-     * @todo write test of the alternative ctor for {@link FusedEntryIterator}
-     *       which is used by {@link AccessPathFusedView}.
+     * @see FusedTupleIterator
      */
     public void test_reverseScan() {
         
-        byte[] k3 = i2k(3);
-        byte[] k5 = i2k(5);
-        byte[] k7 = i2k(7);
+        final byte[] k3 = i2k(3);
+        final byte[] k5 = i2k(5);
+//        final byte[] k7 = i2k(7);
 
-        byte[] v3a = new byte[]{3};
-        byte[] v5a = new byte[]{5};
+        final byte[] v3a = new byte[]{3};
+        final byte[] v5a = new byte[]{5};
 //        byte[] v7a = new byte[]{7};
 //        
 //        byte[] v3b = new byte[]{3,1};
 //        byte[] v5b = new byte[]{5,1};
 //        byte[] v7b = new byte[]{7,1};
         
-        IRawStore store = new SimpleMemoryRawStore();
+        final IRawStore store = new SimpleMemoryRawStore();
         
         // two btrees with the same index UUID.
         final BTree btree1, btree2;
         {
-            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
             
             md.setBranchingFactor(3);
             
             md.setDeleteMarkers(true);
+
+            md.setTupleSerializer(NOPTupleSerializer.INSTANCE);
 
             btree1 = BTree.create(store, md);
             
@@ -548,172 +870,435 @@ public class TestFusedView extends AbstractBTreeTestCase {
                 null/* filter */));
 
     }
-    
-//    /**
-//     * Unit tests for the {@link ILinearList} API when the index is a view
-//     * composed of more than one index resource.
-//     */
-//    public void test_linearList() {
-//        
-//        byte[] k3 = i2k(3);
-//        byte[] k5 = i2k(5);
-//        byte[] k7 = i2k(7);
-//
-//        byte[] v3a = new byte[]{3};
-//        byte[] v5a = new byte[]{5};
-//        byte[] v7a = new byte[]{7};
-//        
-//        byte[] v3b = new byte[]{3,1};
-//        byte[] v5b = new byte[]{5,1};
-//        byte[] v7b = new byte[]{7,1};
-//        
-//        IRawStore store = new SimpleMemoryRawStore();
-//        
-//        // two btrees with the same index UUID.
-//        final BTree btree1, btree2;
-//        {
-//            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
-//            
-//            md.setBranchingFactor(3);
-//            
-//            md.setDeleteMarkers(true);
-//
-//            btree1 = BTree.create(store, md);
-//            
-//            btree2 = BTree.create(store, md.clone());
-//            
-//        }
-//        
-//        /*
-//         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
-//         * will cause the search to halt. If the key is not in btree1 then
-//         * btree2 will also be searched. A miss is reported if the key is not
-//         * found in either btree.
-//         * 
-//         * Note: Since delete markers are enabled keys will be recognized when
-//         * the index entry has been marked as deleted.
-//         */
-//        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
-//                btree2 });
-//        
-//        /* 
-//         * Some tests when the view is empty.
-//         */
-//
-//        // probe with null is disallowed.
-//        try {
-//            view.indexOf(null);
-//            fail("Expecting: " + IllegalArgumentException.class);
-//        } catch (IllegalArgumentException ex) {
-//            log.info("Ignoring expected exception: " + ex);
-//        }
-//        
-//        // not found.
-//        assertEquals(-1,view.indexOf(new byte[]{}));
-//        assertEquals(-1,view.indexOf(k3));
-//        assertEquals(-1,view.indexOf(new byte[]{9,9,9}));
-//            
-//        /*
-//         * Write some data on btree2 and test the linear list API. This lets us
-//         * examine the case where the first btree is empty and all data is in
-//         * the 2nd part of the view.
-//         */
-//        btree2.insert(k3,v3a);
-//        btree2.insert(k5,v5a);
-//        btree2.insert(k7,v7a);
-//        
-//        // not found.
-//        assertEquals(-1,view.indexOf(new byte[]{}));
-//        assertEquals(-3,view.indexOf(new byte[]{9,9,9}));
-//
-//        // found
-//        assertEquals(0,view.indexOf(k3));
-//        assertEquals(1,view.indexOf(k5));
-//        assertEquals(2,view.indexOf(k7));
-//
-//        btree1.insert(k3,v3b);
-////      btree1.insert(k5,v5a);
-////      btree1.insert(k7,v7b);
-//      btree1.remove(k7);
-//      
-//
-//    }
-    
-//        btree1.insert(k5, v5a);
-//        assertEquals(2,btree1.rangeCount(null, null));
-//        assertEquals(1,btree2.rangeCount(null, null));
-//        assertEquals(3,view.rangeCount(null, null));
-//        assertSameIterator(new byte[][]{v3a,v5a},btree1.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v5b},btree2.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3a,v5a},view.rangeIterator(null, null));
-//        assertTrue(view.contains(k3));
-//        assertTrue(view.contains(k5));
-//        assertFalse(view.contains(k7));
-//
-//        btree2.insert(k7, v7b);
-//        assertEquals(2,btree1.rangeCount(null, null));
-//        assertEquals(2,btree2.rangeCount(null, null));
-//        assertEquals(4,view.rangeCount(null, null));
-//        assertSameIterator(new byte[][]{v3a,v5a},btree1.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v5b,v7b},btree2.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3a,v5a,v7b},view.rangeIterator(null, null));
-//        assertTrue(view.contains(k3));
-//        assertTrue(view.contains(k5));
-//        assertTrue(view.contains(k7));
-//
-//        btree1.insert(k7, v7a);
-//        assertEquals(3,btree1.rangeCount(null, null));
-//        assertEquals(2,btree2.rangeCount(null, null));
-//        assertEquals(5,view.rangeCount(null, null));
-//        assertSameIterator(new byte[][]{v3a,v5a,v7a},btree1.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v5b,v7b},btree2.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3a,v5a,v7a},view.rangeIterator(null, null));
-//        assertTrue(view.contains(k3));
-//        assertTrue(view.contains(k5));
-//        assertTrue(view.contains(k7));
-//
-//        btree2.insert(k3, v3b);
-//        assertEquals(3,btree1.rangeCount(null, null));
-//        assertEquals(3,btree2.rangeCount(null, null));
-//        assertEquals(6,view.rangeCount(null, null));
-//        assertSameIterator(new byte[][]{v3a,v5a,v7a},btree1.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3b,v5b,v7b},btree2.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3a,v5a,v7a},view.rangeIterator(null, null));
-//        assertTrue(view.contains(k3));
-//        assertTrue(view.contains(k5));
-//        assertTrue(view.contains(k7));
-//
-//        btree1.remove(k3);
-//        assertEquals(2,btree1.rangeCount(null, null));
-//        assertEquals(3,btree2.rangeCount(null, null));
-//        assertEquals(5,view.rangeCount(null, null));
-//        assertSameIterator(new byte[][]{v5a,v7a},btree1.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3b,v5b,v7b},btree2.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3b,v5a,v7a},view.rangeIterator(null, null));
-//        assertTrue(view.contains(k3));
-//        assertTrue(view.contains(k5));
-//        assertTrue(view.contains(k7));
-//
-//        btree1.remove(k5);
-//        assertEquals(1,btree1.rangeCount(null, null));
-//        assertEquals(3,btree2.rangeCount(null, null));
-//        assertEquals(4,view.rangeCount(null, null));
-//        assertSameIterator(new byte[][]{v7a},btree1.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3b,v5b,v7b},btree2.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3b,v5b,v7a},view.rangeIterator(null, null));
-//        assertTrue(view.contains(k3));
-//        assertTrue(view.contains(k5));
-//        assertTrue(view.contains(k7));
-//
-//        btree1.remove(k7);
-//        assertEquals(0,btree1.rangeCount(null, null));
-//        assertEquals(3,btree2.rangeCount(null, null));
-//        assertEquals(3,view.rangeCount(null, null));
-//        assertSameIterator(new byte[][]{},btree1.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3b,v5b,v7b},btree2.rangeIterator(null,null));
-//        assertSameIterator(new byte[][]{v3b,v5b,v7b},view.rangeIterator(null, null));
-//        assertTrue(view.contains(k3));
-//        assertTrue(view.contains(k5));
-//        assertTrue(view.contains(k7));
 
+    /**
+     * Unit test for correct layering of filters on top of the
+     * {@link FusedTupleIterator}. Note that the filters must be layered on top
+     * of the {@link FusedTupleIterator} rather than being passed into the
+     * per-index source {@link ITupleIterator}s so that the filters will see a
+     * fused iterator. This test is designed to verify that the filters are in
+     * fact applied to the {@link FusedTupleIterator} rather than to the source
+     * iterators.
+     */
+    public void test_filter() {
+        
+        final byte[] k3 = i2k(3);
+        final byte[] k5 = i2k(5);
+        final byte[] k7 = i2k(7);
+        final byte[] k9 = i2k(9);
+
+        final byte[] v3a = new byte[]{3};
+        final byte[] v5a = new byte[]{5};
+        final byte[] v5b = new byte[]{5,1};
+        final byte[] v7a = new byte[]{7};
+        final byte[] v9a = new byte[]{9};
+        
+        final IRawStore store = new SimpleMemoryRawStore();
+        
+        // two btrees with the same index UUID.
+        final BTree btree1, btree2;
+        {
+
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            
+            md.setBranchingFactor(3);
+            
+            md.setDeleteMarkers(true);
+
+            md.setTupleSerializer(NOPTupleSerializer.INSTANCE);
+
+            btree1 = BTree.create(store, md);
+            
+            btree2 = BTree.create(store, md.clone());
+            
+        }
+        
+        /*
+         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
+         * will cause the search to halt. If the key is not in btree1 then
+         * btree2 will also be searched. A miss is reported if the key is not
+         * found in either btree.
+         * 
+         * Note: Since delete markers are enabled keys will be recognized when
+         * the index entry has been marked as deleted.
+         */
+        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
+                btree2 });
+        
+        /*
+         * Setup the view.
+         * 
+         * Note: [k5] is found in both source B+Trees.
+         */
+        btree2.insert(k3, v3a);
+        btree1.insert(k5, v5a);
+        btree2.insert(k5, v5b);
+        btree1.insert(k7, v7a);
+        btree2.insert(k9, v9a);
+
+        /*
+         * Setup a filter that counts the #of tuples _examined_ by the iterator
+         * (not just those that it visits). If this filter is applied to the
+         * source iterators then it would examine (2) tuples for btree1 and (3)
+         * tuples for btree2 for a total of (5). However, if it is applied to
+         * the fused tuple iterator, then it will only examine (4) tuples since
+         * there is a tuple with [k5] in both btree1 and btree2 and therefore
+         * the [k5] tuple from btree2 is dropped from the fused tuple iterator.
+         */
+        final AtomicInteger count = new AtomicInteger(0);
+        IFilterConstructor filterCtor = new FilterConstructor().addFilter(new TupleFilter(){
+            private static final long serialVersionUID = 1L;
+            @Override
+            protected boolean isValid(ITuple tuple) {
+                count.incrementAndGet();
+                return true;
+            }});
+        
+        // forward : counts four distinct tuples.
+        count.set(0);
+        assertSameIterator(new byte[][] { v3a, v5a, v7a, v9a }, view
+                .rangeIterator(null, null,0/*capacity*/,IRangeQuery.DEFAULT,filterCtor));
+        assertEquals(4,count.get());
+
+        // reverse : counts four distinct tuples.
+        count.set(0);
+        assertSameIterator(new byte[][] { v9a, v7a, v5a, v3a }, view.rangeIterator(null,
+                null, 0/* capacity */,
+                IRangeQuery.DEFAULT | IRangeQuery.REVERSE, filterCtor));
+        assertEquals(4,count.get());
+
+    }
+    
+    /**
+     * Unit test for the {@link ITupleCursor} API for a {@link FusedView}.
+     * <p>
+     * Note: The requirement for {@link FusedView} to implement
+     * {@link ITupleCursor} arises in order to support an {@link Advancer} over
+     * a {@link FusedView} (scale-out for the RDF DB) and the requirement to
+     * efficiently choose splits points for an index partition, especially for
+     * the {@link SparseRowStore} (it must not split a logical row).
+     */
+    @SuppressWarnings("unchecked")
+    public void test_cursor() {
+        
+        final Integer k3 = 3;
+        final Integer k5 = 5;
+        final Integer k6 = 6;
+        final Integer k7 = 7;
+        final Integer k9 = 9;
+        final Integer k11 = 11;
+
+        final String v3a = "3";
+        final String v5a = "5";
+        final String v5b = "5b";
+        final String v7a = "7";
+        final String v9a = "9";
+        final String v11a = "11";
+        
+        final IRawStore store = new SimpleMemoryRawStore();
+        
+        // two btrees with the same index UUID.
+        final BTree btree1, btree2;
+        {
+
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            
+            md.setBranchingFactor(3);
+            
+            md.setDeleteMarkers(true);
+
+            btree1 = BTree.create(store, md);
+            
+            btree2 = BTree.create(store, md.clone());
+            
+        }
+        
+        /*
+         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
+         * will cause the search to halt. If the key is not in btree1 then
+         * btree2 will also be searched. A miss is reported if the key is not
+         * found in either btree.
+         * 
+         * Note: Since delete markers are enabled keys will be recognized when
+         * the index entry has been marked as deleted.
+         */
+        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
+                btree2 });
+        
+        /*
+         * Setup the view.
+         * 
+         * Note: k5 is found in both source B+Trees but with a different value
+         * stored under the key.
+         */
+        btree2.insert(k3, v3a);
+        btree1.insert(k5, v5a); // Note: k5 is in both source indices.
+        btree2.insert(k5, v5b);
+        btree2.insert(k7, v7a); // Note: k7 is deleted (overwritten in btree1).
+        btree1.remove(k7);
+        btree2.insert(k9, v9a);
+        btree1.insert(k11, v11a);
+        
+        final int flags = IRangeQuery.DEFAULT | IRangeQuery.CURSOR;
+        
+        final ITupleCursor cursor = (ITupleCursor) view.rangeIterator(
+                null/* fromKey */, null/* toKey */, 0/* capacity */,
+                flags, null/* filter */);
+        
+        // verify expected index reference.
+        assertTrue(view == cursor.getIndex());
+        
+        /*
+         * First, do a forward scan tuple by tuple.
+         */
+        {
+
+            ITuple actual;
+
+            assertTrue(cursor.hasNext());
+            assertEquals(//
+                    new TestTuple(flags, k3, v3a), //
+                    actual = cursor.next());
+            assertEquals(1, actual.getSourceIndex());
+
+            assertTrue(cursor.hasNext());
+            assertEquals(//
+                    new TestTuple(flags, k5, v5a), //
+                    actual = cursor.next());
+            assertEquals(0, actual.getSourceIndex());
+
+            assertTrue(cursor.hasNext());
+            assertEquals(//
+                    new TestTuple(flags, k9, v9a), //
+                    actual = cursor.next());
+            assertEquals(1, actual.getSourceIndex());
+
+            assertTrue(cursor.hasNext());
+            assertEquals(//
+                    new TestTuple(flags, k11, v11a), //
+                    actual = cursor.next());
+            assertEquals(0, actual.getSourceIndex());
+
+            assertFalse(cursor.hasNext());
+
+        }
+
+        /*
+         * Now, do a reverse scan tuple by tuple.
+         */
+
+        {
+
+            ITuple actual;
+
+            assertTrue(cursor.hasPrior());
+            assertEquals(//
+                    new TestTuple(flags, k9, v9a), //
+                    actual = cursor.prior());
+            assertEquals(1, actual.getSourceIndex());
+
+            assertTrue(cursor.hasPrior());
+            assertEquals(//
+                    new TestTuple(flags, k5, v5a), //
+                    actual = cursor.prior());
+            assertEquals(0, actual.getSourceIndex());
+
+            assertTrue(cursor.hasPrior());
+            assertEquals(//
+                    new TestTuple(flags, k3, v3a), //
+                    actual = cursor.prior());
+            assertEquals(1, actual.getSourceIndex());
+
+            assertFalse(cursor.hasPrior());
+
+        }
+
+        /*
+         * Now seek to each tuple in turn and verify the tuple state, including
+         * the source index from which the tuple was obtained; seek() + prior() +
+         * next(); and seek() + next() + prior().
+         */
+        {
+
+            ITuple actual;
+
+            // k3
+            actual = cursor.seek(k3);
+            assertNotNull(actual);
+            assertEquals(new TestTuple(flags, k3, v3a), actual);
+            assertEquals(1, actual.getSourceIndex());
+            assertTrue(cursor.hasNext());
+            assertFalse(cursor.hasPrior());
+            try {
+                cursor.prior();
+                fail("Expecting: " + NoSuchElementException.class);
+            } catch (NoSuchElementException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+            actual = cursor.next();
+            assertEquals(new TestTuple(flags, k5, v5a), actual);
+            actual = cursor.prior();
+            assertEquals(new TestTuple(flags, k3, v3a), actual);
+
+            // k5
+            actual = cursor.seek(k5);
+            assertNotNull(actual);
+            assertEquals(new TestTuple(flags, k5, v5a), actual);
+            assertEquals(0, actual.getSourceIndex());
+            assertTrue(cursor.hasNext());
+            assertTrue(cursor.hasPrior());
+            actual = cursor.prior();
+            assertEquals(new TestTuple(flags, k3, v3a), actual);
+            actual = cursor.next();
+            assertEquals(new TestTuple(flags, k5, v5a), actual);
+            actual = cursor.next();
+            assertEquals(new TestTuple(flags, k9, v9a), actual);
+
+            // k6 : key not found.
+            assertNull(cursor.seek(k6));
+
+            // k7 : key deleted.
+            assertNull(cursor.seek(k7));
+            {
+                /*
+                 * Test seek to deleted key when DELETED is specified.
+                 */
+                
+                // another cursor with DELETED in the flags.
+                final ITupleCursor tmp = (ITupleCursor) view.rangeIterator(
+                        null/* fromKey */, null/* toKey */, 0/* capacity */,
+                        flags|IRangeQuery.DELETED, null/* filter */);
+                
+                // seek to a deleted key.
+                actual = tmp.seek(k7);
+                
+                // verify tuple.
+                assertEquals(
+                        new TestTuple(flags | IRangeQuery.DELETED, k7,
+                                null/* val */, true/* deleted */, 0L/* timestamp */),
+                        actual);
+                
+            }
+
+            // k9
+            actual = cursor.seek(k9);
+            assertNotNull(actual);
+            assertEquals(new TestTuple(flags, k9, v9a), actual);
+            assertEquals(1, cursor.seek(k9).getSourceIndex());
+            assertTrue(cursor.hasNext());
+            assertTrue(cursor.hasPrior());
+            actual = cursor.prior();
+            assertEquals(new TestTuple(flags, k5, v5a), actual);
+            actual = cursor.next();
+            assertEquals(new TestTuple(flags, k9, v9a), actual);
+            actual = cursor.next();
+            assertEquals(new TestTuple(flags, k11, v11a), actual);
+
+            // k11
+            actual = cursor.seek(k11);
+            assertNotNull(actual);
+            assertEquals(new TestTuple(flags, k11, v11a), actual);
+            assertEquals(0, cursor.seek(k11).getSourceIndex());
+            assertFalse(cursor.hasNext());
+            assertTrue(cursor.hasPrior());
+            try {
+                cursor.next();
+                fail("Expecting: " + NoSuchElementException.class);
+            } catch (NoSuchElementException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+            actual = cursor.prior();
+            assertEquals(new TestTuple(flags, k9, v9a), actual);
+            actual = cursor.next();
+            assertEquals(new TestTuple(flags, k11, v11a), actual);
+
+        }
+
+        /*
+         * Now test remove() after seek. This should always remove the last
+         * visited tuple.
+         * 
+         * Note: In all cases the tuple must be removed by writing a delete
+         * marker into [btree1] regardless of which source B+Tree the tuple was
+         * read from.
+         */
+
+        // pre-condition test.
+        assertSameIterator(new Object[] { v3a, v5a, null/*v7a*/,v9a, v11a },
+                new Striterator(view.rangeIterator(null, null, 0/* capacity */,
+                                IRangeQuery.DEFAULT | IRangeQuery.DELETED,null/*filter*/))
+                                .addFilter(new Resolver(){
+                                    private static final long serialVersionUID = 1L;
+                                    @Override
+                                    protected Object resolve(Object e) {
+                                        return ((ITuple)e).getObject();
+                                    }
+                                }));
+
+        {
+            
+            ITuple actual = cursor.seek(k5);
+            assertNotNull(actual);
+            assertEquals(new TestTuple(flags, k5, v5a), actual);
+            assertEquals(0, actual.getSourceIndex());
+            assertTrue(view.contains(k5));
+            cursor.remove();
+            assertFalse(view.contains(k5));
+            
+            // post-condition test.
+            assertSameIterator(new Object[] { v3a, null/*v5a*/, null/*v7a*/,v9a, v11a },
+                    new Striterator(view.rangeIterator(null, null, 0/* capacity */,
+                                    IRangeQuery.DEFAULT | IRangeQuery.DELETED,null/*filter*/))
+                                    .addFilter(new Resolver(){
+                                        private static final long serialVersionUID = 1L;
+                                        @Override
+                                        protected Object resolve(Object e) {
+                                            return ((ITuple)e).getObject();
+                                        }
+                                    }));
+            
+        }
+        
+        {
+
+            ITuple actual = cursor.seek(k11);
+            assertNotNull(actual);
+            assertEquals(new TestTuple(flags, k11, v11a), actual);
+            assertEquals(0, actual.getSourceIndex());
+            assertTrue(view.contains(k11));
+            cursor.remove();
+            assertFalse(view.contains(k11));
+        
+            // post-condition test.
+            assertSameIterator(new Object[] { v3a, null/*v5a*/, null/*v7a*/,v9a, null/*v11a*/ },
+                    new Striterator(view.rangeIterator(null, null, 0/* capacity */,
+                                    IRangeQuery.DEFAULT | IRangeQuery.DELETED,null/*filter*/))
+                                    .addFilter(new Resolver(){
+                                        private static final long serialVersionUID = 1L;
+                                        @Override
+                                        protected Object resolve(Object e) {
+                                            return ((ITuple)e).getObject();
+                                        }
+                                    }));
+
+        }
+        
+        /* 
+         * Done.
+         */
+
+    }
+
+    /**
+     * Compares {@link ITuple}s for equality in their data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    protected void assertEquals(ITuple expected, ITuple actual) {
+        
+        AbstractTupleCursorTestCase.assertEquals(expected,actual);
+        
+    }
+    
 }

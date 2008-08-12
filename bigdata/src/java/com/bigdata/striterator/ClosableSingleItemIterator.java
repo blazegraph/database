@@ -1,6 +1,7 @@
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
 
 import java.util.NoSuchElementException;
+
 
 
 /**
@@ -10,7 +11,7 @@ import java.util.NoSuchElementException;
  * @version $Id$
  * @param <E>
  */
-public class ClosableSingleItemIterator<E> implements IClosableIterator<E> {
+public class ClosableSingleItemIterator<E> implements ICloseableIterator<E> {
 
     private boolean done = false;
     

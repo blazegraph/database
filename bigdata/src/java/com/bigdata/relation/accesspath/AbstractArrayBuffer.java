@@ -69,8 +69,8 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
          * @todo this could be a problem if the element type was in fact Object
          * since we should allocate an Object[] but we will in fact allocate an
          * array of whatever type that first object is. This could in turn cause
-         * runtime errors. If it is then we need to pass in an object (or an
-         * empty array) of the correct type.
+         * runtime errors. If it is a problem then we need to pass in an object
+         * (or an empty array) of the correct type.
          */
         
     }
@@ -125,6 +125,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
     }
 
+    @SuppressWarnings("unchecked")
     public void add(E e) {
 
         if (e == null)
@@ -159,6 +160,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
     }
 
+    @SuppressWarnings("unchecked")
     public void add(final int n, final E[] a) {
 
         if (n == 0)

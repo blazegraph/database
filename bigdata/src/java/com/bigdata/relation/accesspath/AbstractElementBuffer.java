@@ -2,6 +2,9 @@ package com.bigdata.relation.accesspath;
 
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 
 /**
@@ -65,7 +68,7 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
     }
 
     /**
-     * Delegates to {@link #flush(IChunkedIterator)}.
+     * Delegates to {@link #flush(IChunkedOrderedIterator)}
      */
     @Override
     final protected long flush(int n, R[] a) {

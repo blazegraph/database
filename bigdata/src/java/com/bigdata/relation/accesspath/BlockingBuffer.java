@@ -36,6 +36,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
+
 /**
  * <p>
  * A buffer that will block when it is full. You write elements on the buffer

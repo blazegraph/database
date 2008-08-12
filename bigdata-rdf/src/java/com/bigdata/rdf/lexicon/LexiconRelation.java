@@ -117,9 +117,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -128,6 +126,8 @@ import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.TokenBuffer;
 import com.bigdata.service.Split;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
