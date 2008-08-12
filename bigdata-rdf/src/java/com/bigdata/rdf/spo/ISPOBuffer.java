@@ -92,27 +92,25 @@ public interface ISPOBuffer {
      *         as well as any statement that was not pre-existing in the
      *         database. Statement removal also counts as a "write".
      * 
-     * @see IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)
-     * 
      * @see #flush(boolean)
      */
     public int flush();
     
-    /**
-     * Flushes the buffer and optionally resets the counter of the #of
-     * statements actually written on the database.
-     * 
-     * @param reset
-     *            When <code>true</code> the counter is reset after the
-     *            {@link #flush()} operation.
-     * 
-     * @return The cumulative #of statements that were written on the indices
-     *         since the last time the counter was reset. A statement that was
-     *         previously an axiom or inferred and that is converted to an
-     *         explicit statement by this method will be reported in this count
-     *         as well as any statement that was not pre-existing in the
-     *         database. Statement removal also counts as a "write".
-     */
-    public int flush(boolean reset);
+//    /**
+//     * Flushes the buffer and optionally resets the counter of the #of
+//     * statements actually written on the database.
+//     * 
+//     * @param reset
+//     *            When <code>true</code> the counter is reset after the
+//     *            {@link #flush()} operation.
+//     * 
+//     * @return The cumulative #of statements that were written on the indices
+//     *         since the last time the counter was reset. A statement that was
+//     *         previously an axiom or inferred and that is converted to an
+//     *         explicit statement by this method will be reported in this count
+//     *         as well as any statement that was not pre-existing in the
+//     *         database. Statement removal also counts as a "write".
+//     */
+//    public int flush(boolean reset);
     
 }

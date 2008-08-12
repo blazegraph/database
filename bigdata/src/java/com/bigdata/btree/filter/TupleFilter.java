@@ -6,11 +6,13 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.Tuple;
 
 import cutthecrap.utils.striterators.Filter;
@@ -92,7 +94,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
         /**
          * The next value to be returned by {@link #next()}.
          */
-        private Tuple nextValue = null;
+        private ITuple nextValue = null;
 
         /**
          * The {@link ITuple} instance that will actually be returned to the
@@ -104,7 +106,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
          * of the data must be made in order to avoid side-effects from the
          * one-step lookahead used by the filter.
          */
-        final private Tuple returnValue;
+        final private AbstractTuple returnValue;
         
         public Filterator(ITupleIterator<E> src) {
 
@@ -122,9 +124,21 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
 
             if (this.nextValue != null) {
                 
+                final int sourceIndex = nextValue.getSourceIndex();
+                
+                final ITupleSerializer tupleSer = nextValue.getTupleSerializer();
+                
                 // private buffer used to avoid side-effects from getNext()
-                this.returnValue = new Tuple<E>(nextValue.btree,
-                        nextValue.flags());
+                this.returnValue = new AbstractTuple<E>(nextValue.flags()) {
+
+                    public int getSourceIndex() {
+                        return sourceIndex;
+                    }
+
+                    public ITupleSerializer getTupleSerializer() {
+                        return tupleSer;
+                    }
+                };
 
             } else {
 
@@ -242,7 +256,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
          * 
          * @return The next object to be visited.
          */
-        protected Tuple getNext() {
+        protected ITuple getNext() {
 
             while (src.hasNext()) {
 
@@ -266,7 +280,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
                     
                 }
                 
-                return (Tuple) next;
+                return (ITuple) next;
                 
             }
 

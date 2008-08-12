@@ -1824,6 +1824,11 @@ Main issues:
       splits (and with or without overflow) when running on more than
       one host since we have more CPU resources.
 
+      Note: Caching by the disk controller, the OS, and the B+Tree
+      keep the IO costs quite low when the depth is small and the
+      B+Tree is CPU bound in that regiem.  The B+Tree does become IO
+      bound as the depth of the B+Tree increases.
+
       Find the LDS baseline for U100.
 
       Find the EF baseline w/ one data service and no overflow for
@@ -2517,9 +2522,32 @@ B49 := systap
 
 Priority list:
 
-1. unroll loops for faster distributed joins.
+x. Done. FusedViewIterator MUST implement ITupleCursor.  Either make
+         it do so directly and have the source iterator views throw
+         UnsupportedOperationException if they do not support
+         ITupleCursor or layer the class.  Simplify the ITupleCursor
+         API by factoring out an implementation interface that extends
+         it and moving a variety of methods not required at the
+         application level into that API (the application only needs
+         hasPrior(), prior(), and seek() in addition to the Iterator's
+         hasNext(), next(), and remove()).
 
-   How am I going to benchmark this?
+x. *** Lexicon refactor.
+
+       - Lexicon (blank node handling and custom _Value).
+
+       - Lexicon (support fast model comparison with read-only chunked
+         testing).
+
+         AbstractRuleTestCase#modelsEqual() needs to use bulk complete
+         to be efficient for scale out.  This means that it needs to
+         run the SPOs into a BigdataStatementIterator and then into a
+         StatementBuffer against the target database and finally into
+         a bulk complete (or perhaps a filter not found) operator to
+         figure out if everything is there as expected.  Verify with
+         LDS database at once closure test.
+
+x. *** unroll loops for faster distributed joins.
 
    There is a strong relationship between a byte[][] keys iterator
    such as the {@link PrefixFilter} and an unrolled JOIN operator.
@@ -2527,41 +2555,40 @@ Priority list:
    cheap to send the tuples that we want to JOIN to the target data
    service.
 
+x. provenance query problems (MikeP)
+
+x. performance testing for query (LUBM with native rule rewrites of
+   queries) for LTS, LDS, and JDS.
+
 2. misc tests, performance problems and improvements for the RDF DB.
 
-   **** {@link ResultSet#getLastKey()} will return <code>null</code>
-        if there were no tuples to visit. This class does not appear
-        to handle that condition, but it is able to pass a unit test
-        where there is an empty partition in the middle of the key
-        range scan for both forward and reverse traversal.
+   - Performance for unrolled joins?
 
-        Try writing a test where the partition is non-empty, but a
-        filter causes at least one chunk in that partition to report
-        an empty result set. This might lead to either non-progression
-        of the iterator, early termination, or a thrown exception.
+   - Refactor the bulk filter, statement buffer, bulk complete,
+     etc. operations as stackable, chunked, ordered, filtering
+     iterators using some stiterator extensions similar to what I have
+     done for the B+Tree.
 
-   *** AbstractRuleTestCase#modelsEqual() needs to use bulk complete
-       to be efficient for scale out.  This means that it needs to run
-       the SPOs into a BigdataStatementIterator and then into a
-       StatementBuffer against the target database and finally into a
-       bulk complete (or perhaps a filter not found) operator to
-       figure out if everything is there as expected.
-
-     - Refactor the bulk filter, statement buffer, bulk complete,
-       etc. operations as stackable, chunked, ordered, filtering
-       iterators using some stiterator extensions similar to what I
-       have done for the B+Tree.
-
-     * Replace IElementFilter with ITupleFilter or ITupleFilter[].
+   - Replace IElementFilter with ITupleFilter or ITupleFilter[].
        
-       This will allow us to use the prefix scan and distinct term
-       scans directly from an IRule by specifying the appropriate
-       predicate filter(s)!
+     This will allow us to use the prefix scan and distinct term scans
+     directly from an IRule by specifying the appropriate predicate
+     filter(s)!
 
-     - Verify that the distinct term scan can correctly advance across
-       index partition boundaries.  One way to do this is by setting a
-       very small split point and then loading a known data set,
-       computing its closure, and comparing it to ground truth.
+   - Verify that the distinct term scan can correctly advance across
+     index partition boundaries.  One way to do this is by setting a
+     very small split point and then loading a known data set,
+     computing its closure, and comparing it to ground truth.
+
+  - performance testing for owl:sameAs processing at scale.
+
+  - performance testing for distinct term scan
+
+  - TruthMaintenance performance should be vetted.  Handling TM at
+    scale is its own issue and might be best solved using: (a) a magic
+    sets integration; and (b) periodic map/reduce style updates with
+    closure.  (Or database at once closure on a new data set, which is
+    similar to how scale-out text indices are built.)
 
    *** Still some problems:
 
@@ -2639,26 +2666,6 @@ Priority list:
 
    * Details missing for fast closure programs (total and details).
 
-5. performance testing for query (LUBM with native rule rewrites of
-   queries) for LTS, LDS, and JDS.
-
-6. performance testing for owl:sameAs processing at scale.
-
-x. performance testing for distinct term scan
-
-7. provenance query problems (MikeP)
-
-x. misc scaling pain points
-
-   - TruthMaintenance performance should be vetted.  Handling TM at
-     scale is its own issue and might be best solved using: (a) a
-     magic sets integration; and (b) periodic map/reduce style updates
-     with closure.  (Or database at once closure on a new data set,
-     which is similar to how scale-out text indices are built.)
-
-   - Look for other things which have become painful with the
-     introduction of the UnisolatedReadWriteIndex class.
-
 x. GOM style "rows" for IRelation yeilding schema flexible JOINs.
    Could even just use GOM for this, but I would also have to extend
    JOINs to link vs attribute JOINs and make some decisions about
@@ -2674,27 +2681,57 @@ x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
    *** FileVersionDeleter is not quite correct yet.  Make sure that we
        have good tests for the fence posts on this one.
 
-   x. text indexer for the repo.
+   *** Text indexer for the repo.
 
-   - define a schema property for the text index.  if the property
-     exists for a file then index the file when it is written (only
-     file at once, not block-based).
+       - define a schema property for the text index.  if the property
+         exists for a file then index the file when it is written
+         (only file at once, not block-based).
 
-   - perf test the text indexer.
+       - perf test the text indexer.
 
-   - refactor ala {@link IRelation} and use a namespace. have a global
-     "bigdata file system" available from the {@link IIndexManager},
-     but you can create your own as well.  this will also let us place
-     the full text index into the same namespace.
+       * Handle "delete" from the full text index.  We need to do this
+         when a document is deleted whose indexText property was set.
 
-   * Handle "delete" from the full text index.  We need to do this
-     when a document is deleted whose indexText property was set.
+       - consider alternative integration using mg4j and lucene for
+         text indexing.
 
-   * MetadataSchema#IndexText may be too blunt a device.  We may want
-     to specify a variety of metadata for the text indexer, including
-     the URI of the source document, the text index to be used (there
-     can be several, each corresponding to a collection), tokenization
-     preferences (local to the text index I guess), etc.
+       * MetadataSchema#IndexText may be too blunt a device.  We may
+         want to specify a variety of metadata for the text indexer,
+         including the URI of the source document, the text index to
+         be used (there can be several, each corresponding to a
+         collection), tokenization preferences (local to the text
+         index I guess), etc.
 
-   - Focus on two CONOPS: incremental updates (crud) and map/reduce
-     style index builds (bulk write).
+       - Focus on two CONOPS: incremental updates (crud) and map /
+         reduce style index builds (bulk write).
+    
+FIXME IAutoboxBTree api on all IIndex impls.
+
+   - Verify entire suite for bigdata, bigdata-rdf.
+
+   - Need to write tests of the autobox API for BTree, FusedView,
+     ClientIndexView, and DataServiceIndex.
+
+     - Should be able to instantiate a resource that is a BigdataMap
+       or BigdataSet, so perhaps make these classes extend
+       AbstractResource?  Same for SparseRowStore?
+
+   - **** Need [isNull] for ClientIndexView and DataServiceIndex impls
+          to reconstruct the object by allowing reconstruction of the
+          ITuple.
+
+	  Could modify the ResultBuffer to provide this additional
+          information as an option and specify an appropriate
+          constructor for the point test to get back that metadata.
+
+	  Really, should define crudTuple() methods and rework the
+	  batch crud methods in terms of tuples.  That is the general
+	  framwork.  Bit flags can be used to indicate that certain
+	  information (keys, vals, etc). are not required for a given
+	  op.  (keys are always available on the client for these ops
+	  so there is never a need to send them with the data: just
+	  {val, isNull, isDeleted} and the option to read deleted
+	  tuples.
+
+	  BigdataMap and BigdataSet will not scale-out until this
+	  issue is resolved.

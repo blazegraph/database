@@ -23,32 +23,39 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 25, 2008
+ * Created on Aug 7, 2008
  */
 
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
 
+import java.io.Serializable;
 import java.util.Iterator;
 
 /**
- * An iterator that defines a {@link #close()} method - you MUST close instances
- * of this interface. Many implementation depends on this in order to release
- * resources, terminate tasks, etc.
+ * Stackable filter pattern with generics.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <I>
+ *            The generic type of the source iterator.
+ * @param <E>
+ *            The generic type of the elements visited by the source iterator.
+ * @param <F>
+ *            The generic type of the elements visited by the filtered iterator.
+ * 
+ * @todo remove {@link Serializable} - we never serialize filters, only filter
+ *       constructors.  Also remove serialization identifiers from all impls.
  */
-public interface IClosableIterator<E> extends Iterator<E> {
+public interface IFilter<I extends Iterator<E>, E, F> extends Serializable {
 
     /**
-     * Closes the iterator, releasing any associated resources. This method MAY
-     * be invoked safely if the iterator is already closed.
-     * <p>
-     * Note: Implementations that support {@link Iterator#remove()} MUST NOT
-     * eagerly close the iterator when it is exhausted since that would make it
-     * impossible to remove the last visited statement. Instead they MUST wait
-     * for an explicit {@link #close()} by the application.
+     * Wrap the source iterator with an iterator that applies this filter.
+     * 
+     * @param src
+     *            The source iterator.
+     * 
+     * @return The filtered iterator.
      */
-    public void close();
-    
+    public Iterator<F> filter(I src);
+
 }

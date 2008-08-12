@@ -40,13 +40,13 @@ import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Adds support for RDFS inference.

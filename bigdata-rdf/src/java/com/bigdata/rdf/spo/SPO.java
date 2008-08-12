@@ -27,6 +27,7 @@ import java.util.Arrays;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -228,6 +229,29 @@ public class SPO implements ISPO, Comparable<SPO> {
 
         this(s.get(), p.get(), o.get(), type);
 
+    }
+
+    /**
+     * Construct an {@link SPO} from a {@link BigdataStatement}. The term
+     * identifiers and statement type information available on the
+     * {@link BigdataStatement} will be used to initialize the {@link SPO}.
+     * 
+     * @param stmt The statement.
+     */
+    public SPO(BigdataStatement stmt) {
+        
+        this(   stmt.getSubject().getTermId(),//
+                stmt.getPredicate().getTermId(),
+                stmt.getObject().getTermId(),
+                stmt.getStatementType()
+                );
+        
+        if (stmt.getContext() != null) {
+
+            setStatementIdentifier(stmt.getContext().getTermId());
+            
+        }
+        
     }
     
     /**

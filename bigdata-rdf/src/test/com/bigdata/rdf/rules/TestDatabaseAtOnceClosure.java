@@ -267,8 +267,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	                
                     log.error("# Sesame2 stmts: " + numSesame2Stmts);
                     
-	                // make the data visible to a read-committed view.
-	                groundTruth.commit();
+//	                // make the data visible to a read-committed view.
+//	                groundTruth.commit();
 	                
 	            } finally {
 	            	

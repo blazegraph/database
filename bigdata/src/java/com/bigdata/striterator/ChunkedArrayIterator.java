@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 24, 2007
  */
 
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
 
 import java.util.Arrays;
 import java.util.NoSuchElementException;
@@ -154,6 +154,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      * @throws NoSuchElementException
      *             if {@link #hasNext()} returns false.
      */
+    @SuppressWarnings("unchecked")
     public E[] nextChunk() {
        
         if (!hasNext()) {

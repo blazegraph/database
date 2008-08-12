@@ -187,6 +187,11 @@ public interface ITuple<E extends Object> {
      * 
      * @return The de-serialized object.
      * 
+     * @throws UnsupportedOperationException
+     *             if {@link IRangeQuery#KEYS} and/or {@link IRangeQuery#VALS}
+     *             are required to de-serialize the object but were not
+     *             specified when the {@link ITupleIterator} was created.
+     * 
      * @see ITupleSerializer#deserialize(ITuple)
      */
     public E getObject();

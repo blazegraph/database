@@ -30,7 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import java.util.Comparator;
 
-import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Wraps the {@link Comparator} obtained from a {@link IKeyOrder} such that it

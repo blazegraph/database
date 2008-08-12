@@ -39,10 +39,10 @@ import com.bigdata.rdf.spo.JustificationWriter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.AbstractElementBuffer.InsertBuffer;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
+import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
  * A buffer for {@link SPO}s and optional {@link Justification}s that is

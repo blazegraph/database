@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.IChunkedIterator;
+import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Writes {@link Justification}s on the justification index.

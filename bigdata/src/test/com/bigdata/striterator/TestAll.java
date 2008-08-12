@@ -1,6 +1,6 @@
-/*
+/**
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,44 +20,56 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 */
-/*
- * Created on Jul 7, 2008
- */
+package com.bigdata.striterator;
 
-package com.bigdata.relation.accesspath;
-
-import java.util.NoSuchElementException;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * A closable iterator that visits nothing.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ClosableEmptyIterator<E> implements IClosableIterator<E> {
+public class TestAll extends TestCase {
 
-    public void close() {
-        // NOP
-    }
-
-    public boolean hasNext() {
-        
-        return false;
+    /**
+     * 
+     */
+    public TestAll() {
         
     }
 
-    public E next() {
-        
-        throw new NoSuchElementException();
-        
-    }
-
-    public void remove() {
-        
-        throw new UnsupportedOperationException();
+    /**
+     * @param arg0
+     */
+    public TestAll(String arg0) {
+     
+        super(arg0);
         
     }
 
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        TestSuite suite = new TestSuite("striterators");
+   
+        suite.addTestSuite(TestMergeFilter.class);
+        
+        suite.addTestSuite(TestPushbackIterator.class);
+        
+        suite.addTestSuite(TestResolver.class);
+        
+        suite.addTestSuite(TestChunkedFilter.class);
+         
+        return suite;
+        
+    }
+    
 }

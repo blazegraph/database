@@ -91,57 +91,20 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
      */
     protected final boolean computeClosure = false;
 
-    public void test_loadNCIOncology() throws IOException {
+    public void test_U10() throws IOException {
 
-        doTest("../rdf-data/nciOncology.owl","",RDFFormat.RDFXML);
-        
-    }
+        String file = "../rdf-data/lehigh/U10";
 
-    public void test_alibaba() throws IOException {
+        // FIXME correct baseURL for leigh?
+        String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
 
-        doTest("../rdf-data/alibaba_v41.rdf","",RDFFormat.RDFXML);
+        doTest(new File(file), baseURL, RDFFormat.RDFXML, new FilenameFilter() {
 
-    }
-
-    public void test_loadThesaurus() throws IOException {
-
-        doTest("../rdf-data/Thesaurus.owl","",RDFFormat.RDFXML);
-        
-    }
-
-    /**
-     * Note: The order does not matter since we are using database-at-once
-     * closure (assuming that closure is enabled).
-     */
-    public void test_loadWordnet() throws IOException {
-
-        doTest(//
-                new String[] { "../rdf-data/wordnet_nouns-20010201.rdf",
-                        "../rdf-data/wordnet-20000620.rdfs"
-                        },
-                //
-                new String[] { "", "" },
-                //
-                new RDFFormat[] { RDFFormat.RDFXML, RDFFormat.RDFXML });
-        
-    }
-
-    public void test_U1() throws IOException {
-        
-        String file = "../rdf-data/lehigh/U1";
-//      String file = "../rdf-data/lehigh/U10/University0_0.owl";
-      
-      // FIXME correct baseURL for leigh?
-      String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
-      
-      doTest(new File(file), baseURL, RDFFormat.RDFXML,
-              new FilenameFilter() {
-
-                public boolean accept(File dir, String name) {
-                    return ! name.endsWith(".txt");
-                }
+            public boolean accept(File dir, String name) {
+                return !name.endsWith(".txt");
+            }
         });
-      
+
     }
     
     public void test_U5() throws IOException {
@@ -160,22 +123,59 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
     }
     
-    public void test_U10() throws IOException {
+    public void test_U1() throws IOException {
+        
+        String file = "../rdf-data/lehigh/U1";
+//      String file = "../rdf-data/lehigh/U10/University0_0.owl";
+      
+      // FIXME correct baseURL for leigh?
+      String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
+      
+      doTest(new File(file), baseURL, RDFFormat.RDFXML,
+              new FilenameFilter() {
 
-        String file = "../rdf-data/lehigh/U10";
-
-        // FIXME correct baseURL for leigh?
-        String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
-
-        doTest(new File(file), baseURL, RDFFormat.RDFXML, new FilenameFilter() {
-
-            public boolean accept(File dir, String name) {
-                return !name.endsWith(".txt");
-            }
+                public boolean accept(File dir, String name) {
+                    return ! name.endsWith(".txt");
+                }
         });
-
+      
     }
     
+    /**
+     * Note: The order does not matter since we are using database-at-once
+     * closure (assuming that closure is enabled).
+     */
+    public void test_loadWordnet() throws IOException {
+
+        doTest(//
+                new String[] { "../rdf-data/wordnet_nouns-20010201.rdf",
+                        "../rdf-data/wordnet-20000620.rdfs"
+                        },
+                //
+                new String[] { "", "" },
+                //
+                new RDFFormat[] { RDFFormat.RDFXML, RDFFormat.RDFXML });
+        
+    }
+
+    public void test_loadThesaurus() throws IOException {
+
+        doTest("../rdf-data/Thesaurus.owl","",RDFFormat.RDFXML);
+        
+    }
+
+    public void test_alibaba() throws IOException {
+
+        doTest("../rdf-data/alibaba_v41.rdf","",RDFFormat.RDFXML);
+
+    }
+
+    public void test_loadNCIOncology() throws IOException {
+
+        doTest("../rdf-data/nciOncology.owl","",RDFFormat.RDFXML);
+        
+    }
+
     protected void doTest(String file, String baseURL, RDFFormat rdfFormat)
             throws IOException {
 

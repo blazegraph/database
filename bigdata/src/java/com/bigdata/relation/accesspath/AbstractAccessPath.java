@@ -44,6 +44,11 @@ import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.EmptyChunkedIterator;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -390,6 +395,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
              * 
              * Range count the access path and use a synchronous read if the
              * rangeCount is LTE the threshold.
+             * 
+             * @todo this kind of rangeCount might be replaced by an estimated
+             * range count basic on historical data and NOT requiring RMI.
              */
             
             final long rangeCount = rangeCount(false/* exact */);

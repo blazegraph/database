@@ -34,9 +34,11 @@ import com.bigdata.relation.IRelation;
 /**
  * A buffer abstraction.
  * <p>
- * {@link AbstractArrayBuffer} is generally used to write on an
- * {@link IRelation} while {@link BlockingBuffer} is used to feed an iterator
- * that a client can be read from asynchronously.
+ * An {@link AbstractArrayBuffer} is generally used to write on an
+ * {@link IRelation} while {@link BlockingBuffer} may be used to feed an
+ * iterator on which another process will read asynchronously. An
+ * {@link UnsynchronizedArrayBuffer} may be used in single-threaded contexts and
+ * offers reduced synchronization overhead.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -59,10 +61,6 @@ public interface IBuffer<E> {
      * @param e
      *            The element
      */
-//    * 
-//    * @return <code>true</code> if the element was allowed into the buffer
-//    *         (i.e., <code>true</code> unless the buffer has a filter that
-//    *         excludes this element).
     public void add(E e);
 
     /**
@@ -75,10 +73,6 @@ public interface IBuffer<E> {
      * @param a
      *            The set of elements.
      */
-//    * 
-//    * @return The #of elements that were added to the buffer (if the buffer has
-//    *         a filter then some of the caller's elements may have been
-//    *         excluded by that filter).
     public void add(int n, E[] a);
     
     /**

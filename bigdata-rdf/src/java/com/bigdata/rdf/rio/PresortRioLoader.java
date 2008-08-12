@@ -28,8 +28,6 @@ import org.openrdf.model.Value;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 
-import com.bigdata.rdf.store.ITripleStore;
-
 /**
  * Statement handler for the RIO RDF Parser that writes on a
  * {@link StatementBuffer}.
@@ -46,48 +44,6 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      */
     final protected StatementBuffer buffer;
 
-    private boolean flush = true;
-    
-    public boolean setFlush(boolean newValue) {
-        
-        boolean ret = this.flush;
-        
-        this.flush = newValue;
-        
-        return ret;
-        
-    }
-    
-    /**
-     * When <code>true</code> the {@link #buffer} will be
-     * {@link IStatementBuffer#flush() flushed} to the backing store once the
-     * document has been successfully processed by the parser (default is
-     * <code>true</code>). When <code>false</code> the caller is
-     * responsible for flushing the {@link #buffer}.
-     * <p>
-     * This behavior MAY be disabled if you want to chain load a bunch of small
-     * documents without flushing to the backing store after each document. This
-     * can be much more efficient, approximating the throughput for large
-     * document loads. However, the caller MUST insure that the {@link #buffer}
-     * is flushed if all documents are loaded successfully. If an error occurs
-     * during the processing of one or more documents then the entire data load
-     * should be discarded by calling {@link ITripleStore#abort()} since data
-     * MAY have been written on the store.
-     * 
-     * @return The current value.
-     * 
-     * @deprecated The use of this flag can introduce unexpected dependencies
-     *             between source documents since they will use the same
-     *             canonicalizing mapping for blank nodes and, when statement
-     *             identifiers are used, statements using blank nodes will be
-     *             deferred beyond the end of the source document.
-     */
-    public boolean getFlush() {
-        
-        return flush;
-        
-    }
-    
     /**
      * Sets up parser to load RDF.
      * 
@@ -108,7 +64,7 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      */
     protected void success() {
 
-        if(buffer != null && flush) {
+        if (buffer != null) {
             
             buffer.flush();
             
@@ -129,16 +85,6 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
         
     }
     
-    // Let the caller clear the buffer!!!
-//    /**
-//     * Clear the buffer.
-//     */
-//    protected void cleanUp() {
-//
-//        buffer.clear();
-//
-//    }
-
     public RDFHandler newRDFHandler() {
         
         return this;
@@ -167,6 +113,8 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
     }
 
     public void endRDF() throws RDFHandlerException {
+        
+        // @todo why not invoke buffer#force()?
         
     }
 

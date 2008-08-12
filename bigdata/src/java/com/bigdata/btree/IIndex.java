@@ -44,7 +44,7 @@ import com.bigdata.service.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndex extends ISimpleBTree {
+public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery {
 
     /**
      * The description of the resources comprising the index view.

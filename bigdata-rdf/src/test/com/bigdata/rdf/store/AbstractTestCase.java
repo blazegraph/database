@@ -74,9 +74,9 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.relation.accesspath.AbstractArrayBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.service.Split;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * <p>

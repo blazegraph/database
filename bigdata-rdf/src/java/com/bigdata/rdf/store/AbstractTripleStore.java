@@ -104,16 +104,9 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
-import com.bigdata.relation.accesspath.ChunkedResolvingIterator;
-import com.bigdata.relation.accesspath.DelegateChunkedIterator;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
-import com.bigdata.relation.accesspath.EmptyChunkedIterator;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedIterator;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.accesspath.IKeyOrder;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.relation.rule.ArrayBindingSet;
@@ -136,6 +129,13 @@ import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedResolvingIterator;
+import com.bigdata.striterator.DelegateChunkedIterator;
+import com.bigdata.striterator.EmptyChunkedIterator;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 
@@ -2017,9 +2017,9 @@ abstract public class AbstractTripleStore extends
             
             return sb;
             
-        } catch(SailException ex) {
-            
-            throw new RuntimeException(ex);
+//        } catch(SailException ex) {
+//            
+//            throw new RuntimeException(ex);
             
         } finally {
             
@@ -3061,15 +3061,15 @@ abstract public class AbstractTripleStore extends
         public Map<String, Value> next() {
 
             final Statement s;
-            try {
+//            try {
 
                 s = src.next();
                 
-            } catch (SailException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+//            } catch (SailException e) {
+//                
+//                throw new RuntimeException(e);
+//                
+//            }
             
             final Map<String,Value> bindings = new HashMap<String,Value>();
             

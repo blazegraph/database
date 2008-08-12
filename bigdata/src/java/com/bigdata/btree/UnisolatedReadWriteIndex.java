@@ -382,7 +382,71 @@ public class UnisolatedReadWriteIndex implements IIndex {
         throw new UnsupportedOperationException();
         
     }
+
+    public boolean contains(Object key) {
+
+        final Lock lock = readLock();
+        
+        try {
+            
+            return ndx.contains(key);
+            
+        } finally {
+            
+            unlock(lock);
+            
+        }
+        
+    }
+
+    public Object insert(Object key, Object value) {
+
+        final Lock lock = writeLock();
+        
+        try {
+            
+            return ndx.insert(key,value);
+            
+        } finally {
+            
+            unlock(lock);
+            
+        }
     
+    }
+
+    public Object lookup(Object key) {
+        
+        final Lock lock = readLock();
+        
+        try {
+            
+            return ndx.lookup(key);
+            
+        } finally {
+            
+            unlock(lock);
+            
+        }
+        
+    }
+
+    public Object remove(Object key) {
+
+        final Lock lock = writeLock();
+        
+        try {
+            
+            return ndx.remove(key);
+            
+        } finally {
+            
+            unlock(lock);
+            
+        }
+    
+    }
+
     public boolean contains(byte[] key) {
 
         final Lock lock = readLock();

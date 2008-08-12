@@ -63,7 +63,7 @@ public class TestReadOnlyBTreeCursors extends AbstractBTreeCursorTestCase {
     }
     
     @Override
-    protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags,
+    protected ITupleCursor2<String> newCursor(AbstractBTree btree, int flags,
             byte[] fromKey, byte[] toKey) {
 
         assert btree.isReadOnly();

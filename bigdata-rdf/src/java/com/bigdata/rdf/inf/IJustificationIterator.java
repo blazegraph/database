@@ -29,7 +29,7 @@ package com.bigdata.rdf.inf;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.relation.accesspath.IChunkedIterator;
+import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Interface for chunked {@link Justification} iterators.

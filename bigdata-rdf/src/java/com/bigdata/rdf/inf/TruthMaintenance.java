@@ -63,8 +63,8 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * The {@link TruthMaintenance} class facilitates maintaining the RDF(S)+

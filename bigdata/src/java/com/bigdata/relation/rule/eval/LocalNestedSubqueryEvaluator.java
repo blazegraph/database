@@ -33,9 +33,9 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Evaluation uses nested subquery and is optimized under the assumption that

@@ -35,7 +35,6 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedIterator;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -48,6 +47,7 @@ import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.RuleStats;
+import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Base class for rules having a single predicate that is none bound in the tail

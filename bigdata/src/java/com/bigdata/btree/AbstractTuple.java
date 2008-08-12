@@ -534,16 +534,118 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      */
     public String toString() {
         
-        final Object obj = getObject();
+        Object obj;
+        try {
+            obj = getObject();
+        } catch(UnsupportedOperationException ex) {
+            // note: indicates Not Available rather than [null].
+            obj = "N/A";
+        } catch(Throwable t) {
+            /*
+             * Note: The most common error here is an attempt to de-serialize a
+             * byte[] that does not in fact contain a serialized object. This
+             * typically happens when the DefaultTupleSerializer was not
+             * overriden with a NOPTupleSerializer and the application (or often
+             * the test case) is storing byte[]s rather than Objects.
+             */
+            obj = t.getMessage();
+        }
         
         return super.toString()+
         "{nvisited="+nvisited+
+        ", flags="+flagString(flags)+
         (versionDeleted ? ", deleted" : "")+
         (versionTimestamp == 0L ? "" : ", timestamp="+ getVersionTimestamp())+
         ", key="+(getKeysRequested()?Arrays.toString(getKey()):"N/A")+
         ", val="+(getValuesRequested()?(isNull()?"null":Arrays.toString(getValue())):"N/A")+
         ", obj="+(obj instanceof byte[]?Arrays.toString((byte[])obj):obj)+
         "}";
+        
+    }
+
+    /**
+     * Externalizes the flags as a list of symbolic constants.
+     * 
+     * @param flags
+     *            The {@link IRangeQuery} flags.
+     *            
+     * @return The list of symbolic constants.
+     */
+    public static String flagString(final int flags) {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        // #of flags that are turned on.
+        int onCount = 0;
+        
+        sb.append("[");
+
+        if ((flags & IRangeQuery.KEYS) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("KEYS");
+            
+        }
+        
+        if ((flags & IRangeQuery.VALS) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("VALS");
+            
+        }
+        
+        if ((flags & IRangeQuery.DELETED) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("DELETED");
+            
+        }
+        
+        if ((flags & IRangeQuery.READONLY) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("READONLY");
+            
+        }
+        
+        if ((flags & IRangeQuery.REMOVEALL) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("REMOVEALL");
+            
+        }
+        
+        if ((flags & IRangeQuery.CURSOR) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("CURSOR");
+            
+        }
+        
+        if ((flags & IRangeQuery.REVERSE) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("REVERSE");
+            
+        }
+        
+        sb.append("]");
+        
+        return sb.toString();
         
     }
     

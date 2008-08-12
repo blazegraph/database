@@ -35,6 +35,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.Reverserator;
+import com.bigdata.btree.filter.TupleRemover;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
@@ -58,8 +60,8 @@ import com.bigdata.service.Split;
  * it might still have a binding.
  * </p>
  * 
- * @todo consider implementing {@link ILocalBTree} here and collapsing
- *       {@link ILocalBTreeView} and {@link ILocalBTree}.
+ * @todo consider implementing {@link IAutoboxBTree} here and collapsing
+ *       {@link ILocalBTreeView} and {@link IAutoboxBTree}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -145,6 +147,17 @@ public class FusedView implements IIndex, ILocalBTreeView {
     public BTree getMutableBTree() {
         
         return (BTree) srcs[0];
+        
+    }
+    
+    protected void assertNotReadOnly() {
+        
+        if (getMutableBTree().isReadOnly()) {
+
+            // Can't write on this view.
+            throw new IllegalStateException();
+            
+        }
         
     }
     
@@ -302,7 +315,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      */
     public byte[] insert(byte[] key, byte[] value) {
 
-        byte[] oldval = lookup(key);
+        final byte[] oldval = lookup(key);
         
         srcs[0].insert(key, value);
         
@@ -310,6 +323,32 @@ public class FusedView implements IIndex, ILocalBTreeView {
 
     }
     
+    public Object insert(Object key, Object val) {
+
+        key = getTupleSerializer().serializeKey(key);
+
+        val = getTupleSerializer().serializeVal(val);
+
+        final ITuple tuple = lookup((byte[]) key, lookupTuple.get());
+
+        // direct the write to the first source.
+        srcs[0].insert((byte[]) key, (byte[]) val);
+        
+        if (tuple == null || tuple.isDeletedVersion()) {
+
+            /*
+             * Either there was no entry under that key for any source or the
+             * entry is already marked as deleted in the view.
+             */
+            
+            return null;
+            
+        }
+
+        return tuple.getObject();
+        
+    }
+
     /**
      * Resolves the old value against the view and then directs the write to the
      * first of the sources specified to the ctor. The remove is in fact treated
@@ -319,16 +358,17 @@ public class FusedView implements IIndex, ILocalBTreeView {
 
         /*
          * Slight optimization prevents remove() from writing on the index if
-         * there is no entry under that key (or if there is already a deleted
-         * entry under that key).
+         * there is no entry under that key for any source (or if there is
+         * already a deleted entry under that key).
          */
-        Tuple tuple = lookup(key, lookupTuple.get());
+
+        final Tuple tuple = lookup(key, lookupTuple.get());
 
         if (tuple == null || tuple.isDeletedVersion()) {
 
             /*
-             * Either there was no entry under that key or the entry is already
-             * marked as deleted in the view so we are done.
+             * Either there was no entry under that key for any source or the
+             * entry is already marked as deleted in the view so we are done.
              */
             
             return null;
@@ -336,20 +376,50 @@ public class FusedView implements IIndex, ILocalBTreeView {
         }
 
         final byte[] oldval = tuple.getValue();
-        
+
+        // remove from the 1st source.
         srcs[0].remove(key);
         
         return oldval;
 
     }
     
+    public Object remove(Object key) {
+
+        key = getTupleSerializer().serializeKey(key);
+        
+        /*
+         * Slight optimization prevents remove() from writing on the index if
+         * there is no entry under that key for any source (or if there is
+         * already a deleted entry under that key).
+         */
+        final Tuple tuple = lookup((byte[])key, lookupTuple.get());
+
+        if (tuple == null || tuple.isDeletedVersion()) {
+
+            /*
+             * Either there was no entry under that key for any source or the
+             * entry is already marked as deleted in the view so we are done.
+             */
+            
+            return null;
+            
+        }
+
+        // remove from the 1st source.
+        srcs[0].remove(key);
+
+        return tuple.getObject();
+
+    }
+
     /**
      * Return the first value for the key in an ordered search of the trees in
      * the view.
      */
     final public byte[] lookup(byte[] key) {
 
-        Tuple tuple = lookup(key, lookupTuple.get());
+        final Tuple tuple = lookup(key, lookupTuple.get());
 
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -362,6 +432,26 @@ public class FusedView implements IIndex, ILocalBTreeView {
         }
 
         return tuple.getValue();
+        
+    }
+
+    public Object lookup(Object key) {
+
+        key = getTupleSerializer().serializeKey(key);
+
+        final Tuple tuple = lookup((byte[]) key, lookupTuple.get());
+
+        if (tuple == null || tuple.isDeletedVersion()) {
+
+            /*
+             * Interpret a deletion marker as "not found".
+             */
+            
+            return null;
+            
+        }
+
+        return tuple.getObject();
         
     }
 
@@ -433,7 +523,7 @@ public class FusedView implements IIndex, ILocalBTreeView {
      */
     final public boolean contains(byte[] key) {
 
-        Tuple tuple = lookup(key,containsTuple.get());
+        final Tuple tuple = lookup(key, containsTuple.get());
         
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -449,6 +539,20 @@ public class FusedView implements IIndex, ILocalBTreeView {
         
     }
 
+    public boolean contains(Object key) {
+        
+        key = getTupleSerializer().serializeKey(key);
+
+        return contains((byte[]) key);
+        
+    }
+
+    private ITupleSerializer getTupleSerializer() {
+        
+        return getIndexMetadata().getTupleSerializer();
+        
+    }
+    
     /**
      * Returns the sum of the range count on each index in the view. This is the
      * maximum #of entries that could lie within that key range. However, the
@@ -538,12 +642,198 @@ public class FusedView implements IIndex, ILocalBTreeView {
     }
 
     /**
+     * <p>
      * Core implementation.
+     * </p>
+     * <p>
+     * Note: The {@link FusedView}'s iterator first obtains an ordered array of
+     * iterators for each of the source {@link AbstractBTree}s. The <i>filter</i>
+     * is NOT passed through to these source iterators. Instead, an
+     * {@link FusedTupleIterator} is obtained and the filter is applied to that
+     * iterator. This means that filters always see a fused representation of
+     * the source iterators.
+     * </p>
+     * <p>
+     * Note: This implementation supports {@link IRangeQuery#REVERSE}. This may
+     * be used to locate the {@link ITuple} before a specified key, which is a
+     * requirement for several aspects of the overall architecture including
+     * atomic append of file blocks, locating an index partition in the metadata
+     * index, and finding the last member of a set or map.
+     * </p>
+     * <p>
+     * Note: When the {@link IRangeQuery#CURSOR} flag is specified, it is passed
+     * through and an {@link ITupleCursor} is obtained for each source
+     * {@link AbstractBTree}. A {@link FusedTupleIterator} is then obtain that
+     * implements the {@link ITupleCursor} extensions.
+     * </p>
      */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+    @SuppressWarnings("unchecked")
+    public ITupleIterator rangeIterator(//
+            final byte[] fromKey,//
+            final byte[] toKey, //
+            final int capacity, //
+            final int flags,//
+            final IFilterConstructor filter//
+            ) {
 
-        return new FusedEntryIterator(srcs, fromKey, toKey, capacity, flags, filter);
+        // reverse scan?
+        final boolean reverseScan = (flags & REVERSE) != 0;
+        
+        // cursor requested?
+        final boolean cursorMode = (flags & CURSOR) != 0;
+        
+        // read only?
+        final boolean readOnly = ((flags & READONLY) != 0);
+
+        // iff the aggregate iterator should visit deleted entries.
+        final boolean deleted = (flags & DELETED) != 0;
+        
+        // removeAll?
+        final boolean removeAll = (flags & REMOVEALL) != 0;
+        
+        if (readOnly && removeAll) {
+
+            // REMOVEALL is not compatible with READONLY.
+            throw new IllegalArgumentException();
+
+        }
+
+        final int n = srcs.length;
+
+        if (INFO)
+            log.info("nsrcs=" + n + ", flags=" + flags + ", readOnly="
+                    + readOnly + ", deleted=" + deleted + ", reverseScan="
+                    + reverseScan);
+        
+        /*
+         * Note: We request KEYS since we need to compare the keys in order to
+         * decide which tuple to return next.
+         * 
+         * Note: We request DELETED so that we will see deleted entries. This is
+         * necessary in order for processing to stop at the first entry for a
+         * give key regardless of whether it is deleted or not. If the caller
+         * does not want to see the deleted tuples, then they are silently
+         * dropped from the aggregate iterator.
+         * 
+         * Note: The [filter] is NOT passed through to the source iterators.
+         * This is because the filter must be applied to the aggregate iterator
+         * in order to operate on the fused view.
+         * 
+         * Note: The REVERSE flag is NOT passed through to the source iterators.
+         * It is handled below by layering on a filter.
+         * 
+         * Note: The REMOVEALL flag is NOT passed through to the source
+         * iterators. It is handled below by laying on a filter.
+         */
+        final int sourceFlags = (//
+                (flags | KEYS | DELETED)//
+                | (reverseScan || removeAll ? CURSOR : 0) //
+                )//
+                & (~REMOVEALL)// turn off
+                & (~REVERSE)// turn off
+                ;
+        
+        /*
+         * The source iterator produces a fused view of the source indices. We
+         * then layer the filter(s) over the fused view iterator. A subclass is
+         * used if CURSOR support is required for the fused view.
+         */
+        ITupleIterator src;
+        
+        if (cursorMode || removeAll || reverseScan) {
+        
+            /*
+             * CURSOR was specified for the aggregate iterator or is required to
+             * support REMOVEALL.
+             */
+
+            final ITupleCursor[] itrs = new ITupleCursor[n];
+
+            for (int i = 0; i < n; i++) {
+
+                itrs[i] = (ITupleCursor) srcs[i].rangeIterator(fromKey, toKey,
+                        capacity, sourceFlags, null/* filter */);
+
+            }
+
+            // Note: aggregate source implements ITupleCursor.
+            src = new FusedTupleCursor(flags, deleted, itrs, 
+                    readOnly?new ReadOnlyIndex(this):this);
+            
+        } else {
+
+            /*
+             * CURSOR was neither specified nor required for the aggregate
+             * iterator.
+             * 
+             * Note: If reverse was specified, then we pass it into the source
+             * iterators for the source B+Trees. The resulting fused iterator
+             * will already have reversal traversal semantics so we do not need
+             * to layer a Reverserator on top.
+             */
+
+            final ITupleIterator[] itrs = new ITupleIterator[n];
+            
+            for (int i = 0; i < n; i++) {
+
+               itrs[i] = srcs[i].rangeIterator(fromKey, toKey, capacity,
+                        sourceFlags, null/* filter */);
+
+            }
+
+            src = new FusedTupleIterator(flags, deleted, itrs);
+
+        }
+
+        if (reverseScan) {
+
+            /*
+             * Reverse scan iterator.
+             * 
+             * Note: The reverse scan MUST be layered directly over the
+             * ITupleCursor. Most critically, REMOVEALL combined with a REVERSE
+             * scan needs to process the tuples in reverse index order and then
+             * delete them as it goes.
+             */
+
+            src = new Reverserator((ITupleCursor) src);
+
+        }
+
+        if (filter != null) {
+
+            /*
+             * Apply the optional filter.
+             * 
+             * Note: This needs to be after the reverse scan and before
+             * REMOVEALL (those are the assumptions for the flags).
+             */
+            
+            src = filter.newInstance(src);
+            
+        }
+        
+        if ((flags & REMOVEALL) != 0) {
+            
+            assertNotReadOnly();
+            
+            /*
+             * Note: This iterator removes each tuple that it visits from the
+             * source iterator.
+             */
+            
+            src = new TupleRemover() {
+                private static final long serialVersionUID = 1L;
+                @Override
+                protected boolean remove(ITuple e) {
+                    // remove all visited tuples.
+                    return true;
+                }
+            }.filter(src);
+
+        }
+        
+        return src;
 
     }
     

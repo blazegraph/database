@@ -26,14 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 26, 2008
  */
 
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
 
 import java.util.Arrays;
 
 /**
  * Converts the type of the source iterator using #resolve().
  * <p>
- * Note: This class correctly passes {@link IClosableIterator#close()} through
+ * Note: This class correctly passes {@link ICloseableIterator#close()} through
  * to the source iterator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -103,6 +103,7 @@ abstract public class ChunkedResolvingIterator<E,S> implements IChunkedOrderedIt
         
     }
 
+    @SuppressWarnings("unchecked")
     public E[] nextChunk() {
 
         final S[] a = src.nextChunk();

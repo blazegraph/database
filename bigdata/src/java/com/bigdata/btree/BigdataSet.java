@@ -66,7 +66,7 @@ public class BigdataSet<E> extends AbstractSet<E> implements SortedSet<E> {
     
     private final BigdataMap<E, E> map;
 
-    public BigdataSet(AbstractBTree ndx) {
+    public BigdataSet(IIndex ndx) {
 
         map = new BigdataMap<E, E>(ndx);
 

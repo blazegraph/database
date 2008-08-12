@@ -34,7 +34,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractTupleCursorTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleCursor;
+import com.bigdata.btree.ITupleCursor2;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.TestTuple;
@@ -116,7 +116,7 @@ public class TestRemoverator extends AbstractTupleCursorTestCase {
     }
 
     @Override
-    protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags, byte[] fromKey, byte[] toKey) {
+    protected ITupleCursor2<String> newCursor(AbstractBTree btree, int flags, byte[] fromKey, byte[] toKey) {
     
         return new MutableBTreeTupleCursor<String>((BTree) btree,
                 new Tuple<String>(btree, flags), fromKey, toKey);

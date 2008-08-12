@@ -1,8 +1,8 @@
 package com.bigdata.relation.rule.eval;
 
-import com.bigdata.relation.accesspath.EmptyChunkedIterator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.striterator.EmptyChunkedIterator;
 
 
 /**

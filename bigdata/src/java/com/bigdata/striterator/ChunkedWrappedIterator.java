@@ -24,18 +24,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Nov 11, 2007
  */
-package com.bigdata.relation.accesspath;
+package com.bigdata.striterator;
 
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
+import com.bigdata.relation.accesspath.IElementFilter;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Converts an <code>Iterator</code> into chunked iterator.
- * <p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -48,7 +49,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
     /**
      * The source iterator supplied by the caller. If this is an
-     * {@link IClosableIterator} then {@link #close()} will drill through and
+     * {@link ICloseableIterator} then {@link #close()} will drill through and
      * close the source as well.
      */
     private final Iterator<E> realSource;
@@ -143,9 +144,9 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         
         open = false;
 
-        if(realSource instanceof IClosableIterator) {
+        if(realSource instanceof ICloseableIterator) {
             
-            ((IClosableIterator<E>)realSource).close();
+            ((ICloseableIterator<E>)realSource).close();
             
         }
 
@@ -178,7 +179,8 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     }
 
     /**
-     * The next chunk of in whatever order the were visited by {@link #next()}.
+     * The next chunk of elements in whatever order the were visited by
+     * {@link #next()}.
      */
     @SuppressWarnings("unchecked")
     public E[] nextChunk() {

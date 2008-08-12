@@ -43,7 +43,7 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISimpleBTree extends IRangeQuery {
+public interface ISimpleBTree {
 
     /**
      * Insert or update a value under the key.

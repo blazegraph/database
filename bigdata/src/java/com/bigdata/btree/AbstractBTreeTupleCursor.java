@@ -54,7 +54,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
  * @version $Id$
  */
 abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extends Leaf, E>
-        implements ITupleCursor<E> {
+        implements ITupleCursor2<E> {
 
     protected static final Logger log = Logger.getLogger(AbstractBTreeTupleCursor.class);
     
@@ -1178,8 +1178,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      */
     abstract static class AbstractCursorPosition<L extends Leaf,E> implements ICursorPosition<L,E> {
         
-        /** The owning {@link ITupleCursor}. */
-        final protected ITupleCursor<E> cursor;
+        /** The owning {@link ITupleCursor2}. */
+        final protected ITupleCursor2<E> cursor;
 
         /** Used for sequential and random access to the leaves of the B+Tree. */
         final protected ILeafCursor<L> leafCursor;
@@ -1269,7 +1269,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @param key
          *            The key (required).
          */
-        protected AbstractCursorPosition(ITupleCursor<E> cursor, ILeafCursor<L> leafCursor,
+        protected AbstractCursorPosition(ITupleCursor2<E> cursor, ILeafCursor<L> leafCursor,
                 int index, byte[] key) {
             
             if (cursor == null)
@@ -1910,7 +1910,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @param index
          * @param key
          */
-        public ReadOnlyCursorPosition(ITupleCursor<E> cursor,
+        public ReadOnlyCursorPosition(ITupleCursor2<E> cursor,
                 ILeafCursor<Leaf> leafCursor, int index, byte[] key) {
 
             super(cursor, leafCursor, index, key);
@@ -1947,7 +1947,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @param leafCursor
          * @param index
          */
-        protected MutableCursorPosition(ITupleCursor<E> cursor,
+        protected MutableCursorPosition(ITupleCursor2<E> cursor,
                 ILeafCursor<Leaf> leafCursor, int index, byte[] key) {
 
             super(cursor, leafCursor, index, key);

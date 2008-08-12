@@ -33,11 +33,11 @@ import java.util.NoSuchElementException;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Iterator visits {@link SPO}s and supports removal (fully buffered).

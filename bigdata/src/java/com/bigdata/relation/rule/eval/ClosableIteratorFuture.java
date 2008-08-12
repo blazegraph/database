@@ -34,15 +34,15 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.DelegateChunkedIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
-import com.bigdata.relation.accesspath.IClosableIterator;
+import com.bigdata.striterator.DelegateChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Class that knows how to cancel the {@link Future} that is writing on an
  * {@link IBlockingBuffer} when the {@link IChunkedOrderedIterator} draining
- * that {@link IBlockingBuffer} is {@link IClosableIterator#close()}ed.
+ * that {@link IBlockingBuffer} is {@link ICloseableIterator#close()}ed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

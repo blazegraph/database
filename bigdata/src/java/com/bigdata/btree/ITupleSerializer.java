@@ -111,7 +111,7 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
     /**
      * Serialize a facet of an object's state that places the object into the
      * total sort order for the index. This method is automatically applied by
-     * {@link ILocalBTree#insert(Object, Object)} and friends to convert the
+     * {@link IAutoboxBTree#insert(Object, Object)} and friends to convert the
      * <strong>key</strong> object into an <strong>unsigned</strong> variable
      * length byte[].
      * <p>
@@ -137,7 +137,7 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
     /**
      * Serialize the persistent state of the object (the value stored in the
      * index under the key for that object). This method is automatically
-     * applied by {@link ILocalBTree#insert(Object, Object)} and friends to
+     * applied by {@link IAutoboxBTree#insert(Object, Object)} and friends to
      * convert the <strong>value</strong> object into an byte[].
      * 
      * @param obj
@@ -154,7 +154,7 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
 
     /**
      * De-serialize an object from an {@link ITuple}. This method is
-     * automatically applied by methods on the {@link ILocalBTree} interface
+     * automatically applied by methods on the {@link IAutoboxBTree} interface
      * that return the object stored under a key and by
      * {@link ITuple#getObject()}.
      * 

@@ -48,12 +48,9 @@ import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IChunkedIterator;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.ArrayBindingSet;
@@ -86,6 +83,9 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * {@link IProgram} execution support for the RDF DB.

@@ -40,13 +40,19 @@ import java.util.SortedMap;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.journal.ConcurrencyManager;
 
 /**
- * A flyweight {@link SortedMap} wrapping a B+Tree.
+ * A flyweight {@link SortedMap} wrapping an {@link IIndex}.
  * <p>
  * Note: The {@link BigdataMap} has the same concurrency constraints as the
  * {@link BTree} - it is single-threaded for writes and allows concurrent
- * readers.
+ * readers. When wrapping a scale-out index, the {@link ConcurrencyManager} will
+ * automatically provide appropriate concurrency controls. When wrapping a local
+ * index, you can use an {@link UnisolatedReadWriteIndex} to impose {@link Map}
+ * operation level concurrency control if your application does not otherwise
+ * handle this constraint. Also, note that point tests for the scale-out indices
+ * are VERY expensive when compared to ordered reads and writes.
  * <p>
  * Note: The total order of the {@link BigdataMap} is completely determined by
  * {@link ITupleSerializer#serializeKey(Object)}. There is NO concept of a
@@ -78,16 +84,11 @@ import com.bigdata.btree.keys.KeyBuilder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Refactor until this will support both local and scale-out indices.
- * Right now it is restricted to just local / monotlithic indices. This is
- * mostly because the {@link ILocalBTree} interface is not declared by
- * {@link IIndex}.
  */
 public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, V> {
 
     /** The backing B+Tree. */
-    final AbstractBTree ndx;
+    final IIndex ndx;
 
     /** true iff the index supports delete markers. */
     final boolean deleteMarkers;
@@ -104,7 +105,7 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
     /**
      * The backing index.
      */
-    public AbstractBTree getIndex() {
+    public IIndex getIndex() {
         
         return ndx;
         
@@ -116,7 +117,7 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
      * @param ndx
      *            The index.
      */
-    public BigdataMap(AbstractBTree ndx) {
+    public BigdataMap(IIndex ndx) {
 
         this(ndx, null/* fromKey */, null/* toKey */);
         
@@ -132,7 +133,7 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
      * @param toKey
      *            The optional exclusive upper bound.
      */
-    BigdataMap(AbstractBTree ndx, byte[] fromKey, byte[] toKey) {
+    BigdataMap(IIndex ndx, byte[] fromKey, byte[] toKey) {
 
         if (ndx == null)
             throw new IllegalArgumentException();
@@ -262,11 +263,11 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
     
     public void clear() {
 
-        if (fromKey == null && toKey == null) {
+        if (fromKey == null && toKey == null && ndx instanceof AbstractBTree) {
 
             // replace the root leaf.
-            
-            ndx.removeAll();
+
+            ((AbstractBTree) ndx).removeAll();
 
         } else {
 
@@ -327,26 +328,26 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
 
         rangeCheck(key, false/* allowUpperBound */);
 
-        if(deleteMarkers) {
-
-            final ITuple tuple = ndx.insert(tupleSer.serializeKey(key),
-                    null/* val */, true/* delete */, 0L/* timestamp */,
-                    ndx.writeTuple);
-
-            if (tuple.isDeletedVersion()) {
-                
-                // The previous version was deleted.
-                return null;
-                
-            }
-            
-            return (V) tupleSer.deserialize(tuple);
-            
-        } else {
+//        if(deleteMarkers) {
+//
+//            final ITuple tuple = ndx.insert(tupleSer.serializeKey(key),
+//                    null/* val */, true/* delete */, 0L/* timestamp */,
+//                    ndx.writeTuple);
+//
+//            if (tuple.isDeletedVersion()) {
+//                
+//                // The previous version was deleted.
+//                return null;
+//                
+//            }
+//            
+//            return (V) tupleSer.deserialize(tuple);
+//            
+//        } else {
 
             return (V) ndx.remove(key);
             
-        }
+//        }
         
     }
 
@@ -537,19 +538,30 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
     @SuppressWarnings("unchecked")
     public K firstKey() {
 
-        final byte[] key = firstInternalKey();
-        
-        if (key == null)
+        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
+                1/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
+
+        if (!itr.hasNext()) {
+
             throw new NoSuchElementException();
 
-        // Note: The tuple must be defined and non-delete per firstInternalKey().
-        final ITuple tuple = ndx.lookup(key, ndx.lookupTuple.get());
-        
-        assert tuple != null;
+        }
 
-        assert !tuple.isDeletedVersion();
+        return (K) tupleSer.deserializeKey(itr.next());
         
-        return (K) tupleSer.deserializeKey(tuple);
+//        final byte[] key = firstInternalKey();
+//        
+//        if (key == null)
+//            throw new NoSuchElementException();
+//
+//        // Note: The tuple must be defined and non-deleted per firstInternalKey().
+//        final ITuple tuple = ndx.lookup(key, ndx.lookupTuple.get());
+//        
+//        assert tuple != null;
+//
+//        assert !tuple.isDeletedVersion();
+//        
+//        return (K) tupleSer.deserializeKey(tuple);
         
     }
 
@@ -562,67 +574,79 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
      */
     @SuppressWarnings("unchecked")
     public K lastKey() {
-        
-        final byte[] key = lastInternalKey();
-        
-        if (key == null)
-            throw new NoSuchElementException();
-
-        // Note: The tuple must be defined and non-delete per lastInternalKey().
-        final ITuple tuple = ndx.lookup(key, ndx.lookupTuple.get());
-        
-        assert tuple != null;
-
-        assert !tuple.isDeletedVersion();
-        
-        return (K) tupleSer.deserializeKey(tuple);
-                
-    }
-    
-    /**
-     * The <strong>unsigned byte[]</strong> representation of the first key.
-     * 
-     * @return The first key or <code>null</code> if there are no keys. (More
-     *         precisely, if there are no undeleted tuples within the current
-     *         key range constraint.)
-     */
-    public byte[] firstInternalKey() {
-
-        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
-                1/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
-
-        if (!itr.hasNext()) {
-
-            return null;
-
-        }
-
-        return itr.next().getKey();
-
-    }
-
-    /**
-     * The <strong>unsigned byte[]</strong> representation of the last key.
-     * 
-     * @return The last key or <code>null</code> if there are no keys. (More
-     *         precisely, if there are no undeleted tuples within the current
-     *         key range constraint.)
-     */
-    public byte[] lastInternalKey() {
 
         final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                 1/* capacity */, IRangeQuery.DEFAULT | IRangeQuery.REVERSE,
                 null/* filter */);
-        
-        if(!itr.hasNext()) {
-            
-            return null;
-            
-        }
-        
-        return itr.next().getKey();
 
+        if (!itr.hasNext()) {
+
+            throw new NoSuchElementException();
+
+        }
+
+        return (K) tupleSer.deserializeKey(itr.next());
+
+//        final byte[] key = lastInternalKey();
+//        
+//        if (key == null)
+//            throw new NoSuchElementException();
+//
+//        // Note: The tuple must be defined and non-deleted per lastInternalKey().
+//        final ITuple tuple = ndx.lookup(key, ndx.lookupTuple.get());
+//        
+//        assert tuple != null;
+//
+//        assert !tuple.isDeletedVersion();
+//        
+//        return (K) tupleSer.deserializeKey(tuple);
+                
     }
+    
+//    /**
+//     * The <strong>unsigned byte[]</strong> representation of the first key.
+//     * 
+//     * @return The first key or <code>null</code> if there are no keys. (More
+//     *         precisely, if there are no undeleted tuples within the current
+//     *         key range constraint.)
+//     */
+//    public byte[] firstInternalKey() {
+//
+//        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
+//                1/* capacity */, IRangeQuery.DEFAULT, null/* filter */);
+//
+//        if (!itr.hasNext()) {
+//
+//            return null;
+//
+//        }
+//
+//        return itr.next().getKey();
+//
+//    }
+//
+//    /**
+//     * The <strong>unsigned byte[]</strong> representation of the last key.
+//     * 
+//     * @return The last key or <code>null</code> if there are no keys. (More
+//     *         precisely, if there are no undeleted tuples within the current
+//     *         key range constraint.)
+//     */
+//    public byte[] lastInternalKey() {
+//
+//        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
+//                1/* capacity */, IRangeQuery.DEFAULT | IRangeQuery.REVERSE,
+//                null/* filter */);
+//        
+//        if(!itr.hasNext()) {
+//            
+//            return null;
+//            
+//        }
+//        
+//        return itr.next().getKey();
+//
+//    }
 
     /**
      * A {@link SortedMap} view onto the backing B+Tree which imposes the

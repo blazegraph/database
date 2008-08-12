@@ -31,7 +31,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Comparator;
 
-import com.bigdata.relation.accesspath.IKeyOrder;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Represents the key order used by an index for a triple relation.

@@ -68,7 +68,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
     }
 
     @Override
-    protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags,
+    protected ITupleCursor2<String> newCursor(AbstractBTree btree, int flags,
             byte[] fromKey, byte[] toKey) {
         
         assert ! btree.isReadOnly();
@@ -104,7 +104,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          */
         {
             
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
 
             // visit (10,Bryan) and then delete that tuple.
             {
@@ -184,7 +184,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          */
         {
             
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
 
             // visit (30,James) and then delete that tuple.
             {
@@ -264,7 +264,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
 
             // seek to a tuple and verify its state.
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.seek(20));
@@ -310,7 +310,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
 
             // seek to a tuple and verify its state.
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.seek(20));
@@ -417,7 +417,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
 
             // seek to a tuple and verify its state.
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.seek(20));
@@ -510,7 +510,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
 
         {
 
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
 
             /*
              * flush the btree to the store making all nodes clean. any mutation
@@ -592,7 +592,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, flags,
+            ITupleCursor2<String> cursor = newCursor(btree, flags,
                     null/* fromKey */, null/* toKey */);
 
             assertEquals(new TestTuple<String>(flags, 10, "Bryan",
@@ -652,7 +652,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, flags,
+            ITupleCursor2<String> cursor = newCursor(btree, flags,
                     null/* fromKey */, null/* toKey */);
 
             assertEquals(new TestTuple<String>(flags, 10, "Bryan",
@@ -703,7 +703,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
 
         {
             
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
             
             assertTrue(cursor.hasNext());
             
@@ -745,7 +745,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
 
         {
             
-            ITupleCursor<String> cursor = newCursor(btree);
+            ITupleCursor2<String> cursor = newCursor(btree);
             
             assertTrue(cursor.hasPrior());
             

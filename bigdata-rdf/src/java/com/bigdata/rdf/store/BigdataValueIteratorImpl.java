@@ -56,7 +56,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.relation.accesspath.IChunkedIterator;
+import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Wraps an iterator that visits term identifiers and exposes each visited term

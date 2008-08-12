@@ -118,7 +118,7 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
         
     }
     
-    protected ITupleCursor<String> newCursor(AbstractBTree btree, int flags,
+    protected ITupleCursor2<String> newCursor(AbstractBTree btree, int flags,
             byte[] fromKey, byte[] toKey) {
 
         return new IndexSegmentTupleCursor<String>((IndexSegment) btree,
@@ -140,7 +140,7 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
          * the source {@link BTree} does not allow writes.
          */
         {
-            ITupleCursor<String> cursor = newCursor(seg);
+            ITupleCursor2<String> cursor = newCursor(seg);
 
             assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
 

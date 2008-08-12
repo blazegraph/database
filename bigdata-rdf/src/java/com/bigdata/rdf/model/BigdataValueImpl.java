@@ -56,7 +56,8 @@ public abstract class BigdataValueImpl implements BigdataValue {
     private long termId;
 
     /**
-     * 
+     * @param termId
+     *            The term identifier (optional).
      */
     public BigdataValueImpl(long termId) {
         

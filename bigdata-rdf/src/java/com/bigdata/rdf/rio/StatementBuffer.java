@@ -52,9 +52,11 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.relation.accesspath.ChunkedArrayIterator;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * A write buffer for absorbing the output of the RIO parser or other
@@ -217,16 +219,6 @@ public class StatementBuffer implements IStatementBuffer {
      */
     protected final boolean distinct = true;
     
-    /**
-     * @deprecated not used and to be removed.
-     */
-    boolean haveKeys = false;
-    
-    /**
-     * @deprecated not used and to be removed.
-     */
-    boolean sorted = false;
-    
     public boolean isEmpty() {
         
         return numStmts == 0;
@@ -239,6 +231,33 @@ public class StatementBuffer implements IStatementBuffer {
         
     }
 
+    /**
+     * When invoked, the {@link StatementBuffer} will resolve terms against the
+     * lexicon, but not enter new terms into the lexicon. This mode can be used
+     * to efficiently resolve terms to {@link SPO}s.
+     * 
+     * FIXME REFACTOR
+     * 
+     * @todo Use an {@link IBuffer} pattern can be used to make the statement
+     *       buffer chunk-at-a-time. The buffer has a readOnly argument and will
+     *       visit SPOs for the source statements. When readOnly, new terms will
+     *       not be added to the database.
+     * 
+     * @todo Once we have the {@link SPO}s we can just feed them into whatever
+     *       consumer we like and do bulk completion, bulk filtering, write the
+     *       SPOs onto the database,etc.
+     * 
+     * @todo must also support the focusStore patterns, which should not be too
+     *       difficult.
+     */
+    public void setReadOnly() {
+        
+        this.readOnly = true;
+        
+    }
+    
+    private boolean readOnly = false;
+    
     /**
      * Create a buffer that converts Sesame {@link Value} objects to {@link SPO}s
      * and writes on the <i>database</i> when it is {@link #flush()}ed. This
@@ -632,10 +651,6 @@ public class StatementBuffer implements IStatementBuffer {
 
 //        clearBNodeMap();
         
-        haveKeys = false;
-        
-        sorted = false;
-        
     }
     
     /**
@@ -654,7 +669,7 @@ public class StatementBuffer implements IStatementBuffer {
                     log.debug("adding term: "+values[i]+" (termId="+values[i].termId+")");
                 }
             }
-            database.addTerms(values, numValues);
+            addTerms(values, numValues);
             if(DEBUG) {
                 for(int i=0; i<numValues; i++) {
                     log.debug(" added term: "+values[i]+" (termId="+values[i].termId+")");
@@ -680,6 +695,12 @@ public class StatementBuffer implements IStatementBuffer {
         // Reset the state of the buffer (but not the bnodes nor deferred stmts).
         _clear();
 
+    }
+
+    protected void addTerms(final _Value[] terms, final int numTerms) {
+
+        database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
+        
     }
     
     /**
@@ -751,12 +772,13 @@ public class StatementBuffer implements IStatementBuffer {
      * 
      * @return The #of statements written on the database.
      */
-    final protected long addStatements(final _Statement[] stmts, final int numStmts) {
-        
+    final protected long addStatements(final _Statement[] stmts,
+            final int numStmts) {
+
         final SPO[] tmp = new SPO[numStmts];
-        
-        for(int i=0; i<tmp.length; i++) {
-            
+
+        for (int i = 0; i < tmp.length; i++) {
+
             final _Statement stmt = stmts[i];
             
             /*
@@ -881,7 +903,8 @@ public class StatementBuffer implements IStatementBuffer {
      */
     protected long writeSPOs(SPO[] stmts, int numStmts) {
 
-        final IChunkedOrderedIterator<SPO> itr = new ChunkedArrayIterator<SPO>(numStmts, stmts, null/*keyOrder*/);
+        final IChunkedOrderedIterator<SPO> itr = new ChunkedArrayIterator<SPO>(
+                numStmts, stmts, null/*keyOrder*/);
         
         final long nwritten;
 

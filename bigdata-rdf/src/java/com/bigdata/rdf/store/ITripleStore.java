@@ -44,7 +44,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.DataLoader.Options;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Interface for a triple store.
