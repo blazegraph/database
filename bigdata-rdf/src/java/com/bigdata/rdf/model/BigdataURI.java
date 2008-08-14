@@ -55,6 +55,6 @@ import org.openrdf.model.URI;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BigdataURI extends URI, BigdataValue {
+public interface BigdataURI extends URI, BigdataResource {
 
 }

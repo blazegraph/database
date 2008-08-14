@@ -34,7 +34,6 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 
 /**
@@ -294,7 +293,7 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
 
             final long begin = System.currentTimeMillis();
 
-            final ValueFactory fac = OptimizedValueFactory.INSTANCE;
+            final ValueFactory fac = store.getValueFactory();
             
             log.info( "\nCreating "+nvalues+" values..." );
         

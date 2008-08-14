@@ -33,15 +33,15 @@ import com.bigdata.rdf.model.StatementEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOComparator implements Comparator<SPO> {
+public class SPOComparator<T extends ISPO> implements Comparator<T> {
 
-    public static final transient Comparator<SPO> INSTANCE = new SPOComparator();
+    public static final transient Comparator<ISPO> INSTANCE = new SPOComparator<ISPO>();
     
     private SPOComparator() {
         
     }
     
-    public int compare(SPO stmt1, SPO stmt2) {
+    public int compare(ISPO stmt1, ISPO stmt2) {
 
         if (stmt1 == stmt2)
             return 0;
@@ -52,15 +52,15 @@ public class SPOComparator implements Comparator<SPO> {
          */
         int ret;
         
-        ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
+        ret = stmt1.s() < stmt2.s() ? -1 : stmt1.s() > stmt2.s() ? 1 : 0;
         
         if( ret == 0 ) {
         
-            ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
+            ret = stmt1.p() < stmt2.p() ? -1 : stmt1.p() > stmt2.p() ? 1 : 0;
             
             if( ret == 0 ) {
                 
-                ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
+                ret = stmt1.o() < stmt2.o() ? -1 : stmt1.o() > stmt2.o() ? 1 : 0;
                 
             }
             

@@ -51,15 +51,18 @@ package com.bigdata.rdf.model;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class BigdataResourceImpl extends BigdataValueImpl implements BigdataResource {
+public abstract class BigdataResourceImpl extends BigdataValueImpl implements
+        BigdataResource {
 
     /**
+     * @param valueFactory
+     *            The factory that is creating this object (optional).
      * @param termId
      *            The term identifier (optional).
      */
-    public BigdataResourceImpl(long termId) {
+    protected BigdataResourceImpl(BigdataValueFactory valueFactory, long termId) {
 
-        super(termId);
+        super(valueFactory, termId);
         
     }
 

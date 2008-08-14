@@ -35,12 +35,12 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
- * Filter matches only {@link StatementEnum#Explicit} {@link SPO}s.
+ * Filter matches only {@link StatementEnum#Explicit} {@link ISPO}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class ExplicitSPOFilter implements IElementFilter<SPO>, Serializable {
+final public class ExplicitSPOFilter implements IElementFilter<ISPO>, Serializable {
 
     /**
      * 
@@ -50,15 +50,15 @@ final public class ExplicitSPOFilter implements IElementFilter<SPO>, Serializabl
     /**
      * Shared instance.
      */
-    static public final transient IElementFilter<SPO> INSTANCE = new ExplicitSPOFilter();
+    static public final transient IElementFilter<ISPO> INSTANCE = new ExplicitSPOFilter();
     
     private ExplicitSPOFilter() {
         
     }
     
-    public boolean accept(SPO spo) {
+    public boolean accept(ISPO spo) {
 
-        return spo.getType() == StatementEnum.Explicit;
+        return spo.getStatementType() == StatementEnum.Explicit;
         
     }
 

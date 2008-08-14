@@ -52,7 +52,7 @@ public class JustificationRemover implements Callable<Long> {
 
     final SPORelation db;
 
-    final SPO[] a;
+    final ISPO[] a;
 
     final int numStmts;
 
@@ -60,7 +60,7 @@ public class JustificationRemover implements Callable<Long> {
 
     final AtomicLong writeTime;
 
-    public JustificationRemover(SPORelation db, SPO[] stmts, int numStmts,
+    public JustificationRemover(SPORelation db, ISPO[] stmts, int numStmts,
             boolean clone, AtomicLong sortTime, AtomicLong writeTime) {
 
         if (db == null)
@@ -70,7 +70,7 @@ public class JustificationRemover implements Callable<Long> {
 
         if (clone) {
 
-            this.a = new SPO[numStmts];
+            this.a = new ISPO[numStmts];
 
             System.arraycopy(stmts, 0, a, 0, numStmts);
 
@@ -110,7 +110,7 @@ public class JustificationRemover implements Callable<Long> {
         // remove statements from the index.
         for (int i = 0; i < numStmts; i++) {
 
-            SPO spo = a[i];
+            final ISPO spo = a[i];
 
             /*
              * Form an iterator that will range scan the justifications having
@@ -119,11 +119,11 @@ public class JustificationRemover implements Callable<Long> {
              * not actually send back the keys or vals to the client.
              */
 
-            final byte[] fromKey = keyBuilder.reset().append(spo.s).append(
-                    spo.p).append(spo.o).getKey();
+            final byte[] fromKey = keyBuilder.reset().append(spo.s()).append(
+                    spo.p()).append(spo.o()).getKey();
 
-            final byte[] toKey = keyBuilder.reset().append(spo.s).append(spo.p)
-                    .append(spo.o + 1).getKey();
+            final byte[] toKey = keyBuilder.reset().append(spo.s()).append(spo.p())
+                    .append(spo.o() + 1).getKey();
 
             final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                     0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);

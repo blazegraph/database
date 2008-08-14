@@ -42,7 +42,7 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser (the value is supplied by the ctor). 
      */
-    final protected StatementBuffer buffer;
+    final protected IStatementBuffer buffer;
 
     /**
      * Sets up parser to load RDF.
@@ -51,8 +51,10 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
      *            The buffer used to collect, sort, and write statements onto
      *            the database.
      */
-    public PresortRioLoader(StatementBuffer buffer) {
+    public PresortRioLoader(IStatementBuffer buffer) {
 
+        super(buffer.getDatabase().getValueFactory());
+        
         assert buffer != null;
                 
         this.buffer = buffer;
@@ -77,7 +79,7 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
         if(buffer != null) {
             
             // discard all buffered data.
-            buffer.clear();
+            buffer.reset();
             
         }
 

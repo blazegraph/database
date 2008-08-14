@@ -31,7 +31,6 @@ package com.bigdata.rdf.spo;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IBuffer;
 
 /**
@@ -71,16 +70,15 @@ public interface ISPOBuffer {
     public boolean isEmpty();
 
     /**
-     * Adds an {@link SPO} together with an optional justification for that
-     * {@link SPO}.
+     * Adds an {@link ISPO}.
      * 
      * @param spo
-     *            The {@link SPO}.
+     *            The {@link ISPO}.
      * 
      * @return true if the buffer will store the statement (i.e., the statement
      *         is not excluded by the filter).
      */
-    public boolean add(SPO spo);
+    public boolean add(ISPO spo);
 
     /**
      * Flush any buffered statements to the backing store.
@@ -95,22 +93,5 @@ public interface ISPOBuffer {
      * @see #flush(boolean)
      */
     public int flush();
-    
-//    /**
-//     * Flushes the buffer and optionally resets the counter of the #of
-//     * statements actually written on the database.
-//     * 
-//     * @param reset
-//     *            When <code>true</code> the counter is reset after the
-//     *            {@link #flush()} operation.
-//     * 
-//     * @return The cumulative #of statements that were written on the indices
-//     *         since the last time the counter was reset. A statement that was
-//     *         previously an axiom or inferred and that is converted to an
-//     *         explicit statement by this method will be reported in this count
-//     *         as well as any statement that was not pre-existing in the
-//     *         database. Statement removal also counts as a "write".
-//     */
-//    public int flush(boolean reset);
     
 }

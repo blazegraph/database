@@ -362,7 +362,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                 };
 
                 assertEquals(3,
-                        spoRelation.insert(new ChunkedArrayIterator<SPO>(
+                        spoRelation.insert(new ChunkedArrayIterator<ISPO>(
                                 a.length, a, null/* keyOrder */)));
 
                 if (log.isInfoEnabled()) {
@@ -552,7 +552,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                 };
 
                 assertEquals(3,
-                        spoRelation.insert(new ChunkedArrayIterator<SPO>(
+                        spoRelation.insert(new ChunkedArrayIterator<ISPO>(
                                 a.length, a, null/* keyOrder */)));
 
                 if (log.isInfoEnabled()) {

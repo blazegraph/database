@@ -69,11 +69,16 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
@@ -273,7 +278,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
          */
        private BigdataStatement getOnlyStatement(AbstractTripleStore store, long s, long p, long o) {
 
-            final IChunkedOrderedIterator<SPO> itr = store.getAccessPath(s, p, o).iterator();
+            final IChunkedOrderedIterator<ISPO> itr = store.getAccessPath(s, p, o).iterator();
             
             try {
 
@@ -378,7 +383,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              */
             {
                 
-                final IAccessPath<SPO> ap = store.getAccessPath(null, rdfType,
+                final IAccessPath<ISPO> ap = store.getAccessPath(null, rdfType,
                         Software);
                 
                 log.info(store.dump(ap).toString());
@@ -552,24 +557,26 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
 
         {
             
-            _URI x = new _URI("http://www.foo.org/x");
-            _URI y = new _URI("http://www.foo.org/y");
-            _URI z = new _URI("http://www.foo.org/z");
+            final BigdataValueFactory valueFactory = store.getValueFactory();
+            
+            final BigdataURI x = valueFactory.createURI("http://www.foo.org/x");
+            final BigdataURI y = valueFactory.createURI("http://www.foo.org/y");
+            final BigdataURI z = valueFactory.createURI("http://www.foo.org/z");
 
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
+            final BigdataURI A = valueFactory.createURI("http://www.foo.org/A");
+            final BigdataURI B = valueFactory.createURI("http://www.foo.org/B");
+            final BigdataURI C = valueFactory.createURI("http://www.foo.org/C");
 
-            _URI rdfType = new _URI(RDF.TYPE);
+            final BigdataURI rdfType = valueFactory.createURI(RDF.TYPE.stringValue());
 
-            _URI dcCreator = new _URI("http://purl.org/dc/terms/creator");
+            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/terms/creator");
 
-            _Literal bryan = new _Literal("bryan");
-            _Literal mike = new _Literal("mike");
+            final BigdataLiteral bryan = valueFactory.createLiteral("bryan");
+            final BigdataLiteral mike = valueFactory.createLiteral("mike");
 
-            _BNode sid1 = new _BNode("_sid1");
-            _BNode sid2 = new _BNode("_sid2");
-            _BNode sid3 = new _BNode("_sid3");
+            final BigdataBNode sid1 = valueFactory.createBNode("_sid1");
+            final BigdataBNode sid2 = valueFactory.createBNode("_sid2");
+            final BigdataBNode sid3 = valueFactory.createBNode("_sid3");
 
             {
              
@@ -601,26 +608,29 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              */
             {
 
-                final SPO spo1 = store.getStatement(x.termId, rdfType.termId, A.termId);
-                final SPO spo2 = store.getStatement(y.termId, rdfType.termId, B.termId);
-                final SPO spo3 = store.getStatement(z.termId, rdfType.termId, C.termId);
+                final SPO spo1 = store.getStatement(x.getTermId(), rdfType
+                        .getTermId(), A.getTermId());
+                final SPO spo2 = store.getStatement(y.getTermId(), rdfType
+                        .getTermId(), B.getTermId());
+                final SPO spo3 = store.getStatement(z.getTermId(), rdfType
+                        .getTermId(), C.getTermId());
 
                 assertNotNull(spo1);
                 assertNotNull(spo2);
                 assertNotNull(spo3);
 
-                assertEquals(sid1.termId, spo1.getStatementIdentifier());
-                assertEquals(sid2.termId, spo2.getStatementIdentifier());
-                assertEquals(sid3.termId, spo3.getStatementIdentifier());
+                assertEquals(sid1.getTermId(), spo1.getStatementIdentifier());
+                assertEquals(sid2.getTermId(), spo2.getStatementIdentifier());
+                assertEquals(sid3.getTermId(), spo3.getStatementIdentifier());
 
-                assertNotNull(store.getStatement(sid1.termId,
-                        dcCreator.termId, bryan.termId));
-                assertNotNull(store.getStatement(sid2.termId,
-                        dcCreator.termId, bryan.termId));
-                assertNotNull(store.getStatement(sid2.termId,
-                        dcCreator.termId, mike.termId));
-                assertNotNull(store.getStatement(sid3.termId,
-                        dcCreator.termId, mike.termId));
+                assertNotNull(store.getStatement(sid1.getTermId(), dcCreator
+                        .getTermId(), bryan.getTermId()));
+                assertNotNull(store.getStatement(sid2.getTermId(), dcCreator
+                        .getTermId(), bryan.getTermId()));
+                assertNotNull(store.getStatement(sid2.getTermId(), dcCreator
+                        .getTermId(), mike.getTermId()));
+                assertNotNull(store.getStatement(sid3.getTermId(), dcCreator
+                        .getTermId(), mike.getTermId()));
 
             }
         }
@@ -696,22 +706,22 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              * Re-define the vocabulary so that it does not use the term
              * identifiers from the other database.
              */
-            _URI x = new _URI("http://www.foo.org/x");
-            _URI y = new _URI("http://www.foo.org/y");
-            _URI z = new _URI("http://www.foo.org/z");
+            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x");
+            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y");
+            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z");
 
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
+            final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
+            final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
+            final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
 
-            _URI rdfType = new _URI(RDF.TYPE);
+            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
 
-            _URI dcCreator = new _URI("http://purl.org/dc/terms/creator");
+            final BigdataURI dcCreator = new BigdataURIImpl("http://purl.org/dc/terms/creator");
 
-            _Literal bryan = new _Literal("bryan");
-            _Literal mike = new _Literal("mike");
+            final BigdataLiteral bryan = new BigdataLiteralImpl("bryan");
+            final BigdataLiteral mike = new BigdataLiteralImpl("mike");
 
-            _Value[] terms = new _Value[] {
+            BigdataValue[] terms = new BigdataValue[] {
                     x,y,z,//
                     A,B,C,//
                     rdfType,//
@@ -720,7 +730,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             };
             
             // resolve term identifiers for the terms of interest.
-            tempStore.addTerms(terms, terms.length);
+            tempStore.getLexiconRelation()
+                    .addTerms(terms, terms.length, true/*readOnly*/);
             
             /*
              * Verify the structure of the graph, at least those aspects that
@@ -728,13 +739,12 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              * care about TM here.
              */
             
-
-            final SPO spo1 = tempStore.getStatement(x.termId,
-                    rdfType.termId, A.termId);
-            final SPO spo2 = tempStore.getStatement(y.termId,
-                    rdfType.termId, B.termId);
-            final SPO spo3 = tempStore.getStatement(z.termId,
-                    rdfType.termId, C.termId);
+            final SPO spo1 = tempStore.getStatement(x.getTermId(), rdfType
+                    .getTermId(), A.getTermId());
+            final SPO spo2 = tempStore.getStatement(y.getTermId(), rdfType
+                    .getTermId(), B.getTermId());
+            final SPO spo3 = tempStore.getStatement(z.getTermId(), rdfType
+                    .getTermId(), C.getTermId());
 
             assertNotNull(spo1);
             assertNotNull(spo2);
@@ -748,14 +758,14 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             assertEquals(sid2, spo2.getStatementIdentifier());
             assertEquals(sid3, spo3.getStatementIdentifier());
 
-            assertNotNull(tempStore.getStatement(sid1, dcCreator.termId,
-                    bryan.termId));
-            assertNotNull(tempStore.getStatement(sid2, dcCreator.termId,
-                    bryan.termId));
-            assertNotNull(tempStore.getStatement(sid2, dcCreator.termId,
-                    mike.termId));
-            assertNotNull(tempStore.getStatement(sid3, dcCreator.termId,
-                    mike.termId));
+            assertNotNull(tempStore.getStatement(sid1, dcCreator.getTermId(),
+                    bryan.getTermId()));
+            assertNotNull(tempStore.getStatement(sid2, dcCreator.getTermId(),
+                    bryan.getTermId()));
+            assertNotNull(tempStore.getStatement(sid2, dcCreator.getTermId(),
+                    mike.getTermId()));
+            assertNotNull(tempStore.getStatement(sid3, dcCreator.getTermId(),
+                    mike.getTermId()));
             
         } finally {
             

@@ -116,17 +116,17 @@ import org.openrdf.sail.SailException;
 import org.openrdf.sail.helpers.SailBase;
 
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection.BigdataTripleSource;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -141,14 +141,13 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IChunkedOrderedIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -283,7 +282,7 @@ public class BigdataSail extends SailBase implements Sail {
 
     final protected Properties properties;
 
-    final private ValueFactory valueFactory = new BigdataValueFactory();
+//    final private ValueFactory valueFactory = BigdataValueFactory.INSTANCE;
     
     /**
      * The inference engine if the SAIL is using one.
@@ -488,25 +487,57 @@ public class BigdataSail extends SailBase implements Sail {
             BigdataSailConnection view = readCommittedRef == null ? null
                     : readCommittedRef.get();
             
-            if (view == null) {
+            if(view == null) {
+                
+                if(database instanceof LocalTripleStore) {
 
-                /*
-                 * Create the singleton using a read-committed view of the
-                 * database.
-                 */
+                    /*
+                     * Create the singleton using a read-committed view of the
+                     * database.
+                     */
+                    
+                    view = new BigdataSailConnection(((LocalTripleStore)database).asReadCommittedView()) {
+                        
+                        public void close() throws SailException {
+                            
+                            // NOP - close is ignored.
+                            
+                        }
+                        
+                    };
+                    
+                    readCommittedRef = new WeakReference<BigdataSailConnection>(view);
+                    
+                } else if(database instanceof ScaleOutTripleStore) {
+                    
+                    /*
+                     * The scale-out triple store already has read-committed
+                     * semantics since it uses unisolated writes on the data
+                     * service.
+                     * 
+                     * @todo make sure that the use of RdfKeyBuffer and any
+                     * other per-instance state is thread-safe.
+                     */
+                    
+                    view = new BigdataSailConnection(database) {
+                        
+                        public void close() throws SailException {
+                            
+                            // NOP - close is ignored.
+                            
+                        }
 
-                view = new BigdataSailConnection(database.asReadCommittedView()) {
+                    };
+                    
+                    readCommittedRef = new WeakReference<BigdataSailConnection>(view);
+                    
+                } else {
+                    
+                    throw new UnsupportedOperationException(BigdataSail.Options.STORE_CLASS + "="
+                            + database.getClass().getName());                    
 
-                    public void close() throws SailException {
-
-                        // NOP - close is ignored.
-
-                    }
-
-                };
-
-                readCommittedRef = new WeakReference<BigdataSailConnection>(view);
-                                    
+                }
+                
             }
             
             return view; 
@@ -516,11 +547,11 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
-     * A {@link BigdataValueFactory}
+     * A {@link BigdataValueFactoryImpl}
      */
     final public ValueFactory getValueFactory() {
         
-        return valueFactory;
+        return database.getValueFactory();
         
     }
 
@@ -624,7 +655,7 @@ public class BigdataSail extends SailBase implements Sail {
          *       the {@link SailConnection}? Make concurrency safe if I do
          *       that?
          */
-        private final Map<String,_BNode> bnodes;
+        private final Map<String,BigdataBNodeImpl> bnodes;
         
         /**
          * Return the assertion buffer.
@@ -755,7 +786,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 log.info("Read-write view");
 
-                bnodes = new HashMap<String,_BNode>(bufferCapacity);
+                bnodes = new HashMap<String,BigdataBNodeImpl>(bufferCapacity);
                 
                 if (truthMaintenance) {
 
@@ -1116,7 +1147,7 @@ public class BigdataSail extends SailBase implements Sail {
             if(assertBuffer != null) {
                 
                 // discard all buffered data.
-                assertBuffer.clear();
+                assertBuffer.reset();
                 
                 if(truthMaintenance) {
                     
@@ -1133,7 +1164,7 @@ public class BigdataSail extends SailBase implements Sail {
             if (retractBuffer != null) {
 
                 // discard all buffered data.
-                retractBuffer.clear();
+                retractBuffer.reset();
 
                 if (truthMaintenance) {
 
@@ -1240,7 +1271,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * obtain a chunked iterator using the triple pattern that
                  * visits only the explicit statements.
                  */
-                final IChunkedOrderedIterator<SPO> itr = database
+                final IChunkedOrderedIterator<ISPO> itr = database
                         .getAccessPath(s, p, o, ExplicitSPOFilter.INSTANCE)
                         .iterator();
 
@@ -1483,10 +1514,10 @@ public class BigdataSail extends SailBase implements Sail {
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-            final IElementFilter<SPO> filter = includeInferred ? null
+            final IElementFilter<ISPO> filter = includeInferred ? null
                     : ExplicitSPOFilter.INSTANCE;
 
-            final IAccessPath<SPO> accessPath = database.getAccessPath(s, p, o,
+            final IAccessPath<ISPO> accessPath = database.getAccessPath(s, p, o,
                     filter);
 
             if(accessPath instanceof EmptyAccessPath) {
@@ -1505,7 +1536,7 @@ public class BigdataSail extends SailBase implements Sail {
              * Some valid access path.
              */
             
-            final IChunkedOrderedIterator<SPO> src;
+            final IChunkedOrderedIterator<ISPO> src;
             
             if(getTruthMaintenance() && includeInferred) {
 
@@ -1515,15 +1546,8 @@ public class BigdataSail extends SailBase implements Sail {
                  * InferenceEngine was configured.
                  */
                 
-//                long[] ids = accessPath.getTriplePattern();
-                final IPredicate<SPO> pred = accessPath.getPredicate();
-
-                src = getInferenceEngine().backchainIterator(//
-                        // the triple pattern.
-                        (Long)pred.get(0).get(),//
-                        (Long)pred.get(1).get(),//
-                        (Long)pred.get(2).get() // 
-                        );
+                src = getInferenceEngine().backchainIterator(
+                        accessPath.getPredicate());
                 
             } else {
 
@@ -1688,6 +1712,7 @@ public class BigdataSail extends SailBase implements Sail {
          * term cache, but does an index hit per unknown term.
          */
         protected void replaceValues(TupleExpr tupleExpr) throws SailException {
+            
             tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
 
                 @Override
@@ -1698,7 +1723,7 @@ public class BigdataSail extends SailBase implements Sail {
                         Value val = var.getValue();
 
                         // convert to a BigdataValue object.
-                        val = OptimizedValueFactory.INSTANCE.toSesameObject(val);
+                        val = database.getValueFactory().asValue(val);
 
                         // resolve the termId.
 //                        final long termId = 
@@ -1771,11 +1796,11 @@ public class BigdataSail extends SailBase implements Sail {
             }
 
             /**
-             * The {@link BigdataValueFactory}.
+             * The {@link BigdataValueFactoryImpl}.
              */
             public ValueFactory getValueFactory() {
 
-                return valueFactory;
+                return BigdataSail.this.database.getValueFactory();
                 
             }
             

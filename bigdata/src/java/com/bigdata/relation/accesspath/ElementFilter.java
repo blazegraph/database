@@ -39,6 +39,7 @@ import cutthecrap.utils.striterators.Filter;
 abstract public class ElementFilter<E> extends Filter implements
         IElementFilter<E> {
 
+    @SuppressWarnings("unchecked")
     public final boolean isValid(Object obj) {
 
         return accept((E) obj);

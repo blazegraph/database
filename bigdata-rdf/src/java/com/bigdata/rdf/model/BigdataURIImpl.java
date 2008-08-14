@@ -50,8 +50,6 @@ package com.bigdata.rdf.model;
 import org.openrdf.model.URI;
 import org.openrdf.model.util.URIUtil;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-
 /**
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -64,7 +62,7 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
      */
     private static final long serialVersionUID = 3018590380571802474L;
     
-    private final String term;
+    private final String uriString;
     
     /** lazily assigned. */
     private int indexOf = -1;
@@ -75,22 +73,28 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
      * 
      * @param uri
      *            A {@link URI}.
+     * 
+     * @deprecated by
+     *             {@link BigdataValueFactory#asValue(org.openrdf.model.Value)}
      */
     public BigdataURIImpl(URI uri) {
-        
-        this(uri.stringValue(), NULL);
-        
-    }
-    
-    public BigdataURIImpl(_URI uri) {
 
-        this( uri.term, uri.termId );
-        
+        this(uri.stringValue());
+
     }
 
-    public BigdataURIImpl(String uriString, long termId) {
+    public BigdataURIImpl(String uriString) {
 
-        super(termId);
+        this(null, uriString);
+
+    }
+
+    /**
+     * Used by {@link BigdataValueFactoryImpl}.
+     */
+    public BigdataURIImpl(BigdataValueFactory valueFactory, String uriString) {
+
+        super(valueFactory, NULL);
 
         if (uriString == null)
             throw new IllegalArgumentException();
@@ -101,13 +105,13 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
 
         }
         
-        this.term = uriString;
+        this.uriString = uriString;
         
     }
 
     public String toString() {
         
-        return term;
+        return uriString;
         
     }
     
@@ -115,32 +119,32 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
         
         if (indexOf == -1) {
             
-            indexOf = URIUtil.getLocalNameIndex(term);
+            indexOf = URIUtil.getLocalNameIndex(uriString);
             
         }
 
-        return term.substring(0, indexOf);
+        return uriString.substring(0, indexOf);
     }
 
     public String getLocalName() {
         
         if (indexOf == -1) {
             
-            indexOf = URIUtil.getLocalNameIndex(term);
+            indexOf = URIUtil.getLocalNameIndex(uriString);
             
         }
 
-        return term.substring(indexOf);
+        return uriString.substring(indexOf);
         
     }
 
     public String stringValue() {
 
-        return term;
+        return uriString;
         
     }
 
-    public boolean equals(Object o) {
+    final public boolean equals(Object o) {
         
         if (!(o instanceof URI))
             return false;
@@ -149,7 +153,7 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
         
     }
 
-    public boolean equals(URI o) {
+    final public boolean equals(URI o) {
 
         if (this == o)
             return true;
@@ -157,13 +161,13 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
         if (o == null)
             return false;
         
-        return term.equals(o.stringValue());
+        return uriString.equals(o.stringValue());
 
     }
 
-    public int hashCode() {
+    final public int hashCode() {
         
-        return term.hashCode();
+        return uriString.hashCode();
         
     }
     

@@ -3,12 +3,12 @@ package com.bigdata.rdf.inf;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
-public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedIterator<SPO> {
+public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedIterator<ISPO> {
     
     protected final static transient long NULL = IRawTripleStore.NULL;
     
@@ -25,9 +25,9 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     
     protected long sameAs;
 
-    protected IChunkedOrderedIterator<SPO> src;
+    protected IChunkedOrderedIterator<ISPO> src;
 
-    public BackchainOwlSameAsIterator(IChunkedOrderedIterator<SPO> src, AbstractTripleStore db,
+    public BackchainOwlSameAsIterator(IChunkedOrderedIterator<ISPO> src, AbstractTripleStore db,
             long sameAs) {
         if (src == null)
             throw new IllegalArgumentException();
@@ -56,10 +56,10 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     }
 
     public void getSames(long id, Set<Long> sames) {
-        IChunkedOrderedIterator<SPO> it = db.getAccessPath(id, sameAs, NULL).iterator();
+        IChunkedOrderedIterator<ISPO> it = db.getAccessPath(id, sameAs, NULL).iterator();
         try {
             while (it.hasNext()) {
-                long same = it.next().o;
+                long same = it.next().o();
                 if (!sames.contains(same)) {
                     sames.add(same);
                     getSames(same, sames);
@@ -71,7 +71,7 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
         it = db.getAccessPath(NULL, sameAs, id).iterator();
         try {
             while (it.hasNext()) {
-                long same = it.next().s;
+                long same = it.next().s();
                 if (!sames.contains(same)) {
                     sames.add(same);
                     getSames(same, sames);

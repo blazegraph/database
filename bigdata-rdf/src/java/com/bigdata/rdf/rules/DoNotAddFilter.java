@@ -29,7 +29,7 @@ import java.io.Serializable;
 import com.bigdata.rdf.inf.Axioms;
 import com.bigdata.rdf.inf.BaseAxioms;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
 
@@ -46,7 +46,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
+public class DoNotAddFilter implements IElementFilter<ISPO>, Serializable {
 
     /**
      * 
@@ -80,9 +80,9 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
         
     }
 
-    public boolean accept(SPO spo) {
+    public boolean accept(ISPO spo) {
         
-        if(AbstractTripleStore.isLiteral(spo.s)) {
+        if(AbstractTripleStore.isLiteral(spo.s())) {
             
             /*
              * Note: Explicitly toss out entailments that would place a
@@ -94,7 +94,7 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
             
         }
         
-        if (spo.getType() == StatementEnum.Explicit ) {
+        if (spo.getStatementType() == StatementEnum.Explicit ) {
             
             // Accept all explicit statements.
             
@@ -102,7 +102,7 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
             
         }
         
-        if( axioms.isAxiom(spo.s, spo.p, spo.o)) {
+        if( axioms.isAxiom(spo.s(), spo.p(), spo.o())) {
             
             /*
              * Reject all statements which correspond to axioms.
@@ -118,8 +118,8 @@ public class DoNotAddFilter implements IElementFilter<SPO>, Serializable {
             
         }
 
-        if (!forwardChainRdfTypeRdfsResource && spo.p == rdfType
-                && spo.o == rdfsResource) {
+        if (!forwardChainRdfTypeRdfsResource && spo.p() == rdfType
+                && spo.o() == rdfsResource) {
             
             // reject (?x, rdf:type, rdfs:Resource ) 
             

@@ -60,12 +60,13 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TaskCounters;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.AbstractFederation;
@@ -1431,7 +1432,7 @@ public class ConcurrentDataLoader {
             final StatementBuffer buffer = bufferFactory.getStatementBuffer();
             
             // make sure that the buffer is empty.
-            buffer.clear();
+            buffer.reset();
             
             log.info("loading: " + resource);
 
@@ -1478,7 +1479,7 @@ public class ConcurrentDataLoader {
                  * Note: discard anything in the buffer. This prevents the
                  * buffer from retaining data after a failed load operation.
                  */
-                buffer.clear();
+                buffer.reset();
                 
                 // rethrow the exception.
                 throw ex;
@@ -1578,11 +1579,11 @@ public class ConcurrentDataLoader {
 
             for( int i=0; i<numValues; i++ ) {
                 
-                final _Value v = values[i];
+                final BigdataValue v = values[i];
 
                 nterms.incrementAndGet();
 
-                if (v.termId == IRawTripleStore.NULL) {
+                if (v.getTermId() == IRawTripleStore.NULL) {
                     
                     if(WARN) log.warn("Unknown term: "+v);
 
@@ -1596,38 +1597,39 @@ public class ConcurrentDataLoader {
             if (numStmts > 0) {
 
                 final SPO[] a = new SPO[numStmts];
-                final _Statement[] b = new _Statement[numStmts];
+                final BigdataStatement[] b = new BigdataStatement[numStmts];
                 
                 // #of SPOs generated for testing.
                 int n = 0;
                 
-                for(int i=0; i<numStmts; i++) {
-                  
-                    final _Statement s = stmts[i];
+                for (int i = 0; i < numStmts; i++) {
+
+                    final BigdataStatement stmt = stmts[i];
 
                     ntriples.incrementAndGet();
 
-                    if (s.s.termId == IRawTripleStore.NULL
-                            || s.p.termId == IRawTripleStore.NULL
-                            || s.o.termId == IRawTripleStore.NULL) {
-                        
-                        if(WARN) log.warn("Unknown statement (one or more unknown terms) "+s);
-                        
+                    if (!stmt.isFullyBound()) {
+
+                        if (WARN)
+                            log
+                                    .warn("Unknown statement (one or more unknown terms) "
+                                            + stmt);
+
                         ntriplesNotFound.incrementAndGet();
-                        
+
                         continue;
-                        
+
                     }
+
+                    a[n] = new SPO(stmt);
                     
-                    a[n] = new SPO(s.s.termId,s.p.termId,s.o.termId);
-                    
-                    b[n] = s;
+                    b[n] = stmt;
                     
                     n++;
                     
                 }
                 
-                final IChunkedOrderedIterator<SPO> itr = database
+                final IChunkedOrderedIterator<ISPO> itr = database
                         .bulkCompleteStatements(a, n);
 
                 try {
@@ -1646,7 +1648,7 @@ public class ConcurrentDataLoader {
                 
                 for (int i = 0; i < n; i++) {
 
-                    final SPO spo = a[i];
+                    final ISPO spo = a[i];
 
                     if (!spo.hasStatementType()) {
 
@@ -1659,12 +1661,12 @@ public class ConcurrentDataLoader {
 
                     }
 
-                    if (spo.getType() != StatementEnum.Explicit) {
+                    if (spo.getStatementType() != StatementEnum.Explicit) {
                         
                         ntriplesNotFound.incrementAndGet();
 
                         if(WARN)
-                        log.warn("Statement not explicit database: "+b[i]+" is marked as "+spo.getType());
+                        log.warn("Statement not explicit database: "+b[i]+" is marked as "+spo.getStatementType());
                         
                         continue;
                         

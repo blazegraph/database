@@ -31,7 +31,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -47,7 +47,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
     private final AbstractTripleStore db;
     
     /** the statement whose justifications are being visited. */
-    private final SPO head;
+    private final ISPO head;
 
     /**
      * Private key builder.
@@ -72,7 +72,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
      * @param db
      * @param head The statement whose justifications will be materialized.
      */
-    public FullyBufferedJustificationIterator(AbstractTripleStore db, SPO head) {
+    public FullyBufferedJustificationIterator(AbstractTripleStore db, ISPO head) {
         
         assert db != null;
         
@@ -86,11 +86,11 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
         
         keyBuilder = new KeyBuilder(db.N * (1 + 3) * Bytes.SIZEOF_LONG);
         
-        byte[] fromKey = keyBuilder.reset().append(head.s).append(head.p)
-                .append(head.o).getKey();
+        byte[] fromKey = keyBuilder.reset().append(head.s()).append(head.p())
+                .append(head.o()).getKey();
 
-        byte[] toKey = keyBuilder.reset().append(head.s).append(head.p)
-                .append(head.o + 1).getKey();
+        byte[] toKey = keyBuilder.reset().append(head.s()).append(head.p())
+                .append(head.o() + 1).getKey();
         
         final long rangeCount = ndx.rangeCount(fromKey,toKey);
 

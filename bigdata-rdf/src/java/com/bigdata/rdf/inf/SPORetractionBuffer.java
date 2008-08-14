@@ -27,8 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.AbstractElementBuffer.DeleteBuffer;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.DeleteSolutionBuffer;
@@ -78,7 +78,7 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
 
         if (isEmpty()) return 0;
         
-        long n = store.removeStatements(new ChunkedArrayIterator<SPO>(numStmts,stmts,
+        long n = store.removeStatements(new ChunkedArrayIterator<ISPO>(numStmts,stmts,
                 null/*keyOrder*/), computeClosureForStatementIdentifiers);
 
         // reset the counter.

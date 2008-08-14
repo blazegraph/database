@@ -29,6 +29,7 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.ISPOBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -49,7 +50,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
     /**
      * The array in which the statements are stored.
      */
-    final protected SPO[] stmts;
+    final protected ISPO[] stmts;
     
     /**
      * The #of statements currently in {@link #stmts}
@@ -75,7 +76,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      * 
      * @return
      */
-    public SPO get(int i) {
+    public ISPO get(int i) {
         
         if (i > numStmts) {
 
@@ -107,7 +108,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      * An optional filter. When present, statements matched by the filter are
      * NOT retained by the {@link SPOAssertionBuffer}.
      */
-    protected final IElementFilter<SPO> filter;
+    protected final IElementFilter<ISPO> filter;
     
     /**
      * The buffer capacity.
@@ -128,7 +129,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      *            The maximum #of Statements, URIs, Literals, or BNodes that the
      *            buffer can hold.
      */
-    protected AbstractSPOBuffer(AbstractTripleStore store, IElementFilter<SPO> filter,
+    protected AbstractSPOBuffer(AbstractTripleStore store, IElementFilter<ISPO> filter,
             int capacity) {
 
         if (capacity <= 0)
@@ -140,7 +141,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
         
         this.capacity = capacity;
 
-        stmts = new SPO[capacity];
+        stmts = new ISPO[capacity];
         
     }
         
@@ -174,20 +175,6 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
     
     abstract public int flush();
 
-//    final public int flush(boolean reset) {
-//        
-//        final int tmp = nwritten += flush();
-//
-//        if(reset) {
-//            
-//            nwritten = 0;
-//            
-//        }
-//
-//        return tmp;
-//
-//    }
-
     /**
      * Cumulative counter of the #of statements actually written on the database
      * by {@link #flush()}. This is reset by {@link #flush(boolean)} when
@@ -195,7 +182,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      */
     private int nwritten = 0;
     
-    public boolean add( SPO stmt ) {
+    public boolean add( ISPO stmt ) {
         
         assert stmt != null;
 
@@ -251,8 +238,8 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
         System.err.println("capacity=" + capacity + ", numStmts=" + numStmts);
                 
         for (int i = 0; i < numStmts; i++) {
-
-            SPO stmt = stmts[i];
+            
+            final ISPO stmt = stmts[i];
 
             System.err.println("#" + (i+1) + "\t" + stmt.toString(store));
             

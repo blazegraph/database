@@ -54,7 +54,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
@@ -64,10 +63,9 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.BasicRioLoader;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -350,13 +348,13 @@ abstract public class AbstractTestCase
 
             System.err.println("terms index (forward mapping).");
 
-            IIndex ndx = store.getTerm2IdIndex();
+            final IIndex ndx = store.getTerm2IdIndex();
 
-            ITupleIterator itr = ndx.rangeIterator(null, null);
+            final ITupleIterator itr = ndx.rangeIterator(null, null);
 
             while (itr.hasNext()) {
 
-                ITuple tuple = itr.next();
+                final ITuple tuple = itr.next();
                 
 //                // the term identifier.
 //                Object val = itr.next();
@@ -365,7 +363,7 @@ abstract public class AbstractTestCase
                  * The sort key for the term. This is not readily decodable. See
                  * RdfKeyBuilder for specifics.
                  */
-                byte[] key = tuple.getKey();
+                final byte[] key = tuple.getKey();
 
                 /*
                  * deserialize the term identifier (packed long integer).
@@ -395,27 +393,17 @@ abstract public class AbstractTestCase
 
             System.err.println("ids index (reverse mapping).");
 
-            IIndex ndx = store.getId2TermIndex();
+            final IIndex ndx = store.getId2TermIndex();
 
-            ITupleIterator itr = ndx.rangeIterator(null, null);
+            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
 
             while (itr.hasNext()) {
 
-                ITuple tuple = itr.next();
+                final ITuple<BigdataValue> tuple = itr.next();
                 
-//                // the serialized term.
-//                Object val = itr.next();
-
-//                // the sort key for the term identifier.
-//                byte[] key = itr.getKey();
-
-                // decode the term identifier from the sort key.
-                final long id = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(), 0);
-
-                // deserialize the term.
-                _Value term = _Value.deserialize(tuple.getValueStream());
-
-                System.err.println(id + ":" + term);
+                final BigdataValue term = tuple.getObject();
+                
+                System.err.println(term.getTermId()+ ":" + term);
 
             }
 
@@ -464,60 +452,13 @@ abstract public class AbstractTestCase
 
     }
 
-//    /**
-//     * Method verifies that the <i>actual</i> {@link Iterator}
-//     * produces the expected objects in the expected order.  Objects
-//     * are compared using {@link Object#equals( Object other )}.  Errors
-//     * are reported if too few or too many objects are produced, etc.
-//     */
-//    static public void assertSameItr(String msg, Object[] expected,
-//            Iterator<?> actual) {
-//
-//        int i = 0;
-//
-//        while (actual.hasNext()) {
-//
-//            if (i >= expected.length) {
-//
-//                fail(msg + ": The iterator is willing to visit more than "
-//                        + expected.length + " objects.");
-//
-//            }
-//
-//            Object g = actual.next();
-//
-//            //        if (!expected[i].equals(g)) {
-//            try {
-//                assertSameValue(expected[i], g);
-//            } catch (AssertionFailedError ex) {
-//                /*
-//                 * Only do message construction if we know that the assert will
-//                 * fail.
-//                 */
-//                fail(msg + ": Different objects at index=" + i + ": expected="
-//                        + expected[i] + ", actual=" + g);
-//            }
-//
-//            i++;
-//
-//        }
-//
-//        if (i < expected.length) {
-//
-//            fail(msg + ": The iterator SHOULD have visited " + expected.length
-//                    + " objects, but only visited " + i + " objects.");
-//
-//        }
-//
-//    }
-
-    static public void assertSameSPOs(SPO[] expected, IChunkedOrderedIterator<SPO>actual) {
+    static public void assertSameSPOs(ISPO[] expected, IChunkedOrderedIterator<ISPO>actual) {
 
         assertSameSPOs("", expected, actual);
 
     }
 
-    static public void assertSameSPOs(String msg, SPO[] expected, IChunkedOrderedIterator<SPO> actual) {
+    static public void assertSameSPOs(String msg, ISPO[] expected, IChunkedOrderedIterator<ISPO> actual) {
 
         /*
          * clone expected[] and put into the same order as the iterator.
@@ -525,7 +466,7 @@ abstract public class AbstractTestCase
         
         expected = expected.clone();
 
-        IKeyOrder<SPO> keyOrder = actual.getKeyOrder();
+        IKeyOrder<ISPO> keyOrder = actual.getKeyOrder();
 
         if (keyOrder != null) {
 
@@ -544,7 +485,7 @@ abstract public class AbstractTestCase
 
             }
 
-            SPO g = actual.next();
+            ISPO g = actual.next();
 
             if (!expected[i].equals(g)) {
                 
@@ -570,7 +511,7 @@ abstract public class AbstractTestCase
     }
 
     /**
-     * Verify that the iterator visits the expected {@link SPO}s in any order
+     * Verify that the iterator visits the expected {@link ISPO}s in any order
      * without duplicates.
      * 
      * @param store
@@ -579,13 +520,13 @@ abstract public class AbstractTestCase
      * @param actual
      */
     static public void assertSameSPOsAnyOrder(AbstractTripleStore store,
-            SPO[] expected, IChunkedOrderedIterator<SPO>actual) {
+            ISPO[] expected, IChunkedOrderedIterator<ISPO> actual) {
 
-        assertSameSPOsAnyOrder(store,expected,actual,false);
+        assertSameSPOsAnyOrder(store, expected, actual, false);
     }
     
     /**
-     * Verify that the iterator visits the expected {@link SPO}s in any order
+     * Verify that the iterator visits the expected {@link ISPO}s in any order
      * without duplicates, optionally ignoring axioms.
      * 
      * @param store
@@ -595,14 +536,14 @@ abstract public class AbstractTestCase
      * @param ignoreAxioms
      */
     static public void assertSameSPOsAnyOrder(AbstractTripleStore store,
-            SPO[] expected, IChunkedOrderedIterator<SPO> actual,
+            ISPO[] expected, IChunkedOrderedIterator<ISPO> actual,
             boolean ignoreAxioms) {
         
         try {
 
-            Map<SPO, SPO> map = new TreeMap<SPO, SPO>(SPOComparator.INSTANCE);
+            Map<ISPO, ISPO> map = new TreeMap<ISPO, ISPO>(SPOComparator.INSTANCE);
 
-            for (SPO tmp : expected) {
+            for (ISPO tmp : expected) {
 
                 map.put(tmp, tmp);
 
@@ -612,7 +553,7 @@ abstract public class AbstractTestCase
 
             while (actual.hasNext()) {
 
-                SPO actualSPO = actual.next();
+                final ISPO actualSPO = actual.next();
                 
                 if (ignoreAxioms && actualSPO.isAxiom()) {
                     continue;
@@ -621,7 +562,7 @@ abstract public class AbstractTestCase
                 if (log.isInfoEnabled())
                     log.info("actual: " + actualSPO.toString(store));
 
-                SPO expectedSPO = map.remove(actualSPO);
+                final ISPO expectedSPO = map.remove(actualSPO);
 
                 if (expectedSPO == null) {
 
@@ -633,10 +574,10 @@ abstract public class AbstractTestCase
                 // log.info("expected: "+expectedSPO.toString(store));
 
                 StatementEnum expectedType =
-                        expectedSPO.hasStatementType() ? expectedSPO.getType()
+                        expectedSPO.hasStatementType() ? expectedSPO.getStatementType()
                                 : null;
                 StatementEnum actualType =
-                        actualSPO.hasStatementType() ? actualSPO.getType()
+                        actualSPO.hasStatementType() ? actualSPO.getStatementType()
                                 : null;
                 if (expectedType != actualType) {
                     // defer message generation until assert fails.
@@ -665,7 +606,8 @@ abstract public class AbstractTestCase
 
     }
     
-    static public void assertSameStatements(Statement[] expected, BigdataStatementIterator actual) throws SailException {
+    static public void assertSameStatements(Statement[] expected,
+            BigdataStatementIterator actual) throws SailException {
 
         assertSameStatements("", expected, actual);
 
@@ -676,7 +618,8 @@ abstract public class AbstractTestCase
      *       iterator we can not sort expected into the same order. therefore
      *       this should test for the same statements in any order
      */
-    static public void assertSameStatements(String msg, Statement[] expected, BigdataStatementIterator actual) throws SailException {
+    static public void assertSameStatements(String msg, Statement[] expected,
+            BigdataStatementIterator actual) throws SailException {
 
         int i = 0;
 
@@ -783,7 +726,7 @@ abstract public class AbstractTestCase
          * An iterator over the access path whose statements are being treated
          * as ground truth for this pass over the data.
          */
-        final IChunkedOrderedIterator<SPO> itre = db.getAccessPath(
+        final IChunkedOrderedIterator<ISPO> itre = db.getAccessPath(
                 keyOrderExpected).iterator();
 
         try {
@@ -797,7 +740,7 @@ abstract public class AbstractTestCase
                  * This is a chunk of expected statements in the natural order
                  * for the "actual" access path.
                  */
-                final SPO[] expectedChunk = itre.nextChunk(keyOrderActual);
+                final ISPO[] expectedChunk = itre.nextChunk(keyOrderActual);
 
                 /*
                  * Construct a batch contains test for those statements and
@@ -845,7 +788,7 @@ abstract public class AbstractTestCase
                                  * statement in the index.
                                  */
 
-                                final SPO expectedSPO = expectedChunk[i];
+                                final ISPO expectedSPO = expectedChunk[i];
 
                                 log.error("Statement not found" + ": index="
                                         + keyOrderActual + ", stmt="
@@ -922,6 +865,8 @@ abstract public class AbstractTestCase
         public StatementVerifier(AbstractTripleStore db, int capacity,
                 AtomicInteger nerrs, final int maxerrors) {
 
+            super(db.getValueFactory());
+            
             this.db = db;
 
             this.nerrs = nerrs;
@@ -988,30 +933,31 @@ abstract public class AbstractTestCase
 
         private void verifyStatements(int n, Statement[] a) {
 
-            final HashMap<Value,_Value> termSet = new HashMap<Value,_Value>(n);
+            final HashMap<Value, BigdataValue> termSet = new HashMap<Value, BigdataValue>(
+                    n);
             {
 
                 for (int i = 0; i < n; i++) {
 
                     final Statement stmt = a[i];
-                    
-                    termSet.put(stmt.getSubject(),OptimizedValueFactory.INSTANCE
-                            .toNativeValue(stmt.getSubject()));
 
-                    termSet.put(stmt.getPredicate(),OptimizedValueFactory.INSTANCE
-                            .toNativeValue(stmt.getPredicate()));
+                    termSet.put(stmt.getSubject(), db.getValueFactory()
+                            .asValue(stmt.getSubject()));
 
-                    termSet.put(stmt.getObject(),OptimizedValueFactory.INSTANCE
-                            .toNativeValue(stmt.getObject()));
+                    termSet.put(stmt.getPredicate(), db.getValueFactory()
+                            .asValue(stmt.getPredicate()));
+
+                    termSet.put(stmt.getObject(), db.getValueFactory()
+                            .asValue(stmt.getObject()));
 
                 }
 
                 final int nterms = termSet.size();
 
-                final _Value[] terms = new _Value[nterms];
+                final BigdataValue[] terms = new BigdataValue[nterms];
 
                 int i = 0;
-                for (_Value term : termSet.values()) {
+                for (BigdataValue term : termSet.values()) {
 
                     terms[i++] = term;
 
@@ -1021,9 +967,9 @@ abstract public class AbstractTestCase
                         .addTerms(terms, nterms, true/* readOnly */);
 
                 int nunknown = 0;
-                for (_Value term : terms) {
+                for (BigdataValue term : terms) {
 
-                    if (term.termId == 0L) {
+                    if (term.getTermId() == NULL) {
 
                         error("Unknown term: " + term);
                         
@@ -1042,8 +988,9 @@ abstract public class AbstractTestCase
                 
             }
             
-            TestCase2.log.info("There are "+termSet.size()+" distinct terms in the parsed statements.");
-            
+            TestCase2.log.info("There are " + termSet.size()
+                    + " distinct terms in the parsed statements.");
+
             /*
              * Now verify reverse lookup for those terms.
              */
@@ -1051,9 +998,9 @@ abstract public class AbstractTestCase
                 
                 final HashSet<Long> ids  = new HashSet<Long>(termSet.size());
                 
-                for(_Value term : termSet.values()) {
+                for(BigdataValue term : termSet.values()) {
                     
-                    final long id = term.termId;
+                    final long id = term.getTermId();
                     
                     if (id == NULL) {
 
@@ -1069,9 +1016,9 @@ abstract public class AbstractTestCase
                 // batch resolve ids to terms.
                 final Map<Long,BigdataValue> reverseMap = db.getLexiconRelation().getTerms(ids);
                 
-                for(_Value expectedTerm : termSet.values()) {
+                for(BigdataValue expectedTerm : termSet.values()) {
                     
-                    final long id = expectedTerm.termId;
+                    final long id = expectedTerm.getTermId();
                     
                     if (id == NULL) {
 
@@ -1109,15 +1056,18 @@ abstract public class AbstractTestCase
                 for (int i = 0; i < n; i++) {
 
                     final Statement stmt = a[i];
-                    
-                    final BigdataResource s = (BigdataResource) db.asValue(termSet.get(stmt.getSubject()));
-                    
-                    final BigdataURI p = (BigdataURI) db.asValue(termSet.get(stmt.getPredicate()));
-                    
-                    final BigdataValue o = (BigdataValue) db.asValue(termSet.get(stmt.getObject()));
-                    
+
+                    final BigdataResource s = (BigdataResource) db
+                            .asValue(termSet.get(stmt.getSubject()));
+
+                    final BigdataURI p = (BigdataURI) db.asValue(termSet
+                            .get(stmt.getPredicate()));
+
+                    final BigdataValue o = (BigdataValue) db.asValue(termSet
+                            .get(stmt.getObject()));
+
                     boolean ok = true;
-                    if(s == null) {
+                    if (s == null) {
                         
                         log.error("Subject not found: "+stmt.getSubject());
                         ok = false;
@@ -1150,7 +1100,7 @@ abstract public class AbstractTestCase
                     
                 }
 
-                final IChunkedOrderedIterator<SPO> itr = db
+                final IChunkedOrderedIterator<ISPO> itr = db
                         .bulkCompleteStatements(b, n2);
 
                 try {
@@ -1159,7 +1109,7 @@ abstract public class AbstractTestCase
                     
                     while (itr.hasNext()) {
 
-                        final SPO spo = itr.next();
+                        final ISPO spo = itr.next();
 
                         if (!spo.hasStatementType()) {
 

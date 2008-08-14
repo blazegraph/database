@@ -49,6 +49,8 @@ package com.bigdata.rdf.model;
 
 import org.openrdf.model.Statement;
 
+import com.bigdata.rdf.spo.ISPO;
+
 
 /**
  * Also reports whether the statement is explicit, inferred or an axiom.
@@ -56,7 +58,7 @@ import org.openrdf.model.Statement;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BigdataStatement extends Statement {
+public interface BigdataStatement extends Statement, ISPO {
 
     /**
      * Specialized return type.
@@ -77,28 +79,6 @@ public interface BigdataStatement extends Statement {
      * Specialized return type.
      */
     public BigdataResource getContext();
-    
-    /**
-     * Whether the statement is explicit, inferred or an axiom.
-     * 
-     * @return The {@link StatementEnum} type -or- <code>null</code> if the
-     *         statement type has not been specified.
-     */
-    public StatementEnum getStatementType();
-    
-    /**
-     * Set the statement type for this statement.
-     * 
-     * @param type
-     *            The statement type.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>type</i> is <code>null</code>.
-     * @throws IllegalStateException
-     *             if the statement type is already set to a different non-<code>null</code>
-     *             value.
-     */
-    public void setStatementType(StatementEnum type);
     
     /**
      * <code>true</code> if the statement is an axiom that is not present as

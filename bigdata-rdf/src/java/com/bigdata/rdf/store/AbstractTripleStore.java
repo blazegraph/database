@@ -81,8 +81,8 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -92,6 +92,7 @@ import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.JustificationWriter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOConvertingIterator;
@@ -324,6 +325,41 @@ abstract public class AbstractTripleStore extends
         return statementIdentifiers;
         
     }
+
+    /**
+     * The {@link BigdataValueFactoryImpl} for namespace of the
+     * {@link LexiconRelation} associated with this {@link AbstractTripleStore}.
+     * 
+     * @throws UnsupportedOperationException
+     *             if there is no associated lexicon.
+     * 
+     * @todo allow a {@link TempTripleStore} to specify another db's lexicon?
+     */
+    final public BigdataValueFactoryImpl getValueFactory() {
+
+        if (valueFactory != null)
+            return valueFactory;
+
+        if(!lexicon) {
+
+            throw new UnsupportedOperationException();
+
+        }
+        
+        synchronized(this) {
+            
+            if (valueFactory == null) {
+                
+                valueFactory = getLexiconRelation().getValueFactory();
+                
+            }
+            
+        }
+        
+        return valueFactory;
+        
+    }
+    private volatile BigdataValueFactoryImpl valueFactory;
     
     /*
      * IDatabase, ILocatableResource
@@ -361,6 +397,26 @@ abstract public class AbstractTripleStore extends
 
         String DEFAULT_LEXICON = "true";
 
+        /**
+         * Boolean option (default {@value #DEFAULT_STORE_BLANK_NODES})
+         * controls whether or not we store blank nodes in the forward mapping
+         * of the lexicon. When <code>false</code> blank node semantics are
+         * enforced and you CAN NOT unify blank nodes based on their IDs in the
+         * lexicon. When <code>true</code>, you are able to violate blank
+         * node semantics and force unification of blank nodes by assigning the
+         * ID from the RDF interchange syntax to the blank node. RIO has an
+         * option that will allow you to do this. When this option is also
+         * <code>true</code>, then you will in fact be able to resolve
+         * pre-existing blank nodes using their identifiers. The tradeoff is
+         * time and space : if you have a LOT of document using blank nodes then
+         * you might want to disable this option in order to spend less time
+         * writing the forward lexicon index (and it will also take up less
+         * space).
+         */
+        String STORE_BLANK_NODES = "storeBlankNodes";
+        
+        String DEFAULT_STORE_BLANK_NODES = "false";
+        
         /**
          * Boolean option (default <code>false</code>) disables all but a
          * single statement index (aka access path).
@@ -558,19 +614,6 @@ abstract public class AbstractTripleStore extends
         addNamespace(XMLSchema.NAMESPACE, "xsd");
 
     }
-
-    
-//    public IResourceIdentifier<IDatabase<AbstractTripleStore>> getResourceIdentifier() {
-//        
-//        return (IRelationIdentifier)super.getResourceIdentifier();
-//        
-//    }
-//    public IResourceIdentifier getResourceIdentifier() {
-//        
-//        return resourceIdentifier;
-//        
-//    }
-//    final private IResourceIdentifier resourceIdentifier;
     
     /**
      * Return <code>true</code> iff the store is safe for concurrent readers
@@ -696,6 +739,8 @@ abstract public class AbstractTripleStore extends
                         tmp);
 
                 lexiconRelation.create();
+                
+                valueFactory = lexiconRelation.getValueFactory();
 
             }
 
@@ -736,9 +781,15 @@ abstract public class AbstractTripleStore extends
 
                 getLexiconRelation().destroy();
 
+                lexiconRelation = null;
+                
+                valueFactory = null;
+                
             }
 
             getSPORelation().destroy();
+
+            spoRelation = null;
             
             super.destroy();
             
@@ -848,7 +899,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public IIndex getStatementIndex(IKeyOrder<SPO> keyOrder) {
+    final public IIndex getStatementIndex(IKeyOrder<ISPO> keyOrder) {
 
         return getSPORelation().getIndex(keyOrder);
         
@@ -1009,14 +1060,14 @@ abstract public class AbstractTripleStore extends
 
         long n = 0;
 
-        final IChunkedOrderedIterator<SPO> itr = getAccessPath(SPOKeyOrder.SPO,
+        final IChunkedOrderedIterator<ISPO> itr = getAccessPath(SPOKeyOrder.SPO,
                 ExplicitSPOFilter.INSTANCE).iterator();
 
         try {
 
             while (itr.hasNext()) {
 
-                SPO[] chunk = itr.nextChunk();
+                ISPO[] chunk = itr.nextChunk();
 
                 n += chunk.length;
 
@@ -1124,19 +1175,19 @@ abstract public class AbstractTripleStore extends
      */
     public long addTerm(Value value) {
 
-        final _Value[] terms = new _Value[] {//
+        final BigdataValue[] terms = new BigdataValue[] {//
 
-            OptimizedValueFactory.INSTANCE.toNativeValue(value) //
+            getValueFactory().asValue(value) //
 
         };
 
         getLexiconRelation().addTerms(terms, 1, false/* readOnly */);
 
-        return terms[0].termId;
+        return terms[0].getTermId();
 
     }
 
-    final public _Value getTerm(long id) {
+    final public BigdataValue getTerm(long id) {
 
         return getLexiconRelation().getTerm(id);
 
@@ -1148,9 +1199,9 @@ abstract public class AbstractTripleStore extends
         
     }
 
-    public void addTerms(final _Value[] terms, final int numTerms) {
+    public void addTerms(final BigdataValue[] terms) {
 
-        getLexiconRelation().addTerms( terms, numTerms, false/*readOnly*/);
+        getLexiconRelation().addTerms( terms, terms.length, false/*readOnly*/);
         
     }
 
@@ -1303,12 +1354,13 @@ abstract public class AbstractTripleStore extends
         /*
          * convert other Value object types to our object types.
          */
+        final BigdataValueFactory valueFactory = getValueFactory();
+        
+        s = (Resource) valueFactory.asValue(s);
 
-        s = (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(s);
+        p = (URI) valueFactory.asValue(p);
 
-        p = (URI) OptimizedValueFactory.INSTANCE.toSesameObject(p);
-
-        o = OptimizedValueFactory.INSTANCE.toSesameObject(o);
+        o = valueFactory.asValue(o);
 
         /*
          * Convert our object types to internal identifiers.
@@ -1414,22 +1466,22 @@ abstract public class AbstractTripleStore extends
 
     final public BigdataValue asValue(Value value) {
 
-        return OptimizedValueFactory.INSTANCE.toSesameObject(value);
+        return getValueFactory().asValue(value);
 
     }
 
-    public BigdataStatement asStatement(SPO spo) {
+    public BigdataStatement asStatement(ISPO spo) {
 
         /*
          * Use batch API to resolve the term identifiers.
          */
         final List<Long> ids = new ArrayList<Long>(4);
         
-        ids.add(spo.s);
+        ids.add(spo.s());
         
-        ids.add(spo.p);
+        ids.add(spo.p());
         
-        ids.add(spo.o);
+        ids.add(spo.o());
         
         if (spo.hasStatementIdentifier()) {
 
@@ -1442,56 +1494,41 @@ abstract public class AbstractTripleStore extends
         /*
          * Expose as a Sesame compatible Statement object.
          */
-        return new BigdataStatementImpl(//
-                (BigdataResource)terms.get(spo.s),//
-                (BigdataURI)terms.get(spo.p),
-                (BigdataValue) terms.get(spo.o),
-                (BigdataResource) (spo.hasStatementIdentifier() ? terms.get(spo
-                        .getStatementIdentifier()) : null),//
-                spo.getType()
+        return getValueFactory().createStatement(//
+                (BigdataResource)  terms.get(spo.s()),//
+                (BigdataURI)       terms.get(spo.p()),
+                (BigdataValue)     terms.get(spo.o()),
+                (BigdataResource)  (spo.hasStatementIdentifier() ? terms.get(spo.getStatementIdentifier()) : null),//
+                spo.getStatementType()
                 );
         
-//        final _Resource s = (_Resource) getTerm(spo.s);
-//        final _URI p = (_URI) getTerm(spo.p);
-//        final _Value o = (_Value) getTerm(spo.o);
-//        final _Resource c = (_Resource) (spo.hasStatementIdentifier()//
-//                ? getTerm(spo.getStatementIdentifier()) // Note: will look like a bnode.
-//                : null //
-//            );
-//
-//        return new BigdataStatementImpl( //
-//                (BigdataResource) OptimizedValueFactory.INSTANCE.toSesameObject(s),//
-//                (BigdataURI) OptimizedValueFactory.INSTANCE.toSesameObject(p), //
-//                (BigdataValue) OptimizedValueFactory.INSTANCE.toSesameObject(o), //
-//                (BigdataResource) OptimizedValueFactory.INSTANCE.toSesameObject(c),//
-//                spo.getType()
-//        );
-
     }
 
-    public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<SPO> src) {
+    public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<ISPO> src) {
 
         return new BigdataStatementIteratorImpl(this, src);
 
     }
 
-    public IAccessPath<SPO> getAccessPath(Resource s, URI p, Value o) {
+    public IAccessPath<ISPO> getAccessPath(Resource s, URI p, Value o) {
 
         return getAccessPath(s, p, o, null/* filter */);
         
     }
     
-    public IAccessPath<SPO> getAccessPath(Resource s, URI p, Value o,IElementFilter<SPO> filter) {
+    public IAccessPath<ISPO> getAccessPath(Resource s, URI p, Value o,IElementFilter<ISPO> filter) {
 
         /*
          * convert other Value object types to our object types.
          */
 
-        s = (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(s);
+        final BigdataValueFactory valueFactory = getValueFactory();
+        
+        s = (Resource) valueFactory.asValue(s);
 
-        p = (URI) OptimizedValueFactory.INSTANCE.toSesameObject(p);
+        p = (URI) valueFactory.asValue(p);
 
-        o = OptimizedValueFactory.INSTANCE.toSesameObject(o);
+        o = valueFactory.asValue(o);
 
         /*
          * Convert our object types to internal identifiers.
@@ -1502,17 +1539,17 @@ abstract public class AbstractTripleStore extends
         final long _s = getTermId(s);
 
         if (_s == NULL && s != null)
-            return new EmptyAccessPath<SPO>();
+            return new EmptyAccessPath<ISPO>();
 
         final long _p = getTermId(p);
 
         if (_p == NULL && p != null)
-            return new EmptyAccessPath<SPO>();
+            return new EmptyAccessPath<ISPO>();
 
         final long _o = getTermId(o);
 
         if (_o == NULL && o != null)
-            return new EmptyAccessPath<SPO>();
+            return new EmptyAccessPath<ISPO>();
 
         /*
          * Return the access path.
@@ -1522,20 +1559,20 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public IAccessPath<SPO> getAccessPath(long s, long p, long o) {
+    final public IAccessPath<ISPO> getAccessPath(long s, long p, long o) {
     
         return getSPORelation().getAccessPath(s, p, o, null/*filter*/);
         
     }
     
-    final public IAccessPath<SPO> getAccessPath(long s, long p, long o,
-            IElementFilter<SPO> filter) {
+    final public IAccessPath<ISPO> getAccessPath(long s, long p, long o,
+            IElementFilter<ISPO> filter) {
 
         return getSPORelation().getAccessPath(s, p, o, filter);
 
     }
 
-    final public IAccessPath<SPO> getAccessPath(IKeyOrder<SPO> keyOrder) {
+    final public IAccessPath<ISPO> getAccessPath(IKeyOrder<ISPO> keyOrder) {
 
         return getAccessPath(keyOrder, null/*filter*/);
         
@@ -1550,8 +1587,8 @@ abstract public class AbstractTripleStore extends
      *            evaluated close to the data.
      * @return
      */
-    final public IAccessPath<SPO> getAccessPath(IKeyOrder<SPO> keyOrder,
-            final IElementFilter<SPO> filter) {
+    final public IAccessPath<ISPO> getAccessPath(IKeyOrder<ISPO> keyOrder,
+            final IElementFilter<ISPO> filter) {
 
         final SPORelation r = getSPORelation();
         
@@ -1764,7 +1801,7 @@ abstract public class AbstractTripleStore extends
         if (termId == NULL)
             return "NULL";
 
-        final _Value v = getTerm(termId);
+        final BigdataValue v = getTerm(termId);
 
         if (v == null)
             return "<NOT_FOUND#" + termId + ">";
@@ -1930,7 +1967,7 @@ abstract public class AbstractTripleStore extends
 
                 final SPO spo = (SPO)itr.next().getObject();
 
-                switch (spo.getType()) {
+                switch (spo.getStatementType()) {
 
                 case Explicit:
                     nexplicit++;
@@ -2001,7 +2038,7 @@ abstract public class AbstractTripleStore extends
      * 
      * @param accessPath
      */
-    public StringBuilder dump(IAccessPath<SPO> accessPath) {
+    public StringBuilder dump(IAccessPath<ISPO> accessPath) {
                 
         final StringBuilder sb = new StringBuilder();
         
@@ -2045,24 +2082,7 @@ abstract public class AbstractTripleStore extends
      */
     public String usage() {
 
-        return "usage summary: class="
-                + getClass().getSimpleName()
-//                + "\n"
-//                + "\nsummary by index::\n"
-//                + (lexicon //
-//                ? "\n" + usage(name_term2Id, getTerm2IdIndex()) + "\n"
-//                        + usage(name_id2Term, getId2TermIndex()) //
-//                        : "")
-//                //
-//                + (oneAccessPath //
-//                ? "\n" + usage(name_spo, getSPOIndex())
-//                        : ("\n" + usage(name_spo, getSPOIndex()) //
-//                                + "\n" + usage(name_pos, getPOSIndex()) //
-//                                + "\n" + usage(name_osp, getOSPIndex())//
-//                        ))//
-//                + (justify ? "\n" + usage(name_just, getJustificationIndex())
-//                        : "")
-                ;
+        return "usage summary: class=" + getClass().getSimpleName();
 
     }
 
@@ -2122,14 +2142,14 @@ abstract public class AbstractTripleStore extends
      * @todo method signature could be changed to accept the source access path
      *       for the read and then just write on the database
      */
-    public long copyStatements(AbstractTripleStore dst, IElementFilter<SPO> filter,
+    public long copyStatements(AbstractTripleStore dst, IElementFilter<ISPO> filter,
             boolean copyJustifications) {
 
         if (dst == this)
             throw new IllegalArgumentException();
 
         // obtain a chunked iterator reading from any access path.
-        final IChunkedOrderedIterator<SPO> itr = getAccessPath(SPOKeyOrder.SPO,
+        final IChunkedOrderedIterator<ISPO> itr = getAccessPath(SPOKeyOrder.SPO,
                 filter).iterator();
 
         try {
@@ -2205,6 +2225,7 @@ abstract public class AbstractTripleStore extends
 
             }
 
+            if(INFO)
             log.info("Copied "
                     + nwritten
                     + " statements in "
@@ -2225,73 +2246,73 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    public IChunkedOrderedIterator<SPO> bulkFilterStatements(final SPO[] stmts,
+    public IChunkedOrderedIterator<ISPO> bulkFilterStatements(final ISPO[] stmts,
             final int numStmts, boolean present) {
         
         if (numStmts == 0) {
 
-            return new EmptyChunkedIterator<SPO>(SPOKeyOrder.SPO);
+            return new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
             
         }
         
         return bulkFilterStatements(
-                new ChunkedArrayIterator<SPO>(numStmts,
+                new ChunkedArrayIterator<ISPO>(numStmts,
                 stmts, null/* keyOrder */), present);
         
     }
 
-    public IChunkedOrderedIterator<SPO> bulkFilterStatements(
-            final IChunkedOrderedIterator<SPO> itr, final boolean present) {
+    public IChunkedOrderedIterator<ISPO> bulkFilterStatements(
+            final IChunkedOrderedIterator<ISPO> itr, final boolean present) {
         
         return new SPOConvertingIterator(itr, new BulkFilterConverter(
                 getSPOIndex(), present));
         
     }
 
-    public IChunkedOrderedIterator<SPO> bulkCompleteStatements(
+    public IChunkedOrderedIterator<ISPO> bulkCompleteStatements(
             final SPO[] stmts, final int numStmts) {
         
         if (numStmts == 0) {
 
-            return new EmptyChunkedIterator<SPO>(SPOKeyOrder.SPO);
+            return new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
 
         }
 
-        return bulkCompleteStatements(new ChunkedArrayIterator<SPO>(numStmts,
+        return bulkCompleteStatements(new ChunkedArrayIterator<ISPO>(numStmts,
                 stmts, null/* keyOrder */));
         
     }
 
-    public IChunkedOrderedIterator<SPO> bulkCompleteStatements(final IChunkedOrderedIterator<SPO> itr) {
+    public IChunkedOrderedIterator<ISPO> bulkCompleteStatements(final IChunkedOrderedIterator<ISPO> itr) {
         
         return new SPOConvertingIterator(itr, new BulkCompleteConverter(
                 getSPOIndex()));
 
     }
 
-    public long addStatements(SPO[] stmts, int numStmts) {
+    public long addStatements(ISPO[] stmts, int numStmts) {
 
         if (numStmts == 0)
             return 0;
 
-        return addStatements(new ChunkedArrayIterator<SPO>(numStmts, stmts,
+        return addStatements(new ChunkedArrayIterator<ISPO>(numStmts, stmts,
                 null/* keyOrder */), null /* filter */);
 
     }
 
-    public long addStatements(SPO[] stmts, int numStmts,
-            IElementFilter<SPO> filter) {
+    public long addStatements(ISPO[] stmts, int numStmts,
+            IElementFilter<ISPO> filter) {
 
         if (numStmts == 0)
             return 0;
 
-        return addStatements(new ChunkedArrayIterator<SPO>(numStmts, stmts,
+        return addStatements(new ChunkedArrayIterator<ISPO>(numStmts, stmts,
                 null/* keyOrder */), filter);
 
     }
 
-    public long addStatements(final IChunkedOrderedIterator<SPO> itr,
-            final IElementFilter<SPO> filter) {
+    public long addStatements(final IChunkedOrderedIterator<ISPO> itr,
+            final IElementFilter<ISPO> filter) {
 
         return addStatements(this/* statementStore */, false/* copyOnly */,
                 itr, filter);
@@ -2338,8 +2359,8 @@ abstract public class AbstractTripleStore extends
      *         that was not pre-existing in the database.
      */
     public long addStatements(final AbstractTripleStore statementStore,
-            final boolean copyOnly, final IChunkedOrderedIterator<SPO> itr,
-            final IElementFilter<SPO> filter) {
+            final boolean copyOnly, final IChunkedOrderedIterator<ISPO> itr,
+            final IElementFilter<ISPO> filter) {
 
         if (statementStore == null)
             throw new IllegalArgumentException();
@@ -2349,6 +2370,10 @@ abstract public class AbstractTripleStore extends
 
         try {
 
+            final LexiconRelation lexiconRelation = getLexiconRelation();
+
+            final SPORelation spoRelation = statementStore.getSPORelation();
+            
             if (!itr.hasNext())
                 return 0;
 
@@ -2362,7 +2387,7 @@ abstract public class AbstractTripleStore extends
 
             while (itr.hasNext()) {
 
-                final SPO[] a = itr.nextChunk();
+                final ISPO[] a = itr.nextChunk();
 
                 final int numStmts = a.length;
 
@@ -2382,7 +2407,7 @@ abstract public class AbstractTripleStore extends
                      * done to ensure that they remain consistent between the
                      * focusStore using by truth maintenance and the database.
                      */
-                    getLexiconRelation().addStatementIdentifiers(a, numStmts);
+                    lexiconRelation.addStatementIdentifiers(a, numStmts);
 
                     statementIdentifierTime = System.currentTimeMillis()
                             - begin;
@@ -2394,13 +2419,13 @@ abstract public class AbstractTripleStore extends
                 }
 
                 //@todo raise the filter into the caller's iterator?
-                final long numWritten = statementStore.getSPORelation().insert(
-                        a, numStmts, filter);
+                final long numWritten = spoRelation.insert(a, numStmts, filter);
 
                 mutationCount += numWritten;
                 
                 if (numStmts > 1000) {
 
+                    if(INFO)
                     log.info("Wrote "
                             + numStmts
                             + " statements (mutationCount="
@@ -2426,14 +2451,14 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    public long removeStatements(SPO[] stmts, int numStmts) {
+    public long removeStatements(ISPO[] stmts, int numStmts) {
 
-        return removeStatements(new ChunkedArrayIterator<SPO>(numStmts, stmts,
+        return removeStatements(new ChunkedArrayIterator<ISPO>(numStmts, stmts,
                 null/* keyOrder */), true);
 
     }
 
-    public long removeStatements(IChunkedOrderedIterator<SPO> itr) {
+    public long removeStatements(IChunkedOrderedIterator<ISPO> itr) {
 
         return removeStatements(itr, true);
         
@@ -2476,7 +2501,7 @@ abstract public class AbstractTripleStore extends
      *       enabled since you have to serialize incremental TM operations
      *       anyway.)
      */
-    public long removeStatements(IChunkedOrderedIterator<SPO> itr,
+    public long removeStatements(IChunkedOrderedIterator<ISPO> itr,
             boolean computeClosureForStatementIdentifiers) {
 
         if (itr == null)
@@ -2494,7 +2519,7 @@ abstract public class AbstractTripleStore extends
 
             while (itr.hasNext()) {
 
-                final SPO[] stmts = itr.nextChunk();
+                final ISPO[] stmts = itr.nextChunk();
 
                 // The #of statements that will be removed.
                 final int numStmts = stmts.length;
@@ -2528,8 +2553,8 @@ abstract public class AbstractTripleStore extends
      * @param src
      *            The source iterator.
      */
-    public IChunkedOrderedIterator<SPO> computeClosureForStatementIdentifiers(
-            IChunkedOrderedIterator<SPO> src) {
+    public IChunkedOrderedIterator<ISPO> computeClosureForStatementIdentifiers(
+            IChunkedOrderedIterator<ISPO> src) {
      
         if(!statementIdentifiers) {
             
@@ -2566,7 +2591,7 @@ abstract public class AbstractTripleStore extends
          * Note: The returned iterator will automatically release the backing
          * temporary store when it is closed or finalized.
          */
-        return new DelegateChunkedIterator<SPO>(tmp.getAccessPath(SPOKeyOrder.SPO).iterator()) {
+        return new DelegateChunkedIterator<ISPO>(tmp.getAccessPath(SPOKeyOrder.SPO).iterator()) {
             
             public void close() {
                 
@@ -2631,7 +2656,7 @@ abstract public class AbstractTripleStore extends
             statementCount0 = tempStore.getStatementCount();
 
             // visit the explicit statements since only they can have statement identifiers.
-            final IChunkedOrderedIterator<SPO> itr = tempStore.getAccessPath(
+            final IChunkedOrderedIterator<ISPO> itr = tempStore.getAccessPath(
                     SPOKeyOrder.SPO,ExplicitSPOFilter.INSTANCE).iterator();
 
             try {
@@ -2930,12 +2955,12 @@ abstract public class AbstractTripleStore extends
         
             return new BindingSetIterator(//
                   new BigdataStatementIteratorImpl(this,
-                  new ChunkedResolvingIterator<SPO,ISolution>(joinNexus.runQuery(program)){
+                  new ChunkedResolvingIterator<ISPO,ISolution>(joinNexus.runQuery(program)){
 
                     @Override
-                    protected SPO resolve(ISolution e) {
+                    protected ISPO resolve(ISolution e) {
                         
-                        return (SPO) e.get();
+                        return (ISPO) e.get();
                         
                     }
                       

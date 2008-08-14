@@ -16,7 +16,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOAccessPath extends AbstractAccessPath<SPO> {
+public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
     private static transient final long NULL = IRawTripleStore.NULL;
 
@@ -53,8 +53,9 @@ public class SPOAccessPath extends AbstractAccessPath<SPO> {
      * @param ndx
      * @param flags
      */
-    public SPOAccessPath(SPORelation relation, IPredicate<SPO> predicate,
-            IKeyOrder<SPO> keyOrder, IIndex ndx, int flags) {
+    @SuppressWarnings("unchecked")
+    public SPOAccessPath(SPORelation relation, IPredicate<ISPO> predicate,
+            IKeyOrder<ISPO> keyOrder, IIndex ndx, int flags) {
 
         super(relation, predicate, keyOrder, ndx, flags);
 

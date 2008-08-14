@@ -39,7 +39,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOPredicate implements IPredicate<SPO> {
+public class SPOPredicate implements IPredicate<ISPO> {
 
     private final String[] relationName;
     
@@ -49,7 +49,7 @@ public class SPOPredicate implements IPredicate<SPO> {
 
     private final IVariableOrConstant<Long> o;
 
-    private final IElementFilter<SPO> constraint;
+    private final IElementFilter<ISPO> constraint;
 
     public String getOnlyRelationName() {
         
@@ -88,7 +88,7 @@ public class SPOPredicate implements IPredicate<SPO> {
     public SPOPredicate(String[] relationName,
             IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
-            IElementFilter<SPO> constraint) {
+            IElementFilter<ISPO> constraint) {
         
         if (relationName == null)
             throw new IllegalArgumentException();
@@ -319,13 +319,13 @@ public class SPOPredicate implements IPredicate<SPO> {
 
     }
 
-    public IElementFilter<SPO> getConstraint() {
+    public IElementFilter<ISPO> getConstraint() {
 
         return constraint;
         
     }
 
-    public boolean equals(IPredicate<SPO> other) {
+    public boolean equals(IPredicate<ISPO> other) {
         
         if (this == other)
             return true;

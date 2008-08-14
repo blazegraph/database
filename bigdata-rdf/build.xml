@@ -69,7 +69,7 @@
         	        version="true"
         	            use="true"
         		   overview="../bigdata/overview.html"
-				windowtitle="bigdata (TM)"
+				windowtitle="bigdata&#174;"
                classpathref="build.classpath">
             <packageset dir="${bigdata.dir}/src/java"/>
             <packageset dir="${bigdata.jini.dir}/src/java"/>

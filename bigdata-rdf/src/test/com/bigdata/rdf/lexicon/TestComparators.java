@@ -35,9 +35,9 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.TermIdComparator;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -66,19 +66,19 @@ public class TestComparators extends TestCase2 {
         final long lp1 = 1L;
         final long lmax = Long.MAX_VALUE;
 
-        final _Value vmin = new _Literal("a"); vmin.termId = lmin;
-        final _Value vm1  = new _Literal("b"); vm1.termId = lm1;
-        final _Value v0   = new _Literal("c"); v0.termId = l0;
-        final _Value vp1  = new _Literal("d"); vp1.termId = lp1;
-        final _Value vmax = new _Literal("e"); vmax.termId = lmax;
+        final BigdataValue vmin = new BigdataLiteralImpl("a"); vmin.setTermId( lmin);
+        final BigdataValue vm1  = new BigdataLiteralImpl("b"); vm1 .setTermId( lm1 );
+        final BigdataValue v0   = new BigdataLiteralImpl("c"); v0  .clearTermId(); // Note: equivilent to setTermId( l0  );
+        final BigdataValue vp1  = new BigdataLiteralImpl("d"); vp1 .setTermId( lp1 );
+        final BigdataValue vmax = new BigdataLiteralImpl("e"); vmax.setTermId( lmax);
 
         // ids out of order.
-        long[] actualIds = new long[] { lm1, lmax, l0, lp1, lmin };
+        final long[] actualIds = new long[] { lm1, lmax, l0, lp1, lmin };
         // ids in order.
-        long[] expectedIds = new long[] { lmin, lm1, l0, lp1, lmax };
+        final long[] expectedIds = new long[] { lmin, lm1, l0, lp1, lmax };
         
         // values out of order.
-        _Value[] terms = new _Value[] { vmax, vm1, vmin, v0, vp1 };
+        final BigdataValue[] terms = new BigdataValue[] { vmax, vm1, vmin, v0, vp1 };
 
         /*
          * Test conversion of longs to unsigned byte[]s using the KeyBuilder and
@@ -114,7 +114,7 @@ public class TestComparators extends TestCase2 {
          * Test the term identifier comparator.
          */
         
-        Comparator<_Value> c = TermIdComparator.INSTANCE;
+        final Comparator<BigdataValue> c = TermIdComparator.INSTANCE;
 
         System.err.println("unsorted terms: "+Arrays.toString(terms));
         Arrays.sort(terms,c);

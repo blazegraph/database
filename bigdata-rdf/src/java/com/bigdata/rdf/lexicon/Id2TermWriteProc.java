@@ -33,7 +33,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 
@@ -93,12 +93,11 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
     }
 
     /**
-     * Conditionally inserts each key-value pair into the index. The keys
-     * are the term identifiers. The values are the terms as serialized by
-     * {@link _Value#serialize()}. Since a conditional insert is used, the
-     * operation does not cause terms that are already known to the ids
-     * index to be re-inserted, thereby reducing writes of dirty index
-     * nodes.
+     * Conditionally inserts each key-value pair into the index. The keys are
+     * the term identifiers. The values are the terms as serialized by
+     * {@link BigdataValueSerializer}. Since a conditional insert is used, the
+     * operation does not cause terms that are already known to the ids index to
+     * be re-inserted, thereby reducing writes of dirty index nodes.
      * 
      * @param ndx
      *            The index.
@@ -181,11 +180,12 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
                         else
                             suffix = '?';
 
+                        final BigdataValueSerializer valSer = new BigdataValueSerializer(null);
                         log.error("id=" + id + suffix);
                         log.error("val=" + BytesUtil.toString(val));
                         log.error("oldval=" + BytesUtil.toString(oldval));
-                        log.error("val=" + _Value.deserialize(val));
-                        log.error("oldval=" + _Value.deserialize(oldval));
+                        log.error("val=" + valSer.deserialize(val));
+                        log.error("oldval=" + valSer.deserialize(oldval));
                         log.error(ndx.getIndexMetadata().getPartitionMetadata().toString());
                         
                         throw new RuntimeException("Consistency problem: id="+ id);

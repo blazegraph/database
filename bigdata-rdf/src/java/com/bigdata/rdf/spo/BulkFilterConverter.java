@@ -86,7 +86,7 @@ public class BulkFilterConverter implements SPOConverter {
 
     }
 
-    public SPO[] convert(SPO[] chunk) {
+    public ISPO[] convert(ISPO[] chunk) {
 
         Arrays.sort(chunk, SPOComparator.INSTANCE);
                 

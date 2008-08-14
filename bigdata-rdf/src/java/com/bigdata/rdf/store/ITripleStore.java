@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -40,6 +38,7 @@ import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.DataLoader.Options;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
@@ -252,7 +251,7 @@ public interface ITripleStore {
      * @see IAccessPath
      * @see #asStatementIterator(IChunkedOrderedIterator)
      */
-    public IAccessPath<SPO> getAccessPath(Resource s, URI p, Value o);
+    public IAccessPath<ISPO> getAccessPath(Resource s, URI p, Value o);
     
     /**
      * Wraps an {@link IChunkedOrderedIterator} as a {@link BigdataStatementIterator}.
@@ -267,19 +266,19 @@ public interface ITripleStore {
      * @see IAccessPath
      * @see #getAccessPath(Resource, URI, Value)
      */
-    public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<SPO> src);
+    public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<ISPO> src);
 
     /**
-     * Convert an internal {@link SPO} into a Sesame {@link Statement}.
+     * Convert an internal {@link ISPO} into a Sesame {@link Statement}.
      * <p>
      * Note: The object returned will be a {@link BigdataStatement}
      * 
      * @param spo
-     *            The {@link SPO}.
+     *            The {@link ISPO}.
      * 
      * @return The Sesame {@link Statement} -or- <code>null</code>.
      */
-    public BigdataStatement asStatement(SPO spo);
+    public BigdataStatement asStatement(ISPO spo);
     
     /**
      * Return a {@link DataLoader} singleton configured using the properties

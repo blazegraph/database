@@ -38,6 +38,8 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.rules.TestJustifications;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.JustificationTupleSerializer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -667,7 +669,7 @@ public class Justification implements Comparable<Justification> {
             InferenceEngine inf,
             TempTripleStore focusStore,
             AbstractTripleStore db,
-            SPO head,
+            ISPO head,
             boolean testHead,
             boolean testFocusStore,
             VisitedSPOSet visited
@@ -683,9 +685,9 @@ public class Justification implements Comparable<Justification> {
         
         if(testHead) {
 
-            if(head.getType()!=StatementEnum.Inferred) return true;
+            if(head.getStatementType()!=StatementEnum.Inferred) return true;
             
-            if(inf.isAxiom(head.s, head.p, head.o)) return true;
+            if(inf.isAxiom(head.s(), head.p(), head.o())) return true;
 
             if(!visited.add(head)) {
                 
@@ -714,20 +716,20 @@ public class Justification implements Comparable<Justification> {
              * @todo could be optimized for a point test when fully bound?
              */
             
-            final IChunkedOrderedIterator<SPO> itr = db.getAccessPath(head.s,
-                    head.p, head.o).iterator();
+            final IChunkedOrderedIterator<ISPO> itr = db.getAccessPath(head.s(),
+                    head.p(), head.o()).iterator();
             
             try {
             
             while(itr.hasNext()) {
                 
-                final SPO spo = itr.next();
+                final ISPO spo = itr.next();
 
                 if(DEBUG) log.debug("considering: "+spo.toString(db));
                 
-                if(inf.isAxiom(spo.s, spo.p, spo.o)) return true;
+                if(inf.isAxiom(spo.s(), spo.p(), spo.o())) return true;
                 
-                if (spo.getType() == StatementEnum.Explicit) {
+                if (spo.getStatementType() == StatementEnum.Explicit) {
 
                     /*
                      * If we do not have to test the focusStore then we are
@@ -743,7 +745,7 @@ public class Justification implements Comparable<Justification> {
                      * statements that is being retracted.
                      */
 
-                    if (!focusStore.hasStatement(spo.s, spo.p, spo.o)) {
+                    if (!focusStore.hasStatement(spo.s(), spo.p(), spo.o())) {
 
                         /*
                          * This spo provides grounded support for a
@@ -927,7 +929,7 @@ public class Justification implements Comparable<Justification> {
          * @return <code>true</code> iff the set did not already contain the
          *         element (i.e., if the element was added to the set).
          */
-        public boolean add(SPO spo) {
+        public boolean add(ISPO spo) {
 
             if (DEBUG)
                 log.debug(spo.toString());

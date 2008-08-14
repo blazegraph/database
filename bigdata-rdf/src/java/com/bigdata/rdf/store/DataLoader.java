@@ -833,7 +833,7 @@ public class DataLoader {
              * or the DataLoader instance is being used by concurrent threads.
              */
             
-            buffer.clear();
+            buffer.reset();
             
         }
         
@@ -930,7 +930,7 @@ public class DataLoader {
             if(buffer != null) {
             
                 // clear any buffer statements.
-                buffer.clear();
+                buffer.reset();
 
                 if (tm != null) {
                     

@@ -24,7 +24,7 @@
   <!-- compatibility reasons, no leading/trailing newlines and -->
   <!-- 72 character length limit.                              -->
 
-  <shortDescription>bigdata(TM)</shortDescription>
+  <shortDescription>bigdata&#174;</shortDescription>
 
   <description>
 
@@ -34,7 +34,7 @@
 
   <p>
 
-	  bigdata&#169; is a scale-out data and computing fabric designed for commodity hardware. 
+	  bigdata&#174; is a scale-out data and computing fabric designed for commodity hardware. 
 
   </p>
   <p>
@@ -267,22 +267,21 @@
   <dl>
 
   <dt>CouchDB</dt>
-  <dd>http://couchdb.org/CouchDB/CouchDBWeb.nsf/Home?OpenForm</dd>
+  <dd><a href="http://couchdb.org/CouchDB/CouchDBWeb.nsf/Home?OpenForm">CouchDB</a></dd>
 
   <dt>bigtable</dt>
-  <dd>http://labs.google.com/papers/bigtable.html, http://www.techcrunch.com/2008/04/04/source-google-to-launch-bigtable-as-web-service/</dd>
+  <dd><a href="http://labs.google.com/papers/bigtable.html">Google publication</a>,
+  	  <a href="http://www.techcrunch.com/2008/04/04/source-google-to-launch-bigtable-as-web-service/">Google to launch bigtable as web service</a>.</dd>
 
   <dt>map/reduce</dt>
-  <dd>http://labs.google.com/papers/mapreduce.html</dd>
+  <dd><a href="http://labs.google.com/papers/mapreduce.html">Google publication</a></dd>
 
   <dt>Hadoop &amp; HBase</dt>
-  <dd>http://lucene.apache.org/hadoop/</dd>
+  <dd><a href="http://lucene.apache.org/hadoop/">HBase project at Hadoop</a></dd>
 
-  <dt>Pig</dt>
-  <dd>http://research.yahoo.com/node/90</dd>
-
-  <dt>Sawsall</dt>
-  <dd>http://labs.google.com/papers/sawzall.html</dd>
+  <dt>Pig and Sawsall</dt>
+  <dd><a href="http://research.yahoo.com/node/90">Pig at Yahoo</a> and
+      <a href="http://labs.google.com/papers/sawzall.html">Google publication</a></dd>
 
   <dt>Boxwood</dt>
   <dd>http://research.microsoft.com/research/sv/Boxwood/</dd>
@@ -295,6 +294,9 @@
 
   <dt>mg4j</dt>
   <dd>http://mg4j.dsi.unimi.it/</dd>
+
+  <dt>zookeeper</dt>
+  <dd>http://zookeeper.sourceforge.net/</dd>
 
   <dt>Cassandra (FaceBook)</dt>
   <dd>http://www.25hoursaday.com/weblog/CommentView.aspx?guid=c573171e-8e62-45b4-b85c-7b411b528e51#commentstart</dd>

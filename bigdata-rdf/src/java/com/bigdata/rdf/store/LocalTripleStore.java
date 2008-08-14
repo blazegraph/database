@@ -50,7 +50,7 @@ import com.bigdata.relation.locator.DefaultResourceLocator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalTripleStore extends AbstractLocalTripleStore implements ITripleStore {
+public class LocalTripleStore extends AbstractLocalTripleStore {
 
     protected final Journal store;
 

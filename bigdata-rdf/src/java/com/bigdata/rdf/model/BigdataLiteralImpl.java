@@ -53,15 +53,15 @@ import java.math.BigInteger;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
-
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataLiteralImpl extends BigdataValueImpl implements BigdataLiteral {
+public class BigdataLiteralImpl extends BigdataValueImpl implements
+        BigdataLiteral {
 
     /**
      * 
@@ -70,51 +70,34 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements BigdataLiter
 
     private final String label;
     private final String language;
-    private final BigdataURIImpl datatype;
+    private final BigdataURI datatype;
+
+    public BigdataLiteralImpl(String label) {
+
+        this(null, label, null/* language */, null/* datatype */);
+
+    }
+
+    public BigdataLiteralImpl(String label, String language) {
+
+        this(null, label, language, null/* datatype */);
+
+    }
+
+    public BigdataLiteralImpl(String label, URI datatype) {
+
+        this(null, label, null/* language */, new BigdataURIImpl(datatype
+                .stringValue()));
+
+    }
 
     /**
-     * Create a new {@link BigdataLiteral} having the same data and NO term
-     * identifier.
-     * 
-     * @param lit
-     *            A literal.
+     * Used by {@link BigdataValueFactoryImpl}.
      */
-    public BigdataLiteralImpl(Literal lit) {
+    BigdataLiteralImpl(BigdataValueFactory valueFactory, String label,
+            String language, BigdataURI datatype) {
 
-        this(lit.getLabel(), lit.getLanguage(),
-                (lit.getDatatype() == null ? null : new BigdataURIImpl(lit
-                        .getDatatype())), NULL);
-
-    }
-    
-    public BigdataLiteralImpl(_Literal lit) {
-        
-        this(lit.term, lit.language, (lit.datatype == null ? null : new BigdataURIImpl(
-                lit.datatype)), lit.termId);
-        
-    }
-
-    public BigdataLiteralImpl(String label, long termId) {
-        
-        this(label, null, null, termId);
-        
-    }
-
-    public BigdataLiteralImpl(String label, String language, long termId) {
-        
-        this(label, language, null, termId);
-        
-    }
-
-    public BigdataLiteralImpl(String label, BigdataURIImpl datatype, long termId) {
-
-        this(label, null, datatype, termId);
-        
-    }
-    
-    public BigdataLiteralImpl(String label, String language, BigdataURIImpl datatype, long termId) {
-        
-        super( termId );
+        super(valueFactory, NULL);
 
         if (label == null)
             throw new IllegalArgumentException();
@@ -145,31 +128,31 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements BigdataLiter
         
     }
 
-    public String getLabel() {
+    final public String getLabel() {
 
         return label;
         
     }
 
-    public String getLanguage() {
+    final public String getLanguage() {
 
         return language;
         
     }
 
-    public BigdataURI getDatatype() {
+    final public BigdataURI getDatatype() {
 
         return datatype;
         
     }
 
-    public int hashCode() {
+    final public int hashCode() {
         
         return label.hashCode();
         
     }
     
-    public boolean equals(Object o) {
+    final public boolean equals(Object o) {
 
         if (!(o instanceof Literal))
             return false;
@@ -178,7 +161,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements BigdataLiter
         
     }
     
-    public boolean equals(Literal o) {
+    final public boolean equals(Literal o) {
 
         if (this == o)
             return true;
@@ -207,61 +190,61 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements BigdataLiter
      * XSD stuff.
      */
     
-    public boolean booleanValue() {
+    final public boolean booleanValue() {
 
         return XMLDatatypeUtil.parseBoolean(label);
 
     }
 
-    public byte byteValue() {
+    final public byte byteValue() {
 
         return XMLDatatypeUtil.parseByte(label);
 
     }
 
-    public short shortValue() {
+    final public short shortValue() {
 
         return XMLDatatypeUtil.parseShort(label);
 
     }
 
-    public int intValue() {
+    final public int intValue() {
 
         return XMLDatatypeUtil.parseInt(label);
 
     }
 
-    public long longValue() {
+    final public long longValue() {
 
         return XMLDatatypeUtil.parseLong(label);
 
     }
 
-    public float floatValue() {
+    final public float floatValue() {
 
         return XMLDatatypeUtil.parseFloat(label);
 
     }
 
-    public double doubleValue() {
+    final public double doubleValue() {
 
         return XMLDatatypeUtil.parseDouble(label);
 
     }
 
-    public BigInteger integerValue() {
+    final public BigInteger integerValue() {
 
         return XMLDatatypeUtil.parseInteger(label);
 
     }
 
-    public BigDecimal decimalValue() {
+    final public BigDecimal decimalValue() {
 
         return XMLDatatypeUtil.parseDecimal(label);
 
     }
 
-    public XMLGregorianCalendar calendarValue() {
+    final public XMLGregorianCalendar calendarValue() {
 
         return XMLDatatypeUtil.parseCalendar(label);
 

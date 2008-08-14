@@ -57,6 +57,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -222,7 +223,7 @@ public class TruthMaintenance {
      *       is extremely large.
      */
     static public int applyExistingStatements(AbstractTripleStore focusStore,
-            AbstractTripleStore database, IElementFilter<SPO> filter) {
+            AbstractTripleStore database, IElementFilter<ISPO> filter) {
         
         log.info("Filtering statements already known to the database");
 
@@ -233,7 +234,7 @@ public class TruthMaintenance {
          * explicit).
          */
 
-        final IChunkedOrderedIterator<SPO> itr = focusStore.getAccessPath(
+        final IChunkedOrderedIterator<ISPO> itr = focusStore.getAccessPath(
                 SPOKeyOrder.SPO, ExplicitSPOFilter.INSTANCE).iterator();
 
         int nremoved = 0;
@@ -272,9 +273,11 @@ public class TruthMaintenance {
 
             while (itr.hasNext()) {
 
-                SPO[] chunk = itr.nextChunk();
+                final ISPO[] chunk = itr.nextChunk();
 
-                for (SPO spo : chunk) {
+                for(int i=0; i<chunk.length; i++) {
+                    
+                    final SPO spo = (SPO)chunk[i];
 
                     // Lookup the statement in the database.
                     SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
@@ -283,7 +286,7 @@ public class TruthMaintenance {
 
                         // The statement is known to the database.
 
-                        if (tmp.getType() == StatementEnum.Explicit) {
+                        if (tmp.getStatementType() == StatementEnum.Explicit) {
                             
                             /*
                              * Since the statement is already explicit in the
@@ -595,7 +598,7 @@ public class TruthMaintenance {
                 .getProperties(), database);
         
         // consider each statement in the tempStore.
-        final IChunkedOrderedIterator<SPO> itr = tempStore.getAccessPath(SPOKeyOrder.SPO).iterator();
+        final IChunkedOrderedIterator<ISPO> itr = tempStore.getAccessPath(SPOKeyOrder.SPO).iterator();
 
         final long nretracted;
         try {
@@ -657,9 +660,11 @@ public class TruthMaintenance {
 
             while (itr.hasNext()) {
 
-                final SPO[] chunk = itr.nextChunk();
+                final ISPO[] chunk = itr.nextChunk();
 
-                for (SPO spo : chunk) {
+                for(int i=0; i<chunk.length; i++) {
+
+                    final SPO spo = (SPO)chunk[i];
 
                     assert spo.isFullyBound();
                     
@@ -674,7 +679,7 @@ public class TruthMaintenance {
                         
                     }
 
-                    if (spo.getType() == StatementEnum.Axiom) {
+                    if (spo.getStatementType() == StatementEnum.Axiom) {
 
                         /*
                          * Ignore.
@@ -682,7 +687,7 @@ public class TruthMaintenance {
                         if (INFO)
                             log.info("Ignoring axiom in the tempStore: "+spo);
                         
-                    } else if( depth>0 && spo.getType()==StatementEnum.Explicit ) {
+                    } else if( depth>0 && spo.getStatementType()==StatementEnum.Explicit ) {
                         
                         /*
                          * Closure produces inferences (rather than explicit
@@ -693,7 +698,7 @@ public class TruthMaintenance {
                                 "Explicit statement in the tempStore at depth="
                                         + depth + ", " + spo.toString(database));
                         
-                    } else if (inferenceEngine.isAxiom(spo.s, spo.p, spo.o)) {
+                    } else if (inferenceEngine.isAxiom(spo.s(), spo.p(), spo.o())) {
                         
                         /*
                          * Convert back to an axiom. We need this in case an
@@ -706,10 +711,10 @@ public class TruthMaintenance {
                          * in the DoNotAddFilter.
                          */
                         
-                        final SPO tmp = new SPO(spo.s, spo.p, spo.o,
+                        final SPO tmp = new SPO(spo.s(), spo.p(), spo.o(),
                                 StatementEnum.Axiom);
 
-                        tmp.override = true;
+                        tmp.setOverride(true);
 
                         downgradeBuffer.add(tmp, null);                        
 
@@ -740,7 +745,7 @@ public class TruthMaintenance {
                         final SPO tmp = new SPO(spo.s, spo.p, spo.o,
                                 StatementEnum.Inferred);
 
-                        tmp.override = true;
+                        tmp.setOverride(true);
 
                         downgradeBuffer.add(tmp, null);
 

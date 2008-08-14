@@ -31,7 +31,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
@@ -157,7 +157,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
         /**
          * @see #getView()
          */
-        private transient IRelation<SPO> view = null;
+        private transient IRelation<ISPO> view = null;
         
         private final static transient long NULL = IRawTripleStore.NULL;
 
@@ -302,10 +302,10 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                 stats.nsubqueries[0]++;
 
-                final IAccessPath<SPO> accessPath = relation.getAccessPath(
+                final IAccessPath<ISPO> accessPath = relation.getAccessPath(
                         NULL, p, NULL);
 
-                final IChunkedOrderedIterator<SPO> itr2 = accessPath.iterator();
+                final IChunkedOrderedIterator<ISPO> itr2 = accessPath.iterator();
 
                 // ISPOIterator itr2 = (state.focusStore == null ?
                 // state.database
@@ -319,7 +319,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                     while (itr2.hasNext()) {
 
-                        final SPO[] chunk = itr2.nextChunk(SPOKeyOrder.POS);
+                        final ISPO[] chunk = itr2.nextChunk(SPOKeyOrder.POS);
 
                         stats.chunkCount[0] ++;
 
@@ -332,7 +332,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                         }
 
-                        for (SPO spo : chunk) {
+                        for (ISPO spo : chunk) {
 
                             /*
                              * Note: since P includes rdfs:subPropertyOf (as
@@ -345,7 +345,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                              * @todo so, filter out explicit and axioms?
                              */
 
-                            assert spo.p == p;
+                            assert spo.p() == p;
 
                             joinNexus.copyValues(spo, rule.getTail(0),
                                     bindingSet);
@@ -410,7 +410,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          * Return the {@link IRelation} (or {@link RelationFusedView}) used by
          * the {@link #getSet()} impls for their {@link IAccessPath}s.
          */
-        synchronized protected IRelation<SPO> getView() {
+        synchronized protected IRelation<ISPO> getView() {
 
             if (view == null) {
              
@@ -425,7 +425,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                     final long timestamp = joinNexus.getReadTimestamp(database);
                    
-                    return (IRelation<SPO>)resourceLocator.locate(database, timestamp);
+                    return (IRelation<ISPO>)resourceLocator.locate(database, timestamp);
 
                 } else {
 
@@ -433,10 +433,10 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                     final long timestamp1 = joinNexus.getReadTimestamp(focusStore);
 
-                    return new RelationFusedView<SPO>(
+                    return new RelationFusedView<ISPO>(
                             //
-                            (IRelation<SPO>)resourceLocator.locate(database, timestamp0),
-                            (IRelation<SPO>)resourceLocator.locate(focusStore, timestamp1));
+                            (IRelation<ISPO>)resourceLocator.locate(database, timestamp0),
+                            (IRelation<ISPO>)resourceLocator.locate(focusStore, timestamp1));
 
                 }
                     // final IAccessPath accessPath = (focusStore == null //
@@ -506,10 +506,10 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
         
         final static protected Logger log = Logger.getLogger(SubPropertyClosureTask.class);
 
-        private final IRelation<SPO> view; // Note: Not serializable.
+        private final IRelation<ISPO> view; // Note: Not serializable.
         private final IConstant<Long> rdfsSubPropertyOf;
         
-        public SubPropertyClosureTask(IRelation<SPO> view,
+        public SubPropertyClosureTask(IRelation<ISPO> view,
                 IConstant<Long> rdfsSubPropertyOf) {
 
             if (view == null)
@@ -571,7 +571,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                                 Var.var("x"), new Constant<Long>(p), Var.var("y")//
                                 );
                         
-                        final IAccessPath<SPO> accessPath = view
+                        final IAccessPath<ISPO> accessPath = view
                                 .getAccessPath(pred);
                         
 //                        final IAccessPath accessPath = (focusStore == null //
@@ -581,19 +581,19 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 //                                        database.getAccessPath(NULL, p, NULL)//
 //                                ));
 
-                        final IChunkedOrderedIterator<SPO> itr = accessPath.iterator();
+                        final IChunkedOrderedIterator<ISPO> itr = accessPath.iterator();
 
                         try {
 
                             while (itr.hasNext()) {
 
-                                final SPO[] stmts = itr.nextChunk();
+                                final ISPO[] stmts = itr.nextChunk();
 
-                                for (SPO stmt : stmts) {
+                                for (ISPO stmt : stmts) {
 
-                                    if (P.contains(stmt.o)) {
+                                    if (P.contains(stmt.o())) {
 
-                                        tmp.add(stmt.s);
+                                        tmp.add(stmt.s());
 
                                     }
 
@@ -659,11 +659,11 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
         final static protected Logger log = Logger.getLogger(SubPropertyClosureTask.class);
 
-        private final IRelation<SPO> view; // Note: Not serializable.
+        private final IRelation<ISPO> view; // Note: Not serializable.
         private final IConstant<Long> rdfsSubPropertyOf;
         private final IConstant<Long> p;
         
-        public SubPropertiesOfClosureTask(IRelation<SPO> view,
+        public SubPropertiesOfClosureTask(IRelation<ISPO> view,
                 IConstant<Long> rdfsSubPropertyOf, IConstant<Long> p) {
             
             if (view == null)
@@ -704,7 +704,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                     Var.var("x"), rdfsSubPropertyOf, p//
             );
             
-            final IAccessPath<SPO> accessPath = view.getAccessPath(pred);
+            final IAccessPath<ISPO> accessPath = view.getAccessPath(pred);
             
 //            final IAccessPath accessPath = //
 //            (focusStore == null //
@@ -732,17 +732,17 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
              * Note: This query is two-bound on the POS index.
              */
 
-            final IChunkedOrderedIterator<SPO> itr = accessPath.iterator();
+            final IChunkedOrderedIterator<ISPO> itr = accessPath.iterator();
 
             try {
 
                 while (itr.hasNext()) {
 
-                    SPO[] stmts = itr.nextChunk();
+                    final ISPO[] stmts = itr.nextChunk();
 
-                    for (SPO spo : stmts) {
+                    for (ISPO spo : stmts) {
 
-                        boolean added = tmp.add(spo.s);
+                        boolean added = tmp.add(spo.s());
 
                         if (log.isDebugEnabled())
                             log.debug(spo.toString(/* database */)

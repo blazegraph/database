@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.ISPOAssertionBuffer;
 import com.bigdata.rdf.spo.JustificationWriter;
 import com.bigdata.rdf.spo.SPO;
@@ -45,11 +46,8 @@ import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffe
 import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
- * A buffer for {@link SPO}s and optional {@link Justification}s that is
+ * A buffer for {@link ISPO}s and optional {@link Justification}s that is
  * flushed on overflow into a backing {@link AbstractTripleStore}.
- * 
- * @todo make this thread-safe to support parallel execution of rules writing on
- *       the same buffer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -125,7 +123,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
      *            focusStore {@link Justification}s for entailments.
      */
     public SPOAssertionBuffer(AbstractTripleStore focusStore,
-            AbstractTripleStore db, IElementFilter<SPO> filter, int capacity,
+            AbstractTripleStore db, IElementFilter<ISPO> filter, int capacity,
             boolean justified) {
 
         super(db, filter, capacity);
@@ -186,7 +184,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             n = db.addStatements(
                             focusStore,
                             true/* copyOnly */,
-                            new ChunkedArrayIterator<SPO>(numStmts, stmts, null/*keyOrder*/),
+                            new ChunkedArrayIterator<ISPO>(numStmts, stmts, null/*keyOrder*/),
                             null/*filter*/);
 
         } else {
@@ -210,7 +208,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
 
             // task will write SPOs on the statement indices.
             tasks.add(new StatementWriter(getTermDatabase(), focusStore,
-                    false/* copyOnly */, new ChunkedArrayIterator<SPO>(
+                    false/* copyOnly */, new ChunkedArrayIterator<ISPO>(
                             numStmts, stmts, null/*keyOrder*/), nwritten));
             
             // task will write justifications on the justifications index.

@@ -53,43 +53,80 @@ package com.bigdata.rdf.model;
  */
 public abstract class BigdataValueImpl implements BigdataValue {
 
+    private transient BigdataValueFactory valueFactory;
+
     private long termId;
 
+    public final BigdataValueFactory getValueFactory() {
+        
+        return valueFactory;
+        
+    }
+    
     /**
+     * 
+     * @param valueFactory
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if a different {@link BigdataValueFactoryImpl} has already been
+     *             set.
+     */
+    public final void setValueFactory(BigdataValueFactory valueFactory) {
+
+        if (valueFactory == null)
+            throw new IllegalArgumentException();
+
+        if (this.valueFactory != null && this.valueFactory != valueFactory)
+            throw new IllegalStateException();
+
+        this.valueFactory = valueFactory;
+        
+    }
+    
+    /**
+     * @param valueFactory
+     *            The value factory that created this object (optional).
      * @param termId
      *            The term identifier (optional).
      */
-    public BigdataValueImpl(long termId) {
+    protected BigdataValueImpl(BigdataValueFactory valueFactory, long termId) {
+        
+//        if (valueFactory == null)
+//            throw new IllegalArgumentException();
+        
+        this.valueFactory = valueFactory;
         
         this.termId = termId;
         
     }
 
-    
-    public void clearTermId() {
+    final public void clearTermId() {
 
         termId = NULL;
         
     }
 
-    public long getTermId() {
+    final public long getTermId() {
 
         return termId;
         
     }
 
-    final public void setTermId(long termId) {
-    
+    final public void setTermId(final long termId) {
+
         if (termId == NULL) {
-        
+
             throw new IllegalArgumentException();
-            
+
         }
-        
-        if (this.termId != NULL && termId != this.termId) {
-        
-            throw new IllegalStateException();
-            
+
+        if (this.termId != NULL && this.termId != termId) {
+
+            throw new IllegalStateException("termId already assigned: old="
+                    + this.termId + ", new=" + termId);
+
         }
         
         this.termId = termId;

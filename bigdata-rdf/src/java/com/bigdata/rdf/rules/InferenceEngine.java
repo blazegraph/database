@@ -37,11 +37,13 @@ import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.OwlAxioms;
 import com.bigdata.rdf.inf.RdfsAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
@@ -677,6 +679,45 @@ public class InferenceEngine extends RDFSVocabulary {
     }
 
     /**
+     * Variant that accepts an {@link IPredicate} as a triple pattern.
+     * 
+     * @param predicate
+     * 
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public IChunkedOrderedIterator<ISPO> backchainIterator(IPredicate<ISPO> predicate) {
+        
+        final long s, p, o;
+        {
+
+            final IVariableOrConstant<Long> t = predicate.get(0);
+
+            s = t.isVar() ? NULL : t.get();
+
+        }
+
+        {
+
+            final IVariableOrConstant<Long> t = predicate.get(1);
+
+            p = t.isVar() ? NULL : t.get();
+
+        }
+        
+        {
+
+            final IVariableOrConstant<Long> t = predicate.get(2);
+
+            o = t.isVar() ? NULL : t.get();
+
+        }
+
+        return backchainIterator(s, p, o);
+
+    }
+    
+    /**
      * Obtain an iterator that will read on the appropriate {@link IAccessPath}
      * for the database and also backchain any entailments for which forward
      * chaining has been turned off, including {@link RuleOwlSameAs2},
@@ -692,7 +733,7 @@ public class InferenceEngine extends RDFSVocabulary {
      * @return An iterator that will visit the statements in database matching
      *         the triple pattern query plus any necessary entailments.
      */
-    public IChunkedOrderedIterator<SPO> backchainIterator(long s, long p, long o) {
+    public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p, long o) {
         
         return backchainIterator(s, p, o, null );
         
@@ -714,14 +755,14 @@ public class InferenceEngine extends RDFSVocabulary {
      * @return An iterator that will visit the statements in database matching
      *         the triple pattern query plus any necessary entailments.
      */
-    public IChunkedOrderedIterator<SPO> backchainIterator(long s, long p,
-            long o, IElementFilter<SPO> filter) {
+    public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p,
+            long o, IElementFilter<ISPO> filter) {
 
         // pass the filter to the server(s)
-        final IChunkedOrderedIterator<SPO> src = database.getAccessPath(s, p,
+        final IChunkedOrderedIterator<ISPO> src = database.getAccessPath(s, p,
                 o, filter).iterator();
         
-        final IChunkedOrderedIterator<SPO> ret;
+        final IChunkedOrderedIterator<ISPO> ret;
 
         if (rdfsOnly) {
             
@@ -757,8 +798,8 @@ public class InferenceEngine extends RDFSVocabulary {
          * type resource backchainer, below).
          */
 
-        IChunkedOrderedIterator<SPO> itr = (ret == null ? src
-                : new ChunkedWrappedIterator<SPO>(ret, database.bufferCapacity,
+        IChunkedOrderedIterator<ISPO> itr = (ret == null ? src
+                : new ChunkedWrappedIterator<ISPO>(ret, database.bufferCapacity,
                         null/*keyOrder*/, filter));
 
         if (!forwardChainRdfTypeRdfsResource) {

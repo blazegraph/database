@@ -37,6 +37,7 @@ import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -72,18 +73,18 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */ 
-public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SPO> {
+public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<ISPO> {
 
     protected static final Logger log = Logger.getLogger(BackchainTypeResourceIterator.class);
     
     protected final static transient long NULL = IRawTripleStore.NULL;
     
-    private final IChunkedOrderedIterator<SPO> _src;
-    private final Iterator<SPO> src;
+    private final IChunkedOrderedIterator<ISPO> _src;
+    private final Iterator<ISPO> src;
 //    private final long s;
 //    private final AbstractTripleStore db;
     private final long rdfType, rdfsResource;
-    private final IKeyOrder<SPO> keyOrder;
+    private final IKeyOrder<ISPO> keyOrder;
 
     /**
      * The subject(s) whose (s rdf:type rdfs:Resource) entailments will be
@@ -109,12 +110,12 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      * {@link #nextChunk(IKeyOrder)} in order to decide whether the chunk needs
      * to be sorted.
      */
-    private IKeyOrder<SPO> chunkKeyOrder = null; 
+    private IKeyOrder<ISPO> chunkKeyOrder = null; 
 
     /**
-     * The last {@link SPO} visited by {@link #next()}.
+     * The last {@link ISPO} visited by {@link #next()}.
      */
-    private SPO current = null;
+    private ISPO current = null;
     
     /**
      * Create an iterator that will visit all statements in the source iterator
@@ -142,7 +143,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      *            database.
      */
     @SuppressWarnings({ "unchecked", "serial" })
-    public BackchainTypeResourceIterator(IChunkedOrderedIterator<SPO> src,
+    public BackchainTypeResourceIterator(IChunkedOrderedIterator<ISPO> src,
             long s, long p, long o, AbstractTripleStore db, final long rdfType,
             final long rdfsResource) {
         
@@ -266,7 +267,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
         
     }
 
-    public IKeyOrder<SPO> getKeyOrder() {
+    public IKeyOrder<ISPO> getKeyOrder() {
 
         return keyOrder;
         
@@ -354,7 +355,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      * statement iterator is an explicit statement for the current subject, then
      * we emit the explicit statement. Otherwise we emit an inferred statement.
      */
-    public SPO next() {
+    public ISPO next() {
 
         if (!hasNext()) {
 
@@ -467,7 +468,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
      * a chunk the backchained entailments will always begin on a chunk
      * boundary.
      */
-    public SPO[] nextChunk() {
+    public ISPO[] nextChunk() {
 
         final int chunkSize = 10000;
         
@@ -486,7 +487,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
             
             chunkKeyOrder = keyOrder;
 
-            SPO[] s = new SPO[chunkSize];
+            ISPO[] s = new ISPO[chunkSize];
 
             int n = 0;
             
@@ -496,7 +497,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
                 
             }
             
-            SPO[] stmts = new SPO[n];
+            ISPO[] stmts = new ISPO[n];
             
             // copy so that stmts[] is dense.
             System.arraycopy(s, 0, stmts, 0, n);
@@ -557,12 +558,12 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<SP
         
     }
 
-    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+    public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
         
         if (keyOrder == null)
             throw new IllegalArgumentException();
 
-        final SPO[] stmts = nextChunk();
+        final ISPO[] stmts = nextChunk();
         
         if (chunkKeyOrder != keyOrder) {
 

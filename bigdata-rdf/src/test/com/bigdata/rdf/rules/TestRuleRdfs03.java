@@ -35,11 +35,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.inf.NoAxioms;
-import com.bigdata.rdf.rules.DoNotAddFilter;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleRdfs03;
-import com.bigdata.rdf.rules.RuleRdfs04b;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Rule;
@@ -109,7 +105,7 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             final Rule r = new RuleRdfs03(
                     store.getSPORelation().getNamespace(), inf);
             
-            final IElementFilter<SPO> filter = new DoNotAddFilter(inf,
+            final IElementFilter<ISPO> filter = new DoNotAddFilter(inf,
                     new NoAxioms(store), true/* forwardChainRdfTypeRdfsResource */);
             
             applyRule(store, r, filter/* , false justified */,

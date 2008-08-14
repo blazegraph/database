@@ -68,11 +68,11 @@ public class SPOIndexWriter implements Callable<Long> {
 
 //    private final AbstractTripleStore statementStore;
     
-    private final SPO[] stmts;
+    private final ISPO[] stmts;
 
     private final int numStmts;
     
-    private final IElementFilter<SPO> filter;
+    private final IElementFilter<ISPO> filter;
     
     private final AtomicLong sortTime;
     
@@ -80,7 +80,7 @@ public class SPOIndexWriter implements Callable<Long> {
     
     private final AtomicLong numWritten;
     
-    private final Comparator<SPO> comparator;
+    private final Comparator<ISPO> comparator;
 
     private final IIndex ndx;
 
@@ -118,8 +118,8 @@ public class SPOIndexWriter implements Callable<Long> {
      *            incremented when writing on the SPO index to avoid double
      *            counting).
      */
-    public SPOIndexWriter(SPORelation spoRelation, SPO[] a, int numStmts,
-            boolean clone, SPOKeyOrder keyOrder, IElementFilter<SPO> filter,
+    public SPOIndexWriter(SPORelation spoRelation, ISPO[] a, int numStmts,
+            boolean clone, SPOKeyOrder keyOrder, IElementFilter<ISPO> filter,
             AtomicLong sortTime, AtomicLong insertTime, AtomicLong numWritten) {
         
         if (spoRelation == null)
@@ -220,7 +220,7 @@ public class SPOIndexWriter implements Callable<Long> {
         
         int numToAdd = 0;
 
-        SPO last = null;
+        ISPO last = null;
 
         final byte[][] keys = new byte[numStmts][];
 
@@ -230,7 +230,7 @@ public class SPOIndexWriter implements Callable<Long> {
         
         for (int i = 0; i < numStmts; i++) {
 
-            final SPO spo = stmts[i];
+            final ISPO spo = stmts[i];
 
             if (spo == null)
                 throw new IllegalArgumentException("null @ index=" + i);

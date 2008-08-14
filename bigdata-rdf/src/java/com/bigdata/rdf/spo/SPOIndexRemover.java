@@ -43,7 +43,7 @@ public class SPOIndexRemover implements Callable<Long> {
     
     final SPOKeyOrder keyOrder;
 
-    final SPO[] a;
+    final ISPO[] a;
 
     final int numStmts;
 
@@ -51,7 +51,7 @@ public class SPOIndexRemover implements Callable<Long> {
 
     final AtomicLong writeTime;
 
-    public SPOIndexRemover(SPORelation spoRelation, SPO[] stmts, int numStmts,
+    public SPOIndexRemover(SPORelation spoRelation, ISPO[] stmts, int numStmts,
             SPOKeyOrder keyOrder, boolean clone, AtomicLong sortTime,
             AtomicLong writeTime) {
 
@@ -123,7 +123,7 @@ public class SPOIndexRemover implements Callable<Long> {
 
         for (int i = 0; i < numStmts; i++) {
 
-            final SPO spo = a[i];
+            final ISPO spo = a[i];
 
             if (DEBUG) {
 

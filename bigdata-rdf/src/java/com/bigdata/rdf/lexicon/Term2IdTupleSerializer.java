@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.rdf.lexicon;
 
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Properties;
 
 import org.openrdf.model.BNode;
@@ -63,12 +62,9 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Handles the term:id index (forward mapping for the lexicon). The keys are
@@ -292,7 +288,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
          * case-insensitive, so we force the code to upper case for the purposes of
          * comparisons.
          * 
-         * @see _Literal#language
+         * @see Literal#getLanguage()
          */
         public byte[] languageCodeLiteral2key(String languageCode, String text) {
             
@@ -341,7 +337,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
 
             } else if(datatype.equals(XMLSchema.DOUBLE)) {
                     
-                    keyBuilder.append(Double.parseDouble(value));
+                keyBuilder.append(Double.parseDouble(value));
                 
             } else if(datatype.equals(RDF.XMLLITERAL)) {
                 
@@ -391,9 +387,6 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
          *            An RDF value.
          * 
          * @return The sort key for that RDF value.
-         * 
-         * @todo can this be optimized for (and possibly restricted to) the case
-         *       where the {@link Value} is a {@link _Value}?
          */
         public byte[] value2Key(Value value) {
 
