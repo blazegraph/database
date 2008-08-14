@@ -364,7 +364,7 @@ public abstract class BaseAxioms implements Axioms {
                 for (SPO spo : stmts) {
 
                     btree.insert(tupleSer.statement2Key(SPOKeyOrder.SPO, spo),
-                            spo.getType().serialize());
+                            spo.getStatementType().serialize());
 
                 }
 

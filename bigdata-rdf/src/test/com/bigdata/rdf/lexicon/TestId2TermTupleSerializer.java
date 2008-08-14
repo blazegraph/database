@@ -47,12 +47,9 @@ Modifications:
 
 package com.bigdata.rdf.lexicon;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.Id2TermTupleSerializer;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.btree.BytesUtil;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -75,8 +72,10 @@ public class TestId2TermTupleSerializer extends TestCase2 {
 
     public void test_id2key() {
         
+        final String namespace = "lexicon";
+        
         final Id2TermTupleSerializer fixture = new Id2TermTupleSerializer(
-                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG));
+                namespace);
 
         long id1 = -1;
         long id2 = 0;

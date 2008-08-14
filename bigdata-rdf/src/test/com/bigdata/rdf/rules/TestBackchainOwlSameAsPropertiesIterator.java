@@ -36,6 +36,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -139,7 +140,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
             
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(y,NULL,NULL);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,
@@ -174,7 +175,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(y,b,NULL);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,
@@ -203,7 +204,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(NULL,NULL,w);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,
@@ -238,7 +239,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(NULL,a,w);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,
@@ -267,7 +268,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(x,NULL,z);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,
@@ -296,7 +297,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(x,b,z);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,
@@ -323,7 +324,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(NULL,a,NULL);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,
@@ -356,7 +357,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 SPOAccessPath accessPath = (SPOAccessPath)noClosure.getAccessPath(NULL,NULL,NULL);
                 
-                IChunkedOrderedIterator<SPO> itr = new BackchainOwlSameAsPropertiesIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.s,
                         accessPath.p,

@@ -31,6 +31,8 @@ import java.util.Iterator;
 import java.util.Properties;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -53,7 +55,7 @@ import com.bigdata.striterator.IKeyOrder;
 public class BackchainOwlSameAsPropertiesSPIterator extends
         BackchainOwlSameAsIterator {
     
-    private IChunkedOrderedIterator<SPO> sameAs2It, sameAs3It;
+    private IChunkedOrderedIterator<ISPO> sameAs2It, sameAs3It;
 
     private TempTripleStore sameAs2, sameAs3;
 
@@ -80,7 +82,7 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
      *            database.
      */
     public BackchainOwlSameAsPropertiesSPIterator(
-            IChunkedOrderedIterator<SPO> src, long s, long p,
+            IChunkedOrderedIterator<ISPO> src, long s, long p,
             AbstractTripleStore db, final long sameAs) {
         super(src, db, sameAs);
         Properties props = db.getProperties();
@@ -108,38 +110,38 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
             // get all of s's sames
             Iterator<Long> samesIt = getSames(s).iterator();
             while (samesIt.hasNext()) {
-                long same = samesIt.next();
+                final long same = samesIt.next();
                 // attach all of the same's properties to s
-                IChunkedOrderedIterator<SPO> propsIt = db.getAccessPath(same, p, NULL).iterator();
+                IChunkedOrderedIterator<ISPO> propsIt = db.getAccessPath(same, p, NULL).iterator();
                 while (propsIt.hasNext()) {
-                    SPO prop = propsIt.next();
+                    final ISPO prop = propsIt.next();
                     // do not add ( s sameAs s ) inferences
-                    if (prop.p == sameAs && s == prop.o) {
+                    if (prop.p() == sameAs && s == prop.o()) {
                         continue;
                     }
                     // flush the buffer if necessary
                     if (numSPOs == chunkSize) {
                         boolean present = false; // filter for not present
-                        IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos,
+                        IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos,
                                 numSPOs, present);
                         db.addStatements(sameAs2,copyOnly,absent, null);
                         numSPOs = 0;
                     }
                     // attach the p and o to the original s
-                    spos[numSPOs++] = new SPO(s, prop.p, prop.o,
+                    spos[numSPOs++] = new SPO(s, prop.p(), prop.o(),
                             StatementEnum.Inferred);
                 }
             }
             // final flush of the buffer
             boolean present = false; // filter for not present
-            IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos, numSPOs,
+            IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs,
                     present);
             db.addStatements(sameAs2,copyOnly,absent, null);
         }
         sameAs2It = sameAs2.getAccessPath(SPOKeyOrder.SPO).iterator();
     }
 
-    public IKeyOrder<SPO> getKeyOrder() {
+    public IKeyOrder<ISPO> getKeyOrder() {
         
         return src.getKeyOrder();
         
@@ -167,9 +169,9 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
      * up the sameAs{3} inferences, which will then be iterated once the first
      * two iterators are complete.
      */
-    public SPO next() {
+    public ISPO next() {
         canRemove = false;
-        SPO current = null;
+        ISPO current = null;
         if (src.hasNext()) {
             current = src.next();
             processSameAs3(current);
@@ -196,7 +198,7 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
      *            the spo being visited by the source iterator or the sameAs{2}
      *            iterator
      */
-    private void processSameAs3(SPO spo) {
+    private void processSameAs3(ISPO spo) {
         // join:
         // ( s p o ) x ( o sameAs ?same )
         // to produce ( s p ?same )
@@ -205,37 +207,37 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
         // use a buffer so that we can do a more efficient batch contains
         // to filter out existing statements
         int chunkSize = 10000;
-        SPO[] spos = new SPO[chunkSize];
+        ISPO[] spos = new ISPO[chunkSize];
         int numSPOs = 0;
         // get all of o's sames
-        Iterator<Long> samesIt = getSames(spo.o).iterator();
+        Iterator<Long> samesIt = getSames(spo.o()).iterator();
         while (samesIt.hasNext()) {
-            long same = samesIt.next();
+            final long same = samesIt.next();
             // do not add ( s sameAs s ) inferences
-            if (spo.p == sameAs && spo.s == same) {
+            if (spo.p() == sameAs && spo.s() == same) {
                 continue;
             }
             // flush the buffer if necessary
             if (numSPOs == chunkSize) {
                 boolean present = false; // filter for not present
-                IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos, numSPOs,
+                IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs,
                         present);
                 db.addStatements(sameAs3,copyOnly,absent, null);
                 numSPOs = 0;
             }
             // attach the new o to the original s and p
-            spos[numSPOs++] = new SPO(spo.s, spo.p, same,
+            spos[numSPOs++] = new SPO(spo.s(), spo.p(), same,
                     StatementEnum.Inferred);
         }
         // final flush of the buffer
         boolean present = false; // filter for not present
-        IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos, numSPOs, present);
+        IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs, present);
         db.addStatements(sameAs3,copyOnly,absent, null);
     }
 
-    public SPO[] nextChunk() {
+    public ISPO[] nextChunk() {
         final int chunkSize = 10000;
-        SPO[] s = new SPO[chunkSize];
+        ISPO[] s = new ISPO[chunkSize];
         int n = 0;
         while (hasNext() && n < chunkSize) {
             s[n++] = next();
@@ -246,10 +248,10 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
         return stmts;
     }
 
-    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+    public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
         if (keyOrder == null)
             throw new IllegalArgumentException();
-        SPO[] stmts = nextChunk();
+        ISPO[] stmts = nextChunk();
         if (src.getKeyOrder() != keyOrder) {
             // sort into the required order.
             Arrays.sort(stmts, 0, stmts.length, keyOrder.getComparator());

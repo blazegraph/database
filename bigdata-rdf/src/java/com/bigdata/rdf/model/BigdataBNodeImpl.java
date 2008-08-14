@@ -49,13 +49,25 @@ package com.bigdata.rdf.model;
 
 import org.openrdf.model.BNode;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
+ * A blank node.
+ * <p>
+ * Note: When {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} is
+ * enabled blank nodes in the context position of a statement are recognized as
+ * statement identifiers by {@link StatementBuffer}. It coordinates with this
+ * class in order to detect when a blank node is a statement identifier and to
+ * defer the assertion of statements made using a statement identifier until
+ * that statement identifier becomes defined by being paired with a statement.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataBNodeImpl extends BigdataResourceImpl implements BigdataBNode {
+public class BigdataBNodeImpl extends BigdataResourceImpl implements
+        BigdataBNode {
 
     /**
      * 
@@ -65,27 +77,24 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements BigdataBNod
     private final String id;
 
     /**
-     * Create a new {@link BigdataBNode} having the same data and NO term
+     * Boolean flag is set during conversion from an RDF interchange syntax
+     * into the internal {@link SPO} model if the blank node is a statement
      * identifier.
-     * 
-     * @param bnode
-     *            A blank node.
      */
-    public BigdataBNodeImpl(BNode bnode) {
-        
-        this(bnode.getID(), NULL);
-        
-    }
-    
-    public BigdataBNodeImpl(_BNode bnode) {
-        
-        this(bnode.term, bnode.termId);
-        
-    }
-    
-    public BigdataBNodeImpl(String id, long termId) {
+    public boolean statementIdentifier;
 
-        super(termId);
+    public BigdataBNodeImpl(String id) {
+
+        this(null, id);
+
+    }
+
+    /**
+     * Used by {@link BigdataValueFactoryImpl}.
+     */
+    BigdataBNodeImpl(BigdataValueFactory valueFactory, String id) {
+
+        super(valueFactory, NULL);
 
         if (id == null)
             throw new IllegalArgumentException();
@@ -106,7 +115,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements BigdataBNod
 
     }
 
-    public boolean equals(Object o) {
+    final public boolean equals(Object o) {
 
         if (!(o instanceof BNode))
             return false;
@@ -115,7 +124,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements BigdataBNod
 
     }
 
-    public boolean equals(BNode o) {
+    final public boolean equals(BNode o) {
 
         if (this == o)
             return true;
@@ -127,13 +136,13 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements BigdataBNod
 
     }
 
-    public int hashCode() {
+    final public int hashCode() {
 
         return id.hashCode();
 
     }
 
-    public String getID() {
+    final public String getID() {
 
         return id;
         

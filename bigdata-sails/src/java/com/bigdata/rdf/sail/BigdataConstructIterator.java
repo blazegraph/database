@@ -9,12 +9,13 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
-import com.bigdata.relation.accesspath.ChunkedWrappedIterator;
-import com.bigdata.relation.accesspath.IClosableIterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 public class BigdataConstructIterator implements
         CloseableIteration<Statement, QueryEvaluationException> {
@@ -29,24 +30,24 @@ public class BigdataConstructIterator implements
         this.db = db;
         stmtIt =
                 new BigdataStatementIteratorImpl(db, db
-                        .bulkCompleteStatements(new ChunkedWrappedIterator<SPO>(
+                        .bulkCompleteStatements(new ChunkedWrappedIterator<ISPO>(
                                 new SPOConverter(src))));
     }
 
     public boolean hasNext() throws QueryEvaluationException {
-        try {
+//        try {
             return stmtIt.hasNext();
-        } catch (SailException ex) {
-            throw new QueryEvaluationException(ex);
-        }
+//        } catch (SailException ex) {
+//            throw new QueryEvaluationException(ex);
+//        }
     }
 
     public Statement next() throws QueryEvaluationException {
-        try {
+//        try {
             return stmtIt.next();
-        } catch (SailException ex) {
-            throw new QueryEvaluationException(ex);
-        }
+//        } catch (SailException ex) {
+//            throw new QueryEvaluationException(ex);
+//        }
     }
 
     public void remove() throws QueryEvaluationException {
@@ -61,7 +62,7 @@ public class BigdataConstructIterator implements
         }
     }
 
-    private class SPOConverter implements IClosableIterator<SPO> {
+    private class SPOConverter implements ICloseableIterator<ISPO> {
         
         private final CloseableIteration<? extends BindingSet, QueryEvaluationException> src;
 

@@ -34,11 +34,11 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.AbstractRuleFastClosure_3_5_6_7_9.SubPropertyClosureTask;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -89,11 +89,11 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         
         try {
 
-            URI A = new _URI("http://www.foo.org/A");
-            URI B = new _URI("http://www.foo.org/B");
-            URI C = new _URI("http://www.foo.org/C");
+            final URI A = new BigdataURIImpl("http://www.foo.org/A");
+            final URI B = new BigdataURIImpl("http://www.foo.org/B");
+            final URI C = new BigdataURIImpl("http://www.foo.org/C");
 
-            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+            final URI rdfsSubPropertyOf = new BigdataURIImpl(RDFS.SUBPROPERTYOF);
 
             store.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
             store.addStatement(B, rdfsSubPropertyOf, A);
@@ -104,7 +104,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
 
             final RDFSVocabulary inf = new RDFSVocabulary(store);
 
-            final IRelation<SPO> view = store.getSPORelation();
+            final IRelation<ISPO> view = store.getSPORelation();
             
             final SubPropertyClosureTask task = new SubPropertyClosureTask(
                     view, inf.rdfsSubPropertyOf);

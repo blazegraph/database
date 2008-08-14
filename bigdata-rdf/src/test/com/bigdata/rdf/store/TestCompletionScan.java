@@ -56,8 +56,8 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * Unit tests for
@@ -95,18 +95,18 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
              */
             {
                 
-                _Value[] terms = new _Value[] {
+                final BigdataValue[] terms = new BigdataValue[] {
                         
-                        new _Literal("mingus"),
-                        new _Literal("minor"),
-                        new _Literal("minor league"),
-                        new _Literal("minor threat"),
-                        new _Literal("minority report"),
-                        new _Literal("missing report"),
+                        new BigdataLiteralImpl("mingus"),
+                        new BigdataLiteralImpl("minor"),
+                        new BigdataLiteralImpl("minor league"),
+                        new BigdataLiteralImpl("minor threat"),
+                        new BigdataLiteralImpl("minority report"),
+                        new BigdataLiteralImpl("missing report"),
                         
                 };
                 
-                store.addTerms(terms, terms.length);
+                store.addTerms(terms);
                 
             }
 

@@ -58,14 +58,19 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer.StatementCyclesException;
 import com.bigdata.rdf.rio.StatementBuffer.UnificationException;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -111,54 +116,57 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             }
 
-            _URI x = new _URI("http://www.foo.org/x");
-            _URI y = new _URI("http://www.foo.org/y");
-            _URI z = new _URI("http://www.foo.org/z");
+            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x");
+            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y");
+            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z");
     
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
+            final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
+            final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
+            final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
     
-            _URI rdfType = new _URI(RDF.TYPE);
-            _URI rdfsLabel = new _URI(RDFS.LABEL);
-            _URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+            final BigdataURI rdfsLabel = new BigdataURIImpl(RDFS.LABEL);
+            final BigdataURI rdfsSubClassOf = new BigdataURIImpl(RDFS.SUBCLASSOF);
     
-            _Literal lit1 = new _Literal("abc");
-            _Literal lit2 = new _Literal("abc", A);
-            _Literal lit3 = new _Literal("abc", "en");
+            final BigdataLiteral lit1 = new BigdataLiteralImpl("abc");
+            final BigdataLiteral lit2 = new BigdataLiteralImpl("abc", A);
+            final BigdataLiteral lit3 = new BigdataLiteralImpl("abc", "en");
     
-            _BNode bn1 = new _BNode(UUID.randomUUID().toString());
-            _BNode bn2 = new _BNode("a12");
-
-            _Value[] terms = new _Value[] {
-              
-                    x,y,z,//
-                    A,B,C,//
-                    rdfType,//
-                    rdfsLabel,//
-                    rdfsSubClassOf,//
-                    lit1,lit2,lit3,//
-                    bn1,bn2//
-                    
-            };
+            final BigdataBNode bn1 = new BigdataBNodeImpl(UUID.randomUUID().toString());
+            final BigdataBNode bn2 = new BigdataBNodeImpl("a12");
             
-            store.addTerms(terms, terms.length);
-            
-            SPO[] stmts = new SPO[] {
+            {
+                final BigdataValue[] terms = new BigdataValue[] {
 
-                new SPO(x.termId, rdfType.termId, C.termId, StatementEnum.Explicit),
-                new SPO(y.termId, rdfType.termId, B.termId, StatementEnum.Explicit),
-                new SPO(z.termId, rdfType.termId, A.termId, StatementEnum.Explicit),
+                        x, y, z,//
+                        A, B, C,//
+                        rdfType,//
+                        rdfsLabel,//
+                        rdfsSubClassOf,//
+                        lit1, lit2, lit3,//
+                        bn1, bn2 //
+
+                };
+
+                store.addTerms(terms);
                 
-                new SPO(A.termId, rdfsLabel.termId, lit1.termId, StatementEnum.Explicit),
-                new SPO(B.termId, rdfsLabel.termId, lit2.termId, StatementEnum.Explicit),
-                new SPO(C.termId, rdfsLabel.termId, lit3.termId, StatementEnum.Explicit),
+            }
+            
+            final SPO[] stmts = new SPO[] {
+
+                new SPO(x.getTermId(), rdfType.getTermId(), C.getTermId(), StatementEnum.Explicit),
+                new SPO(y.getTermId(), rdfType.getTermId(), B.getTermId(), StatementEnum.Explicit),
+                new SPO(z.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
                 
-                new SPO(B.termId, rdfsSubClassOf.termId, A.termId, StatementEnum.Explicit),
-                new SPO(C.termId, rdfsSubClassOf.termId, B.termId, StatementEnum.Explicit),
+                new SPO(A.getTermId(), rdfsLabel.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
+                new SPO(B.getTermId(), rdfsLabel.getTermId(), lit2.getTermId(), StatementEnum.Explicit),
+                new SPO(C.getTermId(), rdfsLabel.getTermId(), lit3.getTermId(), StatementEnum.Explicit),
+                
+                new SPO(B.getTermId(), rdfsSubClassOf.getTermId(), A.getTermId(), StatementEnum.Explicit),
+                new SPO(C.getTermId(), rdfsSubClassOf.getTermId(), B.getTermId(), StatementEnum.Explicit),
                     
-                new SPO(bn1.termId, rdfsLabel.termId, lit1.termId, StatementEnum.Explicit),
-                new SPO(bn2.termId, rdfsLabel.termId, lit2.termId, StatementEnum.Explicit),
+                new SPO(bn1.getTermId(), rdfsLabel.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
+                new SPO(bn2.getTermId(), rdfsLabel.getTermId(), lit2.getTermId(), StatementEnum.Explicit),
 
             };
 
@@ -198,7 +206,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             {
 
-                final IChunkedOrderedIterator<SPO> itr = store.getAccessPath(SPOKeyOrder.SPO).iterator();
+                final IChunkedOrderedIterator<ISPO> itr = store.getAccessPath(SPOKeyOrder.SPO).iterator();
                 
                 try {
                 
@@ -208,15 +216,15 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                     
                     final SPO expected = stmts[i];
                     
-                    final SPO actual = itr.next();
+                    final ISPO actual = itr.next();
 
-                    assertEquals("S @ i=" + i, expected.s, actual.s);
+                    assertEquals("S @ i=" + i, expected.s, actual.s());
 
-                    assertEquals("P @ i=" + i, expected.p, actual.p);
+                    assertEquals("P @ i=" + i, expected.p, actual.p());
 
-                    assertEquals("O @ i=" + i, expected.o, actual.o);
+                    assertEquals("O @ i=" + i, expected.o, actual.o());
 
-                    assertEquals("TYPE @ i=" + i, expected.getType(), actual.getType());
+                    assertEquals("TYPE @ i=" + i, expected.getStatementType(), actual.getStatementType());
 
                     assertEquals("SID @ i=" + i, expected
                             .getStatementIdentifier(), actual
@@ -250,7 +258,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                     
                     SPO spo = stmts[i];
                     
-                    a[i] = new SPO(spo.s, spo.p, spo.o, spo.getType());
+                    a[i] = new SPO(spo.s, spo.p, spo.o, spo.getStatementType());
                     
                 }
                 
@@ -350,7 +358,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                         SPO spo = stmts[i];
 
-                        a[i] = new SPO(spo.s, spo.p, spo.o, spo.getType());
+                        a[i] = new SPO(spo.s, spo.p, spo.o, spo.getStatementType());
 
                     }
 
@@ -406,41 +414,43 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             }
 
-            _URI x = new _URI("http://www.foo.org/x");
-            _URI y = new _URI("http://www.foo.org/y");
-            _URI z = new _URI("http://www.foo.org/z");
+            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x");
+            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y");
+            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z");
     
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
+            final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
+            final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
+            final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
     
-            _URI rdfType = new _URI(RDF.TYPE);
-//            _URI rdfsLabel = new _URI(RDFS.LABEL);
-            _URI dcCreator = new _URI("http://purl.org/dc/terms/creator");
+            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+//            final BigdataURI rdfsLabel = new BigdataURIImpl(RDFS.LABEL);
+            final BigdataURI dcCreator = new BigdataURIImpl("http://purl.org/dc/terms/creator");
     
-            _Literal lit1 = new _Literal("bryan");
-            _Literal lit2 = new _Literal("mike");
+            BigdataLiteral lit1 = new BigdataLiteralImpl("bryan");
+            BigdataLiteral lit2 = new BigdataLiteralImpl("mike");
     
-//            _BNode bn1 = new _BNode(UUID.randomUUID().toString());
-//            _BNode bn2 = new _BNode("a12");
+//            final BigdataBNode bn1 = new BigdataBNodeImpl(UUID.randomUUID().toString());
+//            final BigdataBNode bn2 = new BigdataBNodeImpl("a12");
 
-            _Value[] terms = new _Value[] {
-              
-                    x,y,z,//
-                    A,B,C,//
-                    rdfType,//
-//                    rdfsLabel,//
-                    dcCreator,//
-                    lit1,lit2,//
-//                    bn1,bn2//
-                    
-            };
-            
-            store.addTerms(terms, terms.length);
-            
-            SPO[] stmts1 = new SPO[] {
+            {
+                final BigdataValue[] terms = new BigdataValue[] {
 
-                new SPO(x.termId, rdfType.termId, A.termId, StatementEnum.Explicit),
+                x, y, z,//
+                        A, B, C,//
+                        rdfType,//
+                        // rdfsLabel,//
+                        dcCreator,//
+                        lit1, lit2,//
+                        // bn1,bn2//
+
+                };
+
+                store.addTerms(terms);
+            }
+            
+            final SPO[] stmts1 = new SPO[] {
+
+                new SPO(x.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
                 
             };
             
@@ -448,9 +458,9 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             final long sid1 = stmts1[0].getStatementIdentifier();
             
-            SPO[] stmts2 = new SPO[] {
+            final SPO[] stmts2 = new SPO[] {
               
-                    new SPO(sid1, dcCreator.termId, lit1.termId, StatementEnum.Explicit),
+                    new SPO(sid1, dcCreator.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
                     
             };
 
@@ -480,7 +490,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             {
                 
-                store.removeStatements(new ChunkedArrayIterator<SPO>(
+                store.removeStatements(new ChunkedArrayIterator<ISPO>(
                         stmts1.length, stmts1, null/*keyOrder*/));
 
                 assertSameSPOArray(store, new SPO[]{}, 0/*numStmts*/);
@@ -514,38 +524,42 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             }
 
-            _URI x = new _URI("http://www.foo.org/x");
-            _URI y = new _URI("http://www.foo.org/y");
-            _URI z = new _URI("http://www.foo.org/z");
+            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x");
+            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y");
+            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z");
     
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
+            final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
+            final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
+            final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
     
-            _URI rdfType = new _URI(RDF.TYPE);
-            _URI dcCreator = new _URI("http://purl.org/dc/terms/creator");
+            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+            final BigdataURI dcCreator = new BigdataURIImpl("http://purl.org/dc/terms/creator");
     
-            _Literal lit1 = new _Literal("bryan");
-            _Literal lit2 = new _Literal("mike");
-    
-            _Value[] terms = new _Value[] {
-              
-                    x,y,z,//
-                    A,B,C,//
-                    rdfType,//
-                    dcCreator,//
-                    lit1,lit2,//
-                    
-            };
-            
-            store.addTerms(terms, terms.length);
+            final BigdataLiteral lit1 = new BigdataLiteralImpl("bryan");
+            final BigdataLiteral lit2 = new BigdataLiteralImpl("mike");
+
+            {
+
+                final BigdataValue[] terms = new BigdataValue[] {
+
+                        x, y, z,//
+                        A, B, C,//
+                        rdfType,//
+                        dcCreator,//
+                        lit1, lit2,//
+
+                };
+
+                store.addTerms(terms);
+
+            }
             
             /*
              * create the original statement.
              */
             SPO[] stmts1 = new SPO[] {
 
-                new SPO(x.termId, rdfType.termId, A.termId, StatementEnum.Explicit),
+                new SPO(x.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
                 
             };
             
@@ -561,7 +575,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             SPO[] stmts2 = new SPO[] {
                     
-                    new SPO(sid1, dcCreator.termId, lit1.termId, StatementEnum.Explicit),
+                    new SPO(sid1, dcCreator.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
                     
             };
 
@@ -579,7 +593,8 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             SPO[] stmts3 = new SPO[] {
                     
-                    new SPO(sid2, dcCreator.termId, lit2.termId, StatementEnum.Explicit),
+                    new SPO(sid2, dcCreator.getTermId(), lit2.getTermId(),
+                    StatementEnum.Explicit),
                     
             };
 
@@ -612,7 +627,8 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             {
                 
-                store.removeStatements(new ChunkedArrayIterator<SPO>(stmts1.length,stmts1,null/*keyOrder*/));
+                store.removeStatements(new ChunkedArrayIterator<ISPO>(
+                        stmts1.length, stmts1, null/*keyOrder*/));
 
                 assertSameSPOArray(store, new SPO[]{}, 0/*numStmts*/);
 
@@ -644,7 +660,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
         
         Arrays.sort(all, 0, all.length, SPOComparator.INSTANCE);
 
-        final IChunkedOrderedIterator<SPO> itr = store.getAccessPath(
+        final IChunkedOrderedIterator<ISPO> itr = store.getAccessPath(
                 SPOKeyOrder.SPO).iterator();
 
         try {
@@ -655,16 +671,16 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                 final SPO expected = all[i];
 
-                final SPO actual = itr.next();
+                final ISPO actual = itr.next();
 
-                assertEquals("S @ i=" + i, expected.s, actual.s);
+                assertEquals("S @ i=" + i, expected.s, actual.s());
 
-                assertEquals("P @ i=" + i, expected.p, actual.p);
+                assertEquals("P @ i=" + i, expected.p, actual.p());
 
-                assertEquals("O @ i=" + i, expected.o, actual.o);
+                assertEquals("O @ i=" + i, expected.o, actual.o());
 
-                assertEquals("TYPE @ i=" + i, expected.getType(), actual
-                        .getType());
+                assertEquals("TYPE @ i=" + i, expected.getStatementType(), actual
+                        .getStatementType());
 
                 assertEquals("SID @ i=" + i, expected.getStatementIdentifier(),
                         actual.getStatementIdentifier());
@@ -698,31 +714,43 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             }
 
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI rdfType = new _URI(RDF.TYPE);
-            _BNode sid1 = new _BNode("_S1");
+            final BigdataValueFactoryImpl valueFactory = store.getValueFactory();
+            final BigdataURI A = valueFactory.createURI("http://www.foo.org/A");
+            final BigdataURI rdfType = valueFactory.createURI(RDF.TYPE.stringValue());
+            final BigdataBNode sid1 = valueFactory.createBNode("_S1");
 
-            StatementBuffer buf = new StatementBuffer(store,100/*capacity*/);
-            
-            // statement about itself is a cycle.
-            buf.add(sid1, rdfType, A, sid1);
-            
             /*
-             * Flush to the database, resolving statement identifiers as
-             * necessary.
+             * Note: Do NOT add the SIDs in advance to the lexicon. The will be
+             * assigned blank node term identifiers rather than statement term
+             * identifiers (SIDs). These differ in their bit pattern on the
+             * lower two bits.
              */
-            try {
+//            store.addTerms(new BigdataValue[] { A, rdfType, sid1 });
+            
+            {
+                StatementBuffer buf = new StatementBuffer(store, 100/* capacity */);
 
-                buf.flush();
+                // statement about itself is a cycle.
+                buf.add(sid1, rdfType, A, sid1);
 
-                fail("Expecting: "+StatementCyclesException.class);
-                
-            } catch(StatementCyclesException ex) {
-                
-                System.err.println("Ignoring expected exception: "+ex);
-                
+                /*
+                 * Flush to the database, resolving statement identifiers as
+                 * necessary.
+                 */
+                try {
+
+                    buf.flush();
+
+                    fail("Expecting: " + StatementCyclesException.class);
+
+                } catch (StatementCyclesException ex) {
+
+                    System.err.println("Ignoring expected exception: " + ex);
+
+                }
+
             }
-
+            
         } finally {
             
             store.closeAndDelete();
@@ -748,33 +776,45 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             }
 
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI rdfType = new _URI(RDF.TYPE);
-            _BNode sid1 = new _BNode("_S1");
-            _BNode sid2 = new _BNode("_S2");
+            final BigdataValueFactoryImpl valueFactory = store.getValueFactory();
+            final BigdataURI B = valueFactory.createURI("http://www.foo.org/B");
+            final BigdataURI rdfType = valueFactory.createURI(RDF.TYPE.stringValue());
+            final BigdataBNode sid1 = valueFactory.createBNode("_S1");
+            final BigdataBNode sid2 = valueFactory.createBNode("_S2");
 
-            StatementBuffer buf = new StatementBuffer(store,100/*capacity*/);
-            
-            // a cycle with a period of one.
-            buf.add(sid2, rdfType, B, sid1);
-            buf.add(sid1, rdfType, B, sid2);
-            
             /*
-             * Flush to the database, resolving statement identifiers as
-             * necessary.
+             * Note: Do NOT add the SIDs in advance to the lexicon. The will be
+             * assigned blank node term identifiers rather than statement term
+             * identifiers (SIDs). These differ in their bit pattern on the
+             * lower two bits.
              */
-            try {
+//            store.addTerms(new BigdataValue[] { B, rdfType, sid1, sid2 });
+            
+            {
+                StatementBuffer buf = new StatementBuffer(store, 100/* capacity */);
 
-                buf.flush();
+                // a cycle with a period of one.
+                buf.add(sid2, rdfType, B, sid1);
+                buf.add(sid1, rdfType, B, sid2);
+                
+                /*
+                 * Flush to the database, resolving statement identifiers as
+                 * necessary.
+                 */
+                try {
 
-                fail("Expecting: "+StatementCyclesException.class);
-                
-            } catch(StatementCyclesException ex) {
-                
-                System.err.println("Ignoring expected exception: "+ex);
-                
+                    buf.flush();
+
+                    fail("Expecting: "+StatementCyclesException.class);
+                    
+                } catch(StatementCyclesException ex) {
+                    
+                    System.err.println("Ignoring expected exception: "+ex);
+                    
+                }
+
             }
-
+            
         } finally {
             
             store.closeAndDelete();
@@ -801,11 +841,11 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             }
 
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
-            _URI rdfType = new _URI(RDF.TYPE);
-            _BNode sid1 = new _BNode("_S1");
+            final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
+            final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
+            final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
+            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+            final BigdataBNode sid1 = new BigdataBNodeImpl("_S1");
 
             StatementBuffer buf = new StatementBuffer(store,100/*capacity*/);
             

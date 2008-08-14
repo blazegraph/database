@@ -36,6 +36,10 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -183,6 +187,18 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     }
     
     /**
+     * Serialized as extended metadata. When <code>true</code> blank nodes
+     * are stored in the lexicon's forward index.
+     */
+    private boolean storeBlankNodes;
+    
+    public final boolean isStoreBlankNodes() {
+        
+        return storeBlankNodes;
+        
+    }
+    
+    /**
      * De-serialization constructor.
      */
     public Term2IdWriteProc() {
@@ -190,26 +206,31 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     }
     
     protected Term2IdWriteProc(IDataSerializer keySer, int fromIndex, int toIndex,
-            byte[][] keys, boolean readOnly) {
+            byte[][] keys, boolean readOnly, boolean storeBlankNodes) {
 
         super(keySer, null, fromIndex, toIndex, keys, null /* vals */);
         
         this.readOnly = readOnly;
+        
+        this.storeBlankNodes = storeBlankNodes;
         
     }
 
     public static class Term2IdWriteProcConstructor extends
             AbstractIndexProcedureConstructor<Term2IdWriteProc> {
 
-        public static Term2IdWriteProcConstructor READ_WRITE = new Term2IdWriteProcConstructor(false);
-        
-        public static Term2IdWriteProcConstructor READ_ONLY = new Term2IdWriteProcConstructor(true);
+//        public static Term2IdWriteProcConstructor READ_WRITE = new Term2IdWriteProcConstructor(false);
+//        
+//        public static Term2IdWriteProcConstructor READ_ONLY = new Term2IdWriteProcConstructor(true);
 
         private final boolean readOnly;
+        private final boolean storeBlankNodes;
         
-        private Term2IdWriteProcConstructor(boolean readOnly) {
+        public Term2IdWriteProcConstructor(boolean readOnly,boolean storeBlankNodes) {
             
             this.readOnly = readOnly;
+            
+            this.storeBlankNodes = storeBlankNodes;
             
         }
         
@@ -219,7 +240,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             assert vals == null;
             
-            return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys, readOnly);
+            return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys,
+                    readOnly, storeBlankNodes);
 
         }
 
@@ -238,6 +260,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * @return The {@link Result}, which contains the discovered / assigned
      *         term identifiers.
+     * 
+     * @todo no point sending bnodes when readOnly.
      */
     public Object apply(IIndex ndx) {
         
@@ -251,13 +275,6 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
         
-//        if (counter.get() == IRawTripleStore.NULL) {
-//            /*
-//             * Note: we never assign this value as a term identifier.
-//             */
-//            counter.incrementAndGet();
-//        }
-        
         // used to serialize term identifers.
         final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
         
@@ -266,162 +283,104 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         for (int i = 0; i < numTerms; i++) {
 
             final byte[] key = getKey(i);
+
+            // this byte encodes the kind of term (URI, Literal, BNode, etc.)
+            final byte code = KeyBuilder.decodeByte(key[0]);
             
             final long termId;
 
-            // Lookup in the forward index.
-            final byte[] tmp = ndx.lookup(key);
-
-            if (tmp == null) {
-
-                if(readOnly) continue;
-                
-                /*
-                 * Not found - assign the termId.
-                 * 
-                 * Note: We set the low two bits to indicate whether a term is a
-                 * literal, bnode, URI, or statement so that we can tell at a
-                 * glance (without lookup up the term in the index) what "kind"
-                 * of thing the term identifier stands for.
-                 * 
-                 * @todo we could use negative term identifiers except that we
-                 * pack the termId in a manner that does not allow negative
-                 * integers. a different pack routine would allow us all bits.
-                 */
-                final long id0 = counter.incrementAndGet();
-                
-                // 0L is never used as a counter value.
-                assert id0 != IRawTripleStore.NULL;
+            if (!storeBlankNodes && code == ITermIndexCodes.TERM_CODE_BND) {
 
                 /*
-                 * left shift two bits to make room for term type coding.
+                 * Do not enter blank nodes into the forward index.
                  * 
-                 * Note: when using partitioned indices the partition identifier
-                 * is already in the high word like [partitionId|counter], so
-                 * this shifts everything left by two bits. The result is that
-                 * the #of partitions is reduced four-fold rather than the #of
-                 * distinct counter values within a given index partition.
+                 * For this case, we just assign a term identifier and leave it
+                 * at that. If two different documents by some chance happen to
+                 * specify the same blank node ID they will still be assigned
+                 * distinct term identifiers. The only way that you can get the
+                 * same term identifier for a blank node is to have the blank
+                 * node ID matched in a canonicalizing map of blank nodes by the
+                 * client. That map, of course, should be scoped to the document
+                 * in which the blank node IDs appear.
                  */
-                long id = id0 << 2;
                 
-                // this byte encodes the kind of term (URI, Literal, BNode, etc.)
-                final byte code = KeyBuilder.decodeByte(key[0]);
+                if (readOnly) {
                 
-                switch(code) {
-                case ITermIndexCodes.TERM_CODE_URI:
-                    id |= ITermIdCodes.TERMID_CODE_URI;
-                    break;
-                case ITermIndexCodes.TERM_CODE_LIT:
-                case ITermIndexCodes.TERM_CODE_DTL:
-                case ITermIndexCodes.TERM_CODE_LCL:
-                    id |= ITermIdCodes.TERMID_CODE_LITERAL;
-                    break;
-                case ITermIndexCodes.TERM_CODE_BND:
-                    id |= ITermIdCodes.TERMID_CODE_BNODE;
-                    break;
-                case ITermIndexCodes.TERM_CODE_STMT:
-                    id |= ITermIdCodes.TERMID_CODE_STATEMENT;
-                    break;
-                default: 
-                    throw new AssertionError("Unknown term type: code=" + code);
+                    // blank nodes can not be resolved by the index.
+                    termId = 0L;
+
+                } else {
+                    
+                    // assign a term identifier.
+                    termId = assignTermId(counter, code);
                 }
                 
-                termId = id;
-                
-                if (DEBUG && enableGroundTruth) {
+            } else {
+
+                // Lookup in the forward index (URIs, Literals, and SIDs)
+                //
+                // Also BNodes iff storeBlankNodes is true
+                final byte[] tmp = ndx.lookup(key);
+    
+                if (tmp == null) {
+
+                    // not found.
                     
-                    if(groundTruthId2Term.isEmpty()) {
+                    if(readOnly) {
                         
-                        log.warn("Ground truth testing enabled.");
-                        
-                    }
+                        // not found - will not be assigned.
+                        termId = 0L;
 
-                    /*
-                     * Note: add to map if not present. returns the value
-                     * already stored in the map (and null if there was no value
-                     * in the map).
-                     */
+                    } else {
+
+                        // assign a term identifier.
+                        termId = assignTermId(counter, code);
+
+                        if (DEBUG && enableGroundTruth) {
+
+                            groundTruthTest(key, termId, ndx, counter);
+
+                        }
+
+                        // format as packed long integer.
+                        try {
+
+                            idbuf.reset().packLong(termId);
+
+                        } catch (IOException ex) {
+
+                            throw new RuntimeException(ex);
+
+                        }
+
+                        // insert into index.
+                        if (ndx.insert(key, idbuf.toByteArray()) != null) {
+
+                            throw new AssertionError();
+
+                        }
+
+                        nnew++;
                     
-                    // remember the termId assigned to that key.
-                    final Long oldId = groundTruthTerm2Id.putIfAbsent(key, termId);
-                    
-                    if( oldId != null && oldId.longValue() != termId ) {
-
-                        /*
-                         * The assignment of the term identifier to the key is
-                         * not stable.
-                         */
-                        
-                        throw new AssertionError("different termId assigned"+//
-                                ": oldId=" + oldId + //
-                                ", newId=" + termId + //
-                                ", key=" + BytesUtil.toString(key)+//
-                                ", pmd="+ndx.getIndexMetadata().getPartitionMetadata());
-
-                    }
-
-                    // remember the key to which we assigned that termId.
-                    final byte[] oldKey = groundTruthId2Term.putIfAbsent(termId, key);
-                    
-                    if (oldKey != null && !BytesUtil.bytesEqual(oldKey, key)) {
-
-                        /*
-                         * The assignment of the term identifier to the key is
-                         * not unique.
-                         */
-                        
-                        // the partition identifier (assuming index is partitioned).
-                        final long pid = id0 >> 32;
-                        final long mask = 0xffffffffL;
-                        final int ctr = (int) (id0 & mask);
-                        
-                        throw new AssertionError("assignment not unique"+//
-                                ": termId=" + termId +//
-                                ", oldKey=" + BytesUtil.toString(oldKey) + //
-                                ", newKey=" + BytesUtil.toString(key)+//
-                                ", pmd="+ndx.getIndexMetadata().getPartitionMetadata()+//
-                                ", pid="+pid+", ctr="+ctr+//
-                                ", counter="+counter.getClass().getName());
-                        
                     }
                     
+                } else { // found.
+    
+                    try {
 
+                        // unpack the existing term identifier.
+                        termId = new DataInputBuffer(tmp).unpackLong();
+                        
+                    } catch (IOException ex) {
+                        
+                        throw new RuntimeException(ex);
+                        
+                    }
+                       
                 }
-                
-                // format as packed long integer.
-                try {
-                    
-                    idbuf.reset().packLong(termId);
-                    
-                } catch(IOException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
-
-                // insert into index.
-                if (ndx.insert(key, idbuf.toByteArray()) != null) {
-
-                    throw new AssertionError();
-
-                }
-                
-                nnew++;
-
-            } else { // found.
-
-                try {
-                    
-                    termId = new DataInputBuffer(tmp).unpackLong();
-                    
-                } catch (IOException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
-                   
+    
             }
-
+            
             ids[i] = termId;
 
         }
@@ -460,6 +419,133 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         return new Result(ids);
 
     }
+    
+    /**
+     * Assign a term identifier.
+     * <p>
+     * Note: We set the low two bits to indicate whether a term is a
+     * {@link Literal}, {@link BNode}, {@link URI}, or {@link Statement} so
+     * that we can tell at a glance (without lookup up the term in the index)
+     * what "kind" of thing the term identifier stands for.
+     * <p>
+     * Note: when using partitioned indices the partition identifier is already
+     * in the high word like [partitionId|counter], so this shifts everything
+     * left by two bits. The result is that the #of partitions is reduced
+     * four-fold rather than the #of distinct counter values within a given
+     * index partition.
+     * 
+     * @todo we could use negative term identifiers except that we pack the
+     *       termId in a manner that does not allow negative integers. a
+     *       different pack routine would allow us all bits.
+     */
+    protected long assignTermId(ICounter counter, byte code) {
+        
+        final long id0 = counter.incrementAndGet();
+        
+        // 0L is never used as a counter value.
+        assert id0 != IRawTripleStore.NULL;
+
+        // Left shift two bits to make room for term type coding.
+        long id = id0 << 2;
+        
+        switch(code) {
+
+        case ITermIndexCodes.TERM_CODE_URI:
+        
+            id |= ITermIdCodes.TERMID_CODE_URI;
+            
+            break;
+            
+        case ITermIndexCodes.TERM_CODE_LIT:
+        case ITermIndexCodes.TERM_CODE_DTL:
+        case ITermIndexCodes.TERM_CODE_LCL:
+            
+            id |= ITermIdCodes.TERMID_CODE_LITERAL;
+            
+            break;
+            
+        case ITermIndexCodes.TERM_CODE_BND:
+            
+            id |= ITermIdCodes.TERMID_CODE_BNODE;
+            
+            break;
+            
+        case ITermIndexCodes.TERM_CODE_STMT:
+            
+            id |= ITermIdCodes.TERMID_CODE_STATEMENT;
+            
+            break;
+            
+        default: 
+            
+            throw new AssertionError("Unknown term type: code=" + code);
+        
+        }
+        
+        return id;
+        
+    }
+    
+    private void groundTruthTest(byte[] key, long termId, IIndex ndx, ICounter counter) {
+        
+        if(groundTruthId2Term.isEmpty()) {
+            
+            log.warn("Ground truth testing enabled.");
+            
+        }
+
+        /*
+         * Note: add to map if not present. returns the value
+         * already stored in the map (and null if there was no value
+         * in the map).
+         */
+        
+        // remember the termId assigned to that key.
+        final Long oldId = groundTruthTerm2Id.putIfAbsent(key, termId);
+        
+        if( oldId != null && oldId.longValue() != termId ) {
+
+            /*
+             * The assignment of the term identifier to the key is
+             * not stable.
+             */
+            
+            throw new AssertionError("different termId assigned"+//
+                    ": oldId=" + oldId + //
+                    ", newId=" + termId + //
+                    ", key=" + BytesUtil.toString(key)+//
+                    ", pmd="+ndx.getIndexMetadata().getPartitionMetadata());
+
+        }
+
+        // remember the key to which we assigned that termId.
+        final byte[] oldKey = groundTruthId2Term.putIfAbsent(termId, key);
+        
+        if (oldKey != null && !BytesUtil.bytesEqual(oldKey, key)) {
+
+            /*
+             * The assignment of the term identifier to the key is
+             * not unique.
+             */
+            
+            // the partition identifier (assuming index is partitioned).
+//                        final long pid = id0 >> 32;
+//                        final long mask = 0xffffffffL;
+//                        final int ctr = (int) (id0 & mask);
+            
+            throw new AssertionError("assignment not unique"+//
+                    ": termId=" + termId +//
+                    ", oldKey=" + BytesUtil.toString(oldKey) + //
+                    ", newKey=" + BytesUtil.toString(key)+//
+                    ", pmd="+ndx.getIndexMetadata().getPartitionMetadata()+//
+//                                ", pid="+pid+", ctr="+ctr+//
+                    ", counter="+counter+//
+                    ", counter="+counter.getClass().getName());
+            
+        }
+        
+    }
+    
     protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
         
         super.readMetadata(in);

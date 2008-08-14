@@ -2450,13 +2450,8 @@ B49 := systap
   Could also lookup the last commit time (or the last closure time)
   and use that timestamp rather than specifying READ_COMMITTED.
   
-* Parallelism free text indexing so that it does not add linear
-  latency.  Also review for obvious performance hits.
-
 * Run all inference test suites that do closure with both full and
   fast variants.
-
-- Done. Verify full db-at-once closure.
 
 - (defer) Optimize by assigning variables in a rule a positional index
   and use a long[] for bindings for SPORelation self-joins.
@@ -2468,23 +2463,6 @@ B49 := systap
   iterators.  When we are running parallel rules and asynchronous
   iterators it could make sense to use much smaller buffers (10k vs
   200k).
-
-- Done. Integrate the UnisolatedReadWriteIndex into the access paths
-  exposed by the SPORelation (and LexiconRelation) when using a
-  LocalTripleStore or TempTripleStore.  Verify that the exposed index
-  is always an instance of this class for those use cases and examine
-  the code (perhaps via logging) to verify that we are not doing a lot
-  of point tests.  Make sure that the DistinctTermScan winds up using
-  the same class so that it obeys the necessary concurrency
-  constraints.
-
-  * This change broke the CompletionScan which is relying on
-    ITupleCursor.  The AbstractChunkedRangeIterator needs to be
-    modified (as does a lot of other code) to drill through the
-    ITupleCursor interface.
-
-    Also, when ITupleCursor is specified, then we can handled
-    REMOVEALL without buffering the keys first.
 
 - *** Look at justifications for bad entailments in the fast closure.
   
@@ -2502,39 +2480,11 @@ B49 := systap
 
 * Sesame 2 TCK integration.
 
-* The lexicon (StatementBuffer and addTerms) *REALLY* needs a rewrite.
-
- TestRDFXMLInterchangeWithStatementIdentifiers.doStatementIdentifiersTest(TestRDFXMLInterchangeWithStatementIdentifiers.java:612)
-
-
-                // ground statements using BNodes for statement identifiers.
-                buf.add(x, rdfType, A, sid1);
-                buf.add(y, rdfType, B, sid2);
-                buf.add(z, rdfType, C, sid3);
-
-                // statements about statements using statement identifiers.
-                buf.add(sid1, dcCreator, bryan);
-                buf.add(sid2, dcCreator, bryan);
-                buf.add(sid2, dcCreator, mike);
-                buf.add(sid3, dcCreator, mike);
-
 ============================================================
 
 Priority list:
 
-x. Done. FusedViewIterator MUST implement ITupleCursor.  Either make
-         it do so directly and have the source iterator views throw
-         UnsupportedOperationException if they do not support
-         ITupleCursor or layer the class.  Simplify the ITupleCursor
-         API by factoring out an implementation interface that extends
-         it and moving a variety of methods not required at the
-         application level into that API (the application only needs
-         hasPrior(), prior(), and seek() in addition to the Iterator's
-         hasNext(), next(), and remove()).
-
 x. *** Lexicon refactor.
-
-       - Lexicon (blank node handling and custom _Value).
 
        - Lexicon (support fast model comparison with read-only chunked
          testing).
@@ -2554,6 +2504,13 @@ x. *** unroll loops for faster distributed joins.
    This is especially true when the unrolled N is small, since it is
    cheap to send the tuples that we want to JOIN to the target data
    service.
+
+x. Full text index performance.
+
+   - Do not re-index terms found in the forward index?  This is
+     definately faster but it lacks the robust guarentee of the
+     unisolated write pattern (all clients write on both all indices
+     to guarentee consistent index states).
 
 x. provenance query problems (MikeP)
 
@@ -2707,8 +2664,6 @@ x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
     
 FIXME IAutoboxBTree api on all IIndex impls.
 
-   - Verify entire suite for bigdata, bigdata-rdf.
-
    - Need to write tests of the autobox API for BTree, FusedView,
      ClientIndexView, and DataServiceIndex.
 
@@ -2735,3 +2690,31 @@ FIXME IAutoboxBTree api on all IIndex impls.
 
 	  BigdataMap and BigdataSet will not scale-out until this
 	  issue is resolved.
+
+============================================================
+
+Finish fixup of the lexicon and benchmark.
+
+   - Seeing some problems again with some of the backchainers.
+
+   - Get 1-2B scaling numbers on the DPP cluster for DaveL and post at
+     http://esw.w3.org/topic/LargeTripleStores.
+
+     Inference and dynamic partitioning are NOT required at first,
+     then do database-at-once closure, then query performance, eg.,
+     lubm, and then try again with dynamic partitioning.
+
+   - Enable TM stress test.
+
+   - Axioms must be serializable for distributed closure.
+
+   - Make sure that the DataLoader uses
+     BigdataValueFactory#newBNodeContext().  Recommend its use when
+     directly loading data with lots of blank nodes using Sesame's
+     API.
+
+   - Test lexicon w/ and w/o storeBlankNodes (probably test the whole
+     RDF DB, or maybe just TestTripleStore).
+
+
+------------------------------------------------------------

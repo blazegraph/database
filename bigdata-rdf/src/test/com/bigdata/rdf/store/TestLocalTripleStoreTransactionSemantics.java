@@ -59,7 +59,13 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
             // commit the transaction.
             store.commit();
 
-            // now visible in the view.
+            // now visible in the view
+            /*
+             * @todo this assert is failing. The reason has to do with the
+             * visiblity of read-committed changes in a BTree vs an index
+             * accessed via the ConcurrencyManager. The test failure will go
+             * away once I figure out what I want to do about that problem.
+             */
             assertTrue(view.hasStatement(s, p, o));
             
         } finally {

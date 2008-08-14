@@ -81,7 +81,7 @@ public class BulkCompleteConverter implements SPOConverter {
 
     }
 
-    public SPO[] convert(SPO[] chunk) {
+    public ISPO[] convert(ISPO[] chunk) {
         
         Arrays.sort(chunk, SPOComparator.INSTANCE);
 
@@ -120,7 +120,8 @@ public class BulkCompleteConverter implements SPOConverter {
             
             if (val != null) {
                 
-                chunk[i].decodeValue(val);
+                // @todo ISPO?
+                ((SPO)chunk[i]).decodeValue(val);
                 
             } else {
                 

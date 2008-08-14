@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
-import java.beans.Statement;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -36,18 +35,21 @@ import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.sail.SailConnection;
 
-import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -55,7 +57,6 @@ import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -77,14 +78,10 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * {@link StatementBuffer} imposes a burden on both the heap and the index
  * writers.
  * 
- * @todo try retaining the top N most frequent terms across resets of the buffer
- *       in order to reduce time on the terms indices, e.g., with
- *       {@link AbstractTripleStore#termCache}
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StatementBuffer implements IStatementBuffer {
+public class StatementBuffer implements IStatementBuffer<Statement> {
 
     final protected static Logger log = Logger.getLogger(StatementBuffer.class);
    
@@ -100,15 +97,17 @@ public class StatementBuffer implements IStatementBuffer {
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
     
+    protected final long NULL = IRawTripleStore.NULL;
+    
     /**
      * Buffer for parsed RDF {@link Value}s.
      */
-    protected final _Value[] values;
+    protected final BigdataValue[] values;
     
     /**
      * Buffer for parsed RDF {@link Statement}s.
      */
-    protected final _Statement[] stmts;
+    protected final BigdataStatement[] stmts;
 
     /**
      * #of valid entries in {@link #values}.
@@ -136,7 +135,7 @@ public class StatementBuffer implements IStatementBuffer {
      * Map used to filter out duplicate terms.  The use of this map provides
      * a ~40% performance gain.
      */
-    final private Map<_Value, _Value> distinctTermMap;
+    final private Map<Value, BigdataValue> distinctTermMap;
 
     /**
      * A canonicalizing map for blank nodes. This map MUST be cleared before you
@@ -146,7 +145,7 @@ public class StatementBuffer implements IStatementBuffer {
      * loading a large document with a lot of blank nodes the map will also
      * become large.
      */
-    private Map<String, _BNode> bnodes;
+    private Map<String, BigdataBNodeImpl> bnodes;
     
     /**
      * Statements which use blank nodes in their {s,p,o} positions must be
@@ -159,7 +158,7 @@ public class StatementBuffer implements IStatementBuffer {
      * always blank nodes and we do not need to defer statements, only maintain
      * the canonicalizing {@link #bnodes} mapping.
      */
-    private Set<_Statement> deferredStmts;
+    private Set<BigdataStatement> deferredStmts;
 
     /**
      * <code>true</code> if statement identifiers are enabled.
@@ -205,6 +204,8 @@ public class StatementBuffer implements IStatementBuffer {
         return database;
         
     }
+    
+    protected final BigdataValueFactory valueFactory;
     
     /**
      * The maximum #of Statements, URIs, Literals, or BNodes that the buffer can
@@ -311,12 +312,14 @@ public class StatementBuffer implements IStatementBuffer {
         this.statementStore = statementStore; // MAY be null.
         
         this.database = database;
+
+        this.valueFactory = database.getValueFactory();
         
         this.capacity = capacity;
         
-        values = new _Value[capacity * database.N];
+        values = new BigdataValue[capacity * database.N];
         
-        stmts = new _Statement[capacity];
+        stmts = new BigdataStatement[capacity];
 
         if (distinct) {
 
@@ -330,7 +333,7 @@ public class StatementBuffer implements IStatementBuffer {
              * hash map.
              */
             
-            distinctTermMap = new HashMap<_Value, _Value>(capacity * database.N);
+            distinctTermMap = new HashMap<Value, BigdataValue>(capacity * database.N);
             
         } else {
             
@@ -358,8 +361,10 @@ public class StatementBuffer implements IStatementBuffer {
      * co-referenced by their IDs. Calling this method will flush the buffer,
      * cause any deferred statements to be written, and cause the canonicalizing
      * mapping for blank nodes to be discarded.
+     * 
+     * @todo this implementation always returns ZERO (0).
      */
-    public void flush() {
+    public long flush() {
  
         log.info("");
 
@@ -372,7 +377,9 @@ public class StatementBuffer implements IStatementBuffer {
         incrementalWrite();
 
         // discard all buffer state (including bnodes and deferred statements).
-        clear();
+        reset();
+        
+        return 0L;
 
     }
     
@@ -392,7 +399,7 @@ public class StatementBuffer implements IStatementBuffer {
      * <ol>
      * 
      * <li> Collect all deferred statements whose blank node bindings never show
-     * up in the context position of a statement ({@link _BNode#statementIdentifier}
+     * up in the context position of a statement ({@link BigdataBNodeImpl#statementIdentifier}
      * is <code>false</code>). Those blank nodes are NOT statement
      * identifiers so we insert them into the lexicon and the insert the
      * collected statements as well. </li>
@@ -416,7 +423,8 @@ public class StatementBuffer implements IStatementBuffer {
      */
     protected void processDeferredStatements() {
 
-        if (!statementIdentifiers || deferredStmts == null || deferredStmts.isEmpty()) {
+        if (!statementIdentifiers || deferredStmts == null
+                || deferredStmts.isEmpty()) {
 
             // NOP.
             
@@ -442,18 +450,18 @@ public class StatementBuffer implements IStatementBuffer {
                 
                 int n = 0;
                 
-                final Iterator<_Statement> itr = deferredStmts.iterator();
+                final Iterator<BigdataStatement> itr = deferredStmts.iterator();
                 
                 while(itr.hasNext()) {
                     
-                    final _Statement stmt = itr.next();
+                    final BigdataStatement stmt = itr.next();
                     
-                    if (stmt.s instanceof _BNode
-                            && ((_BNode) stmt.s).statementIdentifier)
+                    if (stmt.getSubject() instanceof BNode
+                            && ((BigdataBNodeImpl) stmt.getSubject()).statementIdentifier)
                         continue;
 
-                    if (stmt.o instanceof _BNode
-                            && ((_BNode) stmt.o).statementIdentifier)
+                    if (stmt.getObject() instanceof BNode
+                            && ((BigdataBNodeImpl) stmt.getObject()).statementIdentifier)
                         continue;
 
                     if(DEBUG) {
@@ -461,7 +469,7 @@ public class StatementBuffer implements IStatementBuffer {
                     }
 
                     // fully grounded so add to the buffer.
-                    add(stmt.s, stmt.p, stmt.o, stmt.c, stmt.type);
+                    add(stmt);
                     
                     // the statement has been handled.
                     itr.remove();
@@ -497,20 +505,20 @@ public class StatementBuffer implements IStatementBuffer {
                     
                     final int nbefore = deferredStmts.size();
                     
-                    final Iterator<_Statement> itr = deferredStmts.iterator();
+                    final Iterator<BigdataStatement> itr = deferredStmts.iterator();
                     
                     while(itr.hasNext()) {
                         
-                        final _Statement stmt = itr.next();
+                        final BigdataStatement stmt = itr.next();
 
-                        if (stmt.s instanceof _BNode
-                                && ((_BNode) stmt.s).statementIdentifier
-                                && stmt.s.termId == IRawTripleStore.NULL)
+                        if (stmt.getSubject() instanceof BNode
+                                && ((BigdataBNodeImpl) stmt.getSubject()).statementIdentifier
+                                && stmt.s() == NULL)
                             continue;
 
-                        if (stmt.o instanceof _BNode
-                                && ((_BNode) stmt.o).statementIdentifier
-                                && stmt.o.termId == IRawTripleStore.NULL)
+                        if (stmt.getObject() instanceof BNode
+                                && ((BigdataBNodeImpl) stmt.getObject()).statementIdentifier
+                                && stmt.o() == NULL)
                             continue;
 
                         if(DEBUG) {
@@ -518,7 +526,7 @@ public class StatementBuffer implements IStatementBuffer {
                         }
                         
                         // fully grounded so add to the buffer.
-                        add(stmt.s, stmt.p, stmt.o, stmt.c, stmt.type);
+                        add(stmt);
                         
                         // deferred statement has been handled.
                         itr.remove();
@@ -578,7 +586,7 @@ public class StatementBuffer implements IStatementBuffer {
      * Clears all buffered data, including the canonicalizing mapping for blank
      * nodes and deferred provenance statements.
      */
-    public void clear() {
+    public void reset() {
         
         log.info("");
         
@@ -597,50 +605,42 @@ public class StatementBuffer implements IStatementBuffer {
     }
     
     /**
-     * Set the canonicalizing map for blank nodes based on their ID.
-     * <p>
-     * Note: This map is allocated on demand but you MAY explicitly invoke this
-     * method to supply your own map. This allows you to reuse the same map
-     * across multiple {@link StatementBuffer} instances - the
-     * {@link BigdataSail} does this so that the same bnode map is used
-     * throughout the life of a {@link SailConnection}.
-     * 
-     * @param bnodes
-     *            The new map.
+     * @todo could be replaced with {@link BigdataValueFactory
      */
-    public void setBNodeMap(Map<String,_BNode> bnodes) {
+    public void setBNodeMap(Map<String, BigdataBNodeImpl> bnodes) {
+    
+        if (bnodes == null)
+            throw new IllegalArgumentException();
         
-        /*
-         * Note: Passing a null reference will have the same effect as
-         * clearBNodeMap().
-         */
+        if (this.bnodes != null)
+            throw new IllegalStateException();
         
         this.bnodes = bnodes;
         
     }
     
     /**
-     * Invoked by {@link #incrementalWrite()} to clear terms and statements which have
-     * been written in preparation for buffering more writes. This does NOT
-     * discard either the canonicalizing mapping for blank nodes NOR any
-     * deferred statements.
+     * Invoked by {@link #incrementalWrite()} to clear terms and statements
+     * which have been written in preparation for buffering more writes. This
+     * does NOT discard either the canonicalizing mapping for blank nodes NOR
+     * any deferred statements.
      */
     protected void _clear() {
         
-        for(int i=0; i<numValues; i++) {
-            
+        for (int i = 0; i < numValues; i++) {
+
             values[i] = null;
-            
+
         }
 
-        for(int i=0; i<numStmts; i++) {
-            
+        for (int i = 0; i < numStmts; i++) {
+
             stmts[i] = null;
-            
+
         }
-        
+
         numURIs = numLiterals = numBNodes = numStmts = numValues = 0;
-        
+
         numSIDs = 0;
         
         if (distinctTermMap != null) {
@@ -658,21 +658,37 @@ public class StatementBuffer implements IStatementBuffer {
      */
     protected void incrementalWrite() {
 
-        if(INFO) {
-            log.info("numValues="+numValues+", numStmts="+numStmts);
+        if (INFO) {
+            log.info("numValues=" + numValues + ", numStmts=" + numStmts);
         }
-        
+
         // Insert terms (batch operation).
         if (numValues > 0) {
-            if(DEBUG) {
-                for(int i=0; i<numValues; i++) {
-                    log.debug("adding term: "+values[i]+" (termId="+values[i].termId+")");
+            if (DEBUG) {
+                for (int i = 0; i < numValues; i++) {
+                    log
+                            .debug("adding term: "
+                                    + values[i]
+                                    + " (termId="
+                                    + values[i].getTermId()
+                                    + ")"
+                                    + ((values[i] instanceof BNode) ? "sid="
+                                            + ((BigdataBNodeImpl) values[i]).statementIdentifier
+                                            : ""));
                 }
             }
             addTerms(values, numValues);
-            if(DEBUG) {
-                for(int i=0; i<numValues; i++) {
-                    log.debug(" added term: "+values[i]+" (termId="+values[i].termId+")");
+            if (DEBUG) {
+                for (int i = 0; i < numValues; i++) {
+                    log
+                            .debug(" added term: "
+                                    + values[i]
+                                    + " (termId="
+                                    + values[i].getTermId()
+                                    + ")"
+                                    + ((values[i] instanceof BNode) ? "sid="
+                                            + ((BigdataBNodeImpl) values[i]).statementIdentifier
+                                            : ""));
                 }
             }
         }
@@ -697,7 +713,7 @@ public class StatementBuffer implements IStatementBuffer {
 
     }
 
-    protected void addTerms(final _Value[] terms, final int numTerms) {
+    protected void addTerms(final BigdataValue[] terms, final int numTerms) {
 
         database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
         
@@ -732,7 +748,7 @@ public class StatementBuffer implements IStatementBuffer {
     }
     
     /**
-     * Add a statement to the buffer (flushes on overflow).
+     * Add a statement to the buffer (core impl, flushes on overflow).
      * 
      * @param s
      * @param p
@@ -753,11 +769,29 @@ public class StatementBuffer implements IStatementBuffer {
 
     }
     
+    public void add(Statement e) {
+
+        add(e.getSubject(), e.getPredicate(), e.getObject(), e.getContext(),
+                (e instanceof BigdataStatement ? ((BigdataStatement) e)
+                        .getStatementType() : null));
+        
+    }
+
+    public void add(int n, Statement[] a) {
+        
+        for(int i=0; i<n; i++) {
+            
+            add(a[i]);
+            
+        }
+        
+    }
+
     /**
      * Adds the statements to each index (batch api, NO truth maintenance).
      * <p>
-     * Pre-conditions: The {s,p,o} term identifiers for each {@link _Statement}
-     * are defined.
+     * Pre-conditions: The {s,p,o} term identifiers for each
+     * {@link BigdataStatement} are defined.
      * <p>
      * Note: If statement identifiers are enabled and the context position is
      * non-<code>null</code> then it will be unified with the statement
@@ -772,14 +806,14 @@ public class StatementBuffer implements IStatementBuffer {
      * 
      * @return The #of statements written on the database.
      */
-    final protected long addStatements(final _Statement[] stmts,
+    final protected long addStatements(final BigdataStatement[] stmts,
             final int numStmts) {
 
         final SPO[] tmp = new SPO[numStmts];
 
         for (int i = 0; i < tmp.length; i++) {
 
-            final _Statement stmt = stmts[i];
+            final BigdataStatement stmt = stmts[i];
             
             /*
              * Note: context position is not passed when statement identifiers
@@ -787,8 +821,9 @@ public class StatementBuffer implements IStatementBuffer {
              * the {s,p,o} triple.
              */
 
-            final SPO spo = new SPO(stmt.s.termId, stmt.p.termId,
-                    stmt.o.termId, stmt.type);
+            final SPO spo = new SPO(stmt);
+//            .s.termId, stmt.p.termId,
+//                    stmt.o.termId, stmt.type);
 
             if (DEBUG)
                 log.debug("adding: " + stmt.toString() + " (" + spo + ")");
@@ -830,17 +865,19 @@ public class StatementBuffer implements IStatementBuffer {
                 
                 final SPO spo = tmp[i];
                 
-                final _Statement stmt = stmts[i];
+                final BigdataStatement stmt = stmts[i];
 
-                // verify that the _Statement and SPO are the same triple.
-                assert stmt.s.termId == spo.s;
-                assert stmt.p.termId == spo.p;
-                assert stmt.o.termId == spo.o;
+                // verify that the BigdataStatement and SPO are the same triple.
+                assert stmt.s() == spo.s;
+                assert stmt.p() == spo.p;
+                assert stmt.o() == spo.o;
                 
-                if (stmt.c == null)
+                final BigdataResource c = stmt.getContext();
+                
+                if (c == null)
                     continue;
 
-                if (stmt.c instanceof _URI) {
+                if (c instanceof URI) {
 
                     throw new UnificationException(
                             "URI not permitted in context position when statement identifiers are enabled: "
@@ -848,19 +885,19 @@ public class StatementBuffer implements IStatementBuffer {
                     
                 }
                 
-                if( stmt.c instanceof _BNode) {
+                if( c instanceof BNode) {
 
                     final long sid = spo.getStatementIdentifier();
                     
-                    if(stmt.c.termId != 0L) {
+                    if(c.getTermId() != NULL) {
                         
-                        if (sid != stmt.c.termId) {
+                        if (sid != c.getTermId()) {
 
                             throw new UnificationException(
                                     "Can not unify blankNode "
-                                            + stmt.c
+                                            + c
                                             + "("
-                                            + stmt.c.termId
+                                            + c.getTermId()
                                             + ")"
                                             + " in context position with statement identifier="
                                             + sid + ": " + stmt + " (" + spo
@@ -871,11 +908,12 @@ public class StatementBuffer implements IStatementBuffer {
                     } else {
                         
                         // assign the statement identifier.
-                        stmt.c.termId = sid;
+                        c.setTermId(sid);
                         
                         if(DEBUG) {
                             
-                            log.debug("Assigned statement identifier: "+stmt.c+"="+sid);
+                            log.debug("Assigned statement identifier: " + c
+                                    + "=" + sid);
                             
                         }
 
@@ -903,7 +941,7 @@ public class StatementBuffer implements IStatementBuffer {
      */
     protected long writeSPOs(SPO[] stmts, int numStmts) {
 
-        final IChunkedOrderedIterator<SPO> itr = new ChunkedArrayIterator<SPO>(
+        final IChunkedOrderedIterator<ISPO> itr = new ChunkedArrayIterator<ISPO>(
                 numStmts, stmts, null/*keyOrder*/);
         
         final long nwritten;
@@ -976,11 +1014,11 @@ public class StatementBuffer implements IStatementBuffer {
      * @return Either the term or the pre-existing term in the buffer with the
      *         same data.
      */
-    protected _Value getDistinctTerm(_Value term) {
+    protected BigdataValue getDistinctTerm(BigdataValue term) {
 
         assert distinct == true;
         
-        if (term instanceof _BNode) {
+        if (term instanceof BNode) {
 
             /*
              * Canonicalizing map for blank nodes.
@@ -990,21 +1028,23 @@ public class StatementBuffer implements IStatementBuffer {
              * another source.
              */
             
+            final BigdataBNodeImpl bnode = (BigdataBNodeImpl)term;
+            
             // the BNode's ID.
-            final String id = term.term;
+            final String id = bnode.getID();
 
             if (bnodes == null) {
 
                 // allocating canonicalizing map for blank nodes.
-                bnodes = new HashMap<String, _BNode>(capacity);
+                bnodes = new HashMap<String, BigdataBNodeImpl>(capacity);
 
                 // insert this blank node into the map.
-                bnodes.put(id, (_BNode) term);
+                bnodes.put(id, bnode);
 
             } else {
 
                 // test canonicalizing map for blank nodes.
-                final _BNode existingBNode = bnodes.get(term.term);
+                final BigdataBNode existingBNode = bnodes.get(id);
 
                 if (existingBNode != null) {
 
@@ -1014,7 +1054,7 @@ public class StatementBuffer implements IStatementBuffer {
                 }
 
                 // insert this blank node into the map.
-                bnodes.put(id, (_BNode) term);
+                bnodes.put(id, bnode);
                 
             }
             
@@ -1028,7 +1068,7 @@ public class StatementBuffer implements IStatementBuffer {
          * when reading very large documents.
          */
         
-        _Value existingTerm = distinctTermMap.get(term);
+        final BigdataValue existingTerm = distinctTermMap.get(term);
         
         if(existingTerm != null) {
             
@@ -1077,10 +1117,10 @@ public class StatementBuffer implements IStatementBuffer {
      */
     public void handleStatement( Resource s, URI p, Value o, Resource c, StatementEnum type ) {
         
-        s = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(s);
-        p = (URI)      OptimizedValueFactory.INSTANCE.toNativeValue(p);
-        o =            OptimizedValueFactory.INSTANCE.toNativeValue(o);
-        c = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(c);
+        s = (Resource) valueFactory.asValue(s);
+        p = (URI)      valueFactory.asValue(p);
+        o =            valueFactory.asValue(o);
+        c = (Resource) valueFactory.asValue(c);
         
         boolean duplicateS = false;
         boolean duplicateP = false;
@@ -1089,28 +1129,28 @@ public class StatementBuffer implements IStatementBuffer {
         
         if (distinct) {
             {
-                final _Value tmp = getDistinctTerm((_Value) s);
+                final BigdataValue tmp = getDistinctTerm((BigdataValue) s);
                 if (tmp != s) {
                     duplicateS = true;
                 }
                 s = (Resource) tmp;
             }
             {
-                final _Value tmp = getDistinctTerm((_Value) p);
+                final BigdataValue tmp = getDistinctTerm((BigdataValue) p);
                 if (tmp != p) {
                     duplicateP = true;
                 }
                 p = (URI) tmp;
             }
             {
-                final _Value tmp = getDistinctTerm((_Value) o);
+                final BigdataValue tmp = getDistinctTerm((BigdataValue) o);
                 if (tmp != o) {
                     duplicateO = true;
                 }
                 o = (Value) tmp;
             }
             if (c != null) {
-                final _Value tmp = getDistinctTerm((_Value) c);
+                final BigdataValue tmp = getDistinctTerm((BigdataValue) c);
                 if (tmp != c) {
                     duplicateC = true;
                 }
@@ -1119,17 +1159,18 @@ public class StatementBuffer implements IStatementBuffer {
         }
 
         /*
-         * Form the _Statement object now that we have the bindings.
+         * Form the BigdataStatement object now that we have the bindings.
          */
 
-        final _Statement stmt;
+        final BigdataStatement stmt;
         {
           
-            stmt = new _Statement((_Resource) s, (_URI) p, (_Value) o,
-                    (_Resource) c, type);
+            stmt = valueFactory
+                    .createStatement((BigdataResource) s, (BigdataURI) p,
+                            (BigdataValue) o, (BigdataResource) c, type);
 
             if (statementIdentifiers
-                    && (s instanceof _BNode || o instanceof _BNode)) {
+                    && (s instanceof BNode || o instanceof BNode)) {
 
                 /*
                  * When statement identifiers are enabled a statement with a
@@ -1142,7 +1183,7 @@ public class StatementBuffer implements IStatementBuffer {
                 
                 if (deferredStmts == null) {
 
-                    deferredStmts = new HashSet<_Statement>(stmts.length);
+                    deferredStmts = new HashSet<BigdataStatement>(stmts.length);
 
                 }
 
@@ -1166,11 +1207,11 @@ public class StatementBuffer implements IStatementBuffer {
         
         if (!duplicateS) {// && ((_Value) s).termId == 0L) {
 
-            if (s instanceof _URI) {
+            if (s instanceof URI) {
 
                 numURIs++;
 
-                values[numValues++] = (_Value) s;
+                values[numValues++] = (BigdataValue) s;
 
             } else {
 
@@ -1178,7 +1219,7 @@ public class StatementBuffer implements IStatementBuffer {
 
                     numBNodes++;
 
-                    values[numValues++] = (_Value) s;
+                    values[numValues++] = (BigdataValue) s;
 
                 }
                 
@@ -1188,27 +1229,27 @@ public class StatementBuffer implements IStatementBuffer {
 
         if (!duplicateP) {//&& ((_Value) s).termId == 0L) {
             
-            values[numValues++] = (_Value)p;
+            values[numValues++] = (BigdataValue)p;
 
             numURIs++;
-            
+
         }
 
         if (!duplicateO) {// && ((_Value) s).termId == 0L) {
 
-            if (o instanceof _URI) {
+            if (o instanceof URI) {
 
                 numURIs++;
 
-                values[numValues++] = (_Value)o;
-                
-            } else if (o instanceof _BNode) {
+                values[numValues++] = (BigdataValue) o;
+
+            } else if (o instanceof BNode) {
 
                 if (!statementIdentifiers) {
 
                     numBNodes++;
 
-                    values[numValues++] = (_Value) s;
+                    values[numValues++] = (BigdataValue) o;
 
                 }
 
@@ -1216,19 +1257,19 @@ public class StatementBuffer implements IStatementBuffer {
 
                 numLiterals++;
 
-                values[numValues++] = (_Value)o;
-                
+                values[numValues++] = (BigdataValue) o;
+
             }
             
         }
 
-        if (c != null && !duplicateC && ((_Value) s).termId == 0L) {
+        if (c != null && !duplicateC && ((BigdataValue) s).getTermId() == NULL) {
 
-            if (c instanceof _URI) {
+            if (c instanceof URI) {
 
                 numURIs++;
 
-                values[numValues++] = (_Value) c;
+                values[numValues++] = (BigdataValue) c;
 
             } else {
 
@@ -1243,7 +1284,7 @@ public class StatementBuffer implements IStatementBuffer {
                      * statements.
                      */
                     
-                    values[numValues++] = (_Value) c;
+                    values[numValues++] = (BigdataValue) c;
 
                     numBNodes++;
 
@@ -1259,7 +1300,7 @@ public class StatementBuffer implements IStatementBuffer {
                      * node's ID.
                      */
 
-                    ((_BNode) c).statementIdentifier = true;
+                    ((BigdataBNodeImpl) c).statementIdentifier = true;
 
                 }
 
@@ -1316,5 +1357,5 @@ public class StatementBuffer implements IStatementBuffer {
         }
         
     }
-    
+
 }

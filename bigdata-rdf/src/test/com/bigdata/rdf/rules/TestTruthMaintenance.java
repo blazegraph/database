@@ -46,11 +46,13 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -110,28 +112,20 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              * statement identifier).
              */
 
-            _URI x = new _URI("http://www.foo.org/x1");
-            _URI y = new _URI("http://www.foo.org/y2");
-            _URI z = new _URI("http://www.foo.org/z3");
-    
-            _Value[] terms = new _Value[] {
-              
-                    x,y,z,//                
-            };
+            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x1");
+            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y2");
+            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z3");
             
-            store.addTerms(terms, terms.length);
+            store.addTerms(new BigdataValue[] { x, y, z });
             
-            final long x1 = x.termId;
-            final long y2 = y.termId;
-            final long z3 = z.termId;
+            final long x1 = x.getTermId();
+            final long y2 = y.getTermId();
+            final long z3 = z.getTermId();
             
             /*
              * Setup the database.
              */
             {
-
-//                SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store,
-//                        null/* filter */, 100/* capacity */, false/* justified */);
 
                 SPO[] a = new SPO[] {
                 
@@ -142,8 +136,6 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 };
                 
                 store.addStatements(a, a.length);
-
-//                buf.flush();
 
                 assertTrue(store.hasStatement(x1, y2, z3));
                 assertTrue(store.getStatement(x1, y2, z3).isInferred());
@@ -188,7 +180,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                  * lexicon (it does not exist) to assign sids to the statements.
                  */
                 store.addStatements(focusStore, true/* copyOnly */,
-                                new ChunkedArrayIterator<SPO>(a.length, a, null/* keyOrder */),
+                                new ChunkedArrayIterator<ISPO>(a.length, a, null/* keyOrder */),
                                 null/* filter */);
                 
 //                buf.flush();
@@ -975,7 +967,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             final TempTripleStore tempStore = tm.newTempTripleStore();
 
             db.addStatements(tempStore, true/* copyOnly */,
-                            new ChunkedArrayIterator<SPO>(stmts.length, stmts,
+                            new ChunkedArrayIterator<ISPO>(stmts.length, stmts,
                                     null/* keyOrder */), null/* filter */);
             
             log.info("Retracting: n="+stmts.length+", depth="+depth);
@@ -1011,7 +1003,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             final TempTripleStore tempStore = tm.newTempTripleStore();
 
             db.addStatements(tempStore, true/* copyOnly */,
-                            new ChunkedArrayIterator<SPO>(stmts.length, stmts,
+                            new ChunkedArrayIterator<ISPO>(stmts.length, stmts,
                                     null/*keyOrder*/), null/*filter*/);
 
             log.info("Asserting: n=" + stmts.length + ", depth=" + depth);
@@ -1122,14 +1114,14 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
          * statements, in which case we will select fewer than N statements.
          */
         
-        List<SPO> stmts = new ArrayList<SPO>(N);
+        List<ISPO> stmts = new ArrayList<ISPO>(N);
         
         for( long s : subjects ) {
             
-            final IAccessPath<SPO> accessPath = db.getAccessPath(s, NULL, NULL,
+            final IAccessPath<ISPO> accessPath = db.getAccessPath(s, NULL, NULL,
                     ExplicitSPOFilter.INSTANCE);
 
-            final IChunkedOrderedIterator<SPO> itr = accessPath.iterator();
+            final IChunkedOrderedIterator<ISPO> itr = accessPath.iterator();
 
             try {
 
@@ -1137,10 +1129,10 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                     continue;
 
                 // a chunk of explicit statements for that subject.
-                final SPO[] chunk = itr.nextChunk();
+                final ISPO[] chunk = itr.nextChunk();
 
                 // statement randomly choosen from that chunk.
-                final SPO tmp = chunk[r.nextInt(chunk.length)];
+                final ISPO tmp = chunk[r.nextInt(chunk.length)];
 
                 if (log.isInfoEnabled())
                     log.info("Selected at random: " + tmp.toString(db));
@@ -1199,10 +1191,10 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 //                    
 //        }
         
-        final IChunkedOrderedIterator<SPO> itre = expected.getAccessPath(
+        final IChunkedOrderedIterator<ISPO> itre = expected.getAccessPath(
                 SPOKeyOrder.SPO).iterator();
 
-        final IChunkedOrderedIterator<SPO> itra = actual.getAccessPath(
+        final IChunkedOrderedIterator<ISPO> itra = actual.getAccessPath(
                 SPOKeyOrder.SPO).iterator();
 
 //        int i = 0;
@@ -1225,9 +1217,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                     
                 }
 
-                SPO expectedSPO = itre.next(); nexpected++;
+                SPO expectedSPO = (SPO)itre.next(); nexpected++;
                 
-                SPO actualSPO = itra.next(); nactual++;
+                SPO actualSPO = (SPO)itra.next(); nactual++;
                 
                 if (!expectedSPO.equals(actualSPO)) {
 
@@ -1237,7 +1229,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                         if(!itra.hasNext()) break;
                         
-                        actualSPO = itra.next(); nactual++;
+                        actualSPO = (SPO)itra.next(); nactual++;
                         
                         if(nerrs++==maxerrs) fail("Too many errors");
 
@@ -1249,7 +1241,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                         if(!itre.hasNext()) break;
                         
-                        expectedSPO = itre.next(); nexpected++;
+                        expectedSPO = (SPO)itre.next(); nexpected++;
 
                         if(nerrs++==maxerrs) fail("Too many errors");
 

@@ -33,10 +33,10 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
+import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataClient;
 
@@ -96,7 +96,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
      * @param term
      *            The term.
      */
-    protected void doAddTermTest(AbstractTripleStore store, _Value term) {
+    protected void doAddTermTest(AbstractTripleStore store, BigdataValue term) {
 
         assertEquals(NULL, store.getTermId(term));
 
@@ -116,26 +116,27 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
         AbstractTripleStore store = getStore();
 
-        _Value[] terms = new _Value[] { new _Literal("abc"),//
-                new _Literal("abc", new _URI(XMLSchema.DECIMAL)),//
-                new _Literal("abc", "en"),//
-                new _Literal("good day", "en"),//
-                new _Literal("gutten tag", "de"),//
-                new _Literal("tag team", "en"),//
-                new _Literal("the first day", "en"),// // 'the' is a stopword.
+        final BigdataValue[] terms = new BigdataValue[] {//
+                new BigdataLiteralImpl("abc"),//
+                new BigdataLiteralImpl("abc", new BigdataURIImpl(XMLSchema.DECIMAL)),//
+                new BigdataLiteralImpl("abc", "en"),//
+                new BigdataLiteralImpl("good day", "en"),//
+                new BigdataLiteralImpl("gutten tag", "de"),//
+                new BigdataLiteralImpl("tag team", "en"),//
+                new BigdataLiteralImpl("the first day", "en"),// // 'the' is a stopword.
 
-                new _URI("http://www.bigdata.com"),//
-                new _URI(RDF.TYPE),//
-                new _URI(RDFS.SUBCLASSOF),//
-                new _URI(XMLSchema.DECIMAL),//
+                new BigdataURIImpl("http://www.bigdata.com"),//
+                new BigdataURIImpl(RDF.TYPE),//
+                new BigdataURIImpl(RDFS.SUBCLASSOF),//
+                new BigdataURIImpl(XMLSchema.DECIMAL),//
 
-                new _BNode(UUID.randomUUID().toString()),//
-                new _BNode("a12"),//
+                new BigdataBNodeImpl(UUID.randomUUID().toString()),//
+                new BigdataBNodeImpl("a12"),//
         };
 
         try {
 
-            store.addTerms(terms, terms.length);
+            store.addTerms(terms);
 
             dumpTerms(store);
 

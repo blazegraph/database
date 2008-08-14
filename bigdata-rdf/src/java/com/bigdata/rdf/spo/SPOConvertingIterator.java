@@ -14,28 +14,28 @@ import com.bigdata.striterator.IKeyOrder;
  * @version $Id: SPOConvertingIterator.java,v 1.2 2008/06/18 14:16:25
  *          thompsonbry Exp $
  */
-public class SPOConvertingIterator implements IChunkedOrderedIterator<SPO> {
+public class SPOConvertingIterator implements IChunkedOrderedIterator<ISPO> {
     
     private final static Logger log = Logger.getLogger(SPOConvertingIterator.class);
     
-    private final IChunkedOrderedIterator<SPO> src;
+    private final IChunkedOrderedIterator<ISPO> src;
 
     private final SPOConverter converter;
 
-    private final IKeyOrder<SPO> keyOrder;
+    private final IKeyOrder<ISPO> keyOrder;
 
-    private SPO[] converted = new SPO[0];
+    private ISPO[] converted = new ISPO[0];
 
     private int pos = 0;
 
-    public SPOConvertingIterator(IChunkedOrderedIterator<SPO> src, SPOConverter converter) {
+    public SPOConvertingIterator(IChunkedOrderedIterator<ISPO> src, SPOConverter converter) {
         
         this(src, converter, src.getKeyOrder());
         
     }
 
-    public SPOConvertingIterator(IChunkedOrderedIterator<SPO> src,
-            SPOConverter converter, IKeyOrder<SPO> keyOrder) {
+    public SPOConvertingIterator(IChunkedOrderedIterator<ISPO> src,
+            SPOConverter converter, IKeyOrder<ISPO> keyOrder) {
         
         this.src = src;
         
@@ -45,7 +45,7 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<SPO> {
         
     }
 
-    private SPO[] convert(SPO[] src) {
+    private ISPO[] convert(ISPO[] src) {
 
         return converter.convert(src);
         
@@ -57,7 +57,7 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<SPO> {
         
     }
 
-    public SPO next() {
+    public ISPO next() {
         if (pos >= converted.length && src.hasNext()) {
             // convert the next chunk
             converted = convert(src.nextChunk());
@@ -86,13 +86,13 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<SPO> {
         return hasNext;
     }
 
-    public IKeyOrder<SPO> getKeyOrder() {
+    public IKeyOrder<ISPO> getKeyOrder() {
         
         return keyOrder;
         
     }
 
-    public SPO[] nextChunk() {
+    public ISPO[] nextChunk() {
         if (pos >= converted.length && src.hasNext()) {
             // convert the next chunk
             converted = convert(src.nextChunk());
@@ -104,15 +104,15 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<SPO> {
             converted = chunk;
             pos = 0;
         }
-        SPO[] nextChunk = converted;
-        converted = new SPO[0];
+        ISPO[] nextChunk = converted;
+        converted = new ISPO[0];
         pos = 0;
         return nextChunk;
     }
 
-    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+    public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
         
-        SPO[] chunk = nextChunk();
+        ISPO[] chunk = nextChunk();
         
         Arrays.sort(chunk, keyOrder.getComparator());
         
@@ -131,7 +131,7 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<SPO> {
      */
     public static interface SPOConverter {
         
-        SPO[] convert(SPO[] src);
+        ISPO[] convert(ISPO[] src);
         
     }
 

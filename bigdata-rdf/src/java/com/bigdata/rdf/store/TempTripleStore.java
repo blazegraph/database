@@ -75,7 +75,7 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TempTripleStore extends AbstractLocalTripleStore implements ITripleStore {
+public class TempTripleStore extends AbstractLocalTripleStore {
     
     private final TemporaryStore store;
     

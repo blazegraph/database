@@ -285,21 +285,21 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * 
      * @return The key.
      */
-    public byte[] statement2Key(IKeyOrder<SPO> keyOrder, SPO spo) {
+    public byte[] statement2Key(IKeyOrder<ISPO> keyOrder, ISPO spo) {
         
         switch (((SPOKeyOrder)keyOrder).index()) {
 
         case SPOKeyOrder._SPO:
         
-            return statement2Key(spo.s, spo.p, spo.o);
+            return statement2Key(spo.s(), spo.p(), spo.o());
             
         case SPOKeyOrder._POS:
             
-            return statement2Key(spo.p, spo.o, spo.s);
+            return statement2Key(spo.p(), spo.o(), spo.s());
             
         case SPOKeyOrder._OSP:
             
-            return statement2Key(spo.o, spo.s, spo.p);
+            return statement2Key(spo.o(), spo.s(), spo.p());
             
         default:
             throw new UnsupportedOperationException("keyOrder=" + keyOrder);
@@ -352,10 +352,10 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
         buf.reset();
 
-        final StatementEnum type = spo.getType();
+        final StatementEnum type = spo.getStatementType();
 
         // optionally set the override bit on the value.
-        final byte b = (byte) (spo.override ? (type.code() | StatementEnum.MASK_OVERRIDE)
+        final byte b = (byte) (spo.isOverride() ? (type.code() | StatementEnum.MASK_OVERRIDE)
                 : type.code());
 
         buf.putByte(b);

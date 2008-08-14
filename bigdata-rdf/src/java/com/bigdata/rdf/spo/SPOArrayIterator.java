@@ -50,7 +50,7 @@ import com.bigdata.striterator.IKeyOrder;
  *             {@link TruthMaintenance} and with fully buffering precisely
  *             because the DB impl is not using concurrency controls.
  */
-public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
+public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
 
     private boolean open = true;
     
@@ -63,16 +63,10 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
      * The {@link IKeyOrder} in which statements are being visited and
      * <code>null</code> if not known.
      */
-    private final IKeyOrder<SPO> keyOrder;
+    private final IKeyOrder<ISPO> keyOrder;
 
-//    /**
-//     * Optional filter. When non-<code>null</code>, only matching statements
-//     * will be vistied.
-//     */
-//    private final ISPOFilter filter;
-    
     /** SPO buffer. */
-    private SPO[] stmts;
+    private ISPO[] stmts;
 
     /** #of valid entries in {@link #stmts}. */
     private int numStmts;
@@ -86,7 +80,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
     /**
      * The {@link SPO} most recently returned by {@link #next()}.
      */
-    private SPO current = null;
+    private ISPO current = null;
     
     /**
      * The #of statements that this iterator buffered.
@@ -97,7 +91,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
         
     }
 
-    public IKeyOrder<SPO> getKeyOrder() {
+    public IKeyOrder<ISPO> getKeyOrder() {
         
         return keyOrder;
         
@@ -116,7 +110,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
      * @param numStmts
      *            The #of entries in <i>stmts</i> that are valid.
      */
-    public SPOArrayIterator(SPO[] stmts, int numStmts) {
+    public SPOArrayIterator(ISPO[] stmts, int numStmts) {
 
         this.db = null; // not available (remove is disabled).
 
@@ -130,38 +124,35 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
         
     }
 
-    /**
-     * An iterator that visits the {@link SPO}s in the given array and
-     * optionally supports {@link #remove()}.
-     * 
-     * @param db
-     *            The database - when non-<code>null</code> the iterator will
-     *            support {@link #remove()}.
-     * @param keyOrder
-     *            The order of the data in <i>stmts</i> and <code>null</code>
-     *            IFF the order is NOT known.
-     * @param stmts
-     *            The statements.
-     * @param numStmts
-     *            The #of entries in <i>stmts</i> that are valid.
-     * @param filter
-     *            An optional filter. When non-<code>null</code>, only
-     *            matching statements will be visited.
-     */
-    public SPOArrayIterator(AbstractTripleStore db, IKeyOrder<SPO> keyOrder,
-            SPO[] stmts, int numStmts, IElementFilter<SPO> filter) {
-
-        this.db = db; // MAY be null (remove() will be disabled).
-
-        this.keyOrder = keyOrder; // MAY be null (implies not known).
-        
-        this.stmts = stmts;
-        
-        this.numStmts = numStmts;
-        
-//        this.filter = filter;
-
-    }
+//    /**
+//     * An iterator that visits the {@link SPO}s in the given array and
+//     * optionally supports {@link #remove()}.
+//     * 
+//     * @param db
+//     *            The database - when non-<code>null</code> the iterator will
+//     *            support {@link #remove()}.
+//     * @param keyOrder
+//     *            The order of the data in <i>stmts</i> and <code>null</code>
+//     *            IFF the order is NOT known.
+//     * @param stmts
+//     *            The statements.
+//     * @param numStmts
+//     *            The #of entries in <i>stmts</i> that are valid.
+//     */
+//    public SPOArrayIterator(AbstractTripleStore db, IKeyOrder<ISPO> keyOrder,
+//            ISPO[] stmts, int numStmts, IElementFilter<ISPO> filter) {
+//
+//        this.db = db; // MAY be null (remove() will be disabled).
+//
+//        this.keyOrder = keyOrder; // MAY be null (implies not known).
+//        
+//        this.stmts = stmts;
+//        
+//        this.numStmts = numStmts;
+//        
+////        this.filter = filter;
+//
+//    }
 
     /**
      * Fully buffers all statements selected by the {@link IAccessPath}.
@@ -188,8 +179,8 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
      *            An optional filter. When non-<code>null</code>, only
      *            matching statements will be visited.
      */
-    public SPOArrayIterator(AbstractTripleStore db, IAccessPath<SPO> accessPath,
-            int limit, IElementFilter<SPO> filter) {
+    public SPOArrayIterator(AbstractTripleStore db, IAccessPath<ISPO> accessPath,
+            int limit, IElementFilter<ISPO> filter) {
 
         if (accessPath == null)
             throw new IllegalArgumentException();
@@ -265,7 +256,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
         
     }
 
-    public SPO next() {
+    public ISPO next() {
         
         if (!hasNext()) {
 
@@ -306,7 +297,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
             
         }
        
-        db.removeStatements(new SPO[] { current }, 1);
+        db.removeStatements(new ISPO[] { current }, 1);
         
         // clear the reference.
         current = null;
@@ -318,7 +309,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
      * 
      * @see #getStatementCount()
      */
-    public SPO[] array() {
+    public ISPO[] array() {
 
         assertOpen();
 
@@ -332,7 +323,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
      * @throws NoSuchElementException
      *             if {@link #hasNext()} returns false.
      */
-    public SPO[] nextChunk() {
+    public ISPO[] nextChunk() {
        
         if (!hasNext()) {
 
@@ -340,7 +331,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
             
         }
 
-        final SPO[] ret;
+        final ISPO[] ret;
         
         if (i == 0 && numStmts == stmts.length) {
             
@@ -379,12 +370,12 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<SPO> {
         
     }
     
-    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+    public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
 
-        final SPO[] stmts = nextChunk();
+        final ISPO[] stmts = nextChunk();
 
         if (keyOrder != this.keyOrder) {
 

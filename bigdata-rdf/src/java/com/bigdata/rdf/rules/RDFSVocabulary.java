@@ -32,8 +32,8 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.ArrayBindingSet;
@@ -43,7 +43,6 @@ import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.Rule;
@@ -101,24 +100,26 @@ public class RDFSVocabulary {
 
         this.database = store;
         
-        _Value rdfType = new _URI(RDF.TYPE);
-        _Value rdfProperty = new _URI(RDF.PROPERTY);
-        _Value rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
-        _Value rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
-        _Value rdfsDomain = new _URI(RDFS.DOMAIN);
-        _Value rdfsRange = new _URI(RDFS.RANGE);
-        _Value rdfsClass = new _URI(RDFS.CLASS);
-        _Value rdfsResource = new _URI(RDFS.RESOURCE);
-        _Value rdfsCMP = new _URI(RDFS.CONTAINERMEMBERSHIPPROPERTY);
-        _Value rdfsDatatype = new _URI(RDFS.DATATYPE);
-        _Value rdfsMember = new _URI(RDFS.MEMBER);
-        _Value rdfsLiteral = new _URI(RDFS.LITERAL);
+        final BigdataValueFactory f = store.getValueFactory();
         
-        _Value owlSameAs = new _URI(OWL.SAMEAS);
-        _Value owlEquivlentClass = new _URI(OWL.EQUIVALENTCLASS);
-        _Value owlEquivlentProperty = new _URI(OWL.EQUIVALENTPROPERTY);
+        final BigdataValue rdfType = f.asValue(RDF.TYPE);
+        final BigdataValue rdfProperty = f.asValue(RDF.PROPERTY);
+        final BigdataValue rdfsSubClassOf = f.asValue(RDFS.SUBCLASSOF);
+        final BigdataValue rdfsSubPropertyOf = f.asValue(RDFS.SUBPROPERTYOF);
+        final BigdataValue rdfsDomain = f.asValue(RDFS.DOMAIN);
+        final BigdataValue rdfsRange = f.asValue(RDFS.RANGE);
+        final BigdataValue rdfsClass = f.asValue(RDFS.CLASS);
+        final BigdataValue rdfsResource = f.asValue(RDFS.RESOURCE);
+        final BigdataValue rdfsCMP = f.asValue(RDFS.CONTAINERMEMBERSHIPPROPERTY);
+        final BigdataValue rdfsDatatype = f.asValue(RDFS.DATATYPE);
+        final BigdataValue rdfsMember = f.asValue(RDFS.MEMBER);
+        final BigdataValue rdfsLiteral = f.asValue(RDFS.LITERAL);
         
-        _Value[] terms = new _Value[]{
+        final BigdataValue owlSameAs = f.asValue(OWL.SAMEAS);
+        final BigdataValue owlEquivlentClass = f.asValue(OWL.EQUIVALENTCLASS);
+        final BigdataValue owlEquivlentProperty = f.asValue(OWL.EQUIVALENTPROPERTY);
+        
+        final BigdataValue[] terms = new BigdataValue[]{
         
                 rdfType,
                 rdfProperty,
@@ -138,25 +139,26 @@ public class RDFSVocabulary {
                 owlEquivlentProperty
                 
         };
-        
-        store.addTerms(terms, terms.length);
 
-        this.rdfType = new Constant<Long>(rdfType.termId);
-        this.rdfProperty = new Constant<Long>(rdfProperty.termId);
-        this.rdfsSubClassOf = new Constant<Long>(rdfsSubClassOf.termId);
-        this.rdfsSubPropertyOf= new Constant<Long>(rdfsSubPropertyOf.termId);
-        this.rdfsDomain = new Constant<Long>(rdfsDomain.termId);
-        this.rdfsRange = new Constant<Long>(rdfsRange.termId);
-        this.rdfsClass = new Constant<Long>(rdfsClass.termId);
-        this.rdfsResource = new Constant<Long>(rdfsResource.termId);
-        this.rdfsCMP = new Constant<Long>(rdfsCMP.termId);
-        this.rdfsDatatype = new Constant<Long>(rdfsDatatype.termId);
-        this.rdfsMember = new Constant<Long>(rdfsMember.termId);
-        this.rdfsLiteral = new Constant<Long>(rdfsLiteral.termId);
+        store.getLexiconRelation()
+                .addTerms(terms, terms.length, false/* readOnly */);
 
-        this.owlSameAs = new Constant<Long>(owlSameAs.termId);
-        this.owlEquivalentClass = new Constant<Long>(owlEquivlentClass.termId);
-        this.owlEquivalentProperty = new Constant<Long>(owlEquivlentProperty.termId);
+        this.rdfType = new Constant<Long>(rdfType.getTermId());
+        this.rdfProperty = new Constant<Long>(rdfProperty.getTermId());
+        this.rdfsSubClassOf = new Constant<Long>(rdfsSubClassOf.getTermId());
+        this.rdfsSubPropertyOf = new Constant<Long>(rdfsSubPropertyOf.getTermId());
+        this.rdfsDomain = new Constant<Long>(rdfsDomain.getTermId());
+        this.rdfsRange = new Constant<Long>(rdfsRange.getTermId());
+        this.rdfsClass = new Constant<Long>(rdfsClass.getTermId());
+        this.rdfsResource = new Constant<Long>(rdfsResource.getTermId());
+        this.rdfsCMP = new Constant<Long>(rdfsCMP.getTermId());
+        this.rdfsDatatype = new Constant<Long>(rdfsDatatype.getTermId());
+        this.rdfsMember = new Constant<Long>(rdfsMember.getTermId());
+        this.rdfsLiteral = new Constant<Long>(rdfsLiteral.getTermId());
+
+        this.owlSameAs = new Constant<Long>(owlSameAs.getTermId());
+        this.owlEquivalentClass = new Constant<Long>(owlEquivlentClass.getTermId());
+        this.owlEquivalentProperty = new Constant<Long>(owlEquivlentProperty.getTermId());
         
     }
 

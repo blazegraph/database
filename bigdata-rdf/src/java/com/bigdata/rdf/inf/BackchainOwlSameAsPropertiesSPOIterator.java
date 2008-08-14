@@ -31,6 +31,8 @@ import java.util.Properties;
 import java.util.Set;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -55,7 +57,7 @@ import com.bigdata.striterator.IKeyOrder;
 public class BackchainOwlSameAsPropertiesSPOIterator extends
         BackchainOwlSameAsIterator {
 
-    private IChunkedOrderedIterator<SPO> sameAs2and3It;
+    private IChunkedOrderedIterator<ISPO> sameAs2and3It;
 
     private TempTripleStore sameAs2and3;
 
@@ -84,7 +86,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
      *            database.
      */
     public BackchainOwlSameAsPropertiesSPOIterator(
-            IChunkedOrderedIterator<SPO> src, long s, long p, long o,
+            IChunkedOrderedIterator<ISPO> src, long s, long p, long o,
             AbstractTripleStore db, final long sameAs) {
         super(src, db, sameAs);
         Properties props = db.getProperties();
@@ -112,21 +114,21 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             SPO[] spos = new SPO[chunkSize];
             int numSPOs = 0;
             // collect up the links between {s,? sameAs s} X {o,? sameAs o}
-            Set<Long> sAndSames = getSelfAndSames(s);
-            Set<Long> oAndSames = getSelfAndSames(o);
+            final Set<Long> sAndSames = getSelfAndSames(s);
+            final Set<Long> oAndSames = getSelfAndSames(o);
             for (long s1 : sAndSames) {
                 for (long o1 : oAndSames) {
                     // get the links between this {s,o} tuple
-                    IChunkedOrderedIterator<SPO> it = db.getAccessPath(s1, p, o1).iterator();
+                    final IChunkedOrderedIterator<ISPO> it = db.getAccessPath(s1, p, o1).iterator();
                     while (it.hasNext()) {
-                        long p1 = it.next().p;
+                        final long p1 = it.next().p();
                         // do not add ( s sameAs s ) inferences
                         if (p1 == sameAs && s == o) {
                             continue;
                         }
                         if (numSPOs == chunkSize) {
                             boolean present = false; // filter for not present
-                            IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos,
+                            IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos,
                                     numSPOs, present);
                             db.addStatements(sameAs2and3,copyOnly,absent, null);
                             numSPOs = 0;
@@ -138,14 +140,14 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             }
             // final flush of the buffer
             boolean present = false; // filter for not present
-            IChunkedOrderedIterator<SPO> absent = db.bulkFilterStatements(spos, numSPOs,
+            IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs,
                     present);
             db.addStatements(sameAs2and3,copyOnly,absent, null);
         }
         sameAs2and3It = sameAs2and3.getAccessPath(SPOKeyOrder.SPO).iterator();
     }
 
-    public IKeyOrder<SPO> getKeyOrder() {
+    public IKeyOrder<ISPO> getKeyOrder() {
      
         return src.getKeyOrder();
         
@@ -157,9 +159,9 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
         
     }
 
-    public SPO next() {
+    public ISPO next() {
         canRemove = false;
-        SPO current = null;
+        ISPO current = null;
         if (src.hasNext()) {
             current = src.next();
             canRemove = true;
@@ -169,23 +171,23 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
         return current;
     }
 
-    public SPO[] nextChunk() {
+    public ISPO[] nextChunk() {
         final int chunkSize = 10000;
-        SPO[] s = new SPO[chunkSize];
+        ISPO[] s = new ISPO[chunkSize];
         int n = 0;
         while (hasNext() && n < chunkSize) {
             s[n++] = next();
         }
-        SPO[] stmts = new SPO[n];
+        ISPO[] stmts = new ISPO[n];
         // copy so that stmts[] is dense.
         System.arraycopy(s, 0, stmts, 0, n);
         return stmts;
     }
 
-    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+    public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
         if (keyOrder == null)
             throw new IllegalArgumentException();
-        SPO[] stmts = nextChunk();
+        ISPO[] stmts = nextChunk();
         if (src.getKeyOrder() != keyOrder) {
             // sort into the required order.
             Arrays.sort(stmts, 0, stmts.length, keyOrder.getComparator());

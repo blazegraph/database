@@ -119,7 +119,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPORelation extends AbstractRelation<SPO> {
+public class SPORelation extends AbstractRelation<ISPO> {
 
     protected static final Logger log = Logger.getLogger(SPORelation.class);
     
@@ -519,7 +519,7 @@ public class SPORelation extends AbstractRelation<SPO> {
 
     }
     
-    public String getFQN(IKeyOrder<? extends SPO> keyOrder) {
+    public String getFQN(IKeyOrder<? extends ISPO> keyOrder) {
         
         return getNamespace() + ((SPOKeyOrder)keyOrder).getIndexName();
         
@@ -637,7 +637,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * @param p
      * @param o
      */
-    public IAccessPath<SPO> getAccessPath(final long s, final long p, final long o) {
+    public IAccessPath<ISPO> getAccessPath(final long s, final long p, final long o) {
      
         return getAccessPath(s, p, o, null/*filter*/);
         
@@ -652,8 +652,8 @@ public class SPORelation extends AbstractRelation<SPO> {
      * @return
      */
     @SuppressWarnings("unchecked")
-    public IAccessPath<SPO> getAccessPath(final long s, final long p,
-            final long o, IElementFilter<SPO> filter) {
+    public IAccessPath<ISPO> getAccessPath(final long s, final long p,
+            final long o, IElementFilter<ISPO> filter) {
 
 //      return new AccessPath(this, KeyOrder.get(s, p, o), s, p, o);
 
@@ -678,7 +678,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * 
      * @return The best access path for that predicate.
      */
-    public IAccessPath<SPO> getAccessPath(final IPredicate<SPO> predicate) {
+    public IAccessPath<ISPO> getAccessPath(final IPredicate<ISPO> predicate) {
 
         if (predicate == null)
             throw new IllegalArgumentException();
@@ -687,7 +687,7 @@ public class SPORelation extends AbstractRelation<SPO> {
         final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
         final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
 
-        final IAccessPath<SPO> accessPath;
+        final IAccessPath<ISPO> accessPath;
         
         if (s != NULL && p != NULL && o != NULL) {
 
@@ -744,8 +744,8 @@ public class SPORelation extends AbstractRelation<SPO> {
      *            path.
      * @return The access path.
      */
-    public SPOAccessPath getAccessPath(IKeyOrder<SPO> keyOrder,
-            IPredicate<SPO> predicate) {
+    public SPOAccessPath getAccessPath(IKeyOrder<ISPO> keyOrder,
+            IPredicate<ISPO> predicate) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -798,7 +798,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * 
      * @return An iterator visiting the distinct term identifiers.
      */
-    public IChunkedIterator<Long> distinctTermScan(IKeyOrder<SPO> keyOrder) {
+    public IChunkedIterator<Long> distinctTermScan(IKeyOrder<ISPO> keyOrder) {
 
         return distinctTermScan(keyOrder,/* termIdFilter */null);
         
@@ -817,10 +817,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * @return An iterator visiting the distinct term identifiers.
      */
     public IChunkedIterator<Long> distinctTermScan(
-            final IKeyOrder<SPO> keyOrder, final ITermIdFilter termIdFilter) {
-
-//        return new DistinctTermScanner(getExecutorService(), getIndex(keyOrder))
-//                .iterator();
+            final IKeyOrder<ISPO> keyOrder, final ITermIdFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         
@@ -951,7 +948,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * which knows how to generate the statement identifiers. In turn, that
      * method will delegate each "chunk" to this method.
      */
-    public long insert(IChunkedOrderedIterator<SPO> itr) {
+    public long insert(IChunkedOrderedIterator<ISPO> itr) {
 
         try {
             
@@ -959,7 +956,7 @@ public class SPORelation extends AbstractRelation<SPO> {
             
             while(itr.hasNext()) {
                 
-                final SPO[] a = itr.nextChunk();
+                final ISPO[] a = itr.nextChunk();
                 
                 n += insert( a, a.length, null/*filter*/ );
                 
@@ -993,7 +990,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * @see AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)
      * @see SPOAccessPath#removeAll()
      */
-    public long delete(IChunkedOrderedIterator<SPO> itr) {
+    public long delete(IChunkedOrderedIterator<ISPO> itr) {
 
         try {
             
@@ -1001,7 +998,7 @@ public class SPORelation extends AbstractRelation<SPO> {
             
             while(itr.hasNext()) {
                 
-                final SPO[] a = itr.nextChunk();
+                final ISPO[] a = itr.nextChunk();
                 
                 n += delete(a, a.length);
                 
@@ -1033,7 +1030,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * 
      * @todo raise the filter into the caller?
      */
-    public long insert(SPO[] a, int numStmts, IElementFilter<SPO> filter) {
+    public long insert(ISPO[] a, int numStmts, IElementFilter<ISPO> filter) {
 
         if (a == null)
             throw new IllegalArgumentException();
@@ -1147,7 +1144,7 @@ public class SPORelation extends AbstractRelation<SPO> {
      * perhaps it does since you can only do this safely for explicit
      * statements).
      */
-    public long delete(SPO[] stmts, int numStmts) {
+    public long delete(ISPO[] stmts, int numStmts) {
         
         final long begin = System.currentTimeMillis();
 
@@ -1352,16 +1349,16 @@ public class SPORelation extends AbstractRelation<SPO> {
     /**
      * Dumps the specified index.
      */
-    public StringBuilder dump(IKeyOrder<SPO> keyOrder) {
+    public StringBuilder dump(IKeyOrder<ISPO> keyOrder) {
         
         final StringBuilder sb = new StringBuilder();
         
         {
             
-            final IPredicate<SPO> pred = new SPOPredicate(getNamespace(), Var
+            final IPredicate<ISPO> pred = new SPOPredicate(getNamespace(), Var
                     .var("s"), Var.var("p"), Var.var("o"));
 
-            final IChunkedOrderedIterator<SPO> itr = getAccessPath(keyOrder,
+            final IChunkedOrderedIterator<ISPO> itr = getAccessPath(keyOrder,
                     pred).iterator();
 
             try {

@@ -55,6 +55,6 @@ import org.openrdf.model.BNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BigdataBNode extends BigdataValue, BNode {
+public interface BigdataBNode extends BigdataResource, BNode {
 
 }

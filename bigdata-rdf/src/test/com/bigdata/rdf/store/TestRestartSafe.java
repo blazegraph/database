@@ -34,9 +34,12 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataURIImpl;
 
 /**
  * Test restart safety for the various indices.
@@ -57,27 +60,29 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
 
         AbstractTripleStore store = getStore();
         
+        try {
+        
         /*
          * setup the database.
          */
-        _URI x = new _URI("http://www.foo.org/x");
-        _URI y = new _URI("http://www.foo.org/y");
-        _URI z = new _URI("http://www.foo.org/z");
+        final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x");
+        final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y");
+        final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z");
 
-        _URI A = new _URI("http://www.foo.org/A");
-        _URI B = new _URI("http://www.foo.org/B");
-        _URI C = new _URI("http://www.foo.org/C");
+        final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
+        final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
+        final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
 
-        _URI rdfType = new _URI(RDF.TYPE);
+        final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
 
-        _URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+        final BigdataURI rdfsSubClassOf = new BigdataURIImpl(RDFS.SUBCLASSOF);
 
-        _Literal lit1 = new _Literal("abc");
-        _Literal lit2 = new _Literal("abc",A);
-        _Literal lit3 = new _Literal("abc","en");
+        final BigdataLiteral lit1 = new BigdataLiteralImpl("abc");
+        final BigdataLiteral lit2 = new BigdataLiteralImpl("abc",A);
+        final BigdataLiteral lit3 = new BigdataLiteralImpl("abc","en");
 
-        _BNode bn1 = new _BNode(UUID.randomUUID().toString());
-        _BNode bn2 = new _BNode("a12");
+        final BigdataBNode bn1 = new BigdataBNodeImpl(UUID.randomUUID().toString());
+        final BigdataBNode bn2 = new BigdataBNodeImpl("a12");
         
         store.addStatement(x, rdfType, C);
         store.addStatement(y, rdfType, B);
@@ -102,10 +107,16 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         final long bn1_id = store.addTerm(bn1); assertTrue(bn1_id!=NULL);
         final long bn2_id = store.addTerm(bn2); assertTrue(bn2_id!=NULL);
         
-        assertEquals("#terms",8+3+2,store.getTermCount());
+        final boolean storeBlankNodes = store.getLexiconRelation().isStoreBlankNodes();
+        
+        assertEquals("#terms",8+3+(storeBlankNodes?2:0),store.getTermCount());
         assertEquals("#uris",8,store.getURICount());
-        assertEquals("#lits",3,store.getLiteralCount());
-        assertEquals("#bnodes",2,store.getBNodeCount());
+        assertEquals("#lits", 3, store.getLiteralCount());
+        if (storeBlankNodes) {
+            assertEquals("#bnodes", 2, store.getBNodeCount());
+        } else {
+            assertEquals("#bnodes", 0, store.getBNodeCount());
+        }
 
         store.commit();
         
@@ -127,10 +138,15 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
         assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
         
-        assertEquals("#terms",8+3+2,store.getTermCount());
+        assertEquals("#terms", 8 + 3 + (storeBlankNodes ? 2 : 0), store
+                .getTermCount());
         assertEquals("#uris",8,store.getURICount());
         assertEquals("#lits",3,store.getLiteralCount());
-        assertEquals("#bnodes",2,store.getBNodeCount());
+        if (storeBlankNodes) {
+            assertEquals("#bnodes", 2, store.getBNodeCount());
+        } else {
+            assertEquals("#bnodes", 0, store.getBNodeCount());
+        }
 
         if(log.isInfoEnabled())log.info("\n"+store.dumpStore());
         
@@ -163,10 +179,15 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
             assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
             assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
 
-            assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
+            assertEquals("#terms", 8 + 3 + (storeBlankNodes ? 2 : 0), store
+                    .getTermCount());
             assertEquals("#uris", 8, store.getURICount());
             assertEquals("#lits", 3, store.getLiteralCount());
-            assertEquals("#bnodes", 2, store.getBNodeCount());
+            if (storeBlankNodes) {
+                assertEquals("#bnodes", 2, store.getBNodeCount());
+            } else {
+                assertEquals("#bnodes", 0, store.getBNodeCount());
+            }
 
             /*
              * verify the terms can be recovered.
@@ -195,7 +216,11 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
 
         }
         
-        store.closeAndDelete();
+        } finally {
+
+            store.closeAndDelete();
+            
+        }
         
     }
 

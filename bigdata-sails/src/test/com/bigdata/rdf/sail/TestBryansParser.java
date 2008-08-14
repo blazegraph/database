@@ -30,7 +30,9 @@ import java.io.File;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Properties;
+
 import junit.framework.TestCase2;
+
 import org.openrdf.model.Graph;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -43,9 +45,6 @@ import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 
 /**
  */
@@ -84,7 +83,7 @@ public class TestBryansParser extends TestCase2 {
                 System.out.println(sw.toString());
                 Graph graph = new GraphImpl();
                 final RDFXMLParser rdfParser =
-                        new RDFXMLParser(new BigdataValueFactory());
+                        new RDFXMLParser(sail.getValueFactory());
                 /*
                  * Setting this verification to true causes an exception to be
                  * thrown.
@@ -130,7 +129,7 @@ public class TestBryansParser extends TestCase2 {
                 System.out.println(sw.toString());
                 Graph graph = new GraphImpl();
                 final RDFXMLParser rdfParser =
-                        new RDFXMLParser(new BigdataValueFactory());
+                        new RDFXMLParser(sail.getValueFactory());
                 rdfParser.setVerifyData(false);
                 rdfParser.setStopAtFirstError(true);
                 rdfParser

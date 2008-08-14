@@ -39,7 +39,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOKeyOrder implements IKeyOrder<SPO>, Serializable {
+public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
     /**
      * 
@@ -139,7 +139,7 @@ public class SPOKeyOrder implements IKeyOrder<SPO>, Serializable {
      * Return the comparator that places {@link ISPO}s into the natural order
      * for the associated index.
      */
-    final public Comparator<SPO> getComparator() {
+    final public Comparator<ISPO> getComparator() {
 
         switch (index) {
         case _SPO:

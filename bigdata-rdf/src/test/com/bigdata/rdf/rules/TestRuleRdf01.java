@@ -30,9 +30,7 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleRdf01;
+import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.Rule;
 
@@ -71,12 +69,12 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
 
         try {
             
-            URI A = new _URI("http://www.foo.org/A");
-            URI B = new _URI("http://www.foo.org/B");
-            URI C = new _URI("http://www.foo.org/C");
+            final URI A = new BigdataURIImpl("http://www.foo.org/A");
+            final URI B = new BigdataURIImpl("http://www.foo.org/B");
+            final URI C = new BigdataURIImpl("http://www.foo.org/C");
     
-            URI rdfType = RDF.TYPE;
-            URI rdfProperty = RDF.PROPERTY;
+            final URI rdfType = RDF.TYPE;
+            final URI rdfProperty = RDF.PROPERTY;
     
             store.addStatement(A, B, C);
     
@@ -113,14 +111,14 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
 
         try {
 
-            URI A = new _URI("http://www.foo.org/A");
-            URI B = new _URI("http://www.foo.org/B");
-            URI C = new _URI("http://www.foo.org/C");
-            URI D = new _URI("http://www.foo.org/D");
-            URI E = new _URI("http://www.foo.org/E");
+            final URI A = new BigdataURIImpl("http://www.foo.org/A");
+            final URI B = new BigdataURIImpl("http://www.foo.org/B");
+            final URI C = new BigdataURIImpl("http://www.foo.org/C");
+            final URI D = new BigdataURIImpl("http://www.foo.org/D");
+            final URI E = new BigdataURIImpl("http://www.foo.org/E");
 
-            URI rdfType = RDF.TYPE;
-            URI rdfProperty = RDF.PROPERTY;
+            final URI rdfType = RDF.TYPE;
+            final URI rdfProperty = RDF.PROPERTY;
 
             /*
              * Three statements that will trigger the rule, but two statements

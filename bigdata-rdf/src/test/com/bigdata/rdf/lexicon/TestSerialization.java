@@ -28,19 +28,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.lexicon;
 
 import java.io.Externalizable;
-import java.util.UUID;
 
 import junit.framework.TestCase2;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.XMLSchema;
 
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataValueSerializer;
 
 /**
+ * Test of the {@link BigdataValueSerializer}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -60,31 +63,44 @@ public class TestSerialization extends TestCase2 {
     }
 
     /**
+     * Fixture under test.
+     */
+    protected final BigdataValueSerializer<Value> fixture = new BigdataValueSerializer<Value>(
+            ValueFactoryImpl.getInstance());
+    
+    /**
      * Performs round trip using the {@link Externalizable} implementation on
-     * {@link _Value}.
+     * {@link Value}.
      * 
      * @param o
-     *            The {@link _Value}.
-     *            
-     * @return The de-serialized {@link _Value}.
+     *            The {@link Value}.
+     * 
+     * @return The de-serialized {@link Value}.
+     * 
+     * @deprecated The {@link Externalizable} iface is disabled since we can't
+     *             write a stand-off deserializer for {@link Externalizable}.
      */
-    protected _Value roundTrip_externalizable(_Value o) {
+    protected Value roundTrip_externalizable(Value o) {
         
-        return (_Value) SerializerUtil.deserialize(SerializerUtil.serialize(o));
+        // Note: Externalizable is disabled. 
+        
+        return o;
+        
+//        return (_Value) SerializerUtil.deserialize(SerializerUtil.serialize(o));
         
     }
     
     /**
-     * Performs round trip (de-)serialization using {@link _Value#serialize()}
-     * and {@link _Value#deserialize(byte[])}.
+     * Performs round trip (de-)serialization using {@link BigdataValueSerializer#serialize()}
+     * and {@link BigdataValueSerializer#deserialize(byte[])}.
      * 
-     * @param o The {@link _Value}
+     * @param o The {@link Value}
      * 
-     * @return The de-serialized {@link _Value}.
+     * @return The de-serialized {@link Value}.
      */
-    protected _Value roundTrip_tuned(_Value o) {
+    protected Value roundTrip_tuned(Value o) {
         
-        return _Value.deserialize(o.serialize());
+        return fixture.deserialize(fixture.serialize(o));
         
     }
     
@@ -93,9 +109,9 @@ public class TestSerialization extends TestCase2 {
      */
     public void test_URIs() {
 
-        _URI a = new _URI("http://www.bigdata.com");
+        final URI a = new URIImpl("http://www.bigdata.com");
         
-        assertEquals(a, roundTrip_externalizable(a));
+//        assertEquals(a, roundTrip_externalizable(a));
         assertEquals(a, roundTrip_tuned(a));
         
     }
@@ -105,9 +121,9 @@ public class TestSerialization extends TestCase2 {
      */
     public void test_plainLiterals() {
 
-        _Literal a = new _Literal("bigdata");
+        final Literal a = new LiteralImpl("bigdata");
         
-        assertEquals(a, roundTrip_externalizable(a));
+//        assertEquals(a, roundTrip_externalizable(a));
         assertEquals(a, roundTrip_tuned(a));
         
     }
@@ -117,9 +133,9 @@ public class TestSerialization extends TestCase2 {
      */
     public void test_langCodeLiterals() {
 
-        _Literal a = new _Literal("bigdata","en");
+        final Literal a = new LiteralImpl("bigdata","en");
         
-        assertEquals(a, roundTrip_externalizable(a));
+//        assertEquals(a, roundTrip_externalizable(a));
         assertEquals(a, roundTrip_tuned(a));
         
     }
@@ -129,9 +145,9 @@ public class TestSerialization extends TestCase2 {
      */
     public void test_dataTypeLiterals() {
 
-        _Literal a = new _Literal("bigdata",new _URI(XMLSchema.INT));
+        final Literal a = new LiteralImpl("bigdata", XMLSchema.INT);
         
-        assertEquals(a, roundTrip_externalizable(a));
+//        assertEquals(a, roundTrip_externalizable(a));
         assertEquals(a, roundTrip_tuned(a));
         
     }

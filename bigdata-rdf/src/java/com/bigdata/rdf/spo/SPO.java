@@ -25,9 +25,15 @@ package com.bigdata.rdf.spo;
 
 import java.util.Arrays;
 
+import org.openrdf.model.Statement;
+
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataStatementImpl;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -42,8 +48,6 @@ import com.bigdata.relation.rule.IConstant;
  */
 public class SPO implements ISPO, Comparable<SPO> {
     
-    private transient static final long NULL = IRawTripleStore.NULL;
-
     /** The term identifier for the subject position. */
     public final long s;
 
@@ -116,15 +120,6 @@ public class SPO implements ISPO, Comparable<SPO> {
         
     }
     
-    /**
-     * Statement identifier (optional). Statement identifiers are a unique
-     * per-triple identifier assigned when a statement is first asserted against
-     * the database and are are defined iff
-     * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} was specified.
-     * 
-     * @throws IllegalStateException
-     *             if the statement identifier was not assigned.
-     */
     public final long getStatementIdentifier() {
 
         if (sid == NULL)
@@ -134,25 +129,25 @@ public class SPO implements ISPO, Comparable<SPO> {
         
     }
     
-    /**
-     * <code>true</code> iff this {@link SPO} has a statement identifier.
-     */
-    public boolean hasStatementIdentifier() {
+    final public boolean hasStatementIdentifier() {
         
         return sid != NULL;
         
     }
     
-    /**
-     * When this field is set the statement will be written onto the database
-     * with exactly its current {@link #type}. This feature is used during
-     * Truth Maintenance when we need to downgrade an {@link SPO} from
-     * "Explicit" to "Inferred". Normally, a statement is automatically upgraded
-     * from "Inferred" to "Explicit" so within this {@link #override} you could
-     * not downgrade the {@link StatementEnum} in the database without first
-     * deleting the statement (which would also delete its justifications).
-     */
-    public transient boolean override = false;
+    public void setOverride(boolean override) {
+
+        this.override = override;
+        
+    }
+
+    public boolean isOverride() {
+        
+        return override;
+        
+    }
+
+    private transient boolean override = false;
 
     /**
      * Construct a statement whose type is NOT known.
@@ -232,6 +227,21 @@ public class SPO implements ISPO, Comparable<SPO> {
     }
 
     /**
+     * Construct an {@link SPO} from {@link BigdataValue}s.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param type
+     */
+    public SPO(BigdataResource s, BigdataURI p, BigdataValue o,
+            StatementEnum type) {
+        
+        this(s.getTermId(), p.getTermId(), o.getTermId(), type);
+        
+    }
+    
+    /**
      * Construct an {@link SPO} from a {@link BigdataStatement}. The term
      * identifiers and statement type information available on the
      * {@link BigdataStatement} will be used to initialize the {@link SPO}.
@@ -246,9 +256,11 @@ public class SPO implements ISPO, Comparable<SPO> {
                 stmt.getStatementType()
                 );
         
-        if (stmt.getContext() != null) {
+        final BigdataResource c = stmt.getContext();
+        
+        if (c != null && c.getTermId() != NULL) {
 
-            setStatementIdentifier(stmt.getContext().getTermId());
+            setStatementIdentifier(c.getTermId());
             
         }
         
@@ -275,7 +287,8 @@ public class SPO implements ISPO, Comparable<SPO> {
              * read it.
              */
             
-            setStatementIdentifier( new ByteArrayBuffer(1,val.length,val).getLong(1) );
+            setStatementIdentifier(new ByteArrayBuffer(1, val.length, val)
+                    .getLong(1));
         
             assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
                     + toString(sid);
@@ -289,137 +302,10 @@ public class SPO implements ISPO, Comparable<SPO> {
         }
         
     }
-    
-    
-//    /**
-//     * Construct a triple from the sort key.
-//     * <p>
-//     * Note: If statement identifiers are enabled, then the statement identifier
-//     * will be read from the tuple and set on this {@link SPO}.
-//     * 
-//     * @param keyOrder
-//     *            Indicates the permutation of the subject, predicate and object
-//     *            used by the key.
-//     * 
-//     * @param itr
-//     *            The iterator that is visiting the entries in a statement
-//     *            index. The next entry will fetched from the iterator and
-//     *            decoded into an {@link SPO}.
-//     * 
-//     * @see RdfKeyBuilder#key2Statement(byte[], long[])
-//     * 
-//     * @todo This decodes the key directly. If {@link RdfKeyBuilder} is to
-//     *       decode the key then the fields on this class can not be final.
-//     */
-//    public SPO(KeyOrder keyOrder, ITupleIterator itr) {
-//        
-//        if (keyOrder == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (itr == null)
-//            throw new IllegalArgumentException();
-//
-//        final ITuple tuple = itr.next();
-//
-////      // clone of the key.
-////      final byte[] key = itr.getKey();
-//      
-//        // copy of the key in a reused buffer.
-//        final byte[] key = tuple.getKeyBuffer().array(); 
-//
-////        long[] ids = new long[IRawTripleStore.N];
-//        
-//        /*
-//         * Note: GTE since the key is typically a reused buffer which may be
-//         * larger than the #of bytes actually holding valid data.
-//         */
-//        assert key.length >= 8 * IRawTripleStore.N;
-////      assert key.length == 8 * IRawTripleStore.N + 1;
-//        
-////        final long _0 = KeyBuilder.decodeLong(key, 1);
-////      
-////        final long _1 = KeyBuilder.decodeLong(key, 1+8);
-////      
-////        final long _2 = KeyBuilder.decodeLong(key, 1+8+8);
-//        
-//        final long _0 = KeyBuilder.decodeLong(key, 0);
-//        
-//        final long _1 = KeyBuilder.decodeLong(key, 8);
-//      
-//        final long _2 = KeyBuilder.decodeLong(key, 8+8);
-//        
-//        switch (keyOrder) {
-//
-//        case SPO:
-//            s = _0;
-//            p = _1;
-//            o = _2;
-//            break;
-//            
-//        case POS:
-//            p = _0;
-//            o = _1;
-//            s = _2;
-//            break;
-//            
-//        case OSP:
-//            o = _0;
-//            s = _1;
-//            p = _2;
-//            break;
-//
-//        default:
-//
-//            throw new UnsupportedOperationException();
-//
-//        }
-//        
-//        decodeValue(tuple.getValue());
-//        
-////        final ByteArrayBuffer vbuf = tuple.getValueBuffer();
-////        
-////        final byte code = vbuf.getByte(0);
-////        
-////        type = StatementEnum.decode( code ); 
-////        
-////        if (vbuf.limit() == 1 + 8) {
-////
-////            /*
-////             * The value buffer appears to contain a statement identifier, so we
-////             * read it.
-////             */
-////            
-////            sid = vbuf.getLong(1);
-////        
-////            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
-////                    + toString(sid);
-////
-////            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
-////                    + toString();
-////
-////            assert sid != NULL : "statement identifier is NULL for explicit statement: "
-////                    + toString();
-////
-////        }
-//        
-//    }
 
-    /**
-     * Return the byte[] that would be written into a statement index for this
-     * {@link SPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
-     * bit. If the {@link #sid statement identifier} is non-{@link #NULL} then
-     * it will be included in the returned byte[].
-     * 
-     * @param buf
-     *            A buffer supplied by the caller. The buffer will be reset
-     *            before the value is written on the buffer.
-     * 
-     * @return The value that would be written into a statement index for this
-     *         {@link SPO}.
-     */
     public byte[] serializeValue(ByteArrayBuffer buf) {
 
-        return serializeValue(buf, override, type, sid);
+        return serializeValue(buf, isOverride(), type, sid);
         
     }
     
@@ -576,25 +462,29 @@ public class SPO implements ISPO, Comparable<SPO> {
         if (this == o)
             return true;
 
-        return equals((SPO) o);
+        return equals((ISPO) o);
         
     }
     
     /**
-     * True iff the statements are the same object or if the same term
+     * True iff the {@link ISPO}s are the same object or if the same term
      * identifiers are assigned for the subject, predicate and object positions,
      * and the same {@link StatementEnum} are the same.
+     * <p>
+     * Note: This is NOT the same test as
+     * {@link BigdataStatementImpl#equals(Object)} since the latter is
+     * implemented per the {@link Statement} interface.
      */
-    public boolean equals(SPO stmt2) {
+    public boolean equals(ISPO stmt2) {
 
         if (stmt2 == this)
             return true;
 
         return
-                this.s == stmt2.s && //
-                this.p == stmt2.p && //
-                this.o == stmt2.o && //
-                this.type == stmt2.type
+                this.s == stmt2.s() && //
+                this.p == stmt2.p() && //
+                this.o == stmt2.o() && //
+                this.type == stmt2.getStatementType()
                 ;
         
         // @todo statementId comparison?
@@ -647,7 +537,7 @@ public class SPO implements ISPO, Comparable<SPO> {
     /**
      * Resolves the term identifiers to terms against the store and returns a
      * representation of the statement using
-     * {@link ITripleStore#toString(long, long, long)}.
+     * {@link IRawTripleStore#toString(long, long, long)}.
      * 
      * @param store
      *            The store (optional). When non-<code>null</code> the store
@@ -655,7 +545,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      * 
      * @return The externalized representation of the statement.
      */
-    public String toString(AbstractTripleStore store) {
+    public String toString(IRawTripleStore store) {
         
         if (store != null) {
 
@@ -686,32 +576,16 @@ public class SPO implements ISPO, Comparable<SPO> {
         
     }
 
-    /**
-     * Return true iff all position (s,p,o) are non-{@link #NULL}.
-     * <p>
-     * Note: {@link SPO} are sometimes used to represent triple patterns. E.g.,
-     * in the tail of a {@link Justification}. This method will return
-     * <code>true</code> if the "triple pattern" is fully bound and
-     * <code>false</code> if there are any unbound positions.
-     */
-    public boolean isFullyBound() {
+    final public boolean isFullyBound() {
     
         return s != NULL && p != NULL && o != NULL;
 
     }
 
-    /**
-     * Return the statement type (axiom, explicit, or inferred).
-     * 
-     * @return the statement type.
-     * 
-     * @throws IllegalStateException
-     *             if the type is not known.
-     */
-    public StatementEnum getType() {
+    final public StatementEnum getStatementType() {
 
-        if (type == null)
-            throw new IllegalStateException();
+//        if (type == null)
+//            throw new IllegalStateException();
         
         return type;
 
@@ -726,7 +600,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      * @throws IllegalStateException
      *             if the statement type is already set to a different value.
      */
-    public void setStatementType(StatementEnum type) {
+    final public void setStatementType(StatementEnum type) {
         
         if(this.type != null && this.type != type) {
             
@@ -743,7 +617,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      * 
      * <code>true</code> iff the statement type is known for this statement.
      */
-    public boolean hasStatementType() {
+    final public boolean hasStatementType() {
         
         return type != null;
         

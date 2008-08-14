@@ -47,6 +47,10 @@ Modifications:
 
 package com.bigdata.rdf.lexicon;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -56,7 +60,8 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.BigdataValueSerializer;
 
 /**
  * Encapsulates key and value formation for the reverse lexicon index.
@@ -64,7 +69,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Id2TermTupleSerializer extends DefaultTupleSerializer {
+public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, BigdataValue> {
 
     /**
      * 
@@ -72,13 +77,24 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer {
     private static final long serialVersionUID = 4841769875819006615L;
 
     /**
+     * The namespace of the owning {@link LexiconRelation}.
+     */
+    private String namespace;
+
+    /**
+     * A (de-)serialized backed by a {@link BigdataValueFactoryImpl} for the
+     * {@link #namespace} of the owning {@link LexiconRelation}.
+     */
+    transient private BigdataValueSerializer<BigdataValue> valueSer;
+    
+    /**
      * Used to serialize RDF {@link Value}s.
      * <p>
      * Note: While this object is not thread-safe, the mutable B+Tree is
      * restricted to a single writer so it does not have to be thread-safe.
      */
     final transient private DataOutputBuffer buf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
-        
+
     /**
      * De-serialization ctor.
      */
@@ -94,11 +110,16 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer {
      *            A factory that does not support unicode and has an
      *            initialCapacity of {@value Bytes#SIZEOF_LONG}.
      */
-    public Id2TermTupleSerializer(ASCIIKeyBuilderFactory keyBuilderFactory) {
+    public Id2TermTupleSerializer(String namespace) {
         
-        super(keyBuilderFactory);
+        super(new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG));
+
+        if (namespace == null)
+            throw new IllegalArgumentException();
         
-        assert keyBuilderFactory.getInitialCapacity() == Bytes.SIZEOF_LONG;
+        this.namespace = namespace;
+        
+        this.valueSer = BigdataValueFactoryImpl.getInstance(namespace).getValueSerializer();
         
     }
     
@@ -133,7 +154,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer {
      */
     public Long deserializeKey(ITuple tuple) {
 
-        final byte[] key = tuple.getValueBuffer().array();
+        final byte[] key = tuple.getKeyBuffer().array();
 
         final long id = KeyBuilder.decodeLong(key, 0);
 
@@ -159,35 +180,48 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer {
      * 
      * @param obj
      *            An RDF {@link Value}.
-     * 
-     * FIXME Serialization is tightly linked to the {@link _Value} object - it
-     * should also accept {@link BigdataValue}.
      */
-    public byte[] serializeVal(Object obj) {
+    public byte[] serializeVal(BigdataValue obj) {
         
         buf.reset();
         
-        return ((_Value)obj).serialize(buf);
-        
+        return valueSer.serialize(obj, buf);
+
     }
 
     /**
      * De-serializes the {@link ITuple} as a {@link BigdataValue}, including
-     * the term identifier extracted from the unsigned byte[] key.
-     * 
-     * FIXME De-serialization is tightly linked to the {@link _Value} object
-     * rather than {@link BigdataValue}.
+     * the term identifier extracted from the unsigned byte[] key, and sets
+     * the appropriate {@link BigdataValueFactoryImpl} reference on that object.
      */
-    public _Value deserialize(ITuple tuple) {
+    public BigdataValue deserialize(ITuple tuple) {
 
         final long id = deserializeKey(tuple);
-        
-        final _Value tmp = _Value.deserialize(tuple.getValueStream());
-        
+
+        final BigdataValue tmp = valueSer.deserialize(tuple.getValueStream());
+
         tmp.setTermId(id);
-        
+
         return tmp;
-        
+
     }
 
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        
+        super.readExternal(in);
+        
+        namespace = in.readUTF();
+
+        valueSer = BigdataValueFactoryImpl.getInstance(namespace).getValueSerializer();
+        
+    }
+    
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        super.writeExternal(out);
+        
+        out.writeUTF(namespace);
+        
+    }
+    
 }

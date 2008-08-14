@@ -36,7 +36,7 @@ import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.RDFSVocabulary;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -102,7 +102,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             buffer.flush();
 
-            IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
+            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
                     store.getTermId(A), NULL, NULL,//
                     store, //
@@ -177,7 +177,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
             if(log.isInfoEnabled()) log.info("\n"+store.dumpStore());
 
-            IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
+            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
                     store.getTermId(A), NULL, NULL,//
                     store, //
@@ -250,7 +250,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                 buffer.flush();
             }
             
-            IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
+            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(NULL, NULL, NULL).iterator(),//
                     NULL, NULL, NULL,//
                     store, //
@@ -340,7 +340,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             buffer.flush();
 
-            IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
+            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(NULL, NULL, store.getTermId(B)).iterator(),//
                     NULL, NULL, store.getTermId(B),//
                     store, //
@@ -410,7 +410,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
             {
                 // where s is bound.
-                IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
                         store.getAccessPath(s, vocab.rdfType.get(),
                                 vocab.rdfsResource.get()).iterator(),//
                         s, vocab.rdfType.get(), vocab.rdfsResource.get(),//
@@ -426,7 +426,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
             {
                 // where s is unbound.
-                IChunkedOrderedIterator<SPO> itr = new BackchainTypeResourceIterator(//
+                IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
                         store.getAccessPath(NULL, vocab.rdfType.get(),
                                 vocab.rdfsResource.get()).iterator(),//
                         NULL, vocab.rdfType.get(), vocab.rdfsResource.get(),//

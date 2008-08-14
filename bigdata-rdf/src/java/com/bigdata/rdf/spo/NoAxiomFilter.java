@@ -41,7 +41,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NoAxiomFilter implements IElementFilter<SPO>, Serializable {
+public class NoAxiomFilter implements IElementFilter<ISPO>, Serializable {
 
     /**
      * 
@@ -51,15 +51,15 @@ public class NoAxiomFilter implements IElementFilter<SPO>, Serializable {
     /**
      * Shared instance.
      */
-    static public final transient IElementFilter<SPO> INSTANCE = new NoAxiomFilter();
+    static public final transient IElementFilter<ISPO> INSTANCE = new NoAxiomFilter();
     
     private NoAxiomFilter() {
         
     }
     
-    public boolean accept(SPO spo) {
+    public boolean accept(ISPO spo) {
 
-        return spo.getType() != StatementEnum.Axiom;
+        return spo.getStatementType() != StatementEnum.Axiom;
         
     }
 

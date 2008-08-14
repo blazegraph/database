@@ -36,6 +36,8 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.BNodeImpl;
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -44,14 +46,19 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.lexicon.Id2TermWriteProc;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
-import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -95,7 +102,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      * @param term
      *            The term.
      */
-    protected void doAddTermTest(AbstractTripleStore store, _Value term) {
+    protected void doAddTermTest(AbstractTripleStore store, Value term) {
 
         assertEquals(NULL, store.getTermId(term));
 
@@ -127,24 +134,30 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertFalse("isStatement()",AbstractTripleStore.isStatement(id));
 
         }
-        
-        // test lookup in the forward mapping.
-        assertEquals("forward mapping",id, store.getTermId(term));
 
-        // check the reverse mapping (id -> term)
-        if(term instanceof BNode) {
+        if (store.getLexiconRelation().isStoreBlankNodes()
+                || !(term instanceof BNode)) {
 
-            // the bnode ID is not preserved.
-            assertTrue("reverse mapping", store.getTerm(id) instanceof BNode);
-            
-        } else {
-            
-            assertEquals("reverse mapping",term, store.getTerm(id));
+            // test lookup in the forward mapping (term -> id)
+            assertEquals("forward mapping", id, store.getTermId(term));
+
+        }
+
+        // blank nodes are NEVER stored in the reverse index.
+        if (!(term instanceof BNode)) {
+
+            // test lookup in the reverse mapping (id -> term)
+            assertEquals("reverse mapping", term, store.getTerm(id));
+
+        }
+
+        if (store.getLexiconRelation().isStoreBlankNodes()
+                || !(term instanceof BNode)) {
+
+            // re-assert the term and verify that the same id is assigned.
+            assertEquals("add is not stable?", id, store.addTerm(term));
             
         }
-        
-        // re-assert the term and verify that the same id is assigned.
-        assertEquals("add is not stable?", id, store.addTerm(term));
 
     }
 
@@ -157,17 +170,17 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
         try {
 
-            doAddTermTest(store, new _Literal("abc"));
-            doAddTermTest(store, new _Literal("abc", new _URI(XMLSchema.DECIMAL)));
-            doAddTermTest(store, new _Literal("abc", "en"));
+            doAddTermTest(store, new LiteralImpl("abc"));
+            doAddTermTest(store, new LiteralImpl("abc", XMLSchema.DECIMAL));
+            doAddTermTest(store, new LiteralImpl("abc", "en"));
     
-            doAddTermTest(store, new _URI("http://www.bigdata.com"));
-            doAddTermTest(store, new _URI(RDF.TYPE));
-            doAddTermTest(store, new _URI(RDFS.SUBCLASSOF));
-            doAddTermTest(store, new _URI(XMLSchema.DECIMAL));
+            doAddTermTest(store, new URIImpl("http://www.bigdata.com"));
+            doAddTermTest(store, RDF.TYPE);
+            doAddTermTest(store, RDFS.SUBCLASSOF);
+            doAddTermTest(store, XMLSchema.DECIMAL);
     
-            doAddTermTest(store, new _BNode(UUID.randomUUID().toString()));
-            doAddTermTest(store, new _BNode("a12"));
+            doAddTermTest(store, new BNodeImpl(UUID.randomUUID().toString()));
+            doAddTermTest(store, new BNodeImpl("a12"));
     
 //            store.commit();
     
@@ -177,19 +190,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * verify that we can detect literals by examining the term identifier.
              */
 
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc"))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc",XMLSchema.DECIMAL))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc", "en"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc", "en"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI("http://www.bigdata.com"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new URIImpl("http://www.bigdata.com"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI(RDF.TYPE))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(RDF.TYPE)));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode(UUID.randomUUID().toString()))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl(UUID.randomUUID().toString()))));
             
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode("a12"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl("a12"))));
             
         } finally {
             
@@ -204,83 +217,88 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_insertTerms() {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
 
         try {
         
-            _Value[] terms = new _Value[] {//
+            final BigdataValueFactory valueFactory = store.getValueFactory();
+            
+            final BigdataValue[] terms = new BigdataValue[] {//
     
-            new _URI("http://www.bigdata.com"),//
-    
-                    new _URI(RDF.TYPE),//
-                    new _URI(RDFS.SUBCLASSOF),//
-                    new _URI(XMLSchema.DECIMAL),//
-    
-                    new _Literal("abc"),//
-                    new _Literal("abc", new _URI(XMLSchema.DECIMAL)),//
-                    new _Literal("abc", "en"),//
-    
-                    new _BNode(UUID.randomUUID().toString()),//
-                    new _BNode("a12") //
+                valueFactory.createURI("http://www.bigdata.com"),//
+
+                valueFactory.createURI(RDF.TYPE.stringValue()),//
+                valueFactory.createURI(RDFS.SUBCLASSOF.stringValue()),//
+                valueFactory.createURI(XMLSchema.DECIMAL.stringValue()),//
+
+                valueFactory.createLiteral("abc"),//
+                valueFactory.createLiteral("abc", XMLSchema.DECIMAL),//
+                valueFactory.createLiteral("abc", "en"),//
+
+                valueFactory.createBNode(UUID.randomUUID().toString()),//
+                valueFactory.createBNode("a12") //
+
             };
     
-            store.addTerms(terms, terms.length);
+            store.addTerms(terms);
     
-//            store.commit();
+            final boolean storeBlankNodes = store.getLexiconRelation().isStoreBlankNodes();
             
             for (int i = 0; i < terms.length; i++) {
     
                 // verify set by side-effect on batch insert.
-                assertNotSame(NULL,terms[i].termId);
-                assertTrue(terms[i].known);
+                assertNotSame(NULL, terms[i].getTermId());
                 
                 // save & clear
-                final long termId = terms[i].termId;
-                terms[i].termId = NULL;
-                terms[i].known = false;
-                if(i%2==0) terms[i].key = null;
-                
-                // check the forward mapping (term -> id)
-                assertEquals("forward mapping", termId, store.getTermId(terms[i]));
-    
-                // verify set by side effect.
-                assertEquals(termId,terms[i].termId);
-                assertTrue(terms[i].known);
-                assertNotNull(terms[i].key);
-    
+                final long termId = terms[i].getTermId();
+                terms[i].clearTermId();
+
+                if (storeBlankNodes || !(terms[i] instanceof BNode)) {
+
+                    // check the forward mapping (term -> id)
+                    assertEquals("forward mapping", termId, store
+                            .getTermId(terms[i]));
+                    
+                    // verify set by side effect.
+                    assertEquals(termId, terms[i].getTermId());
+
+                }
+
                 // check the reverse mapping (id -> term)
-                if(terms[i] instanceof BNode) {
+                if (terms[i] instanceof BNode) {
 
                     // the bnode ID is not preserved.
                     assertTrue(store.getTerm(termId) instanceof BNode);
-                    
+
                 } else {
-                    
-                    assertEquals("reverse mapping", terms[i], store.getTerm(termId));
-                    
+
+                    assertEquals("reverse mapping", terms[i], store
+                            .getTerm(termId));
+
                 }
-    
+
             }
-    
+
             dumpTerms(store);
         
             /*
-             * verify that we can detect literals by examining the term identifier.
+             * verify that we can detect literals by examining the term
+             * identifier.
              */
 
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc"))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc",XMLSchema.DECIMAL))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new _Literal("abc", "en"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc", "en"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI("http://www.bigdata.com"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new URIImpl("http://www.bigdata.com"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _URI(RDF.TYPE))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(RDF.TYPE)));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode(UUID.randomUUID().toString()))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl(UUID.randomUUID().toString()))));
             
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new _BNode("a12"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl("a12"))));
 
         } finally {
 
@@ -290,41 +308,161 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
     }
 
-//    /**
-//     * @todo this does not actually test anything.
-//     *
-//     */
-//    public void test_insertTermsWithDuplicates() {
-//        
-//        ITripleStore store = getStore();
-//
-//        _Value[] terms = new _Value[] {//
-//
-//                new _URI("http://www.bigdata.com"),//
-//                new _URI("http://www.bigdata.com"),//
-//
-////                new _URI(RDF.TYPE),//
-////                new _URI(RDFS.SUBCLASSOF),//
-////                new _URI(XMLSchema.DECIMAL),//
-////
-////                new _Literal("abc"),//
-////                new _Literal("abc", new _URI(XMLSchema.DECIMAL)),//
-////                new _Literal("abc", "en"),//
-////
-////                new _BNode(UUID.randomUUID().toString()),//
-////                new _BNode("a12") //
-//        };
-//
-//        store.insertTerms(terms, terms.length, false/* haveKeys */, false/* sorted */);
-//
-//        store.commit();
-//        
-//        dumpTerms(store);
-//
-//        store.closeAndDelete();
-//
-//    }
+    /**
+     * Unit test presents an array of {@link BigdataValue}s that contains
+     * duplicates and verifies that the assigned term identifiers are
+     * consistent.
+     */
+    public void test_addTermsFiltersDuplicates() {
+
+        final AbstractTripleStore store = getStore();
+
+        try {
+        
+            final BigdataValueFactory valueFactory = store.getValueFactory();
+            final BigdataURI x = valueFactory.createURI("http://www.foo.org/x");
+            final BigdataURI y = valueFactory.createURI("http://www.foo.org/y");
+            final BigdataLiteral z = valueFactory.createLiteral("z");
+            final BigdataBNode b = valueFactory.createBNode();
+            final BigdataBNode c = valueFactory.createBNode("_c");
+            
+            // add terms - lots of duplicates here.
+            store.addTerms(new BigdataValue[] { x, y, b, c, x, b, z, z, c, y, x, });
+            
+            // none are NULL.
+            assertNotSame(x.getTermId(),NULL);
+            assertNotSame(y.getTermId(),NULL);
+            assertNotSame(z.getTermId(),NULL);
+            assertNotSame(b.getTermId(),NULL);
+            assertNotSame(c.getTermId(),NULL);
+
+            // all distinct.
+            assertNotSame(x.getTermId(), y.getTermId());
+            assertNotSame(x.getTermId(), z.getTermId());
+            assertNotSame(x.getTermId(), b.getTermId());
+            assertNotSame(x.getTermId(), c.getTermId());
+            
+            assertNotSame(y.getTermId(), z.getTermId());
+            assertNotSame(y.getTermId(), b.getTermId());
+            assertNotSame(y.getTermId(), c.getTermId());
+            
+            assertNotSame(z.getTermId(), b.getTermId());
+            assertNotSame(z.getTermId(), c.getTermId());
+            
+            assertNotSame(b.getTermId(), c.getTermId());
+
+            // correct type of term identifier was assigned.
+            assertTrue(AbstractTripleStore.isURI(x.getTermId()));
+            assertTrue(AbstractTripleStore.isURI(y.getTermId()));
+            assertTrue(AbstractTripleStore.isLiteral(z.getTermId()));
+            assertTrue(AbstractTripleStore.isBNode(b.getTermId()));
+            assertTrue(AbstractTripleStore.isBNode(c.getTermId()));
+            
+            // reverse lookup is consistent with the assigned term identifiers.
+            assertEquals(x,store.getTerm(x.getTermId()));
+            assertEquals(y,store.getTerm(y.getTermId()));
+            assertEquals(z,store.getTerm(z.getTermId()));
+            assertTrue(store.getTerm(b.getTermId()) instanceof BNode);
+            assertTrue(store.getTerm(c.getTermId()) instanceof BNode);
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
     
+    /**
+     * Unit test verifies that {@link BigdataValue}s whose term identifiers
+     * have already been assigned are unchanged by
+     * {@link LexiconRelation#addTerms(BigdataValue[], int, boolean)}.
+     * <p>
+     * Note: {@link BNode}s are not tested for this property since they will be
+     * assigned a new term identifier each time. Blank nodes are ONLY made
+     * self-consistent within a canonicalizing mapping imposed for some blank
+     * node context, e.g., a source document that is being parsed.
+     */
+    public void test_addTermsFiltersAlreadyAssigned() {
+
+        final AbstractTripleStore store = getStore();
+
+        try {
+        
+            final BigdataValueFactory valueFactory = store.getValueFactory();
+            
+            final BigdataURI x = valueFactory.createURI("http://www.foo.org/x");
+            final BigdataURI y = valueFactory.createURI("http://www.foo.org/y");
+            final BigdataLiteral z = valueFactory.createLiteral("z");
+            
+            // add terms - lots of duplicates here.
+            store.addTerms(new BigdataValue[] { x, y, x, z, y, z});
+            
+            final long _x = x.getTermId();
+            final long _y = y.getTermId();
+            final long _z = z.getTermId();
+            
+            // none are NULL.
+            assertNotSame(x.getTermId(),NULL);
+            assertNotSame(y.getTermId(),NULL);
+            assertNotSame(z.getTermId(),NULL);
+
+            // all distinct.
+            assertNotSame(x.getTermId(), y.getTermId());
+            assertNotSame(x.getTermId(), z.getTermId());
+            
+            assertNotSame(y.getTermId(), z.getTermId());
+            
+            // correct type of term identifier was assigned.
+            assertTrue(AbstractTripleStore.isURI(x.getTermId()));
+            assertTrue(AbstractTripleStore.isURI(y.getTermId()));
+            assertTrue(AbstractTripleStore.isLiteral(z.getTermId()));
+            
+            // reverse lookup is consistent with the assigned term identifiers.
+            assertEquals(x,store.getTerm(x.getTermId()));
+            assertEquals(y,store.getTerm(y.getTermId()));
+            assertEquals(z,store.getTerm(z.getTermId()));
+
+            /*
+             * re-adding the same term instances does not change their term
+             * identifer assignments.
+             */
+            
+            // add terms - lots of duplicates here.
+            store.addTerms(new BigdataValue[] { x, y, x, z, y, z});
+
+            assertEquals(_x, x.getTermId());
+            assertEquals(_y, y.getTermId());
+            assertEquals(_z, z.getTermId());
+            
+            /*
+             * verify that re-adding distinct term identifier instances having
+             * the same data assigns the same term identifiers.
+             */
+            {
+
+                final BigdataURI x1 = valueFactory.createURI("http://www.foo.org/x");
+                final BigdataURI y1 = valueFactory.createURI("http://www.foo.org/y");
+                final BigdataLiteral z1 = valueFactory.createLiteral("z");
+                
+                // add terms - lots of duplicates here.
+                store.addTerms(new BigdataValue[] { x1, y1, x1, z1, y1, z1});
+
+                // same term identifiers were assigned.
+                assertEquals(_x, x1.getTermId());
+                assertEquals(_y, y1.getTermId());
+                assertEquals(_z, z1.getTermId());
+
+            }
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
+
     /**
      * Test of {@link ITripleStore#addStatement(Resource, URI, Value)} and
      * {@link ITripleStore#hasStatement(Resource, URI, Value)}.
@@ -335,24 +473,27 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         try {
         
-            _URI x = new _URI("http://www.foo.org/x");
-            _URI y = new _URI("http://www.foo.org/y");
-            _URI z = new _URI("http://www.foo.org/z");
+            final boolean storeBlankNodes = store.getLexiconRelation()
+                    .isStoreBlankNodes();
+            
+            URI x = new URIImpl("http://www.foo.org/x");
+            URI y = new URIImpl("http://www.foo.org/y");
+            URI z = new URIImpl("http://www.foo.org/z");
     
-            _URI A = new _URI("http://www.foo.org/A");
-            _URI B = new _URI("http://www.foo.org/B");
-            _URI C = new _URI("http://www.foo.org/C");
+            URI A = new URIImpl("http://www.foo.org/A");
+            URI B = new URIImpl("http://www.foo.org/B");
+            URI C = new URIImpl("http://www.foo.org/C");
     
-            _URI rdfType = new _URI(RDF.TYPE);
+            URI rdfType = RDF.TYPE;
     
-            _URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+            URI rdfsSubClassOf = RDFS.SUBCLASSOF;
     
-            _Literal lit1 = new _Literal("abc");
-            _Literal lit2 = new _Literal("abc", A);
-            _Literal lit3 = new _Literal("abc", "en");
+            Literal lit1 = new LiteralImpl("abc");
+            Literal lit2 = new LiteralImpl("abc", A);
+            Literal lit3 = new LiteralImpl("abc", "en");
     
-            _BNode bn1 = new _BNode(UUID.randomUUID().toString());
-            _BNode bn2 = new _BNode("a12");
+            BNode bn1 = new BNodeImpl(UUID.randomUUID().toString());
+            BNode bn2 = new BNodeImpl("a12");
     
             store.addStatement(x, rdfType, C);
             
@@ -370,7 +511,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                  * defeats the caching of the termId on the _Value).
                  */
     
-                x_termId = store.getTermId(new _URI("http://www.foo.org/x"));
+                x_termId = store.getTermId(new URIImpl("http://www.foo.org/x"));
     
                 assertTrue(x_termId != NULL);
     
@@ -406,10 +547,16 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             final long bn2_id = store.addTerm(bn2);
             assertTrue(bn2_id != NULL);
     
-            assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
+            assertEquals("#terms", 8 + 3 + (store.getLexiconRelation()
+                    .isStoreBlankNodes() ? 2 : 0), store.getTermCount());
             assertEquals("#uris", 8, store.getURICount());
             assertEquals("#lits", 3, store.getLiteralCount());
-            assertEquals("#bnodes", 2, store.getBNodeCount());
+            if (storeBlankNodes) {
+                assertEquals("#bnodes", 2, store.getBNodeCount());
+            } else {
+                // Note: None found since not stored.
+                assertEquals("#bnodes", 0, store.getBNodeCount());
+            }
     
             assertEquals(x_id, store.getTermId(x));
             assertEquals(y_id, store.getTermId(y));
@@ -446,11 +593,16 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
             assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
     
-            assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
+            assertEquals("#terms", 8 + 3 + (storeBlankNodes ? 2 : 0), store.getTermCount());
             assertEquals("#uris", 8, store.getURICount());
             assertEquals("#lits", 3, store.getLiteralCount());
-            assertEquals("#bnodes", 2, store.getBNodeCount());
-
+            if (storeBlankNodes) {
+                assertEquals("#bnodes", 2, store.getBNodeCount());
+            } else {
+                // Note: None found since not stored.
+                assertEquals("#bnodes", 0, store.getBNodeCount());
+            }
+    
         } finally {
 
             store.closeAndDelete();
@@ -473,25 +625,26 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameIterator(new SPO[]{},
                     store.getAccessPath(NULL,NULL,NULL).iterator());
             
-            _URI A = new _URI("http://www.bigdata.com/A");
-            _URI B = new _URI("http://www.bigdata.com/B");
-            _URI C = new _URI("http://www.bigdata.com/C");
-            _URI rdfType = new _URI(RDF.TYPE);
+            final BigdataValueFactoryImpl valueFactory = store.getValueFactory();
+            final BigdataURI A = valueFactory.createURI("http://www.bigdata.com/A");
+            final BigdataURI B = valueFactory.createURI("http://www.bigdata.com/B");
+            final BigdataURI C = valueFactory.createURI("http://www.bigdata.com/C");
+            final BigdataURI rdfType = valueFactory.createURI(RDF.TYPE.stringValue());
 
+            store.addTerms(new BigdataValue[] { A, B, C, rdfType });
+            
             store.addTerm(A);
             store.addTerm(B);
             store.addTerm(C);
             store.addTerm(rdfType);
-
+            
             /*
              * Insert two statements into the store.
              */
             
-            SPO spo1 = new SPO(A.termId, rdfType.termId, B.termId,
-                    StatementEnum.Explicit);            
+            final SPO spo1 = new SPO(A, rdfType, B, StatementEnum.Explicit);            
 
-            SPO spo2 = new SPO(A.termId, rdfType.termId, C.termId,
-                    StatementEnum.Explicit);            
+            final SPO spo2 = new SPO(A, rdfType, C, StatementEnum.Explicit);            
 
             if(log.isInfoEnabled()) {
 
@@ -503,16 +656,22 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 
             }
             
-            assertEquals("mutationCount", 2L, store.addStatements(new SPO[] {
-                    spo1, spo2 }, 2));
+            assertEquals("mutationCount", 2L,//
+                    store.addStatements(new SPO[] { spo1, spo2 }, 2)//
+                    );
 
             if (log.isInfoEnabled()) {
 
                 log.info("\n" + store.dumpStore());
             
-                log.info("\nSPO\n"+store.getSPORelation().dump(SPOKeyOrder.SPO));
-                log.info("\nPOS\n"+store.getSPORelation().dump(SPOKeyOrder.POS));
-                log.info("\nOSP\n"+store.getSPORelation().dump(SPOKeyOrder.OSP));
+                log.info("\nSPO\n"
+                        + store.getSPORelation().dump(SPOKeyOrder.SPO));
+                
+                log.info("\nPOS\n"
+                        + store.getSPORelation().dump(SPOKeyOrder.POS));
+
+                log.info("\nOSP\n"
+                        + store.getSPORelation().dump(SPOKeyOrder.OSP));
                 
             }
 
@@ -661,46 +820,50 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameIterator(new SPO[]{},
                     store.getAccessPath(NULL,NULL,NULL).iterator());
             
-            URIImpl A = new URIImpl("http://www.bigdata.com/A");
-            URIImpl B = new URIImpl("http://www.bigdata.com/B");
-            URIImpl C = new URIImpl("http://www.bigdata.com/C");
+            final BigdataURI A = new BigdataURIImpl("http://www.bigdata.com/A");
+            final BigdataURI B = new BigdataURIImpl("http://www.bigdata.com/B");
+            final BigdataURI C = new BigdataURIImpl("http://www.bigdata.com/C");
+            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
             
-            IStatementBuffer buffer = new StatementBuffer(store,100);
+            // assign term identifiers for reuse below.
+            store.addTerms(new BigdataValue[] { A, B, C, rdfType });
             
-            buffer.add(A, RDF.TYPE, B);
-            buffer.add(A, RDF.TYPE, C);
-            
-            buffer.flush();
+            {
+                // load statements into db.
+                IStatementBuffer buffer = new StatementBuffer(store, 2);
 
-//            store.commit();
-            
-            assertSameSPOs(new SPO[] {
-                    new SPO(store.getTermId(A), store
-                            .getTermId(RDF.TYPE), store.getTermId(B),
-                            StatementEnum.Explicit),
-                    new SPO(store.getTermId(A), store
-                            .getTermId(RDF.TYPE), store.getTermId(C),
-                            StatementEnum.Explicit), },
-                    store.getAccessPath(NULL,NULL,NULL).iterator()
-                    );
+                buffer.add(A, rdfType, B);
+                buffer.add(A, rdfType, C);
 
+                buffer.flush();
+            }
+
+            // store.commit();
+            
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore());
             
+            // make sure that term identifiers were assigned as a side-effect.
+            assertTrue(new SPO(A, rdfType, B, StatementEnum.Explicit).isFullyBound());
+            
+            assertSameSPOs(new SPO[] {
+                    new SPO(A, rdfType, B, StatementEnum.Explicit),
+                    new SPO(A, rdfType, C, StatementEnum.Explicit),//
+                    },//
+                    store.getAccessPath(NULL, NULL, NULL).iterator());
+
             assertEquals(1, store.getAccessPath(NULL, NULL, store.getTermId(B))
                     .removeAll());
 
-//            store.dumpStore();
+            if (log.isInfoEnabled()) {
+                log.info("\n" + store.dumpStore());
+            }
             
 //            store.commit();
             
-            if (log.isInfoEnabled())
-                log.info("\n" + store.dumpStore());
-            
-            assertSameSPOs(new SPO[] {
-                    new SPO(store.getTermId(A), store
-                            .getTermId(RDF.TYPE), store.getTermId(C),
-                            StatementEnum.Explicit), },
+            assertSameSPOs(new SPO[] {//
+                    new SPO(A, rdfType, C, StatementEnum.Explicit), //
+                    }, //
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
@@ -722,10 +885,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
         try {
             
-//            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
-//                    null/* filter */, 100/* capacity */, false/*justified*/);
-  
-            SPO[] a = new SPO[] {
+            final SPO[] a = new SPO[] {
             
             new SPO(1, 2, 3, StatementEnum.Explicit),
             new SPO(2, 2, 3, StatementEnum.Inferred),
@@ -733,10 +893,6 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             };
 
             store.addStatements(a,a.length);
-            
-//            buffer.flush();
-
-//            store.commit();
             
             assertSameSPOs(new SPO[] {//
                     new SPO(1, 2, 3, StatementEnum.Explicit),//
@@ -746,8 +902,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 
-            if(log.isInfoEnabled())log.info("\n"+store.dumpStore());
-            
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
+
         } finally {
             
             store.closeAndDelete();
@@ -770,16 +927,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameIterator(new Statement[]{},
                     store.getAccessPath(null,null,null).iterator());
             
-            URIImpl A = new URIImpl("http://www.bigdata.com/A");
-            URIImpl B = new URIImpl("http://www.bigdata.com/B");
-            URIImpl C = new URIImpl("http://www.bigdata.com/C");
+            final BigdataURI A = new BigdataURIImpl("http://www.bigdata.com/A");
+            final BigdataURI B = new BigdataURIImpl("http://www.bigdata.com/B");
+            final BigdataURI C = new BigdataURIImpl("http://www.bigdata.com/C");
+            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
             
-            IStatementBuffer buffer = new StatementBuffer(store,100);
-            
-            buffer.add(A, RDF.TYPE, B);
-            buffer.add(A, RDF.TYPE, C);
-            
-            buffer.flush();
+            {
+                IStatementBuffer buffer = new StatementBuffer(store, 100);
+
+                buffer.add(A, rdfType, B);
+                buffer.add(A, rdfType, C);
+
+                buffer.flush();
+            }
 
             assertSameStatements(new Statement[]{
                     new StatementImpl(A,RDF.TYPE,B),
@@ -791,13 +951,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore());
             
-            assertEquals(1L,store.removeStatements(null, null, B));
+            assertEquals(1L, store.removeStatements(null, null, B));
 
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore());
             
             assertSameStatements(new Statement[]{
-                    new StatementImpl(A,RDF.TYPE,C),
+                    new StatementImpl(A,rdfType,C),
                     },
                     store.getStatements(null,null,null)
                     );
@@ -832,20 +992,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * statement identifier).
              */
 
-            _URI x = new _URI("http://www.foo.org/x1");
-            _URI y = new _URI("http://www.foo.org/y2");
-            _URI z = new _URI("http://www.foo.org/z3");
+            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x1");
+            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y2");
+            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z3");
     
-            _Value[] terms = new _Value[] {
-              
-                    x,y,z,//                
-            };
+            store.addTerms(new BigdataValue[] { x, y, z });
             
-            store.addTerms(terms, terms.length);
-            
-            final long x1 = x.termId;
-            final long y2 = y.termId;
-            final long z3 = z.termId;
+            final long x1 = x.getTermId();
+            final long y2 = y.getTermId();
+            final long z3 = z.getTermId();
             
             // verify nothing in the store.
             assertSameIterator(new Statement[]{},
@@ -870,7 +1025,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertTrue(store.hasStatement(y2,y2,z3));
             assertEquals(2,store.getStatementCount());
             
-            assertEquals(1, store.removeStatements(new ChunkedArrayIterator<SPO>(
+            assertEquals(1, store.removeStatements(new ChunkedArrayIterator<ISPO>(
                     1,
                     new SPO[] {
                             new SPO(x1, y2, z3, StatementEnum.Explicit)

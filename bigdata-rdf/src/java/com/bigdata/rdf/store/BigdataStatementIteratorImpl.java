@@ -26,7 +26,6 @@ package com.bigdata.rdf.store;
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -39,6 +38,8 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -47,7 +48,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * visited statement as a {@link BigdataStatement} (batch API).
  * 
  * @todo The resolution of term identifiers to terms should happen during
- *       asynchronous read-ahead for even better performance.
+ *       asynchronous read-ahead for even better performance (less latency).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -77,7 +78,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
     /**
      * The source iterator (will be closed when this iterator is closed).
      */
-    private final IChunkedOrderedIterator<SPO> src;
+    private final IChunkedOrderedIterator<ISPO> src;
     
     /**
      * The index of the last entry returned in the current {@link #chunk} and
@@ -88,13 +89,15 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
     /**
      * The current chunk from the source iterator and initially <code>null</code>.
      */
-    private SPO[] chunk = null;
+    private ISPO[] chunk = null;
 
     /**
      * The map that will be used to resolve term identifiers to terms for the
      * current {@link #chunk} and initially <code>null</code>.
      */
     private Map<Long, BigdataValue> terms = null;
+    
+    final private BigdataValueFactory valueFactory;
     
     /**
      * 
@@ -104,13 +107,8 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
      *            The source iterator (will be closed when this iterator is
      *            closed).
      */
-//    * @param bnodes
-//    *            An bnode cache which is used to ensure that a term identifier
-//    *            is always resolved to the same {@link BNode} object during
-//    *            traversal.
     public BigdataStatementIteratorImpl(AbstractTripleStore db,
-//            Map<Long,BigdataBNode> bnodes, 
-            IChunkedOrderedIterator<SPO> src) {
+            IChunkedOrderedIterator<ISPO> src) {
 
         if (db == null)
             throw new IllegalArgumentException();
@@ -122,6 +120,8 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
         
         this.src = src;
 
+        this.valueFactory = db.getValueFactory();
+        
     }
     
     public boolean hasNext() {
@@ -165,13 +165,13 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
             final Collection<Long> ids = new HashSet<Long>(chunk.length * 4);
 
-            for (SPO spo : chunk) {
+            for (ISPO spo : chunk) {
 
-                ids.add(spo.s);
+                ids.add(spo.s());
 
-                ids.add(spo.p);
+                ids.add(spo.p());
 
-                ids.add(spo.o);
+                ids.add(spo.o());
 
                 if (spo.hasStatementIdentifier()) {
 
@@ -204,7 +204,7 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
         }
         
         // the current SPO
-        final SPO spo = chunk[lastIndex];
+        final ISPO spo = chunk[lastIndex];
 
         if(DEBUG) {
             
@@ -216,9 +216,9 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
          * Resolve term identifiers to terms using the map populated when we
          * fetched the current chunk.
          */
-        final BigdataResource s = (BigdataResource) terms.get(spo.s);
-        final BigdataURI p = (BigdataURI) terms.get(spo.p);
-        final BigdataValue o = terms.get(spo.o);
+        final BigdataResource s = (BigdataResource) terms.get(spo.s());
+        final BigdataURI p = (BigdataURI) terms.get(spo.p());
+        final BigdataValue o = terms.get(spo.o());
         final BigdataResource c = (spo.hasStatementIdentifier() ? (BigdataResource) terms
                 .get(spo.getStatementIdentifier())
                 : null);
@@ -226,13 +226,13 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
         if (spo.hasStatementType() == false) {
 
             log.error("statement with no type: "
-                    + new BigdataStatementImpl(s, p, o, c, null));
+                    + valueFactory.createStatement(s, p, o, c, null));
 
         }
         
         // the statement.
-        final BigdataStatement stmt = new BigdataStatementImpl(s, p, o, c, spo
-                .getType());
+        final BigdataStatement stmt = valueFactory.createStatement(s, p, o, c,
+                spo.getStatementType());
 
         if (DEBUG) {
             

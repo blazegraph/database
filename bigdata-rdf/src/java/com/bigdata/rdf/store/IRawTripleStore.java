@@ -34,8 +34,9 @@ import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
@@ -130,7 +131,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return The statement index for that access path.
      */
-    abstract public IIndex getStatementIndex(IKeyOrder<SPO> keyOrder);
+    abstract public IIndex getStatementIndex(IKeyOrder<ISPO> keyOrder);
 
     /**
      * Add a term into the term:id index and the id:term index, returning the
@@ -144,24 +145,15 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     public long addTerm(Value value);
 
     /**
-     * Batch insert of terms into the database.
+     * Batch insert of terms into the database. The term identifiers are set on
+     * the terms as a side-effect.
      * 
      * @param terms
-     *            An array whose elements [0:nterms-1] will be inserted.
-     * @param numTerms
-     *            The #of terms to insert.
+     *            An array to be inserted.
      * 
-     * @todo add a Iterator<_Value> getTerms( Value[] terms ) that can be used
-     *       to efficiently resolve one or more terms in parallel without having
-     *       a side effect in which the terms become defined (the termId remains
-     *       NULL if the term is not known). Alternatively add a boolean flag to
-     *       this {@link #addTerms(_Value[], int)} indicating whether or not
-     *       terms that are not found should be defined. Either approach would
-     *       let us reduce the latency for resolving multiple terms without side
-     *       effects (note that an LRU term cache is already being used to
-     *       reduce latency).
+     * @see LexiconRelation#addTerms(BigdataValue[], int, boolean)
      */
-    public void addTerms(_Value[] terms, int numTerms);
+    public void addTerms(BigdataValue[] terms);
 
     /**
      * Return the RDF {@link Value} given a term identifier (non-batch api).
@@ -198,7 +190,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @deprecated by {@link SPORelation#getAccessPath(long, long, long)}
      */
-    public IAccessPath<SPO> getAccessPath(long s, long p, long o);
+    public IAccessPath<ISPO> getAccessPath(long s, long p, long o);
 
     /**
      * Return the {@link IAccessPath} for the specified {@link IKeyOrder} and
@@ -207,7 +199,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @deprecated by {@link SPORelation#getAccessPath(SPOKeyOrder, com.bigdata.relation.rule.IPredicate)}
      */
-    public IAccessPath<SPO> getAccessPath(IKeyOrder<SPO> keyOrder);
+    public IAccessPath<ISPO> getAccessPath(IKeyOrder<ISPO> keyOrder);
     
     /**
      * Return the statement from the database (fully bound s:p:o only).
@@ -228,7 +220,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * @exception IllegalArgumentException
      *                if any of the arguments is {@link #NULL}.
      */
-    public SPO getStatement(long s, long p, long o);
+    public ISPO getStatement(long s, long p, long o);
     
     /**
      * Writes the statements onto the statements indices (batch, parallel, NO
@@ -247,7 +239,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *         count as well as any statement that was not pre-existing in the
      *         database).
      */
-    public long addStatements(SPO[] stmts, int numStmts );
+    public long addStatements(ISPO[] stmts, int numStmts );
     
     /**
      * Writes the statements onto the statement indices (batch, parallel, NO
@@ -269,7 +261,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *         count as well as any statement that was not pre-existing in the
      *         database).
      */
-    public long addStatements(SPO[] stmts, int numStmts, IElementFilter<SPO> filter );
+    public long addStatements(ISPO[] stmts, int numStmts, IElementFilter<ISPO> filter );
     
     /**
      * Writes the statements onto the statement indices (batch, parallel, NO
@@ -290,7 +282,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      *         
      * @deprecated by {@link SPORelation#insert(IChunkedOrderedIterator)}
      */
-    public long addStatements(IChunkedOrderedIterator<SPO> itr, IElementFilter<SPO> filter);
+    public long addStatements(IChunkedOrderedIterator<ISPO> itr, IElementFilter<ISPO> filter);
 
     /**
      * Removes the statements from the statement indices (batch, parallel, NO
@@ -305,7 +297,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return The #of statements that were removed from the indices.
      */
-    public long removeStatements(SPO[] stmts, int numStmts);
+    public long removeStatements(ISPO[] stmts, int numStmts);
 
     /**
      * Removes the statements from the statement indices (batch, parallel, NO
@@ -320,12 +312,12 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return The #of statements that were removed from the indices.
      */
-    public long removeStatements(IChunkedOrderedIterator<SPO> itr);
+    public long removeStatements(IChunkedOrderedIterator<ISPO> itr);
     
     /**
-     * Filter the supplied set of SPO objects for whether they are "present" or
-     * "not present" in the database, depending on the value of the supplied
-     * boolean variable (batch API).
+     * Filter the supplied set of {@link ISPO} objects for whether they are
+     * "present" or "not present" in the database, depending on the value of the
+     * supplied boolean variable (batch API).
      * 
      * @param stmts
      *            the statements to test
@@ -337,7 +329,7 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return an iteration over the filtered set of statements
      */
-    public IChunkedOrderedIterator<SPO> bulkFilterStatements(SPO[] stmts, int numStmts,
+    public IChunkedOrderedIterator<ISPO> bulkFilterStatements(ISPO[] stmts, int numStmts,
             boolean present);
     
     /**
@@ -353,18 +345,18 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * 
      * @return an iteration over the filtered set of statements
      */
-    public IChunkedOrderedIterator<SPO> bulkFilterStatements(IChunkedOrderedIterator<SPO> itr, boolean present);
+    public IChunkedOrderedIterator<ISPO> bulkFilterStatements(IChunkedOrderedIterator<ISPO> itr, boolean present);
     
     /**
-     * This method fills out the statement metadata (type and sid) for SPOs that
-     * are present in the database. SPOs not present in the database are left
-     * as-is.
+     * This method fills out the statement metadata (type and sid) for
+     * {@link ISPO}s that are present in the database. {@link ISPO}s not
+     * present in the database are left as-is.
      * 
-     * @return An iterator visiting the completed {@link SPO}s. Any {@link SPO}s
-     *         that were not found will be present but their statement metadata
-     *         (type and sid) will be unchanged.
+     * @return An iterator visiting the completed {@link ISPO}s. Any
+     *         {@link ISPO}s that were not found will be present but their
+     *         statement metadata (type and sid) will be unchanged.
      */
-    public IChunkedOrderedIterator<SPO> bulkCompleteStatements(final IChunkedOrderedIterator<SPO> itr);
+    public IChunkedOrderedIterator<ISPO> bulkCompleteStatements(final IChunkedOrderedIterator<ISPO> itr);
     
     /**
      * Externalizes a statement using an appreviated syntax.

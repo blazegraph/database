@@ -6,7 +6,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
@@ -15,7 +15,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RdfTypeRdfsResourceFilter implements IElementFilter<SPO>, Externalizable {
+public class RdfTypeRdfsResourceFilter implements IElementFilter<ISPO>, Externalizable {
 
     /**
      * 
@@ -44,9 +44,9 @@ public class RdfTypeRdfsResourceFilter implements IElementFilter<SPO>, Externali
         
     }
 
-    public boolean accept(SPO spo) {
+    public boolean accept(ISPO spo) {
 
-        if (spo.p == rdfType && spo.o == rdfsResource) {
+        if (spo.p() == rdfType && spo.o() == rdfsResource) {
             
             // reject (?x, rdf:type, rdfs:Resource )
             

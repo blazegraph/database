@@ -30,12 +30,7 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleRdfs02;
-import com.bigdata.rdf.rules.RuleRdfs03;
-import com.bigdata.rdf.rules.RuleRdfs07;
-import com.bigdata.rdf.rules.RuleRdfs09;
+import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.Rule;
 
@@ -82,12 +77,12 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         
         try {
             
-            URI A = new _URI("http://www.foo.org/A");
-            URI B = new _URI("http://www.foo.org/B");
-            URI U = new _URI("http://www.foo.org/U");
-            URI Y = new _URI("http://www.foo.org/Y");
+            final URI A = new BigdataURIImpl("http://www.foo.org/A");
+            final URI B = new BigdataURIImpl("http://www.foo.org/B");
+            final URI U = new BigdataURIImpl("http://www.foo.org/U");
+            final URI Y = new BigdataURIImpl("http://www.foo.org/Y");
     
-            URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
+            final URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
     
             store.addStatement(A, rdfsSubPropertyOf, B);
             store.addStatement(U, A, Y);
@@ -143,14 +138,14 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         
         try {
             
-            URI A = new _URI("http://www.foo.org/A");
-            URI B = new _URI("http://www.foo.org/B");
-            URI U1 = new _URI("http://www.foo.org/U1");
-            URI Y1 = new _URI("http://www.foo.org/Y1");
-            URI U2 = new _URI("http://www.foo.org/U2");
-            URI Y2 = new _URI("http://www.foo.org/Y2");
+            final URI A = new BigdataURIImpl("http://www.foo.org/A");
+            final URI B = new BigdataURIImpl("http://www.foo.org/B");
+            final URI U1 = new BigdataURIImpl("http://www.foo.org/U1");
+            final URI Y1 = new BigdataURIImpl("http://www.foo.org/Y1");
+            final URI U2 = new BigdataURIImpl("http://www.foo.org/U2");
+            final URI Y2 = new BigdataURIImpl("http://www.foo.org/Y2");
     
-            URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
+            final URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
     
             store.addStatement(A, rdfsSubPropertyOf, B);
             store.addStatement(U1, A, Y1);
@@ -214,13 +209,13 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
 
         try {
             
-            URI A = new _URI("http://www.foo.org/A");
-            URI B1 = new _URI("http://www.foo.org/B1");
-            URI B2 = new _URI("http://www.foo.org/B2");
-            URI U = new _URI("http://www.foo.org/U");
-            URI Y = new _URI("http://www.foo.org/Y");
+            final URI A = new BigdataURIImpl("http://www.foo.org/A");
+            final URI B1 = new BigdataURIImpl("http://www.foo.org/B1");
+            final URI B2 = new BigdataURIImpl("http://www.foo.org/B2");
+            final URI U = new BigdataURIImpl("http://www.foo.org/U");
+            final URI Y = new BigdataURIImpl("http://www.foo.org/Y");
     
-            URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
+            final URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
     
             store.addStatement(A, rdfsSubPropertyOf, B1);
             store.addStatement(A, rdfsSubPropertyOf, B2);

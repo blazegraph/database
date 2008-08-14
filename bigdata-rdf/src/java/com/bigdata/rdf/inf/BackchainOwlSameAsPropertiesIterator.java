@@ -31,7 +31,8 @@ import java.io.StringWriter;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -53,7 +54,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @version $Id: BackchainOwlSameAsPropertiesIterator.java,v 1.2 2008/03/20
  *          04:05:51 mrpersonick Exp $
  */
-public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIterator<SPO> {
+public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIterator<ISPO> {
     
     protected final static transient long NULL = IRawTripleStore.NULL;
     
@@ -85,7 +86,7 @@ public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIter
         
     }
 
-    private IChunkedOrderedIterator<SPO> delegate;
+    private IChunkedOrderedIterator<ISPO> delegate;
 
     /**
      * Create an iterator that will visit all statements in the source iterator
@@ -110,7 +111,7 @@ public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIter
      *            database.
      */
     public BackchainOwlSameAsPropertiesIterator(
-            IChunkedOrderedIterator<SPO> src, long s, long p, long o,
+            IChunkedOrderedIterator<ISPO> src, long s, long p, long o,
             AbstractTripleStore db, final long sameAs) {
 
         if (s != NULL && o != NULL) {
@@ -151,7 +152,7 @@ public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIter
         
     }
 
-    public IKeyOrder<SPO> getKeyOrder() {
+    public IKeyOrder<ISPO> getKeyOrder() {
         
         return delegate.getKeyOrder();
         
@@ -163,19 +164,19 @@ public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIter
         
     }
 
-    public SPO next() {
+    public ISPO next() {
         
         return delegate.next();
         
     }
 
-    public SPO[] nextChunk() {
+    public ISPO[] nextChunk() {
         
         return delegate.nextChunk();
         
     }
 
-    public SPO[] nextChunk(IKeyOrder<SPO> keyOrder) {
+    public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
         
         return delegate.nextChunk(keyOrder);
         

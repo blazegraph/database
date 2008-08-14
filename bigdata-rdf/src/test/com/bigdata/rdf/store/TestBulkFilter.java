@@ -32,6 +32,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -95,10 +96,10 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
 //            store.commit();
     
             final long a = store.getTermId(A);
-            final long b = store.getTermId(B);
-            final long c = store.getTermId(C);
-            final long d = store.getTermId(D);
-            final long e = store.getTermId(E);
+//            final long b = store.getTermId(B);
+//            final long c = store.getTermId(C);
+//            final long d = store.getTermId(D);
+//            final long e = store.getTermId(E);
             final long v = store.getTermId(V);
             final long w = store.getTermId(W);
             final long x = store.getTermId(X);
@@ -120,7 +121,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
                 
                 boolean present = false;
 
-                final IChunkedOrderedIterator<SPO> itr = store
+                final IChunkedOrderedIterator<ISPO> itr = store
                         .bulkFilterStatements(stmts, numStmts, present);
                 
                 assertSameSPOsAnyOrder(store,
@@ -148,7 +149,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
                 
                 boolean present = true;
 
-                final IChunkedOrderedIterator<SPO> itr = store
+                final IChunkedOrderedIterator<ISPO> itr = store
                         .bulkFilterStatements(stmts, numStmts, present);
                 
                 assertSameSPOsAnyOrder(store,
@@ -190,10 +191,10 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
         try {
 
             final URI A = new URIImpl("http://www.bigdata.com/A");
-            final URI B = new URIImpl("http://www.bigdata.com/B");
-            final URI C = new URIImpl("http://www.bigdata.com/C");
-            final URI D = new URIImpl("http://www.bigdata.com/D");
-            final URI E = new URIImpl("http://www.bigdata.com/E");
+//            final URI B = new URIImpl("http://www.bigdata.com/B");
+//            final URI C = new URIImpl("http://www.bigdata.com/C");
+//            final URI D = new URIImpl("http://www.bigdata.com/D");
+//            final URI E = new URIImpl("http://www.bigdata.com/E");
 
             final URI V = new URIImpl("http://www.bigdata.com/V");
             final URI W = new URIImpl("http://www.bigdata.com/W");
@@ -202,10 +203,10 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             final URI Z = new URIImpl("http://www.bigdata.com/Z");
             
             final long a = store.addTerm(A);
-            final long b = store.addTerm(B);
-            final long c = store.addTerm(C);
-            final long d = store.addTerm(D);
-            final long e = store.addTerm(E);
+//            final long b = store.addTerm(B);
+//            final long c = store.addTerm(C);
+//            final long d = store.addTerm(D);
+//            final long e = store.addTerm(E);
             
             final long v = store.addTerm(V);
             final long w = store.addTerm(W);
@@ -236,7 +237,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
 
             { // filter out and complete
                 
-                final IChunkedOrderedIterator<SPO> itr = store
+                final IChunkedOrderedIterator<ISPO> itr = store
                         .bulkCompleteStatements(stmts, numStmts);
                 
                 assertSameSPOsAnyOrder(store,

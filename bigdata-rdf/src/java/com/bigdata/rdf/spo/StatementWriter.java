@@ -18,7 +18,7 @@ public class StatementWriter implements Callable<Long>{
     private final AbstractTripleStore database;
     private final AbstractTripleStore statementStore;
     private final boolean copyOnly;
-    private final IChunkedOrderedIterator<SPO> itr;
+    private final IChunkedOrderedIterator<ISPO> itr;
     
     /**
      * Incremented by the #of statements written on the statements indices.
@@ -50,7 +50,7 @@ public class StatementWriter implements Callable<Long>{
      */
     public StatementWriter(AbstractTripleStore database,
             AbstractTripleStore statementStore, boolean copyOnly,
-            IChunkedOrderedIterator<SPO> itr, AtomicLong nwritten) {
+            IChunkedOrderedIterator<ISPO> itr, AtomicLong nwritten) {
     
         if (database == null)
             throw new IllegalArgumentException();

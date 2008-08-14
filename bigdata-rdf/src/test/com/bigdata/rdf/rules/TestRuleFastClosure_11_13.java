@@ -27,12 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.rules.AbstractRuleFastClosure_11_13;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleFastClosure11;
-import com.bigdata.rdf.rules.RuleFastClosure13;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -70,13 +66,13 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
         try {
 
-            final long a = store.addTerm(new _URI("http://www.bigdata.com/a"));
-            final long b = store.addTerm(new _URI("http://www.bigdata.com/b"));
-            final long y = store.addTerm(new _URI("http://www.bigdata.com/y"));
-            final long x = store.addTerm(new _URI("http://www.bigdata.com/x"));
-            final long z = store.addTerm(new _URI("http://www.bigdata.com/z"));
+            final long a = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/a"));
+            final long b = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/b"));
+            final long y = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/y"));
+            final long x = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/x"));
+            final long z = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/z"));
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
+            final RDFSVocabulary inf = new RDFSVocabulary(store);
 
             // told:
             {
@@ -140,11 +136,11 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
         try {
 
-            final long a = store.addTerm(new _URI("http://www.bigdata.com/a"));
-            final long b = store.addTerm(new _URI("http://www.bigdata.com/b"));
-            final long y = store.addTerm(new _URI("http://www.bigdata.com/y"));
-            final long x = store.addTerm(new _URI("http://www.bigdata.com/x"));
-            final long z = store.addTerm(new _URI("http://www.bigdata.com/z"));
+            final long a = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/a"));
+            final long b = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/b"));
+            final long y = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/y"));
+            final long x = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/x"));
+            final long z = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/z"));
 
             RDFSVocabulary inf = new RDFSVocabulary(store);
 

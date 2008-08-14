@@ -391,7 +391,7 @@ public class RDFJoinNexus implements IJoinNexus {
             final SPORelation relation1 = (SPORelation) getIndexManager()
                     .getResourceLocator().locate(relationName1, timestamp1);
 
-            relation = new RelationFusedView<SPO>(relation0, relation1);
+            relation = new RelationFusedView<ISPO>(relation0, relation1);
 
         } else {
 

@@ -29,14 +29,13 @@ import java.util.Iterator;
 import java.util.Vector;
 
 import org.openrdf.model.Statement;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.Rio;
 
-import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * Parses data but does not load it into the indices.
@@ -54,7 +53,14 @@ public class BasicRioLoader implements IRioLoader {
     
     Vector<RioLoaderListener> listeners;
 
-    public BasicRioLoader() {
+    private final BigdataValueFactoryImpl valueFactory;
+    
+    public BasicRioLoader(BigdataValueFactoryImpl valueFactory) {
+        
+        if (valueFactory == null)
+            throw new IllegalArgumentException();
+        
+        this.valueFactory = valueFactory;
         
     }
     
@@ -120,9 +126,7 @@ public class BasicRioLoader implements IRioLoader {
      */
     final protected RDFParser getParser(RDFFormat rdfFormat) {
 
-        final ValueFactory valFactory = OptimizedValueFactory.INSTANCE;
-        
-        final RDFParser parser = Rio.createParser(rdfFormat, valFactory);
+        final RDFParser parser = Rio.createParser(rdfFormat, valueFactory);
         
         return parser;
 

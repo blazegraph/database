@@ -183,7 +183,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
         
         if (expected.hasStatementType()) {
 
-            assertEquals("type", expected.getType(), actual.getType());
+            assertEquals("type", expected.getStatementType(), actual.getStatementType());
 
         }
         
