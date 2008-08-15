@@ -443,9 +443,12 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                         vocab.rdfsResource.get() //
                 );
 
-                AbstractTestCase.assertSameSPOs(new SPO[] { new SPO(s,
-                        vocab.rdfType.get(), vocab.rdfsResource.get(),
-                        StatementEnum.Inferred), }, itr);
+                AbstractTestCase.assertSameSPOs(new SPO[] { //
+                        new SPO(s, vocab.rdfType.get(), vocab.rdfsResource
+                                .get(), StatementEnum.Inferred), //
+                        new SPO(o, vocab.rdfType.get(), vocab.rdfsResource
+                                .get(), StatementEnum.Inferred), //
+                        }, itr);
             }
             
         } finally {
