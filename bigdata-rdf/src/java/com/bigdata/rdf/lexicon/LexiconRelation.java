@@ -63,7 +63,6 @@ import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.TermIdComparator2;
@@ -1453,9 +1452,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     /**
      * Batch resolution of term identifiers to {@link BigdataValue}s.
-     * <p>
-     * Note: the returned values will be {@link BigdataValueImpl}s that play well
-     * with Sesame 2.x
      * 
      * @param ids
      *            An collection of term identifiers.

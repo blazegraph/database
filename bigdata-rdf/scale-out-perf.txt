@@ -473,6 +473,35 @@ Notes on store level record checksums and record compression.
        Add an option for a fully synchronized raw store interface on
        the Journal?
 
+     - IAutoboxBTree
+
+       - Write tests of the autobox API for BTree, FusedView,
+         ClientIndexView, and DataServiceIndex.
+
+       - Should be able to instantiate a resource that is a BigdataMap
+         or BigdataSet, so perhaps make these classes extend
+         AbstractResource?  Same for SparseRowStore?
+
+       - Need [isNull] for ClientIndexView and DataServiceIndex impls
+         to reconstruct the object by allowing reconstruction of the
+         ITuple.
+
+	 Could modify the ResultBuffer to provide this additional
+         information as an option and specify an appropriate
+         constructor for the point test to get back that metadata.
+
+	 Really, should define crudTuple() methods and rework the
+	 batch crud methods in terms of tuples.  That is the general
+	 framwork.  Bit flags can be used to indicate that certain
+	 information (keys, vals, etc). are not required for a given
+	 op.  (keys are always available on the client for these ops
+	 so there is never a need to send them with the data: just
+	 {val, isNull, isDeleted} and the option to read deleted
+	 tuples.
+
+	 BigdataMap and BigdataSet will not scale-out until this issue
+	 is resolved.
+
     - Distributed file repository
 
          - handle overflow of blocks to the index segments during MOVE
@@ -1056,12 +1085,6 @@ Short term tasks:
     renamed as KeyRangePartitionedIndex)
 
   - (*****) Iterator refactor
-
-     - Cursor based tuple:
-
-       - Done. BTree (uses listeners to support concurrent modification).
-
-       - Done. IndexSegment (uses prior/next leaf and data are immutable).
 
      - Modify the procedure logic to abstract a 'next key/val'
        iterator using a shared buffer for de-compression in order to
@@ -1803,11 +1826,6 @@ Main issues:
     (-) Experiment with higher branching factors on the journal
         indices now that we will overflow periodically.
 
-    (*) Try co-threading the search index writes with the reverse
-	lexicon write, but that should only reduce a single load
-	latency where as overall parallelism should reduce the total
-	load latency.
-
     (*) Try co-threading the forward index writes for the statements with
 	the reverse index writes for the term identifiers.
 
@@ -1844,7 +1862,7 @@ Main issues:
       data services is located on a second machine, still w/o
       overflow.
 
-      Done. (Multicase configuration issue was resolved.)  There is
+      Done. (Multicast configuration issue was resolved.)  There is
       still a problem with multicast which is preventing scale-out
       runs.
 
@@ -2036,20 +2054,6 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
 
 ============================================================
 
-- Presentations
-
-  - Provenance
-
-  - Scale-out 
-
-  - LUBM & Modified LUBM
-
-  - Updated whitepapers
-
-  - Cloud computing & travel plans.
-
-============================================================
-
 
 - MetadataService
 
@@ -2187,9 +2191,9 @@ JF-U100-host23-2DS:  ******** RUNNING NOW *********
 
 Index allocation:
 
-      The initial index allocation appears to assign much more of the
-      effort to host3.  Either try random assignment or reconsider the
-      2-host assignment behavior.
+    The initial index allocation appears to assign much more of the
+    effort to host3.  Either try random assignment or reconsider the
+    2-host assignment behavior.
 
 log files:
 
@@ -2321,22 +2325,6 @@ Caused by: java.lang.NullPointerException
    	     concurrent threads and therefore needs the unisolated
    	     indices to be thread-safe.
 
-       - Done. (Rewrote the test code.) The UnisolatedReadWriteIndex
-         sucks hard when it comes to the assertSameStatements() method
-         in test_loadAndVerify.  The problem is that this code uses a
-         lot of point tests, which is why we don't run it for the
-         scale-out database.  Those point tests must acquire a lock
-         when using the UnisolatedReadWriteIndex, which really hurts
-         performance.
-
-	 This could be fixed by exposing the lock and acquiring for
-	 the duration of the point test intensive method.
-
-	 It could also be fixed by re-writing the code to be
-	 efficient, e.g., by using iterators rather than point test
-	 and basically doing a JOIN (nested loop with the inner loop
-	 unrolled).
-
        - Unroll loops for faster distributed joins
 
          Unroll the inner loop for each chunk of the outer loop and
@@ -2353,13 +2341,6 @@ Caused by: java.lang.NullPointerException
 
          Compare the performance for LTS, LDS, and JDS.
 
-       - Scale-out version of distinct term scan (rdf01, rdfs4a,
-         rdfs4b), the closure over the various property sets
-         (fastClosure 3, 5, 6, 7 and 9), and the MatchRule (completion
-         scan against the full text index with join to the
-         SPORelation).  This MAY require driving through the CURSOR
-         and ITupleFilter changes.
-     
        - Modify TM to remove constraints on scaling imposed by the use
          of fully buffered iterators to avoid concurrency problems.
 
@@ -2397,64 +2378,56 @@ execute on the native rule engine.
 
 ============================================================
 
-Problems with StatementBuffer:
+x. misc tests, performance problems and improvements for the RDF DB.
 
-           // fully grounded.
-           buf.add(x, rdfType, Software); // stmt1
-           
-           // statements using [_bigdata] and/or [_systap] blank nodes.
-           buf.add(_systap, rdfsLabel, SYSTAP);   // stmt2
-           buf.add(_systap, dcCreator, _bigdata); // stmt3
-           buf.add(_bigdata, rdfType, Software);  // stmt4 
-           buf.add(_bigdata, rdfsLabel, bigdata); // stmt5
+  - Finish the TestDefaultResourceLocator
 
-           // statement using a distinct blank node [_b1].
-           buf.add(_b1, rdfsLabel, java);         // stmt6
-           buf.add(_b1, rdfType, Software);       // stmt7
+  - asReadCommittedView() is broken for the LocalTripleStore.  This
+    effects the BigdataSail and
+    com.bigdata.rdf.store.TestLocalTripleStoreTransactionSemantics.
+    The problem is that the BTrees are not truely read-committed
+    views.  They are views as of the last commit time.  However
+    asReadCommittedView() is a singleton so the view never advances.
 
-B41 := bigdata
-B45 := _b1
-B49 := systap
+    Could have ReadCommitted BTree variant that was notified of (or
+    simply noticed) commits and re-loaded itself from the new
+    checkpoint.  This could be done in getRoot() and in a few
+    additional methods that return fields (index metadata, entryCount,
+    etc).
 
-#1	Explicit     : < http://www.foo.org/x(12), rdf:type(16), http://www.foo.org/Software(8) > : id=39 stmt1
-#2	Explicit     : < B41(41), rdf:type(16), http://www.foo.org/Software(8) > : id=55 
-#3	Explicit     : < B41(41), rdfs:label(20), bigdata(26) > : id=59
-#4	Explicit     : < B45(45), rdf:type(16), http://www.foo.org/Software(8) > : id=63
-#5	Explicit     : < B45(45), rdfs:label(20), java(30) > : id=67
-#6	Explicit     : < B49(49), http://purl.org/dc/terms/creator(4), B41(41) > : id=71
-#7	Explicit     : < B49(49), rdfs:label(20), SYSTAP, LLC(34) > : id=75
+    Could also lookup the last commit time (or the last closure time)
+    and use that timestamp rather than specifying READ_COMMITTED.
 
+  - (defer) Optimize by assigning variables in a rule a positional
+    index and use a long[] for bindings for SPORelation self-joins.
 
-============================================================
+  - Performance for unrolled joins?
 
-* Finish the TestDefaultResourceLocator
+  - Refactor the bulk filter, statement buffer, bulk complete,
+    etc. operations as stackable, chunked, ordered, filtering
+    iterators using some stiterator extensions similar to what I have
+    done for the B+Tree.
 
-- Done. Problem with "hasStatement()" and other API methods exists
-  when the BigdataValue objects from one DB are used on a DB with a
-  different lexicon.  It assumes see that it has the term identifier
-  and does not realize that the term identifier was assigned by a
-  different database.
+  - Replace IElementFilter with ITupleFilter or ITupleFilter[].
+       
+    This will allow us to use the prefix scan and distinct term scans
+    directly from an IRule by specifying the appropriate predicate
+    filter(s)!
 
-* asReadCommittedView() is broken for the LocalTripleStore.  This
-  effects the BigdataSail and
-  com.bigdata.rdf.store.TestLocalTripleStoreTransactionSemantics.  The
-  problem is that the BTrees are not truely read-committed views.
-  They are views as of the last commit time.  However
-  asReadCommittedView() is a singleton so the view never advances.
+  - Verify that the distinct term scan can correctly advance across
+    index partition boundaries.  One way to do this is by setting a
+    very small split point and then loading a known data set,
+    computing its closure, and comparing it to ground truth.
 
-  Could have ReadCommitted BTree variant that was notified of (or
-  simply noticed) commits and re-loaded itself from the new
-  checkpoint.  This could be done in getRoot() and in a few additional
-  methods that return fields (index metadata, entryCount, etc).
+  - performance testing for owl:sameAs processing at scale.
 
-  Could also lookup the last commit time (or the last closure time)
-  and use that timestamp rather than specifying READ_COMMITTED.
-  
-* Run all inference test suites that do closure with both full and
-  fast variants.
+  - performance testing for distinct term sca
 
-- (defer) Optimize by assigning variables in a rule a positional index
-  and use a long[] for bindings for SPORelation self-joins.
+  - TruthMaintenance performance should be vetted.  Handling TM at
+    scale is its own issue and might be best solved using: (a) a magic
+    sets integration; and (b) periodic map/reduce style updates with
+    closure.  (Or database at once closure on a new data set, which is
+    similar to how scale-out text indices are built.)
 
 - Performance testing of Fast vs Full and then set the default closure
   method appropriately.
@@ -2484,18 +2457,69 @@ B49 := systap
 
 Priority list:
 
-x. *** Lexicon refactor.
+x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
+       at http://esw.w3.org/topic/LargeTripleStores.
 
-       - Lexicon (support fast model comparison with read-only chunked
-         testing).
+       First, do a pure bulk load - triples only.
 
-         AbstractRuleTestCase#modelsEqual() needs to use bulk complete
-         to be efficient for scale out.  This means that it needs to
-         run the SPOs into a BigdataStatementIterator and then into a
-         StatementBuffer against the target database and finally into
-         a bulk complete (or perhaps a filter not found) operator to
-         figure out if everything is there as expected.  Verify with
-         LDS database at once closure test.
+	    - without overflow processing the triple store will take
+              up more space due to the WORM nature of the store.
+
+	    - leading prefix compress can help to compenate for this,
+              but it has not been implemented yet.
+
+       Then compute the database at once closure.
+
+	    - why does serial rule execution do better?  Will this
+              also have an impact on concurrent query performance?
+
+	    - add some of the missing rules for LUBM competeness,
+              e.g., owl:inversePropertyOf, etc.
+
+       Then run LUBM benchmarks (rewrite Sesame2 queries to native
+       JOINs).
+
+       Do this for U100, U1000, and U8000 on one machine and then for
+       the same data sets on three machines using MONOLITHIC indices.
+       Put the statement indices on one host (make sure that optimized
+       joins are enabled) and the lexicon on another.  The full text
+       index can be on a third.  Read the source data from NFS.
+
+       - Jini-aware iterator required for the asynchronous distributed
+         join iterator (and even for the special case where the
+         statement indices are co-located so we can do optimized
+         joins, which applies here).
+
+       - Once I have these numbers, go back and try again to work
+         through dynamic partitioning, load balancing.
+
+       - Compute the database-at-once closure once the data are safely
+         loaded (verify!) using dynamic partitioning, run some LUBM
+         benchmarks.  (This will force validation of the scale-out
+         joins, including serialization, the async iterator, and
+         efficiency).
+
+       - Then run the LUBM benchmarks again against the distributed,
+         key-range partitioned indices.
+
+x. Fast model comparison
+
+      Finish AbstractStatementBuffer and fast (scalable) model compare
+      in AbstractRuleTestCase.
+
+      AbstractRuleTestCase#modelsEqual() needs to use bulk complete to
+      be efficient for scale out.  This means that it needs to run the
+      SPOs into a BigdataStatementIterator and then into a
+      StatementBuffer against the target database and finally into a
+      bulk complete (or perhaps a filter not found) operator to figure
+      out if everything is there as expected.  Verify with LDS
+      database at once closure test.
+
+      Verify that StatementBuffer2 is a safe replacement for
+      StatementBuffer.
+
+      Verify the LDS test suites since some of the tests have not been
+      run for scale-out cases (too slow with point tests).
 
 x. *** unroll loops for faster distributed joins.
 
@@ -2512,56 +2536,10 @@ x. Full text index performance.
      unisolated write pattern (all clients write on both all indices
      to guarentee consistent index states).
 
-x. provenance query problems (MikeP)
+x. **** provenance query problems (MikeP)
 
 x. performance testing for query (LUBM with native rule rewrites of
    queries) for LTS, LDS, and JDS.
-
-2. misc tests, performance problems and improvements for the RDF DB.
-
-   - Performance for unrolled joins?
-
-   - Refactor the bulk filter, statement buffer, bulk complete,
-     etc. operations as stackable, chunked, ordered, filtering
-     iterators using some stiterator extensions similar to what I have
-     done for the B+Tree.
-
-   - Replace IElementFilter with ITupleFilter or ITupleFilter[].
-       
-     This will allow us to use the prefix scan and distinct term scans
-     directly from an IRule by specifying the appropriate predicate
-     filter(s)!
-
-   - Verify that the distinct term scan can correctly advance across
-     index partition boundaries.  One way to do this is by setting a
-     very small split point and then loading a known data set,
-     computing its closure, and comparing it to ground truth.
-
-  - performance testing for owl:sameAs processing at scale.
-
-  - performance testing for distinct term scan
-
-  - TruthMaintenance performance should be vetted.  Handling TM at
-    scale is its own issue and might be best solved using: (a) a magic
-    sets integration; and (b) periodic map/reduce style updates with
-    closure.  (Or database at once closure on a new data set, which is
-    similar to how scale-out text indices are built.)
-
-   *** Still some problems:
-
-       - TTS, LTS, LDS -- what is weird is that these tests only fail
-         when run as part of the total test suite.
-       
-	 - TestBackchainOwlSameAsPropertiesIterator
-
-	 - TestTruthMaintenance#test_closurecorrectness
-
-       - LTS w/o statement identifiers
-
-       	 - TestRDFXMLInterchangeWithStatementIdentifiers has blank
-           node handling problems.
-
-       - And try the TestTruthMaintenance stress test for all flavors.
 
 4. performance testing for data load and closure
 
@@ -2660,61 +2638,25 @@ x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
          index I guess), etc.
 
        - Focus on two CONOPS: incremental updates (crud) and map /
-         reduce style index builds (bulk write).
-    
-FIXME IAutoboxBTree api on all IIndex impls.
+         reduce style index builds (bulk write).   
 
-   - Need to write tests of the autobox API for BTree, FusedView,
-     ClientIndexView, and DataServiceIndex.
-
-     - Should be able to instantiate a resource that is a BigdataMap
-       or BigdataSet, so perhaps make these classes extend
-       AbstractResource?  Same for SparseRowStore?
-
-   - **** Need [isNull] for ClientIndexView and DataServiceIndex impls
-          to reconstruct the object by allowing reconstruction of the
-          ITuple.
-
-	  Could modify the ResultBuffer to provide this additional
-          information as an option and specify an appropriate
-          constructor for the point test to get back that metadata.
-
-	  Really, should define crudTuple() methods and rework the
-	  batch crud methods in terms of tuples.  That is the general
-	  framwork.  Bit flags can be used to indicate that certain
-	  information (keys, vals, etc). are not required for a given
-	  op.  (keys are always available on the client for these ops
-	  so there is never a need to send them with the data: just
-	  {val, isNull, isDeleted} and the option to read deleted
-	  tuples.
-
-	  BigdataMap and BigdataSet will not scale-out until this
-	  issue is resolved.
+x. ZooKeeper integration for resource lock manager?
 
 ============================================================
 
-Finish fixup of the lexicon and benchmark.
+   - Bulk loads on the DPP, then query rewrites and LUBM performance
+     tests.
 
-   - Seeing some problems again with some of the backchainers.
+   - The test suite (TestTruthMaintenance) runs fine if you run it by
+     itself.  But if you run it as part of the total test suite for
+     the module then some of the unit tests will fail.  Weird.  The
+     tests that fail mostly deal with backchaining.
 
-   - Get 1-2B scaling numbers on the DPP cluster for DaveL and post at
-     http://esw.w3.org/topic/LargeTripleStores.
+INFO : 20188 Main Thread         com.bigdata.rdf.rules.TestBackchainTypeResourceIterator.test_backchain_foo_type_resource(TestBackchainTypeResourceIterator.java:410):
+#1	Explicit     : < http://www.bigdata.com/s(64), http://www.bigdata.com/p(68), http://www.bigdata.com/o(72) > : sid=79
 
-     Inference and dynamic partitioning are NOT required at first,
-     then do database-at-once closure, then query performance, eg.,
-     lubm, and then try again with dynamic partitioning.
-
-   - Enable TM stress test.
-
-   - Axioms must be serializable for distributed closure.
-
-   - Make sure that the DataLoader uses
-     BigdataValueFactory#newBNodeContext().  Recommend its use when
-     directly loading data with lots of blank nodes using Sesame's
-     API.
-
-   - Test lexicon w/ and w/o storeBlankNodes (probably test the whole
-     RDF DB, or maybe just TestTripleStore).
-
-
-------------------------------------------------------------
+junit.framework.AssertionFailedError: : The iterator is willing to visit more than 1 objects.  The next 1 objects would be: [< 72U, 8U, 40U : Inferred >]
+	at junit.framework.Assert.fail(Assert.java:47)
+	at com.bigdata.rdf.store.AbstractTestCase.assertSameSPOs(AbstractTestCase.java:493)
+	at com.bigdata.rdf.store.AbstractTestCase.assertSameSPOs(AbstractTestCase.java:458)
+	at com.bigdata.rdf.rules.TestBackchainTypeResourceIterator.test_backchain_foo_type_resource(TestBackchainTypeResourceIterator.java:446)

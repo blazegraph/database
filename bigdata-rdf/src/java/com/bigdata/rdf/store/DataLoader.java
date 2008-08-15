@@ -713,6 +713,12 @@ public class DataLoader {
         /* 
          * Obtain a buffered reader on the input stream.
          */
+        
+        if (rdfStream == null) {
+
+            throw new IOException("Could not locate resource: " + resource);
+            
+        }
 
         // @todo reuse the backing buffer to minimize heap churn. 
         final Reader reader = new BufferedReader(

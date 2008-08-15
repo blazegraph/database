@@ -115,6 +115,7 @@ import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 import org.openrdf.sail.helpers.SailBase;
 
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -217,7 +218,7 @@ import cutthecrap.utils.striterators.Striterator;
 public class BigdataSail extends SailBase implements Sail {
 
     /**
-     * Additional parameters understood by the Sesame 1.x SAIL implementation.
+     * Additional parameters understood by the Sesame 2.x SAIL implementation.
      * 
      * @todo also extend Options for the scale-out triple store once defined.
      * 
@@ -487,62 +488,69 @@ public class BigdataSail extends SailBase implements Sail {
             BigdataSailConnection view = readCommittedRef == null ? null
                     : readCommittedRef.get();
             
-            if(view == null) {
-                
-                if(database instanceof LocalTripleStore) {
+            if (view == null) {
 
-                    /*
-                     * Create the singleton using a read-committed view of the
-                     * database.
-                     */
-                    
-                    view = new BigdataSailConnection(((LocalTripleStore)database).asReadCommittedView()) {
-                        
-                        public void close() throws SailException {
-                            
-                            // NOP - close is ignored.
-                            
-                        }
-                        
-                    };
-                    
-                    readCommittedRef = new WeakReference<BigdataSailConnection>(view);
-                    
-                } else if(database instanceof ScaleOutTripleStore) {
-                    
-                    /*
-                     * The scale-out triple store already has read-committed
-                     * semantics since it uses unisolated writes on the data
-                     * service.
-                     * 
-                     * @todo make sure that the use of RdfKeyBuffer and any
-                     * other per-instance state is thread-safe.
-                     */
-                    
-                    view = new BigdataSailConnection(database) {
-                        
-                        public void close() throws SailException {
-                            
-                            // NOP - close is ignored.
-                            
-                        }
+                /*
+                 * Create the singleton using a read-committed view of the
+                 * database.
+                 */
 
-                    };
-                    
-                    readCommittedRef = new WeakReference<BigdataSailConnection>(view);
-                    
-                } else {
-                    
-                    throw new UnsupportedOperationException(BigdataSail.Options.STORE_CLASS + "="
-                            + database.getClass().getName());                    
+                view = new BigdataSailConnection(database.asReadCommittedView()) {
 
-                }
+                    public void close() throws SailException {
+
+                        // NOP - close is ignored.
+
+                    }
+
+                };
+
+                readCommittedRef = new WeakReference<BigdataSailConnection>(
+                        view);
                 
             }
             
             return view; 
         
         }
+        
+    }
+    
+    /**
+     * Obtain a read-historical view that reads from the specified commit point.
+     * This view is safe for concurrent readers and will not update if there are
+     * concurrent writes.
+     * 
+     * @param commitTime
+     *            The commit point.
+     * 
+     * @return The view.
+     * 
+     * @todo both {@link #asReadCommittedView()} and
+     *       {@link #getReadHistoricalView(long)} do not register the connection
+     *       with the {@link SailBase} which leads to the following message.
+     * 
+     * <pre>
+     *      SailBase.connectionClosed(SailBase.java:204): tried to remove unknown connection object from store.
+     * </pre>
+     * 
+     * This message (probably) can be ignored since these are read-only views.
+     * However, since the {@link SailBase} wants to "close" the connections, the
+     * read-committed view should not be a singleton - it needs to be a distinct
+     * {@link BigdataSailConnection} instance. Also, both views need to get
+     * registered for this message to go away.
+     * <p>
+     * One way to handle this is to obtain a {@link BigdataSail} subclass that
+     * operates as a factory for those views.
+     */
+    public BigdataSailConnection getReadHistoricalView(long commitTime) {
+       
+        AbstractTripleStore tmp = (AbstractTripleStore) database
+                .getIndexManager().getResourceLocator().locate(
+                        database.getNamespace(),
+                        TimestampUtility.asHistoricalRead(commitTime));
+        
+        return new BigdataSailConnection(tmp);
         
     }
     
@@ -575,7 +583,7 @@ public class BigdataSail extends SailBase implements Sail {
      * @todo many of the store can support concurrent writers, but there is a
      *       requirement to serialize writers when truth maintenance is enabled.
      */
-    protected SailConnection getConnectionInternal() throws SailException {
+    protected BigdataSailConnection getConnectionInternal() throws SailException {
 
         // this will block until the semaphore is available.
         try {
@@ -594,6 +602,15 @@ public class BigdataSail extends SailBase implements Sail {
         return conn;
         
     }
+    
+    /**
+     * Strengthens the return type.
+     */
+    public BigdataSailConnection getConnection() throws SailException {
+        
+        return (BigdataSailConnection)super.getConnection();
+        
+    }
 
     /**
      * Note: This is an immediate shutdown - any running transactions will not
@@ -606,12 +623,14 @@ public class BigdataSail extends SailBase implements Sail {
     }
 
     /**
-     * Inner class implements the {@link SailConnection}.
+     * Inner class implements the {@link SailConnection}. Some additional
+     * functionality is available on this class, including
+     * {@link #computeClosure()}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class BigdataSailConnection implements SailConnection {
+    public class BigdataSailConnection implements SailConnection {
 
         /**
          * The database view.
@@ -1383,6 +1402,11 @@ public class BigdataSail extends SailBase implements Sail {
              * SailConnection and do NOT explicitly rollback() the writes then
              * any writes that were flushed through to the database will remain
              * there and participate in the next commit.
+             * 
+             * @todo we could notice if there were writes and only rollback the
+             * store when there were uncommitted writes.  this scenario can only
+             * arise for the Journal.  Any federation based system will be using
+             * unisolated operations with auto-commit.
              */
             
 //            * Note: Since {@link #close()} discards any uncommitted writes it is
@@ -1598,10 +1622,11 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Computes the closure of the triple store for RDF(S)+ entailments.
          * <p>
-         * This computes the full forward closure of the database. This can be
-         * used if you do NOT enable truth maintenance and choose instead to
-         * load up all of your data first and then compute the closure of the
-         * database.
+         * This computes the closure of the database. This can be used if you do
+         * NOT enable truth maintenance and choose instead to load up all of
+         * your data first and then compute the closure of the database. Note
+         * that some rules may be computed by eager closure while others are
+         * computed at query time.
          * <p>
          * Note: If there are already entailments in the database AND you have
          * retracted statements since the last time the closure was computed
@@ -1614,17 +1639,18 @@ public class BigdataSail extends SailBase implements Sail {
          * @see #removeAllEntailments()
          */
         public void computeClosure() throws SailException {
-            
+
             assertWritable();
-            
+
             flushStatementBuffers(true/* assertions */, true/* retractions */);
-            
+
             getInferenceEngine().computeClosure(null/* focusStore */);
-            
+
         }
         
         /**
-         * Removes all "inferred" statements from the database.
+         * Removes all "inferred" statements from the database (does NOT commit
+         * the database).
          */
         public void removeAllEntailments() throws SailException {
             

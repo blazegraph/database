@@ -54,9 +54,7 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Unit tests for high-level query.
