@@ -153,6 +153,12 @@ public class RuleStats {
     public final IStep rule;
     
     /**
+     * The round is zero unless this is a closure operations and then it is an
+     * integer in [1:nrounds]. 
+     */
+    public int closureRound = 0;
+    
+    /**
      * The #of {@link ISolution}s computed by the rule regardless of whether or
      * not they are written onto an {@link IMutableRelation} and regardless of
      * whether or not they duplicate a solution already computed.
@@ -314,7 +320,7 @@ public class RuleStats {
 
         final String q = ""; //'\"';
 
-        return "\""+depthStr.substring(0,depth)+name+"\""//
+        return "\""+depthStr.substring(0,depth)+name+(closureRound==0?"":" round#"+closureRound)+"\""//
              + ", "+(titles?"elapsed=":"") + elapsed//
              + ", "+(titles?"solutionCount=":"") + solutionCount//
              + ", "+(titles?"solutions/sec=":"") + solutionsPerSec//
@@ -380,9 +386,23 @@ public class RuleStats {
      * Reports aggregate and details.
      */
     public String toString() {
+
+        return toString(10L/*minElapsed*/);
+        
+    }
+    
+    /**
+     * 
+     * @param minElapsed
+     *            The minimum elapsed time for which details will be shown.
+     * 
+     */
+    public String toString(long minElapsed) {
+            
+        final int depth = 0;
         
         if (detailStats.isEmpty())
-            return toStringSimple(0/* depth */, true/* titles */);
+            return toStringSimple(depth, true/* titles */);
         
         final StringBuilder sb = new StringBuilder();
         
@@ -392,27 +412,32 @@ public class RuleStats {
         // aggregate level.
         sb.append("\n" + getHeadings());
 
-        sb.append("\n" + toStringSimple(0/* depth */, false/* titles */));
+        sb.append("\n" + toStringSimple(depth, false/* titles */));
 
-        toString(0/*depth*/, sb, a);
+        toString(minElapsed, depth+1, sb, a);
 
         return sb.toString();
 
     }
 
-    private StringBuilder toString(int depth, StringBuilder sb, RuleStats[] a) {
+    private StringBuilder toString(long minElapsed, int depth,
+            StringBuilder sb, RuleStats[] a) {
 
         // detail level.
         for (int i = 0; i < a.length; i++) {
 
             final RuleStats x = (RuleStats) a[i];
 
-            sb.append("\n" + x.toStringSimple(depth,false/* titles */));
+            if (x.elapsed >= minElapsed) {
 
-            if (x.aggregate && !x.detailStats.isEmpty()) {
+                sb.append("\n" + x.toStringSimple(depth, false/* titles */));
 
-                toString(depth + 1, sb, x.detailStats
-                        .toArray(new RuleStats[] {}));
+                if (x.aggregate && !x.detailStats.isEmpty()) {
+
+                    toString(minElapsed, depth + 1, sb, x.detailStats
+                            .toArray(new RuleStats[] {}));
+
+                }
 
             }
 

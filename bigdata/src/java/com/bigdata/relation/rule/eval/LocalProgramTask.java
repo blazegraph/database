@@ -497,7 +497,7 @@ public class LocalProgramTask implements IProgramTask,
 
         final RuleStats totals = new RuleStats(program);
         
-        int round = 0;
+        int round = 1;
         
         while (true) {
 
@@ -518,6 +518,9 @@ public class LocalProgramTask implements IProgramTask,
              */
             final long mutationDelta = tmp.mutationCount.get();
 
+            // set the round identifier.
+            tmp.closureRound = round;
+            
             // aggregate the rule statistics.
             totals.add(tmp);
 
@@ -541,7 +544,7 @@ public class LocalProgramTask implements IProgramTask,
         if (log.isInfoEnabled()) {
 
             log.info("\nComputed fixed point: program="
-                            + program.getName() + ", rounds=" + (round + 1)
+                            + program.getName() + ", rounds=" + round
                             + ", elapsed=" + elapsed + "ms");
                         
         }
