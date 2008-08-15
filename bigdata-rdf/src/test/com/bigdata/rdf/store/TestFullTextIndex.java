@@ -33,10 +33,8 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 
-import com.bigdata.rdf.model.BigdataBNodeImpl;
-import com.bigdata.rdf.model.BigdataLiteralImpl;
-import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataClient;
 
@@ -116,25 +114,27 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
         AbstractTripleStore store = getStore();
 
-        final BigdataValue[] terms = new BigdataValue[] {//
-                new BigdataLiteralImpl("abc"),//
-                new BigdataLiteralImpl("abc", new BigdataURIImpl(XMLSchema.DECIMAL)),//
-                new BigdataLiteralImpl("abc", "en"),//
-                new BigdataLiteralImpl("good day", "en"),//
-                new BigdataLiteralImpl("gutten tag", "de"),//
-                new BigdataLiteralImpl("tag team", "en"),//
-                new BigdataLiteralImpl("the first day", "en"),// // 'the' is a stopword.
-
-                new BigdataURIImpl("http://www.bigdata.com"),//
-                new BigdataURIImpl(RDF.TYPE),//
-                new BigdataURIImpl(RDFS.SUBCLASSOF),//
-                new BigdataURIImpl(XMLSchema.DECIMAL),//
-
-                new BigdataBNodeImpl(UUID.randomUUID().toString()),//
-                new BigdataBNodeImpl("a12"),//
-        };
-
         try {
+
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataValue[] terms = new BigdataValue[] {//
+                    f.createLiteral("abc"),//
+                    f.createLiteral("abc", f.asValue(XMLSchema.DECIMAL)),//
+                    f.createLiteral("abc", "en"),//
+                    f.createLiteral("good day", "en"),//
+                    f.createLiteral("gutten tag", "de"),//
+                    f.createLiteral("tag team", "en"),//
+                    f.createLiteral("the first day", "en"),// // 'the' is a stopword.
+
+                    f.createURI("http://www.bigdata.com"),//
+                    f.asValue(RDF.TYPE),//
+                    f.asValue(RDFS.SUBCLASSOF),//
+                    f.asValue(XMLSchema.DECIMAL),//
+
+                    f.createBNode(UUID.randomUUID().toString()),//
+                    f.createBNode("a12"),//
+            };
 
             store.addTerms(terms);
 

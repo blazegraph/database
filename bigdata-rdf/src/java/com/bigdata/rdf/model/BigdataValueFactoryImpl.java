@@ -70,6 +70,11 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * assigned. Those metadata can be resolved against the various indices and then
  * set on the returned values and statements.
  * 
+ * @todo Hide {@link BigdataValue} ctors that can cause people problems. The
+ *       public ctors are evil since they do not specify a value factory which
+ *       causes a new {@link BigdataValue} be allocated once you try to write on
+ *       the DB.
+ * 
  * @todo Consider a {@link WeakValueCache} on this factory to avoid duplicate
  *       values.
  * 
@@ -85,6 +90,9 @@ public class BigdataValueFactoryImpl implements ValueFactory, BigdataValueFactor
      */
     protected final long NULL = IRawTripleStore.NULL;
 
+    /**
+     * WARNING: Use {@link #getInstance(String)} NOT this constructor.
+     */
     private BigdataValueFactoryImpl() {
         
     }
@@ -404,6 +412,24 @@ public class BigdataValueFactoryImpl implements ValueFactory, BigdataValueFactor
 
         return valueSer;
 
+    }
+
+    public BigdataURI asValue(URI v) {
+        
+        return (BigdataURI)asValue((Value)v);
+        
+    }
+
+    public BigdataLiteral asValue(Literal v) {
+        
+        return (BigdataLiteral)asValue((Value)v);
+        
+    }
+
+    public BigdataBNode asValue(BNode v) {
+
+        return (BigdataBNode)asValue((Value)v);
+        
     }
     
 }

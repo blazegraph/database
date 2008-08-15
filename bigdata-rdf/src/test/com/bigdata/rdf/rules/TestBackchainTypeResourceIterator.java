@@ -33,6 +33,8 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -384,24 +386,30 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_backchain_foo_type_resource() {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
 
         try {
 
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final RDFSVocabulary vocab = new RDFSVocabulary(store);
             
-            URI S = new URIImpl("http://www.bigdata.com/s");
-            URI P = new URIImpl("http://www.bigdata.com/p");
-            URI O = new URIImpl("http://www.bigdata.com/o");
+            final BigdataValueFactory f = store.getValueFactory();
             
-            long s = store.addTerm(S);
-            long p = store.addTerm(P);
-            long o = store.addTerm(O);
+            final BigdataURI S = f.createURI("http://www.bigdata.com/s");
+            final BigdataURI P = f.createURI("http://www.bigdata.com/p");
+            final BigdataURI O = f.createURI("http://www.bigdata.com/o");
+            
+            final long s = store.addTerm(S);
+            final long p = store.addTerm(P);
+            final long o = store.addTerm(O);
 
             store.addStatements(new SPO[] {//
                     new SPO(s, p, o, StatementEnum.Explicit) //
                     }, 1);
 
+            if(log.isInfoEnabled()) {
+                log.info("\n:"+store.dumpStore());
+            }
+            
             AbstractTestCase.assertSameSPOs(new SPO[] {
                     new SPO(s, p, o, StatementEnum.Explicit),
                     },

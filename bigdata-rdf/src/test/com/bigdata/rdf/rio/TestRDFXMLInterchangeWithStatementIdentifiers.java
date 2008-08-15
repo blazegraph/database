@@ -70,12 +70,9 @@ import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ISPO;
@@ -556,7 +553,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         assert store.getStatementIdentifiers() == true;
 
         {
-            
+
             final BigdataValueFactory valueFactory = store.getValueFactory();
             
             final BigdataURI x = valueFactory.createURI("http://www.foo.org/x");
@@ -705,21 +702,27 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             /*
              * Re-define the vocabulary so that it does not use the term
              * identifiers from the other database.
+             * 
+             * @todo since we use the BigdataValueFactory then we SHOULD NOT
+             * need to do this. We SHOULD automatically get new value instances
+             * when we write on a store with a lexicon in a different namespace.
              */
-            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x");
-            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y");
-            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z");
+            final BigdataValueFactory valueFactory = store.getValueFactory();
+            
+            final BigdataURI x = valueFactory.createURI("http://www.foo.org/x");
+            final BigdataURI y = valueFactory.createURI("http://www.foo.org/y");
+            final BigdataURI z = valueFactory.createURI("http://www.foo.org/z");
 
-            final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
-            final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
-            final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
+            final BigdataURI A = valueFactory.createURI("http://www.foo.org/A");
+            final BigdataURI B = valueFactory.createURI("http://www.foo.org/B");
+            final BigdataURI C = valueFactory.createURI("http://www.foo.org/C");
 
-            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+            final BigdataURI rdfType = valueFactory.createURI(RDF.TYPE.stringValue());
 
-            final BigdataURI dcCreator = new BigdataURIImpl("http://purl.org/dc/terms/creator");
+            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/terms/creator");
 
-            final BigdataLiteral bryan = new BigdataLiteralImpl("bryan");
-            final BigdataLiteral mike = new BigdataLiteralImpl("mike");
+            final BigdataLiteral bryan = valueFactory.createLiteral("bryan");
+            final BigdataLiteral mike = valueFactory.createLiteral("mike");
 
             BigdataValue[] terms = new BigdataValue[] {
                     x,y,z,//

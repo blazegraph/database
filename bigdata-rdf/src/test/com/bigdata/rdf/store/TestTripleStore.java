@@ -51,7 +51,6 @@ import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -819,11 +818,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             // verify nothing in the store.
             assertSameIterator(new SPO[]{},
                     store.getAccessPath(NULL,NULL,NULL).iterator());
+
+            final BigdataValueFactory f = store.getValueFactory();
             
-            final BigdataURI A = new BigdataURIImpl("http://www.bigdata.com/A");
-            final BigdataURI B = new BigdataURIImpl("http://www.bigdata.com/B");
-            final BigdataURI C = new BigdataURIImpl("http://www.bigdata.com/C");
-            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+            final BigdataURI A = f.createURI("http://www.bigdata.com/A");
+            final BigdataURI B = f.createURI("http://www.bigdata.com/B");
+            final BigdataURI C = f.createURI("http://www.bigdata.com/C");
+            final BigdataURI rdfType = f.asValue(RDF.TYPE);
             
             // assign term identifiers for reuse below.
             store.addTerms(new BigdataValue[] { A, B, C, rdfType });
@@ -927,10 +928,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameIterator(new Statement[]{},
                     store.getAccessPath(null,null,null).iterator());
             
-            final BigdataURI A = new BigdataURIImpl("http://www.bigdata.com/A");
-            final BigdataURI B = new BigdataURIImpl("http://www.bigdata.com/B");
-            final BigdataURI C = new BigdataURIImpl("http://www.bigdata.com/C");
-            final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI A = f.createURI("http://www.bigdata.com/A");
+            final BigdataURI B = f.createURI("http://www.bigdata.com/B");
+            final BigdataURI C = f.createURI("http://www.bigdata.com/C");
+            final BigdataURI rdfType = f.asValue(RDF.TYPE);
             
             {
                 IStatementBuffer buffer = new StatementBuffer(store, 100);
@@ -992,9 +995,11 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * statement identifier).
              */
 
-            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x1");
-            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y2");
-            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z3");
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final BigdataURI x = f.createURI("http://www.foo.org/x1");
+            final BigdataURI y = f.createURI("http://www.foo.org/y2");
+            final BigdataURI z = f.createURI("http://www.foo.org/z3");
     
             store.addTerms(new BigdataValue[] { x, y, z });
             

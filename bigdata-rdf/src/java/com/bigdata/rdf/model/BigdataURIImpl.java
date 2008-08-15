@@ -51,6 +51,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.util.URIUtil;
 
 /**
+ * A URI. Use {@link BigdataValueFactory} to create instances of this class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -67,32 +68,16 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
     /** lazily assigned. */
     private int indexOf = -1;
 
-    /**
-     * Create a new {@link BigdataURI} having the same data and NO term
-     * identifier.
-     * 
-     * @param uri
-     *            A {@link URI}.
-     * 
-     * @deprecated by
-     *             {@link BigdataValueFactory#asValue(org.openrdf.model.Value)}
-     */
-    public BigdataURIImpl(URI uri) {
-
-        this(uri.stringValue());
-
-    }
-
-    public BigdataURIImpl(String uriString) {
-
-        this(null, uriString);
-
-    }
+//    public BigdataURIImpl(String uriString) {
+//
+//        this(null, uriString);
+//
+//    }
 
     /**
      * Used by {@link BigdataValueFactoryImpl}.
      */
-    public BigdataURIImpl(BigdataValueFactory valueFactory, String uriString) {
+    BigdataURIImpl(BigdataValueFactory valueFactory, String uriString) {
 
         super(valueFactory, NULL);
 

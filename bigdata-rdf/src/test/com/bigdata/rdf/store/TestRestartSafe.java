@@ -35,11 +35,9 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Test restart safety for the various indices.
@@ -62,101 +60,82 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         
         try {
         
-        /*
-         * setup the database.
-         */
-        final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x");
-        final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y");
-        final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z");
+            /*
+             * setup the database.
+             */
+            
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI x = f.createURI("http://www.foo.org/x");
+            final BigdataURI y = f.createURI("http://www.foo.org/y");
+            final BigdataURI z = f.createURI("http://www.foo.org/z");
 
-        final BigdataURI A = new BigdataURIImpl("http://www.foo.org/A");
-        final BigdataURI B = new BigdataURIImpl("http://www.foo.org/B");
-        final BigdataURI C = new BigdataURIImpl("http://www.foo.org/C");
+            final BigdataURI A = f.createURI("http://www.foo.org/A");
+            final BigdataURI B = f.createURI("http://www.foo.org/B");
+            final BigdataURI C = f.createURI("http://www.foo.org/C");
 
-        final BigdataURI rdfType = new BigdataURIImpl(RDF.TYPE);
+            final BigdataURI rdfType = f.asValue(RDF.TYPE);
 
-        final BigdataURI rdfsSubClassOf = new BigdataURIImpl(RDFS.SUBCLASSOF);
+            final BigdataURI rdfsSubClassOf = f.asValue(RDFS.SUBCLASSOF);
 
-        final BigdataLiteral lit1 = new BigdataLiteralImpl("abc");
-        final BigdataLiteral lit2 = new BigdataLiteralImpl("abc",A);
-        final BigdataLiteral lit3 = new BigdataLiteralImpl("abc","en");
+            final BigdataLiteral lit1 = f.createLiteral("abc");
+            final BigdataLiteral lit2 = f.createLiteral("abc", A);
+            final BigdataLiteral lit3 = f.createLiteral("abc", "en");
 
-        final BigdataBNode bn1 = new BigdataBNodeImpl(UUID.randomUUID().toString());
-        final BigdataBNode bn2 = new BigdataBNodeImpl("a12");
-        
-        store.addStatement(x, rdfType, C);
-        store.addStatement(y, rdfType, B);
-        store.addStatement(z, rdfType, A);
+            final BigdataBNode bn1 = f.createBNode(UUID.randomUUID()
+                    .toString());
+            final BigdataBNode bn2 = f.createBNode("a12");
 
-        store.addStatement(B, rdfsSubClassOf, A);
-        store.addStatement(C, rdfsSubClassOf, B);
+            store.addStatement(x, rdfType, C);
+            store.addStatement(y, rdfType, B);
+            store.addStatement(z, rdfType, A);
 
-        final long x_id = store.getTermId(x); assertTrue(x_id!=NULL);
-        final long y_id = store.getTermId(y); assertTrue(y_id!=NULL);
-        final long z_id = store.getTermId(z); assertTrue(z_id!=NULL);
-        final long A_id = store.getTermId(A); assertTrue(A_id!=NULL);
-        final long B_id = store.getTermId(B); assertTrue(B_id!=NULL);
-        final long C_id = store.getTermId(C); assertTrue(C_id!=NULL);
-        final long rdfType_id = store.getTermId(rdfType); assertTrue(rdfType_id!=NULL);
-        final long rdfsSubClassOf_id = store.getTermId(rdfsSubClassOf); assertTrue(rdfsSubClassOf_id!=NULL);
-        
-        final long lit1_id = store.addTerm(lit1); assertTrue(lit1_id!=NULL);
-        final long lit2_id = store.addTerm(lit2); assertTrue(lit2_id!=NULL);
-        final long lit3_id = store.addTerm(lit3); assertTrue(lit3_id!=NULL);
-        
-        final long bn1_id = store.addTerm(bn1); assertTrue(bn1_id!=NULL);
-        final long bn2_id = store.addTerm(bn2); assertTrue(bn2_id!=NULL);
-        
-        final boolean storeBlankNodes = store.getLexiconRelation().isStoreBlankNodes();
-        
-        assertEquals("#terms",8+3+(storeBlankNodes?2:0),store.getTermCount());
-        assertEquals("#uris",8,store.getURICount());
-        assertEquals("#lits", 3, store.getLiteralCount());
-        if (storeBlankNodes) {
-            assertEquals("#bnodes", 2, store.getBNodeCount());
-        } else {
-            assertEquals("#bnodes", 0, store.getBNodeCount());
-        }
+            store.addStatement(B, rdfsSubClassOf, A);
+            store.addStatement(C, rdfsSubClassOf, B);
 
-        store.commit();
-        
-        assertEquals(x_id,store.getTermId(x));
-        assertEquals(y_id,store.getTermId(y));
-        assertEquals(z_id,store.getTermId(z));
-        assertEquals(A_id,store.getTermId(A));
-        assertEquals(B_id,store.getTermId(B));
-        assertEquals(C_id,store.getTermId(C));
-        assertEquals(rdfType_id,store.getTermId(rdfType));
-        assertEquals(rdfsSubClassOf_id,store.getTermId(rdfsSubClassOf));
-        
-        assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(null,null));
-        assertEquals("statementCount", 5, store.getPOSIndex().rangeCount(null,null));
-        assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(null,null));
-        assertTrue(store.hasStatement(x, rdfType, C));
-        assertTrue(store.hasStatement(y, rdfType, B));
-        assertTrue(store.hasStatement(z, rdfType, A));
-        assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
-        assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
-        
-        assertEquals("#terms", 8 + 3 + (storeBlankNodes ? 2 : 0), store
-                .getTermCount());
-        assertEquals("#uris",8,store.getURICount());
-        assertEquals("#lits",3,store.getLiteralCount());
-        if (storeBlankNodes) {
-            assertEquals("#bnodes", 2, store.getBNodeCount());
-        } else {
-            assertEquals("#bnodes", 0, store.getBNodeCount());
-        }
+            final long x_id = store.getTermId(x);
+            assertTrue(x_id != NULL);
+            final long y_id = store.getTermId(y);
+            assertTrue(y_id != NULL);
+            final long z_id = store.getTermId(z);
+            assertTrue(z_id != NULL);
+            final long A_id = store.getTermId(A);
+            assertTrue(A_id != NULL);
+            final long B_id = store.getTermId(B);
+            assertTrue(B_id != NULL);
+            final long C_id = store.getTermId(C);
+            assertTrue(C_id != NULL);
+            final long rdfType_id = store.getTermId(rdfType);
+            assertTrue(rdfType_id != NULL);
+            final long rdfsSubClassOf_id = store.getTermId(rdfsSubClassOf);
+            assertTrue(rdfsSubClassOf_id != NULL);
 
-        if(log.isInfoEnabled())log.info("\n"+store.dumpStore());
-        
-        store.commit();
+            final long lit1_id = store.addTerm(lit1);
+            assertTrue(lit1_id != NULL);
+            final long lit2_id = store.addTerm(lit2);
+            assertTrue(lit2_id != NULL);
+            final long lit3_id = store.addTerm(lit3);
+            assertTrue(lit3_id != NULL);
 
-        if (store.isStable()) {
+            final long bn1_id = store.addTerm(bn1);
+            assertTrue(bn1_id != NULL);
+            final long bn2_id = store.addTerm(bn2);
+            assertTrue(bn2_id != NULL);
 
-            store = reopenStore(store);
+            final boolean storeBlankNodes = store.getLexiconRelation()
+                    .isStoreBlankNodes();
 
-            if(log.isInfoEnabled())log.info("\n"+store.dumpStore());
+            assertEquals("#terms", 8 + 3 + (storeBlankNodes ? 2 : 0), store
+                    .getTermCount());
+            assertEquals("#uris", 8, store.getURICount());
+            assertEquals("#lits", 3, store.getLiteralCount());
+            if (storeBlankNodes) {
+                assertEquals("#bnodes", 2, store.getBNodeCount());
+            } else {
+                assertEquals("#bnodes", 0, store.getBNodeCount());
+            }
+
+            store.commit();
 
             assertEquals(x_id, store.getTermId(x));
             assertEquals(y_id, store.getTermId(y));
@@ -189,37 +168,80 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
                 assertEquals("#bnodes", 0, store.getBNodeCount());
             }
 
-            /*
-             * verify the terms can be recovered.
-             */
-            assertEquals(x, store.getTerm(x_id));
-            assertEquals(y, store.getTerm(y_id));
-            assertEquals(z, store.getTerm(z_id));
-            assertEquals(A, store.getTerm(A_id));
-            assertEquals(B, store.getTerm(B_id));
-            assertEquals(C, store.getTerm(C_id));
+            if (log.isInfoEnabled())
+                log.info("\n" + store.dumpStore());
 
-            assertEquals(rdfType, store.getTerm(rdfType_id));
-            assertEquals(rdfsSubClassOf, store.getTerm(rdfsSubClassOf_id));
+            store.commit();
 
-            assertEquals(lit1, store.getTerm(lit1_id));
-            assertEquals(lit2, store.getTerm(lit2_id));
-            assertEquals(lit3, store.getTerm(lit3_id));
+            if (store.isStable()) {
 
-//            assertEquals(bn1, store.getTerm(bn1_id));
-//            assertEquals(bn2, store.getTerm(bn2_id));
-            assertTrue(store.getTerm(bn1_id)!= null);
-            assertTrue(store.getTerm(bn1_id) instanceof BNode);
-            assertTrue(store.getTerm(bn2_id)!= null);
-            assertTrue(store.getTerm(bn2_id) instanceof BNode);
-            assertTrue(store.getTerm(bn1_id) != store.getTerm(bn2_id));
+                store = reopenStore(store);
 
-        }
-        
+                if (log.isInfoEnabled())
+                    log.info("\n" + store.dumpStore());
+
+                assertEquals(x_id, store.getTermId(x));
+                assertEquals(y_id, store.getTermId(y));
+                assertEquals(z_id, store.getTermId(z));
+                assertEquals(A_id, store.getTermId(A));
+                assertEquals(B_id, store.getTermId(B));
+                assertEquals(C_id, store.getTermId(C));
+                assertEquals(rdfType_id, store.getTermId(rdfType));
+                assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
+
+                assertEquals("statementCount", 5, store.getSPOIndex()
+                        .rangeCount(null, null));
+                assertEquals("statementCount", 5, store.getPOSIndex()
+                        .rangeCount(null, null));
+                assertEquals("statementCount", 5, store.getOSPIndex()
+                        .rangeCount(null, null));
+                assertTrue(store.hasStatement(x, rdfType, C));
+                assertTrue(store.hasStatement(y, rdfType, B));
+                assertTrue(store.hasStatement(z, rdfType, A));
+                assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
+                assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
+
+                assertEquals("#terms", 8 + 3 + (storeBlankNodes ? 2 : 0), store
+                        .getTermCount());
+                assertEquals("#uris", 8, store.getURICount());
+                assertEquals("#lits", 3, store.getLiteralCount());
+                if (storeBlankNodes) {
+                    assertEquals("#bnodes", 2, store.getBNodeCount());
+                } else {
+                    assertEquals("#bnodes", 0, store.getBNodeCount());
+                }
+
+                /*
+                 * verify the terms can be recovered.
+                 */
+                assertEquals(x, store.getTerm(x_id));
+                assertEquals(y, store.getTerm(y_id));
+                assertEquals(z, store.getTerm(z_id));
+                assertEquals(A, store.getTerm(A_id));
+                assertEquals(B, store.getTerm(B_id));
+                assertEquals(C, store.getTerm(C_id));
+
+                assertEquals(rdfType, store.getTerm(rdfType_id));
+                assertEquals(rdfsSubClassOf, store.getTerm(rdfsSubClassOf_id));
+
+                assertEquals(lit1, store.getTerm(lit1_id));
+                assertEquals(lit2, store.getTerm(lit2_id));
+                assertEquals(lit3, store.getTerm(lit3_id));
+
+                //            assertEquals(bn1, store.getTerm(bn1_id));
+                //            assertEquals(bn2, store.getTerm(bn2_id));
+                assertTrue(store.getTerm(bn1_id) != null);
+                assertTrue(store.getTerm(bn1_id) instanceof BNode);
+                assertTrue(store.getTerm(bn2_id) != null);
+                assertTrue(store.getTerm(bn2_id) instanceof BNode);
+                assertTrue(store.getTerm(bn1_id) != store.getTerm(bn2_id));
+
+            }
+
         } finally {
 
             store.closeAndDelete();
-            
+
         }
         
     }

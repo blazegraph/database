@@ -54,7 +54,8 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * A blank node.
+ * A blank node. Use {@link BigdataValueFactory} to create instances of this
+ * class.
  * <p>
  * Note: When {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} is
  * enabled blank nodes in the context position of a statement are recognized as
@@ -83,11 +84,11 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
      */
     public boolean statementIdentifier;
 
-    public BigdataBNodeImpl(String id) {
-
-        this(null, id);
-
-    }
+//    public BigdataBNodeImpl(String id) {
+//
+//        this(null, id);
+//
+//    }
 
     /**
      * Used by {@link BigdataValueFactoryImpl}.

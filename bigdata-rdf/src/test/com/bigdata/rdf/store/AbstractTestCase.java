@@ -36,6 +36,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -439,10 +440,10 @@ abstract public class AbstractTestCase
     }
     
     /**
-     * Method verifies that the <i>actual</i> {@link Iterator}
-     * produces the expected objects in the expected order.  Objects
-     * are compared using {@link Object#equals( Object other )}.  Errors
-     * are reported if too few or too many objects are produced, etc.
+     * Method verifies that the <i>actual</i> {@link Iterator} produces the
+     * expected objects in the expected order. Objects are compared using
+     * {@link Object#equals( Object other )}. Errors are reported if too few or
+     * too many objects are produced, etc.
      * 
      * @todo refactor to {@link TestCase2}.
      */
@@ -466,7 +467,7 @@ abstract public class AbstractTestCase
         
         expected = expected.clone();
 
-        IKeyOrder<ISPO> keyOrder = actual.getKeyOrder();
+        final IKeyOrder<ISPO> keyOrder = actual.getKeyOrder();
 
         if (keyOrder != null) {
 
@@ -480,12 +481,22 @@ abstract public class AbstractTestCase
 
             if (i >= expected.length) {
 
+                // buffer up to N 'extra' values from the itr for the err msg.
+                final Vector<ISPO> v = new Vector<ISPO>();
+                
+                while (actual.hasNext() && v.size() < 10) {
+                
+                    v.add(actual.next());
+                    
+                }
+                
                 fail(msg + ": The iterator is willing to visit more than "
-                        + expected.length + " objects.");
+                        + expected.length + " objects.  The next " + v.size()
+                        + " objects would be: " + Arrays.toString(v.toArray()));
 
             }
 
-            ISPO g = actual.next();
+            final ISPO g = actual.next();
 
             if (!expected[i].equals(g)) {
                 
