@@ -123,7 +123,8 @@ public class UnisolatedReadWriteIndex implements IIndex {
     /**
      * The #of milliseconds that the class will wait for a read or write lock. A
      * (wrapped) {@link InterruptedException} will be thrown if this timeout is
-     * exceeded. The default is <code>10,000</code> milliseconds.
+     * exceeded. The default is {@value #LOCK_TIMEOUT_MILLIS} milliseconds. Use
+     * {@link Long#MAX_VALUE} for no timeout.
      * 
      * @todo There may be no reason to have a timeout when waiting for a lock in
      *       which case we can get rid of this field. Also, there is no means
@@ -131,7 +132,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      *       not configure the fairness policy for the
      *       {@link ReentrantReadWriteLock}).
      */
-    protected static final int LOCK_TIMEOUT_MILLIS = 10000;
+    protected static final long LOCK_TIMEOUT_MILLIS = Long.MAX_VALUE;// 10000;
     
     /**
      * An exclusive write lock used (in the absence of other concurrency control
