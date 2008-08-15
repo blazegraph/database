@@ -300,7 +300,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                 }
 
-                stats.nsubqueries[0]++;
+                stats.subqueryCount[0]++;
 
                 final IAccessPath<ISPO> accessPath = relation.getAccessPath(
                         NULL, p, NULL);

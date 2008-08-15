@@ -197,7 +197,7 @@ abstract public class AbstractTestCase
             
         }        
         
-        return m_properties;
+        return new Properties(m_properties);
         
     }
 
