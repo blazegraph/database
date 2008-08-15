@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
@@ -43,12 +42,20 @@ import com.bigdata.service.ILoadBalancerService;
 
 /**
  * Statistics about what the {@link IProgram} did.
+ * <p>
+ * Program execution has the general form of either a set of {@link IStep}s
+ * executed, at least logically, in parallel, or a sequence of {@link IStep}s
+ * executed in sequence. An {@link IStep} may be a closure operation of one or
+ * more {@link IRule}s, even when it is the top-level {@link IStep}. Inside of
+ * a closure operation, there are one or more rounds and each rule in the
+ * closure will be run in each round. There is no implicit order on the rules
+ * within a closure operation, but they may be forced to execute in a sequence
+ * if the total program execution context forces sequential execution.
+ * <p>
+ * In order to aggregate the data on rule execution, we want to roll up the data
+ * for the individual rules along the same lines as the program structure.
  * 
  * @todo Report as counters aggregated by the {@link ILoadBalancerService}?
- * 
- * FIXME factor out an interface since this is being used by
- * {@link Rule#getQueryCallable(IJoinNexus, com.bigdata.relation.accesspath.IBlockingBuffer)}
- * and {@link Rule#getMutationCallable(ActionEnum, IJoinNexus, IBuffer)}
  * 
  * @author mikep
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -87,9 +94,9 @@ public class RuleStats {
 
             this.elementCount = new long[tailCount];
 
-            this.nsubqueries = new int[tailCount];
+            this.subqueryCount = new int[tailCount];
 
-            this.order = new int[tailCount];
+            this.evalOrder = new int[tailCount];
 
         } else {
 
@@ -97,9 +104,9 @@ public class RuleStats {
             
             this.elementCount = null;
 
-            this.nsubqueries = null;
+            this.subqueryCount = null;
 
-            this.order = null;
+            this.evalOrder = null;
 
         }
 
@@ -122,7 +129,7 @@ public class RuleStats {
         
         this(ruleState.getRule());
         
-        System.arraycopy(ruleState.order, 0, order, 0, ruleState.order.length);
+        System.arraycopy(ruleState.order, 0, evalOrder, 0, ruleState.order.length);
 
 //        this.nexecutions = 1;
         
@@ -146,39 +153,8 @@ public class RuleStats {
     public final IStep rule;
     
     /**
-     * The #of chunks materialized for each predicate in the both of the rule
-     * (in the order in which they were declared, not the order in which they
-     * were evaluated).
-     */
-    public final long[] chunkCount;
-    
-    /**
-     * The #of elements considered for the each predicate in the body of the
-     * rule (in the order in which they were declared, not the order in which
-     * they were evaluated).
-     */
-    public final long[] elementCount;
-
-    /**
-     * The #of subqueries examined for each predicate in the rule. The indices
-     * are correlated 1:1 with the order in which the predicates were declared.
-     * While there are N indices for a rule with N predicates, we only evaluate
-     * a subquery for N-1 predicates so at least one index will always be
-     * zero(0).
-     */
-    public final int[] nsubqueries;
-    
-    /**
-     * The order of execution of the predicates in the body of the rule (only
-     * available at the detail level of a single {@link RuleState} execution. When
-     * aggregated, the order[] will always contain zeros since it can not be
-     * meaningfully combined across executions.
-     */
-    public final int[] order;
-    
-    /**
-     * #of {@link ISolution}s computed by the rule regardless of whether or not
-     * they are written onto an {@link IMutableRelation} and regardless of
+     * The #of {@link ISolution}s computed by the rule regardless of whether or
+     * not they are written onto an {@link IMutableRelation} and regardless of
      * whether or not they duplicate a solution already computed.
      */
     public long solutionCount;
@@ -202,60 +178,202 @@ public class RuleStats {
      */
     public long elapsed;
 
+    /*
+     * The following are only available for the execution of a single rule.
+     */
+    
+    /**
+     * The order of execution of the predicates in the body of a rule (only
+     * available at the detail level of a single rule instance execution). When
+     * aggregated, the {@link #evalOrder} will always contain zeros since it can
+     * not be meaningfully combined across executions of either the same or
+     * different rules.
+     */
+    public final int[] evalOrder;
+    
+    /**
+     * The #of chunks materialized for each predicate in the body of the rule
+     * (in the order in which they were declared, not the order in which they
+     * were evaluated).
+     */
+    public final long[] chunkCount;
+    
+    /**
+     * The #of subqueries examined for each predicate in the rule (in the order
+     * in which they were declared, not the order in which they were evaluated).
+     * While there are N indices for a rule with N predicates, we only evaluate
+     * a subquery for N-1 predicates so at least one index will always be
+     * zero(0).
+     */
+    public final int[] subqueryCount;
+    
+    /**
+     * The #of elements considered for the each predicate in the body of the
+     * rule (in the order in which they were declared, not the order in which
+     * they were evaluated).
+     */
+    public final long[] elementCount;
+
     /**
      * The #of elements considered by the program (total over
      * {@link #elementCount}).
      */
     public int getElementCount() {
-        
+
         int n = 0;
-        
-        for(int i=0; i<elementCount.length; i++) {
-            
+
+        for (int i = 0; i < elementCount.length; i++) {
+
             n += elementCount[i];
-            
+
         }
-        
+
         return n;
         
     }
     
-    public String getSolutionsPerMillisecond() {
-
-        return (elapsed == 0 ? "N/A" : "" + solutionCount / elapsed);
+    /**
+     * Returns the headings.
+     * <p>
+     * The following are present for every record.
+     * <dl>
+     * <dt>rule</dt>
+     * <dd>The name of the rule.</dd>
+     * <dt>elapsed</dt>
+     * <dd>Elapsed execution time in milliseconds. When the rules are executed
+     * concurrently the times will not be additive.</dd>
+     * <dt>solutionCount</dt>
+     * <dd>The #of solutions computed.</dd>
+     * <dt>solutions/sec</dt>
+     * <dd>The #of solutions computed per second.</dd>
+     * <dt>mutationCount</dt>
+     * <dd>The #of solutions that resulted in mutations on a relation (i.e.,
+     * the #of distinct and new solutions). This will be zero unless the rule is
+     * writing on a relation.</dd>
+     * <dt>mutations/sec</dt>
+     * <dd>The #of mutations per second.</dd>
+     * </dl>
+     * The following are only present for individual {@link IRule} execution
+     * records. Each of these is an array containing one element per tail
+     * predicate in the {@link IRule}.
+     * <dl>
+     * <dt>evalOrder</dt>
+     * <dd>The evaluation order for the predicate(s) in the rule.</dd>
+     * <dt>chunkCount</dt>
+     * <dd>The #of chunks that were generated for the left-hand side of the
+     * JOIN for each predicate in the tail of the rule.</dd>
+     * <dt>subqueryCount</dt>
+     * <dd>The #of subqueries issued for the right-hand side of the JOIN for
+     * each predicate in the tail of the rule.</dd>
+     * <dt>elementCount</dt>
+     * <dd>The #of elements materialized from each tail predicate in the rule.</dd>
+     * </dl>
+     * 
+     * @todo collect data on the size of the subquery results. A large #of
+     *       subqueries with a small number of results each is the main reason
+     *       to unroll the JOIN loops.
+     * 
+     * @todo we are actually aggregating the elapsed time, which is a no-no as
+     *       pointed out above when there are rules executing concurrently.
+     */
+    public String getHeadings() {
+     
+        return "rule, elapsed"
+                + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
+                + ", evalOrder, subqueryCount, chunkCount, elementCount"
+        ;
         
     }
     
     /**
-     * Reports only the aggregate.
+     * Reports just the data for this record.
+     * 
+     * @param depth
+     *            The depth at which the record was encountered within some
+     *            top-level aggregation.
+     * @param titles
+     *            When <code>true</code> the titles will be displayed inline,
+     *            e.g., <code>foo=12</code> vs <code>12</code>.
      */
-    public String toStringSimple() {
+    public String toStringSimple(int depth, boolean titles) {
         
-        final String computedPerSec = (solutionCount == 0 ? "N/A"
-                : (elapsed == 0L ? "0" : ""
+        // the symbol used when a count was zero, so count/sec is also zero.
+        final String NA = "";
+        
+        // the symbol used when the elapsed time was zero, so count/sec is divide by zero.
+        final String DZ = "";
+        
+        final String solutionsPerSec = (solutionCount == 0 ? NA
+                : (elapsed == 0L ? DZ : ""
                         + (long) (solutionCount * 1000d / elapsed)));
 
         final long mutationCount = this.mutationCount.get();
         
-        final String newPerSec = (mutationCount == 0 ? "N/A" : (elapsed == 0L ? "0" : ""
+        final String mutationsPerSec = (mutationCount == 0 ? NA : (elapsed == 0L ? DZ : ""
                 + (long) (mutationCount * 1000d / elapsed)));
 
-        return name //
+        final String q = ""; //'\"';
+
+        return "\""+depthStr.substring(0,depth)+name+"\""//
+             + ", "+(titles?"elapsed=":"") + elapsed//
+             + ", "+(titles?"solutionCount=":"") + solutionCount//
+             + ", "+(titles?"solutions/sec=":"") + solutionsPerSec//
+             + ", "+(titles?"mutationCount=":"") + mutationCount//
+             + ", "+(titles?"mutations/sec=":"") + mutationsPerSec//
              + (!aggregate
-                     ?(", #order="+Arrays.toString(order)//
-                       )
+                     ?(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q //
+                     + ", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q //
+                     + ", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q //
+                     + ", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q //
+                     )
                      :(""//", #exec="+nexecutions//
                      ))
-             + ", #subqueries="+Arrays.toString(nsubqueries)//
-             + ", chunkCount=" + Arrays.toString(chunkCount) //
-             + ", elementCount=" + Arrays.toString(elementCount) //
-             + ", elapsed=" + elapsed//
-             + ", solutionCount=" + solutionCount//
-             + ", computed/sec="+computedPerSec//
-             + ", mutationCount=" + mutationCount//
-             + ", new/sec="+newPerSec//
              ;
 
+    }
+    
+    private String depthStr = ".........";
+    
+    private StringBuilder toString(final int[] a) {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append("[");
+        
+        for (int i = 0; i < a.length; i++) {
+            
+            if (i > 0)
+                sb.append(" ");
+            
+            sb.append(a[i]);
+            
+        }
+        
+        sb.append("]");
+        
+        return sb;
+        
+    }
+
+    private StringBuilder toString(final long[] a) {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append("[");
+        
+        for (int i = 0; i < a.length; i++) {
+            
+            if (i > 0)
+                sb.append(" ");
+            
+            sb.append(a[i]);
+            
+        }
+        
+        sb.append("]");
+        
+        return sb;
+        
     }
 
     /**
@@ -263,28 +381,44 @@ public class RuleStats {
      */
     public String toString() {
         
-        if(detailStats.isEmpty()) return toStringSimple();
-        
-        // Note: uses Vector.toArray() to avoid concurrent modification issues.
-        final RuleStats[] a = detailStats.toArray(new RuleStats[] {});
+        if (detailStats.isEmpty())
+            return toStringSimple(0/* depth */, true/* titles */);
         
         final StringBuilder sb = new StringBuilder();
         
+        // Note: uses Vector.toArray() to avoid concurrent modification issues.
+        final RuleStats[] a = detailStats.toArray(new RuleStats[] {});
+
         // aggregate level.
-        sb.append("\ntotal : "+toStringSimple());
-        
-        // detail level.
-        for( int i = 0; i<a.length; i++ ) {
-            
-            RuleStats x = (RuleStats)a[i];
-            
-            sb.append("\n");
-            
-            sb.append("detail: "+x.toString());
-            
-        }
-        
+        sb.append("\n" + getHeadings());
+
+        sb.append("\n" + toStringSimple(0/* depth */, false/* titles */));
+
+        toString(0/*depth*/, sb, a);
+
         return sb.toString();
+
+    }
+
+    private StringBuilder toString(int depth, StringBuilder sb, RuleStats[] a) {
+
+        // detail level.
+        for (int i = 0; i < a.length; i++) {
+
+            final RuleStats x = (RuleStats) a[i];
+
+            sb.append("\n" + x.toStringSimple(depth,false/* titles */));
+
+            if (x.aggregate && !x.detailStats.isEmpty()) {
+
+                toString(depth + 1, sb, x.detailStats
+                        .toArray(new RuleStats[] {}));
+
+            }
+
+        }
+
+        return sb;
         
     }
     
@@ -390,7 +524,7 @@ public class RuleStats {
 
                 elementCount[i] += o.elementCount[i];
 
-                nsubqueries[i] += o.nsubqueries[i];
+                subqueryCount[i] += o.subqueryCount[i];
 
                 // Note: order[] is NOT aggregated.
 
@@ -405,5 +539,17 @@ public class RuleStats {
         elapsed += o.elapsed;
     
     }
-    
+   
+//    public static class ClosureStats extends RuleStats {
+//        
+//    }
+//    
+//    public static class SequenceStats extends RuleStats {
+//        
+//    }
+//
+//    public static class ProgramStats extends RuleStats {
+//        
+//    }
+
 }
