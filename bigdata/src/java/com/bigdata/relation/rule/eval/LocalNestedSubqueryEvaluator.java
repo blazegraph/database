@@ -220,7 +220,7 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
 
                             // run the subquery.
                             
-                            ruleStats.nsubqueries[order]++;
+                            ruleStats.subqueryCount[order]++;
 
                             apply1(index + 1, state);
                             

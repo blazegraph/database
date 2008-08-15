@@ -2095,6 +2095,20 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+                TupleExpr tupleExpr, BindingSet bindings)
+                throws QueryEvaluationException {
+
+            if(log.isInfoEnabled()) {
+                
+                log.info("tupleExpr:\n"+tupleExpr);
+                
+            }
+            
+            return super.evaluate(tupleExpr, bindings);
+            
+        }
+        
         /**
          * Overriden to recognize magic predicates.
          */

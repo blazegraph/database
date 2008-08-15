@@ -230,8 +230,10 @@ public class LocalProgramTask implements IProgramTask,
         try {
 
             final ProgramUtility util = new ProgramUtility();
-
+            
             if (action.isMutation()) {
+
+                final RuleStats totals;
 
                 if (!step.isRule() && ((IProgram) step).isClosure()) {
 
@@ -239,7 +241,7 @@ public class LocalProgramTask implements IProgramTask,
                      * Compute closure of a flat set of rules.
                      */
                     
-                    return executeClosure((IProgram) step).mutationCount.get();
+                    totals = executeClosure((IProgram) step);
 
                 } else if (util.isClosureProgram(step)) {
 
@@ -248,7 +250,7 @@ public class LocalProgramTask implements IProgramTask,
                      * operations.
                      */
                     
-                    return executeProgramWithEmbeddedClosure((IProgram)step).mutationCount.get();
+                    totals = executeProgramWithEmbeddedClosure((IProgram)step);
 
                 } else {
 
@@ -256,10 +258,18 @@ public class LocalProgramTask implements IProgramTask,
                      * Execute a mutation operation that does not use closure.
                      */
                     
-                    return executeMutation(step).mutationCount.get();
+                    totals = executeMutation(step);
                     
                 }
 
+                if(log.isInfoEnabled()) {
+                    
+                    log.info("totals: \n"+totals);
+                    
+                }
+                
+                return totals.mutationCount.get();
+                
             } else {
 
                 if ((!step.isRule() && ((IProgram) step).isClosure())
