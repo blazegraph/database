@@ -47,8 +47,8 @@ import org.openrdf.sail.SailException;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -112,9 +112,11 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
              * statement identifier).
              */
 
-            final BigdataURI x = new BigdataURIImpl("http://www.foo.org/x1");
-            final BigdataURI y = new BigdataURIImpl("http://www.foo.org/y2");
-            final BigdataURI z = new BigdataURIImpl("http://www.foo.org/z3");
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final BigdataURI x = f.createURI("http://www.foo.org/x1");
+            final BigdataURI y = f.createURI("http://www.foo.org/y2");
+            final BigdataURI z = f.createURI("http://www.foo.org/z3");
             
             store.addTerms(new BigdataValue[] { x, y, z });
             
@@ -764,7 +766,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      */
     public void test_stress() {
 
-        fail("enable test");
+//        fail("enable test");
         
         String[] resource = new String[] {
                 "../rdf-data/alibaba_data.rdf",

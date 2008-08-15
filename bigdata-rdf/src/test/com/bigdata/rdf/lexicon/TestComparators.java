@@ -35,8 +35,9 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.TermIdComparator;
 
 /**
@@ -66,11 +67,14 @@ public class TestComparators extends TestCase2 {
         final long lp1 = 1L;
         final long lmax = Long.MAX_VALUE;
 
-        final BigdataValue vmin = new BigdataLiteralImpl("a"); vmin.setTermId( lmin);
-        final BigdataValue vm1  = new BigdataLiteralImpl("b"); vm1 .setTermId( lm1 );
-        final BigdataValue v0   = new BigdataLiteralImpl("c"); v0  .clearTermId(); // Note: equivilent to setTermId( l0  );
-        final BigdataValue vp1  = new BigdataLiteralImpl("d"); vp1 .setTermId( lp1 );
-        final BigdataValue vmax = new BigdataLiteralImpl("e"); vmax.setTermId( lmax);
+        final BigdataValueFactory f = BigdataValueFactoryImpl
+                .getInstance(getName()/*namespace*/);
+
+        final BigdataValue vmin = f.createLiteral("a"); vmin.setTermId( lmin);
+        final BigdataValue vm1  = f.createLiteral("b"); vm1 .setTermId( lm1 );
+        final BigdataValue v0   = f.createLiteral("c"); v0  .clearTermId(); // Note: equivilent to setTermId( l0  );
+        final BigdataValue vp1  = f.createLiteral("d"); vp1 .setTermId( lp1 );
+        final BigdataValue vmax = f.createLiteral("e"); vmax.setTermId( lmax);
 
         // ids out of order.
         final long[] actualIds = new long[] { lm1, lmax, l0, lp1, lmin };

@@ -53,10 +53,11 @@ import java.math.BigInteger;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
 /**
+ * A literal. Use {@link BigdataValueFactory} to create instances of this class.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -72,24 +73,24 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
     private final String language;
     private final BigdataURI datatype;
 
-    public BigdataLiteralImpl(String label) {
-
-        this(null, label, null/* language */, null/* datatype */);
-
-    }
-
-    public BigdataLiteralImpl(String label, String language) {
-
-        this(null, label, language, null/* datatype */);
-
-    }
-
-    public BigdataLiteralImpl(String label, URI datatype) {
-
-        this(null, label, null/* language */, new BigdataURIImpl(datatype
-                .stringValue()));
-
-    }
+//    public BigdataLiteralImpl(String label) {
+//
+//        this(null, label, null/* language */, null/* datatype */);
+//
+//    }
+//
+//    public BigdataLiteralImpl(String label, String language) {
+//
+//        this(null, label, language, null/* datatype */);
+//
+//    }
+//
+//    public BigdataLiteralImpl(String label, URI datatype) {
+//
+//        this(null, label, null/* language */, new BigdataURIImpl(datatype
+//                .stringValue()));
+//
+//    }
 
     /**
      * Used by {@link BigdataValueFactoryImpl}.

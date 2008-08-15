@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-
 import java.util.Iterator;
 import java.util.concurrent.ExecutionException;
 
@@ -108,17 +107,6 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
             IElementFilter<ISPO> filter, long expectedSolutionCount,
             long expectedMutationCount) throws Exception {
 
-        // Note: Now handled by RDFJoinNexus.
-//        /*
-//         * Note: Rules run against the committed view.
-//         * 
-//         * These tests were originally written when rules ran against the
-//         * unisolated indices, so a commit is being requested here to ensure
-//         * that the test cases all run against a view with access to the data
-//         * which they have written on the store.
-//         */
-//        db.commit();
-        
         // dump the database on the console.
         if(log.isInfoEnabled())
             log.info("\ndatabase(before)::\n" + db.dumpStore());

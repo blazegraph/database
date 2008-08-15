@@ -30,7 +30,7 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.Rule;
 
@@ -68,9 +68,11 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
         
         try {
         
-            final URI A = new BigdataURIImpl("http://www.foo.org/A");
-            final URI B = new BigdataURIImpl("http://www.foo.org/B");
-            final URI C = new BigdataURIImpl("http://www.foo.org/C");
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final URI A = f.createURI("http://www.foo.org/A");
+            final URI B = f.createURI("http://www.foo.org/B");
+            final URI C = f.createURI("http://www.foo.org/C");
 
             final URI rdfsSubClassOf = RDFS.SUBCLASSOF;
 

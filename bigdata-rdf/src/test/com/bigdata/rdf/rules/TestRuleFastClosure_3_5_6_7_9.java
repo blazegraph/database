@@ -35,6 +35,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.AbstractRuleFastClosure_3_5_6_7_9.SubPropertyClosureTask;
@@ -85,15 +86,17 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
      */
     public void test_getSubProperties() {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         try {
 
-            final URI A = new BigdataURIImpl("http://www.foo.org/A");
-            final URI B = new BigdataURIImpl("http://www.foo.org/B");
-            final URI C = new BigdataURIImpl("http://www.foo.org/C");
+            final BigdataValueFactory valueFactory = store.getValueFactory();
+            
+            final URI A = valueFactory.createURI("http://www.foo.org/A");
+            final URI B = valueFactory.createURI("http://www.foo.org/B");
+            final URI C = valueFactory.createURI("http://www.foo.org/C");
 
-            final URI rdfsSubPropertyOf = new BigdataURIImpl(RDFS.SUBPROPERTYOF);
+            final URI rdfsSubPropertyOf = valueFactory.asValue(RDFS.SUBPROPERTYOF);
 
             store.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
             store.addStatement(B, rdfsSubPropertyOf, A);

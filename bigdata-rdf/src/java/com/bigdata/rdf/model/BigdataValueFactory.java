@@ -29,6 +29,8 @@ package com.bigdata.rdf.model;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -38,6 +40,8 @@ import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Interface strengthens the return types and adds some custom extensions.
+ * 
+ * @see BigdataValueFactoryImpl#getInstance(String)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -153,6 +157,21 @@ public interface BigdataValueFactory {
      *         <code>null</code> then <code>null</code> is returned.
      */
     BigdataValue asValue(Value v);
+
+    /**
+     * Strongly typed for {@link URI}s.
+     */
+    BigdataURI asValue(URI v);
+
+    /**
+     * Strongly typed for {@link Literal}s.
+     */
+    BigdataLiteral asValue(Literal v);
+
+    /**
+     * Strongly typed for {@link BNode}s.
+     */
+    BigdataBNode asValue(BNode v);
 
     /**
      * An object that can efficiently (de-)serialize {@link Value}s using this

@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -66,11 +66,13 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
         try {
 
-            final long a = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/a"));
-            final long b = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/b"));
-            final long y = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/y"));
-            final long x = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/x"));
-            final long z = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/z"));
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final long a = store.addTerm(f.createURI("http://www.bigdata.com/a"));
+            final long b = store.addTerm(f.createURI("http://www.bigdata.com/b"));
+            final long y = store.addTerm(f.createURI("http://www.bigdata.com/y"));
+            final long x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
+            final long z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
 
             final RDFSVocabulary inf = new RDFSVocabulary(store);
 
@@ -136,11 +138,13 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
         try {
 
-            final long a = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/a"));
-            final long b = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/b"));
-            final long y = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/y"));
-            final long x = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/x"));
-            final long z = store.addTerm(new BigdataURIImpl("http://www.bigdata.com/z"));
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final long a = store.addTerm(f.createURI("http://www.bigdata.com/a"));
+            final long b = store.addTerm(f.createURI("http://www.bigdata.com/b"));
+            final long y = store.addTerm(f.createURI("http://www.bigdata.com/y"));
+            final long x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
+            final long z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
 
             RDFSVocabulary inf = new RDFSVocabulary(store);
 

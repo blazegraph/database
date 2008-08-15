@@ -4,6 +4,8 @@ import java.util.UUID;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -155,6 +157,18 @@ public class BNodeContextFactory implements BigdataValueFactory {
      */
     public BigdataValueFactory newBNodeContext() {
         throw new UnsupportedOperationException();
+    }
+
+    public BigdataURI asValue(URI v) {
+        return valueFactory.asValue(v);
+    }
+
+    public BigdataLiteral asValue(Literal v) {
+        return valueFactory.asValue(v);
+    }
+
+    public BigdataBNode asValue(BNode v) {
+        return valueFactory.asValue(v);
     }
 
 }
