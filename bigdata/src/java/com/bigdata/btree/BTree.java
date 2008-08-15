@@ -38,7 +38,6 @@ import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.sun.corba.se.spi.orbutil.fsm.State;
 
 /**
  * <p>
@@ -1488,8 +1487,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter, ILocalBT
         }
         
         /**
-         * Replace the state of this {@link Stack} with the {@link State} of
-         * the source {@link Stack}.
+         * Replace the state of this {@link Stack} with the state of the source
+         * {@link Stack}.
          * 
          * @param src
          *            The source {@link Stack}.
