@@ -40,6 +40,7 @@ import org.xml.sax.XMLReader;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
  * A parser for XML-serialized RDF. This parser operates directly on the SAX
@@ -75,6 +76,12 @@ import com.bigdata.rdf.store.BNS;
  * // relative URIs against http://foo/bar:
  * parser.parse(inputStream, &quot;http://foo/bar&quot;);
  * </pre>
+ * 
+ * <p>
+ * <strong> This parser has been modified to support the exchange of statement
+ * identifiers and {@link StatementEnum} metadata as described in {@link BNS}
+ * and {@link Options#STATEMENT_IDENTIFIERS}. </strong>
+ * </p>
  * 
  * @see org.openrdf.model.ValueFactory
  * @see org.openrdf.rio.RDFHandler

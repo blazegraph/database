@@ -56,6 +56,7 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.rio.rdfxml.RDFXMLParser;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BTree;
@@ -78,7 +79,6 @@ import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -440,27 +440,45 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_TEXT_INDEX = "true";
 
         /**
-         * Boolean option (default <code>false</code>) enables support for
-         * statement identifiers. A statement identifier is unique to a
-         * <em>triple</em> (regardless of the graph in which that triple may
-         * be found). Statement identifiers may be used to make statements about
-         * statements without using RDF style reification.
+         * Boolean option (default {@value #DEFAULT_STATEMENT_IDENTIFIERS})
+         * enables support for statement identifiers. A statement identifier is
+         * unique identifier for a <em>triple</em> in the database. Statement
+         * identifiers may be used to make statements about statements without
+         * using RDF style reification.
          * <p>
          * Statement identifers are assigned consistently when {@link Statement}s
          * are mapped into the database. This is done using an extension of the
          * <code>term:id</code> index to map the statement as if it were a
-         * term onto a unique statement identifier. That statement identifier is
-         * in fact a term identifier, and the identified statement may be
-         * resolved against the <code>id:term</code> index. While the
-         * statement identifier is assigned canonically by the
-         * <code>term:id</code> index, it is stored redundently in the value
-         * position for each of the statement indices.
+         * term onto a unique statement identifier. While the statement
+         * identifier is assigned canonically by the <code>term:id</code>
+         * index, it is stored redundently in the value position for each of the
+         * statement indices. While the statement identifier is, in fact, a term
+         * identifier, the reverse mapping is NOT stored in the id:term index
+         * and you CAN NOT translate from a statement identifier back to the
+         * original statement.
          * <p>
-         * Statement identifiers add latency when loading data since it
+         * bigdata supports an RDF/XML interchange extension for the interchange
+         * of <em>triples</em> with statement identifiers that may be used as
+         * blank nodes to make statements about statements. See {@link BNS} and
+         * {@link RDFXMLParser}.
+         * <p>
+         * Statement identifiers add some latency when loading data since it
          * increases the size of the writes on the terms index (and also its
          * space requirements since all statements are also replicated in the
          * terms index). However, if you are doing concurrent data load then the
          * added latency is nicely offset by the parallelism.
+         * <p>
+         * The main benefit for statement identifiers is that they provide a
+         * mechanism for statement level provenance. This is critical for some
+         * applications.
+         * <p>
+         * An alternative approach to provenance within RDF is to use the
+         * concatenation of the subject, predicate, and object (or a hash of
+         * their concatenation) as the value in the context position. While this
+         * approach can be used with any quad store, it is less transparent and
+         * requires <em>twice</em> the amount of data on the disk since you
+         * need an additional three statement indices to cover the quad access
+         * paths.
          * 
          * @see ITermIndexCodes#TERM_CODE_STMT
          * 
