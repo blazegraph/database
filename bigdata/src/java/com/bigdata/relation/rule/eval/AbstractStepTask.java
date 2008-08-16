@@ -278,6 +278,54 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     }
 
     /**
+     * Run a single step (sequence of one).
+     * <p>
+     * Note: use {@link #runOne(IStep, Callable)} rather than either
+     * {@link #runParallel(IStep, List)} or {@link #runSequential(IStep, List)}
+     * when there is only one task to execute in order to avoid an unnecessary
+     * layering of the {@link RuleStats} (this is due to a coupling between the
+     * {@link RuleStats} reporting structure and the control structure for
+     * executing the tasks).
+     * 
+     * @param program
+     * @param tasks
+     * 
+     * @return
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    protected RuleStats runOne(IStep program,
+            Callable<RuleStats> task) throws InterruptedException,
+            ExecutionException {
+    
+        if (log.isInfoEnabled())
+            log.info("program=" + program.getName());
+    
+        if (indexManager == null)
+            throw new IllegalStateException();
+        
+        final ExecutorService service = indexManager.getExecutorService();
+        
+        /*
+         * Submit and wait for the future.
+         * 
+         * Note: tasks that are run in a sequential (or as a single task)
+         * program are required to flush the buffer so that all solutions are
+         * available for the next step of the program. This is critical for
+         * programs that have dependencies between their steps.
+         * 
+         * Note: This is handled by the task factory.
+         */
+        final RuleStats stats = service.submit(task).get();
+
+        if (log.isInfoEnabled())
+            log.info("program=" + program.getName() + " - done");
+    
+        return stats;
+    
+    }
+
+    /**
      * Run <i>this</i> task.
      * <p>
      * If we are executing on a {@link DataService} then {@link #dataService}

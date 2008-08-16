@@ -387,7 +387,7 @@ public class RuleStats {
      */
     public String toString() {
 
-        return toString(10L/*minElapsed*/);
+        return toString(0L/*minElapsed*/);
         
     }
     

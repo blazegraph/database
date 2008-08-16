@@ -95,7 +95,11 @@ public class QueryTask extends AbstractStepTask {
 
             final RuleStats totals;
 
-            if (!joinNexus.forceSerialExecution() && !step.isRule()
+            if (tasks.size() == 1) {
+
+                totals = runOne(step, tasks.get(0));
+
+            } else if (!joinNexus.forceSerialExecution() && !step.isRule()
 					&& ((IProgram) step).isParallel()) {
 
                 totals = runParallel(step, tasks);

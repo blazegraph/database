@@ -40,7 +40,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
@@ -116,7 +115,11 @@ public class MutationTask extends AbstractStepTask {
 
         final RuleStats totals;
 
-        if (!joinNexus.forceSerialExecution() && !step.isRule()
+        if(tasks.size()==1) {
+            
+            totals = runOne(step, tasks.get(0));
+            
+        } else if (!joinNexus.forceSerialExecution() && !step.isRule()
                 && ((IProgram) step).isParallel()) {
 
             totals = runParallel(step, tasks);
