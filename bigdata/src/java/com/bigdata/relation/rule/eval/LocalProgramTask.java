@@ -597,9 +597,9 @@ public class LocalProgramTask implements IProgramTask,
         
         log.info("program embeds closure operations");
         
-        final RuleStats totals = new RuleStats(step);
+        final RuleStats totals = new RuleStats(program);
         
-        final Iterator<? extends IStep> itr = ((IProgram)step).steps();
+        final Iterator<? extends IStep> itr = (program).steps();
         
         while(itr.hasNext()) {
             

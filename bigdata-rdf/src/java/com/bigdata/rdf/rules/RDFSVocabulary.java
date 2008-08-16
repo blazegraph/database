@@ -438,7 +438,6 @@ public class RDFSVocabulary {
         program.addStep(new RuleFastClosure11(db, this));
 
         // 12. RuleRdfs03
-
         program.addStep(new RuleRdfs03(db, this));
 
         /*
