@@ -118,7 +118,8 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
         if (termId == NULL) {
 
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(
+                    "Can not set termId to NULL: term=" + this);
 
         }
 

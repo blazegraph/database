@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.rule.eval.ActionEnum;
 
 /**
  * Conjunctive query of N {@link IPredicate}s with optional {@link IConstraint}s.
@@ -68,7 +69,13 @@ public interface IRule<E> extends IStep {
     public int getTailCount();
 
     /**
-     * The head of the rule.
+     * The head of the rule -or- <code>null</code> iff there is no head for
+     * this rule. Note that rules that are executed as queries DO NOT need to
+     * specify a head. However, rules that will be executed as mutation
+     * operations (insert or delete) MUST specify the head as it determines the
+     * {@link IRelation} on which the rule will write.
+     * 
+     * @see ActionEnum
      */
     public IPredicate getHead();
 

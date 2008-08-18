@@ -186,7 +186,7 @@ public class RuleState {
         sb.append(" -> ");
 
         // write out bindings for the head.
-        {
+        if (rule.getHead() != null) {
 
             sb.append(rule.getHead().toString(bindingSet));
 

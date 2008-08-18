@@ -71,8 +71,8 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IProgramTask;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
-import com.bigdata.relation.rule.eval.LocalNestedSubqueryEvaluator;
-import com.bigdata.relation.rule.eval.LocalProgramTask;
+import com.bigdata.relation.rule.eval.NestedSubqueryTask;
+import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTaskFactory;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -182,7 +182,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             public IStepTask newTask(IRule rule,IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
                 
-                return new LocalNestedSubqueryEvaluator(rule, joinNexus, buffer);
+                return new NestedSubqueryTask(rule, joinNexus, buffer);
                 
             }
             
@@ -807,6 +807,12 @@ public class RDFJoinNexus implements IJoinNexus {
         if (!action.isMutation())
             throw new IllegalStateException();
         
+        if (step.isRule() && ((IRule) step).getHead() == null) {
+
+            throw new IllegalArgumentException("No head for this rule: " + step);
+
+        }
+        
         if(log.isInfoEnabled())
             log.info("action=" + action + ", program=" + step.getName());
         
@@ -915,7 +921,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         makeWriteSetsVisible();
         
-        final IProgramTask innerTask = new LocalProgramTask(action, step,
+        final IProgramTask innerTask = new ProgramTask(action, step,
                 getJoinNexusFactory(), getIndexManager());
 
         return innerTask.call();
@@ -929,7 +935,7 @@ public class RDFJoinNexus implements IJoinNexus {
      * use RMI.
      * 
      * FIXME This is not optimized for distributed joins. It is actually using
-     * the {@link ClientIndexView} and the {@link LocalProgramTask} - this is
+     * the {@link ClientIndexView} and the {@link ProgramTask} - this is
      * NOT efficient!!! It needs to be modified to (a) unroll to inner loop of
      * the join; and (b) partition the join such that the outer loop is split
      * across the data services where the index partition resides. This makes
@@ -950,7 +956,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
-        final IProgramTask innerTask = new LocalProgramTask(action, step,
+        final IProgramTask innerTask = new ProgramTask(action, step,
                 getJoinNexusFactory(), getIndexManager());
 
         return innerTask.call();
@@ -979,7 +985,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
         
-        final IProgramTask innerTask = new LocalProgramTask(action, step,
+        final IProgramTask innerTask = new ProgramTask(action, step,
                 getJoinNexusFactory());
 
         return dataService.submit(innerTask).get();

@@ -650,6 +650,10 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
             final IRule r = (IRule) p;
 
+            if (r.getHead() == null)
+                throw new IllegalArgumentException(
+                        "No head for this rule: rule=" + p);
+            
             c.add(r.getHead().getOnlyRelationName());
 
         } else {

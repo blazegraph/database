@@ -2,6 +2,7 @@ package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.FilterIteration;
+
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -15,6 +16,7 @@ import org.openrdf.query.parser.ParsedGraphQuery;
 import org.openrdf.repository.sail.SailGraphQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 
 public class BigdataSailGraphQuery extends SailGraphQuery {

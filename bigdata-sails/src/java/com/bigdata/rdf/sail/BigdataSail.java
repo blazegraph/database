@@ -71,13 +71,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.Semaphore;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.openrdf.model.Literal;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -86,27 +84,22 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.NamespaceImpl;
 import org.openrdf.model.impl.StatementImpl;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.algebra.evaluation.TripleSource;
 import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.openrdf.query.algebra.evaluation.impl.ConstantOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.impl.FilterOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
-import org.openrdf.query.algebra.evaluation.iterator.JoinIterator;
 import org.openrdf.query.algebra.evaluation.util.QueryOptimizerList;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import org.openrdf.sail.Sail;
@@ -118,24 +111,18 @@ import org.openrdf.sail.helpers.SailBase;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
-import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection.BigdataTripleSource;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BNS;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
-import com.bigdata.rdf.store.BigdataValueIterator;
-import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -145,13 +132,8 @@ import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.search.FullTextIndex;
-import com.bigdata.search.IHit;
-import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
-import cutthecrap.utils.striterators.Resolver;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Sesame <code>2.x</code> integration.
@@ -260,18 +242,18 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger(BigdataSail.class);
+    private static final Logger log = Logger.getLogger(BigdataSail.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
     
     /**
@@ -1698,9 +1680,11 @@ public class BigdataSail extends SailBase implements Sail {
 
                 replaceValues(tupleExpr);
 
-                TripleSource tripleSource = new BigdataTripleSource(includeInferred);
+                TripleSource tripleSource = new BigdataTripleSource(this,
+                        includeInferred);
 
-                EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl((BigdataTripleSource)tripleSource, dataset);
+                EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
+                        (BigdataTripleSource) tripleSource, dataset);
 
                 QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());
@@ -1708,7 +1692,7 @@ public class BigdataSail extends SailBase implements Sail {
                 optimizerList.add(new CompareOptimizer());
                 optimizerList.add(new ConjunctiveConstraintSplitter());
                 optimizerList.add(new SameTermFilterOptimizer());
-                optimizerList.add(new QueryJoinOptimizer(new BigdataEvaluationStatistics()));
+                optimizerList.add(new QueryJoinOptimizer(new BigdataEvaluationStatistics(this)));
                 optimizerList.add(new FilterOptimizer());
 
                 optimizerList.optimize(tupleExpr, dataset, bindings);
@@ -1768,627 +1752,6 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
-        /**
-         * TripleSource API - used by high-level query.
-         * <p>
-         * Note: We need to use a class for this since the behavior is
-         * parameterized based on whether or not inferred statements are to be
-         * included in the query results.
-         */
-        protected class BigdataTripleSource implements TripleSource {
-
-            private final boolean includeInferred;
-            
-            private BigdataTripleSource(boolean includeInferred) {
-                
-                this.includeInferred = includeInferred;
-                
-            }
-            
-            protected AbstractTripleStore getDatabase() {
-                
-                return BigdataSail.this.database;
-                
-            }
-            
-            /**
-             * This wraps
-             * {@link BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource[])}.
-             */
-            public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(
-                    Resource s, URI p, Value o, Resource... contexts)
-                    throws QueryEvaluationException {
-
-                /*
-                 * Note: we have to wrap the statement iterator due to conflicting
-                 * exception signatures.
-                 */
-                
-                final CloseableIteration<? extends Statement, SailException> src;
-                
-                try {
-                
-                    src = BigdataSailConnection.this.getStatements(s, p, o,
-                            includeInferred, contexts);
-                    
-                } catch (SailException ex) {
-                    
-                    throw new QueryEvaluationException(ex);
-                    
-                }
-                
-                return new QueryEvaluationStatementIterator<Statement>(src);
-
-            }
-
-            /**
-             * The {@link BigdataValueFactoryImpl}.
-             */
-            public ValueFactory getValueFactory() {
-
-                return BigdataSail.this.database.getValueFactory();
-                
-            }
-            
-        }
-
-        /**
-         * Class exists to align exceptions thrown by
-         * {@link TripleSource#getStatements(Resource, URI, Value, Resource[])}
-         * with those thrown by
-         * {@link SailConnection#getStatements(Resource, URI, Value, boolean, Resource[])}.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         * @version $Id$
-         */
-        private class QueryEvaluationStatementIterator<T extends Statement> implements CloseableIteration<T, QueryEvaluationException> {
-
-            private final CloseableIteration<? extends Statement, SailException> src;
-            
-            private QueryEvaluationStatementIterator(CloseableIteration<? extends Statement, SailException> src) {
-                
-                assert src != null;
-                
-                this.src = src;
-                
-            }
-            
-            public boolean hasNext() throws QueryEvaluationException {
-                
-                try {
- 
-                    return src.hasNext();
-                    
-                } catch (SailException ex) {
-                    
-                    throw new QueryEvaluationException(ex);
-                    
-                }
-                
-            }
-
-            public T next() throws QueryEvaluationException {
-
-                try {
-
-                    return (T) src.next();
-                    
-                } catch(SailException ex) {
-                    
-                    throw new QueryEvaluationException(ex);
-                    
-                }
-                
-            }
-
-            public void remove() throws QueryEvaluationException {
-
-                try {
-
-                    src.remove();
-                    
-                } catch(SailException ex) {
-                    
-                    throw new QueryEvaluationException(ex);
-                    
-                }
-                
-            }
-            
-            public void close() throws QueryEvaluationException {
-
-                try {
-
-                    src.close();
-                    
-                } catch(SailException ex) {
-                    
-                    throw new QueryEvaluationException(ex);
-                    
-                }
-                
-            }
-
-        }
-       
     }
-
-    /**
-     * Uses range counts to give cost estimates based on the size of the
-     * expected results.
-     * 
-     * @todo consider overriding or replacing the {@link QueryJoinOptimizer} so
-     *       that I can determine the effect of the propagation of bindings as
-     *       well as the selectivity in the data when choosing the join ordering
-     *       (how I already do it for the rules).
-     * 
-     * @todo if a {@link StatementPattern} is to read against the default
-     *       context and that is a merge of pre-defined contexts then we need
-     *       to use the union of the range counts for those contexts.
-     */
-    protected class BigdataEvaluationStatistics extends EvaluationStatistics {
-
-        @Override
-        protected CardinalityCalculator getCardinalityCalculator(Set<String> boundVars) {
-
-            return new BigdataCardinalityCalculator(boundVars);
-            
-        }
-
-        protected class BigdataCardinalityCalculator extends CardinalityCalculator {
-
-            public BigdataCardinalityCalculator(Set<String> boundVars) {
-                
-                super(boundVars);
-                
-            }
-
-            @Override
-            public void meet(StatementPattern sp) {
-
-                /*
-                 * Figure out which positions in the pattern are bound to
-                 * constants, obtaining the corresponding internal Value object.
-                 * 
-                 * Note: This assumes that the term identifier on the Value was
-                 * already resolved as part of the query optimization (the
-                 * constants should have been re-written into internal _Value
-                 * objects and their term identifiers resolved against the
-                 * database).
-                 */
-                
-                final BigdataResource subj = (BigdataResource) getConstantValue(sp
-                        .getSubjectVar());
-                
-                final BigdataURI pred = (BigdataURI) getConstantValue(sp.getPredicateVar());
-                
-                final BigdataValue obj = (BigdataValue) getConstantValue(sp.getObjectVar());
-                
-                final BigdataResource context = (BigdataResource) getConstantValue(sp
-                        .getContextVar());
-
-                if (subj != null && subj.getTermId() == NULL //
-                        || pred != null && pred.getTermId() == NULL //
-                        || obj != null && obj.getTermId() == NULL //
-                        || context != null && context.getTermId() == NULL//
-                ) {
-
-                    // non-existent subject, predicate, object or context
-
-                    if (DEBUG)
-                        log.debug("One or more constants not found in the lexicon: "+ sp);
-                    
-                    cardinality = 0;
-                    
-                    return;
-                    
-                }
-
-                /* 
-                 * Get the most efficient access path.
-                 */
-
-                final IAccessPath accessPath = database.getAccessPath(
-                        (subj == null ? NULL : subj.getTermId()),
-                        (pred == null ? NULL : pred.getTermId()),
-                        (obj == null ? NULL : obj.getTermId()));
-
-                /*
-                 * The range count for that access path based on the data. The
-                 * variables will be unbound at this point so the selectivity
-                 * will depend mostly on the #of SPOC positions that were bound
-                 * to constants in the query.
-                 */
-
-                final long rangeCount = accessPath.rangeCount(false/*exact*/);
-
-                cardinality = rangeCount;
-
-//                int constantVarCount = countConstantVars(sp);
-                final int boundVarCount = countBoundVars(sp);
-
-                final int sqrtFactor = 2 * boundVarCount;
-
-                if (sqrtFactor > 1) {
-                    
-                    cardinality = Math.pow(cardinality, 1.0 / sqrtFactor);
-                    
-                    if (INFO)
-                        log.info("cardinality=" + cardinality + ", nbound="
-                                + boundVarCount + ", rangeCount=" + rangeCount
-                                + ", pattern=" + sp);
-                    
-                }
-
-            }
-
-            /**
-             * Return the value of the variable iff bound to a constant and
-             * otherwise <code>null</code>.
-             * 
-             * @param var
-             *            The variable (MAY be <code>null</code>, in which
-             *            case <code>null</code> is returned).
-             * 
-             * @return Its constant value -or- <code>null</code>.
-             */
-            protected Value getConstantValue(Var var) {
-                
-                if (var != null) {
-                    
-                    return var.getValue();
-                    
-                }
-
-                return null;
-                
-            }
-        }
-    } // end inner class     
-    
-    /**
-     * Extended to allow magic predicates and the like.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
-    static protected class BigdataEvaluationStrategyImpl extends
-            EvaluationStrategyImpl {
-
-        /**
-         * The magic predicate for text search.
-         * 
-         * @see BNS#SEARCH
-         */
-        static final URI MAGIC_SEARCH = new URIImpl(BNS.SEARCH);
-        
-        protected final BigdataTripleSource tripleSource;
-        protected final Dataset dataset;
-        
-        private final AbstractTripleStore database;
-        
-        /**
-         * @param tripleSource
-         */
-        public BigdataEvaluationStrategyImpl(BigdataTripleSource tripleSource) {
-
-            this(tripleSource, null);
-            
-        }
-
-        /**
-         * @param tripleSource
-         * @param dataset
-         */
-        public BigdataEvaluationStrategyImpl(BigdataTripleSource tripleSource,
-                Dataset dataset) {
-
-            super(tripleSource, dataset);
-
-            this.tripleSource = tripleSource;
-            
-            this.dataset = null;
-
-            this.database = tripleSource.getDatabase();
-            
-        }
-
-        public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-                TupleExpr tupleExpr, BindingSet bindings)
-                throws QueryEvaluationException {
-
-            if(log.isInfoEnabled()) {
-                
-                log.info("tupleExpr:\n"+tupleExpr);
-                
-            }
-            
-            return super.evaluate(tupleExpr, bindings);
-            
-        }
-        
-        /**
-         * Overriden to recognize magic predicates.
-         */
-        public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-                StatementPattern sp, BindingSet bindings)
-                throws QueryEvaluationException {
-
-            final Var predVar = sp.getPredicateVar();
-            
-            final Value predValue = getVarValue(predVar, bindings);
-            
-            if(MAGIC_SEARCH.equals(predValue)) {
-            
-                final Var ovar = sp.getObjectVar();
-                
-                final Value oval = getVarValue(ovar, bindings);
-                
-                if (oval == null) {
-                    
-                    throw new QueryEvaluationException(MAGIC_SEARCH
-                            + " : value must be bound.");
-                
-                }
-                 
-                if( ! (oval instanceof Literal)) {
-                    
-                    throw new QueryEvaluationException(MAGIC_SEARCH
-                            + " : value must be literal.");
-                
-                }
-
-                Literal lit = (Literal)oval;
-                
-                if( lit.getDatatype() != null ) {
-                    
-                    throw new QueryEvaluationException(MAGIC_SEARCH
-                            + " : value must not be a datatype literal.");
-                
-                }
-                
-                return search(sp.getSubjectVar(), lit.getLanguage(), lit
-                        .getLabel(), bindings);
-                
-            }
-
-            return super.evaluate(sp, bindings);
-
-        }
-
-        /**
-         * Evaluates the {@link BNS#SEARCH} magic predicate as a full-text
-         * search against the index literal in the database, binding <i>svar</i>
-         * to each matched literal in turn.
-         * <p>
-         * Note: The minimum cosine (relevance score) is set to ZERO (0d) in
-         * order to make sure that any match within a literal qualifies that
-         * literal for inclusion within the set of bindings that are
-         * materialized. This is in contrast to a standard search engine, where
-         * a minimum relevance score is used to filter out less likely matches.
-         * However, it is my sense that query against the KB is often used to
-         * find ALL matches. Regardless, the matches will be materialized in
-         * order of decreasing relevance and an upper bound of 10000 matches is
-         * imposed by the search implementation. See
-         * {@link FullTextIndex#search(String, String, double, int)}.
-         * 
-         * @param svar
-         *            The variable from the subject position of the
-         *            {@link StatementPattern} in which the {@link BNS#SEARCH}
-         *            magic predicate appears.
-         * @param languageCode
-         *            An optional language code from the bound literal appearing
-         *            in the object position of that {@link StatementPattern}.
-         * @param label
-         *            The required label from the bound literal appearing in the
-         *            object position of that {@link StatementPattern}.
-         * @param bindings
-         *            The current bindings.
-         * 
-         * @return Iteration visiting the bindings obtained by the search.
-         * 
-         * @throws QueryEvaluationException
-         * 
-         * @todo consider options for term weights and normalization. Search on
-         *       the KB is probably all terms with anything matching, stopwords
-         *       are excluded, and term weights can be without normalization
-         *       since ranking does not matter. And maxRank should probably be
-         *       defeated (Integer.MAX_VALUE or ZERO - whichever does the
-         *       trick).
-         * 
-         * @todo it would be nice if there were a way for the caller to express
-         *       more parameters for the search, e.g., to give the minCosine and
-         *       maxRank values directly as a tuple-based function call. I'm not
-         *       sure if that is supported within Sesame/SPARQL.
-         */
-        protected CloseableIteration<BindingSet, QueryEvaluationException> search(
-                Var svar, String languageCode, String label, BindingSet bindings) throws QueryEvaluationException {
-           
-            if (log.isInfoEnabled())
-                log.info("languageCode=" + languageCode + ", label=" + label);
-            
-            final Iterator<IHit> itr;
-            try {
-
-                itr = database.getSearchEngine().search(label, languageCode,
-                        0d/* minCosine */, 10000/* maxRank */);
-                
-            } catch (InterruptedException e) {
-                
-                throw new QueryEvaluationException("Interrupted.");
-                
-            }
-            
-            // Return an iterator that converts the term identifiers to var bindings
-            return new HitConvertor(database, itr, svar, bindings);
-            
-        }
-
-        /**
-         * Converts the term identifiers from a text search into variable
-         * bindings.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         * @version $Id$
-         */
-        static private class HitConvertor implements
-                CloseableIteration<BindingSet, QueryEvaluationException> {
-
-            final AbstractTripleStore database;
-
-            final BigdataValueIterator src;
-
-            final Var svar;
-
-            final BindingSet bindings;
-
-            @SuppressWarnings("unchecked")
-            HitConvertor(AbstractTripleStore database, Iterator<IHit> src,
-                    Var svar, BindingSet bindings) {
-
-                this.database = database;
-
-                /*
-                 * Resolve the document identifier from the hit (the term
-                 * identifers are treated as "documents" by the search engine).
-                 * 
-                 * And then wrap up the term identifier iterator as a chunked
-                 * iterator.
-                 * 
-                 * And finally wrap up the chunked term identifier iterator with
-                 * an iterator that efficiently resolves term identifiers to
-                 * BigdataValue objects that we can pass along to Sesame.
-                 */
-                this.src = new BigdataValueIteratorImpl(database,
-                        new ChunkedWrappedIterator<Long>(new Striterator(src)
-                                .addFilter(new Resolver() {
-
-                                    private static final long serialVersionUID = 1L;
-                                    
-                                    @Override
-                                    protected Object resolve(final Object arg0) {
-
-                                        final IHit hit = (IHit) arg0;
-
-                                        return hit.getDocId();
-                                    }
-
-                                })));
-
-                this.svar = svar;
-                
-                this.bindings = bindings;
-                
-            }
-            
-            public void close() throws QueryEvaluationException {
-
-                try {
-                    
-                    src.close();
-                    
-                } catch (SailException e) {
-                    
-                    throw new QueryEvaluationException(e);
-                    
-                }
-                
-            }
-
-            public boolean hasNext() throws QueryEvaluationException {
-
-                try {
-                    
-                    return src.hasNext();
-                    
-                } catch (SailException e) {
-                    
-                    throw new QueryEvaluationException(e);
-                    
-                }
-                
-            }
-
-            /**
-             * Binds the next {@link BigdataValue} (must be a Literal).
-             * 
-             * @throws QueryEvaluationException
-             */
-            public BindingSet next() throws QueryEvaluationException {
-                
-                final QueryBindingSet result = new QueryBindingSet(bindings);
-
-                final BigdataValue val;
-                try {
-                    
-                    val = src.next();
-                    
-                } catch (SailException e) {
-                    
-                    throw new QueryEvaluationException(e);
-                    
-                }
-
-                if( !(val instanceof Literal)) {
-                    
-                    throw new QueryEvaluationException("Not a literal? : " + val);
-                    
-                }
-                
-                /*
-                 * Note: Hopefully nothing will choke when we bind a Literal to
-                 * a variable that appears in the subject position!
-                 */
-
-                result.addBinding(svar.getName(), val);
-                
-                return result;
-                
-            }
-
-            public void remove() throws QueryEvaluationException {
-                
-                throw new UnsupportedOperationException();
-                
-            }
-            
-        }
-        
-//        public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-//                Search op, BindingSet bindings)
-//                throws QueryEvaluationException {
-//
-//            throw new UnsupportedOperationException();
-//            
-//        }
-
-        /**
-         * @todo override to optimize join impl or replace {@link JoinIterator}
-         *       instead?
-         */
-        public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-                Join join, BindingSet bindings) throws QueryEvaluationException {
-
-            return super.evaluate(join, bindings);
-
-        }
-
-        /** @issue make protected in openrdf. */
-        protected Value getVarValue(Var var, BindingSet bindings) {
-            if (var == null) {
-                return null;
-            }
-            else if (var.hasValue()) {
-                return var.getValue();
-            }
-            else {
-                return bindings.getValue(var.getName());
-            }
-        }
-        
-    }
-
+   
 }
