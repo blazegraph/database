@@ -33,12 +33,11 @@ import java.io.Serializable;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 
-import cutthecrap.utils.striterators.IFilter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Interface allows instances of a {@link Striterator} (stackable streaming
- * iterator) to be assembled and executed remotely. Typical uses include
+ * iterator) to be assembled and executed remotely.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -760,6 +760,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     public void addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
 
+        if (log.isDebugEnabled()) {
+            log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
+        }
+        
         if (numTerms == 0)
             return;
 
@@ -907,7 +911,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                         new IResultHandler<Term2IdWriteProc.Result, Void>() {
 
                             /**
-                             * Copy the assigned/discovered term identifiers
+                             * Copy the assigned / discovered term identifiers
                              * onto the corresponding elements of the terms[].
                              */
                             public void aggregate(Term2IdWriteProc.Result result,
@@ -917,7 +921,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                                     final long termId = result.ids[j];
                                     
-                                    a[i].obj.setTermId(termId);
+                                    if (termId == IRawTripleStore.NULL) {
+
+                                        if (!readOnly)
+                                            throw new AssertionError();
+                                        
+                                    } else {
+                                        
+                                        a[i].obj.setTermId(termId);
+                                        
+                                        if(log.isDebugEnabled()) {
+                                            log.debug("termId="+termId+", term="+a[i].obj);
+                                        }
+                                        
+                                    }
 
                                 }
 

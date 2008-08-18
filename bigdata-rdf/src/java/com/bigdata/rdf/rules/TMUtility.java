@@ -129,6 +129,11 @@ public class TMUtility {
         /*
          * The head of the rule is modified to write on the focusStore. 
          */
+        
+        if (rule.getHead() == null)
+            throw new IllegalArgumentException("No head for this rule: rule="
+                    + rule);
+        
         final IPredicate head = rule.getHead().setRelationName(
                 new String[] { focusStore });
 

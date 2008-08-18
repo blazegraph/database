@@ -32,6 +32,8 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.relation.rule.eval.ActionEnum;
+
 /**
  * Default impl.
  * 
@@ -191,7 +193,7 @@ public class Rule<E> implements IRule<E>, Serializable {
         sb.append(" -> ");
         
         // write out bindings for the head.
-        {
+        if (head != null) {
             
             sb.append(head.toString(bindingSet));
 
@@ -245,9 +247,16 @@ public class Rule<E> implements IRule<E>, Serializable {
     /**
      * 
      * @param name
+     *            The name of the rule.
      * @param head
+     *            The head of the rule. This is optional for rules that will be
+     *            evaluated using {@link ActionEnum#Query} but required for
+     *            rules that will be evaluated using a mutation
+     *            {@link ActionEnum}.
      * @param tail
+     *            The predicates in the tail of the rule.
      * @param constraints
+     *            The constraints on the rule (optional).
      * @param taskFactory
      *            Optional override for rule evaluation (MAY be
      *            <code>null</code>).
@@ -258,8 +267,8 @@ public class Rule<E> implements IRule<E>, Serializable {
         if (name == null)
             throw new IllegalArgumentException();
         
-        if (head == null)
-            throw new IllegalArgumentException();
+//        if (head == null)
+//            throw new IllegalArgumentException();
 
         if (tail == null)
             throw new IllegalArgumentException();
@@ -296,7 +305,7 @@ public class Rule<E> implements IRule<E>, Serializable {
         
         // the head of the rule - all variables must occur in the tail.
         this.head = head;
-        {
+        if(head != null) {
 
             if (head.getRelationCount() != 1) {
                 
@@ -368,7 +377,8 @@ public class Rule<E> implements IRule<E>, Serializable {
          * bindings.
          */
 
-        final IPredicate newHead = head.asBound(bindingSet);
+        final IPredicate newHead = (head == null ? null : head
+                .asBound(bindingSet));
 
         final IPredicate[] newTail = bind(tail, bindingSet);
 

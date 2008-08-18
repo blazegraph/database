@@ -87,6 +87,36 @@ public class TestRule extends AbstractRuleTestCase {
         assertFalse(r.isDeclared(Var.var("x")));
         
     }
+    
+    public void test_ctor_noHead() {
+
+        final Var<Long> u = Var.var("u");
+
+        final IRule r = new MyRule(
+                // NO head
+                null,
+                // tail
+                new IPredicate[] {//
+                new P(relation, u, rdfType, rdfsClass) //
+                });
+
+        // write out the rule on the console.
+        System.err.println(r.toString());
+
+        assertEquals("variableCount", 1, r.getVariableCount());
+
+        assertNull("head", r.getHead());
+
+        assertTrue("tail[0]", new P(relation, u, rdfType, rdfsClass).equals(r
+                .getTail(0)));
+
+        assertSameIteratorAnyOrder(new Comparable[] { u }, r.getVariables());
+
+        assertTrue(r.isDeclared(u));
+
+        assertFalse(r.isDeclared(Var.var("x")));
+    
+    }
 
     /**
      * Test for computing the intersection of the variables in two predicates.

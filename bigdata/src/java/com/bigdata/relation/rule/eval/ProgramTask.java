@@ -90,7 +90,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalProgramTask implements IProgramTask,
+public class ProgramTask implements IProgramTask,
         IDataServiceAwareProcedure, Serializable {
 
     /**
@@ -98,14 +98,14 @@ public class LocalProgramTask implements IProgramTask,
      */
     private static final long serialVersionUID = -7047397038429305180L;
 
-    protected static final transient Logger log = Logger.getLogger(LocalProgramTask.class);
+    protected static final transient Logger log = Logger.getLogger(ProgramTask.class);
     
     private final ActionEnum action;
     
     private final IStep step;
 
     /**
-     * Serializable field specified when the {@link LocalProgramTask} will be
+     * Serializable field specified when the {@link ProgramTask} will be
      * submitted (via RMI or not) to a {@link DataService}. A new
      * {@link IJoinNexus} is instantiated in the execution context on the
      * {@link DataService} from this field.
@@ -144,7 +144,7 @@ public class LocalProgramTask implements IProgramTask,
      * be local, but the indices must not be partitioned and must all exist on
      * the target {@link DataService}).
      * <p>
-     * Note: the caller MUST submit the {@link LocalProgramTask} using
+     * Note: the caller MUST submit the {@link ProgramTask} using
      * {@link DataService#submit(Callable)} in which case {@link #dataService}
      * field will be set (after the ctor) by the {@link DataService} itself. The
      * {@link DataService} will be used to identify an {@link ExecutorService}
@@ -156,7 +156,7 @@ public class LocalProgramTask implements IProgramTask,
      * @param step
      * @param joinNexus
      */
-    public LocalProgramTask(ActionEnum action, IStep step,
+    public ProgramTask(ActionEnum action, IStep step,
             IJoinNexusFactory joinNexusFactory) {
 
         if (action == null)
@@ -189,7 +189,7 @@ public class LocalProgramTask implements IProgramTask,
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
      */
-    public LocalProgramTask(ActionEnum action, IStep step,
+    public ProgramTask(ActionEnum action, IStep step,
             IJoinNexusFactory joinNexusFactory, IIndexManager indexManager) {
 
         if (action == null)

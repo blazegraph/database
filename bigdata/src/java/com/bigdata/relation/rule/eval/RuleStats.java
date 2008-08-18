@@ -392,6 +392,13 @@ public class RuleStats {
     }
     
     /**
+     * Set this to [true] if you want a single rule to be formatted in a table,
+     * just like a set of rules. Set it to [false] if you want a single rule all
+     * on one line using [title=value] for each column.
+     */
+    static private final boolean showSingleRuleInTable = true;
+    
+    /**
      * 
      * @param minElapsed
      *            The minimum elapsed time for which details will be shown.
@@ -401,8 +408,11 @@ public class RuleStats {
             
         final int depth = 0;
         
-        if (detailStats.isEmpty())
+        if (detailStats.isEmpty() && !showSingleRuleInTable) {
+
             return toStringSimple(depth, true/* titles */);
+            
+        }
         
         final StringBuilder sb = new StringBuilder();
         

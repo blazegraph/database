@@ -29,8 +29,11 @@ package com.bigdata.relation.rule.eval;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleCursor;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
@@ -38,31 +41,15 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Evaluation uses nested subquery and is optimized under the assumption that
- * the indices backing the {@link IAccessPath}s are all local (on the same
- * {@link AbstractJournal}). Under these assumptions we can submit a task to
- * the {@link ConcurrencyManager} that obtains all necessary locks and then runs
- * with the local B+Tree objects.
- * 
- * @todo do a variant of this evaluation that assumes that the indices for the
- *       access paths are remote and partitioned. This evaluation strategy needs
- *       to take a chunk[] from the first access path and re-distribute, split
- *       that chunk according to the index partitions, and then send each split
- *       to the index partition for the 2nd access path where it will
- *       materialize a set of bindings that satisify the join and send them
- *       back. (A set at a time variant of the JOIN where the sets correspond to
- *       the index paritions and are bounded by the chunk size).
- *       <p>
- *       In fact, the same variant will probably be more efficient for the
- *       purely local case as well since it will improve locality for the 2nd
- *       index if the re-distribution can be done efficiently.
+ * Evaluation of an {@link IRule} using nested subquery (one or more JOINs plus
+ * any filters specified for the predicates in the tail or the rule itself).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalNestedSubqueryEvaluator implements IStepTask {
+public class NestedSubqueryTask implements IStepTask {
 
-    protected static final Logger log = Logger.getLogger(LocalNestedSubqueryEvaluator.class);
+    protected static final Logger log = Logger.getLogger(NestedSubqueryTask.class);
     
 //    /**
 //     * When true, enables subquery elimination by mapping a set of outer
@@ -82,14 +69,13 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
     /*
      * from the ctor.
      */
-//    private final IRule rule;
     private final IJoinNexus joinNexus;
     private final IBuffer<ISolution> buffer;
     private final IBindingSet bindingSet;
     private RuleState ruleState;
     private RuleStats ruleStats;
     
-    public LocalNestedSubqueryEvaluator(IRule rule, IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
+    public NestedSubqueryTask(IRule rule, IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -99,8 +85,6 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
         
         if (buffer == null)
             throw new IllegalArgumentException();
-
-//        this.rule = rule;
 
         this.joinNexus = joinNexus;
         
@@ -129,11 +113,11 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
 
 //        if(subqueryElimination) {
 //
-//            apply2( 0, state, EMPTY_SET);
+//            apply2( 0, EMPTY_SET);
 //            
 //        } else {
             
-            apply1( 0, ruleState );
+            apply1( 0 );
             
 //        }
         
@@ -152,35 +136,29 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
     /**
      * Variant does not attempt subquery elimination.
      * 
-     * @param index
+     * @param tailIndex
      *            The current index in order[] that is being scanned.
      *            <p>
      *            Note: You MUST indirect through order, e.g., order[index], to
      *            obtain the index of the corresponding predicate in the
      *            evaluation order.
-     * 
-     * @todo it would be nicer if the order was encapsulated by an iterator over
-     *       the predicates so that order[] was not directly used by the rule
-     *       impls. however that might just be a bias in favor of set-at-a-time
-     *       solution processing vs set a a time JOIN processing or some other
-     *       JOIN strategy.
      */
-    final private void apply1(final int index, RuleState state) {
+    final private void apply1(final int tailIndex) {
 
-        final IRule rule = state.getRule();
+        final IRule rule = ruleState.getRule();
         
         final int tailCount = rule.getTailCount();
         
         // note: evaluation order is fixed by now.
-        final int order = state.order[index];
+        final int order = ruleState.order[tailIndex];
         
-        if (index < 0 || index >= tailCount)
+        if (tailIndex < 0 || tailIndex >= tailCount)
             throw new IllegalArgumentException();
         
         /*
          * Subquery iterator.
          */
-        final IAccessPath accessPath = state.getAccessPath(order, bindingSet);
+        final IAccessPath accessPath = ruleState.getAccessPath(order, bindingSet);
         
         final IChunkedOrderedIterator itr = accessPath.iterator();
         
@@ -193,7 +171,7 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
 
                 ruleStats.chunkCount[order]++;
 
-                if (index + 1 < tailCount) {
+                if (tailIndex + 1 < tailCount) {
 
                     // nexted subquery.
 
@@ -201,7 +179,7 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
 
                         if (log.isDebugEnabled()) {
                             log.debug("Considering: " + e.toString()
-                                    + ", index=" + index + ", rule="
+                                    + ", tailIndex=" + tailIndex + ", rule="
                                     + rule.getName());
                         }
 
@@ -214,15 +192,15 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
                          * JOIN).
                          */
 
-                        state.clearDownstreamBindings(index + 1,bindingSet);
+                        ruleState.clearDownstreamBindings(tailIndex + 1, bindingSet);
                         
-                        if (state.bind(order, e, bindingSet)) {
+                        if (ruleState.bind(order, e, bindingSet)) {
 
                             // run the subquery.
                             
                             ruleStats.subqueryCount[order]++;
 
-                            apply1(index + 1, state);
+                            apply1(tailIndex + 1);//, ruleState);
                             
                         }
 
@@ -236,18 +214,22 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
 
                         if (log.isDebugEnabled()) {
                             log.debug("Considering: " + e.toString()
-                                    + ", index=" + index + ", rule="
+                                    + ", tailIndex=" + tailIndex + ", rule="
                                     + rule.getName());
                         }
 
                         ruleStats.elementCount[order]++;
 
                         // bind variables from the current element.
-                        if (state.bind(order, e, bindingSet)) {
+                        if (ruleState.bind(order, e, bindingSet)) {
 
                             /*
                              * emit entailment
                              */
+
+                            if (log.isDebugEnabled()) {
+                                log.debug("solution: " + bindingSet);
+                            }
 
                             final ISolution solution = joinNexus.newSolution(
                                     rule, bindingSet);
@@ -271,6 +253,168 @@ public class LocalNestedSubqueryEvaluator implements IStepTask {
         }
 
     }
+
+//    /**
+//     * Variant does not attempt subquery elimination but unrolls each chunk of
+//     * the outer query. The chunk is unrolled by forming a range query whose
+//     * <i>fromKey</i> is determined by the first tuple in the chunk and whose
+//     * <i>toKey</i> is determined by the last key in the chunk. The chunk
+//     * itself is wrapped up in an {@link IFilterConstructor} and the tuples in
+//     * the chunk are used to advance through (skip to) the possible matches on
+//     * the subquery using the {@link ITupleCursor} interface.
+//     * 
+//     * @todo this should be refactored so that each JOIN can execute on a
+//     *       different host where it is reading from the right-hand side of the
+//     *       index. The last JOIN should return a smart proxy iterator back to
+//     *       the client.
+//     * 
+//     * @todo since the subquery iterator will visit elements belonging to each
+//     *       element in the source chunk, we need to extend the logic that
+//     *       processes the source chunk elements to notice when the next element
+//     *       from the subquery iterator is not a match and then to advance the
+//     *       source chunk until we have a match.
+//     *       <p>
+//     *       An alternative is to simply send the source chunk elements through
+//     *       to the next JOIN, having the final JOIN write the solutions onto
+//     *       the buffer.
+//     * 
+//     * @todo the chunk could be sent to the {@link IIndex} as a byte[][]
+//     *       (perhaps even without deserializing from {@link ITuple}s) and the
+//     *       {@link IIndex} could realize the JOIN itself.
+//     *       <p>
+//     *       This would let a key-range partitioned index split the chunk
+//     *       according to the index partitions so that each index partition
+//     *       would only receive an iterator whose advancer would visit tuples in
+//     *       that index partition.
+//     *       <p>
+//     *       This could also help for hash-partitioned indices since the split
+//     *       logic would be different.
+//     * 
+//     * @todo Unrolling loops will be important for the LTS also in order to
+//     *       reduce synchronization for the iterators in
+//     *       {@link UnisolatedReadWriteIndex}.
+//     * 
+//     * @param tailIndex
+//     *            The current index in {@link RuleState#order} that is being
+//     *            scanned.
+//     *            <p>
+//     *            Note: You MUST indirect through order, e.g.,
+//     *            <code>order[index]</code>, to obtain the index of the
+//     *            corresponding tail predicate in the evaluation order.
+//     * 
+//     * @todo not realized yet and it might be refactored into the {@link IIndex}
+//     *       to make this efficient.
+//     */
+//    final private void applyWithChunkUnrolled(final int tailIndex) {
+//
+//        final IRule rule = ruleState.getRule();
+//        
+//        final int tailCount = rule.getTailCount();
+//        
+//        // note: evaluation order is fixed by now.
+//        final int order = ruleState.order[tailIndex];
+//        
+//        if (tailIndex < 0 || tailIndex >= tailCount)
+//            throw new IllegalArgumentException();
+//        
+//        /*
+//         * Subquery iterator.
+//         */
+//        final IAccessPath accessPath = ruleState.getAccessPath(order, bindingSet);
+//        
+//        final IChunkedOrderedIterator itr = accessPath.iterator();
+//        
+//        try {
+//
+//            while (itr.hasNext()) {
+//
+//                // next chunk of results from that access path.
+//                final Object[] chunk = itr.nextChunk();
+//
+//                ruleStats.chunkCount[order]++;
+//
+//                if (tailIndex + 1 < tailCount) {
+//
+//                    // nexted subquery.
+//
+//                    for (Object e : chunk) {
+//
+//                        if (log.isDebugEnabled()) {
+//                            log.debug("Considering: " + e.toString()
+//                                    + ", tailIndex=" + tailIndex + ", rule="
+//                                    + rule.getName());
+//                        }
+//
+//                        ruleStats.elementCount[order]++;
+//
+//                        /*
+//                         * Then bind this statement, which propagates bindings
+//                         * to the next predicate (if the bindings are rejected
+//                         * then the solution would violate the constaints on the
+//                         * JOIN).
+//                         */
+//
+//                        ruleState.clearDownstreamBindings(tailIndex + 1, bindingSet);
+//                        
+//                        if (ruleState.bind(order, e, bindingSet)) {
+//
+//                            // run the subquery.
+//                            
+//                            ruleStats.subqueryCount[order]++;
+//
+//                            apply1(tailIndex + 1);
+//                            
+//                        }
+//
+//                    }
+//
+//                } else {
+//
+//                    // bottomed out.
+//
+//                    for (Object e : chunk) {
+//
+//                        if (log.isDebugEnabled()) {
+//                            log.debug("Considering: " + e.toString()
+//                                    + ", tailIndex=" + tailIndex + ", rule="
+//                                    + rule.getName());
+//                        }
+//
+//                        ruleStats.elementCount[order]++;
+//
+//                        // bind variables from the current element.
+//                        if (ruleState.bind(order, e, bindingSet)) {
+//
+//                            /*
+//                             * emit entailment
+//                             */
+//
+//                            if (log.isDebugEnabled()) {
+//                                log.debug("solution: " + bindingSet);
+//                            }
+//
+//                            final ISolution solution = joinNexus.newSolution(
+//                                    rule, bindingSet);
+//            
+//                            ruleStats.solutionCount++;
+//                            
+//                            buffer.add( solution );
+//                            
+//                        }
+//
+//                    }
+//
+//                }
+//
+//            } // while
+//
+//        } finally {
+//
+//            itr.close();
+//
+//        }
+//
+//    }
 
 //    /**
 //     * 

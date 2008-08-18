@@ -248,6 +248,12 @@ public class MutationTask extends AbstractStepTask {
 
         if (step.isRule()) {
 
+            if (step.isRule() && ((IRule) step).getHead() == null) {
+
+                throw new IllegalArgumentException("No head for this rule: " + step);
+
+            }
+
             tasks = new ArrayList<Callable<RuleStats>>(1);
 
             final IRule rule = (IRule) step;
@@ -279,6 +285,12 @@ public class MutationTask extends AbstractStepTask {
 
                 // @todo handle sub-programs.
                 final IRule rule = (IRule) itr.next();
+
+                if (rule.getHead() == null) {
+
+                    throw new IllegalArgumentException("No head for this rule: " + rule);
+
+                }
 
                 final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getOnlyRelationName());
                 
