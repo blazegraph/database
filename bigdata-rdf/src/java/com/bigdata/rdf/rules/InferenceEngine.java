@@ -29,7 +29,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.inf.Axioms;
-import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.BaseAxioms;
 import com.bigdata.rdf.inf.ClosureStats;
@@ -44,12 +43,10 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
-import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -614,7 +611,8 @@ public class InferenceEngine extends RDFSVocabulary {
             
             final IJoinNexusFactory joinNexusFactory = database
                     .newJoinNexusFactory(ruleContext, ActionEnum.Insert,
-							solutionFlags, doNotAddFilter, justify,
+                            solutionFlags, doNotAddFilter, justify,
+                            false/* backchain */,
                             DefaultEvaluationPlanFactory2.INSTANCE);
 
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
@@ -659,32 +657,34 @@ public class InferenceEngine extends RDFSVocabulary {
     @SuppressWarnings("unchecked")
     public IChunkedOrderedIterator<ISPO> backchainIterator(IPredicate<ISPO> predicate) {
         
-        final long s, p, o;
-        {
-
-            final IVariableOrConstant<Long> t = predicate.get(0);
-
-            s = t.isVar() ? NULL : t.get();
-
-        }
-
-        {
-
-            final IVariableOrConstant<Long> t = predicate.get(1);
-
-            p = t.isVar() ? NULL : t.get();
-
-        }
-        
-        {
-
-            final IVariableOrConstant<Long> t = predicate.get(2);
-
-            o = t.isVar() ? NULL : t.get();
-
-        }
-
-        return backchainIterator(s, p, o);
+        // pass the filter to the server(s)
+        return backchainIterator(database.getSPORelation().getAccessPath(predicate));
+//        final long s, p, o;
+//        {
+//
+//            final IVariableOrConstant<Long> t = predicate.get(0);
+//
+//            s = t.isVar() ? NULL : t.get();
+//
+//        }
+//
+//        {
+//
+//            final IVariableOrConstant<Long> t = predicate.get(1);
+//
+//            p = t.isVar() ? NULL : t.get();
+//
+//        }
+//        
+//        {
+//
+//            final IVariableOrConstant<Long> t = predicate.get(2);
+//
+//            o = t.isVar() ? NULL : t.get();
+//
+//        }
+//
+//        return backchainIterator(s, p, o);
 
     }
     
@@ -706,7 +706,7 @@ public class InferenceEngine extends RDFSVocabulary {
      */
     public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p, long o) {
         
-        return backchainIterator(s, p, o, null );
+        return backchainIterator(s, p, o, null);
         
     }
 
@@ -728,70 +728,28 @@ public class InferenceEngine extends RDFSVocabulary {
      */
     public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p,
             long o, IElementFilter<ISPO> filter) {
-
+        
         // pass the filter to the server(s)
-        final IChunkedOrderedIterator<ISPO> src = database.getAccessPath(s, p,
-                o, filter).iterator();
+        return backchainIterator(database.getAccessPath(s, p, o, filter));
         
-        final IChunkedOrderedIterator<ISPO> ret;
+    }
+    
+    /**
+     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
+     * for the database and also backchain any entailments for which forward
+     * chaining has been turned off, including {@link RuleOwlSameAs2},
+     * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
+     * 
+     * @param accessPath
+     *            The source {@link IAccessPath}
+     * 
+     * @return An iterator that will visit the statements in database that would
+     *         be visited by that {@link IAccessPath} query plus any necessary
+     *         entailments.
+     */
+    public IChunkedOrderedIterator<ISPO> backchainIterator(IAccessPath<ISPO> accessPath) {
 
-        if (rdfsOnly) {
-            
-            // no entailments.
-            ret = null;
-        
-        } else if(forwardChainOwlSameAsClosure && !forwardChainOwlSameAsProperties) {
-            
-            ret = new BackchainOwlSameAsPropertiesIterator(//
-                    src,//
-                    s,p,o,//
-                    database, //
-                    owlSameAs.get()
-                    );
-
-        } else {
-            
-            // no entailments.
-            ret = null;
-            
-        }
-        
-        /*
-         * Wrap it up as a chunked iterator.
-         * 
-         * Note: If we are not adding any entailments then we just use the
-         * source iterator directly.
-         * 
-         * @todo why is the filter being passed in here? Can the backchaining
-         * iterators produce entailments that would violate the filter? If so,
-         * then shouldn't the filter be applied by the backchainers themselves
-         * so that they do not overgenerate? (This comment also applies for the
-         * type resource backchainer, below).
-         */
-
-        IChunkedOrderedIterator<ISPO> itr = (ret == null ? src
-                : new ChunkedWrappedIterator<ISPO>(ret, database.bufferCapacity,
-                        null/*keyOrder*/, filter));
-
-        if (!forwardChainRdfTypeRdfsResource) {
-            
-            /*
-             * Backchain (x rdf:type rdfs:Resource ).
-             * 
-             * @todo pass the filter in here also.
-             */
-            
-            itr = new BackchainTypeResourceIterator(//
-                    itr,//
-                    s,p,o,//
-                    database, //
-                    rdfType.get(), //
-                    rdfsResource.get() //
-                    );
-            
-        }
-
-        return itr;
+        return new BackchainAccessPath(this, accessPath).iterator();
         
     }
     

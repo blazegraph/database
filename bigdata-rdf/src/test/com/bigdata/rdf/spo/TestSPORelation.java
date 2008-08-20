@@ -33,6 +33,7 @@ import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -47,7 +48,9 @@ import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlan;
+import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
+import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.RuleState;
@@ -482,6 +485,11 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
      */
     public void test_runRule() throws Exception {
 
+        final IElementFilter filter = null;
+        final boolean justify = false;
+        final boolean backchain = false;
+        final IEvaluationPlanFactory planFactory = DefaultEvaluationPlanFactory2.INSTANCE;
+        
         final AbstractTripleStore store = getStore();
 
         try {
@@ -593,10 +601,11 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
              */
             {
 
-                final IJoinNexus joinNexus = store.newJoinNexusFactory(
-                		RuleContextEnum.HighLevelQuery,
-                        ActionEnum.Query, IJoinNexus.ALL, null/* filter */)
-                        .newInstance(store.getIndexManager());
+                final IJoinNexus joinNexus = store
+                        .newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
+                                ActionEnum.Query, IJoinNexus.ALL, filter,
+                                justify, backchain, planFactory).newInstance(
+                                store.getIndexManager());
 
 //                /*
 //                 * Note: We commit before running the Query since the writes
@@ -658,9 +667,10 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             {
 
                 final IJoinNexus joinNexus = store.newJoinNexusFactory(
-                		RuleContextEnum.DatabaseAtOnceClosure,
-                        ActionEnum.Insert, IJoinNexus.ALL, null/* filter */)
-                        .newInstance(store.getIndexManager());
+                        RuleContextEnum.DatabaseAtOnceClosure,
+                        ActionEnum.Insert, IJoinNexus.ALL, filter, justify,
+                        backchain, planFactory).newInstance(
+                        store.getIndexManager());
 
                 log.info("\n\nRun rules as insert operations\n");
 

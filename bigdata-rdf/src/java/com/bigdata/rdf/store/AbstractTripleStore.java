@@ -2848,7 +2848,7 @@ abstract public class AbstractTripleStore extends
             ActionEnum action, int solutionFlags, IElementFilter filter) {
         
         return newJoinNexusFactory(ruleContext, action, solutionFlags, filter,
-                isJustify(), DefaultEvaluationPlanFactory2.INSTANCE);
+                isJustify(), false/*backchain*/, DefaultEvaluationPlanFactory2.INSTANCE);
         
     }
     
@@ -2861,8 +2861,8 @@ abstract public class AbstractTripleStore extends
      * @return
      */
     public IJoinNexusFactory newJoinNexusFactory(RuleContextEnum ruleContext,
-			ActionEnum action, int solutionFlags, IElementFilter filter,
-            boolean justify,IEvaluationPlanFactory planFactory) {
+            ActionEnum action, int solutionFlags, IElementFilter filter,
+            boolean justify, boolean backchain, IEvaluationPlanFactory planFactory) {
         
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -2920,8 +2920,8 @@ abstract public class AbstractTripleStore extends
         }
         
         return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
-                readTimestamp, forceSerialExecution, justify, bufferCapacity,
-                solutionFlags, filter, planFactory);
+                readTimestamp, forceSerialExecution, justify, backchain,
+                bufferCapacity, solutionFlags, filter, planFactory);
         
     }
     

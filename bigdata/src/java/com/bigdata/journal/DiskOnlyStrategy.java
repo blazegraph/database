@@ -2148,7 +2148,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 log.info(getCounters().toString());
             
         } catch(IOException ex) {
-            
+         
+            /*
+             * I've see an IOException "The handle is invalid" tossed here (just
+             * once). A bit of searching around suggests that perhaps the
+             * RandomAccessFile was concurrently closed? Something to look out
+             * for if it happens again.
+             */
             throw new RuntimeException(ex);
             
         }
