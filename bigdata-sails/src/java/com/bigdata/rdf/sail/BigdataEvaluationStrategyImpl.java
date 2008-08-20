@@ -661,6 +661,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                     .newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
                             ActionEnum.Query, IJoinNexus.BINDINGS,
                             null/* filter */, false/* justify */,
+                            true /* backchain */,
                             planFactory
                             );
 

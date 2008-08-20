@@ -48,11 +48,12 @@ Modifications:
 package com.bigdata.rdf.rules;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
@@ -78,11 +79,6 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final long writeTimestamp;
     final long readTimestamp;
     final boolean justify;
-    /**
-     * true for high level query and false for closure. when <code>true</code>,
-     * query time inferences are included in an read on the access path using
-     * {@link InferenceEngine#backchainIterator(IPredicate)}.
-     */
     final boolean backchain;
     final boolean forceSerialExecution;
     final int bufferCapacity;
@@ -143,6 +139,13 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      *            program.
      * @param justify
      *            if justifications are required.
+     * @param backchain
+     *            Normally <code>true</code> for high level query and
+     *            <code>false</code> for database-at-once-closure and Truth
+     *            Maintenance. When <code>true</code>, query time inferences
+     *            are included when reading on an {@link IAccessPath} for the
+     *            {@link SPORelation} using the {@link InferenceEngine} to
+     *            "backchain" any necessary entailments.
      * @param bufferCapacity
      *            The capacity of the buffers used to support chunked iterators
      *            and efficient ordered writes.
@@ -159,8 +162,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      */
 	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
             long writeTime, long readTime, boolean forceSerialExecution,
-            boolean justify, int bufferCapacity, int solutionFlags,
-            IElementFilter filter, IEvaluationPlanFactory planFactory) {
+            boolean justify, boolean backchain, int bufferCapacity,
+            int solutionFlags, IElementFilter filter,
+            IEvaluationPlanFactory planFactory) {
 
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -181,8 +185,10 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
         this.justify = justify;
 
-        this.backchain = ruleContext == RuleContextEnum.HighLevelQuery ? true
-                : false;
+//        this.backchain = ruleContext == RuleContextEnum.HighLevelQuery ? true
+//                : false;
+
+        this.backchain = backchain;
         
         this.forceSerialExecution = forceSerialExecution;
         

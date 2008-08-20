@@ -416,33 +416,36 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     /**
-     * FIXME When {@link #backchain} is true, wrap the access path so that (a)
-     * the iterator will visit the backchained inferences as well; and (b) an
-     * exact range count must scan the iterator since it may materialize
-     * additional inferences rather than distributing the range count operation
-     * over the data.
+     * When {@link #backchain} is <code>true</code> and the tail predicate is
+     * reading on the {@link SPORelation}, then the {@link IAccessPath} is
+     * wrapped so that the iterator will visit the backchained inferences as
+     * well.
      * 
-     * One way to address this is to make the backchainer just an
-     * {@link IAccessPath}. We just need to be careful that we only layer the
-     * source iterator when the specific triple pattern requires inference and
-     * make it possible to selectively disabled certain classes of inference
-     * (sameAs) that might be handled at the {@link ISolution} level.
+     * @see InferenceEngine
+     * @see BackchainAccessPath
      * 
      * @todo consider encapsulating the {@link IRangeCountFactory} in the
      *       returned access path for non-exact range count requests. this will
      *       make it slightly harder to write the unit tests for the
      *       {@link IEvaluationPlanFactory}
-     * 
-     * @see InferenceEngine#backchainIterator(IPredicate)
      */
     public IAccessPath getTailAccessPath(IPredicate predicate) {
     	
         // Resolve the relation name to the IRelation object.
         final IRelation relation = getTailRelationView(predicate);
-
+        
         // find the best access path for the predicate for that relation.
         final IAccessPath accessPath = relation.getAccessPath(predicate);
 
+        if(backchain && relation instanceof SPORelation) {
+
+            final SPORelation spoRelation = (SPORelation)relation;
+            
+            return new BackchainAccessPath(spoRelation.getContainer()
+                    .getInferenceEngine(), accessPath);
+            
+        }
+        
         // return that access path.
         return accessPath;
 

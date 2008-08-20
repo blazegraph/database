@@ -49,6 +49,8 @@ import com.bigdata.rdf.store.ConcurrentDataLoader.VerifyStatementBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
+import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -111,13 +113,18 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         if(log.isInfoEnabled())
             log.info("\ndatabase(before)::\n" + db.dumpStore());
 
+//        final IElementFilter filter = null;
+        final boolean justify = false;
+        final boolean backchain = false;
+        final IEvaluationPlanFactory planFactory = DefaultEvaluationPlanFactory2.INSTANCE;
+        
         // run as query.
         {
 
             final IJoinNexus joinNexus = db.newJoinNexusFactory(
-            		RuleContextEnum.HighLevelQuery,
-                    ActionEnum.Query, IJoinNexus.ALL, filter).newInstance(
-                    db.getIndexManager());
+                    RuleContextEnum.HighLevelQuery, ActionEnum.Query,
+                    IJoinNexus.ALL, filter, justify, backchain, planFactory)
+                    .newInstance(db.getIndexManager());
 
             long n = 0;
             
@@ -160,9 +167,9 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         {
 
             final IJoinNexus joinNexus = db.newJoinNexusFactory(
-            		RuleContextEnum.DatabaseAtOnceClosure,
-                    ActionEnum.Insert, IJoinNexus.ALL, filter).newInstance(
-                    db.getIndexManager());
+                    RuleContextEnum.DatabaseAtOnceClosure, ActionEnum.Insert,
+                    IJoinNexus.ALL, filter, justify, backchain, planFactory)
+                    .newInstance(db.getIndexManager());
 
             final long actualMutationCount = joinNexus.runMutation(rule);
 
