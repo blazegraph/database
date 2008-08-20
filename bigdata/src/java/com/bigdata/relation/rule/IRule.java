@@ -208,8 +208,8 @@ public interface IRule<E> extends IStep {
      * Return true iff the selected predicate is fully bound.
      * 
      * @param index
-     *            The index of a predicate declared in the {@link #tail} of the
-     *            rule.
+     *            The index of a predicate declared the {@link #getTail() tail}
+     *            of the {@link IRule}.
      * @param bindingSet
      *            The variable bindings.
      * 
@@ -234,6 +234,21 @@ public interface IRule<E> extends IStep {
      */
     public boolean isFullyBound(IBindingSet bindingSet);
 
+    /**
+     * The #of arguments in the selected predicate that are variables (vs
+     * constants) with the given the bindings.
+     * 
+     * @param index
+     *            The index of a predicate declared the {@link #getTail() tail}
+     *            of the {@link IRule}.
+     * @param bindingSet
+     *            The bindings under which the variable count will be obtained
+     *            (any variables in the predicate that are bound in the binding
+     *            set will be treated as constants for the purposes of this
+     *            method).
+     */
+    public int getVariableCount(int index,IBindingSet bindingSet);
+    
     /**
      * Return <code>true</code> unless the {@link IBindingSet} violates a
      * {@link IConstraint} declared for this {@link Rule}.

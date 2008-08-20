@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.relation.rule;
+package com.bigdata.relation.rule.eval;
 
 
 import junit.framework.Test;
@@ -61,26 +61,8 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("rule");
 
-        // test variable and constant impls.
-        suite.addTestSuite(TestVar.class);
-        suite.addTestSuite(TestConstant.class);
-        
-        // test predicate impls.
-        suite.addTestSuite(TestPredicate.class);
-        
-        // @todo test binding set impls.
-        suite.addTestSuite(TestBindingSet.class);
-        
-        // test suite for basic rule mechanisms.
-        suite.addTestSuite( TestRule.class );
-       
-        // test suite for IProgram, but not program evaluation.
-        suite.addTestSuite( TestProgram.class );
-
-        // test suite for rule evaluation.
-        suite.addTest( com.bigdata.relation.rule.eval.TestAll.suite() );
-
-        // @todo test suite for XML interchange of programs.
+        // test evaluation plans.
+        suite.addTestSuite( TestDefaultEvaluationPlan.class );
         
         return suite;
         

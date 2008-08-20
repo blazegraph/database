@@ -285,7 +285,7 @@ public class ArrayBindingSet implements IBindingSet {
         
     }
 
-    public void set(IVariable var, IConstant val) {
+    public void set(final IVariable var, final IConstant val) {
         
         if (var == null)
             throw new IllegalArgumentException();

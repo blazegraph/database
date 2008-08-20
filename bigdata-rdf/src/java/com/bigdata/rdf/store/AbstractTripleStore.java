@@ -89,6 +89,9 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.rules.RuleFastClosure5;
+import com.bigdata.rdf.rules.RuleFastClosure6;
+import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -121,6 +124,8 @@ import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
+import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -288,7 +293,7 @@ abstract public class AbstractTripleStore extends
      *       resolve it from {@link SPORelation}?
      */
     final protected boolean statementIdentifiers;
-
+    
     /**
      * The capacity of the buffers used when computing entailments (for insert
      * or query).
@@ -302,6 +307,12 @@ abstract public class AbstractTripleStore extends
      */
     final public int bufferCapacity;
 
+    /**
+     * When <code>true</code>, rule sets will be forced to execute
+     * sequentially even when they are not flagged as a sequential program.
+     */
+    final private boolean forceSerialExecution;
+    
     /**
      * When <code>true</code> the database will support statement identifiers.
      * <p>
@@ -560,18 +571,65 @@ abstract public class AbstractTripleStore extends
          * ontology, especially how it influences the #of entailments generated
          * by each rule.
          * </p>
-         * 
-         * @todo add a buffer capacity property for the
-         *       {@link InferenceEngine#backchainIterator(long, long, long)} or
-         *       use this capacity there as well.
          */
-        public static final String BUFFER_CAPACITY = "bufferCapacity";
+        String BUFFER_CAPACITY = "bufferCapacity";
 
         /**
          * @todo experiment with different values for this capacity.
          */
-        public static final String DEFAULT_BUFFER_CAPACITY = ""+200*Bytes.kilobyte32;
+        String DEFAULT_BUFFER_CAPACITY = ""+20*Bytes.kilobyte32;
 
+        /**
+         * When <code>true</code> ({@value #DEFAULT_FORCE_SERIAL_EXECUTION}),
+         * rule sets will be forced to execute sequentially even when they are
+         * not flagged as a sequential program.
+         * <p>
+         * The
+         * {@link com.bigdata.rdf.rules.InferenceEngine.Options#FORWARD_CLOSURE}
+         * option defaults to {@link ForwardClosureEnum#Fast} which has very
+         * little possible parallelism (it is mostly a sequential program by
+         * nature). For that reason, {@link #FORCE_SERIAL_EXECUTION} defaults to
+         * <code>false</code> since the overhead of parallel execution is more
+         * likely to lower the observed performance with such limited possible
+         * parallelism. However, when using {@link ForwardClosureEnum#Full} the
+         * benefits of parallelism MAY justify its overhead.
+         * <p>
+         * The following data are for LUBM datasets.
+         * 
+         * <pre>
+         * U1  Fast Serial   : closure =  2250ms; 2765, 2499, 2530
+         * U1  Fast Parallel : closure =  2579ms; 2514, 2594
+         * U1  Full Serial   : closure = 10437ms.
+         * U1  Full Parallel : closure = 10843ms.
+         * 
+         * U10 Fast Serial   : closure = 41203ms, 39171ms (38594, 35360 when running in caller's thread rather than on the executorService).
+         * U10 Fast Parallel : closure = 30722ms. 
+         * U10 Full Serial   : closure = 108110ms.
+         * U10 Full Parallel : closure = 248550ms.
+         * </pre>
+         * 
+         * Note that the only rules in the fast closure program that have
+         * potential parallelism are {@link RuleFastClosure5} and
+         * {@link RuleFastClosure6} and these rules are not being triggered by
+         * these datasets, so there is in fact NO potential parallelism (in the
+         * data) for these datasets.
+         * <p>
+         * It is possible that a machine with more cores would perform better
+         * under the "full" closure program with parallel rule execution (these
+         * data were collected on a laptop with 2 cores) since performance tends
+         * to be CPU bound for small data sets. However, the benefit of the
+         * "fast" closure program is so large that there is little reason to
+         * consider parallel rule execution for the "full" closure program.
+         * 
+         * @todo retry the U10 Full serial vs parallel rule execution examples
+         *       and look further into ways in which overhead might be reduced
+         *       for rule parallelism and also for when rule parallelism is not
+         *       enabled.
+         */
+        String FORCE_SERIAL_EXECUTION = "forceSerialExecution";
+        
+        String DEFAULT_FORCE_SERIAL_EXECUTION = "true";
+        
     }
 
     /**
@@ -613,6 +671,18 @@ abstract public class AbstractTripleStore extends
         log.info(Options.STATEMENT_IDENTIFIERS + "=" + statementIdentifiers);
 
         {
+            
+            forceSerialExecution = Boolean.parseBoolean(properties.getProperty(
+                    Options.FORCE_SERIAL_EXECUTION,
+                    Options.DEFAULT_FORCE_SERIAL_EXECUTION));
+
+            log.info(Options.FORCE_SERIAL_EXECUTION + "="
+                    + forceSerialExecution); 
+            
+        }
+        
+        {
+
             bufferCapacity = Integer.parseInt(properties.getProperty(
                     Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
 
@@ -2777,8 +2847,8 @@ abstract public class AbstractTripleStore extends
     public IJoinNexusFactory newJoinNexusFactory(RuleContextEnum ruleContext,
             ActionEnum action, int solutionFlags, IElementFilter filter) {
         
-        return newJoinNexusFactory(ruleContext, action, solutionFlags, filter, 
-                isJustify());
+        return newJoinNexusFactory(ruleContext, action, solutionFlags, filter,
+                isJustify(), DefaultEvaluationPlanFactory2.INSTANCE);
         
     }
     
@@ -2792,7 +2862,7 @@ abstract public class AbstractTripleStore extends
      */
     public IJoinNexusFactory newJoinNexusFactory(RuleContextEnum ruleContext,
 			ActionEnum action, int solutionFlags, IElementFilter filter,
-            boolean justify) {
+            boolean justify,IEvaluationPlanFactory planFactory) {
         
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -2848,9 +2918,10 @@ abstract public class AbstractTripleStore extends
             readTimestamp = getTimestamp();
             
         }
-
+        
         return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
-				readTimestamp, justify, bufferCapacity, solutionFlags, filter);
+                readTimestamp, forceSerialExecution, justify, bufferCapacity,
+                solutionFlags, filter, planFactory);
         
     }
     

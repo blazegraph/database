@@ -29,14 +29,10 @@ package com.bigdata.relation.rule.eval;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleCursor;
-import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -72,10 +68,11 @@ public class NestedSubqueryTask implements IStepTask {
     private final IJoinNexus joinNexus;
     private final IBuffer<ISolution> buffer;
     private final IBindingSet bindingSet;
-    private RuleState ruleState;
-    private RuleStats ruleStats;
+    private final RuleState ruleState;
+    private final RuleStats ruleStats;
     
-    public NestedSubqueryTask(IRule rule, IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
+    public NestedSubqueryTask(final IRule rule, final IJoinNexus joinNexus,
+            final IBuffer<ISolution> buffer) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -103,9 +100,18 @@ public class NestedSubqueryTask implements IStepTask {
      */
     final public RuleStats call() {
 
-        if(log.isDebugEnabled()) {
+        if(log.isInfoEnabled()) {
             
-            log.debug("begin: ruleState="+ruleState);
+            log.info("begin:\nruleState=" + ruleState + "\nplan="
+                    + ruleState.plan);
+            
+        }
+
+        if (ruleState.plan.isEmpty()) {
+
+            log.info("Rule proven to have no solutions.");
+            
+            return ruleStats;
             
         }
         
@@ -125,7 +131,8 @@ public class NestedSubqueryTask implements IStepTask {
         
         if(log.isDebugEnabled()) {
             
-            log.debug("done: ruleState="+ruleState+", ruleStats="+ruleStats);
+            log.debug("done: ruleState=" + ruleState + ", ruleStats="
+                    + ruleStats);
             
         }
         
@@ -136,31 +143,49 @@ public class NestedSubqueryTask implements IStepTask {
     /**
      * Variant does not attempt subquery elimination.
      * 
-     * @param tailIndex
+     * @param orderIndex
      *            The current index in order[] that is being scanned.
      *            <p>
-     *            Note: You MUST indirect through order, e.g., order[index], to
-     *            obtain the index of the corresponding predicate in the
-     *            evaluation order.
+     *            Note: You MUST indirect through order, e.g.,
+     *            order[orderIndex], to obtain the index of the corresponding
+     *            predicate in the evaluation order.
      */
-    final private void apply1(final int tailIndex) {
+    final private void apply1(final int orderIndex) {
 
         final IRule rule = ruleState.getRule();
         
         final int tailCount = rule.getTailCount();
         
         // note: evaluation order is fixed by now.
-        final int order = ruleState.order[tailIndex];
+        final int order = ruleState.order[orderIndex];
         
-        if (tailIndex < 0 || tailIndex >= tailCount)
+        if (orderIndex < 0 || orderIndex >= tailCount)
             throw new IllegalArgumentException();
         
         /*
          * Subquery iterator.
          */
-        final IAccessPath accessPath = ruleState.getAccessPath(order, bindingSet);
-        
-        final IChunkedOrderedIterator itr = accessPath.iterator();
+        final IChunkedOrderedIterator itr;
+        {
+
+            final IPredicate predicate = rule.getTail(order)
+                    .asBound(bindingSet);
+
+            final IAccessPath accessPath = joinNexus
+                    .getTailAccessPath(predicate);
+
+            if (log.isDebugEnabled()) {
+
+                log.debug("orderIndex=" + orderIndex + ", tailIndex=" + order
+                        + ", tail=" + ruleState.rule.getTail(order)
+                        + ", bindingSet=" + bindingSet + ", accessPath="
+                        + accessPath);
+
+            }
+
+            itr = accessPath.iterator();
+            
+        }
         
         try {
 
@@ -171,7 +196,7 @@ public class NestedSubqueryTask implements IStepTask {
 
                 ruleStats.chunkCount[order]++;
 
-                if (tailIndex + 1 < tailCount) {
+                if (orderIndex + 1 < tailCount) {
 
                     // nexted subquery.
 
@@ -179,7 +204,7 @@ public class NestedSubqueryTask implements IStepTask {
 
                         if (log.isDebugEnabled()) {
                             log.debug("Considering: " + e.toString()
-                                    + ", tailIndex=" + tailIndex + ", rule="
+                                    + ", tailIndex=" + orderIndex + ", rule="
                                     + rule.getName());
                         }
 
@@ -192,7 +217,7 @@ public class NestedSubqueryTask implements IStepTask {
                          * JOIN).
                          */
 
-                        ruleState.clearDownstreamBindings(tailIndex + 1, bindingSet);
+                        ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
                         
                         if (ruleState.bind(order, e, bindingSet)) {
 
@@ -200,7 +225,7 @@ public class NestedSubqueryTask implements IStepTask {
                             
                             ruleStats.subqueryCount[order]++;
 
-                            apply1(tailIndex + 1);//, ruleState);
+                            apply1(orderIndex + 1);
                             
                         }
 
@@ -214,7 +239,7 @@ public class NestedSubqueryTask implements IStepTask {
 
                         if (log.isDebugEnabled()) {
                             log.debug("Considering: " + e.toString()
-                                    + ", tailIndex=" + tailIndex + ", rule="
+                                    + ", tailIndex=" + orderIndex + ", rule="
                                     + rule.getName());
                         }
 

@@ -31,10 +31,10 @@ package com.bigdata.relation.rule.eval;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.journal.ITx;
-import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
@@ -59,6 +59,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
     private final IRule rule;
 
+    private final int tailCount;
+    
     /**
      * The computed evaluation order. The elements in this array are the order
      * in which each tail predicate will be evaluated. The index into the array
@@ -70,9 +72,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
     public int[] getOrder() {
         
-        if (order == null) {
-            calc();
-        }
+        calc();
         
         return order;
         
@@ -100,6 +100,19 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     private boolean[/*tailIndex*/] used;
     
     /**
+     * <code>true</code> iff the rule was proven to have no solutions.
+     */
+    private boolean empty = false;
+    
+    public boolean isEmpty() {
+        
+        calc();
+        
+        return empty;
+        
+    }
+    
+    /**
      * Computes an evaluation plan for the rule.
      * 
      * @param joinNexus
@@ -118,6 +131,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         this.joinNexus = joinNexus;
         
         this.rule = rule;
+        
+        this.tailCount = rule.getTailCount();
     
         if(log.isDebugEnabled()) {
             
@@ -125,30 +140,41 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             
         }
         
+        calc();
+        
     }
     
     /**
      * Compute the evaluation order.
      */
     protected void calc() {
+
+        if (order != null)
+            return;
+
+        order = new int[tailCount];
+
+        rangeCount = new long[tailCount];
         
-        order = new int[rule.getTailCount()];
-        rangeCount = new long[rule.getTailCount()];
-        used = new boolean[rule.getTailCount()];
+        // initialize to -1L as indication that rangeCount was not taken yet.
+        for(int i=0; i<tailCount; i++)
+            rangeCount[i] = -1L;
         
-        if (rule.getTailCount() == 1) {
+        used = new boolean[tailCount];
+        
+        if (tailCount == 1) {
             order[0] = 0;
             return;
         }
         
-        if (rule.getTailCount() == 2) {
+        if (tailCount == 2) {
             order[0] = rangeCount(0) <= rangeCount(1) ? 0 : 1;
             order[1] = rangeCount(0) <= rangeCount(1) ? 1 : 0;
             return;
         }
         
         // clear arrays.
-        for (int i = 0; i < rule.getTailCount(); i++) {
+        for (int i = 0; i < tailCount; i++) {
             order[i] = -1; // -1 is used to detect logic errors.
             rangeCount[i] = -1L;  // -1L indicates no range count yet.
             used[i] = false;  // not yet evaluated
@@ -165,7 +191,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         order[1] = rangeCount(t1) <= rangeCount(t2) ? t2 : t1;
         used[order[0]] = true;
         used[order[1]] = true;
-        for (int i = 2; i < rule.getTailCount(); i++) {
+        for (int i = 2; i < tailCount; i++) {
             join = getNextJoin(join);
             order[i] = ((Tail) join.getD2()).getTail();
             used[order[i]] = true;
@@ -186,9 +212,9 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         long minCardinality = Long.MAX_VALUE;
         Tail minD1 = null;
         Tail minD2 = null;
-        for (int i = 0; i < rule.getTailCount(); i++) {
+        for (int i = 0; i < tailCount; i++) {
             Tail d1 = new Tail(i, rangeCount(i), getVars(i));
-            for (int j = 0; j < rule.getTailCount(); j++) {
+            for (int j = 0; j < tailCount; j++) {
                 if (i == j) {
                     continue;
                 }
@@ -225,7 +251,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         }
         long minCardinality = Long.MAX_VALUE;
         Tail minTail = null;
-        for (int i = 0; i < rule.getTailCount(); i++) {
+        for (int i = 0; i < tailCount; i++) {
             // only check unused tails
             if (used[i]) {
                 continue;
@@ -259,30 +285,12 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * 
      * @return The range count for that tail predicate.
      */
-    protected long rangeCount(final int tailIndex) {
+    public long rangeCount(final int tailIndex) {
 
         if (rangeCount[tailIndex] == -1L) {
 
-            final IPredicate predicate = rule.getTail(tailIndex);
-
-            final IAccessPath accessPath = joinNexus
-                    .getTailAccessPath(predicate);
-
-            final long rangeCount = accessPath.rangeCount(false/* exact */);
-
-            if (log.isDebugEnabled()) {
-
-                /*
-                 * @todo trace total time in range counts while generating the plan
-                 * or just track the total time to generate the plan, which should
-                 * be dominated by the range count time. if this adds too much
-                 * latency then consider other approaches to optimization.
-                 */
-                log.debug("rangeCount=" + rangeCount + ", tailIndex="
-                        + tailIndex + ", tail=" + rule.getTail(tailIndex)
-                        + ", accessPath=" + accessPath);
-
-            }
+            final long rangeCount = joinNexus.getRangeCountFactory()
+                    .rangeCount(rule.getTail(tailIndex));
 
             this.rangeCount[tailIndex] = rangeCount;
 
@@ -291,7 +299,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         return rangeCount[tailIndex];
 
     }
-
+    
     public String toString() {
         return Arrays.toString(getOrder());
     }

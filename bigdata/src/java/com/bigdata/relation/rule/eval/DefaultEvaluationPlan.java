@@ -29,11 +29,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.journal.ITx;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -42,7 +44,6 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.Rule;
 
 /**
  * The evaluation order is determined by analysis of the propagation of
@@ -63,65 +64,229 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
 
     private final IRule rule;
 
+    /**
+     * Used to propagate fake bindings so that the tail predicates appear to
+     * become increasingly bound as each successive predicates is assigned to
+     * its place in the evaluation order.
+     */
     private final IBindingSet bindingSet;
 
+    /**
+     * The #of predicates in the tail of the rule.
+     */
     private final int tailCount;
 
-    private final boolean[] used;
+    /**
+     * Tail predicates are marked as {@link #used} as they are assigned a place
+     * in the evaluation order. This keeps any given tail predicate from being
+     * assigned to more than one index position in the evaluation order.
+     */
+    private final boolean[/*tailIndex*/] used;
 
-    private final int[] order;
+    /**
+     * The computed evaluation order. The elements in this array are the order
+     * in which each tail predicate will be evaluated. The index into the array
+     * is the index of the tail predicate whose evaluation order you want. So
+     * <code>[2,0,1]</code> says that the predicates will be evaluated in the
+     * order tail[2], then tail[0], then tail[1]. 
+     */
+    private final int[/* order */] order;
 
     public int[] getOrder() {
+        
+        calc();
         
         return order;
         
     }
 
-    /*
-     * FIXME Cache the range counts if they are obtained (use -1L if not
-     * computed) and compute [empty] based on the range counts. Then use
-     * isEmpty() to avoid rule execution when there will be no solutions.
+    /**
+     * True iff a range count on any of the tail predicates finds that there is
+     * at least one tail that does not match anything in the data and, hence,
+     * that there must be no solutions for the rule in the data.
+     * <p>
+     * This determination, like the evaluation order itself, is only good for
+     * the commit time when it is evaluated. If the rule will be executed at a
+     * later point then its evaluation order SHOULD be re-computed.
+     * 
+     * @return true iff the rule was proven to have NO solutions based on the
+     *         range counts that were obtained.
      */
-//    /**
-//     * True iff a range count on the tails finds finds that there is at least
-//     * one tail that does not match anything in the data and, hence, that there
-//     * must be no solutions for the rule in the data.
-//     * <p>
-//     * This determination, like the evaluation order itself, is only good for
-//     * the commit time when it is evaluated. If the rule will be executed at a
-//     * later point then its evaluation order SHOULD be re-computed.
-//     * 
-//     * @return
-//     */
-//    public boolean isEmpty() {
-//        
-//        return empty;
-//        
-//    }
-//    private final boolean empty;
-//    private final long[] rangeCount;
+    public boolean isEmpty() {
+        
+        calc();
+        
+        return empty;
+        
+    }
+    /**
+     * Assumes not empty unless proven otherwise when computing the evaluation
+     * order.
+     */
+    private boolean empty = false;
+
+    /**
+     * The variables that will be bound when it comes time to evaluate the
+     * predicate at each point in the computed evaluation order.
+     */
+    protected final List<IVariable>[/*tailIndex*/] varsBoundInRule;
     
     /**
-     * Some interesting metadata about the plan.
+     * The variables bound by the predicate in the computed evaluation order.
      */
-    public String toString() {
+    final protected List<IVariable>[/*tailIndex*/] varsBoundByPred;
+    
+    /**
+     * The #of unbound variables remaining at each point in the computed
+     * evaluation order.
+     */
+    protected final int[/*tailIndex*/] varCount;
+    
+    /**
+     * Return the #of unbound variables for the tail predicate given the
+     * computed evaluation order.
+     * 
+     * @param tailIndex
+     *            The index of the predicate in the tail of the rule.
+     * 
+     * @return The #of variables that will not yet be bound when it is time to
+     *         evaluate the predicate.
+     */
+    public int getVariableCount(int tailIndex) {
         
-        return getClass().getName() + "{order=" + Arrays.toString(order)
-                + ", rule=" + rule + "}";
+        calc();
+        
+        return varCount[tailIndex];
         
     }
     
     /**
-     * FIXME When there is NO data the first tail predicate (this is the only
-     * one where we have the exact bindings and therefore a correct upper bound
-     * on the range count) then the evaluation plan SHOULD be a NOP since
-     * nothing can be entailed by the rule. There needs to be a way to indicate
-     * this. Likewise, the API here should keep more metadata about the access
-     * path, including basic range counts. Those things really change pretty
-     * slowly, so it would be nice if they could be shared across some service.
+     * Return <code>true</code> iff the predicate will be fully bound when it
+     * is evaluated (hence, a point test rather than a range scan).
+     * 
+     * @param tailIndex
+     *            The index of a predicate in the tail of the rule.
+     * 
+     * @return <code>true</code> iff the predicate will be fully bound when it
+     *         is evaluated in the given evaluation order.
+     */
+    public boolean isFullyBound(int tailIndex) {
+        
+        calc();
+        
+        return varCount[tailIndex] == 0;
+        
+    }
+    
+    /**
+     * Cache of the computed range counts for the predicates in the tail. The
+     * elements of this array are initialized to -1L, which indicates that the
+     * range count has NOT been computed. Range counts are computed on demand
+     * and MAY be zero. Only an approximate range count is obtained. Such
+     * approximate range counts are an upper bound on the #of elements that are
+     * spanned by the access pattern. Therefore if the range count reports ZERO
+     * (0L) it is a real zero and the access pattern does not match anything in
+     * the data. The only other caveat is that the range counts are valid as of
+     * the commit point on which the access pattern is reading. If you obtain
+     * them for {@link ITx#READ_COMMITTED} or {@link ITx#UNISOLATED} views then
+     * they could be invalidated by concurrent writers.
+     */
+    private final long[/*tailIndex*/] rangeCount;
+    
+    /**
+     * Some interesting metadata about the plan.
+     * <p>
+     * Note: Do not invoke methods that would call {@link #calc()} from within
+     * this implementation.
+     */
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        final String delim = "\t";
+        
+        sb.append(getClass().getName() + //
+                "{ empty="+empty + //
+                ", rule=\"" + rule.getName() + "\"" +//
+                "\n"
+                );
+
+        sb.append("tailIndex" + delim + "predicate" + delim + "evalOrder"
+                + delim + "rngcnt" + delim + "varcnt" + delim
+                + "binds" + delim + "given" + "\n");
+        
+        for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
+
+            sb.append(Integer.toString(tailIndex));
+
+            sb.append(delim + "\"" + rule.getTail(tailIndex) + "\"");
+
+            sb.append(delim + order[tailIndex]);
+
+            // note: will be cached.
+            sb.append(delim + rangeCount(tailIndex));
+
+            sb.append(delim + varCount[tailIndex]);
+
+            sb.append(delim);
+            toString(sb, varsBoundByPred[tailIndex]);
+
+            sb.append(delim);
+            toString(sb, varsBoundInRule[tailIndex]);
+
+            sb.append("\n");
+            
+        }
+        
+        sb.append("}");
+
+        return sb.toString();
+        
+    }
+    
+    /**
+     * A string representation of a list without commas between the elements.
+     * 
+     * @param sb
+     *            The representation will be appended to this buffer.
+     * @param l
+     *            The list.
+     */
+    private void toString(StringBuilder sb, List l) {
+
+        if (l == null || l.isEmpty()) {
+            
+            sb.append("[ ]");
+            
+            return;
+            
+        }
+        
+        Object[] a = l.toArray();
+
+        Arrays.sort(a);
+        
+        sb.append("[");
+        
+        for(Object o : a) {
+            
+            sb.append(" "+o);
+            
+        }
+        
+        sb.append(" ");
+        
+        sb.append("]");
+        
+    }
+    
+    /**
+     * Ctor required by {@link IEvaluationPlanFactory}.
      * 
      * @param joinNexus
+     *            The join nexus.
      * @param rule
+     *            The rule.
      */
     public DefaultEvaluationPlan(IJoinNexus joinNexus, IRule rule) {
         
@@ -135,12 +300,6 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
         
         this.rule = rule;
     
-        if(log.isDebugEnabled()) {
-            
-            log.debug("rule=" + rule);
-            
-        }
-        
         bindingSet = new ArrayBindingSet(rule.getVariableCount());
 
         tailCount = rule.getTailCount();
@@ -149,34 +308,131 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
 
         used = new boolean[tailCount];
 
+        rangeCount = new long[tailCount];
+        
+        varCount = new int[tailCount];
+
+        varsBoundInRule = new LinkedList[tailCount];
+        
+        varsBoundByPred = new LinkedList[tailCount];
+
+        calc();
+        
+        if(log.isInfoEnabled()) {
+            
+            log.info(toString());
+            
+        }
+        
+    }
+    
+    /**
+     * Compute the evaluation order (NOP if already computed).
+     */
+    private void calc() {
+        
+        if (used[0]) return;
+
         if (tailCount == 1) {
 
             order[0] = 0;
+            
+            used[0] = true;
 
+            // not proven empty since range count not taken.
+            empty = false;
+            
             return;
             
         }
         
-        // clear array. -1 is used to detect logic errors.
-        for (int i = 0; i < order.length; i++)
-            order[i] = -1;
-
+        // clear arrays.
         for (int i = 0; i < tailCount; i++) {
 
-            int index = -1;
-            int minVarCount = Integer.MAX_VALUE;
-            long minRangeCount = Long.MAX_VALUE;
+            order[i] = -1; // -1 is used to detect logic errors.
             
+            varCount[i] = -1; // -1 indicates not processed yet.
+            
+            rangeCount[i] = -1L;  // -1L indicates no range count yet.
+
+            varsBoundInRule[i] = new LinkedList<IVariable>();
+            
+            varsBoundByPred[i] = new LinkedList<IVariable>();
+            
+        }
+
+        /*
+         * Process each tail predicate in order, comparing its selectivity (#of
+         * unbound variables and possibly its range count) to each non-comsumed
+         * (!used) tail predicate in turn. As each predicate is assigned in turn
+         * to the evaluation order, we propagate fake bindings so that
+         * downstream predicates will appear to be more bound - much as they
+         * would if the rule were being run against real data.
+         */
+        for (int evalOrder = 0; evalOrder < tailCount; evalOrder++) {
+
+            if (log.isDebugEnabled())
+                log.debug("Choosing predicate to evaluate next: evalOrder="
+                        + evalOrder + ", order=" + Arrays.toString(order));
+            
+            // choosen as the remaining tail predicate that is most selective.
+            int tailIndex = -1;
+
+            int minVarCount = Integer.MAX_VALUE;
+            
+            // consider the remaining tail predicates.
             for (int j = 0; j < tailCount; j++) {
                 
                 if(used[j]) continue; // already in the evaluation order. 
                 
-                final int varCount = rule.getTail(j)
+                /*
+                 * The #of variables remaining in this tail predicate given the
+                 * propagated bindings.
+                 */
+                final int varCount = rule.getTail(j).asBound(bindingSet)
                         .getVariableCount();
 
+                if (log.isDebugEnabled())
+                    log.debug("j=" + j + ", tailIndex=" + tailIndex
+                            + ", varCount=" + varCount + ", bindingSet="
+                            + bindingSet);
+                
+                /*
+                 * Range count of the current predicate under examination
+                 * WITHOUT the propagated bindings (cached).
+                 * 
+                 * Note: We disregard the bindings that were propagated since
+                 * they will NOT match anything anywhere and CAN NOT be used to
+                 * obtain useful range counts.
+                 */
+                final long rangeCount = rangeCount(j);
+                
+                if (!empty && rangeCount == 0L) {
+
+                    /*
+                     * There will be no solutions, but we continue to assign an
+                     * evaluation order in case the rule execution logic fails
+                     * to test isEmpty().
+                     */
+                    
+                    log.warn("Query is proven empty - no solutions for tail="
+                            + rule.getTail(j));
+                    
+                    empty = true;
+                    
+                }
+                
                 if (varCount < minVarCount) {
 
-                    index = j;
+                    if(log.isDebugEnabled()) {
+
+                        log.debug("j=" + j + ", tailIndex=" + tailIndex
+                                + ", varCount=" + varCount + ", minVarCount="
+                                + minVarCount + ", rangeCount=" + rangeCount);
+                        
+                    }
+                    
+                    tailIndex = j;
 
                     minVarCount = varCount;
 
@@ -186,10 +442,6 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
                      * Tweaks the evaluation order for predicates where the #of
                      * variable bindings is the same by examining the range
                      * counts.
-                     * 
-                     * Note: In doing this, we disregard the bindings that were
-                     * propagated since they are -1 and will NOT match anything
-                     * anywhere!
                      * 
                      * Note: In the case where some other predicate is already
                      * first in the evaluation order by the virtue of having
@@ -202,88 +454,93 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
                      * the two predicates are competing for the 1st position in
                      * the evaluation order, this "tweak" is exact.
                      * 
-                     * @todo Some tails use the same constant pattern in both
-                     * predicates. E.g., rdfs11 (u subClassOf v) (v subClassOf
-                     * x). In these cases comparing range counts is pointless
-                     * and could be avoided by testing for this pattern.
+                     * @todo Some tails use the same pattern of variables and
+                     * constants in both predicates. E.g., rdfs11 is (u
+                     * subClassOf v) AND (v subClassOf x). In these cases
+                     * comparing range counts is pointless and could be avoided
+                     * by testing for this pattern.
                      */
                     
-                    if(minRangeCount == Long.MAX_VALUE) {
-                        
-                        // range count of the current best choice (computed
-                        // lazily).
-                        minRangeCount = getAccessPath(index, null/* bindingSet */)
-                                .rangeCount(false/*exact*/);
+                    // range count of the current best choice (cached).
+                    final long minRangeCount = rangeCount(tailIndex);
+
+                    if (log.isDebugEnabled()) {
+
+                        log.debug("j=" + j + ", tailIndex=" + tailIndex
+                                + ", varCount=" + varCount + ", minVarCount="
+                                + minVarCount + ", rangeCount=" + rangeCount
+                                + ", minRangeCount=" + minRangeCount);
 
                     }
 
-                    // range count of the current predicate under
-                    // examination.
-                    final long rangeCount = getAccessPath(j, null/* bindingSet */)
-                            .rangeCount(false/* exact */);
-                    
                     if (rangeCount < minRangeCount) {
 
                         /*
-                         * choose the predicate that is more selective given
-                         * the variable bindings.
+                         * choose the predicate that is more selective in the
+                         * data.
                          */
                         
-                        index = j;
+                        tailIndex = j;
                         
                         minVarCount = varCount;
                         
-                        minRangeCount = rangeCount;
-                        
                     }
                     
-                }
+                } // end else if
                 
-            }
+            } // next j
 
-            if (index == -1)
+            /*
+             * Note: [tailIndex] is the index of the tail predicate that was
+             * choosen as being the most selective out of those remaining.
+             */
+            
+            if (tailIndex == -1)
                 throw new AssertionError();
             
-            if (used[index])
-                throw new AssertionError("Attempting to reuse predicate: index="+i+"\n"+this);
+            if (used[tailIndex])
+                throw new AssertionError(
+                        "Attempting to reuse predicate: tailIndex=" + tailIndex
+                                + "\n" + this);
+
+            order[evalOrder] = tailIndex;
             
-            order[i] = index;
+            if (log.isDebugEnabled()) {
+
+                log.debug("choose tailIndex=" + tailIndex + " : minVarCount="
+                        + minVarCount + ", rangeCount=" + rangeCount(tailIndex)
+                        + ", order=" + Arrays.toString(order));
+                
+            }
             
-            used[index] = true;
-            
+            used[tailIndex] = true;
+                    
+            varCount[tailIndex] = minVarCount;
+
+            /*
+             * Populate varsBoundInRule given the current bindings. This
+             * reflects the bindings on hand when we choose this predicate as
+             * being the most selective out of those remaining BEFORE we
+             * propagate the fake bindings that reflect the impact of evaluating
+             * the choose predicate.
+             */
+            for (Iterator<IVariable> itr = rule.getVariables(); itr.hasNext();) {
+
+                final IVariable var = itr.next();
+
+                if (bindingSet.isBound(var)) {
+
+                    varsBoundInRule[tailIndex].add(var);
+
+                }
+
+            }
+
             // set fake bindings for this predicate.
             {
                 
-                final IPredicate pred = rule.getTail(index);
+                final IPredicate pred = rule.getTail(tailIndex);
 
-                if (rule.isFullyBound(index, bindingSet)) {
-
-                    /*
-                     * Note: If a predicate is fully bound (whether by constants
-                     * or as a side-effect of the bindings that would have been
-                     * propagated by the previous predicates in the evaluation
-                     * order) then it is just an existance test.
-                     * 
-                     * Note: A predicate that is fully bound with constants will
-                     * be ordered before any predicate that has an unbound
-                     * variable. Predicates that become fully bound due to the
-                     * evaluation order are somewhat (but not too) different
-                     * since the existence test is for an element whose bindings
-                     * are not known until runtime.
-                     * 
-                     * @todo optimize rule execution for existence tests.
-                     */
-                    
-                    if(log.isDebugEnabled()) {
-
-                        log.debug("predicate will be fully bound: " + pred);
-                        
-                    }
-                    
-                    continue;
-                    
-                }
-                
                 final int arity = pred.arity();
 
                 for (int z = 0; z < arity; z++) {
@@ -292,22 +549,28 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
 
                     if (v.isVar() && !bindingSet.isBound((IVariable)v)) {
 
+                        if (log.isDebugEnabled())
+                            log.debug("binding: var=" + v + ", tailIndex="
+                                    + tailIndex + ", bindingSet=" + bindingSet);
+                        
                         bindingSet.set((IVariable) v, FAKE);
 
+                        varsBoundByPred[tailIndex].add((IVariable)v);
+                        
                     }
 
                 }
                 
             }
             
-        } // next tail predicate.
+        } // choose the tail predicate for the next position in the evaluation order.
 
-        if (log.isDebugEnabled()) {
+        if (log.isInfoEnabled()) {
 
-            log.debug(toString());
+            log.info(toString());
             
         }
-        
+
     }
     
     /**
@@ -317,157 +580,26 @@ public class DefaultEvaluationPlan implements IEvaluationPlan {
             "Fake");
 
     /**
-     * Return the {@link IAccessPath} that would be used to read from the
-     * selected {@link IPredicate} (no caching).
+     * Return the range count for the predicate, ignoring any bindings. The
+     * range count for the tail predicate is cached the first time it is
+     * requested and returned from the cache thereafter.
      * 
-     * @param index
-     *            The index of the {@link IPredicate} in the tail of the
-     *            {@link Rule}.
-     * @param bindingSet
-     *            When non-<code>null</code>, the bindings will be used to
-     *            generate the {@link IAccessPath}. When <code>null</code>
-     *            the {@link IAccessPath} will use wildcards in every position
-     *            where the predicate declares a variable.
+     * @param tailIndex
+     *            The index of the predicate in the tail of the rule.
      * 
-     * @return The {@link IAccessPath}.
-     * 
-     * @throws IndexOutOfBoundsException
-     *             if index is out of bounds.
-     * @throws RuntimeException
-     *             if the name of the relation can not be resolved by the
-     *             {@link IJoinNexus} to an {@link IRelation} instance.
+     * @return The range count for that tail predicate.
      */
-    protected IAccessPath getAccessPath(final int index,
-            final IBindingSet bindingSet) {
+    public long rangeCount(final int tailIndex) {
 
-        final IPredicate predicate;
+        if (rangeCount[tailIndex] == -1L) {
 
-        if (bindingSet != null) {
-
-            // based on the current bindings.
-
-            predicate = rule.getTail(index).asBound(bindingSet);
-
-        } else {
-
-            // as declared by the predicate (no bindings).
-
-            predicate = rule.getTail(index);
-
+            rangeCount[tailIndex] = joinNexus.getRangeCountFactory()
+                    .rangeCount(rule.getTail(tailIndex));
+            
         }
 
-        return joinNexus.getTailAccessPath(predicate);
-        
-    }
+        return rangeCount[tailIndex];
 
-//  if (focusStore != null && focusIndex > 0) {
-//  /*
-//   * Note: This stuff is specific to the RDF DB, including the ROM
-//   * assumptions for the focusStore vs the DB. With the refactor the
-//   * focusStore and the fusedView are already encoded into the relation
-//   * associated with each tail and the order will therefore reflect the
-//   * actual (or approximate) range counts for each access path.
-//   */
-//      
-//      /*
-//       * The rule of thumb is to always evaluate the predicate that
-//       * will read from the focusStore 1st since we presume that any
-//       * triple pattern reading on the [focusStore] will be
-//       * significantly smaller than any other triple pattern reading
-//       * on the fused view [focusStore + database].
-//       * 
-//       * However, there are counter examples. Loading schema and then
-//       * data into a database is one, e.g., the wordnet ontology
-//       * followed by the wordnet nouns data. Another is when the 2nd
-//       * predicate in the body is none bound - you are often better
-//       * off NOT running the all none bound predicate 1st.
-//       * 
-//       * Note: All of this logic is executed IFF the focusIndex is >
-//       * 0. When the focusIndex is 0, the focusStore is already being
-//       * read by the predicate that is first in the evaluation order.
-//       */
-//
-//      /*
-//       * In this alternative, we simply refuse to order a 3-unbound
-//       * predicate to the 1st position in the evaluation order.
-//       */
-//      
-//      if (false && rule.getTailPredicate(order[focusIndex])
-//              .getVariableCount() < 3) {
-//
-//          /*
-//           * Note: This does not work since we may have already done a
-//           * rangeCount (w/o bindings) when computing the evaluation
-//           * order so we can not undo that purely by considering the
-//           * variable bindings. An alternative is to mark as "pinned"
-//           * any part of the evaluation order that have already been
-//           * tested in the data, e.g., by retaining the rangeCounts if
-//           * computed by computeEvaluationOrder.  If we do that then
-//           * we could try this simpler test again.
-//           */
-//          
-////              /*
-////               * Swap the places of those predicates in the evaluation
-////               * order such that we will evaluate the predicate at the
-////               * focusIndex 1st.
-////               */
-////
-////              int tmp = order[0];
-////
-////              order[0] = order[focusIndex];
-////
-////              order[focusIndex] = tmp;
-//
-//      } else {
-//
-//          /*
-//           * In order to catch those counter examples we range count
-//           * the predicate that is already 1st in the evaluate order
-//           * against [focusStore+database] and then the predicate at
-//           * the focusIndex against the [focusStore]. We then reorder
-//           * the predicate at the focusIndex 1st iff it has a smaller
-//           * range count that the predicate that is already first in
-//           * the evaluation order.
-//           * 
-//           * Note: range counts here could be expensive when the index
-//           * is remote or partitioned.
-//           */
-//          
-//          /*
-//           * Range count for the predicate that is 1st in the
-//           * evaluation order. This will read against [focusStore +
-//           * database].
-//           */
-//
-//          final long rangeCount1 = getAccessPath(order[0], null/* bindingSet */)
-//                  .rangeCount();
-//
-//          /*
-//           * Range count for the predicate at the focusIndex. This
-//           * will read against [focusStore].
-//           */
-//
-//          final long rangeCount2 = getAccessPath(order[focusIndex],
-//                  null/* bindingSet */).rangeCount();
-//
-//          if (rangeCount2 < rangeCount1) {
-//
-//              /*
-//               * Swap the places of those predicates in the evaluation
-//               * order such that we will evaluate the predicate at the
-//               * focusIndex 1st.
-//               */
-//
-//              int tmp = order[0];
-//
-//              order[0] = order[focusIndex];
-//
-//              order[focusIndex] = tmp;
-//
-//          }
-//
-//      }
-//      
-//  }
+    }
 
 }

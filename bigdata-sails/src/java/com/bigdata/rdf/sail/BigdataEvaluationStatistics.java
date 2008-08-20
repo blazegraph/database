@@ -19,11 +19,6 @@ import com.bigdata.relation.rule.IRule;
  * Uses range counts to give cost estimates based on the size of the expected
  * results.
  * 
- * @todo we do not need to override anything here if we are converting the
- *       Sesame query operations to native {@link IRule}s since the
- *       {@link IRule}s will self-optimize.  Especially, we do not want to
- *       compute the range counts twice for each query!
- * 
  * @todo if a {@link StatementPattern} is to read against the default context
  *       and that is a merge of pre-defined contexts then we need to use the
  *       union of the range counts for those contexts.
@@ -36,6 +31,17 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
     protected static final Logger log = Logger.getLogger(BigdataEvaluationStatistics.class);
 
     private final BigdataSailConnection conn;
+
+    /**
+     * When <code>true</code>, range counts will be obtained and used to
+     * influence the join order.
+     * 
+     * @todo we do not need to override anything here if we are converting the
+     *       Sesame query operations to native {@link IRule}s since the
+     *       {@link IRule}s will self-optimize. Especially, we do not want to
+     *       compute the range counts twice for each query!
+     */
+    private final boolean useRangeCounts = true;
 
     public BigdataEvaluationStatistics(BigdataSailConnection conn) {
 
@@ -104,31 +110,54 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
 
             }
 
-            /* 
-             * Get the most efficient access path.
-             */
+            final long rangeCount;
+            if (useRangeCounts) {
 
-            final IAccessPath accessPath = conn.database.getAccessPath(
-                    (subj == null ? BigdataSail.NULL : subj.getTermId()),
-                    (pred == null ? BigdataSail.NULL : pred.getTermId()),
-                    (obj == null ? BigdataSail.NULL : obj.getTermId()));
+                /*
+                 * Get the most efficient access path.
+                 */
 
-            /*
-             * The range count for that access path based on the data. The
-             * variables will be unbound at this point so the selectivity
-             * will depend mostly on the #of SPOC positions that were bound
-             * to constants in the query.
-             */
+                final IAccessPath accessPath = conn.database.getAccessPath(
+                        (subj == null ? BigdataSail.NULL : subj.getTermId()),
+                        (pred == null ? BigdataSail.NULL : pred.getTermId()),
+                        (obj == null ? BigdataSail.NULL : obj.getTermId()));
 
-            final long rangeCount = accessPath.rangeCount(false/*exact*/);
+                /*
+                 * The range count for that access path based on the data. The
+                 * variables will be unbound at this point so the selectivity
+                 * will depend mostly on the #of SPOC positions that were bound
+                 * to constants in the query.
+                 */
 
+                rangeCount = accessPath.rangeCount(false/* exact */);
+
+                cardinality = rangeCount;
+
+            } else {
+
+                /*
+                 * Fake range count, e.g., because we are going to translate the
+                 * query into a native Rule and the Rule will self-optimize when
+                 * it is executed so we want to avoid getting the range count
+                 * data twice.
+                 */ 
+
+                rangeCount = 1000;
+
+            }
+            
             cardinality = rangeCount;
+            
+//            final int boundVarCount = countBoundVars(sp);
+//
+//            final int sqrtFactor = 2 * boundVarCount;
 
-            //                int constantVarCount = countConstantVars(sp);
+            final int constantVarCount = countConstantVars(sp);
+            
             final int boundVarCount = countBoundVars(sp);
 
-            final int sqrtFactor = 2 * boundVarCount;
-
+            final int sqrtFactor = 2 * boundVarCount + constantVarCount;
+            
             if (sqrtFactor > 1) {
 
                 cardinality = Math.pow(cardinality, 1.0 / sqrtFactor);

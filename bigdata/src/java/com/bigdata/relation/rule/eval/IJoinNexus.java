@@ -70,6 +70,11 @@ public interface IJoinNexus {
      * instances when the rule execution crosses an RMI boundary.
      */
     IJoinNexusFactory getJoinNexusFactory();
+
+    /**
+     * The factory object for range counts used by {@link IEvaluationPlan}s.
+     */
+    IRangeCountFactory getRangeCountFactory();
     
     /**
      * The kind of operation that is being executed (Query, Insert, or Delete).
@@ -197,6 +202,13 @@ public interface IJoinNexus {
      * @see RunRuleAndFlushBufferTask
      */
     public IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule);
+    
+    /**
+     * Return the factory for {@link IEvaluationPlan}s.
+     * 
+     * @return The factory.
+     */
+    public IEvaluationPlanFactory getPlanFactory();
     
     /**
      * The timestamp used when an {@link IBuffer} is flushed against an

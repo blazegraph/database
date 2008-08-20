@@ -1678,12 +1678,23 @@ public class BigdataSail extends SailBase implements Sail {
 
             try {
 
+                /*
+                 * @todo review use of replaceValues once custom rule rewrite is
+                 * in place. make sure that we are not looking up the terms in
+                 * the rule twice. since we already resolve them here, then the
+                 * easiest thing to do is to not resolve them again when
+                 * re-writing the query into a rule. However, the resolve that
+                 * is being done here is not using ordered reads, so it is less
+                 * efficient. Probably this needs to be modified to use an
+                 * ordered read and then resolve in the rewrite needs to be
+                 * disabled.
+                 */
                 replaceValues(tupleExpr);
 
-                TripleSource tripleSource = new BigdataTripleSource(this,
+                final TripleSource tripleSource = new BigdataTripleSource(this,
                         includeInferred);
 
-                EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
+                final EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
                         (BigdataTripleSource) tripleSource, dataset);
 
                 QueryOptimizerList optimizerList = new QueryOptimizerList();

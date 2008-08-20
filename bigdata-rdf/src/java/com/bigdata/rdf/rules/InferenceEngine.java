@@ -45,6 +45,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -654,7 +655,8 @@ public class InferenceEngine extends RDFSVocabulary {
             
             final IJoinNexusFactory joinNexusFactory = database
                     .newJoinNexusFactory(ruleContext, ActionEnum.Insert,
-							solutionFlags, doNotAddFilter, justify);
+							solutionFlags, doNotAddFilter, justify,
+                            DefaultEvaluationPlanFactory2.INSTANCE);
 
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
                     .getIndexManager());

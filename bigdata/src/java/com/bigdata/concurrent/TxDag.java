@@ -1012,7 +1012,7 @@ public class TxDag {
     }
 
     /**
-	 * Resets the {@link #order} cache so that {@link #getOrder()} will be
+	 * Resets the {@link #_order} cache so that {@link #getOrder()} will be
 	 * forced to recompute its response. This method is automatically.
 	 */
     final synchronized void resetOrder() {

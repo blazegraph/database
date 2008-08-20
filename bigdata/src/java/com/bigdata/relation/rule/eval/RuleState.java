@@ -7,14 +7,11 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
@@ -59,18 +56,23 @@ public class RuleState {
 
     }
 
-    /**
-     * The {@link IAccessPath} corresponding to each {@link IPredicate} in the
-     * tail of the {@link Rule}.
-     * <p>
-     * Note: The corresponding access path in this array is invalidated by
-     * whenever a variable is (re-)bound since that will in general change the
-     * selectivity of the access path (it may have a different range count).
-     * <p>
-     * Note: {@link #resetBindings()} clears all elements of this array.
-     */
-    final private IAccessPath[] accessPath;
+//    /**
+//     * The {@link IAccessPath} corresponding to each {@link IPredicate} in the
+//     * tail of the {@link Rule}.
+//     * <p>
+//     * Note: The corresponding access path in this array is invalidated by
+//     * whenever a variable is (re-)bound since that will in general change the
+//     * selectivity of the access path (it may have a different range count).
+//     * <p>
+//     * Note: {@link #resetBindings()} clears all elements of this array.
+//     */
+//    final private IAccessPath[] accessPath;
 
+    /**
+     * The plan (data from which the evaluation order was selected).
+     */
+    final protected IEvaluationPlan plan;
+    
     /**
      * The evaluation order for the predicates in the tail of the {@link Rule}.
      */
@@ -107,13 +109,16 @@ public class RuleState {
 
         this.joinNexus = joinNexus;
 
-        final int tailCount = rule.getTailCount();
+//        final int tailCount = rule.getTailCount();
+//
+//        // Allocate access path cache.
+//        this.accessPath = new IAccessPath[tailCount];
 
-        // Allocate access path cache.
-        this.accessPath = new IAccessPath[tailCount];
-
+        // The plan (data from which the evaluation order was selected).
+        this.plan = joinNexus.getPlanFactory().newPlan(joinNexus, rule);
+        
         // The evaluation order.
-        this.order = new DefaultEvaluationPlan(joinNexus, rule).getOrder();
+        this.order = plan.getOrder();
 
         /*
          * The dependency graph for the variables in the tail based on the
@@ -141,13 +146,6 @@ public class RuleState {
      *            When non-<code>null</code>, the current variable bindings
      *            will be displayed. Otherwise, the names of variables will be
      *            displayed rather than their bindings.
-     * 
-     * @todo There should be a way to resolve the bindings against a dictionary.
-     *       perhaps for {@link Rule} but definately for {@link RuleState}.
-     *       This makes it MUCH easier to figure out what is going on when the
-     *       data are keys in a dictionary, which is the case for the RDF DB. Of
-     *       course, doing that efficiently is a JOIN :-) but it can be done
-     *       with a cache in front of a point lookup as well.
      */
     public String toString(IBindingSet bindingSet) {
 
@@ -161,19 +159,13 @@ public class RuleState {
 
         int i = 0;
 
-        for (Iterator<IPredicate> itr = rule.getTail(); itr.hasNext(); i++) {
+        for (final Iterator<IPredicate> itr = rule.getTail(); itr.hasNext(); i++) {
 
             final IPredicate pred = itr.next();
 
             sb.append(pred.toString(bindingSet));
 
-            // if (bindingSet == null) {
-
-            // displays the evaluation order as an index on the predicate.
-
             sb.append("[" + order[i] + "]");
-
-            // }
 
             if (itr.hasNext()) {
 
@@ -256,164 +248,102 @@ public class RuleState {
 
     }
 
-    /**
-     * Initialize the bindings from the constants and variables in the rule.
-     * <p>
-     * Note: This MUST be invoked before the rule is executed. If you do not
-     * clear the bindings then the old bindings will make it appear as if your
-     * variables are all bound to constants and the rule will NOT select the
-     * correct data.
-     */
-    protected void resetBindings(IBindingSet bindings) {
+//    /**
+//     * Initialize the bindings from the constants and variables in the rule.
+//     * <p>
+//     * Note: This MUST be invoked before the rule is executed. If you do not
+//     * clear the bindings then the old bindings will make it appear as if your
+//     * variables are all bound to constants and the rule will NOT select the
+//     * correct data.
+//     */
+//    protected void resetBindings(IBindingSet bindings) {
+//
+//        bindings.clearAll();
+//
+//        for (int i = 0; i < accessPath.length; i++) {
+//
+//            accessPath[i] = null;
+//
+//        }
+//
+//    }
 
-        bindings.clearAll();
-
-        for (int i = 0; i < accessPath.length; i++) {
-
-            accessPath[i] = null;
-
-        }
-
-    }
-
-    // /**
-    // * <p>
-    // * Return the current binding for the variable or constant.
-    // * </p>
-    // *
-    // * @param var
-    // * The variable or constant.
-    // *
-    // * @return Its binding. The binding will be <code>null</code> if a
-    // * variable is not currently bound.
-    // *
-    // * @throws NullPointerException
-    // * if <i>var</i> is <code>null</code>.
-    // * @throws IllegalArgumentException
-    // * if the variable is not used in the rule.
-    // * @throws IllegalArgumentException
-    // * if var is a constant.
-    // *
-    // * @see #set(Var, Object)
-    // * @see #bind(int, SPO)
-    // */
-    // public Object get(IBindingSet bindings,IVariableOrConstant var) {
-    //    
-    // return get(bindings,var, true);
-    //        
-    // }
-    //    
-    // /**
-    // * <p>
-    // * Return the current binding for the variable or constant.
-    // * </p>
-    // *
-    // * @param var
-    // * The variable or constant.
-    // * @param required
-    // * When <code>true</code> an exception is reported if the
-    // * variable is not used in the rule. Note that specializing a
-    // * rule often results in variables being replaced by constants
-    // * such that an {@link IConstraint} might no longer be evaluable
-    // * for the rule in terms of that variable.
-    // *
-    // * @return Its binding. The binding will be <code>null</code> if a
-    // * variable is not currently bound or if the variable is not used in
-    // * the rule and <code>required := false</code>.
-    // *
-    // * @throws NullPointerException
-    // * if <i>var</i> is <code>null</code>.
-    // * @throws IllegalArgumentException
-    // * if <code>required := true</code> and the variable is not
-    // * used in the rule.
-    // * @throws IllegalArgumentException
-    // * if var is a constant.
-    // *
-    // * @see #set(Var, Object)
-    // * @see #bind(int, SPO)
-    // */
-    // public Object get(IBindingSet bindings,IVariableOrConstant var, boolean
-    // required) {
-    //        
-    // // if (var == null)
-    // // throw new NullPointerException();
-    //
-    // if (var.isConstant()) {
-    //
-    // return var.get();
-    //            
-    // }
-    //
-    // if (required && !rule.isDeclared((IVariable)var)) {
-    //
-    // throw new IllegalArgumentException("Not declared: " + var + " by "
-    // + rule);
-    //            
-    // }
-    //        
-    // return bindings.get((IVariable) var);
-    //                
-    // }
-
-    /**
-     * Binds the variable.
-     * <p>
-     * Note: The cached {@link IAccessPath} for a predicate is cleared if a
-     * variable binding is set on that predicate.
-     * 
-     * @param var
-     *            A variable that appears in that predicate.
-     * @param val
-     *            The value to be bound on the variable -or- <code>null</code>
-     *            to clear the binding for the variable.
-     * 
-     * @throws NullPointerException
-     *             if the variable is null.
-     * @throws IndexOutOfBoundsException
-     *             if the predicate index is out of range.
-     * 
-     * @see #bind(int, Object)
-     */
-    // * @throws IllegalArgumentException
-    // * if the variable does not appear in the rule.
-    public void set(IVariable var, IConstant val, IBindingSet bindings) {
-
-        // // verify variable declared by the rule.
-        // if(!rule.isDeclared(var)) throw new IllegalArgumentException();
-
-        // bind the variable.
-        if (val == null) {
-
-            bindings.clear(var);
-
-        } else {
-
-            bindings.set(var, val);
-
-        }
-
-        final int tailCount = rule.getTailCount();
-
-        // clear cached access path for preds using that variable.
-        for (int i = 0; i < tailCount; i++) {
-
-            final IPredicate pred = rule.getTail(i);
-
-            final int arity = pred.arity();
-
-            for (int j = 0; j < arity; j++) {
-
-                if (pred.get(j) == var) {
-
-                    accessPath[i] = null;
-
-                }
-
-            }
-
-        }
-
-    }
+//    /**
+//     * Binds the variable.
+//     * 
+//     * @param var
+//     *            A variable that appears in that predicate.
+//     * @param val
+//     *            The value to be bound on the variable -or- <code>null</code>
+//     *            to clear the binding for the variable.
+//     * 
+//     * @throws NullPointerException
+//     *             if the variable is null.
+//     * @throws IndexOutOfBoundsException
+//     *             if the predicate index is out of range.
+//     * 
+//     * @see #bind(int, Object)
+//     */
+////    * <p>
+////    * Note: The cached {@link IAccessPath} for a predicate is cleared if a
+////    * variable binding is set on that predicate.
+//    // * @throws IllegalArgumentException
+//    // * if the variable does not appear in the rule.
+//    public void set(IVariable var, IConstant val, IBindingSet bindings) {
+//
+//        // // verify variable declared by the rule.
+//        // if(!rule.isDeclared(var)) throw new IllegalArgumentException();
+//
+//        // bind the variable.
+//        if (val == null) {
+//
+//            bindings.clear(var);
+//
+//        } else {
+//
+//            final Object oldval = bindings.get(var);
+//            
+//            if (oldval != null && !oldval.equals(val)) {
+//
+//                /*
+//                 * This is a paranioia test. It will catch attempts to rebind a
+//                 * variable to a different value when that variable has not
+//                 * first been cleared (set to null) by
+//                 * clearDownstreamBindings().
+//                 */
+//                
+//                throw new IllegalStateException(
+//                        "Attempting to rebind variable: var=" + var
+//                                + ", oldval=" + oldval + ", newval=" + val);
+//                
+//            }
+//            
+//            bindings.set(var, val);
+//
+//        }
+//
+////        final int tailCount = rule.getTailCount();
+////
+////        // clear cached access path for preds using that variable.
+////        for (int i = 0; i < tailCount; i++) {
+////
+////            final IPredicate pred = rule.getTail(i);
+////
+////            final int arity = pred.arity();
+////
+////            for (int j = 0; j < arity; j++) {
+////
+////                if (pred.get(j) == var) {
+////
+////                    accessPath[i] = null;
+////
+////                }
+////
+////            }
+////
+////        }
+//
+//    }
 
     /**
      * Binds variables from a visited element.
@@ -437,7 +367,7 @@ public class RuleState {
      * @throws IndexOutOfBoundsException
      *             if the <i>index</i> is out of bounds.
      * 
-     * @see #clearDownstreamBindings(IBindingSet bindingSet, int index)
+     * @see #clearDownstreamBindings(int, IBindingSet)
      */
     @SuppressWarnings("unchecked")
     public boolean bind(int index, Object e, IBindingSet bindings) {
@@ -455,18 +385,21 @@ public class RuleState {
      * variable in a downstream predicate was 1st bound by an upstream predicate
      * as identified by {@link #depends} then its value is NOT cleared.
      * <p>
-     * Note: You MUST {@link #resetBindings()} before you evaluate a rule.
+     * Note: You MUST {@link #clearDownstreamBindings(int, IBindingSet)} before
+     * you (re-)evaluate a subquery. Failure to do so will leave stale bindings
+     * in place which will cause {@link #getAccessPath(int)} to identify the
+     * wrong access path, and hence select the wrong data.
      * <p>
-     * Note: You MUST {@link #clearDownstreamBindings(IBindingSet,int)} bindings
-     * before you (re-)evaluate a subquery. Failure to do so will leave stale
-     * bindings in place which will cause {@link #getAccessPath(int)} to
-     * identify the wrong access path, and hence select the wrong data.
+     * Note: We only clear downstream bindings in order to get the access path
+     * right for the next subquery. We DO NOT clear the old bindings before
+     * copying in the new bindings from the next element. In that case the new
+     * bindings are just blasted over the old bindings.
      * 
      * @param index
      *            The index of the predicate whose values you intend to
      *            {@link #bind(IBindingSet,int, Object)}.
      */
-    protected void clearDownstreamBindings(int index, IBindingSet bindingSet) {
+    protected void clearDownstreamBindings(final int index, final IBindingSet bindingSet) {
 
         if (log.isDebugEnabled()) {
 
@@ -492,7 +425,14 @@ public class RuleState {
 
                     if (k >= index) {
 
-                        set((Var) t, null, bindingSet);
+                        if(log.isDebugEnabled()) {
+                            
+                            log.debug("Clearing: "+t);
+                            
+                        }
+                        
+                        bindingSet.clear((Var)t);
+//                        set((Var) t, null, bindingSet);
 
                     }
 
@@ -504,90 +444,90 @@ public class RuleState {
 
     }
 
-    /**
-     * Return the {@link IAccessPath} that would be used to read from the
-     * selected tail {@link IPredicate}.
-     * <p>
-     * Note: a cache is maintained by the rule for the access paths. If the
-     * cache does not have an entry for the desired access path then one is
-     * obtained and placed into the cache before being returned to the caller.
-     * The cache is invalidated by {@link #resetBindings()} and (on a selective
-     * basis) by {@link #bind(int, Object)} and {@link #set(IVariable, Object)}.
-     * 
-     * @param index
-     *            The index into tail of the {@link Rule}.
-     * 
-     * @return The {@link IAccessPath}.
-     * 
-     * @throws IndexOutOfBoundsException
-     *             if index is out of bounds.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>bindingSet</i> is <code>null</code>.
-     * 
-     * FIXME The side-effect on {@link #accessPath}[] means that this class is
-     * NOT thread-safe. A thread-local weak reference to an access path cache
-     * might fix that. However, I am not yet sure if this is a problem.
-     * 
-     * @todo A more generalized access path cache might be located on the
-     *       {@link IRelation} impl. it could either scan an LRU of predicates
-     *       for recently returned access paths or it could use the hash of the
-     *       predicate to test a weak reference map backed by an LRU. However,
-     *       measure the cost of obtaining an access path. It is done without IO
-     *       so it can't be too much! (Note that if the cache is specific to the
-     *       bindings on the predicate then there are no side-effects from the
-     *       propagation of bindings and we can simplify how we set, clear, and
-     *       reset the bindings!)
-     */
-    public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
-
-        if (bindingSet == null)
-            throw new IllegalArgumentException();
-
-        // check the cache.
-        IAccessPath accessPath = this.accessPath[index];
-
-        if (accessPath == null) {
-
-            accessPath = getAccessPathNoCache(index, bindingSet);
-
-            // update the cache.
-            this.accessPath[index] = accessPath;
-
-        }
-
-        return accessPath;
-
-    }
-
-    /**
-     * Return the {@link IAccessPath} that would be used to read from the
-     * selected {@link IPredicate} (no caching).
-     * 
-     * @param index
-     *            The index of the {@link IPredicate} in the tail of the
-     *            {@link Rule}.
-     * @param bindingSet
-     *            The bindings used to generate the {@link IAccessPath}.
-     * 
-     * @return The {@link IAccessPath}.
-     * 
-     * @throws IndexOutOfBoundsException
-     *             if index is out of bounds.
-     * @throws IllegalArgumentException
-     *             if <i>bindingSet</i> is <code>null</code>.
-     * @throws RuntimeException
-     *             if the name of the relation can not be resolved by the
-     *             {@link IJoinNexus} to an {@link IRelation} instance.
-     */
-    protected IAccessPath getAccessPathNoCache(final int index,
-            final IBindingSet bindingSet) {
-
-        // based on the given bindings.
-        final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
-
-        return joinNexus.getTailAccessPath(predicate);
-
-    }
+//    /**
+//     * Return the {@link IAccessPath} that would be used to read from the
+//     * selected tail {@link IPredicate}.
+//     * <p>
+//     * Note: a cache is maintained by the rule for the access paths. If the
+//     * cache does not have an entry for the desired access path then one is
+//     * obtained and placed into the cache before being returned to the caller.
+//     * The cache is invalidated by {@link #resetBindings()} and (on a selective
+//     * basis) by {@link #bind(int, Object)} and {@link #set(IVariable, Object)}.
+//     * 
+//     * @param index
+//     *            The index into tail of the {@link Rule}.
+//     * 
+//     * @return The {@link IAccessPath}.
+//     * 
+//     * @throws IndexOutOfBoundsException
+//     *             if index is out of bounds.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if <i>bindingSet</i> is <code>null</code>.
+//     * 
+//     * FIXME The side-effect on {@link #accessPath}[] means that this class is
+//     * NOT thread-safe. A thread-local weak reference to an access path cache
+//     * might fix that. However, I am not yet sure if this is a problem.
+//     * 
+//     * @todo A more generalized access path cache might be located on the
+//     *       {@link IRelation} impl. it could either scan an LRU of predicates
+//     *       for recently returned access paths or it could use the hash of the
+//     *       predicate to test a weak reference map backed by an LRU. However,
+//     *       measure the cost of obtaining an access path. It is done without IO
+//     *       so it can't be too much! (Note that if the cache is specific to the
+//     *       bindings on the predicate then there are no side-effects from the
+//     *       propagation of bindings and we can simplify how we set, clear, and
+//     *       reset the bindings!)
+//     */
+//    public IAccessPath getAccessPath(final int index, IBindingSet bindingSet) {
+//
+//        if (bindingSet == null)
+//            throw new IllegalArgumentException();
+//
+//        // check the cache.
+//        IAccessPath accessPath = this.accessPath[index];
+//
+//        if (accessPath == null) {
+//
+//            accessPath = getAccessPathNoCache(index, bindingSet);
+//
+//            // update the cache.
+//            this.accessPath[index] = accessPath;
+//
+//        }
+//
+//        return accessPath;
+//
+//    }
+//
+//    /**
+//     * Return the {@link IAccessPath} that would be used to read from the
+//     * selected {@link IPredicate} (no caching).
+//     * 
+//     * @param index
+//     *            The index of the {@link IPredicate} in the tail of the
+//     *            {@link Rule}.
+//     * @param bindingSet
+//     *            The bindings used to generate the {@link IAccessPath}.
+//     * 
+//     * @return The {@link IAccessPath}.
+//     * 
+//     * @throws IndexOutOfBoundsException
+//     *             if index is out of bounds.
+//     * @throws IllegalArgumentException
+//     *             if <i>bindingSet</i> is <code>null</code>.
+//     * @throws RuntimeException
+//     *             if the name of the relation can not be resolved by the
+//     *             {@link IJoinNexus} to an {@link IRelation} instance.
+//     */
+//    protected IAccessPath getAccessPathNoCache(final int index,
+//            final IBindingSet bindingSet) {
+//
+//        // based on the given bindings.
+//        final IPredicate predicate = rule.getTail(index).asBound(bindingSet);
+//
+//        return joinNexus.getTailAccessPath(predicate);
+//
+//    }
 
 }

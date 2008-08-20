@@ -65,10 +65,13 @@ import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.DefaultRangeCountFactory;
 import com.bigdata.relation.rule.eval.EmptyProgramTask;
+import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IProgramTask;
+import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.NestedSubqueryTask;
@@ -108,6 +111,12 @@ public class RDFJoinNexus implements IJoinNexus {
     private final long readTimestamp;
     
     private final boolean justify;
+    
+    /**
+     * when <code>true</code> the backchainer will be enabled for access path
+     * reads.
+     */
+    private final boolean backchain;
 
     private final int bufferCapacity;
     
@@ -123,6 +132,17 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     private final IRuleTaskFactory defaultTaskFactory;
 
+    /**
+     * The factory for rule evaluation plans.
+     */
+    private final IEvaluationPlanFactory planFactory;
+
+    /**
+     * @todo caching for the same relation and database state shared across join
+     *       nexus instances.
+     */
+    private final IRangeCountFactory rangeCountFactory = new DefaultRangeCountFactory(this);
+    
 	/**
 	 * @param joinNexusFactory
 	 *            The object used to create this instance and which can be used
@@ -130,26 +150,6 @@ public class RDFJoinNexus implements IJoinNexus {
 	 *            execution.
 	 * @param indexManager
 	 *            The object used to resolve indices, relations, etc.
-	 * @param action
-	 *            Indicates whether this is a Query, Insert, or Delete
-	 *            operation.
-	 * @param writeTimestamp
-	 *            The timestamp of the relation view(s) using to write on the
-	 *            {@link IMutableRelation}s (ignored if you are not execution
-	 *            mutation programs).
-	 * @param readTimestamp
-	 *            The timestamp of the relation view(s) used to read from the
-	 *            access paths.
-	 * @param bufferCapacity
-	 *            The capacity of the buffers used to support chunked iterators
-	 *            and efficient ordered writes.
-	 * @param solutionFlags
-	 *            Flags controlling the behavior of
-	 *            {@link #newSolution(IRule, IBindingSet)}.
-	 * @param filter
-	 *            An optional filter that will be applied to keep matching
-	 *            elements out of the {@link IBuffer} for Query or Mutation
-	 *            operations.
 	 */
 	public RDFJoinNexus(RDFJoinNexusFactory joinNexusFactory,
 			IIndexManager indexManager) {
@@ -170,7 +170,11 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.readTimestamp = joinNexusFactory.readTimestamp;
 
+        this.forceSerialExecution = joinNexusFactory.forceSerialExecution;
+        
         this.justify = joinNexusFactory.justify;
+ 
+        this.backchain = joinNexusFactory.backchain;
         
         this.bufferCapacity = joinNexusFactory.bufferCapacity;
         
@@ -187,6 +191,8 @@ public class RDFJoinNexus implements IJoinNexus {
             }
             
         };
+        
+        this.planFactory = joinNexusFactory.planFactory;
    
     }
 
@@ -196,19 +202,19 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-    /**
-     * Note: This MUST be [false] for a release!
-     */
-    final private transient boolean forceSerialExecution = true;
+    public IRangeCountFactory getRangeCountFactory() {
+        
+        return rangeCountFactory;
+        
+    }
+    
+    final private transient boolean forceSerialExecution;
     
     final public boolean forceSerialExecution() {
 
-        if(forceSerialExecution) {
-            
-            log.warn("Forcing serial execution of rule sets.");
-            
-        }
-        
+        if (log.isInfoEnabled())
+            log.info("forceSerialExecution="+forceSerialExecution);
+
         return forceSerialExecution;
     	
     }
@@ -409,6 +415,22 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
+    /**
+     * FIXME When {@link #backchain} is true, wrap the access path so that (a)
+     * the iterator will visit the backchained inferences as well; and (b) an
+     * exact range count must scan the iterator since it may materialize
+     * additional inferences rather than distributing the range count operation
+     * over the data.
+     * 
+     * @todo consider encapsulating the {@link IRangeCountFactory} in the
+     *       returned access path for non-exact range count requests. this will
+     *       make it harder to write the unit tests.
+     * 
+     * FIXME verify correct and efficient closure
+     * 
+     * FIXME verify correct LUBM query under sesame and correct and efficient
+     * query under hard-coded lubm queries.
+     */
     public IAccessPath getTailAccessPath(IPredicate predicate) {
     	
         // Resolve the relation name to the IRelation object.
@@ -429,7 +451,8 @@ public class RDFJoinNexus implements IJoinNexus {
     }
     
     @SuppressWarnings("unchecked")
-    public void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet ) {
+    public void copyValues(final Object e, final IPredicate predicate,
+            final IBindingSet bindingSet) {
 
         if (e == null)
             throw new IllegalArgumentException();
@@ -450,7 +473,13 @@ public class RDFJoinNexus implements IJoinNexus {
             
             if(t.isVar()) {
 
-                bindingSet.set((IVariable<Long>) t, new Constant<Long>(spo.s));
+                final IVariable<Long> var = (IVariable<Long>)t;
+                
+                final Constant newval = new Constant<Long>(spo.s);
+
+//                assert assertConsistentBinding(var, newval, e, predicate, bindingSet);
+                
+                bindingSet.set(var, newval);
                 
             }
 
@@ -462,7 +491,13 @@ public class RDFJoinNexus implements IJoinNexus {
             
             if(t.isVar()) {
 
-                bindingSet.set((IVariable<Long>) t, new Constant<Long>(spo.p));
+                final IVariable<Long> var = (IVariable<Long>)t;
+
+                final Constant newval = new Constant<Long>(spo.p);
+
+//                assert assertConsistentBinding(var, newval, e, predicate, bindingSet);
+
+                bindingSet.set(var, newval);
                 
             }
 
@@ -474,7 +509,13 @@ public class RDFJoinNexus implements IJoinNexus {
             
             if(t.isVar()) {
 
-                bindingSet.set((IVariable<Long>) t, new Constant<Long>(spo.o));
+                final IVariable<Long> var = (IVariable<Long>)t;
+
+                final Constant newval = new Constant<Long>(spo.o);
+
+//                assert assertConsistentBinding(var, newval, e, predicate, bindingSet);
+
+                bindingSet.set(var, newval);
                 
             }
 
@@ -482,6 +523,50 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
+    /*
+     * Note: This finds "non-problems". In fact, we only clear downstream
+     * bindings in order to get the access path right for the next subquery. We
+     * DO NOT clear the old bindings before copying in the new bindings from the
+     * next element.
+     */
+//    
+//    /**
+//     * Throws an {@link AssertionError} if the variable is already bound to a
+//     * different value.
+//     * 
+//     * @param var
+//     *            The variable.
+//     * @param newval
+//     *            The new value.
+//     * @param e
+//     *            From {@link #copyValues(Object, IPredicate, IBindingSet)}
+//     * @param predicate
+//     *            From {@link #copyValues(Object, IPredicate, IBindingSet)}
+//     * @param bindingSet
+//     *            From {@link #copyValues(Object, IPredicate, IBindingSet)}
+//     *            
+//     * @return <code>true</code>
+//     */
+//    private boolean assertConsistentBinding(IVariable<Long> var,
+//            IConstant<Long> newval, Object e, IPredicate predicate,
+//            IBindingSet bindingSet) {
+//
+//        assert !bindingSet.isBound(var) || bindingSet.get(var).equals(newval) : "already bound to different value: var="
+//                + var
+//                + ", newval="
+//                + newval
+//                + ", oldval="
+//                + bindingSet.get(var)
+//                + ", e="
+//                + e
+//                + ", pred="
+//                + predicate
+//                + ", bindingSet=" + bindingSet;
+//
+//        return true;
+//
+//    }
+//    
     public ISolution newSolution(IRule rule, IBindingSet bindingSet) {
 
         final Solution solution = new Solution(this, rule, bindingSet);
@@ -538,6 +623,12 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
+    public IEvaluationPlanFactory getPlanFactory() {
+        
+        return planFactory;
+        
+    }
+    
     public IResourceLocator getRelationLocator() {
         
         return indexManager.getResourceLocator();

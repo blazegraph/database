@@ -304,8 +304,6 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         if (indexManager == null)
             throw new IllegalStateException();
         
-        final ExecutorService service = indexManager.getExecutorService();
-        
         /*
          * Submit and wait for the future.
          * 
@@ -316,7 +314,14 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
          * 
          * Note: This is handled by the task factory.
          */
-        final RuleStats stats = service.submit(task).get();
+//        final ExecutorService service = indexManager.getExecutorService();
+//        final RuleStats stats = service.submit(task).get();
+        final RuleStats stats;
+        try {
+            stats = task.call();
+        } catch (Exception ex) {
+            throw new ExecutionException(ex);
+        }
 
         if (log.isInfoEnabled())
             log.info("program=" + program.getName() + " - done");
