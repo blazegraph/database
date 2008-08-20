@@ -141,6 +141,12 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             return;
         }
         
+        if (rule.getTailCount() == 2) {
+            order[0] = rangeCount(0) < rangeCount(1) ? 0 : 1;
+            order[1] = rangeCount(0) < rangeCount(1) ? 1 : 0;
+            return;
+        }
+        
         // clear arrays.
         for (int i = 0; i < rule.getTailCount(); i++) {
             order[i] = -1; // -1 is used to detect logic errors.
