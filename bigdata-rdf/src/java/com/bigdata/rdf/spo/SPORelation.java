@@ -655,8 +655,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
     public IAccessPath<ISPO> getAccessPath(final long s, final long p,
             final long o, IElementFilter<ISPO> filter) {
 
-//      return new AccessPath(this, KeyOrder.get(s, p, o), s, p, o);
-
         final IVariableOrConstant<Long> S = (s == NULL ? Var.var("s")
                 : new Constant<Long>(s));
 

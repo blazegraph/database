@@ -422,11 +422,18 @@ public class RDFJoinNexus implements IJoinNexus {
      * additional inferences rather than distributing the range count operation
      * over the data.
      * 
+     * One way to address this is to make the backchainer just an
+     * {@link IAccessPath}. We just need to be careful that we only layer the
+     * source iterator when the specific triple pattern requires inference and
+     * make it possible to selectively disabled certain classes of inference
+     * (sameAs) that might be handled at the {@link ISolution} level.
+     * 
      * @todo consider encapsulating the {@link IRangeCountFactory} in the
      *       returned access path for non-exact range count requests. this will
-     *       make it harder to write the unit tests.
-     *       
-     *       @see InferenceEngine#backchainIterator(IPredicate)
+     *       make it slightly harder to write the unit tests for the
+     *       {@link IEvaluationPlanFactory}
+     * 
+     * @see InferenceEngine#backchainIterator(IPredicate)
      */
     public IAccessPath getTailAccessPath(IPredicate predicate) {
     	
