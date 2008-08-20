@@ -1544,9 +1544,9 @@ public class BigdataSail extends SailBase implements Sail {
             
             final IChunkedOrderedIterator<ISPO> src;
             
-            if(getTruthMaintenance() && includeInferred) {
+            if(/*getTruthMaintenance() &&*/ includeInferred) {
 
-                /*
+                /* FIXME Do this if TM is enabled OR the database closure has been updated, but we have no way to detect the latter.
                  * Obtain an iterator that will generate any missing entailments at
                  * query time. The behavior of the iterator depends on how the
                  * InferenceEngine was configured.
