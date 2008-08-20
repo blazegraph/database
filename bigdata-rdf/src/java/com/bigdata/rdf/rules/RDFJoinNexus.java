@@ -425,6 +425,8 @@ public class RDFJoinNexus implements IJoinNexus {
      * @todo consider encapsulating the {@link IRangeCountFactory} in the
      *       returned access path for non-exact range count requests. this will
      *       make it harder to write the unit tests.
+     *       
+     *       @see InferenceEngine#backchainIterator(IPredicate)
      */
     public IAccessPath getTailAccessPath(IPredicate predicate) {
     	
