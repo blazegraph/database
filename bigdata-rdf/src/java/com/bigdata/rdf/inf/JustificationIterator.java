@@ -499,7 +499,7 @@ public class JustificationIterator implements IJustificationIterator {
 
             try {
 
-                Thread.sleep(100);
+                Thread.sleep(10/*ms*/);
 
             } catch (InterruptedException ex) {
 

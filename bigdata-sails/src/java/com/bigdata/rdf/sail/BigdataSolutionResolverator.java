@@ -67,6 +67,11 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
     private Map<Long, BigdataValue> terms = null;
     
     /**
+     * The elapsed time spend in this class.
+     */
+    private long elapsed = 0L;
+    
+    /**
      * 
      * @param db
      *            Used to resolve term identifiers to {@link Value} objects.
@@ -109,7 +114,20 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
             
         }
         
-        return src.hasNext();
+        final long begin = System.currentTimeMillis();
+        
+        try {
+
+            return src.hasNext();
+            
+        } finally {
+
+            final long tmp = System.currentTimeMillis() - begin;
+            elapsed += (tmp);
+            if (log.isInfoEnabled())
+                log.info("source hasNext: time=" + tmp + "ms");
+
+        }
         
     }
 
@@ -120,6 +138,8 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
 
         if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
 
+            final long begin = System.currentTimeMillis();
+            
             if (log.isInfoEnabled())
                 log.info("Fetching next chunk");
             
@@ -162,9 +182,16 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
             // batch resolve term identifiers to terms.
             terms = db.getLexiconRelation().getTerms(ids);
 
+            if (log.isInfoEnabled())
+                log.info("Resolved " + ids.size() + " term identifiers");
+            
             // reset the index.
             lastIndex = 0;
             
+            final long tmp = System.currentTimeMillis() - begin;
+            elapsed += (tmp);
+            if(log.isInfoEnabled()) log.info("nextChunk ready: time="+tmp+"ms");
+                        
         } else {
             
             // index of the next SPO in this chunk.
@@ -174,24 +201,21 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
 
         if(log.isDebugEnabled()) {
             
-            log.debug("lastIndex="+lastIndex+", chunk.length="+chunk.length);
+            log.debug("lastIndex=" + lastIndex + ", chunk.length="
+                    + chunk.length);
             
         }
         
         // the current solution
         final ISolution solution = chunk[lastIndex];
 
-        if(log.isDebugEnabled()) {
-            
-            log.debug("solution="+solution);
-            
-        }
-        
         // resolve the solution to a Sesame2 BindingSet
         final BindingSet bindingSet = getBindingSet(solution);
                 
         if (log.isDebugEnabled()) {
             
+            log.debug("solution=" + solution);
+
             log.debug("bindingSet=" + bindingSet);
 
         }
@@ -262,7 +286,7 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
     public void close() {
 
         if (log.isInfoEnabled())
-            log.info("");
+            log.info("elapsed=" + elapsed);
         
         src.close();
 

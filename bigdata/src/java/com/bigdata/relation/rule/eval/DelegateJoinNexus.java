@@ -119,6 +119,10 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getRuleTaskFactory(parallel, rule);
     }
 
+    public IEvaluationPlanFactory getPlanFactory() {
+        return delegate.getPlanFactory();
+    }
+
     public IJoinNexusFactory getJoinNexusFactory() {
         return delegate.getJoinNexusFactory();
     }
@@ -142,5 +146,9 @@ public class DelegateJoinNexus implements IJoinNexus {
 	public IAccessPath getTailAccessPath(IPredicate pred) {
 		return delegate.getTailAccessPath(pred);
 	}
+
+    public IRangeCountFactory getRangeCountFactory() {
+        return delegate.getRangeCountFactory();
+    }
 
 }

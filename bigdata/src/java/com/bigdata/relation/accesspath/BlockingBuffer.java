@@ -199,7 +199,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             throw new IllegalArgumentException();
 
         if (minChunkSize > capacity)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("minChunkSize=" + minChunkSize
+                    + ", capacity=" + capacity);
         
         if (chunkTimeout < 0)
             throw new IllegalArgumentException();
@@ -563,7 +564,18 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 if (spo == null) {
                     
                     try {
-                        Thread.sleep(100/*millis*/);
+                        /*
+                         * @todo if this threashold is large (100ms is large)
+                         * then it places an unacceptable latency on short
+                         * queries since the total query can often be evaluated
+                         * in less than 100ms. However, if it is small then we
+                         * might loop while waiting for the results to be
+                         * materialized. Perhaps an explicit condition would be
+                         * better or using an increasing wait (or a fixed
+                         * sequence of total time waiting).
+                         */
+                        final long sleepMillis = 10;
+                        Thread.sleep(sleepMillis);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }

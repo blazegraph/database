@@ -41,7 +41,7 @@ import com.bigdata.relation.rule.Rule;
 import com.bigdata.service.ILoadBalancerService;
 
 /**
- * Statistics about what the {@link IProgram} did.
+ * Statistics about what an {@link IStep} did when it was executed.
  * <p>
  * Program execution has the general form of either a set of {@link IStep}s
  * executed, at least logically, in parallel, or a sequence of {@link IStep}s
@@ -72,13 +72,6 @@ public class RuleStats {
      * 
      * @param program
      *            The program.
-     * 
-     * @todo when aggregating for a rule, we need to identify all rules that are
-     *       derived from the same rule whether by a re-write (for truth
-     *       maintenance) or specialization. Those should all get rolled up
-     *       under the same base rule, but probably not crossing a fixed point
-     *       closure. The total should get rolled up under the top-level
-     *       program.
      */
     public RuleStats(IStep program) {
        
@@ -90,24 +83,28 @@ public class RuleStats {
 
             final int tailCount = ((IRule) program).getTailCount();
 
-            this.chunkCount = new long[tailCount];
+            this.evalOrder = new int[tailCount];
 
-            this.elementCount = new long[tailCount];
+            this.chunkCount = new long[tailCount];
 
             this.subqueryCount = new int[tailCount];
 
-            this.evalOrder = new int[tailCount];
+            this.elementCount = new long[tailCount];
 
-        } else {
-
-            this.chunkCount = null;
+            this.rangeCount = new long[tailCount];
             
-            this.elementCount = null;
-
-            this.subqueryCount = null;
+        } else {
 
             this.evalOrder = null;
 
+            this.chunkCount = null;
+            
+            this.subqueryCount = null;
+            
+            this.elementCount = null;
+
+            this.rangeCount = null;
+            
         }
 
 //        this.nexecutions = 0;
@@ -129,10 +126,28 @@ public class RuleStats {
         
         this(ruleState.getRule());
         
-        System.arraycopy(ruleState.order, 0, evalOrder, 0, ruleState.order.length);
-
-//        this.nexecutions = 1;
+        final int tailCount = ruleState.rule.getTailCount();
         
+        System.arraycopy(ruleState.order, 0, evalOrder, 0, tailCount);
+
+        for (int i = 0; i < tailCount; i++) {
+            
+            /*
+             * Copy range count data.
+             * 
+             * @todo This data is normally cached, but for some rules and some
+             * evaluation planners the plan is formed without requesting some
+             * (or any) of the range counts. An optimization would allow us to
+             * NOT force a range count if it was not already take.
+             * 
+             * However, a caching IRangeCountFactory might hide these costs
+             * anyway.
+             */
+            
+            rangeCount[ i ] = ruleState.plan.rangeCount(i);
+            
+        }
+
         this.aggregate = false;
         
     }
@@ -214,29 +229,21 @@ public class RuleStats {
     public final int[] subqueryCount;
     
     /**
-     * The #of elements considered for the each predicate in the body of the
-     * rule (in the order in which they were declared, not the order in which
-     * they were evaluated).
+     * The #of elements considered for each predicate in the body of the rule
+     * (in the order in which they were declared, not the order in which they
+     * were evaluated).
      */
     public final long[] elementCount;
 
     /**
-     * The #of elements considered by the program (total over
-     * {@link #elementCount}).
+     * The predicated range counts for each predicate in the body of the rule
+     * (in the order in which they were declared, not the order in which they
+     * were evaluated) as reported by the {@link IRangeCountFactory}. The range
+     * counts are used by the {@link IEvaluationPlan}. You can compare the
+     * {@link #elementCount}s with the {@link #rangeCount}s to see the actual
+     * vs predicated #of elements visited per predicate.
      */
-    public int getElementCount() {
-
-        int n = 0;
-
-        for (int i = 0; i < elementCount.length; i++) {
-
-            n += elementCount[i];
-
-        }
-
-        return n;
-        
-    }
+    public final long[] rangeCount;
     
     /**
      * Returns the headings.
@@ -272,7 +279,11 @@ public class RuleStats {
      * <dd>The #of subqueries issued for the right-hand side of the JOIN for
      * each predicate in the tail of the rule.</dd>
      * <dt>elementCount</dt>
-     * <dd>The #of elements materialized from each tail predicate in the rule.</dd>
+     * <dd>The #of elements that were actually visited for each tail predicate
+     * in the rule.</dd>
+     * <dt>ranceCount</dt>
+     * <dd>The #of elements predicated for each tail predicate in the rule by
+     * the {@link IRangeCountFactory} on behalf of the {@link IEvaluationPlan}.</dd>
      * </dl>
      * 
      * @todo collect data on the size of the subquery results. A large #of
@@ -286,7 +297,7 @@ public class RuleStats {
      
         return "rule, elapsed"
                 + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
-                + ", evalOrder, subqueryCount, chunkCount, elementCount"
+                + ", evalOrder, subqueryCount, chunkCount, elementCount, rangeCount"
         ;
         
     }
@@ -331,6 +342,7 @@ public class RuleStats {
                      + ", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q //
                      + ", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q //
                      + ", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q //
+                     + ", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q //
                      )
                      :(""//", #exec="+nexecutions//
                      ))
@@ -457,82 +469,6 @@ public class RuleStats {
         
     }
     
-    /*
-     * FIXME restore code that examines the cost to summarize by rule.
-     */
-//    public String toString() {
-//
-//        if(rules.isEmpty()) return "No rules were run.\n";
-//        
-//        StringBuilder sb = new StringBuilder();
-//        
-//        // summary
-//        
-//        sb.append("rule    \tms\t#entms\tentms/ms\n");
-//
-//        long elapsed = 0;
-//        long numComputed = 0;
-//        
-//        for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
-//            
-//            RuleStats stats = entry.getValue();
-//            
-//            // note: hides low cost rules (elapsed<=10)
-//            
-//            if(stats.elapsed>=10) {
-//            
-//                sb.append(stats.name + "\t" + stats.elapsed + "\t"
-//                        + stats.solutionCount + "\t"
-//                        + stats.getEntailmentsPerMillisecond());
-//
-//                sb.append("\n");
-//                
-//            }
-//            
-//            elapsed += stats.elapsed;
-//            
-//            numComputed += stats.solutionCount;
-//            
-//        }
-//
-//        sb.append("totals: elapsed="
-//                + elapsed
-//                + ", nadded="
-//                + nentailments
-//                + ", numComputed="
-//                + numComputed
-//                + ", added/sec="
-//                + (elapsed == 0 ? "N/A"
-//                        : (long) (nentailments * 1000d / elapsed))
-//                + ", computed/sec="
-//                + (elapsed == 0 ? "N/A"
-//                        : (long) (numComputed * 1000d / elapsed)) + "\n");
-//        
-//        /* details.
-//         * 
-//         * Note: showing details each time for high cost rules.
-//         */
-//        
-////        if(InferenceEngine.DEBUG) {
-//
-//            for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
-//
-//                RuleStats stats = entry.getValue();
-//
-//                if(stats.elapsed>100) {
-//
-//                    sb.append(stats+"\n");
-//                    
-//                }
-//            
-//            }
-//            
-////        }
-//        
-//        return sb.toString();
-//        
-//    }
-
     /**
      * When execution {@link RuleState}s are being aggregated, this will contain
      * the individual {@link RuleStats} for each execution {@link RuleState}. 
@@ -555,13 +491,15 @@ public class RuleStats {
 
             for (int i = 0; i < elementCount.length; i++) {
 
-                chunkCount[i] += o.chunkCount[i];
+                // Note: order[] is NOT aggregated.
 
-                elementCount[i] += o.elementCount[i];
+                chunkCount[i] += o.chunkCount[i];
 
                 subqueryCount[i] += o.subqueryCount[i];
 
-                // Note: order[] is NOT aggregated.
+                elementCount[i] += o.elementCount[i];
+
+                rangeCount[i] += o.rangeCount[i];
 
             }
             
@@ -575,16 +513,4 @@ public class RuleStats {
     
     }
    
-//    public static class ClosureStats extends RuleStats {
-//        
-//    }
-//    
-//    public static class SequenceStats extends RuleStats {
-//        
-//    }
-//
-//    public static class ProgramStats extends RuleStats {
-//        
-//    }
-
 }

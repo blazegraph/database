@@ -48,8 +48,15 @@ Modifications:
 package com.bigdata.rdf.rules;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.IEvaluationPlan;
+import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 
@@ -71,10 +78,18 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final long writeTimestamp;
     final long readTimestamp;
     final boolean justify;
+    /**
+     * true for high level query and false for closure. when <code>true</code>,
+     * query time inferences are included in an read on the access path using
+     * {@link InferenceEngine#backchainIterator(IPredicate)}.
+     */
+    final boolean backchain;
+    final boolean forceSerialExecution;
     final int bufferCapacity;
     final int solutionFlags;
     @SuppressWarnings("unchecked")
 	final IElementFilter filter;
+    final IEvaluationPlanFactory planFactory;
 
     public String toString() {
         
@@ -92,12 +107,18 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         sb.append(", justify="+justify);
         
+        sb.append(", backchain="+backchain);
+        
+        sb.append(", forceSerialExecution="+forceSerialExecution);
+        
         sb.append(", bufferCapacity="+bufferCapacity);
         
         sb.append(", solutionFlags="+solutionFlags);
         
         sb.append(", filter="+(filter==null?"N/A":filter.getClass().getName()));
-        
+
+        sb.append(", planFactory="+planFactory.getClass().getName());
+
         sb.append("}");
         
         return sb.toString();
@@ -105,21 +126,49 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     }
 
 	/**
-	 * 
-	 * @param writeTime
-	 * @param readTime
-	 * @param justify
-	 * @param solutionFlags
-	 * @param filter
-	 */
+     * 
+     * @param action
+     *            Indicates whether this is a Query, Insert, or Delete
+     *            operation.
+     * @param writeTimestamp
+     *            The timestamp of the relation view(s) using to write on the
+     *            {@link IMutableRelation}s (ignored if you are not execution
+     *            mutation programs).
+     * @param readTimestamp
+     *            The timestamp of the relation view(s) used to read from the
+     *            access paths.
+     * @param forceSerialExecution
+     *            When <code>true</code>, rule sets will be forced to execute
+     *            sequentially even when they are not flagged as a sequential
+     *            program.
+     * @param justify
+     *            if justifications are required.
+     * @param bufferCapacity
+     *            The capacity of the buffers used to support chunked iterators
+     *            and efficient ordered writes.
+     * @param solutionFlags
+     *            Flags controlling the behavior of
+     *            {@link #newSolution(IRule, IBindingSet)}.
+     * @param filter
+     *            An optional filter that will be applied to keep matching
+     *            elements out of the {@link IBuffer} for Query or Mutation
+     *            operations.
+     * @param planFactory
+     *            The factory used to generate {@link IEvaluationPlan}s for
+     *            {@link IRule}s.
+     */
 	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
-			long writeTime, long readTime, boolean justify, int bufferCapacity,
-			int solutionFlags, IElementFilter filter) {
+            long writeTime, long readTime, boolean forceSerialExecution,
+            boolean justify, int bufferCapacity, int solutionFlags,
+            IElementFilter filter, IEvaluationPlanFactory planFactory) {
 
         if (ruleContext == null)
             throw new IllegalArgumentException();
 
         if (action == null)
+            throw new IllegalArgumentException();
+
+        if (planFactory == null)
             throw new IllegalArgumentException();
 
         this.ruleContext = ruleContext;
@@ -132,11 +181,18 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
         this.justify = justify;
 
+        this.backchain = ruleContext == RuleContextEnum.HighLevelQuery ? true
+                : false;
+        
+        this.forceSerialExecution = forceSerialExecution;
+        
         this.bufferCapacity = bufferCapacity;
         
         this.solutionFlags = solutionFlags;
 
         this.filter = filter;
+        
+        this.planFactory = planFactory;
 
     }
 

@@ -266,12 +266,11 @@ public class UnisolatedReadWriteIndex implements IIndex {
     static final private WeakHashMap<IIndex, ReadWriteLock> locks = new WeakHashMap<IIndex,ReadWriteLock>();
     
     /**
-     * The default capacity for iterator reads against the underlying index.
-     * This is default is relatively small since the index is local and the main
-     * purpose of the capacity is to reduce the contention for the
+     * The default capacity for iterator reads against the underlying index. The
+     * main purpose of the capacity is to reduce the contention for the
      * {@link ReadWriteLock}.
      */
-    final static protected int DEFAULT_CAPACITY = 1000;
+    final static protected int DEFAULT_CAPACITY = 10000;
     
     /**
      * Creates a view of an unisolated index that will enforce the concurrency

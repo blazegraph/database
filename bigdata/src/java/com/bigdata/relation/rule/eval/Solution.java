@@ -69,14 +69,16 @@ public class Solution<E> implements ISolution<E>, Serializable {
      * @param rule
      *            The rule.
      * @param bindingSet
-     *            This MUST be a <strong>copy</strong> of the binding set that
-     *            will NOT be modified by further execution of the rule.
+     *            The binding set for this solution. If
+     *            {@link IJoinNexus#BINDINGS} was specified, then the binding
+     *            set will be <em>cloned</em> by this ctor.
      * 
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
      */
     @SuppressWarnings("unchecked")
-    public Solution(IJoinNexus joinNexus, IRule rule, IBindingSet bindingSet) {
+    public Solution(final IJoinNexus joinNexus, final IRule rule,
+            final IBindingSet bindingSet) {
         
         if (joinNexus == null)
             throw new IllegalArgumentException();
@@ -154,19 +156,19 @@ public class Solution<E> implements ISolution<E>, Serializable {
     }
 
     public String toString() {
-        
-        StringBuilder sb = new StringBuilder();
-        
+
+        final StringBuilder sb = new StringBuilder();
+
         sb.append("Solution");
-        
-        sb.append("{ element="+e);
-        
-        sb.append(", rule="+rule);
-        
-        sb.append(", bindingSet="+bindingSet);
-        
+
+        sb.append("{ element=" + e);
+
+        sb.append(", rule=" + rule);
+
+        sb.append(", bindingSet=" + bindingSet);
+
         sb.append("}");
-        
+
         return sb.toString();
         
     }

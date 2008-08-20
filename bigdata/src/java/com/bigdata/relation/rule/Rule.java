@@ -500,6 +500,43 @@ public class Rule<E> implements IRule<E>, Serializable {
 
     }
 
+    public int getVariableCount(int index, IBindingSet bindingSet) {
+        
+//      if (index < 0 || index >= body.length)
+//          throw new IndexOutOfBoundsException();
+
+      if (bindingSet == null)
+          throw new IllegalArgumentException();
+      
+      final IPredicate pred = tail[index];
+
+      final int arity = pred.arity();
+      
+      int nbound = 0;
+      
+      for(int j=0; j<arity; j++) {
+
+          final IVariableOrConstant t = pred.get(j);
+          
+          // check any variables.
+          if (t.isVar()) {
+              
+              // if a variable is unbound then return false.
+              if (!bindingSet.isBound((IVariable) t)) {
+                  
+                  nbound++;
+                  
+              }
+              
+          }
+          
+      }
+      
+      return nbound;
+      
+  }
+  
+
     public boolean isFullyBound(int index, IBindingSet bindingSet) {
         
 //        if (index < 0 || index >= body.length)

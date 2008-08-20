@@ -181,12 +181,12 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         .newBindingSet(rule);
 
                 // (u rdfs:subClassOf x)
-                assertEquals(SPOKeyOrder.POS, ruleState.getAccessPath(0,
-                        bindingSet).getKeyOrder());
+                assertEquals(SPOKeyOrder.POS, joinNexus.getTailAccessPath(
+                        rule.getTail(0).asBound(bindingSet)).getKeyOrder());
 
                 // (v rdfs:subClassOf u)
-                assertEquals(SPOKeyOrder.POS, ruleState.getAccessPath(1,
-                        bindingSet).getKeyOrder());
+                assertEquals(SPOKeyOrder.POS, joinNexus.getTailAccessPath(
+                        rule.getTail(1).asBound(bindingSet)).getKeyOrder());
 
             }
 
@@ -212,8 +212,9 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         .newBindingSet(rule);
 
                 // (x y z)
-                assertEquals(SPOKeyOrder.SPO, ruleState.getAccessPath(0,
-                        bindingSet).getKeyOrder());
+                assertEquals(SPOKeyOrder.SPO,
+                        joinNexus.getTailAccessPath(
+                                rule.getTail(0).asBound(bindingSet)).getKeyOrder());
 
             }
 
@@ -244,12 +245,15 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         .newBindingSet(rule);
 
                 // (1L y z)
-                assertEquals(SPOKeyOrder.SPO, ruleState.getAccessPath(0,
-                        bindingSet).getKeyOrder());
+                assertEquals(SPOKeyOrder.SPO,
+                        joinNexus.getTailAccessPath(
+                                rule.getTail(0).asBound(bindingSet)).getKeyOrder());
 
                 // (x y 1L)
-                assertEquals(SPOKeyOrder.OSP, ruleState.getAccessPath(1,
-                        bindingSet).getKeyOrder());
+                assertEquals(SPOKeyOrder.OSP,
+                        joinNexus.getTailAccessPath(
+                                rule.getTail(1).asBound(bindingSet)).getKeyOrder());
+
 
             }
 
@@ -334,11 +338,13 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 for (int i = 0; i < rule.getTailCount(); i++) {
 
-                    assertEquals(0, ruleState.getAccessPath(i, bindingSet)
-                            .rangeCount(true/* exact */));
+                    final IAccessPath accessPath = joinNexus
+                            .getTailAccessPath(rule.getTail(i).asBound(
+                                    bindingSet));
 
-                    assertEquals(0, ruleState.getAccessPath(i, bindingSet)
-                            .rangeCount(false/* exact */));
+                    assertEquals(0, accessPath.rangeCount(true/* exact */));
+
+                    assertEquals(0, accessPath.rangeCount(false/* exact */));
 
                 }
 
@@ -421,16 +427,16 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 final RuleState ruleState = new RuleState(rule, joinNexus);
 
-                ruleState.set(Var.var("u"), U1, bindings);
+                bindings.set(Var.var("u"), U1);
 
-                ruleState.set(Var.var("x"), X1, bindings);
+                bindings.set(Var.var("x"), X1);
 
                 assertTrue(rule.isFullyBound(0, bindings));
 
                 /*
                  * Now bind the last variable.
                  */
-                ruleState.set(Var.var("v"), V1, bindings);
+                bindings.set(Var.var("v"), V1);
 
                 assertTrue(rule.isFullyBound(1, bindings));
 

@@ -31,7 +31,6 @@ package com.bigdata.relation.accesspath;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -97,19 +96,6 @@ public interface IAccessPath<R> extends Iterable<R> {
      */
     public ITupleIterator<R> rangeIterator();
 
-//    /**
-//     * The raw iterator for traversing the selected index within the key range
-//     * implied by {@link IPredicate}.
-//     * 
-//     * @param capacity
-//     *            An override for the capacity.
-//     * @param flags
-//     *            An override for the flags.
-//     * @param filter An override for the filter.
-//     */
-//    public ITupleIterator<R> rangeIterator(int capacity, int flags,
-//            IFilterConstructor<R> filter);
-    
     /**
      * An iterator visiting elements using the natural order of the index
      * selected for the {@link IPredicate}. This is equivalent to

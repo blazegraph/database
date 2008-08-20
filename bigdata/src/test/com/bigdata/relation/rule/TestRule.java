@@ -86,6 +86,26 @@ public class TestRule extends AbstractRuleTestCase {
 
         assertFalse(r.isDeclared(Var.var("x")));
         
+        {
+
+            final IBindingSet bindings = new HashBindingSet();
+            
+            assertFalse(r.getTail(0).isFullyBound());
+            
+            assertEquals(1, r.getTail(0).getVariableCount());
+            
+            assertFalse(r.isFullyBound(0, bindings));
+            
+            assertEquals(1, r.getVariableCount(0,bindings));
+            
+            bindings.set(u, rdfType);
+            
+            assertTrue(r.isFullyBound(0, bindings));
+
+            assertEquals(0, r.getVariableCount(0,bindings));
+            
+        }
+        
     }
     
     public void test_ctor_noHead() {
