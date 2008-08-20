@@ -43,6 +43,7 @@ import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
@@ -52,72 +53,28 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Adds support for RDFS inference.
+ * Supports RDFS inference plus optional support for <code>owl:sameAs</code>,
+ * <code>owl:equivalentProperty</code>, and <code>owl:equivalentClass</code>.
+ * Additional entailments can be introduced using custom rules.
  * <p>
- * A fact always has the form:
- * 
- * <pre>
- * triple(s, p, o)
- * </pre>
- * 
- * where s, p, and or are identifiers for RDF values in the terms index. Facts
- * are stored either in the long-term database or in a per-query answer set.
- * <p>
- * A rule always has the form:
- * 
- * <pre>
- *                                    pred :- pred*.
- * </pre>
- * 
- * where <i>pred</i> is either
- * <code>magic(triple(varOrId,varOrId,varOrId))</code> or
- * <code>triple(varOrId,varOrId,varOrId)</code>. A rule is a clause
- * consisting of a head (a predicate) and a body (one or more predicates). Note
- * that the body of the rule MAY be empty. When there are multiple predicates in
- * the body of a rule the rule succeeds iff all predicates in the body succeed.
- * When a rule succeeds, the head of the clause is asserted. If the head is a
- * predicate then it is asserted into the rule base for the query. If it is a
- * fact, then it is asserted into the database for the query. Each predicate has
- * an "arity" with is the number of arguments, e.g., the predicate "triple" has
- * an arity of 3 and may be written as triple/3 while the predicate "magic" has
- * an arity of 1 and may be written as magic/1.
- * <p>
- * A copy is made of the basic rule base at the start of each query and a magic
- * transform is applied to the rule base, producing a new rule base that is
- * specific to the query. Each query is also associated with an answer set in
- * which facts are accumulated. Query execution consists of iteratively applying
- * all rules in the rule base. Execution terminates when no new facts or rules
- * are asserted in a given iteration - this is the <i>fixed point</i> of the
- * query.
- * <p>
- * Note: it is also possible to run the rule set without creating a magic
- * transform. This will produce the full forward closure of the entailments.
- * This is done by using the statements loaded from some source as the source
- * fact base and inserting the entailments created by the rules back into
- * statement collection. When the rules reach their fixed point, the answer set
- * contains both the told triples and the inferred triples and is simply
- * inserted into the long-term database.
- * <p>
- * rdfs9 is represented as:
- * 
- * <pre>
- *                                     triple(?v,rdf:type,?x) :-
- *                                        triple(?u,rdfs:subClassOf,?x),
- *                                        triple(?v,rdf:type,?u). 
- * </pre>
- * 
- * rdfs11 is represented as:
- * 
- * <pre>
- *    triple(?u,rdfs:subClassOf,?x) :-
- *      triple(?u,rdfs:subClassOf,?v),
- *      triple(?v,rdf:subClassOf,?x). 
- * </pre>
+ * The {@link IRule}s are declarative, and it is easy to write new rules. In
+ * order for the rules to be used by the {@link InferenceEngine} you need to
+ * introduce them into the base class. There are two "programs" used to compute
+ * and maintain closure. The "full" closure program is a simple fix point of the
+ * RDFS+ entailments, except for the <code> foo rdf:type rdfs:Resource</code>
+ * entailments which are normally generated at query time. The "fast" closure
+ * program breaks nearly all cycles in the RDFS rules and runs nearly entirely
+ * as a sequence of {@link IRule}s, including several custom rules. It is far
+ * easier to modify the "full" closure program since any new rules can just be
+ * dropped into place. Modifying the "fast" closure program requires careful
+ * consideration of the entailments computed at each stage in order to determine
+ * where a new rule would fit in. When support for <code>owl:sameAs</code>,
+ * etc. processing is enabled, some of the entailments are computed by rules run
+ * during forward closure and some of the entailments are computed by rules run
+ * at query time.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo update the javadoc on this class.
  * 
  * FIXME test backchain iterator at scale.
  * 
@@ -132,9 +89,11 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  *       low hanging fruit there?
  * 
  * @todo Improve write efficiency for the proofs - they are slowing things way
- *       down. Note that using magic sets or a backward chainer will let us
- *       avoid writing proofs altogether since we can prove whether or not a
- *       statement is still entailed without recourse to reading proofs chains.
+ *       down. Perhaps turn off the range count metadata inside of the B+Tree
+ *       for that index? Note that using magic sets or a backward chainer will
+ *       let us avoid writing proofs altogether since we can prove whether or
+ *       not a statement is still entailed without recourse to reading proofs
+ *       chains.
  * 
  * @todo explore an option for "owl:sameAs" semantics using destructive merging
  *       (the terms are assigned the same term identifier, one of them is
