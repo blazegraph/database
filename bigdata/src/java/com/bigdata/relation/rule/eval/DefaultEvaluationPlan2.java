@@ -153,8 +153,10 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
          * they should be.
          */
         Join join = getFirstJoin();
-        order[0] = ((Tail) join.getD1()).getTail();
-        order[1] = ((Tail) join.getD2()).getTail();
+        int t1 = ((Tail) join.getD1()).getTail();
+        int t2 = ((Tail) join.getD2()).getTail();
+        order[0] = rangeCount(t1) < rangeCount(t2) ? t1 : t2;
+        order[1] = rangeCount(t1) < rangeCount(t2) ? t2 : t1;
         used[order[0]] = true;
         used[order[1]] = true;
         for (int i = 2; i < rule.getTailCount(); i++) {
