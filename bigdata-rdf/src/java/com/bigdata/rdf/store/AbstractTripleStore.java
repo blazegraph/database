@@ -108,6 +108,7 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -298,15 +299,26 @@ abstract public class AbstractTripleStore extends
      * The capacity of the buffers used when computing entailments (for insert
      * or query).
      * 
-     * @see Options#BUFFER_CAPACITY
-     * @see #newJoinNexusFactory(ActionEnum, int, IElementFilter)
-     * 
-     * FIXME Re-evaluate the effect of the buffer capacity for the chunked
-     * iterators. When we are running parallel rules and asynchronous iterators
-     * it could make sense to use much smaller buffers (10k vs 200k).
+     * @see Options#MUTATION_BUFFER_CAPACITY
      */
-    final public int bufferCapacity;
+    final public int mutationBufferCapacity;
 
+    /**
+     * The capacity of the buffers used when computing entailments (for insert
+     * or query).
+     * 
+     * @see Options#QUERY_BUFFER_CAPACITY
+     */
+    final public int queryBufferCapacity;
+
+    /**
+     * If the estimated range count for an
+     * {@link IAccessPath#iterator(int, int)} is LTE this threshold then do a
+     * fully buffered (synchronous) read. Otherwise we will do an asynchronous
+     * read.
+     */
+    final public int fullyBufferedReadThreshold;
+    
     /**
      * When <code>true</code>, rule sets will be forced to execute
      * sequentially even when they are not flagged as a sequential program.
@@ -548,9 +560,9 @@ abstract public class AbstractTripleStore extends
         /**
          * <p>
          * Sets the capacity of the buffers used by the chunked iterators for
-         * query answering and truth maintenance. These buffers make it possible
-         * to perform efficient ordered writes using the batch API (default
-         * 200k).
+         * mutation operations (insert and delete on a relation) (default
+         * {@value #MUTATION_BUFFER_CAPACITY}). These buffers make it possible
+         * to perform efficient ordered writes using the batch API.
          * </p>
          * <p>
          * Some results for comparison on a 45k triple data set:
@@ -572,12 +584,42 @@ abstract public class AbstractTripleStore extends
          * by each rule.
          * </p>
          */
-        String BUFFER_CAPACITY = "bufferCapacity";
+        String MUTATION_BUFFER_CAPACITY = "mutationBufferCapacity";
 
         /**
-         * @todo experiment with different values for this capacity.
+         * Default for {@link #MUTATION_BUFFER_CAPACITY} 
          */
-        String DEFAULT_BUFFER_CAPACITY = ""+20*Bytes.kilobyte32;
+        String DEFAULT_MUTATION_BUFFER_CAPACITY = ""+20*Bytes.kilobyte32;
+
+        /**
+         * <p>
+         * Sets the capacity of the buffers used by the {@link BlockingBuffer}
+         * to support asynchronous iterators for query operations ({@value #QUERY_BUFFER_CAPACITY}).
+         * This controls the maximum chunk size for the asynchronous iterator
+         * and places an upper bound on the #of elements which can be written
+         * into the buffer's queue before it will block.
+         * </p>
+         */
+        String QUERY_BUFFER_CAPACITY = "queryBufferCapacity";
+
+        /**
+         * Default for {@link #QUERY_BUFFER_CAPACITY} 
+         */
+        String DEFAULT_QUERY_BUFFER_CAPACITY = ""+20*Bytes.kilobyte32;
+
+        /**
+         * If the estimated rangeCount for an
+         * {@link IAccessPath#iterator(int, int)} is LTE this threshold then use
+         * a fully buffered (synchronous) iterator. Otherwise use an
+         * asynchronous iterator whose internal queue capacity is specified by
+         * {@link #QUERY_BUFFER_CAPACITY}.
+         */
+        String FULLY_BUFFERED_READ_THRESHOLD = "fullyBufferedReadThreadshold";
+
+        /**
+         * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD} 
+         */
+        String DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = ""+20*Bytes.kilobyte32;
 
         /**
          * When <code>true</code> ({@value #DEFAULT_FORCE_SERIAL_EXECUTION}),
@@ -683,15 +725,49 @@ abstract public class AbstractTripleStore extends
         
         {
 
-            bufferCapacity = Integer.parseInt(properties.getProperty(
-                    Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
+            mutationBufferCapacity = Integer.parseInt(properties.getProperty(
+                    Options.MUTATION_BUFFER_CAPACITY,
+                    Options.DEFAULT_MUTATION_BUFFER_CAPACITY));
 
-            if (bufferCapacity <= 0) {
-                throw new IllegalArgumentException(Options.BUFFER_CAPACITY
-                        + " must be positive");
+            if (mutationBufferCapacity <= 0) {
+                throw new IllegalArgumentException(
+                        Options.MUTATION_BUFFER_CAPACITY + " must be positive");
             }
 
-            log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
+            log.info(Options.MUTATION_BUFFER_CAPACITY + "="
+                    + mutationBufferCapacity);
+
+        }
+
+        {
+
+            queryBufferCapacity = Integer.parseInt(properties.getProperty(
+                    Options.QUERY_BUFFER_CAPACITY,
+                    Options.DEFAULT_QUERY_BUFFER_CAPACITY));
+
+            if (queryBufferCapacity <= 0) {
+                throw new IllegalArgumentException(
+                        Options.QUERY_BUFFER_CAPACITY + " must be positive");
+            }
+
+            log.info(Options.QUERY_BUFFER_CAPACITY + "=" + queryBufferCapacity);
+            
+        }
+
+        {
+
+            fullyBufferedReadThreshold = Integer.parseInt(properties
+                    .getProperty(Options.FULLY_BUFFERED_READ_THRESHOLD,
+                            Options.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD));
+
+            if (fullyBufferedReadThreshold <= 0) {
+                throw new IllegalArgumentException(
+                        Options.FULLY_BUFFERED_READ_THRESHOLD
+                                + " must be positive");
+            }
+
+            log.info(Options.FULLY_BUFFERED_READ_THRESHOLD + "="
+                    + fullyBufferedReadThreshold);
             
         }
 
@@ -2921,7 +2997,9 @@ abstract public class AbstractTripleStore extends
         
         return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
                 readTimestamp, forceSerialExecution, justify, backchain,
-                bufferCapacity, solutionFlags, filter, planFactory);
+                mutationBufferCapacity, queryBufferCapacity,
+                fullyBufferedReadThreshold, solutionFlags,
+                filter, planFactory);
         
     }
     

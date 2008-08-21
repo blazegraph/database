@@ -1,38 +1,32 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
-import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Set;
-import java.util.Vector;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.algebra.BinaryTupleOperator;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
-import org.openrdf.query.algebra.evaluation.iterator.JoinIterator;
 
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
@@ -40,7 +34,6 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
-import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
@@ -52,6 +45,13 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 /**
  * Extended to rewrite Sesame {@link TupleExpr}s onto native {@link Rule}s and
  * to evaluate magic predicates for full text search, etc.
+ * 
+ * @todo batch resolve terms when converting a {@link BinaryTupleOperator} into
+ *       a native rule.
+ * 
+ * @todo capture more kinds of {@link BinaryTupleOperator} and
+ *       {@link UnaryTupleOperator} using native rule evaluation, including
+ *       rolling filters and options into the native rules, etc.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -104,35 +104,6 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         this.database = tripleSource.getDatabase();
         
         this.nativeJoins = nativeJoins;
-
-    }
-
-    /**
-     * FIXME override to evaluate {@link TupleExpr} queries using a rewrite onto
-     * a native {@link Rule}.
-     */
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-            TupleExpr tupleExpr, BindingSet bindings)
-            throws QueryEvaluationException {
-
-        if (log.isInfoEnabled()) {
-
-            log.info("tupleExpr:\n"+
-                     tupleExpr.getClass()+"\n"+
-                     tupleExpr);
-
-        }
-
-        if(false) {
-            
-            // FIXME REMOVE THIS CODE!
-            log.error("Custom evaluation for LUBM!!!");
-            
-            return evaluateLubmQuery8(tupleExpr, bindings);
-            
-        }
-        
-        return super.evaluate(tupleExpr, bindings);
 
     }
 
@@ -273,6 +244,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
     }
 
+    /**
+     * Uses native joins iff {@link BigdataSail.Options#NATIVE_JOINS} is
+     * specified.
+     */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Join join, BindingSet bindings)
         throws QueryEvaluationException
@@ -294,7 +269,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final String SPO = database.getSPORelation().getNamespace();
         final Collection<IPredicate> tails = new LinkedList<IPredicate>();
         for (StatementPattern stmtPattern : stmtPatterns) {
-            IVariableOrConstant<Long> s;
+            final IVariableOrConstant<Long> s;
             {
                 Var var = stmtPattern.getSubjectVar();
                 Value val = var.getValue();
@@ -302,10 +277,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 if (val == null) {
                     s = com.bigdata.relation.rule.Var.var(name);
                 } else {
-                    s = new Constant<Long>(database.getLexiconRelation().getTermId(val));
+                    s = new Constant<Long>(((BigdataValue)val).getTermId());
                 }
             }
-            IVariableOrConstant<Long> p;
+            final IVariableOrConstant<Long> p;
             {
                 Var var = stmtPattern.getPredicateVar();
                 Value val = var.getValue();
@@ -313,10 +288,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 if (val == null) {
                     p = com.bigdata.relation.rule.Var.var(name);
                 } else {
-                    p = new Constant<Long>(database.getLexiconRelation().getTermId(val));
+                    p = new Constant<Long>(((BigdataValue)val).getTermId());
                 }
             }
-            IVariableOrConstant<Long> o;
+            final IVariableOrConstant<Long> o;
             {
                 Var var = stmtPattern.getObjectVar();
                 Value val = var.getValue();
@@ -324,7 +299,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 if (val == null) {
                     o = com.bigdata.relation.rule.Var.var(name);
                 } else {
-                    o = new Constant<Long>(database.getLexiconRelation().getTermId(val));
+                    o = new Constant<Long>(((BigdataValue)val).getTermId());
                 }
             }
             tails.add(new SPOPredicate(SPO, s, p, o));
@@ -355,365 +330,365 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         }
     }
 
-    /**
-     * Hardcodes query 8 from LUBM.
-     * 
-     * <pre>
-     * [query8]
-     * PREFIX rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
-     * PREFIX ub: &lt;http://www.lehigh.edu/&tilde;zhp2/2004/0401/univ-bench.owl#&gt;
-     * SELECT ?x ?y ?z
-     * WHERE{
-     *     ?y a ub:Department .
-     *     ?x a ub:Student;
-     *         ub:memberOf ?y .
-     *     ?y ub:subOrganizationOf &lt;http://www.University0.edu&gt; .
-     *     ?x ub:emailAddress ?z .
-     *      }
-     * </pre>
-     */
-    @SuppressWarnings("unchecked")
-    private CloseableIteration<BindingSet, QueryEvaluationException> evaluateLubmQuery8(
-            TupleExpr tupleExpr, BindingSet bindings)
-            throws QueryEvaluationException {
-
-        final IRule rule;
-        {
-
-            // name of the SPO relation.
-            final String SPO = database.getSPORelation().getNamespace();
-
-            // RDFS vocabulary.
-            final BigdataValueFactory valueFactory = database.getValueFactory();
-
-            // prefix used by the query.
-            final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
-
-            final BigdataURI rdfType = valueFactory.asValue(RDF.TYPE);
-            final BigdataURI Department = valueFactory.createURI(ub + "Department"); 
-            final BigdataURI Student = valueFactory.createURI(ub + "Student"); 
-            final BigdataURI memberOf = valueFactory.createURI(ub + "memberOf"); 
-            final BigdataURI subOrganizationOf = valueFactory.createURI(ub + "subOrganizationOf"); 
-            final BigdataURI emailAddress = valueFactory.createURI(ub + "emailAddress"); 
-            final BigdataURI University0 = valueFactory.createURI("http://www.University0.edu");
-
-            /*
-             * Resolve the values used by this query.
-             * 
-             * Note: If any value can not be resolved, then its term identifer
-             * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
-             * indicates that the query CAN NOT be satisified by the data since
-             * one or more required terms are unknown to the database.
-             */
-            {
-                
-                final Collection<BigdataValue> values = new Vector<BigdataValue>();
-
-                values.add(rdfType);
-                values.add(Department);
-                values.add(Student);
-                values.add(memberOf);
-                values.add(subOrganizationOf);
-                values.add(emailAddress);
-                values.add(University0);
-
-                final BigdataValue[] terms = values
-                        .toArray(new BigdataValue[] {});
-
-                database.getLexiconRelation().addTerms(terms, terms.length,
-                        true/* readOnly */);
-
-                for(int i=0; i<terms.length; i++) {
-                    
-                    if (terms[i].getTermId() == IRawTripleStore.NULL) {
-
-                        // No match possible.
-                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
-                        
-                    }
-                    
-                }
-                
-            }
-
-//            * WHERE{
-//                *     ?y a ub:Department .
-//                *     ?x a ub:Student;
-//                *         ub:memberOf ?y .
-//                *     ?y ub:subOrganizationOf &lt;http://www.University0.edu&gt; .
-//                *     ?x ub:emailAddress ?z .
-            rule = new Rule(
-                    "lubmQuery8",
-                    null, // head
-                    new IPredicate[] { // tail
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("y"),
-                                    new Constant<Long>(rdfType.getTermId()),
-                                    new Constant<Long>(Department.getTermId())),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(rdfType.getTermId()),
-                                    new Constant<Long>(Student.getTermId())),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(memberOf.getTermId()),
-                                    com.bigdata.relation.rule.Var.var("y")),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("y"),
-                                    new Constant<Long>(subOrganizationOf.getTermId()),
-                                    new Constant<Long>(University0.getTermId())),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(emailAddress.getTermId()),
-                                    com.bigdata.relation.rule.Var.var("z")),
-                    //
-                    },
-                    // constraints on the rule.
-                    null
-            );
-            
-        }
-
-        return runQuery(tupleExpr, rule);
-        
-    }
-    
-    /**
-     * Hardcodes query 1 from LUBM.
-     * 
-     * <pre>
-     * [query1]
-     * PREFIX rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
-     * PREFIX ub: &lt;http://www.lehigh.edu/&tilde;zhp2/2004/0401/univ-bench.owl#&gt;
-     * SELECT ?x
-     * WHERE{
-     *  ?x a ub:GraduateStudent ;
-     *      ub:takesCourse &lt;http://www.Department0.University0.edu/GraduateCourse0&gt;.
-     *      }
-     * </pre>
-     * 
-     * @todo the select (projection) should be driven into the distributed JOIN
-     *       so that we only materialize those bindings from the binding set on
-     *       the client that were actually requested for the query (less network
-     *       IO).
-     */
-    @SuppressWarnings("unchecked")
-    private CloseableIteration<BindingSet, QueryEvaluationException> evaluateLubmQuery1(
-            TupleExpr tupleExpr, BindingSet bindings)
-            throws QueryEvaluationException {
-
-        final IRule rule;
-        {
-
-            // name of the SPO relation.
-            final String SPO = database.getSPORelation().getNamespace();
-
-            // RDFS vocabulary.
-            final BigdataValueFactory valueFactory = database.getValueFactory();
-
-            // prefix used by the query.
-            final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
-
-            final BigdataURI rdfType = valueFactory.asValue(RDF.TYPE);
-            final BigdataURI GraduateStudent = valueFactory.createURI(ub + "GraduateStudent"); 
-            final BigdataURI takesCourse = valueFactory.createURI(ub + "takesCourse"); 
-            final BigdataURI GraduateCourse0 = valueFactory.createURI("http://www.Department0.University0.edu/GraduateCourse0");
-
-            /*
-             * Resolve the values used by this query.
-             * 
-             * Note: If any value can not be resolved, then its term identifer
-             * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
-             * indicates that the query CAN NOT be satisified by the data since
-             * one or more required terms are unknown to the database.
-             */
-            {
-                
-                final Collection<BigdataValue> values = new Vector<BigdataValue>();
-
-                values.add(rdfType);
-                values.add(GraduateStudent);
-                values.add(takesCourse);
-                values.add(GraduateCourse0);
-
-                final BigdataValue[] terms = values
-                        .toArray(new BigdataValue[] {});
-
-                database.getLexiconRelation().addTerms(terms, terms.length,
-                        true/* readOnly */);
-
-                for(int i=0; i<terms.length; i++) {
-                    
-                    if (terms[i].getTermId() == IRawTripleStore.NULL) {
-
-                        // No match possible.
-                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
-                        
-                    }
-                    
-                }
-                
-            }
-
-//            * WHERE{
-//                *  ?x a ub:GraduateStudent ;
-//                *      ub:takesCourse &lt;http://www.Department0.University0.edu/GraduateCourse0&gt;.
-//                *      }
-            rule = new Rule(
-                    "lubmQuery1",
-                    null, // head
-                    new IPredicate[] { // tail
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(rdfType.getTermId()),
-                                    new Constant<Long>(GraduateStudent.getTermId())),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(takesCourse.getTermId()),
-                                    new Constant<Long>(GraduateCourse0.getTermId())),
-                            //
-                            },
-                    // constraints on the rule.
-                    null
-            );
-            
-        }
-
-        return runQuery(tupleExpr, rule);
-        
-    }
-    
-    @SuppressWarnings("unchecked")
-    private CloseableIteration<BindingSet, QueryEvaluationException> evaluateLubmQuery9(
-            TupleExpr tupleExpr, BindingSet bindings)
-            throws QueryEvaluationException {
-
-        final IRule rule;
-        {
-
-            // name of the SPO relation.
-            final String SPO = database.getSPORelation().getNamespace();
-
-//            // name of the LEXICON relation.
-//            final String LEX = database.getLexiconRelation().getNamespace();
-
-            // RDFS vocabulary.
-//          final RDFSVocabulary vocab = database.getInferenceEngine();
-//          final IConstant<Long> rdfType = vocab.rdfType;
-            final BigdataValueFactory valueFactory = database.getValueFactory();
-
-            // prefix used by the query.
-            final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
-
-            final BigdataURI rdfType = valueFactory.asValue(RDF.TYPE);
-            final BigdataURI Student = valueFactory.createURI(ub + "Student"); 
-            final BigdataURI Faculty = valueFactory.createURI(ub + "Faculty"); 
-            final BigdataURI Course  = valueFactory.createURI(ub + "Course"); 
-            final BigdataURI advisor = valueFactory.createURI(ub + "advisor"); 
-            final BigdataURI teacherOf = valueFactory.createURI(ub + "teacherOf"); 
-            final BigdataURI takesCourse = valueFactory.createURI(ub + "takesCourse"); 
-
-            /*
-             * Resolve the values used by this query.
-             * 
-             * Note: If any value can not be resolved, then its term identifer
-             * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
-             * indicates that the query CAN NOT be satisified by the data since
-             * one or more required terms are unknown to the database.
-             */
-            {
-                
-                final Collection<BigdataValue> values = new Vector<BigdataValue>();
-
-                values.add(rdfType);
-                values.add(Student);
-                values.add(Faculty);
-                values.add(Course);
-                values.add(advisor);
-                values.add(teacherOf);
-                values.add(takesCourse);
-
-                final BigdataValue[] terms = values
-                        .toArray(new BigdataValue[] {});
-
-                database.getLexiconRelation().addTerms(terms, terms.length,
-                        true/* readOnly */);
-
-                for(int i=0; i<terms.length; i++) {
-                    
-                    if (terms[i].getTermId() == IRawTripleStore.NULL) {
-
-                        // No match possible.
-                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
-                        
-                    }
-                    
-                }
-                
-            }
-
-//                * SELECT ?x ?y ?z
-//                * WHERE{
-//                *     ?x a ub:Student .
-//                *     ?y a ub:Faculty .
-//                *     ?z a ub:Course .
-//                *     ?x ub:advisor ?y .
-//                *     ?y ub:teacherOf ?z .
-//                *     ?x ub:takesCourse ?z .
-//                *     }
-
-            rule = new Rule(
-                    "lubmQuery9",
-                    null, // head
-                    new IPredicate[] { // tail
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(rdfType.getTermId()),
-                                    new Constant<Long>(Student.getTermId())),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("y"),
-                                    new Constant<Long>(rdfType.getTermId()),
-                                    new Constant<Long>(Faculty.getTermId())),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("z"),
-                                    new Constant<Long>(rdfType.getTermId()),
-                                    new Constant<Long>(Course.getTermId())),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(advisor.getTermId()),
-                                    com.bigdata.relation.rule.Var.var("y")),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("y"),
-                                    new Constant<Long>(teacherOf.getTermId()),
-                                    com.bigdata.relation.rule.Var.var("z")),
-                            new SPOPredicate(
-                                    SPO, //
-                                    com.bigdata.relation.rule.Var.var("x"),
-                                    new Constant<Long>(takesCourse.getTermId()),
-                                    com.bigdata.relation.rule.Var.var("z"))
-                            //
-                            },
-                    // constraints on the rule.
-                    null
-            );
-            
-        }
-
-        return runQuery(tupleExpr, rule);
-        
-    }
+//    /**
+//     * Hardcodes query 8 from LUBM.
+//     * 
+//     * <pre>
+//     * [query8]
+//     * PREFIX rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
+//     * PREFIX ub: &lt;http://www.lehigh.edu/&tilde;zhp2/2004/0401/univ-bench.owl#&gt;
+//     * SELECT ?x ?y ?z
+//     * WHERE{
+//     *     ?y a ub:Department .
+//     *     ?x a ub:Student;
+//     *         ub:memberOf ?y .
+//     *     ?y ub:subOrganizationOf &lt;http://www.University0.edu&gt; .
+//     *     ?x ub:emailAddress ?z .
+//     *      }
+//     * </pre>
+//     */
+//    @SuppressWarnings("unchecked")
+//    private CloseableIteration<BindingSet, QueryEvaluationException> evaluateLubmQuery8(
+//            TupleExpr tupleExpr, BindingSet bindings)
+//            throws QueryEvaluationException {
+//
+//        final IRule rule;
+//        {
+//
+//            // name of the SPO relation.
+//            final String SPO = database.getSPORelation().getNamespace();
+//
+//            // RDFS vocabulary.
+//            final BigdataValueFactory valueFactory = database.getValueFactory();
+//
+//            // prefix used by the query.
+//            final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
+//
+//            final BigdataURI rdfType = valueFactory.asValue(RDF.TYPE);
+//            final BigdataURI Department = valueFactory.createURI(ub + "Department"); 
+//            final BigdataURI Student = valueFactory.createURI(ub + "Student"); 
+//            final BigdataURI memberOf = valueFactory.createURI(ub + "memberOf"); 
+//            final BigdataURI subOrganizationOf = valueFactory.createURI(ub + "subOrganizationOf"); 
+//            final BigdataURI emailAddress = valueFactory.createURI(ub + "emailAddress"); 
+//            final BigdataURI University0 = valueFactory.createURI("http://www.University0.edu");
+//
+//            /*
+//             * Resolve the values used by this query.
+//             * 
+//             * Note: If any value can not be resolved, then its term identifer
+//             * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
+//             * indicates that the query CAN NOT be satisified by the data since
+//             * one or more required terms are unknown to the database.
+//             */
+//            {
+//                
+//                final Collection<BigdataValue> values = new Vector<BigdataValue>();
+//
+//                values.add(rdfType);
+//                values.add(Department);
+//                values.add(Student);
+//                values.add(memberOf);
+//                values.add(subOrganizationOf);
+//                values.add(emailAddress);
+//                values.add(University0);
+//
+//                final BigdataValue[] terms = values
+//                        .toArray(new BigdataValue[] {});
+//
+//                database.getLexiconRelation().addTerms(terms, terms.length,
+//                        true/* readOnly */);
+//
+//                for(int i=0; i<terms.length; i++) {
+//                    
+//                    if (terms[i].getTermId() == IRawTripleStore.NULL) {
+//
+//                        // No match possible.
+//                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
+//                        
+//                    }
+//                    
+//                }
+//                
+//            }
+//
+////            * WHERE{
+////                *     ?y a ub:Department .
+////                *     ?x a ub:Student;
+////                *         ub:memberOf ?y .
+////                *     ?y ub:subOrganizationOf &lt;http://www.University0.edu&gt; .
+////                *     ?x ub:emailAddress ?z .
+//            rule = new Rule(
+//                    "lubmQuery8",
+//                    null, // head
+//                    new IPredicate[] { // tail
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("y"),
+//                                    new Constant<Long>(rdfType.getTermId()),
+//                                    new Constant<Long>(Department.getTermId())),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(rdfType.getTermId()),
+//                                    new Constant<Long>(Student.getTermId())),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(memberOf.getTermId()),
+//                                    com.bigdata.relation.rule.Var.var("y")),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("y"),
+//                                    new Constant<Long>(subOrganizationOf.getTermId()),
+//                                    new Constant<Long>(University0.getTermId())),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(emailAddress.getTermId()),
+//                                    com.bigdata.relation.rule.Var.var("z")),
+//                    //
+//                    },
+//                    // constraints on the rule.
+//                    null
+//            );
+//            
+//        }
+//
+//        return runQuery(tupleExpr, rule);
+//        
+//    }
+//    
+//    /**
+//     * Hardcodes query 1 from LUBM.
+//     * 
+//     * <pre>
+//     * [query1]
+//     * PREFIX rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
+//     * PREFIX ub: &lt;http://www.lehigh.edu/&tilde;zhp2/2004/0401/univ-bench.owl#&gt;
+//     * SELECT ?x
+//     * WHERE{
+//     *  ?x a ub:GraduateStudent ;
+//     *      ub:takesCourse &lt;http://www.Department0.University0.edu/GraduateCourse0&gt;.
+//     *      }
+//     * </pre>
+//     * 
+//     * @todo the select (projection) should be driven into the distributed JOIN
+//     *       so that we only materialize those bindings from the binding set on
+//     *       the client that were actually requested for the query (less network
+//     *       IO).
+//     */
+//    @SuppressWarnings("unchecked")
+//    private CloseableIteration<BindingSet, QueryEvaluationException> evaluateLubmQuery1(
+//            TupleExpr tupleExpr, BindingSet bindings)
+//            throws QueryEvaluationException {
+//
+//        final IRule rule;
+//        {
+//
+//            // name of the SPO relation.
+//            final String SPO = database.getSPORelation().getNamespace();
+//
+//            // RDFS vocabulary.
+//            final BigdataValueFactory valueFactory = database.getValueFactory();
+//
+//            // prefix used by the query.
+//            final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
+//
+//            final BigdataURI rdfType = valueFactory.asValue(RDF.TYPE);
+//            final BigdataURI GraduateStudent = valueFactory.createURI(ub + "GraduateStudent"); 
+//            final BigdataURI takesCourse = valueFactory.createURI(ub + "takesCourse"); 
+//            final BigdataURI GraduateCourse0 = valueFactory.createURI("http://www.Department0.University0.edu/GraduateCourse0");
+//
+//            /*
+//             * Resolve the values used by this query.
+//             * 
+//             * Note: If any value can not be resolved, then its term identifer
+//             * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
+//             * indicates that the query CAN NOT be satisified by the data since
+//             * one or more required terms are unknown to the database.
+//             */
+//            {
+//                
+//                final Collection<BigdataValue> values = new Vector<BigdataValue>();
+//
+//                values.add(rdfType);
+//                values.add(GraduateStudent);
+//                values.add(takesCourse);
+//                values.add(GraduateCourse0);
+//
+//                final BigdataValue[] terms = values
+//                        .toArray(new BigdataValue[] {});
+//
+//                database.getLexiconRelation().addTerms(terms, terms.length,
+//                        true/* readOnly */);
+//
+//                for(int i=0; i<terms.length; i++) {
+//                    
+//                    if (terms[i].getTermId() == IRawTripleStore.NULL) {
+//
+//                        // No match possible.
+//                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
+//                        
+//                    }
+//                    
+//                }
+//                
+//            }
+//
+////            * WHERE{
+////                *  ?x a ub:GraduateStudent ;
+////                *      ub:takesCourse &lt;http://www.Department0.University0.edu/GraduateCourse0&gt;.
+////                *      }
+//            rule = new Rule(
+//                    "lubmQuery1",
+//                    null, // head
+//                    new IPredicate[] { // tail
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(rdfType.getTermId()),
+//                                    new Constant<Long>(GraduateStudent.getTermId())),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(takesCourse.getTermId()),
+//                                    new Constant<Long>(GraduateCourse0.getTermId())),
+//                            //
+//                            },
+//                    // constraints on the rule.
+//                    null
+//            );
+//            
+//        }
+//
+//        return runQuery(tupleExpr, rule);
+//        
+//    }
+//    
+//    @SuppressWarnings("unchecked")
+//    private CloseableIteration<BindingSet, QueryEvaluationException> evaluateLubmQuery9(
+//            TupleExpr tupleExpr, BindingSet bindings)
+//            throws QueryEvaluationException {
+//
+//        final IRule rule;
+//        {
+//
+//            // name of the SPO relation.
+//            final String SPO = database.getSPORelation().getNamespace();
+//
+////            // name of the LEXICON relation.
+////            final String LEX = database.getLexiconRelation().getNamespace();
+//
+//            // RDFS vocabulary.
+////          final RDFSVocabulary vocab = database.getInferenceEngine();
+////          final IConstant<Long> rdfType = vocab.rdfType;
+//            final BigdataValueFactory valueFactory = database.getValueFactory();
+//
+//            // prefix used by the query.
+//            final String ub = "http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#";
+//
+//            final BigdataURI rdfType = valueFactory.asValue(RDF.TYPE);
+//            final BigdataURI Student = valueFactory.createURI(ub + "Student"); 
+//            final BigdataURI Faculty = valueFactory.createURI(ub + "Faculty"); 
+//            final BigdataURI Course  = valueFactory.createURI(ub + "Course"); 
+//            final BigdataURI advisor = valueFactory.createURI(ub + "advisor"); 
+//            final BigdataURI teacherOf = valueFactory.createURI(ub + "teacherOf"); 
+//            final BigdataURI takesCourse = valueFactory.createURI(ub + "takesCourse"); 
+//
+//            /*
+//             * Resolve the values used by this query.
+//             * 
+//             * Note: If any value can not be resolved, then its term identifer
+//             * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
+//             * indicates that the query CAN NOT be satisified by the data since
+//             * one or more required terms are unknown to the database.
+//             */
+//            {
+//                
+//                final Collection<BigdataValue> values = new Vector<BigdataValue>();
+//
+//                values.add(rdfType);
+//                values.add(Student);
+//                values.add(Faculty);
+//                values.add(Course);
+//                values.add(advisor);
+//                values.add(teacherOf);
+//                values.add(takesCourse);
+//
+//                final BigdataValue[] terms = values
+//                        .toArray(new BigdataValue[] {});
+//
+//                database.getLexiconRelation().addTerms(terms, terms.length,
+//                        true/* readOnly */);
+//
+//                for(int i=0; i<terms.length; i++) {
+//                    
+//                    if (terms[i].getTermId() == IRawTripleStore.NULL) {
+//
+//                        // No match possible.
+//                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
+//                        
+//                    }
+//                    
+//                }
+//                
+//            }
+//
+////                * SELECT ?x ?y ?z
+////                * WHERE{
+////                *     ?x a ub:Student .
+////                *     ?y a ub:Faculty .
+////                *     ?z a ub:Course .
+////                *     ?x ub:advisor ?y .
+////                *     ?y ub:teacherOf ?z .
+////                *     ?x ub:takesCourse ?z .
+////                *     }
+//
+//            rule = new Rule(
+//                    "lubmQuery9",
+//                    null, // head
+//                    new IPredicate[] { // tail
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(rdfType.getTermId()),
+//                                    new Constant<Long>(Student.getTermId())),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("y"),
+//                                    new Constant<Long>(rdfType.getTermId()),
+//                                    new Constant<Long>(Faculty.getTermId())),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("z"),
+//                                    new Constant<Long>(rdfType.getTermId()),
+//                                    new Constant<Long>(Course.getTermId())),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(advisor.getTermId()),
+//                                    com.bigdata.relation.rule.Var.var("y")),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("y"),
+//                                    new Constant<Long>(teacherOf.getTermId()),
+//                                    com.bigdata.relation.rule.Var.var("z")),
+//                            new SPOPredicate(
+//                                    SPO, //
+//                                    com.bigdata.relation.rule.Var.var("x"),
+//                                    new Constant<Long>(takesCourse.getTermId()),
+//                                    com.bigdata.relation.rule.Var.var("z"))
+//                            //
+//                            },
+//                    // constraints on the rule.
+//                    null
+//            );
+//            
+//        }
+//
+//        return runQuery(tupleExpr, rule);
+//        
+//    }
     
     /**
      * Run a rule based on a {@link TupleExpr} as a query.
@@ -740,7 +715,6 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final IChunkedOrderedIterator<ISolution> itr1;
         try {
 
-            // FIXME restore default plan (2)!
 //            final IEvaluationPlanFactory planFactory = DefaultEvaluationPlanFactory.INSTANCE;
             final IEvaluationPlanFactory planFactory = DefaultEvaluationPlanFactory2.INSTANCE;
             // as computed by bigdata
@@ -753,8 +727,9 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final IJoinNexusFactory joinNexusFactory = database
                     .newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
                             ActionEnum.Query, IJoinNexus.BINDINGS,
-                            null/* filter */, false/* justify */,
-                            true /* backchain */,
+                            null, // filter
+                            false, // justify 
+                            true, // backchain
                             planFactory
                             );
 
@@ -763,21 +738,6 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     
             itr1 = joinNexus.runQuery(rule);
 
-            // FIXME remove loop consuming itr.
-            if (false) {
-
-                while (itr1.hasNext()) {
-
-                    itr1.next();
-
-                }
-
-                itr1.close();
-
-                throw new UnsupportedOperationException();
-
-            }
-            
         } catch (Exception ex) {
             
             throw new QueryEvaluationException(ex);
@@ -801,47 +761,47 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
     }
 
-    private static final class CustomEvaluationPlanFactory implements IEvaluationPlanFactory {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 5557700123364184677L;
-
-        private final int[] order;
-        
-        public CustomEvaluationPlanFactory(int[] order) {
-        
-            this.order = order;
-            
-        }
-        
-        public IEvaluationPlan newPlan(final IJoinNexus joinNexus, final IRule rule) {
-
-            return new IEvaluationPlan() {
-
-                public int[] getOrder() {
-
-                    return order;
-                    
-                }
-
-                public boolean isEmpty() {
-
-                    return false;
-                    
-                }
-              
-                public long rangeCount(int tailIndex) {
-                    
-                    return joinNexus.getRangeCountFactory().rangeCount(rule.getTail(tailIndex));
-                    
-                }
-                
-            };
-            
-        }
-        
-    }
+//    private static final class CustomEvaluationPlanFactory implements IEvaluationPlanFactory {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 5557700123364184677L;
+//
+//        private final int[] order;
+//        
+//        public CustomEvaluationPlanFactory(int[] order) {
+//        
+//            this.order = order;
+//            
+//        }
+//        
+//        public IEvaluationPlan newPlan(final IJoinNexus joinNexus, final IRule rule) {
+//
+//            return new IEvaluationPlan() {
+//
+//                public int[] getOrder() {
+//
+//                    return order;
+//                    
+//                }
+//
+//                public boolean isEmpty() {
+//
+//                    return false;
+//                    
+//                }
+//              
+//                public long rangeCount(int tailIndex) {
+//                    
+//                    return joinNexus.getRangeCountFactory().rangeCount(rule.getTail(tailIndex));
+//                    
+//                }
+//                
+//            };
+//            
+//        }
+//        
+//    }
 
 }

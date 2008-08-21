@@ -225,8 +225,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
         IChunkedOrderedIterator<ISPO> itr = (ret == null ? src
                 : new ChunkedWrappedIterator<ISPO>(ret,
-                        capacity == 0 ? inf.database.bufferCapacity : capacity,
-                        null/* keyOrder */, filter));
+                        capacity == 0 ? inf.database.queryBufferCapacity
+                                : capacity, null/* keyOrder */, filter));
 
         if (!inf.forwardChainRdfTypeRdfsResource) {
             

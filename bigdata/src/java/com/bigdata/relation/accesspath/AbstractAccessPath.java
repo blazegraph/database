@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.accesspath;
 
 import java.util.Iterator;
+import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
@@ -71,6 +72,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     protected final IKeyOrder<R> keyOrder;
     protected final IIndex ndx;
     protected final int flags;
+    private final int queryBufferCapacity;
+    private final int fullyBufferedReadThreshold;
 
     /**
      * The filter derived from the {@link IElementFilter}.
@@ -150,6 +153,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      *            The index on which the access path is reading.
      * @param flags
      *            The default {@link IRangeQuery} flags.
+     * @param queryBufferCapacity
+     *            The capacity for the internal {@link Queue} for the
+     *            {@link BlockingBuffer} used by the
+     *            {@link #asynchronousIterator(Iterator)}.
+     * @param fullyBufferedReadThreshold
+     *            If the estimated rangeCount for an {@link #iterator(int, int)}
+     *            is LTE this threshold then we will do a fully buffered
+     *            (synchronous) read. Otherwise we will do an asynchronous read.
      * 
      * @todo This needs to be more generalized so that you can use a index that
      *       is best without being optimal by specifying a low-level filter to
@@ -160,7 +171,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             final IPredicate<R> predicate,//
             final IKeyOrder<R> keyOrder,  //
             final IIndex ndx,//
-            final int flags  //
+            final int flags, //
+            final int queryBufferCapacity,
+            final int fullyBufferedReadThreshold
             ) {
 
         if (relation == null)
@@ -185,6 +198,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         this.flags = flags;
 
+        this.queryBufferCapacity = queryBufferCapacity;
+
+        this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
+        
         final IElementFilter<R> constraint = predicate.getConstraint();
 
         if (constraint == null) {
@@ -328,13 +345,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
-    /**
-     * This is the threshold for [limit] - if the [limit] is LTE this threshold
-     * then we will do a fully buffered (synchronous) read. Otherwise we will do
-     * an asynchronous read.
-     */
-    private final int FULLY_BUFFERED_READ_THRESHOLD = 1000;
-    
     @SuppressWarnings("unchecked")
     final public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
 
@@ -421,7 +431,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                 
             }
             
-            if(rangeCount < FULLY_BUFFERED_READ_THRESHOLD) {
+            if(rangeCount < fullyBufferedReadThreshold) {
             
                 limit = capacity = (int)rangeCount;
                 
@@ -563,7 +573,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          * once the elements were materialized on the client.
          */
         final BlockingBuffer<R> buffer = new BlockingBuffer<R>(
-                BlockingBuffer.DEFAULT_CAPACITY, keyOrder, null/* filter */);
+                queryBufferCapacity, keyOrder, null/* filter */);
         
         final Future<Void> future = getRelation().getExecutorService().submit(new Callable<Void>(){
         

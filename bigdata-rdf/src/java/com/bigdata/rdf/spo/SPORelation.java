@@ -251,8 +251,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * Strengthened return type.
      */
     public AbstractTripleStore getContainer() {
-        
-        return (AbstractTripleStore)super.getContainer();
+
+        return (AbstractTripleStore) super.getContainer();
         
     }
 
@@ -764,7 +764,14 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
-        return new SPOAccessPath(this, predicate, keyOrder, ndx, flags).init();
+        final AbstractTripleStore container = getContainer();
+        
+        final int queryBufferCapacity = container.queryBufferCapacity;
+
+        final int fullyBufferedReadThreshold = container.fullyBufferedReadThreshold;
+        
+        return new SPOAccessPath(this, predicate, keyOrder, ndx, flags,
+                queryBufferCapacity, fullyBufferedReadThreshold).init();
         
     }
     

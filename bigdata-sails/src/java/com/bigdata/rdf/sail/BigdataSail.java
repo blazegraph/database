@@ -1571,10 +1571,13 @@ public class BigdataSail extends SailBase implements Sail {
             
             if(/*getTruthMaintenance() &&*/ includeInferred) {
 
-                /* FIXME Do this if TM is enabled OR the database closure has been updated, but we have no way to detect the latter.
-                 * Obtain an iterator that will generate any missing entailments at
-                 * query time. The behavior of the iterator depends on how the
-                 * InferenceEngine was configured.
+                /*
+                 * FIXME Do this if TM is enabled OR the database closure has
+                 * been updated, but we have no way to detect the latter.
+                 * 
+                 * Obtain an iterator that will generate any missing entailments
+                 * at query time. The behavior of the iterator depends on how
+                 * the InferenceEngine was configured.
                  */
                 
                 src = getInferenceEngine().backchainIterator(
@@ -1704,15 +1707,9 @@ public class BigdataSail extends SailBase implements Sail {
             try {
 
                 /*
-                 * @todo review use of replaceValues once custom rule rewrite is
-                 * in place. make sure that we are not looking up the terms in
-                 * the rule twice. since we already resolve them here, then the
-                 * easiest thing to do is to not resolve them again when
-                 * re-writing the query into a rule. However, the resolve that
-                 * is being done here is not using ordered reads, so it is less
-                 * efficient. Probably this needs to be modified to use an
-                 * ordered read and then resolve in the rewrite needs to be
-                 * disabled.
+                 * Convert the terms in the query with BigdataValues. Both the
+                 * native joins and the BigdataEvaluationStatistics rely on
+                 * this.
                  */
                 replaceValues(tupleExpr);
 

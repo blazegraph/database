@@ -118,7 +118,11 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     private final boolean backchain;
 
-    private final int bufferCapacity;
+    private final int mutationBufferCapacity;
+
+    private final int queryBufferCapacity;
+    
+    private final int fullyBufferedReadThreshold;
     
     private final int solutionFlags;
     
@@ -176,7 +180,11 @@ public class RDFJoinNexus implements IJoinNexus {
  
         this.backchain = joinNexusFactory.backchain;
         
-        this.bufferCapacity = joinNexusFactory.bufferCapacity;
+        this.mutationBufferCapacity = joinNexusFactory.mutationBufferCapacity;
+        
+        this.queryBufferCapacity = joinNexusFactory.queryBufferCapacity;
+
+        this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
         
         this.solutionFlags = joinNexusFactory.solutionFlags;
 
@@ -656,7 +664,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (getAction().isMutation())
             throw new IllegalStateException();
         
-        return new BlockingBuffer<ISolution>(bufferCapacity,
+        return new BlockingBuffer<ISolution>(queryBufferCapacity,
                 null/* keyOrder */, filter == null ? null
                         : new SolutionFilter(filter));
         
@@ -837,7 +845,7 @@ public class RDFJoinNexus implements IJoinNexus {
              */
             
             return new InsertSPOAndJustificationBuffer(
-                    bufferCapacity, relation, filter == null ? null
+                    mutationBufferCapacity, relation, filter == null ? null
                             : new SolutionFilter(filter));
             
         }
@@ -848,7 +856,7 @@ public class RDFJoinNexus implements IJoinNexus {
          */
         
         return new AbstractSolutionBuffer.InsertSolutionBuffer(
-                bufferCapacity, relation, filter == null ? null
+                mutationBufferCapacity, relation, filter == null ? null
                         : new SolutionFilter(filter));
 
     }
@@ -867,7 +875,7 @@ public class RDFJoinNexus implements IJoinNexus {
         }
 
         return new AbstractSolutionBuffer.DeleteSolutionBuffer(
-                bufferCapacity, relation, filter == null ? null
+                mutationBufferCapacity, relation, filter == null ? null
                         : new SolutionFilter(filter));
 
     }

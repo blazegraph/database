@@ -50,6 +50,7 @@ package com.bigdata.rdf.rules;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -81,7 +82,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final boolean justify;
     final boolean backchain;
     final boolean forceSerialExecution;
-    final int bufferCapacity;
+    final int mutationBufferCapacity;
+    final int queryBufferCapacity;
+    final int fullyBufferedReadThreshold;
     final int solutionFlags;
     @SuppressWarnings("unchecked")
 	final IElementFilter filter;
@@ -107,7 +110,11 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         sb.append(", forceSerialExecution="+forceSerialExecution);
         
-        sb.append(", bufferCapacity="+bufferCapacity);
+        sb.append(", mutationBufferCapacity="+mutationBufferCapacity);
+        
+        sb.append(", queryBufferCapacity="+queryBufferCapacity);
+
+        sb.append(", fullyBufferedReadThreshold="+fullyBufferedReadThreshold);
         
         sb.append(", solutionFlags="+solutionFlags);
         
@@ -146,9 +153,18 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      *            are included when reading on an {@link IAccessPath} for the
      *            {@link SPORelation} using the {@link InferenceEngine} to
      *            "backchain" any necessary entailments.
-     * @param bufferCapacity
+     * @param mutationBufferCapacity
      *            The capacity of the buffers used to support chunked iterators
      *            and efficient ordered writes.
+     * @param queryBufferCapacity
+     *            The capacity of the {@link BlockingBuffer} used to support
+     *            asynchronous iterators for high-level query.
+     * @param fullyBufferedReadThreshold
+     *            If the estimated range count for an
+     *            {@link IAccessPath#iterator(int, int)} is LTE to this
+     *            threshold, then use a fully buffered (synchronous) iterator.
+     *            Otherwise use an asynchronous iterator whose internal queue
+     *            capacity is specified by <i>queryBufferCapacity</i>.
      * @param solutionFlags
      *            Flags controlling the behavior of
      *            {@link #newSolution(IRule, IBindingSet)}.
@@ -162,7 +178,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      */
 	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
             long writeTime, long readTime, boolean forceSerialExecution,
-            boolean justify, boolean backchain, int bufferCapacity,
+            boolean justify, boolean backchain, int mutationBufferCapacity,
+            int queryBufferCapacity, int fullyBufferedReadThreshold,
             int solutionFlags, IElementFilter filter,
             IEvaluationPlanFactory planFactory) {
 
@@ -192,7 +209,11 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         this.forceSerialExecution = forceSerialExecution;
         
-        this.bufferCapacity = bufferCapacity;
+        this.mutationBufferCapacity = mutationBufferCapacity;
+        
+        this.queryBufferCapacity = queryBufferCapacity;
+        
+        this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
         this.solutionFlags = solutionFlags;
 

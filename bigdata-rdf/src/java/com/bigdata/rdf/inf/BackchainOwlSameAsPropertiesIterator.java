@@ -62,7 +62,7 @@ public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIter
      * Enables record of stack traces for callers and verification that the
      * iterator is closed.
      */
-    private static final boolean RECORD_STACK_TRACES = true;
+    private static final boolean RECORD_STACK_TRACES = false;
     
     private static final Logger log =
             Logger.getLogger(BackchainOwlSameAsPropertiesIterator.class);
