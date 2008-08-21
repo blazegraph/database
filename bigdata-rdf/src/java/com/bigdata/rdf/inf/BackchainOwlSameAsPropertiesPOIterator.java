@@ -128,6 +128,7 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
                     // attach the s and p to the original o
                     spos[numSPOs++] = new SPO(reverseProp.s(), reverseProp.p(), o,
                             StatementEnum.Inferred);
+                    dumpSPO(spos[numSPOs-1]);
                 }
             }
             if (numSPOs > 0) {
@@ -246,6 +247,7 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             // attach the new s to the original p and o
             spos[numSPOs++] = new SPO(same, spo.p(), spo.o(),
                     StatementEnum.Inferred);
+            dumpSPO(spos[numSPOs-1]);
         }
         if (numSPOs > 0) {
             // final flush of the buffer
