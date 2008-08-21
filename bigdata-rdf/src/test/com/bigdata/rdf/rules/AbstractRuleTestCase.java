@@ -42,6 +42,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.StatementResolverTask;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
@@ -216,7 +217,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         {
 
             BigdataStatementIterator it = actual.asStatementIterator(actual
-                    .getInferenceEngine().backchainIterator(NULL, NULL, NULL));
+                    .getInferenceEngine().backchainIterator(
+                            actual.getAccessPath(NULL, NULL, NULL)));
 
             try {
 
@@ -257,7 +259,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         {
 
             BigdataStatementIterator it = expected.asStatementIterator(expected
-                    .getInferenceEngine().backchainIterator(NULL, NULL, NULL));
+                    .getInferenceEngine().backchainIterator(
+                            expected.getAccessPath(NULL, NULL, NULL)));
 
             try {
 
@@ -351,9 +354,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
          * Visit all SPOs in the source, including backchained
          * inferences.
          */
-        final IChunkedOrderedIterator<ISPO> itr1 = src
-                .getInferenceEngine().backchainIterator(NULL, NULL,
-                        NULL);
+        final IChunkedOrderedIterator<ISPO> itr1 = src.getInferenceEngine()
+                .backchainIterator(src.getAccessPath(NULL, NULL, NULL));
 
         /*
          * Efficiently convert SPOs to BigdataStatements (externalizes

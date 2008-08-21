@@ -629,7 +629,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * <em>inconsistent</em> unified namespace is introduced. You can protect
      * yourself by ensuring that resources located on {@link TemporaryStore}s
      * and the like are always created with a unique prefix, e.g., the
-     * {@link UUID} of the {@link TemporaryStore} itself.
+     * {@link UUID} of the {@link TemporaryStore} itself or a {@link UUID} for
+     * each container that is allocated on the {@link TemporaryStore}.
      * 
      * @param indexManager
      *            Typically a {@link TemporaryStore} or {@link Journal}

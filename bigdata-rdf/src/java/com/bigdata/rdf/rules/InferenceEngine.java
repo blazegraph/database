@@ -41,7 +41,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
@@ -647,92 +646,92 @@ public class InferenceEngine extends RDFSVocabulary {
         
     }
 
-    /**
-     * Variant that accepts an {@link IPredicate} as a triple pattern.
-     * 
-     * @param predicate
-     * 
-     * @return
-     */
-    @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<ISPO> backchainIterator(IPredicate<ISPO> predicate) {
-        
-        // pass the filter to the server(s)
-        return backchainIterator(database.getSPORelation().getAccessPath(predicate));
-//        final long s, p, o;
-//        {
-//
-//            final IVariableOrConstant<Long> t = predicate.get(0);
-//
-//            s = t.isVar() ? NULL : t.get();
-//
-//        }
-//
-//        {
-//
-//            final IVariableOrConstant<Long> t = predicate.get(1);
-//
-//            p = t.isVar() ? NULL : t.get();
-//
-//        }
+//    /**
+//     * Variant that accepts an {@link IPredicate} as a triple pattern.
+//     * 
+//     * @param predicate
+//     * 
+//     * @return
+//     */
+//    @SuppressWarnings("unchecked")
+//    public IChunkedOrderedIterator<ISPO> backchainIterator(IPredicate<ISPO> predicate) {
 //        
-//        {
+//        // pass the filter to the server(s)
+//        return backchainIterator(database.getSPORelation().getAccessPath(predicate));
+////        final long s, p, o;
+////        {
+////
+////            final IVariableOrConstant<Long> t = predicate.get(0);
+////
+////            s = t.isVar() ? NULL : t.get();
+////
+////        }
+////
+////        {
+////
+////            final IVariableOrConstant<Long> t = predicate.get(1);
+////
+////            p = t.isVar() ? NULL : t.get();
+////
+////        }
+////        
+////        {
+////
+////            final IVariableOrConstant<Long> t = predicate.get(2);
+////
+////            o = t.isVar() ? NULL : t.get();
+////
+////        }
+////
+////        return backchainIterator(s, p, o);
 //
-//            final IVariableOrConstant<Long> t = predicate.get(2);
+//    }
+//    
+//    /**
+//     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
+//     * for the database and also backchain any entailments for which forward
+//     * chaining has been turned off, including {@link RuleOwlSameAs2},
+//     * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
+//     * 
+//     * @param s
+//     *            The subject in triple pattern for that access path.
+//     * @param p
+//     *            The predicate in triple pattern for that access path.
+//     * @param o
+//     *            The object in triple pattern for that access path.
+//     * 
+//     * @return An iterator that will visit the statements in database matching
+//     *         the triple pattern query plus any necessary entailments.
+//     */
+//    public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p, long o) {
+//        
+//        return backchainIterator(s, p, o, null);
+//        
+//    }
 //
-//            o = t.isVar() ? NULL : t.get();
-//
-//        }
-//
-//        return backchainIterator(s, p, o);
-
-    }
-    
-    /**
-     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
-     * for the database and also backchain any entailments for which forward
-     * chaining has been turned off, including {@link RuleOwlSameAs2},
-     * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
-     * 
-     * @param s
-     *            The subject in triple pattern for that access path.
-     * @param p
-     *            The predicate in triple pattern for that access path.
-     * @param o
-     *            The object in triple pattern for that access path.
-     * 
-     * @return An iterator that will visit the statements in database matching
-     *         the triple pattern query plus any necessary entailments.
-     */
-    public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p, long o) {
-        
-        return backchainIterator(s, p, o, null);
-        
-    }
-
-    /**
-     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
-     * for the database and also backchain any entailments for which forward
-     * chaining has been turned off, including {@link RuleOwlSameAs2},
-     * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
-     * 
-     * @param s
-     *            The subject in triple pattern for that access path.
-     * @param p
-     *            The predicate in triple pattern for that access path.
-     * @param o
-     *            The object in triple pattern for that access path.
-     * 
-     * @return An iterator that will visit the statements in database matching
-     *         the triple pattern query plus any necessary entailments.
-     */
-    public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p,
-            long o, IElementFilter<ISPO> filter) {
-        
-        // pass the filter to the server(s)
-        return backchainIterator(database.getAccessPath(s, p, o, filter));
-        
-    }
+//    /**
+//     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
+//     * for the database and also backchain any entailments for which forward
+//     * chaining has been turned off, including {@link RuleOwlSameAs2},
+//     * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
+//     * 
+//     * @param s
+//     *            The subject in triple pattern for that access path.
+//     * @param p
+//     *            The predicate in triple pattern for that access path.
+//     * @param o
+//     *            The object in triple pattern for that access path.
+//     * 
+//     * @return An iterator that will visit the statements in database matching
+//     *         the triple pattern query plus any necessary entailments.
+//     */
+//    public IChunkedOrderedIterator<ISPO> backchainIterator(long s, long p,
+//            long o, IElementFilter<ISPO> filter) {
+//        
+//        // pass the filter to the server(s)
+//        return backchainIterator(database.getAccessPath(s, p, o, filter));
+//        
+//    }
     
     /**
      * Obtain an iterator that will read on the appropriate {@link IAccessPath}

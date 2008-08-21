@@ -29,7 +29,10 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -87,14 +90,14 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
      */
     public BackchainOwlSameAsPropertiesSPOIterator(
             IChunkedOrderedIterator<ISPO> src, long s, long p, long o,
-            AbstractTripleStore db, final long sameAs) {
+            AbstractTripleStore db, final long sameAs, TemporaryStore tempStore) {
         super(src, db, sameAs);
         Properties props = db.getProperties();
         // do not store terms
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
         // only store the SPO index
         props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-        sameAs2and3 = new TempTripleStore(props,db);
+        sameAs2and3 = new TempTripleStore(tempStore, props, db);
         /*
          * We are essentially taking a cross product of the two sets {s, ?
          * sameAs s} and {o, ? sameAs o}, then doing a query for all the links

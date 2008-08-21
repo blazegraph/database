@@ -33,6 +33,7 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -64,6 +65,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
         super(name);
     }
 
+    final TemporaryStore tempStore = new TemporaryStore();
+    
     /**
      * Test the various access paths for backchaining the property collection
      * normally done through owl:sameAs {2,3}.
@@ -146,7 +149,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,
@@ -181,7 +185,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,
@@ -210,7 +215,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,
@@ -245,7 +251,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,
@@ -274,7 +281,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,
@@ -303,7 +311,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,
@@ -330,7 +339,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,
@@ -363,7 +373,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                         accessPath.p,
                         accessPath.o,
                         noClosure, //
-                        same
+                        same,//
+                        tempStore
                         );
 
                 assertSameSPOsAnyOrder(noClosure,

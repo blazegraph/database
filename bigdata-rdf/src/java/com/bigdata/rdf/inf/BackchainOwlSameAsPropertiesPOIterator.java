@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Properties;
 
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -82,15 +83,15 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
      *            database.
      */
     public BackchainOwlSameAsPropertiesPOIterator(IChunkedOrderedIterator<ISPO> src, long p,
-            long o, AbstractTripleStore db, final long sameAs) {
+            long o, AbstractTripleStore db, final long sameAs,TemporaryStore tempStore) {
         super(src, db, sameAs);
         Properties props = db.getProperties();
         // do not store terms
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
         // only store the SPO index
         props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-        sameAs3 = new TempTripleStore(props,db);
-        sameAs2 = new TempTripleStore(props,db);
+        sameAs3 = new TempTripleStore(tempStore,props,db);
+        sameAs2 = new TempTripleStore(tempStore,props,db);
         /*
          * Collect up additional reverse properties (s and p values) for the
          * known o value by examining the values which are owl:sameAs o. The p

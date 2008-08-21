@@ -1542,7 +1542,8 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Returns an iterator that visits {@link BigdataStatement} objects.
          */
-        private BigdataStatementIterator getStatements(Resource s, URI p, Value o, boolean includeInferred) {
+        private BigdataStatementIterator getStatements(Resource s, URI p,
+                Value o, boolean includeInferred) {
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
@@ -1581,8 +1582,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * the InferenceEngine was configured.
                  */
                 
-                src = getInferenceEngine().backchainIterator(
-                        accessPath.getPredicate());
+                src = getInferenceEngine().backchainIterator(accessPath);
                 
             } else {
 

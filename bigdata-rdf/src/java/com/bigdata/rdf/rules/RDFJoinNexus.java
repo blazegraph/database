@@ -40,10 +40,12 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -464,6 +466,38 @@ public class RDFJoinNexus implements IJoinNexus {
         return indexManager;
         
     }
+
+    /**
+     * A purely local temporary store whose scope is this {@link RDFJoinNexus}
+     * instance. The store uses {@link WormAddressManager#SCALE_UP_OFFSET_BITS}
+     * and can address up to 4T of data. The returned store is NOT reachable by
+     * remote processes. The store is created lazily and may be used for a
+     * variety of purposes, including {@link TempTripleStore}s. The store will
+     * be closed and its backing file (if any) deleted after it is no longer
+     * weakly reachable, typically shortly after the {@link RDFJoinNexus} is
+     * finalized.
+     */
+    public TemporaryStore getTemporaryStore() {
+
+        if (tempStore == null) {
+
+            synchronized (this) {
+
+                if (tempStore == null) {
+
+                    tempStore = new TemporaryStore();
+
+                }
+
+            }
+
+        }
+
+        return tempStore;
+
+    }
+
+    private volatile TemporaryStore tempStore = null;
     
     @SuppressWarnings("unchecked")
     public void copyValues(final Object e, final IPredicate predicate,
