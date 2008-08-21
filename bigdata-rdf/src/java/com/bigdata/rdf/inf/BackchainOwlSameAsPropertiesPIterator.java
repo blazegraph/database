@@ -153,6 +153,10 @@ public class BackchainOwlSameAsPropertiesPIterator extends
         // using the supplied p
         Set<Long> sAndSames = getSelfAndSames(spo.s());
         Set<Long> oAndSames = getSelfAndSames(spo.o());
+        if (sAndSames.size() == 1 && oAndSames.size() == 1) {
+            // no point in continuing if there are no sames
+            return;
+        }
         for (long s1 : sAndSames) {
             for (long o1 : oAndSames) {
                 // do not add ( s sameAs s ) inferences
@@ -161,13 +165,15 @@ public class BackchainOwlSameAsPropertiesPIterator extends
                 }
                 if (numSPOs == chunkSize) {
                     // flush the buffer
-                    if (sameAs2and3 == null) {
-                        sameAs2and3 = createTempTripleStore();
-                    }
                     boolean present = false; // filter for not present
                     final IChunkedOrderedIterator<ISPO> absent = 
                         db.bulkFilterStatements(spos, numSPOs, present);
-                    db.addStatements(sameAs2and3, copyOnly, absent, null);
+                    if (absent.hasNext()) {
+                        if (sameAs2and3 == null) {
+                            sameAs2and3 = createTempTripleStore();
+                        }
+                        db.addStatements(sameAs2and3, copyOnly, absent, null);
+                    }
                     numSPOs = 0;
                 }
                 // grow the buffer
@@ -178,13 +184,15 @@ public class BackchainOwlSameAsPropertiesPIterator extends
         }
         if (numSPOs > 0) {
             // final flush of the buffer
-            if (sameAs2and3 == null) {
-                sameAs2and3 = createTempTripleStore();
-            }
             boolean present = false; // filter for not present
             final IChunkedOrderedIterator<ISPO> absent = 
                 db.bulkFilterStatements(spos, numSPOs, present);
-            db.addStatements(sameAs2and3, copyOnly, absent, null);
+            if (absent.hasNext()) {
+                if (sameAs2and3 == null) {
+                    sameAs2and3 = createTempTripleStore();
+                }
+                db.addStatements(sameAs2and3, copyOnly, absent, null);
+            }
         }
     }
 

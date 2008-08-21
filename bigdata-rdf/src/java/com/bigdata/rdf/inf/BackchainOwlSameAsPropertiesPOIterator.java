@@ -116,13 +116,15 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
                     }
                     // flush the buffer if necessary
                     if (numSPOs == chunkSize) {
-                        if (sameAs3 == null) {
-                            sameAs3 = createTempTripleStore();
-                        }
                         boolean present = false; // filter for not present
                         IChunkedOrderedIterator<ISPO> absent = 
                             db.bulkFilterStatements(spos, numSPOs, present);
-                        db.addStatements(sameAs3, copyOnly, absent, null);
+                        if (absent.hasNext()) {
+                            if (sameAs3 == null) {
+                                sameAs3 = createTempTripleStore();
+                            }
+                            db.addStatements(sameAs3, copyOnly, absent, null);
+                        }
                         numSPOs = 0;
                     }
                     // attach the s and p to the original o
@@ -133,13 +135,15 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             }
             if (numSPOs > 0) {
                 // final flush of the buffer
-                if (sameAs3 == null) {
-                    sameAs3 = createTempTripleStore();
-                }
                 boolean present = false; // filter for not present
                 IChunkedOrderedIterator<ISPO> absent = 
                     db.bulkFilterStatements(spos, numSPOs, present);
-                db.addStatements(sameAs3, copyOnly, absent, null);
+                if (absent.hasNext()) {
+                    if (sameAs3 == null) {
+                        sameAs3 = createTempTripleStore();
+                    }
+                    db.addStatements(sameAs3, copyOnly, absent, null);
+                }
             }
         }
     }
@@ -235,13 +239,15 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             }
             // flush the buffer if necessary
             if (numSPOs == chunkSize) {
-                if (sameAs2 == null) {
-                    sameAs2 = createTempTripleStore();
-                }
                 boolean present = false; // filter for not present
                 IChunkedOrderedIterator<ISPO> absent = 
                     db.bulkFilterStatements(spos, numSPOs, present);
-                db.addStatements(sameAs2, copyOnly, absent, null);
+                if (absent.hasNext()) {
+                    if (sameAs2 == null) {
+                        sameAs2 = createTempTripleStore();
+                    }
+                    db.addStatements(sameAs2, copyOnly, absent, null);
+                }
                 numSPOs = 0;
             }
             // attach the new s to the original p and o
@@ -251,13 +257,15 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
         }
         if (numSPOs > 0) {
             // final flush of the buffer
-            if (sameAs2 == null) {
-                sameAs2 = createTempTripleStore();
-            }
             boolean present = false; // filter for not present
             IChunkedOrderedIterator<ISPO> absent = 
                 db.bulkFilterStatements(spos, numSPOs, present);
-            db.addStatements(sameAs2, copyOnly, absent, null);
+            if (absent.hasNext()) {
+                if (sameAs2 == null) {
+                    sameAs2 = createTempTripleStore();
+                }
+                db.addStatements(sameAs2, copyOnly, absent, null);
+            }
         }
     }
 
