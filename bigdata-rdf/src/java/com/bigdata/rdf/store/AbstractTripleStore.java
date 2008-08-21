@@ -846,7 +846,7 @@ abstract public class AbstractTripleStore extends
      * Default is a NOP - invoked by {@link #close()} and
      * {@link #closeAndDelete()}
      */
-    protected void shutdown() {
+    final protected void shutdown() {
 
         open = false;
         
@@ -1373,26 +1373,21 @@ abstract public class AbstractTripleStore extends
      * singletons.
      */
 
-    private WeakReference<InferenceEngine> inferenceEngineRef = null;
+    private volatile InferenceEngine inferenceEngine = null;
 
     final public InferenceEngine getInferenceEngine() {
 
         synchronized (this) {
 
-            InferenceEngine inf = inferenceEngineRef == null ? null
-                    : inferenceEngineRef.get();
+            if(inferenceEngine == null) {
 
-            if (inf == null) {
-
-                inf = new InferenceEngine(this);
-
-                inferenceEngineRef = new WeakReference<InferenceEngine>(inf);
+                inferenceEngine = new InferenceEngine(this);
 
             }
 
-            return inf;
-
         }
+        
+        return inferenceEngine;
 
     }
 
@@ -2589,8 +2584,8 @@ abstract public class AbstractTripleStore extends
                 
                 if (numStmts > 1000) {
 
-                    if(INFO)
-                    log.info("Wrote "
+//                    if(INFO)
+                    log.warn("Wrote "
                             + numStmts
                             + " statements (mutationCount="
                             + numWritten

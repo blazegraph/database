@@ -49,9 +49,6 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * Extended to rewrite Sesame {@link TupleExpr}s onto native {@link Rule}s and
  * to evaluate magic predicates for full text search, etc.
  * 
- * @todo batch resolve terms when converting a {@link BinaryTupleOperator} into
- *       a native rule.
- * 
  * @todo capture more kinds of {@link BinaryTupleOperator} and
  *       {@link UnaryTupleOperator} using native rule evaluation, including
  *       rolling filters and options into the native rules, etc.

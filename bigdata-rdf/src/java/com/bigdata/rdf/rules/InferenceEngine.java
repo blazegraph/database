@@ -47,6 +47,7 @@ import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.striterator.DelegateChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -739,6 +740,12 @@ public class InferenceEngine extends RDFSVocabulary {
      * for the database and also backchain any entailments for which forward
      * chaining has been turned off, including {@link RuleOwlSameAs2},
      * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
+     * <p>
+     * Note: This creates a new {@link TemporaryStore} for each invocation. It
+     * will only be materialized on the disk if something writes at least 1M of
+     * data on it, but you can do better if you can reuse the same
+     * {@link TemporaryStore} across a bunch of operations. The rules already do
+     * this.
      * 
      * @param accessPath
      *            The source {@link IAccessPath}
@@ -749,7 +756,22 @@ public class InferenceEngine extends RDFSVocabulary {
      */
     public IChunkedOrderedIterator<ISPO> backchainIterator(IAccessPath<ISPO> accessPath) {
 
-        return new BackchainAccessPath(this, new TemporaryStore(), accessPath).iterator();
+        final TemporaryStore tempStore = new TemporaryStore();
+
+        final IChunkedOrderedIterator<ISPO> src = new BackchainAccessPath(this,
+                tempStore, accessPath).iterator();
+
+        return new DelegateChunkedIterator<ISPO>(src) {
+
+            public void close() {
+
+                super.close();
+
+                tempStore.close();
+
+            }
+
+        };
         
     }
     
