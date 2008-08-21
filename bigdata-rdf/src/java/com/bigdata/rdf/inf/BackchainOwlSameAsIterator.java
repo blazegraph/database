@@ -1,11 +1,14 @@
 package com.bigdata.rdf.inf;
 
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedIterator<ISPO> {
@@ -26,9 +29,11 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     protected long sameAs;
 
     protected IChunkedOrderedIterator<ISPO> src;
-
+    
+    protected TemporaryStore tempStore;
+    
     public BackchainOwlSameAsIterator(IChunkedOrderedIterator<ISPO> src, AbstractTripleStore db,
-            long sameAs) {
+            long sameAs, TemporaryStore tempStore) {
         if (src == null)
             throw new IllegalArgumentException();
         if (db == null)
@@ -38,16 +43,17 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
         this.src = src;
         this.db = db;
         this.sameAs = sameAs;
+        this.tempStore = tempStore;
     }
 
-    public Set<Long> getSelfAndSames(long id) {
+    protected Set<Long> getSelfAndSames(long id) {
         Set<Long> selfAndSames = new TreeSet<Long>();
         selfAndSames.add(id);
         getSames(id, selfAndSames);
         return selfAndSames;
     }
 
-    public Set<Long> getSames(long id) {
+    protected Set<Long> getSames(long id) {
         Set<Long> sames = new TreeSet<Long>();
         sames.add(id);
         getSames(id, sames);
@@ -55,7 +61,7 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
         return sames;
     }
 
-    public void getSames(long id, Set<Long> sames) {
+    protected void getSames(long id, Set<Long> sames) {
         IChunkedOrderedIterator<ISPO> it = db.getAccessPath(id, sameAs, NULL).iterator();
         try {
             while (it.hasNext()) {
@@ -81,4 +87,14 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
             it.close();
         }
     }
+    
+    protected TempTripleStore createTempTripleStore() {
+        Properties props = db.getProperties();
+        // do not store terms
+        props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
+        // only store the SPO index
+        props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
+        return new TempTripleStore(tempStore, props, db);
+    }
+
 }
