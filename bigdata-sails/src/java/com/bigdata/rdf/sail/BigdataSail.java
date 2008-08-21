@@ -236,7 +236,14 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String BUFFER_CAPACITY = "bufferCapacity";
     
         public static final String DEFAULT_BUFFER_CAPACITY = "10000";
-    
+        
+        /**
+         * This boolean may be used to specify whether or not to use "native"
+         * joins, bypassing the Sesame join mechanism. 
+         */
+        public static final String NATIVE_JOINS = "nativeJoins";
+        
+        public static final String DEFAULT_NATIVE_JOINS = "false";
     }
 
     /**
@@ -300,6 +307,11 @@ public class BigdataSail extends SailBase implements Sail {
      * When true, the RDFS closure will be maintained.
      */
     final private boolean truthMaintenance;
+    
+    /**
+     * When true, SAIL will delegate joins to bigdata internal joins.
+     */
+    final private boolean nativeJoins;
     
     /**
      * When true, the RDFS closure will be maintained by the <em>SAIL</em>
@@ -435,6 +447,19 @@ public class BigdataSail extends SailBase implements Sail {
             log
                     .info(BigdataSail.Options.BUFFER_CAPACITY + "="
                             + bufferCapacity);
+
+        }
+
+        // nativeJoins
+        {
+            
+            nativeJoins = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.NATIVE_JOINS,
+                    BigdataSail.Options.DEFAULT_NATIVE_JOINS));
+
+            log
+                    .info(BigdataSail.Options.NATIVE_JOINS + "="
+                            + nativeJoins);
 
         }
 
@@ -1695,7 +1720,7 @@ public class BigdataSail extends SailBase implements Sail {
                         includeInferred);
 
                 final EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
-                        (BigdataTripleSource) tripleSource, dataset);
+                        (BigdataTripleSource) tripleSource, dataset, nativeJoins);
 
                 QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());
@@ -1703,7 +1728,11 @@ public class BigdataSail extends SailBase implements Sail {
                 optimizerList.add(new CompareOptimizer());
                 optimizerList.add(new ConjunctiveConstraintSplitter());
                 optimizerList.add(new SameTermFilterOptimizer());
-                optimizerList.add(new QueryJoinOptimizer(new BigdataEvaluationStatistics(this)));
+                // only need to optimize the join order this way if we are not
+                // using native joins
+                if (nativeJoins == false) {
+                    optimizerList.add(new QueryJoinOptimizer(new BigdataEvaluationStatistics(this)));
+                }
                 optimizerList.add(new FilterOptimizer());
 
                 optimizerList.optimize(tupleExpr, dataset, bindings);
