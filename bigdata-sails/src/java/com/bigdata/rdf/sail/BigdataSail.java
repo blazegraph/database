@@ -113,6 +113,7 @@ import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -1751,14 +1752,31 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * Replace all Value objects stored in variables with
-         * {@link BigdataValue} objects, which have access to the 64-bit
-         * internal term identifier associated with each value in the database.
-         * 
-         * FIXME Batch resolve the term identifiers. This will benefit from the
-         * term cache, but does an index hit per unknown term.
+         * Batch resolve and replace all {@link Value} objects stored in
+         * variables with {@link BigdataValue} objects, which have access to the
+         * 64-bit internal term identifier associated with each value in the
+         * database.
+         * <p>
+         * Note: The native rule execution must examine the resulting
+         * {@link BigdataValue}s. If any value does not exist in the lexicon
+         * then its term identifier will be ZERO (0L). {@link StatementPattern}s
+         * with term identifiers of ZERO (0L) WILL NOT match anything in the
+         * data and MUST NOT be executed since a ZERO (0L) will be interpreted
+         * as a variable!
          */
         protected void replaceValues(TupleExpr tupleExpr) throws SailException {
+
+            /*
+             * Resolve the values used by this query.
+             * 
+             * Note: If any value can not be resolved, then its term identifer
+             * will remain ZERO (0L) (aka NULL). Except within OPTIONALs, this
+             * indicates that the query CAN NOT be satisified by the data since
+             * one or more required terms are unknown to the database.
+             */
+            final HashMap<Value, BigdataValue> values = new HashMap<Value, BigdataValue>();
+
+            final BigdataValueFactory valueFactory = database.getValueFactory();
             
             tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
 
@@ -1767,19 +1785,56 @@ public class BigdataSail extends SailBase implements Sail {
                     
                     if (var.hasValue()) {
 
+                        final Value val = var.getValue();
+
+                        // add BigdataValue variant of the var's Value.
+                        values.put(val, valueFactory.asValue(val));
+                        
+                    }
+                    
+                }
+                
+            });
+
+            /*
+             * Batch resolve term identifiers for those BigdataValues.
+             * 
+             * Note: If any value does not exist in the lexicon then its term
+             * identifier will be ZERO (0L).
+             */
+            {
+                 
+                 final BigdataValue[] terms = values.values().toArray(
+                        new BigdataValue[] {});
+    
+                 database.getLexiconRelation().addTerms(terms, terms.length,
+                         true/* readOnly */);
+
+            }
+            
+            /*
+             * Replace the values with BigdataValues having their resolve term
+             * identifiers.
+             */
+            tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
+
+                @Override
+                public void meet(Var var) {
+                    
+                    if (var.hasValue()) {
+
+                        // the Sesame Value object.
                         Value val = var.getValue();
 
-                        // convert to a BigdataValue object.
-                        val = database.getValueFactory().asValue(val);
+                        // Lookup the resolve BigdataValue object.
+                        val = values.get(val);
 
-                        // resolve the termId.
-//                        final long termId = 
-                        database.getTermId(val);
+                        assert val != null : "value not found: "+var.getValue();
                         
                         if (DEBUG)
                             log.debug("value: "+val+" : "+((BigdataValue)val).getTermId());
                         
-                        // replace the constant.
+                        // replace the constant in the query.
                         var.setValue(val);
 
                     }
