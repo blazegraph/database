@@ -201,14 +201,20 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
         } else if(inf.forwardChainOwlSameAsClosure && !inf.forwardChainOwlSameAsProperties) {
             
-            ret = new BackchainOwlSameAsPropertiesIterator(//
-                    src,//
-                    s,p,o,//
-                    inf.database, //
-                    inf.owlSameAs.get(),
-                    tempStore
-                    );
+            if (inf.database.getAccessPath(NULL, inf.owlSameAs.get(), NULL)
+                    .rangeCount(false/*exact*/) == 0L) {
 
+                ret = null;
+
+            } else {
+
+                ret = new BackchainOwlSameAsPropertiesIterator(//
+                        src,//
+                        s, p, o,//
+                        inf.database, //
+                        inf.owlSameAs.get(), tempStore);
+            }
+            
         } else {
             
             // no entailments.
