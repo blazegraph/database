@@ -29,6 +29,7 @@ package com.bigdata.rdf.store;
 
 import java.util.Enumeration;
 import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
@@ -186,12 +187,31 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      */
     public TempTripleStore(Properties properties, AbstractTripleStore db) {
         
-        this(new TemporaryStore(), db == null ? properties : stackProperties(
-                properties, db));
+        this(new TemporaryStore(), properties, db);
 
+    }
+
+    /**
+     * Variant for creating a(nother) {@link TempTripleStore} on the same
+     * {@link TemporaryStore}. The {@link TempTripleStore} will have its own
+     * namespace.
+     * 
+     * @param store
+     *            The {@link TemporaryStore}.
+     * @param properties
+     *            Overrides for the database's properties.
+     * @param db
+     *            The optional database (a) will establish the defaults for the
+     *            {@link TempTripleStore}; and (b) will be able to locate
+     *            relations declared on the backing {@link TemporaryStore}.
+     */
+    public TempTripleStore(TemporaryStore store, Properties properties, AbstractTripleStore db) {
+        
+        this(store, db == null ? properties : stackProperties(properties, db));
+        
         if(log.isInfoEnabled()) {
             
-            log.info("new temporary store: "+store.getFile()+", uuid="+store.getUUID());
+            log.info("new temporary store: "+store.getFile()+", namespace="+getNamespace());
             
         }
 
@@ -216,7 +236,7 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      */
     private TempTripleStore(TemporaryStore store, Properties properties) {
 
-        this(store, store.getUUID() + "kb", ITx.UNISOLATED, properties);
+        this(store, UUID.randomUUID() + "kb", ITx.UNISOLATED, properties);
         
     }
 

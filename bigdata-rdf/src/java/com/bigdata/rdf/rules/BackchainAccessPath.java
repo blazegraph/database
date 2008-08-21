@@ -31,6 +31,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.spo.ISPO;
@@ -64,6 +65,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
     private final static transient long NULL = IRawTripleStore.NULL;
 
     final private InferenceEngine inf;
+    final private TemporaryStore tempStore;
     final private IAccessPath<ISPO> accessPath;
 
     /**
@@ -198,7 +200,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
                     src,//
                     s,p,o,//
                     inf.database, //
-                    inf.owlSameAs.get()
+                    inf.owlSameAs.get(),
+                    tempStore
                     );
 
         } else {
