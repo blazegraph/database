@@ -108,6 +108,7 @@ import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 import org.openrdf.sail.helpers.SailBase;
 
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
@@ -116,6 +117,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -843,6 +845,34 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        /**
+         * A {@link BigdataSailConnection} local {@link TemporaryStore}.
+         * 
+         * @todo explicitly close with the {@link BigdataSailConnection}? I
+         *       believe that some connection instances may be reused (for read
+         *       historical views and for the read-committed view).
+         */
+        protected TemporaryStore getTemporaryStore() {
+
+            if (tempStore == null) {
+                
+                synchronized (this) {
+                
+                    if (tempStore == null) {
+                    
+                        tempStore = new TemporaryStore();
+                        
+                    }
+                    
+                }
+                
+            }
+            
+            return tempStore;
+            
+        }
+        private volatile TemporaryStore tempStore = null; 
+        
         /*
          * SailConnectionListener support.
          * 
@@ -1582,7 +1612,10 @@ public class BigdataSail extends SailBase implements Sail {
                  * the InferenceEngine was configured.
                  */
                 
-                src = getInferenceEngine().backchainIterator(accessPath);
+                src = new BackchainAccessPath(getInferenceEngine(),
+                        getTemporaryStore(), accessPath).iterator();
+                
+//                src = getInferenceEngine().backchainIterator(accessPath);
                 
             } else {
 
@@ -1692,8 +1725,9 @@ public class BigdataSail extends SailBase implements Sail {
                 throws SailException {
            
             if (INFO)
-                log.info("Evaluating query: "+tupleExpr+", dataSet="+dataset+", includeInferred="+includeInferred);
-            
+                log.info("Evaluating query: " + tupleExpr + ", dataSet="
+                        + dataset + ", includeInferred=" + includeInferred);
+
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
             // Clone the tuple expression to allow for more aggressive optimizations

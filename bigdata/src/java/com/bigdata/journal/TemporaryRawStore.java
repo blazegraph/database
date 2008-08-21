@@ -165,6 +165,14 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         
         super(offsetBits);
         
+        if(log.isInfoEnabled()) {
+            
+            log.info("offsetBits="+offsetBits+", file="+file
+//            ,new RuntimeException()
+            );
+            
+        }
+        
         // Note: timestamp is NOT assigned by a centralized service!
         this.createTime = System.currentTimeMillis();
         
@@ -237,7 +245,8 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
             
                 if (buf.isOpen()) {
 
-                    log.info("Closing temp store.");
+                    if (log.isInfoEnabled())
+                        log.info("Finalizing temp store");
 
                     close();
 
@@ -274,6 +283,9 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
 
         synchronized (buf) {
 
+            if (log.isInfoEnabled())
+                log.info("Closing temp store");
+            
             try {
             
                 if (!buf.isOpen())

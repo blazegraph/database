@@ -87,30 +87,43 @@ public class TempTripleStore extends AbstractLocalTripleStore {
     }
 
     /**
-     * Delegates the operation to the backing store.
+     * NOP.
+     * <p>
+     * Note: since multiple {@link TempTripleStore}s may be created on the same
+     * backing {@link TemporaryStore} it is NOT safe to perform a
+     * {@link TemporaryStore#checkpoint()}. There is no coordination of write
+     * access to the indices so the checkpoint can not be atomic. Therefore this
+     * method is a NOP and {@link #abort()} will throw an exception.
      */
     final public void commit() {
      
-        final long begin = System.currentTimeMillis();
+//        final long begin = System.currentTimeMillis();
 
         super.commit();
         
-        final long checkpointAddr = getIndexManager().checkpoint();
-
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        if (log.isInfoEnabled())
-            log.info("latency=" + elapsed + "ms, checkpointAddr="
-                    + checkpointAddr);
+//        final long checkpointAddr = getIndexManager().checkpoint();
+//
+//        final long elapsed = System.currentTimeMillis() - begin;
+//
+//        if (log.isInfoEnabled())
+//            log.info("latency=" + elapsed + "ms, checkpointAddr="
+//                    + checkpointAddr);
 
     }
 
+    /**
+     * Not supported.
+     * 
+     * @throws UnsupportedOperationException
+     */
     final public void abort() {
-                
-        super.abort();
+
+        throw new UnsupportedOperationException();
         
-        // discard the write sets.
-        getIndexManager().restoreLastCheckpoint();
+//        super.abort();
+//        
+//        // discard the write sets.
+//        getIndexManager().restoreLastCheckpoint();
 
     }
     
@@ -120,14 +133,25 @@ public class TempTripleStore extends AbstractLocalTripleStore {
         
     }
     
+    /**
+     * Causes the {@link TempTripleStore} to be {@link #destroy()}ed, but does
+     * not reclaim space in the backing {@link TemporaryStore} and does not
+     * close the backing {@link TemporaryStore}.
+     */
     final public void close() {
         
-        store.close();
-        
+//        store.close();
+
+        destroy();
+
         super.close();
         
     }
-    
+
+    /**
+     * Deletes the backing {@link TemporaryStore}, thereby destroying all
+     * {@link TempTripleStore}s on that {@link TemporaryStore}.
+     */
     final public void closeAndDelete() {
         
         store.closeAndDelete();

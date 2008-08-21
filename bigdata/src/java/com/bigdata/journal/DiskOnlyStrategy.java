@@ -2142,7 +2142,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             counters.ntruncate++;
             
-            log.warn("Disk file: newLength="+cf.format(newExtent));
+            log.warn("newLength="+cf.format(newExtent)+", file="+file);
             
             if(log.isInfoEnabled())
                 log.info(getCounters().toString());
