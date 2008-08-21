@@ -107,7 +107,8 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
             while (samesIt.hasNext()) {
                 final long same = samesIt.next();
                 // attach all of the same's properties to s
-                IChunkedOrderedIterator<ISPO> propsIt = db.getAccessPath(same, p, NULL).iterator();
+                IChunkedOrderedIterator<ISPO> propsIt = 
+                    db.getAccessPath(same, p, NULL).iterator();
                 while (propsIt.hasNext()) {
                     final ISPO prop = propsIt.next();
                     // do not add ( s sameAs s ) inferences
@@ -249,6 +250,7 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
             // attach the new o to the original s and p
             spos[numSPOs++] = new SPO(spo.s(), spo.p(), same,
                     StatementEnum.Inferred);
+            dumpSPO(spos[numSPOs-1]);
         }
         if (numSPOs > 0) {
             // final flush of the buffer

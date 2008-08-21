@@ -3,6 +3,7 @@ package com.bigdata.rdf.inf;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.log4j.Logger;
 
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.spo.ISPO;
@@ -12,6 +13,8 @@ import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedIterator<ISPO> {
+    
+    protected final static Logger log = Logger.getLogger(BackchainOwlSameAsIterator.class);
     
     protected final static transient long NULL = IRawTripleStore.NULL;
     
@@ -89,6 +92,8 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     }
     
     protected TempTripleStore createTempTripleStore() {
+        // log.info("creating temp triple store for owl:sameAs backchainer");
+        // System.err.println("creating temp triple store for owl:sameAs backchainer");
         Properties props = db.getProperties();
         // do not store terms
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
@@ -97,4 +102,8 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
         return new TempTripleStore(tempStore, props, db);
     }
 
+    protected void dumpSPO(ISPO spo) {
+        System.err.println(spo.toString(db));
+    }
+    
 }

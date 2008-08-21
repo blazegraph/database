@@ -173,6 +173,7 @@ public class BackchainOwlSameAsPropertiesPIterator extends
                 // grow the buffer
                 spos[numSPOs++] = new SPO(s1, spo.p(), o1,
                         StatementEnum.Inferred);
+                dumpSPO(spos[numSPOs-1]);
             }
         }
         if (numSPOs > 0) {

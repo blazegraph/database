@@ -114,6 +114,10 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             // collect up the links between {s,? sameAs s} X {o,? sameAs o}
             final Set<Long> sAndSames = getSelfAndSames(s);
             final Set<Long> oAndSames = getSelfAndSames(o);
+            if (sAndSames.size() == 1 && oAndSames.size() == 1) {
+                // no point in continuing if there are no sames
+                return;
+            }
             for (long s1 : sAndSames) {
                 for (long o1 : oAndSames) {
                     // get the links between this {s,o} tuple
@@ -125,29 +129,34 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
                             continue;
                         }
                         if (numSPOs == chunkSize) {
-                            if (sameAs2and3 == null) {
-                                sameAs2and3 = createTempTripleStore();
-                            }
                             boolean present = false; // filter for not present
                             IChunkedOrderedIterator<ISPO> absent = 
                                 db.bulkFilterStatements(spos, numSPOs, present);
-                            db.addStatements(sameAs2and3, copyOnly, absent, null);
+                            if (absent.hasNext()) {
+                                if (sameAs2and3 == null) {
+                                    sameAs2and3 = createTempTripleStore();
+                                }
+                                db.addStatements(sameAs2and3, copyOnly, absent, null);
+                            }
                             numSPOs = 0;
                         }
                         spos[numSPOs++] = new SPO(s, p1, o,
                                 StatementEnum.Inferred);
+                        dumpSPO(spos[numSPOs-1]);
                     }
                 }
             }
             if (numSPOs > 0) {
                 // final flush of the buffer
-                if (sameAs2and3 == null) {
-                    sameAs2and3 = createTempTripleStore();
-                }
                 boolean present = false; // filter for not present
                 IChunkedOrderedIterator<ISPO> absent = 
                     db.bulkFilterStatements(spos, numSPOs, present);
-                db.addStatements(sameAs2and3, copyOnly, absent, null);
+                if (absent.hasNext()) {
+                    if (sameAs2and3 == null) {
+                        sameAs2and3 = createTempTripleStore();
+                    }
+                    db.addStatements(sameAs2and3, copyOnly, absent, null);
+                }
             }
         }
     }
