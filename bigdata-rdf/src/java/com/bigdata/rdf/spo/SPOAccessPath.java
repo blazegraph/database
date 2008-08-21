@@ -55,9 +55,11 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
      */
     @SuppressWarnings("unchecked")
     public SPOAccessPath(SPORelation relation, IPredicate<ISPO> predicate,
-            IKeyOrder<ISPO> keyOrder, IIndex ndx, int flags) {
+            IKeyOrder<ISPO> keyOrder, IIndex ndx, int flags,
+            int queryBufferCapacity, int fullyBufferedReadThreshold) {
 
-        super(relation, predicate, keyOrder, ndx, flags);
+        super(relation, predicate, keyOrder, ndx, flags, queryBufferCapacity,
+                fullyBufferedReadThreshold);
 
         {
 

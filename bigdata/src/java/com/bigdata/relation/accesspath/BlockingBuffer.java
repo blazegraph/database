@@ -68,7 +68,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     private volatile boolean open = true;
 
     private volatile Throwable cause = null;
-    
+
+    /**
+     * The queue capacity (from the ctor).
+     */
+    private final int capacity;
+
     /**
      * Used to coordinate the reader and the writer.
      */
@@ -205,6 +210,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         if (chunkTimeout < 0)
             throw new IllegalArgumentException();
 
+        this.capacity = capacity;
+        
         this.queue = new ArrayBlockingQueue<E>(capacity);
         
         this.iterator = new BlockingIterator();
@@ -334,22 +341,25 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         }
 
-//        if (log.isInfoEnabled())
-//            log.info("add: " + e.toString());
-
+        final long begin = System.currentTimeMillis();
+        
         // wait if the queue is full.
+        int ntries = 0;
         while (true) {
 
             try {
 
-                if (queue.offer(e, 100, TimeUnit.MILLISECONDS)) {
+                if (!queue.offer(e, 100, TimeUnit.MILLISECONDS)) {
 
-                    // item now on the queue.
-
-                    if (log.isDebugEnabled())
-                        log.debug("added: " + e.toString());
+                    ntries++;
                     
-                    return;
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    
+                    log.warn("waiting - queue is full: ntries=" + ntries
+                                    + ", elapsed=" + elapsed + ", capacity="
+                                    + capacity);
+
+                    continue;
                     
                 }
                 
@@ -360,6 +370,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 throw new RuntimeException("Buffer closed by interrupt", ex);
                 
             }
+            
+            // item now on the queue.
+
+            if (log.isDebugEnabled())
+                log.debug("added: " + e.toString());
+            
+            return;
             
         }
         
@@ -574,7 +591,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                          * better or using an increasing wait (or a fixed
                          * sequence of total time waiting).
                          */
-                        final long sleepMillis = 10;
+                        final long sleepMillis = 1;
                         Thread.sleep(sleepMillis);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);

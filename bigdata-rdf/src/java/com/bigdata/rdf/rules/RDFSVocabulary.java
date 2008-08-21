@@ -388,7 +388,7 @@ public class RDFSVocabulary {
              * mutual dependency.
              */
 
-            final MappedProgram subProgram = new MappedProgram("fastClosure{5,6}",
+            final MappedProgram subProgram = new MappedProgram("fastClosure{5 6}",
                     focusStore, true/* parallel */, false/* closure */);
 
             // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)

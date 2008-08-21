@@ -131,22 +131,37 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
      */
     public ILocatableResource getContainer() {
 
-        if (getContainerNamespace() != null) {
+        if (container == null) {
 
-            if(log.isInfoEnabled()) {
-                
-                log.info("resolving container: "+getContainerNamespace());
-                
+            synchronized (this) {
+
+                if (container == null) {
+
+                    if (getContainerNamespace() != null) {
+
+                        if (log.isInfoEnabled()) {
+
+                            log.info("resolving container: "
+                                    + getContainerNamespace());
+
+                        }
+
+                        container = getIndexManager()
+                                .getResourceLocator()
+                                .locate(getContainerNamespace(), getTimestamp());
+
+                    }
+
+                }
+
             }
             
-            return getIndexManager().getResourceLocator().locate(getContainerNamespace(),
-                    getTimestamp());
-
         }
-        
-        return null;
+
+        return container;
         
     }
+    private volatile ILocatableResource container;
     
     public final long getTimestamp() {
         
