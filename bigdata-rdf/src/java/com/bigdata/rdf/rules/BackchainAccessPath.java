@@ -71,10 +71,13 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
     /**
      * 
      * @param inf
+     * @param tempStore
+     *            To be used by the backchainers.
      * @param accessPath
      *            The source {@link IAccessPath}.
      */
-    public BackchainAccessPath(InferenceEngine inf, IAccessPath<ISPO> accessPath) {
+    public BackchainAccessPath(InferenceEngine inf, TemporaryStore tempStore,
+            IAccessPath<ISPO> accessPath) {
 
         if (inf == null)
             throw new IllegalArgumentException();
@@ -83,6 +86,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
             throw new IllegalArgumentException();
 
         this.inf = inf;
+        
+        this.tempStore = tempStore;
         
         this.accessPath = accessPath;
         
