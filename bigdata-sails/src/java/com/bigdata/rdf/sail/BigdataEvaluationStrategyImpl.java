@@ -5,6 +5,8 @@ import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Set;
 import java.util.Vector;
 
 import org.apache.log4j.Logger;
@@ -16,10 +18,12 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
+import org.openrdf.query.algebra.evaluation.iterator.JoinIterator;
 
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -32,6 +36,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
@@ -71,13 +76,15 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     protected final Dataset dataset;
 
     private final AbstractTripleStore database;
+    
+    private final boolean nativeJoins;
 
     /**
      * @param tripleSource
      */
     public BigdataEvaluationStrategyImpl(BigdataTripleSource tripleSource) {
 
-        this(tripleSource, null);
+        this(tripleSource, null, false);
 
     }
 
@@ -86,7 +93,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * @param dataset
      */
     public BigdataEvaluationStrategyImpl(BigdataTripleSource tripleSource,
-            Dataset dataset) {
+            Dataset dataset, boolean nativeJoins) {
 
         super(tripleSource, dataset);
 
@@ -95,6 +102,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         this.dataset = null;
 
         this.database = tripleSource.getDatabase();
+        
+        this.nativeJoins = nativeJoins;
 
     }
 
@@ -108,7 +117,9 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
         if (log.isInfoEnabled()) {
 
-            log.info("tupleExpr:\n" + tupleExpr);
+            log.info("tupleExpr:\n"+
+                     tupleExpr.getClass()+"\n"+
+                     tupleExpr);
 
         }
 
@@ -260,6 +271,88 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
         }
 
+    }
+
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Join join, BindingSet bindings)
+        throws QueryEvaluationException
+    {
+        if (nativeJoins == false) {
+            return super.evaluate(join, bindings);
+        }
+        
+        if (log.isInfoEnabled()) log.info("evaluating native join");
+        Collection<StatementPattern> stmtPatterns = 
+            new LinkedList<StatementPattern>();
+        collectStatementPatterns(join, stmtPatterns);
+        if (log.isInfoEnabled()) {
+            for (StatementPattern stmtPattern : stmtPatterns) {
+                log.info(stmtPattern);
+            }
+        }
+        // name of the SPO relation.
+        final String SPO = database.getSPORelation().getNamespace();
+        final Collection<IPredicate> tails = new LinkedList<IPredicate>();
+        for (StatementPattern stmtPattern : stmtPatterns) {
+            IVariableOrConstant<Long> s;
+            {
+                Var var = stmtPattern.getSubjectVar();
+                Value val = var.getValue();
+                String name = var.getName();
+                if (val == null) {
+                    s = com.bigdata.relation.rule.Var.var(name);
+                } else {
+                    s = new Constant<Long>(database.getLexiconRelation().getTermId(val));
+                }
+            }
+            IVariableOrConstant<Long> p;
+            {
+                Var var = stmtPattern.getPredicateVar();
+                Value val = var.getValue();
+                String name = var.getName();
+                if (val == null) {
+                    p = com.bigdata.relation.rule.Var.var(name);
+                } else {
+                    p = new Constant<Long>(database.getLexiconRelation().getTermId(val));
+                }
+            }
+            IVariableOrConstant<Long> o;
+            {
+                Var var = stmtPattern.getObjectVar();
+                Value val = var.getValue();
+                String name = var.getName();
+                if (val == null) {
+                    o = com.bigdata.relation.rule.Var.var(name);
+                } else {
+                    o = new Constant<Long>(database.getLexiconRelation().getTermId(val));
+                }
+            }
+            tails.add(new SPOPredicate(SPO, s, p, o));
+        }
+        final IRule rule = new Rule(
+                "nativeJoin",
+                null, // head
+                tails.toArray(new IPredicate[tails.size()]),
+                // constraints on the rule.
+                null
+        );
+
+        return runQuery(join, rule);
+        
+    }
+    
+    private void collectStatementPatterns(TupleExpr tupleExpr, Collection<StatementPattern> stmtPatterns) {
+        if (tupleExpr instanceof StatementPattern) {
+            stmtPatterns.add((StatementPattern) tupleExpr);
+        } else if (tupleExpr instanceof Join) {
+            Join join = (Join) tupleExpr;
+            TupleExpr left = join.getLeftArg();
+            TupleExpr right = join.getRightArg();
+            collectStatementPatterns(left, stmtPatterns);
+            collectStatementPatterns(right, stmtPatterns);
+        } else {
+            throw new RuntimeException("encountered unexpected TupleExpr: " + tupleExpr.getClass());
+        }
     }
 
     /**
