@@ -38,6 +38,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -83,15 +84,8 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
      *            database.
      */
     public BackchainOwlSameAsPropertiesPOIterator(IChunkedOrderedIterator<ISPO> src, long p,
-            long o, AbstractTripleStore db, final long sameAs,TemporaryStore tempStore) {
-        super(src, db, sameAs);
-        Properties props = db.getProperties();
-        // do not store terms
-        props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
-        // only store the SPO index
-        props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-        sameAs3 = new TempTripleStore(tempStore,props,db);
-        sameAs2 = new TempTripleStore(tempStore,props,db);
+            long o, AbstractTripleStore db, final long sameAs, TemporaryStore tempStore) {
+        super(src, db, sameAs, tempStore);
         /*
          * Collect up additional reverse properties (s and p values) for the
          * known o value by examining the values which are owl:sameAs o. The p
@@ -112,7 +106,8 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             while (samesIt.hasNext()) {
                 long same = samesIt.next();
                 // attach all of the same's reverse properties to o
-                final IChunkedOrderedIterator<ISPO> reversePropsIt = db.getAccessPath(NULL, p, same).iterator();
+                final IChunkedOrderedIterator<ISPO> reversePropsIt = 
+                    db.getAccessPath(NULL, p, same).iterator();
                 while (reversePropsIt.hasNext()) {
                     final ISPO reverseProp = reversePropsIt.next();
                     // do not add ( s sameAs s ) inferences
@@ -121,10 +116,13 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
                     }
                     // flush the buffer if necessary
                     if (numSPOs == chunkSize) {
+                        if (sameAs3 == null) {
+                            sameAs3 = createTempTripleStore();
+                        }
                         boolean present = false; // filter for not present
-                        IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos,
-                                numSPOs, present);
-                        db.addStatements(sameAs3,copyOnly,absent, null);
+                        IChunkedOrderedIterator<ISPO> absent = 
+                            db.bulkFilterStatements(spos, numSPOs, present);
+                        db.addStatements(sameAs3, copyOnly, absent, null);
                         numSPOs = 0;
                     }
                     // attach the s and p to the original o
@@ -132,35 +130,41 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
                             StatementEnum.Inferred);
                 }
             }
-            // final flush of the buffer
-            boolean present = false; // filter for not present
-            IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs,
-                    present);
-            db.addStatements(sameAs3,copyOnly,absent, null);
+            if (numSPOs > 0) {
+                // final flush of the buffer
+                if (sameAs3 == null) {
+                    sameAs3 = createTempTripleStore();
+                }
+                boolean present = false; // filter for not present
+                IChunkedOrderedIterator<ISPO> absent = 
+                    db.bulkFilterStatements(spos, numSPOs, present);
+                db.addStatements(sameAs3, copyOnly, absent, null);
+            }
         }
-        sameAs3It = sameAs3.getAccessPath(SPOKeyOrder.SPO).iterator();
     }
 
     public IKeyOrder<ISPO> getKeyOrder() {
-        
         return src.getKeyOrder();
-        
     }
 
     public boolean hasNext() {
-        
-        if (src.hasNext() || sameAs3It.hasNext()) {
-            
-            return true;
-            
-        } else if (sameAs2It == null) {
-            
-            sameAs2It = sameAs2.getAccessPath(SPOKeyOrder.SPO).iterator();
-            
+        if (sameAs3It == null) {
+            if (sameAs3 != null) {
+                sameAs3It = sameAs3.getAccessPath(getKeyOrder()).iterator();
+            } else {
+                sameAs3It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+            }
         }
-
+        if (src.hasNext() || sameAs3It.hasNext()) {
+            return true;
+        } else if (sameAs2It == null) {
+            if (sameAs2 != null) {
+                sameAs2It = sameAs2.getAccessPath(getKeyOrder()).iterator();
+            } else {
+                sameAs2It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+            }
+        }
         return sameAs2It.hasNext();
-        
     }
 
     /**
@@ -170,6 +174,13 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
      * two iterators are complete.
      */
     public ISPO next() {
+        if (sameAs3It == null) {
+            if (sameAs3 != null) {
+                sameAs3It = sameAs3.getAccessPath(getKeyOrder()).iterator();
+            } else {
+                sameAs3It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+            }
+        }
         canRemove = false;
         ISPO current = null;
         if (src.hasNext()) {
@@ -181,7 +192,11 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             processSameAs2(current);
         } else {
             if (sameAs2It == null) {
-                sameAs2It = sameAs2.getAccessPath(SPOKeyOrder.SPO).iterator();
+                if (sameAs2 != null) {
+                    sameAs2It = sameAs2.getAccessPath(getKeyOrder()).iterator();
+                } else {
+                    sameAs2It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+                }
             }
             if (sameAs2It.hasNext()) {
                 current = sameAs2It.next();
@@ -219,20 +234,29 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             }
             // flush the buffer if necessary
             if (numSPOs == chunkSize) {
+                if (sameAs2 == null) {
+                    sameAs2 = createTempTripleStore();
+                }
                 boolean present = false; // filter for not present
-                IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs,
-                        present);
-                db.addStatements(sameAs2,copyOnly,absent, null);
+                IChunkedOrderedIterator<ISPO> absent = 
+                    db.bulkFilterStatements(spos, numSPOs, present);
+                db.addStatements(sameAs2, copyOnly, absent, null);
                 numSPOs = 0;
             }
             // attach the new s to the original p and o
             spos[numSPOs++] = new SPO(same, spo.p(), spo.o(),
                     StatementEnum.Inferred);
         }
-        // final flush of the buffer
-        boolean present = false; // filter for not present
-        IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs, present);
-        db.addStatements(sameAs2,copyOnly,absent, null);
+        if (numSPOs > 0) {
+            // final flush of the buffer
+            if (sameAs2 == null) {
+                sameAs2 = createTempTripleStore();
+            }
+            boolean present = false; // filter for not present
+            IChunkedOrderedIterator<ISPO> absent = 
+                db.bulkFilterStatements(spos, numSPOs, present);
+            db.addStatements(sameAs2, copyOnly, absent, null);
+        }
     }
 
     public ISPO[] nextChunk() {
@@ -265,8 +289,10 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             sameAs3It.close();
         if (sameAs2It != null)
             sameAs2It.close();
-        sameAs3.closeAndDelete();
-        sameAs2.closeAndDelete();
+        if (sameAs3 != null)
+            sameAs3.close();
+        if (sameAs2 != null)
+            sameAs2.close();
     }
 
     public void remove() {

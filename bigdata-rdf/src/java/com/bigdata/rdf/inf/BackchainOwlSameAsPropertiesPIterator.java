@@ -27,9 +27,7 @@
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
-import java.util.Properties;
 import java.util.Set;
-
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -38,6 +36,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -81,33 +80,25 @@ public class BackchainOwlSameAsPropertiesPIterator extends
      */
     public BackchainOwlSameAsPropertiesPIterator(
             IChunkedOrderedIterator<ISPO> src, long p, AbstractTripleStore db,
-            final long sameAs,TemporaryStore tempStore) {
+            final long sameAs, TemporaryStore tempStore) {
 
-        super(src, db, sameAs);
-
-        Properties props = db.getProperties();
-
-        // do not store terms
-        props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
-
-        // only store the SPO index
-        props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-
-        sameAs2and3 = new TempTripleStore(tempStore,props, db);
+        super(src, db, sameAs, tempStore);
 
     }
-
+    
     public IKeyOrder<ISPO> getKeyOrder() {
-        
         return src.getKeyOrder();
-        
     }
 
     public boolean hasNext() {
         if (src.hasNext()) {
             return true;
         } else if (sameAs2and3It == null) {
-            sameAs2and3It = sameAs2and3.getAccessPath(SPOKeyOrder.SPO).iterator();
+            if (sameAs2and3 != null) {
+                sameAs2and3It = sameAs2and3.getAccessPath(SPOKeyOrder.SPO).iterator();
+            } else {
+                sameAs2and3It = new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
+            }
         }
         return sameAs2and3It.hasNext();
     }
@@ -121,7 +112,11 @@ public class BackchainOwlSameAsPropertiesPIterator extends
             canRemove = true;
         } else {
             if (sameAs2and3It == null) {
-                sameAs2and3It = sameAs2and3.getAccessPath(SPOKeyOrder.SPO).iterator();
+                if (sameAs2and3 != null) {
+                    sameAs2and3It = sameAs2and3.getAccessPath(SPOKeyOrder.SPO).iterator();
+                } else {
+                    sameAs2and3It = new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
+                }
             }
             if (sameAs2and3It.hasNext()) {
                 current = sameAs2and3It.next();
@@ -166,10 +161,13 @@ public class BackchainOwlSameAsPropertiesPIterator extends
                 }
                 if (numSPOs == chunkSize) {
                     // flush the buffer
+                    if (sameAs2and3 == null) {
+                        sameAs2and3 = createTempTripleStore();
+                    }
                     boolean present = false; // filter for not present
-                    final IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos,
-                            numSPOs, present);
-                    db.addStatements(sameAs2and3,copyOnly,absent, null);
+                    final IChunkedOrderedIterator<ISPO> absent = 
+                        db.bulkFilterStatements(spos, numSPOs, present);
+                    db.addStatements(sameAs2and3, copyOnly, absent, null);
                     numSPOs = 0;
                 }
                 // grow the buffer
@@ -177,10 +175,16 @@ public class BackchainOwlSameAsPropertiesPIterator extends
                         StatementEnum.Inferred);
             }
         }
-        // final flush of the buffer
-        boolean present = false; // filter for not present
-        final IChunkedOrderedIterator<ISPO> absent = db.bulkFilterStatements(spos, numSPOs, present);
-        db.addStatements(sameAs2and3,copyOnly,absent, null);
+        if (numSPOs > 0) {
+            // final flush of the buffer
+            if (sameAs2and3 == null) {
+                sameAs2and3 = createTempTripleStore();
+            }
+            boolean present = false; // filter for not present
+            final IChunkedOrderedIterator<ISPO> absent = 
+                db.bulkFilterStatements(spos, numSPOs, present);
+            db.addStatements(sameAs2and3, copyOnly, absent, null);
+        }
     }
 
     public ISPO[] nextChunk() {
@@ -211,7 +215,8 @@ public class BackchainOwlSameAsPropertiesPIterator extends
         src.close();
         if (sameAs2and3It != null)
             sameAs2and3It.close();
-        sameAs2and3.closeAndDelete();
+        if (sameAs2and3 != null)
+            sameAs2and3.close();   
     }
 
     public void remove() {
