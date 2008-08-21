@@ -25,6 +25,7 @@ import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
@@ -323,7 +324,9 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                     o = new Constant<Long>(id);
                 }
             }
-            tails.add(new SPOPredicate(SPO, s, p, o));
+            tails.add(new SPOPredicate(new String[] { SPO }, s, p, o,
+                    !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
+                            : null));
         }
         final IRule rule = new Rule(
                 "nativeJoin",
@@ -750,7 +753,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                             ActionEnum.Query, IJoinNexus.BINDINGS,
                             null, // filter
                             false, // justify 
-                            true, // backchain
+                            tripleSource.includeInferred, // backchain
                             planFactory
                             );
 

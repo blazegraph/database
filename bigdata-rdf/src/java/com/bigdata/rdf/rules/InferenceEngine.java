@@ -28,6 +28,7 @@ import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.Axioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.BaseAxioms;
@@ -748,7 +749,7 @@ public class InferenceEngine extends RDFSVocabulary {
      */
     public IChunkedOrderedIterator<ISPO> backchainIterator(IAccessPath<ISPO> accessPath) {
 
-        return new BackchainAccessPath(this, accessPath).iterator();
+        return new BackchainAccessPath(this, new TemporaryStore(), accessPath).iterator();
         
     }
     
