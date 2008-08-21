@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
+import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -27,6 +28,7 @@ import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
@@ -71,6 +73,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      */
     static final URI MAGIC_SEARCH = new URIImpl(BNS.SEARCH);
 
+    private final long NULL = IRawTripleStore.NULL;
+    
     protected final BigdataTripleSource tripleSource;
 
     protected final Dataset dataset;
@@ -247,6 +251,14 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     /**
      * Uses native joins iff {@link BigdataSail.Options#NATIVE_JOINS} is
      * specified.
+     * <p>
+     * Note: As a pre-condition, the {@link Value}s in the query expression
+     * MUST have been rewritten as {@link BigdataValue}s and their term
+     * identifiers MUST have been resolved. Any term identifier that remains
+     * {@link IRawTripleStore#NULL} is an indication that there is no entry for
+     * that {@link Value} in the database. Since the JOINs are required (vs
+     * OPTIONALs), that means that there is no solution for the JOINs and an
+     * {@link EmptyIteration} is returned rather than evaluating the query.
      */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Join join, BindingSet bindings)
@@ -277,7 +289,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 if (val == null) {
                     s = com.bigdata.relation.rule.Var.var(name);
                 } else {
-                    s = new Constant<Long>(((BigdataValue)val).getTermId());
+                    final Long id = ((BigdataValue)val).getTermId();
+                    if (id.longValue() == NULL)
+                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
+                    s = new Constant<Long>(id);
                 }
             }
             final IVariableOrConstant<Long> p;
@@ -288,7 +303,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 if (val == null) {
                     p = com.bigdata.relation.rule.Var.var(name);
                 } else {
-                    p = new Constant<Long>(((BigdataValue)val).getTermId());
+                    final Long id = ((BigdataValue)val).getTermId();
+                    if (id.longValue() == NULL)
+                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
+                    p = new Constant<Long>(id);
                 }
             }
             final IVariableOrConstant<Long> o;
@@ -299,7 +317,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 if (val == null) {
                     o = com.bigdata.relation.rule.Var.var(name);
                 } else {
-                    o = new Constant<Long>(((BigdataValue)val).getTermId());
+                    final Long id = ((BigdataValue)val).getTermId();
+                    if (id.longValue() == NULL)
+                        return new EmptyIteration<BindingSet, QueryEvaluationException>();
+                    o = new Constant<Long>(id);
                 }
             }
             tails.add(new SPOPredicate(SPO, s, p, o));
