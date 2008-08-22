@@ -30,9 +30,7 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -44,13 +42,11 @@ import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.striterator.ClosableEmptyIterator;
 import com.bigdata.striterator.ClosableSingleItemIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
-
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IFilter;
 import cutthecrap.utils.striterators.Resolver;
@@ -155,17 +151,28 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
             final IAccessPath<ISPO> accessPath, final AbstractTripleStore db,
             final long rdfType, final long rdfsResource) {
         
-        if (_src == null)
+        if (accessPath == null)
             throw new IllegalArgumentException();
         
-        if (accessPath == null)
+        final SPO spo = new SPO(accessPath.getPredicate());
+
+        if (((spo.p == NULL || spo.p == rdfType) && 
+             (spo.o == NULL || spo.o == rdfsResource)) == false) {
+            
+            /*
+             * Backchain will not generate any statements.
+             */
+
+            return _src;
+            
+        }
+           
+        if (_src == null)
             throw new IllegalArgumentException();
         
         if (db == null)
             throw new IllegalArgumentException();
         
-        final SPO spo = new SPO(accessPath.getPredicate());
-
         /*
          * The subject(s) whose (s rdf:type rdfs:Resource) entailments will be
          * visited.
@@ -181,10 +188,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
          */
         final PushbackIterator<Long> posItr;
 
-        if (spo.s == NULL
-                && (spo.p == NULL || spo.p == rdfType)
-                && (spo.o == NULL || spo.o == rdfsResource)
-                ) {
+        if (spo.s == NULL) {
 
             /*
              * Backchain will generate one statement for each distinct subject
@@ -229,8 +233,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
                         }
                     }));
 
-        } else if ((spo.p == NULL || spo.p == rdfType)
-                && (spo.o == NULL || spo.o == rdfsResource)) {
+        } else {
 
             /*
              * Backchain will generate exactly one statement: (s rdf:type
@@ -256,20 +259,8 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
                         }
             }));
 
-        } else {
-
-            /*
-             * Backchain will not generate any statements.
-             */
-
-            resourceIds = new PushbackIterator<Long>(new ClosableEmptyIterator<Long>());
-
-            posItr = null;
-            
-            return _src;
-            
         }
-
+        
         /*
          * filters out (x rdf:Type rdfs:Resource) in case it is explicit in the
          * db so that we do not generate duplicates for explicit type resource
