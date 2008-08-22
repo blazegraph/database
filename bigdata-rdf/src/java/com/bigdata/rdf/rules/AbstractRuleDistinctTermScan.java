@@ -258,7 +258,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
 //                    .getAccessPath(keyOrder) : state.focusStore
 //                    .getAccessPath(keyOrder);
 
-            final RuleStats ruleStats = new RuleStats(rule);
+            final RuleStats ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(rule);
             
             // there is only a single unbound variable for this rule.
             final IBindingSet bindingSet = new ArrayBindingSet(1/*capacity*/);

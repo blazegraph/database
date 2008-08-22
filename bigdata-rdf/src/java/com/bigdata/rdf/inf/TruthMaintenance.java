@@ -403,8 +403,9 @@ public class TruthMaintenance {
 
         final long nafterClosure = tempStore.getStatementCount();
 
-        log.info("There are " + nafterClosure
-                + " statements in the temporary store after closure");
+        if (log.isInfoEnabled())
+            log.info("There are " + nafterClosure
+                    + " statements in the temporary store after closure");
 
         /*
          * copy statements from the temporary store to the database.

@@ -177,7 +177,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      *            {@link IRule}s.
      */
 	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
-            long writeTime, long readTime, boolean forceSerialExecution,
+            long writeTimestamp, long readTimestamp, boolean forceSerialExecution,
             boolean justify, boolean backchain, int mutationBufferCapacity,
             int queryBufferCapacity, int fullyBufferedReadThreshold,
             int solutionFlags, IElementFilter filter,
@@ -196,9 +196,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
         this.action = action;
         
-        this.writeTimestamp = writeTime;
+        this.writeTimestamp = writeTimestamp;
 
-        this.readTimestamp = readTime;
+        this.readTimestamp = readTimestamp;
 
         this.justify = justify;
 
@@ -227,6 +227,14 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
         return new RDFJoinNexus(this, indexManager);
 
+    }
+
+    public long getReadTimestamp() {
+        return readTimestamp;
+    }
+
+    public long getWriteTimestamp() {
+        return writeTimestamp;
     }
 
 }

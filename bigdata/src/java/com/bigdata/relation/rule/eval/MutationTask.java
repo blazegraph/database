@@ -115,21 +115,21 @@ public class MutationTask extends AbstractStepTask {
 
         final RuleStats totals;
 
-        if(tasks.size()==1) {
-            
-            totals = runOne(step, tasks.get(0));
-            
+        if (tasks.size() == 1) {
+
+            totals = runOne(joinNexus, step, tasks.get(0));
+
         } else if (!joinNexus.forceSerialExecution() && !step.isRule()
                 && ((IProgram) step).isParallel()) {
 
-            totals = runParallel(step, tasks);
+            totals = runParallel(joinNexus, step, tasks);
 
             flushBuffers(joinNexus, totals, buffers);
 
         } else {
 
             // Note: flushes buffer after each step.
-            totals = runSequential(step, tasks);
+            totals = runSequential(joinNexus, step, tasks);
 
         }
 

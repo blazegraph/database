@@ -177,7 +177,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      *       <p>
      *       Do the same thing for running a program as a sequence.
      */
-    protected RuleStats runParallel(IStep program,
+    protected RuleStats runParallel(IJoinNexus joinNexus, IStep program,
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
     
@@ -187,7 +187,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         if (indexManager == null)
             throw new IllegalStateException();
         
-        final RuleStats totals = new RuleStats(program);
+        final RuleStats totals = joinNexus.getRuleStatisticsFactory().newInstance(program);
         
         final ExecutorService service = indexManager.getExecutorService();
         
@@ -220,7 +220,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected RuleStats runSequential(IStep program,
+    protected RuleStats runSequential(IJoinNexus joinNexus, IStep program,
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
     
@@ -234,7 +234,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         
         final ExecutorService service = indexManager.getExecutorService();
         
-        final RuleStats totals = new RuleStats(program);
+        final RuleStats totals = joinNexus.getRuleStatisticsFactory().newInstance(program);
         
         final Iterator<Callable<RuleStats>> itr = tasks.iterator();
     
@@ -294,7 +294,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected RuleStats runOne(IStep program,
+    protected RuleStats runOne(IJoinNexus joinNexus, IStep program,
             Callable<RuleStats> task) throws InterruptedException,
             ExecutionException {
     
@@ -541,14 +541,16 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         final long timestamp;
         {
             
+//            final IJoinNexus joinNexus = joinNexusFactory.newInstance(indexManager);
+            
             if (action.isMutation()) {
 
-                timestamp = joinNexusFactory.newInstance(indexManager)
-                        .getWriteTimestamp();
+                timestamp = joinNexusFactory.getWriteTimestamp();
 
             } else {
 
-                timestamp = ITx.READ_COMMITTED;
+                timestamp = joinNexusFactory.getReadTimestamp();
+//                timestamp = ITx.READ_COMMITTED;
                 
             }
 

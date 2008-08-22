@@ -97,16 +97,16 @@ public class QueryTask extends AbstractStepTask {
 
             if (tasks.size() == 1) {
 
-                totals = runOne(step, tasks.get(0));
+                totals = runOne(joinNexus, step, tasks.get(0));
 
             } else if (!joinNexus.forceSerialExecution() && !step.isRule()
 					&& ((IProgram) step).isParallel()) {
 
-                totals = runParallel(step, tasks);
+                totals = runParallel(joinNexus, step, tasks);
 
             } else {
 
-                totals = runSequential(step, tasks);
+                totals = runSequential(joinNexus, step, tasks);
 
             }
 
