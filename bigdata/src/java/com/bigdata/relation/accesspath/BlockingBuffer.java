@@ -345,19 +345,30 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
         // wait if the queue is full.
         int ntries = 0;
+        long timeout = 100;
         while (true) {
 
             try {
 
-                if (!queue.offer(e, 100, TimeUnit.MILLISECONDS)) {
+                if (!queue.offer(e, timeout, TimeUnit.MILLISECONDS)) {
 
+                    /*
+                     * Note: While not the only explanation, a timeout here can
+                     * occur if you have nested JOINs. The outer JOIN can
+                     * timeout waiting on the inner JOINs to consume the current
+                     * tuple. If there are a lot of tuples being evaluated in
+                     * the inner JOINs, then a timeout is becomes more likely.
+                     */
+                    
                     ntries++;
                     
                     final long elapsed = System.currentTimeMillis() - begin;
                     
+                    timeout = Math.min(10000, timeout*= 2);
+                    
                     log.warn("waiting - queue is full: ntries=" + ntries
-                                    + ", elapsed=" + elapsed + ", capacity="
-                                    + capacity);
+                            + ", elapsed=" + elapsed + ", timeout=" + timeout
+                            + ", capacity=" + capacity);
 
                     continue;
                     
