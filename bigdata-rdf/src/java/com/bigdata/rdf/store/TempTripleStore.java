@@ -150,7 +150,10 @@ public class TempTripleStore extends AbstractLocalTripleStore {
 
     /**
      * Deletes the backing {@link TemporaryStore}, thereby destroying all
-     * {@link TempTripleStore}s on that {@link TemporaryStore}.
+     * {@link TempTripleStore}s on that {@link TemporaryStore}. After calling
+     * this method you will see an {@link IllegalStateException} if you attempt
+     * further operations on {@link TempTripleStore}s that were backed by the
+     * backing {@link TemporaryStore}.
      */
     final public void closeAndDelete() {
         

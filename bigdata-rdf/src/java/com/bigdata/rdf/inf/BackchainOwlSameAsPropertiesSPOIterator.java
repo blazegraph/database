@@ -116,7 +116,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             final Set<Long> oAndSames = getSelfAndSames(o);
             if (sAndSames.size() == 1 && oAndSames.size() == 1) {
                 // no point in continuing if there are no sames
-                return;
+//                return;
             }
             for (long s1 : sAndSames) {
                 for (long o1 : oAndSames) {
