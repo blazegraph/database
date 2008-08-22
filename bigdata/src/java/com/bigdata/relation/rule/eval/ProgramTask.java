@@ -495,7 +495,8 @@ public class ProgramTask implements IProgramTask,
         
         final long begin = System.currentTimeMillis();
 
-        final RuleStats totals = new RuleStats(program);
+        final RuleStats totals = joinNexusFactory.newInstance(indexManager)
+                .getRuleStatisticsFactory().newInstance(program);
         
         int round = 1;
         
@@ -597,8 +598,9 @@ public class ProgramTask implements IProgramTask,
         
         log.info("program embeds closure operations");
         
-        final RuleStats totals = new RuleStats(program);
-        
+        final RuleStats totals = joinNexusFactory.newInstance(indexManager)
+                .getRuleStatisticsFactory().newInstance(program);
+
         final Iterator<? extends IStep> itr = (program).steps();
         
         while(itr.hasNext()) {

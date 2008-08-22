@@ -42,9 +42,11 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -69,15 +71,18 @@ import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultRangeCountFactory;
 import com.bigdata.relation.rule.eval.EmptyProgramTask;
+import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IProgramTask;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
+import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.NestedSubqueryTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
+import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTaskFactory;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -147,8 +152,158 @@ public class RDFJoinNexus implements IJoinNexus {
      * @todo caching for the same relation and database state shared across join
      *       nexus instances.
      */
-    private final IRangeCountFactory rangeCountFactory = new DefaultRangeCountFactory(this);
+    private final IRangeCountFactory rangeCountFactory = new DefaultRangeCountFactory(
+            this);
+
+    private final IRuleStatisticsFactory ruleStatisticsFactory = new IRuleStatisticsFactory() {
+
+        public RuleStats newInstance(IStep step) {
+            
+            return new RDFRuleStats(step);
+            
+        }
+
+        public RuleStats newInstance(IRule rule, IEvaluationPlan plan) {
+         
+            return new RDFRuleStats(null, readTimestamp, rule, plan);
+
+        }
+        
+        /**
+         * Factory will resolve term identifiers in {@link IPredicate}s in the
+         * tail of the {@link IRule} to {@link BigdataValue}s unless the
+         * {@link IIndexManager} is an {@link IBigdataFederation}.
+         * 
+         * @todo translation of term identifiers is disabled. someone is
+         *       interrupting the thread logging the {@link RuleStats}. until i
+         *       can figure out who that is, you will see term identifiers
+         *       rather than {@link BigdataValue}s.
+         */
+        public RuleStats newInstancex(IRule rule, IEvaluationPlan plan) {
+            
+            return new RDFRuleStats(
+                    (indexManager instanceof IBigdataFederation ? null
+                            : indexManager), //
+                        readTimestamp, //
+                        rule, //
+                        plan //
+                        );
+            
+        }
+        
+    };
     
+    /**
+     * Extends {@link RuleStats}s to translate the tail predicates back into
+     * RDF by resolving the term identifiers to {@link BigdataValue}s.
+     */
+    private static class RDFRuleStats extends RuleStats {
+
+        private final IIndexManager indexManager;
+        private final long timestamp;
+        
+        public RDFRuleStats(IStep step) {
+
+            super(step);
+
+            indexManager = null;
+            
+            timestamp = 0L; // ignored.
+            
+        }
+        
+        /**
+         * 
+         * @param indexManager
+         *            When non-<code>null</code>, this is used to resolve
+         *            the term identifers in the {@link IPredicate}s in the
+         *            tail of the rule to {@link BigdataValue}s.
+         * 
+         * @param rule
+         * @param plan
+         */
+        public RDFRuleStats(IIndexManager indexManager, long timestamp,
+                IRule rule, IEvaluationPlan plan) {
+
+            super(rule, plan);
+
+            this.indexManager = indexManager;
+            
+            this.timestamp = timestamp;
+            
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        protected String toString(IPredicate pred) {
+
+            if (indexManager == null) {
+
+                return pred.toString().replace(", ", " ");
+                
+            }
+
+            final SPORelation spoRelation = (SPORelation) indexManager
+                    .getResourceLocator().locate(pred.getRelationName(0),
+                            timestamp);
+
+            final AbstractTripleStore db = spoRelation.getContainer();
+
+            final Object s, p, o;
+            try {
+
+                {
+
+                    final IVariableOrConstant<Long> t = pred.get(0);
+
+                    if (t.isVar())
+                        s = t.getName();
+                    else
+                        s = db.toString(t.get());
+
+                }
+
+                {
+
+                    final IVariableOrConstant<Long> t = pred.get(1);
+
+                    if (t.isVar())
+                        p = t.getName();
+                    else
+                        p = db.toString(t.get());
+
+                }
+
+                {
+
+                    final IVariableOrConstant<Long> t = pred.get(2);
+
+                    if (t.isVar())
+                        o = t.getName();
+                    else
+                        o = db.toString(t.get());
+
+                }
+            } catch (Throwable t) {
+                
+                /*
+                 * @todo It appears that someone is interrupting the thread in
+                 * which the logging data is being generated. You can see this
+                 * if you enable translation of term identifiers above in the
+                 * factory that produces instances of this class.
+                 */
+                
+                throw new RuntimeException("pred=" + pred + ", timestamp="
+                        + timestamp + ", indexManager=" + indexManager
+                        + ", db=" + db, t);
+            }
+           
+            return "(" + s + " " + p + " " + o + ")";
+            
+        }
+        
+    }
+        
 	/**
 	 * @param joinNexusFactory
 	 *            The object used to create this instance and which can be used
@@ -212,6 +367,12 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
+    public IRuleStatisticsFactory getRuleStatisticsFactory() {
+        
+        return ruleStatisticsFactory;
+        
+    }
+    
     public IRangeCountFactory getRangeCountFactory() {
         
         return rangeCountFactory;
@@ -236,11 +397,17 @@ public class RDFJoinNexus implements IJoinNexus {
     }
     
     public long getWriteTimestamp() {
-        
+
         return writeTimestamp;
-        
+
     }
 
+    final public long getReadTimestamp() {
+        
+        return readTimestamp;
+        
+    }
+    
 //	/**
 //	 * Return <code>true</code> if the <i>relationName</i> is on a
 //	 * {@link TempTripleStore}
@@ -283,62 +450,62 @@ public class RDFJoinNexus implements IJoinNexus {
 //
 //    }
 
-//	/**
-//	 * A per-relation reentrant read-write lock allows either concurrent readers
-//	 * or an writer on the unisolated view of a relation. When we use this lock
-//	 * we also use {@link ITx#UNISOLATED} reads and writes and
-//	 * {@link #makeWriteSetsVisible()} is a NOP.
-//	 */
-//    final private static boolean useReentrantReadWriteLockAndUnisolatedReads = true;
-    
-    public long getReadTimestamp(String relationName) {
-
-//		if (useReentrantReadWriteLockAndUnisolatedReads) {
-
-//			if (action.isMutation()) {
-//				
-//                assert readTimestamp == ITx.UNISOLATED : "readTimestamp="+readTimestamp;
-//                
-//			}
-
-            return readTimestamp;
-
-//		} else {
+////	/**
+////	 * A per-relation reentrant read-write lock allows either concurrent readers
+////	 * or an writer on the unisolated view of a relation. When we use this lock
+////	 * we also use {@link ITx#UNISOLATED} reads and writes and
+////	 * {@link #makeWriteSetsVisible()} is a NOP.
+////	 */
+////    final private static boolean useReentrantReadWriteLockAndUnisolatedReads = true;
+//    
+//    public long getReadTimestamp(String relationName) {
 //
-//            /*
-//             * When the relation is the focusStore choose {@link ITx#UNISOLATED}.
-//             * Otherwise choose whatever was specified to the
-//             * {@link RDFJoinNexusFactory}. This is because we avoid doing a
-//             * commit on the focusStore and instead just its its UNISOLATED
-//             * indices. This is more efficient since they are already buffered
-//             * and since we can avoid touching disk at all for small data sets.
-//             */
-//            
-//			if (isTempStore(relationName)) {
+////		if (useReentrantReadWriteLockAndUnisolatedReads) {
 //
-//				return ITx.UNISOLATED;
+////			if (action.isMutation()) {
+////				
+////                assert readTimestamp == ITx.UNISOLATED : "readTimestamp="+readTimestamp;
+////                
+////			}
 //
-//			}
+//            return readTimestamp;
 //
-//			if (lastCommitTime != 0L && action.isMutation()) {
-//
-//				/*
-//				 * Note: This advances the read-behind timestamp for a local
-//				 * Journal configuration without the ConcurrencyManager (the
-//				 * only scenario where we do an explicit commit).
-//				 * 
-//				 * @issue negative timestamp for historical read.
-//				 */
-//
-//				return -lastCommitTime;
-//
-//			}
-//
-//			return readTimestamp;
-//
-//		}
-        
-    }
+////		} else {
+////
+////            /*
+////             * When the relation is the focusStore choose {@link ITx#UNISOLATED}.
+////             * Otherwise choose whatever was specified to the
+////             * {@link RDFJoinNexusFactory}. This is because we avoid doing a
+////             * commit on the focusStore and instead just its its UNISOLATED
+////             * indices. This is more efficient since they are already buffered
+////             * and since we can avoid touching disk at all for small data sets.
+////             */
+////            
+////			if (isTempStore(relationName)) {
+////
+////				return ITx.UNISOLATED;
+////
+////			}
+////
+////			if (lastCommitTime != 0L && action.isMutation()) {
+////
+////				/*
+////				 * Note: This advances the read-behind timestamp for a local
+////				 * Journal configuration without the ConcurrencyManager (the
+////				 * only scenario where we do an explicit commit).
+////				 * 
+////				 * @issue negative timestamp for historical read.
+////				 */
+////
+////				return -lastCommitTime;
+////
+////			}
+////
+////			return readTimestamp;
+////
+////		}
+//        
+//    }
 
 	/**
 	 * The head relation is what we write on for mutation operations and is also
@@ -355,7 +522,7 @@ public class RDFJoinNexus implements IJoinNexus {
         final String relationName = pred.getOnlyRelationName();
         
         final long timestamp = (getAction().isMutation() ? getWriteTimestamp()
-                : getReadTimestamp(relationName));
+                : getReadTimestamp(/*relationName*/));
 
         final IRelation relation = (IRelation) getIndexManager()
                 .getResourceLocator().locate(relationName, timestamp);
@@ -386,7 +553,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final String relationName = pred.getOnlyRelationName();
 
-            final long timestamp = getReadTimestamp(relationName);
+            final long timestamp = getReadTimestamp(/*relationName*/);
 
             relation = (IRelation) getIndexManager().getResourceLocator().locate(
                     relationName, timestamp);
@@ -397,9 +564,9 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final String relationName1 = pred.getRelationName(1);
 
-            final long timestamp0 = getReadTimestamp(relationName0);
+            final long timestamp0 = getReadTimestamp(/*relationName0*/);
 
-            final long timestamp1 = getReadTimestamp(relationName1);
+            final long timestamp1 = getReadTimestamp(/*relationName1*/);
 
             final SPORelation relation0 = (SPORelation) getIndexManager()
                     .getResourceLocator().locate(relationName0, timestamp0);

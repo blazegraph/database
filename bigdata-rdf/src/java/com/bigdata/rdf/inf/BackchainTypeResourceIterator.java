@@ -155,8 +155,6 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
             final IAccessPath<ISPO> accessPath, final AbstractTripleStore db,
             final long rdfType, final long rdfsResource) {
         
-        if(true) throw new UnsupportedOperationException();
-        
         if (_src == null)
             throw new IllegalArgumentException();
         

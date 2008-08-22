@@ -107,8 +107,8 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getWriteTimestamp();
     }
 
-    public long getReadTimestamp(String relationName) {
-        return delegate.getReadTimestamp(relationName);
+    public long getReadTimestamp(/*String relationName*/) {
+        return delegate.getReadTimestamp(/*relationName*/);
     }
 
     public int solutionFlags() {
@@ -149,6 +149,10 @@ public class DelegateJoinNexus implements IJoinNexus {
 
     public IRangeCountFactory getRangeCountFactory() {
         return delegate.getRangeCountFactory();
+    }
+
+    public IRuleStatisticsFactory getRuleStatisticsFactory() {
+        return delegate.getRuleStatisticsFactory();
     }
 
 }

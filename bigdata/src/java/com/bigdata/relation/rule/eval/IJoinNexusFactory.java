@@ -53,6 +53,16 @@ import com.bigdata.service.IBigdataFederation;
 public interface IJoinNexusFactory extends Serializable {
 
     /**
+     * The timestamp for the write view of the relation(s).
+     */
+    long getWriteTimestamp();
+    
+    /**
+     * The timestamp for the read view of the relation(s).
+     */
+    long getReadTimestamp();
+    
+    /**
      * New instance.
      * 
      * @param indexManager

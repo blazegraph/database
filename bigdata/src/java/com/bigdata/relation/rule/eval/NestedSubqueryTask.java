@@ -91,7 +91,8 @@ public class NestedSubqueryTask implements IStepTask {
 
         this.ruleState = new RuleState(rule, joinNexus);
 
-        this.ruleStats = new RuleStats(ruleState);
+        this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(rule,
+                ruleState.plan);
         
     }
     

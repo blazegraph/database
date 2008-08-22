@@ -243,7 +243,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 log.info("running: rule=" + rule.getName() + ", propertyId="
                         + propertyId);
             
-            final RuleStats stats = new RuleStats(rule);
+            final RuleStats stats = joinNexus.getRuleStatisticsFactory().newInstance(rule);
 
             final long begin = System.currentTimeMillis();
 
@@ -423,15 +423,15 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 
                 if (focusStore == null) {
 
-                    final long timestamp = joinNexus.getReadTimestamp(database);
+                    final long timestamp = joinNexus.getReadTimestamp(/*database*/);
                    
                     return (IRelation<ISPO>)resourceLocator.locate(database, timestamp);
 
                 } else {
 
-                    final long timestamp0 = joinNexus.getReadTimestamp(database);
+                    final long timestamp0 = joinNexus.getReadTimestamp(/*database*/);
 
-                    final long timestamp1 = joinNexus.getReadTimestamp(focusStore);
+                    final long timestamp1 = joinNexus.getReadTimestamp(/*focusStore*/);
 
                     return new RelationFusedView<ISPO>(
                             //

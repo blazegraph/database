@@ -37,7 +37,6 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.Rule;
 import com.bigdata.service.ILoadBalancerService;
 
 /**
@@ -64,27 +63,29 @@ import com.bigdata.service.ILoadBalancerService;
 public class RuleStats {
 
     /**
-     * Initilizes statistics for a {@link Rule}.
+     * Initilizes statistics for an {@link IStep}.
      * <p>
      * Note: This form is used when statistics will be aggregated across the
-     * execution of multiple steps in a program, including computing the closure
-     * (fix point) of the program.
+     * execution of multiple {@link IStep}s, such as when computing the closure
+     * (fix point) of a set of {@link IRule}s or a sequential {@link IProgram}.
      * 
-     * @param program
-     *            The program.
+     * @param step
+     *            The {@link IStep}.
      */
-    public RuleStats(IStep program) {
+    public RuleStats(IStep step) {
        
-        this.rule = program;
+        this.rule = step;
 
-        this.name = program.getName();
+        this.name = step.getName();
 
-        if (program.isRule()) {
+        if (step.isRule()) {
 
-            final int tailCount = ((IRule) program).getTailCount();
+            final int tailCount = ((IRule) step).getTailCount();
 
             this.evalOrder = new int[tailCount];
 
+            this.permutation = new int[tailCount];
+            
             this.chunkCount = new long[tailCount];
 
             this.subqueryCount = new int[tailCount];
@@ -97,6 +98,8 @@ public class RuleStats {
 
             this.evalOrder = null;
 
+            this.permutation = null;
+            
             this.chunkCount = null;
             
             this.subqueryCount = null;
@@ -109,27 +112,45 @@ public class RuleStats {
 
 //        this.nexecutions = 0;
 
-        this.aggregate = true;
+        this.aggregation = true;
         
     }
 
     /**
-     * Initilizes statistics from a {@link Rule}'s execution {@link RuleState}.
+     * Initilizes statistics from an {@link iRule} and its
+     * {@link IEvaluationPlan}.
      * <p>
-     * Note: This ctor variant makes the order of execution for the
-     * {@link IPredicate}s in the {@link Rule} available.
+     * Note: This ctor variant makes available the order of execution and range
+     * count metadata from the {@link IEvaluationPlan}.
      * 
-     * @param ruleState
-     *            The rule execution state.
+     * @param rule
+     *            The {@link IRule}.
+     * @param plan
+     *            The {@link IEvaluationPlan}.
      */
-    RuleStats(RuleState ruleState) {
+    public RuleStats(IRule rule, IEvaluationPlan plan) {
         
-        this(ruleState.getRule());
+        this(rule);
         
-        final int tailCount = ruleState.rule.getTailCount();
+        final int tailCount = rule.getTailCount();
         
-        System.arraycopy(ruleState.order, 0, evalOrder, 0, tailCount);
+        final int[] order = plan.getOrder();
+        
+        System.arraycopy(order, 0, evalOrder, 0, tailCount);
 
+        /*
+         * Construct the permutation of the tail index order for the
+         * rule that corresponds to the evaluation order.
+         * 
+         * permutation[i] is the sequence in the evaluation order at
+         * which tail[i] is evaluated.
+         */
+        for (int i = 0; i < tailCount; i++) {
+
+            permutation[evalOrder[i]] = i;
+
+        }
+        
         for (int i = 0; i < tailCount; i++) {
             
             /*
@@ -144,18 +165,18 @@ public class RuleStats {
              * anyway.
              */
             
-            rangeCount[ i ] = ruleState.plan.rangeCount(i);
+            rangeCount[ i ] = plan.rangeCount(i);
             
         }
 
-        this.aggregate = false;
+        this.aggregation = false;
         
     }
 
     /**
-     * True iff this is an aggregation of individual rule execution {@link RuleState}s.
+     * True iff this is an aggregation of individual rule executions.
      */
-    private boolean aggregate;
+    private boolean aggregation;
     
     /**
      * The name of the rule.
@@ -163,7 +184,7 @@ public class RuleStats {
     public final String name;
     
     /**
-     * The rule itself.
+     * The {@link IStep} that was executed.
      */
     public final IStep rule;
     
@@ -211,6 +232,15 @@ public class RuleStats {
      * different rules.
      */
     public final int[] evalOrder;
+
+    /**
+     * The permutation of the tail predicate index order for an {@link IRule}
+     * (only available when the {@link IStep} is an {@link IRule}) that
+     * corresponds to the evaluation order of the tail predicate in the
+     * {@link IRule}. <code>permutation[i]</code> is the sequence in the
+     * evaluation order at which <code>tail[i]</code> was evaluated.
+     */
+    public final int[] permutation;
     
     /**
      * The #of chunks materialized for each predicate in the body of the rule
@@ -281,9 +311,23 @@ public class RuleStats {
      * <dt>elementCount</dt>
      * <dd>The #of elements that were actually visited for each tail predicate
      * in the rule.</dd>
-     * <dt>ranceCount</dt>
+     * <dt>rangeCount</dt>
      * <dd>The #of elements predicated for each tail predicate in the rule by
      * the {@link IRangeCountFactory} on behalf of the {@link IEvaluationPlan}.</dd>
+     * <dt>tailIndex</dt>
+     * <dd>The index in which the tail predicate(s) for rule were declared for
+     * the rule. This information is present iff
+     * <code>joinDetails == true</code> was specified. Since the tail
+     * predicates will be written into the table in this order, this information
+     * is mainly of use if you want to resort the table while keeping the
+     * relationship between the predicate evaluation order and the declared
+     * predicate order.</dd>
+     * <dt>tailPredicate</dt>
+     * <dd>The tail predicate(s) for rule in the order in which they were
+     * declared for the rule. This information is present iff
+     * <code>joinDetails == true</code> was specified. When present, the tail
+     * predicate details will be found on their own rows in the table and will
+     * be aligned under the column whose details are being broken out.</dd>
      * </dl>
      * 
      * @todo collect data on the size of the subquery results. A large #of
@@ -298,6 +342,7 @@ public class RuleStats {
         return "rule, elapsed"
                 + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
                 + ", evalOrder, subqueryCount, chunkCount, elementCount, rangeCount"
+                + ", tailIndex, tailPredicate"
         ;
         
     }
@@ -311,8 +356,14 @@ public class RuleStats {
      * @param titles
      *            When <code>true</code> the titles will be displayed inline,
      *            e.g., <code>foo=12</code> vs <code>12</code>.
+     * @param joinDetails
+     *            When <code>true</code> , presents a tablular display of the
+     *            details for each JOIN IFF this {@link RuleStats} was collected
+     *            for an {@link IRule} (rather than an aggregation of
+     *            {@link IRule}).
      */
-    public String toStringSimple(int depth, boolean titles) {
+    public String toStringSimple(final int depth, final boolean titles,
+            final boolean joinDetails) {
         
         // the symbol used when a count was zero, so count/sec is also zero.
         final String NA = "";
@@ -331,23 +382,70 @@ public class RuleStats {
 
         final String q = ""; //'\"';
 
-        return "\""+depthStr.substring(0,depth)+name+(closureRound==0?"":" round#"+closureRound)+"\""//
-             + ", "+(titles?"elapsed=":"") + elapsed//
-             + ", "+(titles?"solutionCount=":"") + solutionCount//
-             + ", "+(titles?"solutions/sec=":"") + solutionsPerSec//
-             + ", "+(titles?"mutationCount=":"") + mutationCount//
-             + ", "+(titles?"mutations/sec=":"") + mutationsPerSec//
-             + (!aggregate
-                     ?(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q //
-                     + ", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q //
-                     + ", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q //
-                     + ", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q //
-                     + ", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q //
-                     )
-                     :(""//", #exec="+nexecutions//
-                     ))
-             ;
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append("\""+depthStr.substring(0,depth)+name+(closureRound==0?"":" round#"+closureRound)+"\"");
+        sb.append( ", "+(titles?"elapsed=":"") + elapsed );
+        sb.append( ", "+(titles?"solutionCount=":"") + solutionCount);
+        sb.append( ", "+(titles?"solutions/sec=":"") + solutionsPerSec);
+        sb.append( ", "+(titles?"mutationCount=":"") + mutationCount);
+        sb.append( ", "+(titles?"mutations/sec=":"") + mutationsPerSec);
+        
+        if(!aggregation) {
+            sb.append(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q);
+            sb.append(", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q);
+            sb.append(", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q);
+            sb.append(", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q);
+            sb.append(", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q);
 
+            if(joinDetails) {
+                
+                final IRule r = (IRule)rule;
+                
+                final int tailCount = r.getTailCount();
+                
+                for (int i = 0; i < tailCount; i++) {
+                    
+                    sb.append("\n,,,,,");
+                    
+                    sb.append(", "+permutation[i]);
+                    
+                    sb.append(", "+subqueryCount[i]);
+                    sb.append(", "+chunkCount[i]);
+                    sb.append(", "+elementCount[i]);
+                    sb.append(", "+rangeCount[i]);
+                    
+                    sb.append(", "+i);
+                    
+                    sb.append(", \""+toString(r.getTail(i))+"\"");
+                    
+                }
+                
+            }
+            
+        }
+
+        return sb.toString();
+        
+    }
+
+    /**
+     * Return a human readable representation of the predicate. Subclasses may
+     * be created that know how to externalize the predicate correctly for its
+     * relation. It is a good idea to strip commas from the representation so
+     * that the table can be more readily imported into worksheets that exhibit
+     * problems with quoted strings embedding commas. This can be done using
+     * {@link String#replace(CharSequence, CharSequence)}.
+     * 
+     * @param pred
+     *            A predicate from the tail of an {@link IRule}.
+     * 
+     * @return The representaiton of that predicate.
+     */
+    protected String toString(IPredicate pred) {
+       
+        return pred.toString();
+        
     }
     
     private String depthStr = ".........";
@@ -399,8 +497,8 @@ public class RuleStats {
      */
     public String toString() {
 
-        return toString(0L/*minElapsed*/);
-        
+        return toString(0L/* minElapsed */, true/* joinDetails */);
+
     }
     
     /**
@@ -414,15 +512,17 @@ public class RuleStats {
      * 
      * @param minElapsed
      *            The minimum elapsed time for which details will be shown.
-     * 
+     * @param joinDetails
+     *            When <code>true</code>, also presents a tablular display of
+     *            the details for each JOIN in each {@link IRule}.
      */
-    public String toString(long minElapsed) {
+    public String toString(final long minElapsed, final boolean joinDetails) {
             
         final int depth = 0;
         
         if (detailStats.isEmpty() && !showSingleRuleInTable) {
 
-            return toStringSimple(depth, true/* titles */);
+            return toStringSimple(depth, true/* titles */, joinDetails);
             
         }
         
@@ -434,16 +534,17 @@ public class RuleStats {
         // aggregate level.
         sb.append("\n" + getHeadings());
 
-        sb.append("\n" + toStringSimple(depth, false/* titles */));
+        sb.append("\n" + toStringSimple(depth, false/* titles */, joinDetails));
 
-        toString(minElapsed, depth+1, sb, a);
+        toString(minElapsed, joinDetails, depth+1, sb, a);
 
         return sb.toString();
 
     }
 
-    private StringBuilder toString(long minElapsed, int depth,
-            StringBuilder sb, RuleStats[] a) {
+    private StringBuilder toString(final long minElapsed,
+            final boolean joinDetails, final int depth, final StringBuilder sb,
+            final RuleStats[] a) {
 
         // detail level.
         for (int i = 0; i < a.length; i++) {
@@ -452,12 +553,12 @@ public class RuleStats {
 
             if (x.elapsed >= minElapsed) {
 
-                sb.append("\n" + x.toStringSimple(depth, false/* titles */));
+                sb.append("\n" + x.toStringSimple(depth, false/* titles */, joinDetails));
 
-                if (x.aggregate && !x.detailStats.isEmpty()) {
+                if (x.aggregation && !x.detailStats.isEmpty()) {
 
-                    toString(minElapsed, depth + 1, sb, x.detailStats
-                            .toArray(new RuleStats[] {}));
+                    toString(minElapsed, joinDetails, depth + 1, sb,
+                            x.detailStats.toArray(new RuleStats[] {}));
 
                 }
 
@@ -512,5 +613,5 @@ public class RuleStats {
         elapsed += o.elapsed;
     
     }
-   
+
 }

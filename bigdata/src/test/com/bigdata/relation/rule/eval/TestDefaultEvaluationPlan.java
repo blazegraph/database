@@ -261,7 +261,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
-        public long getReadTimestamp(String relationName) {
+        public long getReadTimestamp(/*String relationName*/) {
 
             return 0;
         }
@@ -335,6 +335,11 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             
             return rangeCountFactory;
             
+        }
+
+        public IRuleStatisticsFactory getRuleStatisticsFactory() {
+            // TODO Auto-generated method stub
+            return null;
         }
 
     }

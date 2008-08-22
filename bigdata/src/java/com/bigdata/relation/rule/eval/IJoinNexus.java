@@ -30,7 +30,6 @@ package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
@@ -65,6 +64,11 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public interface IJoinNexus {
 
+    /**
+     * The factory for rule statistics objects.
+     */
+    IRuleStatisticsFactory getRuleStatisticsFactory();
+    
     /**
      * The factory object is used to materialize appropriate {@link IJoinNexus}
      * instances when the rule execution crosses an RMI boundary.
@@ -210,29 +214,30 @@ public interface IJoinNexus {
      */
     public IEvaluationPlanFactory getPlanFactory();
     
+//    /**
+//     * The timestamp used when an {@link IBuffer} is flushed against an
+//     * {@link IMutableRelation}.
+//     */
+//    long getWriteTimestamp();
+//
+//    /**
+//     * The timestamp used when obtaining an {@link IAccessPath} to read on a
+//     * {@link IRelation}.
+//     * 
+//     * @param relationName
+//     *            The relation on which you will read.
+//     */
+//    long getReadTimestamp(String relationName);
+    
     /**
-     * The timestamp used when an {@link IBuffer} is flushed against an
-     * {@link IMutableRelation}.
-     * <p>
-     * Note: The {@link BTree} does NOT support concurrent writers. However,
-     * {@link IStep}s are often executed in parallel. Therefore it is important
-     * to use a {@link #getReadTimestamp()} that is different from the
-     * {@link #getWriteTimestamp()}. Failure to do this will result in various
-     * exceptions thrown out of the {@link BTree} class.
+     * Equivalent to {@link IJoinNexusFactory#getWriteTimestamp()}.
      */
     long getWriteTimestamp();
-
+    
     /**
-     * The timestamp used when obtaining an {@link IAccessPath} to read on a
-     * {@link IRelation}. When computing the closure of a set of {@link IRule}s,
-     * it is beneficial to specify a read timestamp that remains fixed during
-     * each round of closure. The timestamp that should be choosen is the last
-     * commit time for the database prior to the execution of the round.
-     * 
-     * @param relationName
-     *            The relation on which you will read.
+     * Equivalent to {@link IJoinNexusFactory#getReadTimestamp()}.
      */
-    long getReadTimestamp(String relationName);
+    long getReadTimestamp();
     
     /**
      * Locate and return the view of the relation identified by the
