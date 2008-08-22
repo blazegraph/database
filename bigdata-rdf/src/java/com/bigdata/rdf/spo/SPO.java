@@ -38,7 +38,10 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IConstant;
+import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
  * Represents a triple.
@@ -226,6 +229,46 @@ public class SPO implements ISPO, Comparable<SPO> {
 
     }
 
+    /**
+     * Variant to create an SPO from a predicate - the {@link StatementEnum} and
+     * statement identifer are not specified. This may be used as a convenience
+     * to extract the {s, p, o} from an {@link IPredicate} or from an
+     * {@link IAccessPath} when the predicate is not known to be an
+     * {@link SPOPredicate} or the {@link IAccessPath} is not known to be an
+     * {@link SPOAccessPath}.
+     * 
+     * @param predicate
+     *            The predicate.
+     */
+    @SuppressWarnings("unchecked")
+    public SPO(final IPredicate<ISPO> predicate) {
+        
+        {
+
+            final IVariableOrConstant<Long> t = predicate.get(0);
+
+            s = t.isVar() ? NULL : t.get();
+
+        }
+
+        {
+
+            final IVariableOrConstant<Long> t = predicate.get(1);
+
+            p = t.isVar() ? NULL : t.get();
+
+        }
+
+        {
+
+            final IVariableOrConstant<Long> t = predicate.get(2);
+
+            o = t.isVar() ? NULL : t.get();
+
+        }
+
+    }
+    
     /**
      * Construct an {@link SPO} from {@link BigdataValue}s.
      * 

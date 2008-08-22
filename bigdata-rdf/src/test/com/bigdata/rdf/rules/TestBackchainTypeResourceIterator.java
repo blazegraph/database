@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
@@ -42,6 +40,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -84,11 +83,13 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
         try {
 
             // adds rdf:Type and rdfs:Resource to the store.
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final RDFSVocabulary vocab = new RDFSVocabulary(store);
 
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI B = new URIImpl("http://www.foo.org/B");
-            URI C = new URIImpl("http://www.foo.org/C");
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI A = f.createURI("http://www.foo.org/A");
+            final BigdataURI B = f.createURI("http://www.foo.org/B");
+            final BigdataURI C = f.createURI("http://www.foo.org/C");
 
             /*
              * add statements to the store.
@@ -96,22 +97,33 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
              * Note: this gives us TWO (2) distinct subjects (A and B), but we 
              * will only visit statements for (A).
              */
-            
-            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
-            
-            buffer.add(A, RDF.TYPE, B);
-            buffer.add(B, RDF.TYPE, C);
-            
-            buffer.flush();
+            {
+                
+                final IStatementBuffer buffer = new StatementBuffer(store, 10/* capacity */);
 
-            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
-                    store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
-                    store.getTermId(A), NULL, NULL,//
+                buffer.add(A, RDF.TYPE, B);
+                buffer.add(B, RDF.TYPE, C);
+
+                buffer.flush();
+                
+            }
+            
+            final IChunkedOrderedIterator<ISPO> itr;
+            {
+
+                final IAccessPath<ISPO> accessPath = store.getAccessPath(store
+                        .getTermId(A), NULL, NULL);
+             
+                itr = BackchainTypeResourceIterator.newInstance(//
+                    accessPath.iterator(),//
+                    accessPath,//
                     store, //
                     vocab.rdfType.get(), //
                     vocab.rdfsResource.get()//
                     );
-
+                
+            }
+            
             assertSameSPOsAnyOrder(store,
                     
                     new SPO[]{
@@ -154,38 +166,51 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
         try {
 
             // adds rdf:Type and rdfs:Resource to the store.
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final RDFSVocabulary vocab = new RDFSVocabulary(store);
 
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI B = new URIImpl("http://www.foo.org/B");
-            URI C = new URIImpl("http://www.foo.org/C");
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI A = f.createURI("http://www.foo.org/A");
+            final BigdataURI B = f.createURI("http://www.foo.org/B");
+            final BigdataURI C = f.createURI("http://www.foo.org/C");
 
             /*
              * add statements to the store.
              * 
-             * Note: this gives us TWO (2) distinct subjects (A and B), but we 
+             * Note: this gives us TWO (2) distinct subjects (A and B), but we
              * will only visit statements for (A).
              */
-            
-            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
-            
-            buffer.add(A, RDF.TYPE, B);
+            {
+                
+                IStatementBuffer buffer = new StatementBuffer(store, 10/* capacity */);
 
-            buffer.add(A, RDF.TYPE, RDFS.RESOURCE);
+                buffer.add(A, RDF.TYPE, B);
 
-            buffer.add(B, RDF.TYPE, C);
-            
-            buffer.flush();
+                buffer.add(A, RDF.TYPE, RDFS.RESOURCE);
+
+                buffer.add(B, RDF.TYPE, C);
+
+                buffer.flush();
+                
+            }
 
             if(log.isInfoEnabled()) log.info("\n"+store.dumpStore());
 
-            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
-                    store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
-                    store.getTermId(A), NULL, NULL,//
-                    store, //
-                    vocab.rdfType.get(), //
-                    vocab.rdfsResource.get() //
-                    );
+            final IChunkedOrderedIterator<ISPO> itr;
+            {
+
+                final IAccessPath<ISPO> accessPath = store.getAccessPath(store
+                        .getTermId(A), NULL, NULL);
+
+                itr = BackchainTypeResourceIterator.newInstance(//
+                        accessPath.iterator(),//
+                        accessPath,//
+                        store, //
+                        vocab.rdfType.get(), //
+                        vocab.rdfsResource.get() //
+                        );
+                
+            }
 
             assertSameSPOsAnyOrder(store, new SPO[]{
                     
@@ -221,16 +246,18 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_noneBound() {
         
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         try {
 
             // adds rdf:Type and rdfs:Resource to the store.
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final RDFSVocabulary vocab = new RDFSVocabulary(store);
 
-            final URI A = new URIImpl("http://www.foo.org/A");
-            final URI B = new URIImpl("http://www.foo.org/B");
-            final URI C = new URIImpl("http://www.foo.org/C");
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI A = f.createURI("http://www.foo.org/A");
+            final BigdataURI B = f.createURI("http://www.foo.org/B");
+            final BigdataURI C = f.createURI("http://www.foo.org/C");
 
             /*
              * add statements to the store.
@@ -241,7 +268,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
              * distinct subjects.
              */
             {
-                final IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+                
+                final IStatementBuffer buffer = new StatementBuffer(store, 10/* capacity */);
 
                 buffer.add(A, RDF.TYPE, B);
 
@@ -250,16 +278,24 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                 buffer.add(B, RDF.TYPE, C);
 
                 buffer.flush();
+                
+            }
+
+            final IChunkedOrderedIterator<ISPO> itr;
+            {
+                final IAccessPath<ISPO> accessPath = store.getAccessPath(NULL,
+                        NULL, NULL);
+
+                itr = BackchainTypeResourceIterator.newInstance(//
+                        accessPath.iterator(),//
+                        accessPath,//
+                        store, //
+                        vocab.rdfType.get(), //
+                        vocab.rdfsResource.get() //
+                );
+
             }
             
-            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
-                    store.getAccessPath(NULL, NULL, NULL).iterator(),//
-                    NULL, NULL, NULL,//
-                    store, //
-                    vocab.rdfType.get(), //
-                    vocab.rdfsResource.get() //
-                    );
-
             assertSameSPOsAnyOrder(store, new SPO[]{
 
                     new SPO(//
@@ -318,37 +354,49 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_otherBound_01() {
         
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         try {
 
             // adds rdf:Type and rdfs:Resource to the store.
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final RDFSVocabulary vocab = new RDFSVocabulary(store);
 
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI B = new URIImpl("http://www.foo.org/B");
-            URI C = new URIImpl("http://www.foo.org/C");
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI A = f.createURI("http://www.foo.org/A");
+            final BigdataURI B = f.createURI("http://www.foo.org/B");
+            final BigdataURI C = f.createURI("http://www.foo.org/C");
 
             /*
              * add statements to the store.
              * 
              * Note: this gives us TWO (2) distinct subjects (A and B).
              */
-            
-            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
-            
-            buffer.add(A, RDF.TYPE, B);
-            buffer.add(B, RDF.TYPE, C);
-            
-            buffer.flush();
+            {
+                
+                IStatementBuffer buffer = new StatementBuffer(store, 10/* capacity */);
 
-            IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
-                    store.getAccessPath(NULL, NULL, store.getTermId(B)).iterator(),//
-                    NULL, NULL, store.getTermId(B),//
-                    store, //
-                    vocab.rdfType.get(), //
-                    vocab.rdfsResource.get() //
-                    );
+                buffer.add(A, RDF.TYPE, B);
+                buffer.add(B, RDF.TYPE, C);
+
+                buffer.flush();
+                
+            }
+
+            final IChunkedOrderedIterator<ISPO> itr;
+            {
+                final IAccessPath<ISPO> accessPath = store.getAccessPath(NULL,
+                        NULL, store.getTermId(B));
+
+                itr = BackchainTypeResourceIterator.newInstance(//
+                        accessPath.iterator(),//
+                        accessPath,//
+                        store, //
+                        vocab.rdfType.get(), //
+                        vocab.rdfsResource.get() //
+                        );
+                
+            }
 
             /*
              * Note: Since we are reading with the object bound, only the
@@ -418,14 +466,17 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
             {
                 // where s is bound.
-                IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
-                        store.getAccessPath(s, vocab.rdfType.get(),
-                                vocab.rdfsResource.get()).iterator(),//
-                        s, vocab.rdfType.get(), vocab.rdfsResource.get(),//
-                        store, //
-                        vocab.rdfType.get(), //
-                        vocab.rdfsResource.get() //
-                );
+                final IAccessPath<ISPO> accessPath = store.getAccessPath(s,
+                        vocab.rdfType.get(), vocab.rdfsResource.get());
+
+                final IChunkedOrderedIterator<ISPO> itr = BackchainTypeResourceIterator
+                        .newInstance(//
+                                accessPath.iterator(),//
+                                accessPath,//
+                                store, //
+                                vocab.rdfType.get(), //
+                                vocab.rdfsResource.get() //
+                        );
 
                 AbstractTestCase.assertSameSPOs(new SPO[] { new SPO(s,
                         vocab.rdfType.get(), vocab.rdfsResource.get(),
@@ -434,10 +485,12 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
             {
                 // where s is unbound.
-                IChunkedOrderedIterator<ISPO> itr = new BackchainTypeResourceIterator(//
-                        store.getAccessPath(NULL, vocab.rdfType.get(),
-                                vocab.rdfsResource.get()).iterator(),//
-                        NULL, vocab.rdfType.get(), vocab.rdfsResource.get(),//
+                final IAccessPath<ISPO> accessPath = store.getAccessPath(NULL,
+                        vocab.rdfType.get(), vocab.rdfsResource.get());
+                
+                final IChunkedOrderedIterator<ISPO> itr = BackchainTypeResourceIterator.newInstance(//
+                        accessPath.iterator(),//
+                        accessPath,//
                         store, //
                         vocab.rdfType.get(), //
                         vocab.rdfsResource.get() //

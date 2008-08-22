@@ -103,7 +103,7 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     }
 
     protected void dumpSPO(ISPO spo) {
-        System.err.println(spo.toString(db));
+//        System.err.println(spo.toString(db));
     }
     
 }

@@ -659,6 +659,11 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     store.addStatements(new SPO[] { spo1, spo2 }, 2)//
                     );
 
+            // verify that a re-insert reports a zero mutation count.
+            assertEquals("mutationCount", 0L,//
+                    store.addStatements(new SPO[] { spo1, spo2 }, 2)//
+                    );
+
             if (log.isInfoEnabled()) {
 
                 log.info("\n" + store.dumpStore());

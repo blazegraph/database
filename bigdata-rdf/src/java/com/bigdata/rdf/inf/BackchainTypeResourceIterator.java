@@ -40,8 +40,10 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.ClosableEmptyIterator;
 import com.bigdata.striterator.ClosableSingleItemIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -116,6 +118,187 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
      * The last {@link ISPO} visited by {@link #next()}.
      */
     private ISPO current = null;
+
+    /**
+     * Returns a suitably configured {@link BackchainTypeResourceIterator} -or-
+     * <i>src</i> iff the <i>accessPath</i> does not require the
+     * materialization of <code>(x rdf:type rdfs:Resource)</code> entailments.
+     * 
+     * @param src
+     *            The source iterator. {@link #nextChunk()} will sort statements
+     *            into the {@link IKeyOrder} reported by this iterator (as long
+     *            as the {@link IKeyOrder} is non-<code>null</code>).
+     * @param accessPath
+     *            The {@link IAccessPath} from which the <i>src</i> iterator
+     *            was derived. Note that <i>src</i> is NOT necessarily
+     *            equivalent to {@link IAccessPath#iterator()} since it MAY have
+     *            been layered already to backchain other entailments, e.g.,
+     *            <code>owl:sameAs</code>.
+     * @param db
+     *            The database from which we will read the distinct subject
+     *            identifiers from its {@link SPORelation}. This parameter is
+     *            used iff this is an all unbound triple pattern.
+     * @param rdfType
+     *            The term identifier that corresponds to rdf:Type for the
+     *            database.
+     * @param rdfsResource
+     *            The term identifier that corresponds to rdf:Resource for the
+     *            database.
+     * 
+     * @return The backchain iterator -or- the <i>src</i> iterator iff the
+     *         <i>accessPath</i> does not require the materialization of
+     *         <code>(x rdf:type rdfs:Resource)</code> entailments.
+     */
+    @SuppressWarnings("unchecked")
+    static public IChunkedOrderedIterator<ISPO> newInstance(
+            final IChunkedOrderedIterator<ISPO> _src,
+            final IAccessPath<ISPO> accessPath, final AbstractTripleStore db,
+            final long rdfType, final long rdfsResource) {
+        
+        if(true) throw new UnsupportedOperationException();
+        
+        if (_src == null)
+            throw new IllegalArgumentException();
+        
+        if (accessPath == null)
+            throw new IllegalArgumentException();
+        
+        if (db == null)
+            throw new IllegalArgumentException();
+        
+        final SPO spo = new SPO(accessPath.getPredicate());
+
+        /*
+         * The subject(s) whose (s rdf:type rdfs:Resource) entailments will be
+         * visited.
+         */
+        final PushbackIterator<Long> resourceIds;
+        
+        /*
+         * An iterator reading on the {@link SPOKeyOrder#POS} index. The
+         * predicate is bound to <code>rdf:type</code> and the object is bound
+         * to <code>rdfs:Resource</code>. If the subject was given to the
+         * ctor, then it will also be bound. The iterator visits the term
+         * identifier for the <em>subject</em> position.
+         */
+        final PushbackIterator<Long> posItr;
+
+        /*
+         * filters out (x rdf:Type rdfs:Resource) in case it is explicit in the
+         * db so that we do not generate duplicates for explicit type resource
+         * statement.
+         */
+        final Iterator<ISPO> src = new Striterator(_src).addFilter(new Filter(){
+
+            private static final long serialVersionUID = 1L;
+
+            protected boolean isValid(Object arg0) {
+
+                final SPO o = (SPO) arg0;
+
+                if (o.p == rdfType && o.o == rdfsResource) {
+                    
+                    return false;
+                    
+                }
+                
+                return true;
+                
+            }});
+        
+        if (spo.s == NULL
+                && (spo.p == NULL || spo.p == rdfType)
+                && (spo.o == NULL || spo.o == rdfsResource)
+                ) {
+
+            /*
+             * Backchain will generate one statement for each distinct subject
+             * or object in the store.
+             * 
+             * @todo This is Ok as long as you are forward chaining all of the
+             * rules that put a predicate or an object into the subject position
+             * since it will then have all resources. If you backward chain some
+             * of those rules, e.g., rdf1, then you MUST change this to read on
+             * the ids index and skip anything that is marked as a literal using
+             * the low bit of the term identifier but you will overgenerate for
+             * resources that are no longer in use by the KB (you could filter
+             * for that).
+             */
+
+//            resourceIds = db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO);
+            
+            resourceIds = new PushbackIterator<Long>(new MergedOrderedIterator(//
+                    db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO), //
+                    db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP,
+                            new ITermIdFilter() {
+                                private static final long serialVersionUID = 1L;
+                                public boolean isValid(long termId) {
+                                    // filter out literals from the OSP scan.
+                                    return !AbstractTripleStore
+                                            .isLiteral(termId);
+                                }
+                            })));
+
+            /*
+             * Reading (? rdf:Type rdfs:Resource) using the POS index.
+             */
+
+            posItr = new PushbackIterator<Long>(new Striterator(db.getAccessPath(
+                    NULL, rdfType, rdfsResource,
+                            ExplicitSPOFilter.INSTANCE).iterator())
+                    .addFilter(new Resolver() {
+                        private static final long serialVersionUID = 1L;
+                        @Override
+                        protected Object resolve(Object obj) {
+                            return Long.valueOf(((SPO) obj).s);
+                        }
+                    }));
+
+        } else if ((spo.p == NULL || spo.p == rdfType)
+                && (spo.o == NULL || spo.o == rdfsResource)) {
+
+            /*
+             * Backchain will generate exactly one statement: (s rdf:type
+             * rdfs:Resource).
+             */
+
+            resourceIds = new PushbackIterator<Long>(
+                    new ClosableSingleItemIterator<Long>(spo.s));
+
+            /*
+             * Reading a single point (s type resource), so this will actually
+             * use the SPO index.
+             */
+
+            posItr = new PushbackIterator<Long>(new Striterator(db
+                    .getAccessPath(spo.s, rdfType, rdfsResource,
+                            ExplicitSPOFilter.INSTANCE).iterator())
+                    .addFilter(new Resolver() {
+                        private static final long serialVersionUID = 1L;
+                        @Override
+                        protected Object resolve(Object obj) {
+                            return Long.valueOf(((SPO) obj).s);
+                        }
+            }));
+
+        } else {
+
+            /*
+             * Backchain will not generate any statements.
+             */
+
+            resourceIds = new PushbackIterator<Long>(new ClosableEmptyIterator<Long>());
+
+            posItr = null;
+            
+//            return _src;
+            
+        }
+
+        return new BackchainTypeResourceIterator(_src, src, resourceIds,
+                posItr, rdfType, rdfsResource);
+        
+    }
     
     /**
      * Create an iterator that will visit all statements in the source iterator
@@ -141,130 +324,36 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
      * @param rdfsResource
      *            The term identifier that corresponds to rdf:Resource for the
      *            database.
+     * 
+     * @see #newInstance(IChunkedOrderedIterator, IAccessPath,
+     *      AbstractTripleStore, long, long)
      */
     @SuppressWarnings({ "unchecked", "serial" })
-    public BackchainTypeResourceIterator(IChunkedOrderedIterator<ISPO> src,
-            long s, long p, long o, AbstractTripleStore db, final long rdfType,
-            final long rdfsResource) {
+    private BackchainTypeResourceIterator(IChunkedOrderedIterator<ISPO> _src,//
+            Iterator<ISPO> src,//
+            PushbackIterator<Long> resourceIds,//
+            PushbackIterator<Long> posItr,//
+            final long rdfType,//
+            final long rdfsResource//
+            ) {
         
-        if (src == null)
-            throw new IllegalArgumentException();
+        // the raw source - we pass close() through to this.
+        this._src = _src;
         
-        if (db == null)
-            throw new IllegalArgumentException();
+        this.keyOrder = _src.getKeyOrder(); // MAY be null.
         
-        this._src = src;
+        // the source with (x type resource) filtered out.
+        this.src = src;
         
-        /*
-         * filters out (x rdf:Type rdfs:Resource) in case it is explicit in the
-         * db so that we do not generate duplicates for explicit type resource
-         * statement.
-         */
-        this.src = new Striterator(src).addFilter(new Filter(){
-
-            private static final long serialVersionUID = 1L;
-
-            protected boolean isValid(Object arg0) {
-
-                SPO o = (SPO) arg0;
-
-                if (o.p == rdfType && o.o == rdfsResource) {
-                    
-                    return false;
-                    
-                }
-                
-                return true;
-            }});
+        // 
+        this.resourceIds = resourceIds;
         
-        this.keyOrder = src.getKeyOrder(); // MAY be null.
-
-//        this.s = s;
+        this.posItr = posItr;
         
-        if (s == NULL
-                && (p == NULL || p == rdfType)
-                && (o == NULL || o == rdfsResource)
-                ) {
-
-            /*
-             * Backchain will generate one statement for each distinct subject
-             * or object in the store.
-             * 
-             * @todo This is Ok as long as you are forward chaining all of the
-             * rules that put a predicate or an object into the subject position
-             * since it will then have all resources. If you backward chain some
-             * of those rules, e.g., rdf1, then you MUST change this to read on
-             * the ids index and skip anything that is marked as a literal using
-             * the low bit of the term identifier but you will overgenerate for
-             * resources that are no longer in use by the KB.
-             */
-
-//            resourceIds = db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO);
-            
-            resourceIds = new PushbackIterator<Long>(new MergedOrderedIterator(//
-                    db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO), //
-                    db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP,
-                            new ITermIdFilter() {
-                                public boolean isValid(long termId) {
-                                    // filter out literals from the OSP scan.
-                                    return !AbstractTripleStore
-                                            .isLiteral(termId);
-                                }
-                            })));
-
-            /*
-             * Reading (? rdf:Type rdfs:Resource) using the POS index.
-             */
-
-            posItr = new PushbackIterator<Long>(new Striterator(db.getAccessPath(
-                    NULL, rdfType, rdfsResource, ExplicitSPOFilter.INSTANCE)
-                    .iterator()).addFilter(new Resolver() {
-                @Override
-                protected Object resolve(Object obj) {
-                    return Long.valueOf(((SPO) obj).s);
-                }
-            }));
-
-        } else if ((p == NULL || p == rdfType)
-                && (o == NULL || o == rdfsResource)) {
-
-            /*
-             * Backchain will generate exactly one statement: (s rdf:type
-             * rdfs:Resource).
-             */
-
-            resourceIds = new PushbackIterator<Long>(new ClosableSingleItemIterator<Long>(s));
-
-            /*
-             * Reading a single point (s type resource), so this will actually
-             * use the SPO index.
-             */
-
-            posItr = new PushbackIterator<Long>(new Striterator(db.getAccessPath(s,
-                    rdfType, rdfsResource, ExplicitSPOFilter.INSTANCE)
-                    .iterator()).addFilter(new Resolver() {
-                @Override
-                protected Object resolve(Object obj) {
-                    return Long.valueOf(((SPO) obj).s);
-                }
-            }));
-
-        } else {
-
-            /*
-             * Backchain will not generate any statements.
-             */
-
-            resourceIds = new PushbackIterator<Long>(new ClosableEmptyIterator<Long>());
-
-            posItr = null;
-            
-        }
-
         this.rdfType = rdfType;
         
         this.rdfsResource = rdfsResource;
-        
+                
     }
 
     public IKeyOrder<ISPO> getKeyOrder() {

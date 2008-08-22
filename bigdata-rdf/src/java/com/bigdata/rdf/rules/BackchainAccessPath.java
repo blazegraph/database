@@ -35,12 +35,12 @@ import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -165,60 +165,42 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         final IChunkedOrderedIterator<ISPO> src = accessPath.iterator(limit,
                 capacity);
         
-        final IChunkedOrderedIterator<ISPO> ret;
+        final IChunkedOrderedIterator<ISPO> owlSameAsItr;
 
         final IPredicate<ISPO> predicate = accessPath.getPredicate();
 
-        final long s, p, o;
-        {
-
-            final IVariableOrConstant<Long> t = predicate.get(0);
-
-            s = t.isVar() ? NULL : t.get();
-
-        }
-
-        {
-
-            final IVariableOrConstant<Long> t = predicate.get(1);
-
-            p = t.isVar() ? NULL : t.get();
-
-        }
-
-        {
-
-            final IVariableOrConstant<Long> t = predicate.get(2);
-
-            o = t.isVar() ? NULL : t.get();
-
-        }
+        final SPO spo = new SPO(predicate);
 
         if (inf.rdfsOnly) {
             
-            // no entailments.
-            ret = null;
+            // no owl:sameAs entailments.
+            owlSameAsItr = null;
         
         } else if(inf.forwardChainOwlSameAsClosure && !inf.forwardChainOwlSameAsProperties) {
             
             if (inf.database.getAccessPath(NULL, inf.owlSameAs.get(), NULL)
                     .rangeCount(false/*exact*/) == 0L) {
 
-                ret = null;
+                /*
+                 * No owl:sameAs assertions in the KB, so we do not need to
+                 * backchain owl:sameAs.
+                 */
+                
+                owlSameAsItr = null;
 
             } else {
 
-                ret = new BackchainOwlSameAsPropertiesIterator(//
+                owlSameAsItr = new BackchainOwlSameAsPropertiesIterator(//
                         src,//
-                        s, p, o,//
+                        spo.s, spo.p, spo.o,//
                         inf.database, //
                         inf.owlSameAs.get(), tempStore);
             }
             
         } else {
             
-            // no entailments.
-            ret = null;
+            // no owl:sameAs entailments.
+            owlSameAsItr = null;
             
         }
         
@@ -237,10 +219,12 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
         final IElementFilter<ISPO> filter = predicate.getConstraint();
         
-        IChunkedOrderedIterator<ISPO> itr = (ret == null ? src
-                : new ChunkedWrappedIterator<ISPO>(ret,
+        IChunkedOrderedIterator<ISPO> itr = (owlSameAsItr == null//
+                ? src //
+                : new ChunkedWrappedIterator<ISPO>(owlSameAsItr,
                         capacity == 0 ? inf.database.queryBufferCapacity
-                                : capacity, null/* keyOrder */, filter));
+                                : capacity, null/* keyOrder */, filter)//
+        );
 
         if (!inf.forwardChainRdfTypeRdfsResource) {
             
@@ -250,9 +234,9 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
              * @todo pass the filter in here also.
              */
             
-            itr = new BackchainTypeResourceIterator(//
+            itr = BackchainTypeResourceIterator.newInstance(//
                     itr,//
-                    s,p,o,//
+                    accessPath,//
                     inf.database, //
                     inf.rdfType.get(), //
                     inf.rdfsResource.get() //
