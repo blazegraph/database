@@ -181,29 +181,6 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
          */
         final PushbackIterator<Long> posItr;
 
-        /*
-         * filters out (x rdf:Type rdfs:Resource) in case it is explicit in the
-         * db so that we do not generate duplicates for explicit type resource
-         * statement.
-         */
-        final Iterator<ISPO> src = new Striterator(_src).addFilter(new Filter(){
-
-            private static final long serialVersionUID = 1L;
-
-            protected boolean isValid(Object arg0) {
-
-                final SPO o = (SPO) arg0;
-
-                if (o.p == rdfType && o.o == rdfsResource) {
-                    
-                    return false;
-                    
-                }
-                
-                return true;
-                
-            }});
-        
         if (spo.s == NULL
                 && (spo.p == NULL || spo.p == rdfType)
                 && (spo.o == NULL || spo.o == rdfsResource)
@@ -289,10 +266,33 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
 
             posItr = null;
             
-//            return _src;
+            return _src;
             
         }
 
+        /*
+         * filters out (x rdf:Type rdfs:Resource) in case it is explicit in the
+         * db so that we do not generate duplicates for explicit type resource
+         * statement.
+         */
+        final Iterator<ISPO> src = new Striterator(_src).addFilter(new Filter(){
+
+            private static final long serialVersionUID = 1L;
+
+            protected boolean isValid(Object arg0) {
+
+                final SPO o = (SPO) arg0;
+
+                if (o.p == rdfType && o.o == rdfsResource) {
+                    
+                    return false;
+                    
+                }
+                
+                return true;
+                
+            }});
+        
         return new BackchainTypeResourceIterator(_src, src, resourceIds,
                 posItr, rdfType, rdfsResource);
         
