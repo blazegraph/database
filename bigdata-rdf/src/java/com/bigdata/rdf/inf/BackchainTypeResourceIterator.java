@@ -156,8 +156,8 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
         
         final SPO spo = new SPO(accessPath.getPredicate());
 
-        if (((spo.p == NULL || spo.p == rdfType) && 
-             (spo.o == NULL || spo.o == rdfsResource)) == false) {
+        if (((spo.o == NULL || spo.o == rdfsResource) && 
+             (spo.p == NULL || spo.p == rdfType)) == false) {
             
             /*
              * Backchain will not generate any statements.
