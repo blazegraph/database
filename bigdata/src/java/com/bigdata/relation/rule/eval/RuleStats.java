@@ -371,20 +371,24 @@ public class RuleStats {
         // the symbol used when the elapsed time was zero, so count/sec is divide by zero.
         final String DZ = "";
         
-        final String solutionsPerSec = (solutionCount == 0 ? NA
-                : (elapsed == 0L ? DZ : ""
-                        + (long) (solutionCount * 1000d / elapsed)));
+        final String solutionsPerSec = (solutionCount == 0 ? NA //
+                : (elapsed == 0L ? DZ //
+                        : "" + (long) (solutionCount * 1000d / elapsed)));
 
         final long mutationCount = this.mutationCount.get();
-        
-        final String mutationsPerSec = (mutationCount == 0 ? NA : (elapsed == 0L ? DZ : ""
-                + (long) (mutationCount * 1000d / elapsed)));
 
-        final String q = ""; //'\"';
+        final String mutationsPerSec = (mutationCount == 0 ? NA //
+                : (elapsed == 0L ? DZ //
+                        : "" + (long) (mutationCount * 1000d / elapsed)));
+
+        final String q = ""; // '\"';
 
         final StringBuilder sb = new StringBuilder();
-        
-        sb.append("\""+depthStr.substring(0,depth)+name+(closureRound==0?"":" round#"+closureRound)+"\"");
+
+        final String ruleNameStr = "\"" + depthStr.substring(0, depth) + name
+                + (closureRound == 0 ? "" : " round#" + closureRound) + "\"";
+
+        sb.append(ruleNameStr);
         sb.append( ", "+(titles?"elapsed=":"") + elapsed );
         sb.append( ", "+(titles?"solutionCount=":"") + solutionCount);
         sb.append( ", "+(titles?"solutions/sec=":"") + solutionsPerSec);
@@ -392,13 +396,16 @@ public class RuleStats {
         sb.append( ", "+(titles?"mutations/sec=":"") + mutationsPerSec);
         
         if(!aggregation) {
+            
+            if(!joinDetails) {
+            
             sb.append(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q);
             sb.append(", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q);
             sb.append(", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q);
             sb.append(", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q);
             sb.append(", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q);
 
-            if(joinDetails) {
+            } else {
                 
                 final IRule r = (IRule)rule;
                 
@@ -406,7 +413,8 @@ public class RuleStats {
                 
                 for (int i = 0; i < tailCount; i++) {
                     
-                    sb.append("\n,,,,,");
+                    if (i > 0)
+                        sb.append("\n"+ruleNameStr+",,,,,");
                     
                     sb.append(", "+permutation[i]);
                     

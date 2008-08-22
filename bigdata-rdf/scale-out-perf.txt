@@ -896,7 +896,6 @@ Short term tasks:
      - Done. Problem w/ correlated view of counters. Was plotting a
        String[] rather than its elements.
 
-
      - Add counters to the client index view showing the times for
        each operation and also showing the times for querying the
        metadata index to split an key[] operation or map a key-range
@@ -1392,41 +1391,6 @@ Short term tasks:
 	 - Done. Verify a CONSTRUCT query.
 
 	 - Done. Verify a SELECT query using statement identifiers.
-
-      4. (****) JOIN optimization.
-
-	 - (*) direct term scan.
-
-	 - Map the first triple pattern over its index, and for each
-           mapped key-range of the index collect intermediate results
-           and map them over the next index.  This must use
-           read-historical or read-committed access to avoid locking
-           up the unisolated index, but that's going to be automatic
-           since the join operator itself does not write on an index.
-           the buffer in which we accumulate the join results needs to
-           write somewhere, and the choices either back to the client,
-           onto the focusStore, or onto the database.  All of those
-           can be handled since the read-only procedure will be either
-           returning a result or submitting a write procedure.  A join
-           variable buffer should accumulate those results and then
-           write only the selected variables into any of the
-           appropriate locations on overflow (via subclassing or a
-           ctor parameter for the writer).
-
-	 - Any SPARQL query which can be directly mapped onto a series
-           of JOINS can be directly translated into a rule and run by
-           the existing rule engine.  If it has filters that need to
-           be applied then they should be handled by a filter applied
-           to the buffered join results.  That filter can even handle
-	   batch filtering by inspection of datatyped literals.
-
-	 - A further optimization is possible for the local data
-           service since all indices are known to be local and the
-           index lookups do not need to be batched since they will
-           always be continuous unbuffered local reads.
-
-	 - ***** Replace Sesame 2 JOINs by re-writes into our rule
-                 engine.
       
       6. Publish on statement level provenance and truth maintenance
          for SPARQL end points.
@@ -2325,22 +2289,6 @@ Caused by: java.lang.NullPointerException
    	     concurrent threads and therefore needs the unisolated
    	     indices to be thread-safe.
 
-       - Unroll loops for faster distributed joins
-
-         Unroll the inner loop for each chunk of the outer loop and
-         parallelize the inner loop queries.  Be careful with the
-         parallelization as the thread pools are typically uncapped
-         and a large #of elements are in each chunk.  However, the
-         maximum parallelization will be the #of index partitions and
-         the ClientIndexView should provide that parallelization
-         automatically if I unroll the loop.
-
-         This could also improve performance for the LTS since it is
-         now using the UnisolatedReadWriteIndex for better concurrency
-         and therefore must acquire locks for its operations.
-
-         Compare the performance for LTS, LDS, and JDS.
-
        - Modify TM to remove constraints on scaling imposed by the use
          of fully buffered iterators to avoid concurrency problems.
 
@@ -2354,12 +2302,16 @@ Caused by: java.lang.NullPointerException
 
 Translate Sesame2 queries to Rules dynamically so that they can
 execute on the native rule engine.
+   
+   - allow rules with an empty head (for query).
 
    - verify that query is against the last committed state of the kb.
 
    - simple conjunctive query.
 
-   - optionals
+   - optionals (requires a change to the rule evaluation plan since a
+     zero range count for an optional does not mean that the rule will
+     have no solutions.)
 
    - resolution of terms to term ids and visa versa using JOINs?
 
@@ -2437,11 +2389,6 @@ x. misc tests, performance problems and improvements for the RDF DB.
   iterators it could make sense to use much smaller buffers (10k vs
   200k).
 
-- *** Look at justifications for bad entailments in the fast closure.
-  
-      Try a unit test for the fast closure property sets where it is
-      reading from a fused view.
-
 * Test concurrent data loader on multiple servers
 
   - with and without closure
@@ -2460,9 +2407,27 @@ Priority list:
 x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
        at http://esw.w3.org/topic/LargeTripleStores.
 
+       * Benchmark requirements to DaveL and DanH.
+
+       * Increase the journal chunk size.
+
+       * Verify correctness for U1 before beginning server-based runs.
+
+       - Note the time writing on the statement indices during closure
+         and compare it with the time reading on those indices.  What
+         takes more time?  For which rules?
+
+       * Modify test harness for concurrent data load, or simply load
+         data via our own test harness but with the same set of
+         options for the triple store (justify=false, testIndex=false,
+         statementIdentifiers=false).
+
        First, do a pure bulk load - triples only.
 
-	    - without overflow processing the triple store will take
+	    - Without compression this will have to be on more than
+	      one machine or using NAS.
+
+	    - Without overflow processing the triple store will take
               up more space due to the WORM nature of the store.
 
 	    - leading prefix compress can help to compenate for this,
@@ -2478,6 +2443,9 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
 
        Then run LUBM benchmarks (rewrite Sesame2 queries to native
        JOINs).
+
+	    - Update our Sesame disto since they have been working on
+              their optimizer.
 
        Do this for U100, U1000, and U8000 on one machine and then for
        the same data sets on three machines using MONOLITHIC indices.
@@ -2537,6 +2505,15 @@ x. Full text index performance.
      to guarentee consistent index states).
 
 x. **** provenance query problems (MikeP)
+
+x. **** performance tuning for queries.
+
+   - BlockingBuffer - the 100ms wait time if there was no element
+     ready was swamping the query time for simple queries.
+
+     Examine the latency and chunk size for BlockingBuffer, e.g., by
+     reporting the details (#of elements and time for hasNext()
+     through nextChunk()) into RuleStats.
 
 x. performance testing for query (LUBM with native rule rewrites of
    queries) for LTS, LDS, and JDS.
@@ -2599,7 +2576,8 @@ x. performance testing for query (LUBM with native rule rewrites of
      is not possible when the shared buffer is flushed after a round
      since there are no threads writing on the buffer at that time.)
 
-   * Details missing for fast closure programs (total and details).
+   - Done. Details missing for fast closure programs (total and
+     details).
 
 x. GOM style "rows" for IRelation yeilding schema flexible JOINs.
    Could even just use GOM for this, but I would also have to extend
@@ -2627,6 +2605,10 @@ x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
        * Handle "delete" from the full text index.  We need to do this
          when a document is deleted whose indexText property was set.
 
+	 One solution is to filter the results by whether the document
+	 is still in the file metadata index.  That might not be too
+	 bad.
+
        - consider alternative integration using mg4j and lucene for
          text indexing.
 
@@ -2644,19 +2626,126 @@ x. ZooKeeper integration for resource lock manager?
 
 ============================================================
 
-   - Bulk loads on the DPP, then query rewrites and LUBM performance
-     tests.
+   - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
 
-   - The test suite (TestTruthMaintenance) runs fine if you run it by
-     itself.  But if you run it as part of the total test suite for
-     the module then some of the unit tests will fail.  Weird.  The
-     tests that fail mostly deal with backchaining.
+      - Unroll joins then distribute joins.  w/ MikeP
 
-INFO : 20188 Main Thread         com.bigdata.rdf.rules.TestBackchainTypeResourceIterator.test_backchain_foo_type_resource(TestBackchainTypeResourceIterator.java:410):
-#1	Explicit     : < http://www.bigdata.com/s(64), http://www.bigdata.com/p(68), http://www.bigdata.com/o(72) > : sid=79
+      - cache range counts (and maybe more) for historical access
+        paths.
 
-junit.framework.AssertionFailedError: : The iterator is willing to visit more than 1 objects.  The next 1 objects would be: [< 72U, 8U, 40U : Inferred >]
-	at junit.framework.Assert.fail(Assert.java:47)
-	at com.bigdata.rdf.store.AbstractTestCase.assertSameSPOs(AbstractTestCase.java:493)
-	at com.bigdata.rdf.store.AbstractTestCase.assertSameSPOs(AbstractTestCase.java:458)
-	at com.bigdata.rdf.rules.TestBackchainTypeResourceIterator.test_backchain_foo_type_resource(TestBackchainTypeResourceIterator.java:446)
+   - Jini smart proxy iterator and then test scale-out joins (EDS,
+     JDS).
+
+   - (Various MikeP)
+
+     - Setup some test data w/ owlSameAs and tune the sameAs
+       backchainer and the type resource backchainer.
+
+     * Specialize type resource for the case when s is not null
+       to do less work.
+     
+     * Make the backchainer run async and expose an iterator that the
+       caller reads on to reduce latency.  right now we have to wait
+       for the complete set of sameAs entailments before the client
+       can read the 1st triple from the iterator.
+     
+     * Consider a rewrite of the owl:sameAs backchainer as a rewrite
+       of the statement pattern in the query into 3 statement patterns
+       that use the native rule execution to accomplish the same ends
+       as the owl:sameAs backchainer.
+
+     * Handle inverseOf and TransitiveProperty.
+
+     * Are any additional owl axioms required for LUBM?  Are any owl
+       axioms required?	  
+
+     * Is there any information in the ontology that could be used to
+       eliminate or otherwise optimize some joins?
+
+     * Consider when there is an unbound s or o for the owl:sameAs
+       backchainer whether we can fix point a chunk of subjects (or
+       objects) at a time, rather than fix pointing one at a time.
+
+============================================================
+
+Probable concurrency problem.  I suspect that the iterator needs to
+re-seek since there has been an intervening writer on the B+Tree.
+
+Caused by: java.lang.RuntimeException: De-serialization problem: addr={nbytes=232,offset=9492165} from store=C:\DOCUME~1\BRYANT~1\LOCALS~1\Temp\bigdata44921.tmp : cause=java.lang.RuntimeException: Child is not persistent: index=6
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2460)
+	at com.bigdata.btree.Node.getChild(Node.java:2116)
+	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:163)
+	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:1)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:59)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:58)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at com.bigdata.btree.AbstractNode$PostOrderEntryIterator.hasNext(AbstractNode.java:657)
+	at com.bigdata.btree.ResultSet.<init>(ResultSet.java:896)
+	at com.bigdata.btree.filter.ChunkedLocalRangeIterator.getResultSet(ChunkedLocalRangeIterator.java:123)
+	at com.bigdata.btree.UnisolatedReadWriteIndex$ChunkedIterator.getResultSet(UnisolatedReadWriteIndex.java:700)
+	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.rangeQuery(AbstractChunkedTupleIterator.java:305)
+	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.hasNext(AbstractChunkedTupleIterator.java:461)
+	at com.bigdata.btree.FusedTupleIterator.hasNext(FusedTupleIterator.java:197)
+	at cutthecrap.utils.striterators.Resolverator.hasNext(Resolverator.java:48)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at com.bigdata.striterator.ChunkedWrappedIterator.hasNext(ChunkedWrappedIterator.java:162)
+	at com.bigdata.relation.rule.eval.LocalNestedSubqueryEvaluator.apply1(LocalNestedSubqueryEvaluator.java:189)
+	at com.bigdata.relation.rule.eval.LocalNestedSubqueryEvaluator.call(LocalNestedSubqueryEvaluator.java:136)
+	at com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTask.call(RunRuleAndFlushBufferTask.java:47)
+	at com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTask.call(RunRuleAndFlushBufferTask.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+Caused by: java.lang.RuntimeException: Child is not persistent: index=6
+	at com.bigdata.btree.AddressSerializer.putChildAddresses(AddressSerializer.java:70)
+	at com.bigdata.btree.NodeSerializer.putNode2(NodeSerializer.java:517)
+	at com.bigdata.btree.NodeSerializer.putNode(NodeSerializer.java:475)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:2345)
+	at com.bigdata.btree.AbstractBTree.writeNodeRecursive(AbstractBTree.java:2235)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:111)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
+	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:273)
+	at com.bigdata.cache.HardReferenceQueue.append(HardReferenceQueue.java:235)
+	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:2122)
+	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:321)
+	at com.bigdata.btree.Leaf.<init>(Leaf.java:159)
+	at com.bigdata.btree.BTree$NodeFactory.allocLeaf(BTree.java:1197)
+	at com.bigdata.btree.NodeSerializer.getLeaf(NodeSerializer.java:930)
+	at com.bigdata.btree.NodeSerializer.getNodeOrLeaf(NodeSerializer.java:415)
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2456)
+	at com.bigdata.btree.Node.getChild(Node.java:2116)
+	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:163)
+	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:1)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:59)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:58)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at com.bigdata.btree.AbstractNode$PostOrderEntryIterator.hasNext(AbstractNode.java:657)
+	at com.bigdata.btree.ResultSet.<init>(ResultSet.java:896)
+	at com.bigdata.btree.filter.ChunkedLocalRangeIterator.getResultSet(ChunkedLocalRangeIterator.java:123)
+	at com.bigdata.btree.UnisolatedReadWriteIndex$ChunkedIterator.getResultSet(UnisolatedReadWriteIndex.java:700)
+	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.rangeQuery(AbstractChunkedTupleIterator.java:305)
+	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.hasNext(AbstractChunkedTupleIterator.java:461)
+
