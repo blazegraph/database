@@ -548,9 +548,9 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
                 timestamp = joinNexusFactory.getWriteTimestamp();
 
             } else {
-
-                timestamp = joinNexusFactory.getReadTimestamp();
-//                timestamp = ITx.READ_COMMITTED;
+                // FIXME reconsider what is right here for computing closure!
+//                timestamp = joinNexusFactory.getReadTimestamp();
+                timestamp = ITx.READ_COMMITTED;
                 
             }
 

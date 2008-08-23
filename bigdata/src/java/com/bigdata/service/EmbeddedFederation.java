@@ -257,7 +257,8 @@ public class EmbeddedFederation extends AbstractFederation {
         isTransient = BufferMode.Transient.toString().equals(
                 properties.getProperty(Options.BUFFER_MODE));
         
-        log.info("federation is "+(isTransient?"not ":"")+"persistent");
+        if (log.isInfoEnabled())
+            log.info("federation is "+(isTransient?"not ":"")+"persistent");
         
         // true if temp files are being requested.
         final boolean createTempFile = Boolean.parseBoolean(properties

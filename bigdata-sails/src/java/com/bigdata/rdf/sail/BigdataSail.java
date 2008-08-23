@@ -115,7 +115,6 @@ import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -123,9 +122,10 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.store.AbstractLocalTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
-import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.EmptyStatementIterator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -135,6 +135,9 @@ import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 
@@ -150,9 +153,10 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * <h2>Concurrent Query</h2>
  * 
  * While this class, by itself, is NOT safe for readers that run concurrently
- * with a writer, it provides a read-committed view that is safe for concurrent
- * readers and that is safe to use while a writer is concurrently running a
- * transaction. See {@link #asReadCommittedView()}.
+ * with a writer, it provides both a read-committed and a read-historical view
+ * that are safe for concurrent readers and that are safe to use while a writer
+ * is concurrently running a transaction. See {@link #asReadCommittedView()}
+ * and {@link #getReadHistoricalView(long)}.
  * <p>
  * In order to use concurrent query you basically have to decide whether an
  * operation is read-only or read-write. A read-only operation should be
@@ -172,14 +176,6 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  *       e.g., if a CONSTRUCT query is used to recover statements about
  *       statements.
  * 
- * @todo support a "quadStore" mode with named graphs. I'm not clear if we need
- *       3 or 6 statement indices for this.
- * 
- * @todo Get basic query optimizations working and test w/ modified LUBM.
- *       <p>
- *       (a) Use {@link BigdataValue} and avoid lookup of terms in the lexicon
- *       staying within out native API for JOINs.
- * 
  * @todo Is there anything to be done with {@link #setDataDir(java.io.File)}?
  *       With {@link #getDataDir()}?
  * 
@@ -188,11 +184,6 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  *       parameter. This is much more convenient when creating Sail instances
  *       programmatically. You are free to add whatever initialization method to
  *       your Sail class.)
- * 
- * FIXME add a magic predicate for free text search <code>bigdata:search</code>.
- * This will need to get hooked in as an alternative to a standard join,
- * returning a set of term identifiers that are then used to select matching
- * statements in the triple pattern within which it is embedded.
  * 
  * FIXME run against the "Technology Compatibilty Kit"
  * https://src.aduna-software.org/svn/org.openrdf/projects/sesame2-tck/
@@ -205,12 +196,10 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * Additional parameters understood by the Sesame 2.x SAIL implementation.
      * 
-     * @todo also extend Options for the scale-out triple store once defined.
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.rdf.store.LocalTripleStore.Options {
+    public static interface Options extends com.bigdata.rdf.store.AbstractTripleStore.Options {
     
         /**
          * This optional boolean property may be used to specify whether or not
@@ -223,9 +212,11 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String DEFAULT_TRUTH_MAINTENANCE = "true"; 
     
         /**
-         * The property whose value is the name of the {@link ITripleStore} 
-         * implementation that will be instantiated.  An {@link InferenceEngine} 
-         * will be used to wrap that {@link ITripleStore}.
+         * The property whose value is the name of the {@link ITripleStore}
+         * implementation that will be instantiated. This may be used to select
+         * either the {@link LocalTripleStore} (default) or the
+         * {@link TempTripleStore} in combination
+         * {@link BigdataSail#BigdataSail(Properties)} ctor.
          */
         public static final String STORE_CLASS = "storeClass";
         
@@ -242,11 +233,20 @@ public class BigdataSail extends SailBase implements Sail {
         
         /**
          * This boolean may be used to specify whether or not to use "native"
-         * joins, bypassing the Sesame join mechanism. 
+         * joins, bypassing the Sesame join mechanism (default
+         * {@value #DEFAULT_NATIVE_JOINS}). Native joins translate high-level
+         * query from an {@link TupleExpr} into an {@link IRule} and then
+         * execute the {@link IRule}. The generated {@link IRule}s operate
+         * directly with the {@link SPORelation} and {@link SPO} objects using
+         * internal 64-bit term identifiers rather than RDF {@link Value}s.
+         * When query results are externalized, efficient batch resolution is
+         * used to translate from those 64-bit term identifiers to
+         * {@link BigdataValue}s.
          */
         public static final String NATIVE_JOINS = "nativeJoins";
         
-        public static final String DEFAULT_NATIVE_JOINS = "false";
+        public static final String DEFAULT_NATIVE_JOINS = "true";
+        
     }
 
     /**
@@ -274,8 +274,6 @@ public class BigdataSail extends SailBase implements Sail {
     final protected AbstractTripleStore database;
 
     final protected Properties properties;
-
-//    final private ValueFactory valueFactory = BigdataValueFactory.INSTANCE;
     
     /**
      * The inference engine if the SAIL is using one.
@@ -287,19 +285,10 @@ public class BigdataSail extends SailBase implements Sail {
      * read-only view.
      */
     public InferenceEngine getInferenceEngine() {
-        
-        if(_inf==null) {
-        
-            _inf = database.getInferenceEngine();
-            
-        }
-        
-        return _inf;
+
+        return database.getInferenceEngine();
         
     }
-    
-    // hard reference cache.
-    private InferenceEngine _inf = null;
     
     /**
      * The configured capacity for the statement buffer(s).
@@ -315,6 +304,13 @@ public class BigdataSail extends SailBase implements Sail {
      * When true, SAIL will delegate joins to bigdata internal joins.
      */
     final private boolean nativeJoins;
+    
+    /**
+     * Set <code>true</code> by ctor variants that open/create the database
+     * but not by those that connect to an existing database. This helps to
+     * provide the illusion of a dedicated purpose SAIL for those ctor variants.
+     */
+    private boolean closeOnShutdown;
     
     /**
      * When true, the RDFS closure will be maintained by the <em>SAIL</em>
@@ -350,10 +346,16 @@ public class BigdataSail extends SailBase implements Sail {
     
     /**
      * Create/re-open the database identified by the properites.
+     * <p>
+     * Note: This can only be used for {@link AbstractLocalTripleStore}s. The
+     * {@link ScaleOutTripleStore} uses the {@link DefaultResourceLocator}
+     * pattern and does not have a constructor suitable for just a
+     * {@link Properties} object.
      * 
      * @see Options
      */
-    private static AbstractTripleStore setUp(Properties properties) {
+    @SuppressWarnings("unchecked")
+    private static AbstractLocalTripleStore setUp(Properties properties) {
 
         final String val = properties.getProperty(
                 BigdataSail.Options.STORE_CLASS,
@@ -363,18 +365,18 @@ public class BigdataSail extends SailBase implements Sail {
 
             final Class storeClass = Class.forName(val);
 
-            if (!ITripleStore.class.isAssignableFrom(storeClass)) {
+            if (!AbstractLocalTripleStore.class.isAssignableFrom(storeClass)) {
 
                 throw new RuntimeException("Must extend "
-                        + ITripleStore.class.getName() + " : "
+                        + AbstractLocalTripleStore.class.getName() + " : "
                         + storeClass.getName());
 
             }
 
-            final Constructor ctor = storeClass
+            final Constructor<AbstractLocalTripleStore> ctor = storeClass
                     .getConstructor(new Class[] { Properties.class });
 
-            final AbstractTripleStore database = (AbstractTripleStore) ctor
+            final AbstractLocalTripleStore database = ctor
                     .newInstance(new Object[] { properties });
 
             return database;
@@ -393,13 +395,14 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSail() {
         
         this(setUp(getDefaultProperties()));
+        
+        closeOnShutdown = true;
+        
     }
     
     /**
      * Create or open a database instance configured using the specified
      * properties.
-     * <p>
-     * Note: you MUST still invoke {@link #initialize()}.
      * 
      * @see Options
      */
@@ -407,22 +410,28 @@ public class BigdataSail extends SailBase implements Sail {
         
         this(setUp(properties));
         
+        closeOnShutdown = true;
+
     }
     
     /**
-     * Variant constructor used to wrap an exiting database.
+     * Core ctor.
      * <p>
-     * Note: you MUST still invoke {@link #initialize()}.
+     * To create a {@link BigdataSail} backed by an
+     * {@link IBigdataFederation} use the {@link ScaleOutTripleStore} ctor and
+     * then {@link AbstractTripleStore#create()} the triple store if it does not
+     * exist.
      * 
      * @param database
-     *            A reference for an existing database instance.
-     * 
-     * @see Options
+     *            An existing {@link AbstractTripleStore}.
      */
     public BigdataSail(AbstractTripleStore database) {
-
+        
         if (database == null)
             throw new IllegalArgumentException();
+    
+        // default to false here and overwritten by some ctor variants.
+        this.closeOnShutdown = false;
         
         this.database = database;
         
@@ -472,16 +481,53 @@ public class BigdataSail extends SailBase implements Sail {
         
         // NOP (nothing to invoke in the SailBase).
         
+        if(log.isInfoEnabled()) {
+            
+            log.info("closeOnShutdown=" + closeOnShutdown);
+            
+        }
+        
     }
     
-    private WeakReference<BigdataSailConnection> readCommittedRef;
+    /**
+     * Invokes {@link #shutDown()}.
+     * 
+     * @todo should test a local boolean indicating open vs closed - this tests
+     * the backing database.
+     */
+    protected void finalize() throws Throwable {
+        
+        if(database.isOpen()) {
+            
+            log.info("");
+            
+            shutDown();
+            
+        }
+        
+        super.finalize();
+        
+    }
     
+    /**
+     * If the backing database was created/opened by the {@link BigdataSail}
+     * then it is closed.  Otherwise this is a NOP.
+     */
+    protected void shutDownInternal() throws SailException {
+        
+        if (closeOnShutdown) {
+
+            log.info("Closing the backing database");
+            
+            database.close();
+            
+        }
+        
+    }
+
     /**
      * A factory returning the singleton read-committed view of the database.
      * This view is safe for concurrent query operations.
-     * <p>
-     * Note: This is only supported when the {@link Options#STORE_CLASS}
-     * specifies {@link LocalTripleStore} or {@link ScaleOutTripleStore}.
      * <p>
      * Note: The returned object is thread-safe and the same instance is used by
      * concurrent readers. Therefore {@link SailConnection#close()} is a NOP for
@@ -525,7 +571,8 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
     }
-    
+    private WeakReference<BigdataSailConnection> readCommittedRef;
+        
     /**
      * Obtain a read-historical view that reads from the specified commit point.
      * This view is safe for concurrent readers and will not update if there are
@@ -565,7 +612,7 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
-     * A {@link BigdataValueFactoryImpl}
+     * A {@link BigdataValueFactory}
      */
     final public ValueFactory getValueFactory() {
         
@@ -623,16 +670,6 @@ public class BigdataSail extends SailBase implements Sail {
     }
 
     /**
-     * Note: This is an immediate shutdown - any running transactions will not
-     * complete.
-     */
-    protected void shutDownInternal() throws SailException {
-        
-        database.close();
-        
-    }
-
-    /**
      * Inner class implements the {@link SailConnection}. Some additional
      * functionality is available on this class, including
      * {@link #computeClosure()}.
@@ -679,12 +716,8 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * A canonicalizing mapping for blank nodes whose life cycle is the same
          * as that of the {@link SailConnection}.
-         * 
-         * @todo share with {@link BigdataStatementIteratorImpl}s returned by
-         *       the {@link SailConnection}? Make concurrency safe if I do
-         *       that?
          */
-        private final Map<String,BigdataBNodeImpl> bnodes;
+        private final Map<String, BigdataBNodeImpl> bnodes;
         
         /**
          * Return the assertion buffer.
@@ -1358,7 +1391,12 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
         /**
-         * @todo implement {@link #getContextIDs()}
+         * @todo implement {@link #getContextIDs()}. The
+         *       {@link AbstractTripleStore} supports provenance with statement
+         *       identifiers. Those statement identifiers appear in the context
+         *       position. Since these are not "named graphs" we might return an
+         *       empty iterator here. The other option an iterator reading on
+         *       the SPO index and visiting all of the statement identifiers.
          */
         public CloseableIteration<? extends Resource, SailException> getContextIDs() throws SailException {
 
@@ -1577,6 +1615,10 @@ public class BigdataSail extends SailBase implements Sail {
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
+            /*
+             * When includedInferred is false we set a filter that causes the
+             * access path to only visit the Explicit statements.
+             */
             final IElementFilter<ISPO> filter = includeInferred ? null
                     : ExplicitSPOFilter.INSTANCE;
 
@@ -1604,9 +1646,6 @@ public class BigdataSail extends SailBase implements Sail {
             if(/*getTruthMaintenance() &&*/ includeInferred) {
 
                 /*
-                 * FIXME Do this if TM is enabled OR the database closure has
-                 * been updated, but we have no way to detect the latter.
-                 * 
                  * Obtain an iterator that will generate any missing entailments
                  * at query time. The behavior of the iterator depends on how
                  * the InferenceEngine was configured.
@@ -1615,31 +1654,19 @@ public class BigdataSail extends SailBase implements Sail {
                 src = new BackchainAccessPath(getInferenceEngine(),
                         getTemporaryStore(), accessPath).iterator();
                 
-//                src = getInferenceEngine().backchainIterator(accessPath);
-                
             } else {
 
                 /*
                  * Otherwise NO entailments are permitted and we only return the
                  * statements actually present in the database.
+                 * 
+                 * Note: An ExplicitSPOFilter is set above that enforces this.
                  */
-                
-//                // Read straight from the database.
-//                if(includeInferred) {
 
-                    // include statements in the database that are axioms or inferences.
-                    src = accessPath.iterator();
-                    
-//                } else {
-//                    
-//                    // filter such that the caller only sees the explicit statements.
-//                    src = accessPath.iterator(ExplicitSPOFilter.INSTANCE);
-//                    
-//                }
+                src = accessPath.iterator();
                 
             }
             
-//            return new BigdataStatementIteratorImpl(this, src);
             return database.asStatementIterator(src);
 
         }
@@ -1702,7 +1729,6 @@ public class BigdataSail extends SailBase implements Sail {
             
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-            // @todo write unit test - make sure the filter is applied before remove!
             database
                     .getAccessPath(NULL, NULL, NULL, InferredSPOFilter.INSTANCE)
                     .removeAll();

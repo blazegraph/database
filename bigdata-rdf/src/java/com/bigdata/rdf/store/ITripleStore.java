@@ -313,9 +313,8 @@ public interface ITripleStore {
      * Commit changes on the database.
      * <p>
      * Note: The semantics of this operation depend on whether the database is
-     * embedded (does a commit), temporary (checkpoint), or a federation
-     * (ignored since unisolated writes on the federation are atomic and
-     * auto-committed).
+     * embedded (does a commit), temporary (ignored), or a federation (ignored
+     * since unisolated writes on the federation are atomic and auto-committed).
      */
     public void commit();
     

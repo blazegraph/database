@@ -2628,13 +2628,69 @@ x. ZooKeeper integration for resource lock manager?
 
    - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
 
+      - Is the closure really at a fixed point?  Re-load and re-close
+        on U1 shows a non-zero (2439) mutation count.  rdfs02 (12) and
+        rdfs09 (2421) are not at a fixed point.  However, this is with
+        the fast closure program, so I could believe that re-execution
+        of fast closure might produce additional entailments. Look
+        into this with MikeP.
+
       - Unroll joins then distribute joins.  w/ MikeP
 
       - cache range counts (and maybe more) for historical access
         paths.
 
-   - Jini smart proxy iterator and then test scale-out joins (EDS,
-     JDS).
+      - Test w/ Sesame 2 custom lubm extensions - look for other
+        places where we can boost performance.
+
+      - Database-at-once closure for LDS, EDS, and JDS may require
+        advancing the historical read-behind point after each round of
+        closure, probably forming an overriden joinNexus.
+
+	Note that I changed READ-COMMITTED to readTimestamp in
+        AbstractStepTask#552, when submitting a task to the
+        concurrency manager.  Review this change!
+
+      * The LDS should be able to run the entire closure program as a
+	single task on the concurrency manager -- refactor until it
+	does!
+	
+	LDS U10 Load rate w/o closure on d620 with 10 threads and 100k
+	statement buffer.  Not bad.
+
+	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
+
+      * The EDS and JDS should be able to run with overflow disabled
+        and the SPO indices located on the same data service just as
+        efficiently as the LTS or LDS.
+
+        It would be nice if we could constrain the placement of the
+        SPO indices onto a host and run with (much of) the same
+        efficiency as the LTS or LDS but with overflow.  There will be
+        some cost if the MDS is remote as the #of partitions grows.
+
+      - Make sure that the SAIL query is against the last commited
+        state of the store.
+
+      - Change the SAIL setup to use the Locator mechanism.
+
+      - Add LUBM factory variants for LDS, EDS, and JDS.  All three
+        configure from an IBigdataClient.  LDS and EDS must also
+        handle the federation create.  For JDS, the federation should
+        pre-exist and the client just connects.  Open and close for
+        JDS is just connect and disconnect.  For LDS and EDS, we also
+        just connect and disconnect, but that has the semantics of
+        shutting down the federation when we disconnect.
+
+      * Examine the pure access path read rate for LTS, LDS, EDS, and
+        JDS.  This is query6 and query 14.  Both queries produce a lot
+        of tuples.  Tune up the access path read until it is good on
+        all of these configurations.
+
+      * Jini smart proxy iterator and then test scale-out joins (EDS,
+        JDS).  note that EDS does not use RMI and therefore does not
+        serialize anything while JDS requires that we cross machine
+        boundaries with RMI.
 
    - (Various MikeP)
 
