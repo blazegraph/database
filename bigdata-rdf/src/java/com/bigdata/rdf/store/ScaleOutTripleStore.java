@@ -95,16 +95,16 @@ import com.bigdata.service.jini.JiniFederation;
  */
 public class ScaleOutTripleStore extends AbstractTripleStore {
 
-    private final IBigdataFederation fed;
-    
-    /**
-     * The {@link IBigdataFederation} that is being used.
-     */
-    public IBigdataFederation getFederation() {
-        
-        return fed;
-        
-    }
+//    private final IBigdataFederation fed;
+//    
+//    /**
+//     * The {@link IBigdataFederation} that is being used.
+//     */
+//    public IBigdataFederation getFederation() {
+//        
+//        return fed;
+//        
+//    }
 
     /**
      * Ctor specified by {@link DefaultResourceLocator}
@@ -116,7 +116,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         super( indexManager, namespace, timestamp, properties );
 
-        this.fed = (IBigdataFederation) indexManager;
+        /*
+         * Note: The indexManager will be an IsolatedJournal if the resource is
+         * instantiated from within an AbstractTask.
+         */
+        
+//        this.fed = (IBigdataFederation) indexManager;
      
         /*
          * Note: KB is NOT created automatically.
@@ -124,15 +129,17 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
     }
     
-    public IBigdataFederation getIndexManager() {
-        
-        return fed;
-        
-    }
+//    public IBigdataFederation getIndexManager() {
+//        
+//        return fed;
+//        
+//    }
     
     final public boolean isStable() {
 
-        return fed.isStable();
+        return true;
+        
+//        return getIndexManager().isStable();
         
     }
 

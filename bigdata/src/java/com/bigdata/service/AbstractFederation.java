@@ -560,8 +560,9 @@ abstract public class AbstractFederation implements IBigdataFederation {
                 
                 final UUID clientUUID = client.getClientUUID();
 
-                log.info("Starting performance counter collection: uuid="
-                        + clientUUID);
+                if (log.isInfoEnabled())
+                    log.info("Starting performance counter collection: uuid="
+                            + clientUUID);
 
                 p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
                         "service" + ICounterSet.pathSeparator
