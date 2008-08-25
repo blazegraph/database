@@ -36,7 +36,6 @@ import junit.framework.Test;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
-import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.LocalDataServiceFederation;
 
@@ -131,9 +130,9 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
     }
 
     /**
-     * An embedded federation is setup and torn down per unit test.
+     * An embedded federation under the control of the test harness.
      */
-    IBigdataClient client;
+    private LocalDataServiceClient client = null;
 
     /**
      * Data files are placed into a directory named by the test. If the
@@ -142,24 +141,24 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
     public void setUp(ProxyTestCase testCase) throws Exception {
     
         super.setUp(testCase);
-        
-        File dataDir = new File( testCase.getName() );
-        
-        if(dataDir.exists() && dataDir.isDirectory()) {
 
-            recursiveDelete( dataDir );
-            
+        final File dataDir = new File(testCase.getName());
+
+        if (dataDir.exists() && dataDir.isDirectory()) {
+
+            recursiveDelete(dataDir);
+
         }
 
-        Properties properties = new Properties(getProperties());
-        
-        // Note: directory named for the unit test (name is available from the
-        // proxy test case).
+        final Properties properties = new Properties(getProperties());
+
+        // Note: directory named for the unit test (name is available from
+        // the proxy test case).
         properties.setProperty(LocalDataServiceClient.Options.DATA_DIR,
                 testCase.getName());
-        
+
         client = new LocalDataServiceClient(properties);
-        
+
         client.connect();
         
     }
@@ -171,6 +170,8 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
 
         // delete on disk federation (if any).
         recursiveDelete(new File(testCase.getName()));
+
+        client = null;
         
         super.tearDown();
         
@@ -212,16 +213,13 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
         final String namespace = store.getNamespace();
-        
-//        // Note: properties we need to re-start the client.
-//        final Properties properties = client.getProperties();
-        
+
         // Note: also shutdown the embedded federation.
-        client.disconnect(true/*immediateShutdown*/);
+        client.disconnect(true/* immediateShutdown */);
 
         // new client.
-        client = new LocalDataServiceClient( client.getProperties() );
-        
+        client = new LocalDataServiceClient(client.getProperties());
+
         // re-connect.
         client.connect();
         
@@ -229,7 +227,6 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
         return new ScaleOutTripleStore(client
                 .getFederation(), namespace, ITx.UNISOLATED,
                 store.getProperties()
-//                client.getProperties()
                 );
 
     }
