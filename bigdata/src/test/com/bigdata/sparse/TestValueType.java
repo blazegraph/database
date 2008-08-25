@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.sparse;
 
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.Random;
 
@@ -35,9 +36,6 @@ import junit.framework.TestCase2;
 
 /**
  * Test suite for {@link ValueType}.
- * 
- * @todo test use of thread-local variables to make the encoder and decoder
- *       thread-safe.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -189,5 +187,60 @@ public class TestValueType extends TestCase2 {
         assertEquals(data, (byte[]) ValueType.decode(ValueType.encode(data)));
         
     }
+
+    public void test_encode_Object() {
+
+        doEncodeDecodeTest(new MySerializable("abc"));
+        
+        doEncodeDecodeTest(new MySerializable(null));
+        
+        doEncodeDecodeTest(new MySerializable("ABC"));
+        
+    }
+
+    private void doEncodeDecodeTest(final Object o) {
+
+        final Object o2 = ValueType.decode(ValueType.encode(o));
+
+        assertFalse(o == o2);
+
+        assertTrue(o.equals(o2));
+        
+    }
     
+    /**
+     * Serializable object with simple state.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class MySerializable implements Serializable {
+        
+        private static final long serialVersionUID = -3616507592564793343L;
+        
+        private final String s;
+        
+        public MySerializable(String s) {
+            
+            this.s = s;
+            
+        }
+
+        public boolean equals(Object o) {
+
+            return equals((MySerializable)o);
+            
+        }
+        
+        public boolean equals(MySerializable o) {
+
+            if (s == null)
+                return o.s == null;
+
+            return s.equals(o.s);
+
+        }
+        
+    }
+
 }

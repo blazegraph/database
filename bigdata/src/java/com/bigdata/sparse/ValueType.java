@@ -24,11 +24,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.sparse;
 
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Date;
 
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.SerializerUtil;
 
 /**
  * A type safe enumeration of value types. This class also supports encoding
@@ -72,7 +75,12 @@ public enum ValueType {
     /**
      * A 64-bit auto-incremental counter.
      */
-    AutoIncLong(9)
+    AutoIncLong(9),
+    /**
+     * A Java object that will be serialized using its {@link Serializable} or
+     * {@link Externalizable} interface.
+     */
+    Serializable(10)
     ;
     
     private final int code;
@@ -105,6 +113,8 @@ public enum ValueType {
         case 6: return Date;
         case 7: return ByteArray;
         case 8: return AutoIncInteger;
+        case 9: return AutoIncLong;
+        case 10: return Serializable;
         default:
             throw new IllegalArgumentException("Unknown code: "+code);
         }
@@ -236,6 +246,16 @@ public enum ValueType {
 
                 buf.writeByte(ValueType.AutoIncLong.intValue());
                 
+            } else if( v instanceof Serializable) {
+                
+                buf.writeByte(ValueType.Serializable.intValue());
+
+                final byte[] bytes = SerializerUtil.serialize(v); 
+                
+                buf.packLong( bytes.length );
+
+                buf.write( bytes );
+                
             } else {
                 
                 throw new UnsupportedOperationException();
@@ -265,10 +285,11 @@ public enum ValueType {
         if (v.length == 0)
             throw new IllegalArgumentException("Zero length byte[]");
 
-        DataInputBuffer buf = new DataInputBuffer(v, 0, v.length);
+        final DataInputBuffer buf = new DataInputBuffer(v, 0, v.length);
 
         try {
-            ValueType type = ValueType.valueOf((int) buf.readByte());
+            
+            final ValueType type = ValueType.valueOf((int) buf.readByte());
 
             switch (type) {
 
@@ -281,8 +302,8 @@ public enum ValueType {
             case Double:
                 return buf.readDouble();
             case Unicode: {
-                int len = (int)buf.unpackLong();
-                byte[] bytes = new byte[len];
+                final int len = (int)buf.unpackLong();
+                final byte[] bytes = new byte[len];
                 buf.readFully(bytes);
                 String s = new String(bytes,UTF8);
                 return s;
@@ -290,8 +311,8 @@ public enum ValueType {
             case Date:
                 return new java.util.Date(buf.readLong());
             case ByteArray: {
-                int len = (int)buf.unpackLong();
-                byte[] bytes = new byte[len];
+                final int len = (int)buf.unpackLong();
+                final byte[] bytes = new byte[len];
                 buf.readFully(bytes);
                 return bytes;
             }
@@ -301,8 +322,15 @@ public enum ValueType {
             case AutoIncLong: {
                 return AutoIncLongCounter.INSTANCE;
             }
+            case Serializable: {
+                final int len = (int)buf.unpackLong();
+                final byte[] bytes = new byte[len];
+                buf.readFully(bytes);
+                return SerializerUtil.deserialize(bytes);
+            }
             default:
-                throw new AssertionError();
+
+                throw new AssertionError("type="+type);
 
             }
 
