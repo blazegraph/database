@@ -56,18 +56,14 @@ import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.sail.SailException;
 import org.openrdf.sail.inferencer.fc.ForwardChainingRDFSInferencer;
 import org.openrdf.sail.memory.MemoryStore;
 
-import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -75,7 +71,6 @@ import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Unit tests for database at once closure, fix point of a rule set (does not
@@ -166,7 +161,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
             throws Exception {
 
         /*
-         * Used to compute the entailments with out own rules engine.
+         * Used to compute the entailments our own rules engine.
          */
         final AbstractTripleStore closure;
         {

@@ -577,9 +577,10 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
 
         log.info("");
         
-        bnodes.clear();
+        bnodes = null;
         
-        deferredStatementBuffer.clear();
+        if (deferredStatementBuffer != null)
+            deferredStatementBuffer.clear();
         
         counter = 0L;
         

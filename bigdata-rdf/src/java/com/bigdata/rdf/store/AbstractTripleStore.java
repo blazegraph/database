@@ -3061,14 +3061,18 @@ abstract public class AbstractTripleStore extends
         /*
          * Use the timestamp for the database view.
          * 
-         * Note: The choice here reflects the use of the
-         * UnisolatedReadWriteIndex to allow interleaved reads and writes on the
-         * unisolated indices when using a Journal or Temporary(Raw)Store. When
-         * running against an IBigdataFederation, the ConcurrencyManager will be
-         * interposed and unisolated writes will result in commits.
+         * Note: The choice here effects the behavior for MUTATION only (e.g.,
+         * computing or updating the closure of the db) and reflects the use of
+         * the UnisolatedReadWriteIndex to allow interleaved reads and writes on
+         * the unisolated indices when using a Journal or Temporary(Raw)Store.
+         * When running against an IBigdataFederation, the ConcurrencyManager
+         * will be interposed and unisolated writes will result in commits.
+         * 
+         * Note: If we are only reading (Query) then we just use the timestamp
+         * of the view.
          */
         final long readTimestamp;
-        if (writeTimestamp == ITx.UNISOLATED
+        if (action.isMutation() && writeTimestamp == ITx.UNISOLATED
                 && getIndexManager() instanceof IBigdataFederation) {
            
             /*
