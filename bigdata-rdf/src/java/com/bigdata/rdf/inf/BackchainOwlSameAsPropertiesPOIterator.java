@@ -155,18 +155,18 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
     public boolean hasNext() {
         if (sameAs3It == null) {
             if (sameAs3 != null) {
-                sameAs3It = sameAs3.getAccessPath(getKeyOrder()).iterator();
+                sameAs3It = sameAs3.getAccessPath(SPOKeyOrder.SPO).iterator();
             } else {
-                sameAs3It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+                sameAs3It = new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
             }
         }
         if (src.hasNext() || sameAs3It.hasNext()) {
             return true;
         } else if (sameAs2It == null) {
             if (sameAs2 != null) {
-                sameAs2It = sameAs2.getAccessPath(getKeyOrder()).iterator();
+                sameAs2It = sameAs2.getAccessPath(SPOKeyOrder.SPO).iterator();
             } else {
-                sameAs2It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+                sameAs2It = new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
             }
         }
         return sameAs2It.hasNext();
@@ -181,9 +181,9 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
     public ISPO next() {
         if (sameAs3It == null) {
             if (sameAs3 != null) {
-                sameAs3It = sameAs3.getAccessPath(getKeyOrder()).iterator();
+                sameAs3It = sameAs3.getAccessPath(SPOKeyOrder.SPO).iterator();
             } else {
-                sameAs3It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+                sameAs3It = new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
             }
         }
         canRemove = false;
@@ -198,9 +198,9 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
         } else {
             if (sameAs2It == null) {
                 if (sameAs2 != null) {
-                    sameAs2It = sameAs2.getAccessPath(getKeyOrder()).iterator();
+                    sameAs2It = sameAs2.getAccessPath(SPOKeyOrder.SPO).iterator();
                 } else {
-                    sameAs2It = new EmptyChunkedIterator<ISPO>(getKeyOrder());
+                    sameAs2It = new EmptyChunkedIterator<ISPO>(SPOKeyOrder.SPO);
                 }
             }
             if (sameAs2It.hasNext()) {
