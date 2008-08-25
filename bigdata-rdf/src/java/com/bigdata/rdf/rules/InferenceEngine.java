@@ -623,7 +623,6 @@ public class InferenceEngine extends RDFSVocabulary {
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            // FIXME return RuleStats instead -- much more info.
             return new ClosureStats(mutationCount,elapsed);
 
         } catch (Exception ex) {
@@ -667,6 +666,12 @@ public class InferenceEngine extends RDFSVocabulary {
      * @return An iterator that will visit the statements in database that would
      *         be visited by that {@link IAccessPath} query plus any necessary
      *         entailments.
+     *         
+     * @deprecated by {@link BackchainAccessPath} ctor.
+     * 
+     * FIXME add ITemporaryStoreFactory, add same to IJoinNexus, add as argument
+     * to {@link BackchainAccessPath}, drop this method, and replace use of
+     * this method in modelsEqual with {@link BackchainAccessPath} ctor.
      */
     public IChunkedOrderedIterator<ISPO> backchainIterator(IAccessPath<ISPO> accessPath) {
 

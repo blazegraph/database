@@ -534,7 +534,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
          * 
          * A mutation task runs with the writeTimestamp.
          * 
-         * A query task runs as READ_COMMITTED.
+         * A query task runs with the readTimestamp.
          * 
          * @todo handle transactions in this context.
          */
@@ -548,9 +548,9 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
                 timestamp = joinNexusFactory.getWriteTimestamp();
 
             } else {
-                // FIXME reconsider what is right here for computing closure!
-//                timestamp = joinNexusFactory.getReadTimestamp();
-                timestamp = ITx.READ_COMMITTED;
+
+                timestamp = joinNexusFactory.getReadTimestamp();
+//                timestamp = ITx.READ_COMMITTED;
                 
             }
 

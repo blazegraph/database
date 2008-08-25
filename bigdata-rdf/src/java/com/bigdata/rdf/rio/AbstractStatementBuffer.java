@@ -4,9 +4,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -31,9 +28,6 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Class for efficiently converting {@link Statement}s into
@@ -227,42 +221,35 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
     }
         
     /**
-     * Return a canonical {@link BigdataValue} instance representing the
-     * given <i>value</i>. The scope of the canonical instance is until the
-     * next internal buffer overflow ({@link URI}s and {@link Literal}s)
-     * or until {@link #flush()} ({@link BNode}s, since blank nodes are
-     * global for a given source). The purpose of the canonicalizing mapping
-     * is to reduce the buffered {@link BigdataValue}s to the minimum
-     * variety required to represent the buffered {@link BigdataStatement}s,
-     * which improves throughput significantly (40%) when resolving terms to
-     * the corresponding term identifiers using the {@link LexiconRelation}.
+     * Return a canonical {@link BigdataValue} instance representing the given
+     * <i>value</i>. The scope of the canonical instance is until the next
+     * internal buffer overflow ({@link URI}s and {@link Literal}s) or until
+     * {@link #flush()} ({@link BNode}s, since blank nodes are global for a
+     * given source). The purpose of the canonicalizing mapping is to reduce the
+     * buffered {@link BigdataValue}s to the minimum variety required to
+     * represent the buffered {@link BigdataStatement}s, which improves
+     * throughput significantly (40%) when resolving terms to the corresponding
+     * term identifiers using the {@link LexiconRelation}.
      * <p>
-     * Note: This is not a true canonicalizing map when statement
-     * identifiers are used since values used in deferred statements will be
-     * held over until the buffer is {@link #flush()}ed. This relaxation of
-     * the canonicalizing mapping is not a problem since the purpose of the
-     * mapping is to provide better throughput and nothign relies on a pure
-     * canonicalization of the {@link Value}s.
+     * Note: This is not a true canonicalizing map when statement identifiers
+     * are used since values used in deferred statements will be held over until
+     * the buffer is {@link #flush()}ed. This relaxation of the canonicalizing
+     * mapping is not a problem since the purpose of the mapping is to provide
+     * better throughput and nothign relies on a pure canonicalization of the
+     * {@link Value}s.
      * 
      * @param value
      *            A value.
      * 
-     * @return The corresponding canonical {@link BigdataValue}. The
-     *         returned value is NEVER the same as the given value, even
-     *         when the given value implements {@link BigdataValue}. This
-     *         is done in order to facilitate conversion of
-     *         {@link BigdataStatement}s backed by the lexicon for one
-     *         {@link AbstractTripleStore} into {@link BigdataStatement}s
-     *         backed by the lexicon of a different
-     *         {@link AbstractTripleStore}.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>value</i> is <code>null</code>.
+     * @return The corresponding canonical {@link BigdataValue} for the target
+     *         {@link BigdataValueFactory}. This will be <code>null</code>
+     *         iff the <i>value</i> is <code>null</code> (allows for the
+     *         context to be undefined).
      */
     protected BigdataValue convertValue(Value value) {
 
         if (value == null)
-            throw new IllegalArgumentException();
+            return null;
 
         if (value instanceof BNode) {
 
@@ -409,10 +396,22 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
              * Note: blank nodes do not appear in the predicate position.
              */
             
-            deferredStatementBuffer.add( stmt );
-            
+            if(log.isInfoEnabled()) {
+                
+                log.info("deferred: " + stmt);
+
+            }
+
+            deferredStatementBuffer.add(stmt);
+
         } else {
-        
+
+            if (log.isInfoEnabled()) {
+
+                log.info("added=" + stmt);
+                
+            }
+            
             statementBuffer[nstmts++] = stmt;
             
         }
@@ -603,217 +602,217 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
 
     }
         
-    /**
-     * Provides an iterator for reading resolved statements. The source (
-     * {@link #add(Statement)}ing {@link Statement}s to this buffer) and the
-     * sink (consuming the {@link #iterator()}) MUST be different threads. This
-     * class may also be used to load data into a database simply by passing the
-     * {@link #iterator()} into
-     * {@link IRawTripleStore#addStatements(IChunkedOrderedIterator, IElementFilter)}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <F>
-     *            The generic type of the source {@link Statement} added to the
-     *            buffer by the callers.
-     * @param <G>
-     *            The generic type of the {@link BigdataStatement}s stored in
-     *            the buffer.
-     */
-    public static class StatementResolvingBuffer<F extends Statement, G extends BigdataStatement>
-            extends AbstractStatementBuffer<F, G> {
-
-        /**
-         * @param db
-         *            The database against which the {@link Value}s will be
-         *            resolved (or added). If this database supports statement
-         *            identifiers, then statement identifiers for the converted
-         *            statements will be resolved (or added) to the lexicon.
-         * @param readOnly
-         *            When <code>true</code>, {@link Value}s (and statement
-         *            identifiers iff enabled) will be resolved against the
-         *            {@link LexiconRelation}, but entries WILL NOT be inserted
-         *            into the {@link LexiconRelation} for unknown {@link Value}s
-         *            (or for statement identifiers for unknown
-         *            {@link Statement}s when statement identifiers are
-         *            enabled).
-         * @param capacity
-         *            The capacity of the backing buffer.
-         */
-        public StatementResolvingBuffer(AbstractTripleStore db,
-                boolean readOnly, int capacity) {
-
-            super(db, readOnly, capacity);
-
-            this.itr = new OutputIterator();
-            
-        }
-
-        /**
-         * Adds converted statements to the output iterator.
-         */
-        @Override
-        protected int handleProcessedStatements(G[] a){
-
-            itr.add(a);
-            
-            return a.length;
-
-        }
-        
-        /**
-         * An asynchronous iterator singleton that reads from the converted
-         * statements. {@link BigdataStatement}s are made available to the
-         * iterator in chunks each time the buffer {@link #overflow()}s and
-         * when it is {@link #flush()}ed. The iterator will block until more
-         * {@link BigdataStatement}s are available or until it is
-         * {@link ICloseableIterator#close()}d. The iterator is safe for
-         * reading by a single thread. The iterator does NOT support removal.
-         */
-        synchronized public ICloseableIterator<G> iterator() {
-            
-            return itr;
-            
-        }
-        private final OutputIterator itr;
-
-        /**
-         * Extended to ensure that the {@link OutputIterator} is closed.
-         */
-        protected void finalize() throws Throwable {
-            
-            super.finalize();
-            
-            itr.close();
-            
-        }
-        
-        /**
-         * Iterator for converted {@link BigdataStatement}s.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
-         */
-        private class OutputIterator implements ICloseableIterator<G> {
-
-            /**
-             * <code>true</code> iff the iterator is open. When open, the
-             * iterator will block if the {@link #queue} is empty.
-             * <p>
-             * Note: Access to {@link #open} should be synchronized on <i>this</i>
-             * so that concurrent changes made in other threads will be visible.
-             */
-            private boolean open;
-
-            /**
-             * Blocking queue containing chunks of converted
-             * {@link BigdataStatement}s.
-             * <p>
-             * Note: The queue has an unbounded capacity. In practice, a bounded
-             * and small (~5-10) capacity would be just fine since we normally
-             * expect the conversion process to be more expensive than the
-             * processing consuming this iterator. However, the unbounded queue
-             * makes the {@link AbstractStatementBuffer} non-blocking, which seems
-             * to be worthwhile.
-             */
-            private final BlockingQueue<G[]> queue = new LinkedBlockingQueue<G[]>();
-            
-            /**
-             * The current chunk of converted {@link BigdataStatement}s from
-             * the {@link #queue}.
-             */
-            private G[] chunk = null;
-            
-            /**
-             * The index of the next element in {@link #chunk} to be delivered
-             * by the iterator.
-             */
-            private int index = 0;
-            
-            public OutputIterator() {
-                
-            }
-
-            /**
-             * Adds the chunk to the {@link #queue}. The elements in the chunk
-             * will be processed when that chunk is popped off of the
-             * {@link #queue}.
-             * 
-             * @param chunk
-             *            A chunk of converted {@link BigdataStatement}s.
-             */
-            protected void add(G[] chunk) {
-
-                queue.add(chunk);
-                
-            }
-
-            synchronized public void close() {
-
-                open = false;
-                
-            }
-
-            private void nextChunk() {
-                
-                chunk = null;
-                
-                index = 0;
-                
-                try {
-
-                    chunk = queue.take();
-                    
-                    index = 0;
-                    
-                } catch (InterruptedException e) {
-                    
-                    log.warn("Interrupted - iterator will be closed");
-                    
-                    open = false;
-                    
-                    throw new RuntimeException("Iterator closed by interrupt",
-                            e);
-                    
-                }
-                
-            }
-            
-            public boolean hasNext() {
-
-                while (open && chunk == null || index == chunk.length) {
-
-                    // synchronize to make [open] visible.
-                    synchronized(this) {
-                        
-                        nextChunk();
-                        
-                    }
-
-                }
-
-                return open && chunk != null || index < chunk.length;
-                
-            }
-
-            public G next() {
-                
-                if (!hasNext())
-                    throw new NoSuchElementException();
-                
-                return chunk[index++];
-                
-            }
-
-            public void remove() {
-                
-                throw new UnsupportedOperationException();
-                
-            }
-            
-        }
-
-    }
+//    /**
+//     * Provides an iterator for reading resolved statements. The source (
+//     * {@link #add(Statement)}ing {@link Statement}s to this buffer) and the
+//     * sink (consuming the {@link #iterator()}) MUST be different threads. This
+//     * class may also be used to load data into a database simply by passing the
+//     * {@link #iterator()} into
+//     * {@link IRawTripleStore#addStatements(IChunkedOrderedIterator, IElementFilter)}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * @param <F>
+//     *            The generic type of the source {@link Statement} added to the
+//     *            buffer by the callers.
+//     * @param <G>
+//     *            The generic type of the {@link BigdataStatement}s stored in
+//     *            the buffer.
+//     */
+//    public static class StatementResolvingBuffer<F extends Statement, G extends BigdataStatement>
+//            extends AbstractStatementBuffer<F, G> {
+//
+//        /**
+//         * @param db
+//         *            The database against which the {@link Value}s will be
+//         *            resolved (or added). If this database supports statement
+//         *            identifiers, then statement identifiers for the converted
+//         *            statements will be resolved (or added) to the lexicon.
+//         * @param readOnly
+//         *            When <code>true</code>, {@link Value}s (and statement
+//         *            identifiers iff enabled) will be resolved against the
+//         *            {@link LexiconRelation}, but entries WILL NOT be inserted
+//         *            into the {@link LexiconRelation} for unknown {@link Value}s
+//         *            (or for statement identifiers for unknown
+//         *            {@link Statement}s when statement identifiers are
+//         *            enabled).
+//         * @param capacity
+//         *            The capacity of the backing buffer.
+//         */
+//        public StatementResolvingBuffer(AbstractTripleStore db,
+//                boolean readOnly, int capacity) {
+//
+//            super(db, readOnly, capacity);
+//
+//            this.itr = new OutputIterator();
+//            
+//        }
+//
+//        /**
+//         * Adds converted statements to the output iterator.
+//         */
+//        @Override
+//        protected int handleProcessedStatements(G[] a){
+//
+//            itr.add(a);
+//            
+//            return a.length;
+//
+//        }
+//        
+//        /**
+//         * An asynchronous iterator singleton that reads from the converted
+//         * statements. {@link BigdataStatement}s are made available to the
+//         * iterator in chunks each time the buffer {@link #overflow()}s and
+//         * when it is {@link #flush()}ed. The iterator will block until more
+//         * {@link BigdataStatement}s are available or until it is
+//         * {@link ICloseableIterator#close()}d. The iterator is safe for
+//         * reading by a single thread. The iterator does NOT support removal.
+//         */
+//        synchronized public ICloseableIterator<G> iterator() {
+//            
+//            return itr;
+//            
+//        }
+//        private final OutputIterator itr;
+//
+//        /**
+//         * Extended to ensure that the {@link OutputIterator} is closed.
+//         */
+//        protected void finalize() throws Throwable {
+//            
+//            super.finalize();
+//            
+//            itr.close();
+//            
+//        }
+//        
+//        /**
+//         * Iterator for converted {@link BigdataStatement}s.
+//         * 
+//         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//         * @version $Id$
+//         */
+//        private class OutputIterator implements ICloseableIterator<G> {
+//
+//            /**
+//             * <code>true</code> iff the iterator is open. When open, the
+//             * iterator will block if the {@link #queue} is empty.
+//             * <p>
+//             * Note: Access to {@link #open} should be synchronized on <i>this</i>
+//             * so that concurrent changes made in other threads will be visible.
+//             */
+//            private boolean open;
+//
+//            /**
+//             * Blocking queue containing chunks of converted
+//             * {@link BigdataStatement}s.
+//             * <p>
+//             * Note: The queue has an unbounded capacity. In practice, a bounded
+//             * and small (~5-10) capacity would be just fine since we normally
+//             * expect the conversion process to be more expensive than the
+//             * processing consuming this iterator. However, the unbounded queue
+//             * makes the {@link AbstractStatementBuffer} non-blocking, which seems
+//             * to be worthwhile.
+//             */
+//            private final BlockingQueue<G[]> queue = new LinkedBlockingQueue<G[]>();
+//            
+//            /**
+//             * The current chunk of converted {@link BigdataStatement}s from
+//             * the {@link #queue}.
+//             */
+//            private G[] chunk = null;
+//            
+//            /**
+//             * The index of the next element in {@link #chunk} to be delivered
+//             * by the iterator.
+//             */
+//            private int index = 0;
+//            
+//            public OutputIterator() {
+//                
+//            }
+//
+//            /**
+//             * Adds the chunk to the {@link #queue}. The elements in the chunk
+//             * will be processed when that chunk is popped off of the
+//             * {@link #queue}.
+//             * 
+//             * @param chunk
+//             *            A chunk of converted {@link BigdataStatement}s.
+//             */
+//            protected void add(G[] chunk) {
+//
+//                queue.add(chunk);
+//                
+//            }
+//
+//            synchronized public void close() {
+//
+//                open = false;
+//                
+//            }
+//
+//            private void nextChunk() {
+//                
+//                chunk = null;
+//                
+//                index = 0;
+//                
+//                try {
+//
+//                    chunk = queue.take();
+//                    
+//                    index = 0;
+//                    
+//                } catch (InterruptedException e) {
+//                    
+//                    log.warn("Interrupted - iterator will be closed");
+//                    
+//                    open = false;
+//                    
+//                    throw new RuntimeException("Iterator closed by interrupt",
+//                            e);
+//                    
+//                }
+//                
+//            }
+//            
+//            public boolean hasNext() {
+//
+//                while (open && (chunk == null || index == chunk.length)) {
+//
+//                    // synchronize to make [open] visible.
+//                    synchronized(this) {
+//                        
+//                        nextChunk();
+//                        
+//                    }
+//
+//                }
+//
+//                return open && (chunk != null || index < chunk.length);
+//                
+//            }
+//
+//            public G next() {
+//                
+//                if (!hasNext())
+//                    throw new NoSuchElementException();
+//                
+//                return chunk[index++];
+//                
+//            }
+//
+//            public void remove() {
+//                
+//                throw new UnsupportedOperationException();
+//                
+//            }
+//            
+//        }
+//
+//    }
 
     /**
      * Loads {@link Statement}s into an RDF database.

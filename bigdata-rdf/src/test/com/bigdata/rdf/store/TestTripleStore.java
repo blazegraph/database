@@ -887,23 +887,32 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_addInferredExplicitAxiom() {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         try {
             
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final BigdataURI v1 = f.createURI("http://www.bigdata.com/1"); 
+            final BigdataURI v2 = f.createURI("http://www.bigdata.com/2"); 
+            final BigdataURI v3 = f.createURI("http://www.bigdata.com/3"); 
+            
+            // assign term identifiers.
+            store.addTerms(new BigdataValue[]{v1,v2,v3});
+            
             final SPO[] a = new SPO[] {
             
-            new SPO(1, 2, 3, StatementEnum.Explicit),
-            new SPO(2, 2, 3, StatementEnum.Inferred),
-            new SPO(3, 2, 3, StatementEnum.Axiom)
+            new SPO(v1, v2, v3, StatementEnum.Explicit),
+            new SPO(v2, v2, v3, StatementEnum.Inferred),
+            new SPO(v3, v2, v3, StatementEnum.Axiom)
             };
 
             store.addStatements(a,a.length);
             
             assertSameSPOs(new SPO[] {//
-                    new SPO(1, 2, 3, StatementEnum.Explicit),//
-                    new SPO(2, 2, 3, StatementEnum.Inferred),//
-                    new SPO(3, 2, 3, StatementEnum.Axiom),//
+                    new SPO(v1, v2, v3, StatementEnum.Explicit),//
+                    new SPO(v2, v2, v3, StatementEnum.Inferred),//
+                    new SPO(v3, v2, v3, StatementEnum.Axiom),//
                     },//
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );

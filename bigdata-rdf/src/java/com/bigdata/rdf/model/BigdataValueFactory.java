@@ -159,6 +159,11 @@ public interface BigdataValueFactory {
     BigdataValue asValue(Value v);
 
     /**
+     * Strongly typed for {@link Resource}s.
+     */
+    BigdataResource asValue(Resource v);
+    
+    /**
      * Strongly typed for {@link URI}s.
      */
     BigdataURI asValue(URI v);

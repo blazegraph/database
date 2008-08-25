@@ -57,6 +57,8 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
 
 /**
+ * Bulk completes the {@link StatementEnum} and/or statement identifier (SID)
+ * for {@link ISPO}s using the given statement {@link IIndex}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -82,6 +84,9 @@ public class BulkCompleteConverter implements SPOConverter {
     }
 
     public ISPO[] convert(ISPO[] chunk) {
+
+        if (chunk == null)
+            throw new IllegalArgumentException();
         
         Arrays.sort(chunk, SPOComparator.INSTANCE);
 
@@ -120,8 +125,7 @@ public class BulkCompleteConverter implements SPOConverter {
             
             if (val != null) {
                 
-                // @todo ISPO?
-                ((SPO)chunk[i]).decodeValue(val);
+                SPO.decodeValue(chunk[i], val);
                 
             } else {
                 
@@ -131,6 +135,7 @@ public class BulkCompleteConverter implements SPOConverter {
                 chunk[i].setStatementType(StatementEnum.Inferred);
                 
             }
+            
         }
         
         return chunk;

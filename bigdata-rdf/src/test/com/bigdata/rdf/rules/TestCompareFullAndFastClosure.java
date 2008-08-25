@@ -49,13 +49,12 @@ package com.bigdata.rdf.rules;
 
 import java.io.IOException;
 import java.util.Properties;
+
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
  * Test suite comparing full fix point closure of RDFS entailments against the
@@ -80,7 +79,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
         super(name);
     }
 
-    public void test_compareEntailments() throws IOException, SailException {
+    public void test_compareEntailments() throws Exception {
         
         // String[] resource = new String[]{"/com/bigdata/rdf/rules/testOwlSameAs.rdf"};
         // String[] resource = new String[]{"/com/bigdata/rdf/rules/testOwlSameAs.rdf"};
@@ -94,22 +93,18 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
     
     /**
      * 
-     * Note: This always uses {@link TempTripleStore} rather than whatever is
-     * configured since we need to create two stores and we need control over
-     * the options for each store.
-     * 
      * @param resource
      * @param baseURL
      * @param format
      * @throws IOException
      */
     protected void doCompareEntailments(String resource[], String baseURL[],
-            RDFFormat[] format) throws IOException, SailException {
+            RDFFormat[] format) throws Exception {
 
         final AbstractTripleStore store1;
         final AbstractTripleStore store2;
         
-        Properties properties = new Properties(getProperties());
+        final Properties properties = new Properties(getProperties());
         
         // close each set of resources after it has been loaded.
         properties.setProperty(DataLoader.Options.CLOSURE,
@@ -117,7 +112,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
         { // use the "full" forward closure.
 
-            Properties tmp = new Properties(properties);
+            final Properties tmp = new Properties(properties);
 
             tmp.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,
                     InferenceEngine.ForwardClosureEnum.Full.toString());
@@ -131,7 +126,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
         { // use the "fast" forward closure.
 
-            Properties tmp = new Properties(properties);
+            final Properties tmp = new Properties(properties);
 
             tmp.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,
                     InferenceEngine.ForwardClosureEnum.Fast.toString());
@@ -171,10 +166,15 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
                 
             }
         
+            /*
+             * Note: Both graphs have the same configuration and therefore
+             * should have the same statements in the data without the
+             * backchainer.
+             */
             assertTrue(modelsEqual(store1, store2));
-            
+
         } finally {
-            
+
             store1.closeAndDelete();
             store2.closeAndDelete();
             

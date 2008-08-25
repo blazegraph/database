@@ -237,35 +237,72 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      */
     public void test_assertAll_01() {
         
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         try {
             
             final TruthMaintenance tm = new TruthMaintenance(store.getInferenceEngine());
             
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI U = f.createURI("http://www.bigdata.com/U");
+            final BigdataURI V = f.createURI("http://www.bigdata.com/V");
+            final BigdataURI X = f.createURI("http://www.bigdata.com/X");
+
+            final BigdataURI rdfsSubClassOf = f.asValue(RDFS.SUBCLASSOF);
+
+            final TempTripleStore tempStore = tm.newTempTripleStore();
+
             // buffer writes on the tempStore.
-            final StatementBuffer assertionBuffer = new StatementBuffer(tm
-                    .newTempTripleStore(), store, 100/* capacity */);
-            
-            URI U = new URIImpl("http://www.bigdata.com/U");
-            URI V = new URIImpl("http://www.bigdata.com/V");
-            URI X = new URIImpl("http://www.bigdata.com/X");
+            {
 
-            URI rdfsSubClassOf = RDFS.SUBCLASSOF;
+                final StatementBuffer assertionBuffer = new StatementBuffer(
+                        tempStore, store, 10/* capacity */);
 
-            assertionBuffer.add(U, rdfsSubClassOf, V);
-            assertionBuffer.add(V, rdfsSubClassOf, X);
-            
-            // flush to the temp store.
-            assertionBuffer.flush();
+                assertTrue(tempStore == assertionBuffer.getStatementStore());
+                
+                assertionBuffer.add(U, rdfsSubClassOf, V);
+                assertionBuffer.add(V, rdfsSubClassOf, X);
+
+                // flush to the temp store.
+                assertionBuffer.flush();
+                
+            }
 
             if (log.isInfoEnabled())
                 log.info("\n\ntempStore:\n"
-                        + assertionBuffer.getStatementStore().dumpStore(store,
+                        + tempStore.dumpStore(store,
                                 true, true, false, true));
 
+//            if(true)// FIXME remove this block.
+//            {
+//                assert rdfsSubClassOf.getTermId() != NULL;
+//
+//                IAccessPath<ISPO> accessPath = tempStore.getAccessPath(NULL,
+//                        rdfsSubClassOf.getTermId(), NULL);
+//
+//                assertEquals(2L,accessPath.rangeCount(false/*exact*/));
+//                
+//                IChunkedOrderedIterator<ISPO> itr = accessPath.iterator();
+//                
+//                try {
+//                    
+//                    while(itr.hasNext()) {
+//                        
+//                        log.info(itr.next().toString(store));
+//                        
+//                    }
+//                    
+//                } finally {
+//                    
+//                    itr.close();
+//                    
+//                }
+//                
+//            }
+            
             // perform closure and write on the database.
-            tm.assertAll((TempTripleStore) assertionBuffer.getStatementStore());
+            tm.assertAll(tempStore);
 
             if (log.isInfoEnabled())
                 log.info("\n\ndatabase:\n"
@@ -286,7 +323,6 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
         
     }
 
-
     /**
      * A simple test of {@link TruthMaintenance} in which some statements are
      * asserted, their closure is computed and aspects of that closure are
@@ -303,16 +339,18 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      */
     public void test_retractAll_01() {
         
-        URI U = new URIImpl("http://www.bigdata.com/U");
-        URI V = new URIImpl("http://www.bigdata.com/V");
-        URI X = new URIImpl("http://www.bigdata.com/X");
-
-        URI rdfsSubClassOf = RDFS.SUBCLASSOF;
-
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         try {
+
+            final BigdataValueFactory f = store.getValueFactory();
             
+            final BigdataURI U = f.createURI("http://www.bigdata.com/U");
+            final BigdataURI V = f.createURI("http://www.bigdata.com/V");
+            final BigdataURI X = f.createURI("http://www.bigdata.com/X");
+
+            final BigdataURI rdfsSubClassOf = f.asValue(RDFS.SUBCLASSOF);
+
             final InferenceEngine inf = store.getInferenceEngine();
 
             final TruthMaintenance tm = new TruthMaintenance(inf);
@@ -766,7 +804,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
      */
     public void test_stress() {
 
-//        fail("enable test");
+        fail("enable test");
         
         String[] resource = new String[] {
                 "../rdf-data/alibaba_data.rdf",
@@ -1215,7 +1253,10 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 if(!itra.hasNext()) {
 
                     fail("Actual iterator exhausted before expected: nexpected="
-                            + nexpected + ", nactual=" + nactual);
+                            + nexpected
+                            + ", nactual="
+                            + nactual
+                            + ", remaining=" + toString(itre, 10, expected));
                     
                 }
 
@@ -1275,4 +1316,38 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
     }
     
+    /**
+     * Consumes up to max elements from the iterator and returns a
+     * {@link String} representation of those elements. This is used to show the
+     * additional elements that would be visited by an iterator when the other
+     * iterator is exhausted.
+     * 
+     * @param itr
+     *            The iterator.
+     * @param max
+     *            The maximum #of elements to visit.
+     * @param db
+     *            Used to resolve term identifiers to RDF values.
+     *            
+     * @return The string representation of the visited elements.
+     */
+    private String toString(IChunkedOrderedIterator<ISPO> itr, int max, AbstractTripleStore db) {
+
+        StringBuilder sb = new StringBuilder();
+        
+        int n = 0;
+        
+        while (itr.hasNext() && n < max) {
+            
+            if (n > 0)
+                sb.append(", ");
+
+            sb.append(itr.next().toString(db));
+
+        }
+
+        return "{" + sb.toString() + "}";
+
+    }
+
 }

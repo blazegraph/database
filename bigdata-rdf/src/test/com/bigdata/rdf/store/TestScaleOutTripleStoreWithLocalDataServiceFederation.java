@@ -29,6 +29,7 @@ package com.bigdata.rdf.store;
 
 import java.io.File;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -174,12 +175,17 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
         super.tearDown();
         
     }
+
+    private AtomicInteger inc = new AtomicInteger();
     
     protected AbstractTripleStore getStore(Properties properties) {
         
+        // Note: distinct namespace for each triple store created on the federation.
+        final String namespace = "test"+inc.incrementAndGet();
+        
         // connect to the database.
         AbstractTripleStore store = new ScaleOutTripleStore(client
-                .getFederation(), "test", ITx.UNISOLATED,
+                .getFederation(), namespace, ITx.UNISOLATED,
                 properties
 //                client.getProperties()
                 );
@@ -205,6 +211,8 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
      */
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
+        final String namespace = store.getNamespace();
+        
 //        // Note: properties we need to re-start the client.
 //        final Properties properties = client.getProperties();
         
@@ -219,7 +227,7 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
         
         // Obtain view on the triple store.
         return new ScaleOutTripleStore(client
-                .getFederation(), "test", ITx.UNISOLATED,
+                .getFederation(), namespace, ITx.UNISOLATED,
                 store.getProperties()
 //                client.getProperties()
                 );

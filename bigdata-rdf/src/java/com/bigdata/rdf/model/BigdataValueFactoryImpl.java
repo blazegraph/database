@@ -414,6 +414,12 @@ public class BigdataValueFactoryImpl implements ValueFactory, BigdataValueFactor
 
     }
 
+    public BigdataResource asValue(Resource v) {
+
+        return (BigdataResource) asValue((Value) v);
+        
+    }
+
     public BigdataURI asValue(URI v) {
         
         return (BigdataURI)asValue((Value)v);
