@@ -159,6 +159,10 @@ public class BNodeContextFactory implements BigdataValueFactory {
         throw new UnsupportedOperationException();
     }
 
+    public BigdataResource asValue(Resource v) {
+        return valueFactory.asValue(v);
+    }
+
     public BigdataURI asValue(URI v) {
         return valueFactory.asValue(v);
     }

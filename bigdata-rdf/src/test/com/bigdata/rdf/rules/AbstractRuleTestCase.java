@@ -27,26 +27,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import java.util.Iterator;
+import java.util.Properties;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.rio.StatementResolverTask;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rio.AbstractStatementBuffer.StatementBuffer2;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
-import com.bigdata.rdf.store.ConcurrentDataLoader.VerifyStatementBuffer;
+import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -54,8 +51,8 @@ import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -140,8 +137,9 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
                     for(ISolution solution : chunk) {
                     
                         n++;
-                        
-                        log.info("#"+n+" : "+solution.toString());
+
+                        if (log.isInfoEnabled())
+                            log.info("#" + n + " : " + solution.toString());
                         
                     }
                     
@@ -190,57 +188,56 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
     }
 
     /**
-     * Compares two RDF graphs for equality (same statements). This does NOT
-     * handle bnodes, which much be treated as variables for RDF semantics. Note
-     * that term identifiers are assigned by the lexicon for each database and
-     * will differ between databases. Therefore, the comparison is performed in
-     * terms of the externalized RDF {@link Statement}s rather than {@link SPO}s.
+     * Compares two RDF graphs for equality (same statements).
+     * <p>
+     * Note: This does NOT handle bnodes, which much be treated as variables for
+     * RDF semantics.
+     * <p>
+     * Note: Comparison is performed in terms of the externalized RDF
+     * {@link Statement}s rather than {@link SPO}s since different graphs use
+     * different lexicons.
+     * <p>
+     * Note: If the graphs differ in which entailments they are storing in their
+     * data and which entailments are backchained then you MUST make them
+     * consistent in this regard. You can do this by exporting one or both using
+     * {@link #bulkExport(AbstractTripleStore)}, which will cause all
+     * entailments to be materialized in the returned {@link TempTripleStore}.
      * 
      * @param expected
+     *            One graph.
      * 
      * @param actual
+     *            Another graph <strong>with a consistent policy for forward and
+     *            backchained entailments</strong>.
      * 
      * @return true if all statements in the expected graph are in the actual
      *         graph and if the actual graph does not contain any statements
      *         that are not also in the expected graph.
-     * 
-     * FIXME refactor to {@link AbstractTestCase} and make sure that the same
-     * logic is not present in the rest of the test suite.
      */
     public static boolean modelsEqual(AbstractTripleStore expected,
-            AbstractTripleStore actual) throws SailException {
+            AbstractTripleStore actual) throws Exception {
 
-        int actualSize = 0;
+//        int actualSize = 0;
         int notExpecting = 0;
         int expecting = 0;
         boolean sameStatements1 = true;
         {
 
-            BigdataStatementIterator it = actual.asStatementIterator(actual
-                    .getInferenceEngine().backchainIterator(
-                            actual.getAccessPath(NULL, NULL, NULL)));
+            final ICloseableIterator<BigdataStatement> it = notFoundInTarget(actual, expected);
 
             try {
 
                 while(it.hasNext()) {
 
-                    BigdataStatement stmt = it.next();
+                    final BigdataStatement stmt = it.next();
 
-                    if (!hasStatement(expected,//
-                            (Resource)actual.getValueFactory().asValue(stmt.getSubject()),//
-                            (URI)actual.getValueFactory().asValue(stmt.getPredicate()),//
-                            (Value)actual.getValueFactory().asValue(stmt.getObject()))//
-                            ) {
+                    sameStatements1 = false;
 
-                        sameStatements1 = false;
+                    log("Not expecting: " + stmt);
+                    
+                    notExpecting++;
 
-                        log("Not expecting: " + stmt);
-                        
-                        notExpecting++;
-
-                    }
-
-                    actualSize++; // count #of statements actually visited.
+//                    actualSize++; // count #of statements actually visited.
                     
                 }
 
@@ -249,30 +246,22 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
                 it.close();
 
             }
-            
+                        
             log("all the statements in actual in expected? " + sameStatements1);
 
         }
 
-        int expectedSize = 0;
+//        int expectedSize = 0;
         boolean sameStatements2 = true;
         {
 
-            BigdataStatementIterator it = expected.asStatementIterator(expected
-                    .getInferenceEngine().backchainIterator(
-                            expected.getAccessPath(NULL, NULL, NULL)));
-
+            final ICloseableIterator<BigdataStatement> it = notFoundInTarget(expected, actual);
+            
             try {
 
                 while(it.hasNext()) {
 
-                BigdataStatement stmt = it.next();
-
-                if (!hasStatement(actual,//
-                        (Resource)actual.getValueFactory().asValue(stmt.getSubject()),//
-                        (URI)actual.getValueFactory().asValue(stmt.getPredicate()),//
-                        (Value)actual.getValueFactory().asValue(stmt.getObject()))//
-                        ) {
+                    final BigdataStatement stmt = it.next();
 
                     sameStatements2 = false;
 
@@ -280,9 +269,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
                     
                     expecting++;
 
-                }
-                
-                expectedSize++; // counts statements actually visited.
+//                    expectedSize++; // counts statements actually visited.
 
                 }
                 
@@ -292,21 +279,55 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
                 
             }
 
+//          BigdataStatementIterator it = expected.asStatementIterator(expected
+//          .getInferenceEngine().backchainIterator(
+//                  expected.getAccessPath(NULL, NULL, NULL)));
+//
+//            try {
+//
+//                while(it.hasNext()) {
+//
+//                BigdataStatement stmt = it.next();
+//
+//                if (!hasStatement(actual,//
+//                        (Resource)actual.getValueFactory().asValue(stmt.getSubject()),//
+//                        (URI)actual.getValueFactory().asValue(stmt.getPredicate()),//
+//                        (Value)actual.getValueFactory().asValue(stmt.getObject()))//
+//                        ) {
+//
+//                    sameStatements2 = false;
+//
+//                    log("    Expecting: " + stmt);
+//                    
+//                    expecting++;
+//
+//                }
+//                
+//                expectedSize++; // counts statements actually visited.
+//
+//                }
+//                
+//            } finally {
+//                
+//                it.close();
+//                
+//            }
+
             log("all the statements in expected in actual? " + sameStatements2);
 
         }
 
-        final boolean sameSize = expectedSize == actualSize;
-        
-        log("size of 'expected' repository: " + expectedSize);
-
-        log("size of 'actual'   repository: " + actualSize);
+//        final boolean sameSize = expectedSize == actualSize;
+//        
+//        log("size of 'expected' repository: " + expectedSize);
+//
+//        log("size of 'actual'   repository: " + actualSize);
 
         log("# expected but not found: " + expecting);
         
         log("# not expected but found: " + notExpecting);
         
-        return sameSize && sameStatements1 && sameStatements2;
+        return /*sameSize &&*/ sameStatements1 && sameStatements2;
 
     }
 
@@ -316,102 +337,197 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
     }
 
-    static private boolean hasStatement(AbstractTripleStore database,
-            Resource s, URI p, Value o) {
-
-        if (RDF.TYPE.equals(p) && RDFS.RESOURCE.equals(o)) {
-
-            if (database.getTermId(s) != NULL) {
-
-                return true;
-
-            }
-
-        }
-
-        return database.hasStatement(s, p, o);
-
-    }
-
     /**
-     * Visits {@link SPO}s not found in the target database.
+     * Visits <i>expected</i> {@link BigdataStatement}s not found in <i>actual</i>.
      * 
-     * @param src
-     * @param tgt
-     * @return
+     * @param expected
+     * @param actual
+     * 
+     * @return An iterator visiting {@link BigdataStatement}s present in
+     *         <i>expected</i> but not found in <i>actual</i>.
+     * 
      * @throws ExecutionException
      * @throws InterruptedException
-     * 
-     * @todo rewrite the {@link StatementVerifier} and
-     *       {@link VerifyStatementBuffer} to use the same logic.
      */
-    protected Iterator<ISPO> notFoundInTarget(//
-            final AbstractTripleStore src,//
-            final AbstractTripleStore tgt //
+    static protected ICloseableIterator<BigdataStatement> notFoundInTarget(//
+            final AbstractTripleStore expected,//
+            final AbstractTripleStore actual //
             ) throws InterruptedException, ExecutionException {
         
         /*
-         * Visit all SPOs in the source, including backchained
-         * inferences.
+         * The source access path is a full scan of the SPO index.
          */
-        final IChunkedOrderedIterator<ISPO> itr1 = src.getInferenceEngine()
-                .backchainIterator(src.getAccessPath(NULL, NULL, NULL));
-
+        final IAccessPath<ISPO> expectedAccessPath = expected.getAccessPath(NULL,
+                NULL, NULL);
+        
         /*
          * Efficiently convert SPOs to BigdataStatements (externalizes
          * statements).
          */
-        final BigdataStatementIterator itr2 = src.asStatementIterator(itr1);
+        final BigdataStatementIterator itr2 = expected
+                .asStatementIterator(expectedAccessPath.iterator());
 
-        /*
-         * Buffer size (#of statements). 
-         */
-        final int capacity = 10000; // @todo large capacity for bulk loads.
+        final int capacity = 100000;
         
-        /*
-         * Read only since we do not want to write on the lexicon or the
-         * statement indices, just resolve what already exists and look for
-         * missing statements.
-         */
-        final boolean readOnly = true;
+        final BlockingBuffer<BigdataStatement> buffer = new BlockingBuffer<BigdataStatement>(capacity);
         
-        /*
-         * FIXME Change the striterator heirarchy into an implementation
-         * heirarchy (StriteratorImpl) for co-varying generics and a use
-         * hierarchy (IStriterator and Striterator) in which only the element
-         * type is generic. This should be significantly easier to use and
-         * understand.
-         */
-        
-        /*
-         * Task that will efficiently convert to BigdataStatements using the
-         * lexicon for the target database.
-         */
-        final StatementResolverTask<ISPO> task = new StatementResolverTask<ISPO>(
-                (Iterator<BigdataStatement>) itr2, readOnly, capacity, tgt) {
+        final StatementBuffer2<Statement, BigdataStatement> sb = new StatementBuffer2<Statement, BigdataStatement>(
+                actual, true/* readOnly */, capacity) {
 
-            /** bulk filter for SPOs NOT FOUND in the target. */
+            /**
+             * Statements not found in [actual] are written on the
+             * BlockingBuffer.
+             * 
+             * @return The #of statements that were not found.
+             */
             @Override
-            protected Iterator<ISPO> getOutputIterator() {
+            protected int handleProcessedStatements(final BigdataStatement[] a) {
+            
+                if (log.isInfoEnabled())
+                    log.info("Given " + a.length + " statements");
+                
+                // bulk filter for statements not present in [actual].
+                final IChunkedOrderedIterator<ISPO> notFoundItr = actual
+                        .bulkFilterStatements(a, a.length, false/* present */);
+                
+                int nnotFound = 0;
+                
+                try {
+                 
+                    while(notFoundItr.hasNext()) {
 
-                return tgt.bulkFilterStatements(
-                        new ChunkedWrappedIterator<ISPO>(this.iterator()),
-                        false/*present*/);
+                        final ISPO notFoundStmt = notFoundItr.next();
+                        
+                        if (log.isInfoEnabled())
+                            log.info("Not found: " + notFoundStmt);
+                        
+                        buffer.add((BigdataStatement)notFoundStmt);
+                        
+                        nnotFound++;
+                        
+                    }
+                    
+                } finally {
+                    
+                    notFoundItr.close();
+                    
+                }
 
+                if (log.isInfoEnabled())
+                    log.info("Given " + a.length + " statements, " + nnotFound
+                            + " of them were not found");
+                
+                return nnotFound;
+                
             }
             
         };
+        
+        /**
+         * Run task. The task consumes externalized statements from [expected]
+         * and writes statements not found in [actual] onto the blocking buffer.
+         */
+        buffer.setFuture(actual.getExecutorService().submit(new Callable<Void>() {
+
+            public Void call() throws Exception {
+
+                try {
+                    
+                    while(itr2.hasNext()) {
+
+                        // a statement from the source db.
+                        final BigdataStatement stmt = itr2.next();
+
+//                        if (log.isInfoEnabled()) log.info("Source: " + stmt);
+                        
+                        // add to the buffer.
+                        sb.add( stmt );
+                        
+                    }
+                    
+                } finally {
+                    
+                    itr2.close();
+                    
+                }
+                
+                /*
+                 * Flush everything in the StatementBuffer so that it shows up in
+                 * the BlockingBuffer's iterator().
+                 */
+                
+                final long nnotFound = sb.flush();
+
+                if (log.isInfoEnabled())
+                    log.info("Flushed: #notFound=" + nnotFound);
+                
+                return null;
+
+            }
+
+        }));
 
         /*
-         * Run the task.
-         * 
-         * Note: We do not obtain the Future. If an error occurs, then we will
-         * notice it when the converting iterator is closed.
+         * Return iterator reading "not found" statements from the blocking
+         * buffer.
          */
-        tgt.getExecutorService().submit(task);
 
-        // visits SPOs NOT FOUND in the target.
-        return task.iterator();
+        return buffer.iterator();
+        
+    }
+
+    /**
+     * Exports all statements found in the data and all backchained entailments
+     * for the <i>db</i> into a {@link TempTripleStore}. This may be used to
+     * compare graphs purely in their data by pre-generation of all backchained
+     * entailments.
+     * 
+     * @param db
+     *            The source database.
+     * 
+     * @return The {@link TempTripleStore}.
+     * 
+     * @todo refactor to {@link AbstractTripleStore} as utility for export onto
+     *       a new or existing tripleStore?
+     */
+    protected TempTripleStore bulkExport(AbstractTripleStore db) {
+
+        final TempTripleStore tmp = new TempTripleStore(new Properties());
+
+        final StatementBuffer sb = new StatementBuffer(tmp, 100000/* capacity */);
+
+        final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(db
+                .getInferenceEngine(), tmp.getIndexManager(), db.getAccessPath(
+                NULL, NULL, NULL)).iterator();
+
+        final BigdataStatementIterator itr2 = db.asStatementIterator(itr1);
+
+        try {
+
+            while (itr2.hasNext()) {
+
+                final BigdataStatement stmt = itr2.next();
+
+                sb.add(stmt);
+
+            }
+
+        } finally {
+
+            try {
+                itr2.close();
+                
+            } catch (SailException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+
+        }
+
+        sb.flush();
+
+        return tmp;
 
     }
 

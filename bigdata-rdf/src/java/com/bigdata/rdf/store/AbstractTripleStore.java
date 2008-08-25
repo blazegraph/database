@@ -1683,38 +1683,77 @@ abstract public class AbstractTripleStore extends
 
         final BigdataValueFactory valueFactory = getValueFactory();
         
-        s = (Resource) valueFactory.asValue(s);
+        final BigdataResource _s = valueFactory.asValue(s);
 
-        p = (URI) valueFactory.asValue(p);
+        final BigdataURI      _p = valueFactory.asValue(p);
 
-        o = valueFactory.asValue(o);
+        final BigdataValue    _o = valueFactory.asValue(o);
 
         /*
-         * Convert our object types to internal identifiers.
-         * 
-         * Note: If a value was specified and it is not in the terms index then
-         * the statement can not exist in the KB.
+         * Batch resolve all non-null values to get their term identifiers.
          */
-        final long _s = getTermId(s);
+        int nnonNull = 0;
+        final BigdataValue[] values = new BigdataValue[3];
+        {
 
-        if (_s == NULL && s != null)
+            if (s != null)
+                values[nnonNull++] = _s;
+
+            if (p != null)
+                values[nnonNull++] = _p;
+
+            if (o != null)
+                values[nnonNull++] = _o;
+
+            getLexiconRelation().addTerms(values, nnonNull, true/* readOnly */);
+            
+        }
+
+        /*
+         * If any value was given but is not known to the lexicon then use an
+         * empty access path since no statements can exist for the given
+         * statement pattern.
+         */
+        if (s != null && _s.getTermId() == NULL)
             return new EmptyAccessPath<ISPO>();
 
-        final long _p = getTermId(p);
-
-        if (_p == NULL && p != null)
+        if (p != null && _p.getTermId() == NULL)
             return new EmptyAccessPath<ISPO>();
 
-        final long _o = getTermId(o);
-
-        if (_o == NULL && o != null)
+        if (o != null && _o.getTermId() == NULL)
             return new EmptyAccessPath<ISPO>();
+
+//        /*
+//         * Convert our object types to internal identifiers.
+//         * 
+//         * Note: If a value was specified and it is not in the terms index then
+//         * the statement can not exist in the KB.
+//         */
+//        final long _s = getTermId(s);
+//
+//        if (_s == NULL && s != null)
+//            return new EmptyAccessPath<ISPO>();
+//
+//        final long _p = getTermId(p);
+//
+//        if (_p == NULL && p != null)
+//            return new EmptyAccessPath<ISPO>();
+//
+//        final long _o = getTermId(o);
+//
+//        if (_o == NULL && o != null)
+//            return new EmptyAccessPath<ISPO>();
 
         /*
          * Return the access path.
          */
 
-        return getAccessPath(_s, _p, _o, filter);
+        return getAccessPath(//
+                s == null ? NULL : _s.getTermId(), //
+                p == null ? NULL : _p.getTermId(),//
+                o == null ? NULL : _o.getTermId(),//
+                filter//
+        );
 
     }
 
@@ -2118,48 +2157,109 @@ abstract public class AbstractTripleStore extends
 
         {
 
-            final ITupleIterator itr = getSPOIndex().rangeIterator();
+            // Full SPO scan efficiently resolving SPOs to BigdataStatements.
+            final BigdataStatementIterator itr = resolveTerms
+                    .asStatementIterator(getAccessPath(NULL, NULL, NULL)
+                            .iterator());
 
             int i = 0;
+            
+            try {
+                
+                while (itr.hasNext()) {
 
-            while (itr.hasNext()) {
+                    final BigdataStatement stmt = itr.next();
 
-                final SPO spo = (SPO)itr.next().getObject();
+                    switch (stmt.getStatementType()) {
 
-                switch (spo.getStatementType()) {
+                    case Explicit:
+                        nexplicit++;
+                        if (!explicit)
+                            continue;
+                        else
+                            break;
 
-                case Explicit:
-                    nexplicit++;
-                    if (!explicit)
-                        continue;
-                    else
-                        break;
+                    case Inferred:
+                        ninferred++;
+                        if (!inferred)
+                            continue;
+                        else
+                            break;
 
-                case Inferred:
-                    ninferred++;
-                    if (!inferred)
-                        continue;
-                    else
-                        break;
+                    case Axiom:
+                        naxioms++;
+                        if (!axioms)
+                            continue;
+                        else
+                            break;
 
-                case Axiom:
-                    naxioms++;
-                    if (!axioms)
-                        continue;
-                    else
-                        break;
+                    default:
+                        throw new AssertionError();
 
-                default:
-                    throw new AssertionError();
+                    }
+
+                    sb.append("#" + (i + 1) + "\t" + stmt + "\n");
+
+                    i++;
 
                 }
+                
+            } finally {
+                
+                try {
 
-                sb.append("#" + (i + 1) + "\t" + spo.toString(resolveTerms)
-                        + "\n");
-
-                i++;
-
+                    itr.close();
+                    
+                } catch (SailException ex) {
+                    
+                    log.error(ex, ex);
+                    
+                }
+                
             }
+            
+// final ITupleIterator itr = getSPOIndex().rangeIterator();
+//
+// int i = 0;
+//
+//            while (itr.hasNext()) {
+//
+//                final SPO spo = (SPO)itr.next().getObject();
+//
+//                switch (spo.getStatementType()) {
+//
+//                case Explicit:
+//                    nexplicit++;
+//                    if (!explicit)
+//                        continue;
+//                    else
+//                        break;
+//
+//                case Inferred:
+//                    ninferred++;
+//                    if (!inferred)
+//                        continue;
+//                    else
+//                        break;
+//
+//                case Axiom:
+//                    naxioms++;
+//                    if (!axioms)
+//                        continue;
+//                    else
+//                        break;
+//
+//                default:
+//                    throw new AssertionError();
+//
+//                }
+//
+//                sb.append("#" + (i + 1) + "\t" + spo.toString(resolveTerms)
+//                        + "\n");
+//
+//                i++;
+//
+//            }
 
         }
 
@@ -2193,11 +2293,11 @@ abstract public class AbstractTripleStore extends
     }
 
     /**
-     * Dumps the access path, resolving term identifiers to terms.
+     * Dumps the access path, efficiently resolving term identifiers to terms.
      * 
      * @param accessPath
      */
-    public StringBuilder dump(IAccessPath<ISPO> accessPath) {
+    public StringBuilder dumpStatements(IAccessPath<ISPO> accessPath) {
                 
         final StringBuilder sb = new StringBuilder();
         
@@ -2584,8 +2684,8 @@ abstract public class AbstractTripleStore extends
                 
                 if (numStmts > 1000) {
 
-//                    if(INFO)
-                    log.warn("Wrote "
+                    if(INFO)
+                    log.info("Wrote "
                             + numStmts
                             + " statements (mutationCount="
                             + numWritten
@@ -2979,6 +3079,7 @@ abstract public class AbstractTripleStore extends
              */
             
             readTimestamp = ITx.READ_COMMITTED;
+//            readTimestamp = getTimestamp();
             
         } else {
 

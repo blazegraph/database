@@ -47,27 +47,27 @@ Modifications:
 
 package com.bigdata.rdf.rules;
 
-import java.io.IOException;
 import java.util.Properties;
 
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFParseException;
 import org.openrdf.sail.SailException;
 import org.openrdf.sail.inferencer.fc.ForwardChainingRDFSInferencer;
 import org.openrdf.sail.memory.MemoryStore;
 
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -75,6 +75,7 @@ import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Unit tests for database at once closure, fix point of a rule set (does not
@@ -101,8 +102,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_Small_Full() throws SailException,
-            RepositoryException, IOException, RDFParseException {
+    public void test_fixedPoint_Small_Full() throws Exception {
 
         final String file = "small.rdf";
 
@@ -110,8 +110,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_Small_Fast() throws SailException,
-            RepositoryException, IOException, RDFParseException {
+    public void test_fixedPoint_Small_Fast() throws Exception {
 
         final String file = "small.rdf";
 
@@ -119,8 +118,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_SampleData_Full() throws SailException,
-            RepositoryException, IOException, RDFParseException {
+    public void test_fixedPoint_SampleData_Full() throws Exception {
 
         final String file = "sample data.rdf";
 
@@ -128,8 +126,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_SampleData_Fast() throws SailException,
-            RepositoryException, IOException, RDFParseException {
+    public void test_fixedPoint_SampleData_Fast() throws Exception {
 
         final String file = "sample data.rdf";
 
@@ -137,8 +134,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_TestOwlSameAs_Full() throws SailException,
-        RepositoryException, IOException, RDFParseException {
+    public void test_fixedPoint_TestOwlSameAs_Full() throws Exception {
     
         // final String file = "testOwlSameAs.rdf";
         final String file = "small owlSameAs.rdf";
@@ -147,8 +143,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     
     }
     
-    public void test_fixedPoint_TestOwlSameAs_Fast() throws SailException,
-        RepositoryException, IOException, RDFParseException {
+    public void test_fixedPoint_TestOwlSameAs_Fast() throws Exception {
     
         final String file = "testOwlSameAs.rdf";
         
@@ -165,14 +160,10 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * @param closureType
      *            The closure program to be applied by bigdata.
      * 
-     * @throws RepositoryException
-     * @throws RDFParseException
-     * @throws IOException
-     * @throws SailException
+     * @throws Exception
      */
     protected void doFixedPointTest(String file, ForwardClosureEnum closureType)
-            throws RepositoryException, RDFParseException, IOException,
-            SailException {
+            throws Exception {
 
         /*
          * Used to compute the entailments with out own rules engine.
@@ -210,7 +201,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         final TempTripleStore groundTruth;
         {
          
-            Properties properties = new Properties();
+            final Properties properties = new Properties();
             
             properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
 
@@ -312,7 +303,20 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 // -DdataLoader.closure=None
         	}
             
-        	assertTrue(modelsEqual(groundTruth, closure));
+            /*
+             * Note: For this test the closure of the [groundTruth] was computed
+             * by Sesame and just loaded into a bigdata triple store instance
+             * while the closure of the [closure] graph was computed by bigdata
+             * itself. In order to be able to compare these two graphs, we first
+             * bulk export the [closure] graph (with its backchained
+             * entailments) into a TempTripleStore and then compare that
+             * TempTripleStore to the data from Sesame2.
+             */
+            final TempTripleStore tmp = bulkExport(closure);
+
+            assertTrue(modelsEqual(groundTruth, tmp));
+            
+            tmp.closeAndDelete();
             
         } finally {
             
@@ -358,11 +362,13 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         
         try {
             
-            final URI A = new URIImpl("http://www.bigdata.com/a");
-            final URI B = new URIImpl("http://www.bigdata.com/b");
-            final URI C = new URIImpl("http://www.bigdata.com/c");
-            final URI D = new URIImpl("http://www.bigdata.com/d");
-            final URI SCO = RDFS.SUBCLASSOF;
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            final BigdataURI A = f.createURI("http://www.bigdata.com/a");
+            final BigdataURI B = f.createURI("http://www.bigdata.com/b");
+            final BigdataURI C = f.createURI("http://www.bigdata.com/c");
+            final BigdataURI D = f.createURI("http://www.bigdata.com/d");
+            final BigdataURI SCO = f.asValue(RDFS.SUBCLASSOF);
             
             final RDFSVocabulary vocab = new RDFSVocabulary(store);
             
@@ -429,5 +435,5 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         }
         
     }
-    
+
 }

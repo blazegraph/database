@@ -210,7 +210,7 @@ public class SPO implements ISPO, Comparable<SPO> {
         this.p = p;
         this.o = o;
         
-        decodeValue(val);
+        decodeValue(this, val);
         
     }
     
@@ -317,11 +317,13 @@ public class SPO implements ISPO, Comparable<SPO> {
      *            The value associated with the key one of the statement
      *            indices.
      */
-    public void decodeValue(byte[] val) {
+    public static void decodeValue(ISPO spo, byte[] val) {
         
         final byte code = val[0];
         
-        setStatementType( StatementEnum.decode( code ) ); 
+        final StatementEnum type = StatementEnum.decode( code );
+        
+        spo.setStatementType( type ); 
         
         if (val.length == 1 + 8) {
 
@@ -330,18 +332,19 @@ public class SPO implements ISPO, Comparable<SPO> {
              * read it.
              */
             
-            setStatementIdentifier(new ByteArrayBuffer(1, val.length, val)
-                    .getLong(1));
-        
+            final long sid = new ByteArrayBuffer(1, val.length, val).getLong(1);
+            
             assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
                     + toString(sid);
 
             assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
-                    + toString();
+                    + spo.toString();
 
             assert sid != NULL : "statement identifier is NULL for explicit statement: "
-                    + toString();
+                    + spo.toString();
 
+            spo.setStatementIdentifier(sid);
+            
         }
         
     }
@@ -556,7 +559,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      *            The term identifier.
      * @return
      */
-    private String toString(long id) {
+    public static String toString(long id) {
 
         if (id == NULL)
             return "NULL";

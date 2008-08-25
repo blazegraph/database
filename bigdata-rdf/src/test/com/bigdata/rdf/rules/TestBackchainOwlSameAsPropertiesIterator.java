@@ -75,33 +75,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
     {
      
         // store with no owl:sameAs closure
-        AbstractTripleStore noClosure = getStore();
+        final AbstractTripleStore noClosure = getStore();
         
         try {
 
-//            InferenceEngine inf = noClosure.getInferenceEngine();
-            
-//            Rule[] rules = inf.getRuleModel();
-//            for( Rule rule : rules ) {
-//                System.err.println(rule.getName());
-//            }
-            
             final URI A = new URIImpl("http://www.bigdata.com/A");
             final URI B = new URIImpl("http://www.bigdata.com/B");
-//            final URI C = new URIImpl("http://www.bigdata.com/C");
-//            final URI D = new URIImpl("http://www.bigdata.com/D");
-//            final URI E = new URIImpl("http://www.bigdata.com/E");
-
-//            final URI V = new URIImpl("http://www.bigdata.com/V");
             final URI W = new URIImpl("http://www.bigdata.com/W");
             final URI X = new URIImpl("http://www.bigdata.com/X");
             final URI Y = new URIImpl("http://www.bigdata.com/Y");
             final URI Z = new URIImpl("http://www.bigdata.com/Z");
 
             {
-//                TMStatementBuffer buffer = new TMStatementBuffer
-//                ( inf, 100/* capacity */, BufferEnum.AssertionBuffer
-//                  );
                 StatementBuffer buffer = new StatementBuffer
                     ( noClosure, 100/* capacity */
                       );
@@ -115,18 +100,13 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 buffer.flush();
                 
                 // database at once closure.
-                noClosure.getInferenceEngine().computeClosure(null/*focusStore*/);
+                noClosure.getInferenceEngine()
+                        .computeClosure(null/*focusStore*/);
 
-                // write on the store.
-//                buffer.flush();
             }
             
             final long a = noClosure.getTermId(A);
             final long b = noClosure.getTermId(B);
-//            final long c = noClosure.getTermId(C);
-//            final long d = noClosure.getTermId(D);
-//            final long e = noClosure.getTermId(E);
-//            final long v = noClosure.getTermId(V);
             final long w = noClosure.getTermId(W);
             final long x = noClosure.getTermId(X);
             final long y = noClosure.getTermId(Y);

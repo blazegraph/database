@@ -365,17 +365,24 @@ public class RuleStats {
     public String toStringSimple(final int depth, final boolean titles,
             final boolean joinDetails) {
         
+        // the symbol used when a count is zero.
+        final String ZE = "0";
+        
         // the symbol used when a count was zero, so count/sec is also zero.
-        final String NA = "";
+        final String NA = "0";
         
         // the symbol used when the elapsed time was zero, so count/sec is divide by zero.
-        final String DZ = "";
+        final String DZ = "0";
         
+        final String solutionCountStr = solutionCount == 0 ? ZE : "" + solutionCount;
+
         final String solutionsPerSec = (solutionCount == 0 ? NA //
                 : (elapsed == 0L ? DZ //
                         : "" + (long) (solutionCount * 1000d / elapsed)));
 
         final long mutationCount = this.mutationCount.get();
+
+        final String mutationCountStr = mutationCount == 0 ? ZE : "" + mutationCount;
 
         final String mutationsPerSec = (mutationCount == 0 ? NA //
                 : (elapsed == 0L ? DZ //
@@ -390,9 +397,9 @@ public class RuleStats {
 
         sb.append(ruleNameStr);
         sb.append( ", "+(titles?"elapsed=":"") + elapsed );
-        sb.append( ", "+(titles?"solutionCount=":"") + solutionCount);
+        sb.append( ", "+(titles?"solutionCount=":"") + solutionCountStr);
         sb.append( ", "+(titles?"solutions/sec=":"") + solutionsPerSec);
-        sb.append( ", "+(titles?"mutationCount=":"") + mutationCount);
+        sb.append( ", "+(titles?"mutationCount=":"") + mutationCountStr);
         sb.append( ", "+(titles?"mutations/sec=":"") + mutationsPerSec);
         
         if(!aggregation) {

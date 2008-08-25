@@ -421,15 +421,21 @@ public class TruthMaintenance {
 //        database.dumpStore(database,true,true,false,true);
 
         // note: this is the number that are _new_ to the database.
-        log.info("Copied " + ncopied
-                + " statements that were new to the database.");
+        if (log.isInfoEnabled())
+            log.info("Copied " + ncopied
+                    + " statements that were new to the database.");
 
         final long elapsed = System.currentTimeMillis() - begin;
         
         stats.elapsed += elapsed;
 
-        log.info("Computed closure in "+elapsed+"ms");
+        if (log.isInfoEnabled())
+            log.info("Computed closure in " + elapsed + "ms");
         
+        if (log.isInfoEnabled())
+            log.info("\n\ntempStore:\n"
+                    + tempStore.dumpStore(database, true, true, false, true));
+
         tempStore.closeAndDelete();
         
         return stats;

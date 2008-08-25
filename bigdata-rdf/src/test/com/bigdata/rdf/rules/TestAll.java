@@ -69,6 +69,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestSPORelation.class);
 
         /*
+         * test suite for modelsEqual().
+         */
+        suite.addTestSuite(TestModelsEqual.class);
+        
+        /*
          * test forward chainer rules.
          */
         

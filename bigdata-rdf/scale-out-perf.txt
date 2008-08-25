@@ -1085,6 +1085,12 @@ Short term tasks:
 
   - (*****) Iterator refactor
 
+     * Change the striterator heirarchy into an implementation
+       heirarchy (StriteratorImpl) for co-varying generics and a use
+       hierarchy (IStriterator and Striterator) in which only the
+       element type is generic. This should be significantly easier to
+       use and understand.
+
      - Modify the procedure logic to abstract a 'next key/val'
        iterator using a shared buffer for de-compression in order to
        minimize heap churn on the data server.
@@ -2470,25 +2476,6 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
        - Then run the LUBM benchmarks again against the distributed,
          key-range partitioned indices.
 
-x. Fast model comparison
-
-      Finish AbstractStatementBuffer and fast (scalable) model compare
-      in AbstractRuleTestCase.
-
-      AbstractRuleTestCase#modelsEqual() needs to use bulk complete to
-      be efficient for scale out.  This means that it needs to run the
-      SPOs into a BigdataStatementIterator and then into a
-      StatementBuffer against the target database and finally into a
-      bulk complete (or perhaps a filter not found) operator to figure
-      out if everything is there as expected.  Verify with LDS
-      database at once closure test.
-
-      Verify that StatementBuffer2 is a safe replacement for
-      StatementBuffer.
-
-      Verify the LDS test suites since some of the tests have not been
-      run for scale-out cases (too slow with point tests).
-
 x. *** unroll loops for faster distributed joins.
 
    There is a strong relationship between a byte[][] keys iterator
@@ -2503,20 +2490,6 @@ x. Full text index performance.
      definately faster but it lacks the robust guarentee of the
      unisolated write pattern (all clients write on both all indices
      to guarentee consistent index states).
-
-x. **** provenance query problems (MikeP)
-
-x. **** performance tuning for queries.
-
-   - BlockingBuffer - the 100ms wait time if there was no element
-     ready was swamping the query time for simple queries.
-
-     Examine the latency and chunk size for BlockingBuffer, e.g., by
-     reporting the details (#of elements and time for hasNext()
-     through nextChunk()) into RuleStats.
-
-x. performance testing for query (LUBM with native rule rewrites of
-   queries) for LTS, LDS, and JDS.
 
 4. performance testing for data load and closure
 
@@ -2632,8 +2605,9 @@ x. ZooKeeper integration for resource lock manager?
         on U1 shows a non-zero (2439) mutation count.  rdfs02 (12) and
         rdfs09 (2421) are not at a fixed point.  However, this is with
         the fast closure program, so I could believe that re-execution
-        of fast closure might produce additional entailments. Look
-        into this with MikeP.
+        of fast closure might produce additional entailments.
+	
+	Look into this with MikeP.
 
       - Unroll joins then distribute joins.  w/ MikeP
 
@@ -2651,6 +2625,13 @@ x. ZooKeeper integration for resource lock manager?
         AbstractStepTask#552, when submitting a task to the
         concurrency manager.  Review this change!
 
+      * Should load axiom model into db when created unless inference
+        is disabled - this may require updates to a bunch of unit
+        tests if those tests assume that the db is empty.
+
+	There is no way to restrict the db to pure RDF vs RDFS vs etc.
+	The axiom / inference model should be an option.
+
       * The LDS should be able to run the entire closure program as a
 	single task on the concurrency manager -- refactor until it
 	does!
@@ -2659,6 +2640,44 @@ x. ZooKeeper integration for resource lock manager?
 	statement buffer.  Not bad.
 
 	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
+
+    *** Closure is not correct for LDS!  I am not sure what the
+        problem is there.  Since writes are auto-commit, read-behind
+        should be automatic unless it is a historical read (both
+        unisolated and read-committed reads would advance as the
+        rounds advanced).
+
+	The problem shows up in TestTruthMaintenance and in the LUBM
+	test harness.  It DOES NOT show up in the database-at-once
+	closure unit tests.
+
+        * Fix TruthMaintenance#applyExistingStatements() - should use
+	  bulk filter not point tests!
+
+	* Closure for StatementIdentifers should reuse the same
+          TemporaryStore and close() vs closeAndDelete().
+
+	* TruthMaintenance should reuse the same TemporaryStore (at
+          least for a given closure) and close() vs closeAndDelete().
+
+        * Messing with AbstractStepTask and newJoinNexusFactory(ATS).
+
+junit.framework.AssertionFailedError: Actual iterator exhausted before
+expected: nexpected=156, nactual=153, remaining={
+
+Inferred : <http://www.bigdata.com/b(140), rdf:type(8),
+rdfs:Class(12)>
+
+Inferred :< http://www.bigdata.com/b(140), rdfs:subClassOf(44),
+rdfs:Resource(40) >
+
+Inferred : < http://www.bigdata.com/b(140),rdfs:subClassOf(44),
+http://www.bigdata.com/b(140) >}
+
+	at junit.framework.Assert.fail(Assert.java:47)
+	at com.bigdata.rdf.rules.TestTruthMaintenance.assertSameGraphs(TestTruthMaintenance.java:1217)
+	at com.bigdata.rdf.rules.TestTruthMaintenance.test_closurecorrectness(TestTruthMaintenance.java:652)
+
 
       * The EDS and JDS should be able to run with overflow disabled
         and the SPO indices located on the same data service just as
@@ -2687,10 +2706,23 @@ x. ZooKeeper integration for resource lock manager?
         of tuples.  Tune up the access path read until it is good on
         all of these configurations.
 
-      * Jini smart proxy iterator and then test scale-out joins (EDS,
-        JDS).  note that EDS does not use RMI and therefore does not
-        serialize anything while JDS requires that we cross machine
-        boundaries with RMI.
+      * JDS
+
+        - Jini smart proxy iterator and then test scale-out joins
+          (EDS, JDS).  note that EDS does not use RMI and therefore
+          does not serialize anything while JDS requires that we cross
+          machine boundaries with RMI.
+
+	- Can use the ConcurrentDataLoader with one host directing the
+          loads using the LUBM harness or can use the
+          ConcurrentDataLoader directly and have multiple machines
+          loading concurrently (something that will become a m/r job
+          eventually).
+
+	- Can test a single host running queries easily enough.
+
+	- Testing concurrent query under load will require more
+          adaptation (it should be a m/r job).
 
    - (Various MikeP)
 
@@ -2804,4 +2836,10 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 	at com.bigdata.btree.UnisolatedReadWriteIndex$ChunkedIterator.getResultSet(UnisolatedReadWriteIndex.java:700)
 	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.rangeQuery(AbstractChunkedTupleIterator.java:305)
 	at com.bigdata.btree.filter.AbstractChunkedTupleIterator.hasNext(AbstractChunkedTupleIterator.java:461)
+
+
+------
+
+Commit:
+
 

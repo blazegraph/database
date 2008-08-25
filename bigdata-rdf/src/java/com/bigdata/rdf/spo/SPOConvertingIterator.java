@@ -37,6 +37,12 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<ISPO> {
     public SPOConvertingIterator(IChunkedOrderedIterator<ISPO> src,
             SPOConverter converter, IKeyOrder<ISPO> keyOrder) {
         
+        if (src == null)
+            throw new IllegalArgumentException();
+
+        if (converter == null)
+            throw new IllegalArgumentException();
+        
         this.src = src;
         
         this.converter = converter;
@@ -45,9 +51,18 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<ISPO> {
         
     }
 
-    private ISPO[] convert(ISPO[] src) {
+    private ISPO[] convert(final ISPO[] src) {
 
-        return converter.convert(src);
+        if (src == null)
+            throw new IllegalArgumentException();
+        
+        final ISPO[] tmp = converter.convert(src);
+
+        if (tmp == null)
+            throw new AssertionError("Converter returns null: "
+                    + converter.getClass());
+        
+        return tmp;
         
     }
 
@@ -104,17 +119,24 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<ISPO> {
             converted = chunk;
             pos = 0;
         }
-        ISPO[] nextChunk = converted;
+        final ISPO[] nextChunk = converted;
         converted = new ISPO[0];
         pos = 0;
         return nextChunk;
     }
 
     public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
+
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
         
-        ISPO[] chunk = nextChunk();
+        final ISPO[] chunk = nextChunk();
         
-        Arrays.sort(chunk, keyOrder.getComparator());
+        if (!keyOrder.equals(this.keyOrder)) {
+
+            Arrays.sort(chunk, keyOrder.getComparator());
+
+        }
         
         return chunk;
         
@@ -131,6 +153,14 @@ public class SPOConvertingIterator implements IChunkedOrderedIterator<ISPO> {
      */
     public static interface SPOConverter {
         
+        /**
+         * Convert the source element(s) into target element(s).
+         * 
+         * @param src
+         *            The source (not null).
+         *            
+         * @return The target (not null, but may be empty).
+         */
         ISPO[] convert(ISPO[] src);
         
     }

@@ -33,22 +33,36 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
 
     protected IChunkedOrderedIterator<ISPO> src;
     
-    protected TemporaryStore tempStore;
+    private final TemporaryStore tempStore;
     
-    public BackchainOwlSameAsIterator(IChunkedOrderedIterator<ISPO> src, AbstractTripleStore db,
-            long sameAs, TemporaryStore tempStore) {
+    public BackchainOwlSameAsIterator(IChunkedOrderedIterator<ISPO> src,
+            AbstractTripleStore db, long sameAs, TemporaryStore tempStore) {
+
         if (src == null)
             throw new IllegalArgumentException();
+        
         if (db == null)
             throw new IllegalArgumentException();
+        
         if (sameAs == NULL)
             throw new IllegalArgumentException();
+        
+        if (tempStore == null)
+            throw new IllegalArgumentException();
+        
+        if (!tempStore.isOpen())
+            throw new IllegalArgumentException();
+        
         this.src = src;
+        
         this.db = db;
+        
         this.sameAs = sameAs;
+        
         this.tempStore = tempStore;
+    
     }
-
+    
     protected Set<Long> getSelfAndSames(long id) {
         Set<Long> selfAndSames = new TreeSet<Long>();
         selfAndSames.add(id);

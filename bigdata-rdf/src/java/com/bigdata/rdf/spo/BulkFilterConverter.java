@@ -55,6 +55,8 @@ import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
 
 /**
+ * Bulk filters for {@link ISPO}s either present or NOT present in the target
+ * statement {@link IIndex}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -88,6 +90,9 @@ public class BulkFilterConverter implements SPOConverter {
 
     public ISPO[] convert(ISPO[] chunk) {
 
+        if (chunk == null)
+            throw new IllegalArgumentException();
+        
         Arrays.sort(chunk, SPOComparator.INSTANCE);
                 
 //        // Thread-local key builder.
@@ -112,7 +117,7 @@ public class BulkFilterConverter implements SPOConverter {
                 resultHandler);
         
         // get the array of existence test results
-        boolean[] contains = resultHandler.getResult().getResult();
+        final boolean[] contains = resultHandler.getResult().getResult();
         
         // filter in or out, depending on the present variable
         int chunkSize = chunk.length;
@@ -126,8 +131,15 @@ public class BulkFilterConverter implements SPOConverter {
             }
         }
 
+        if (chunkSize == 0)
+            return new ISPO[] {};
+        
         // size the return array correctly
-        SPO[] filtered = new SPO[chunkSize];
+        final ISPO[] filtered;// = new SPO[chunkSize];
+
+        // dynamic type.
+        filtered = (ISPO[]) java.lang.reflect.Array.newInstance(chunk[0]
+                .getClass(), chunkSize);
         
         System.arraycopy(chunk, 0, filtered, 0, chunkSize);
         
