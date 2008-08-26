@@ -266,13 +266,13 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
 
                 final Object key = e.nextElement();
 
-                if (!(key instanceof String)) {
-
-                    log.warn("Will not store non-String key: " + key);
-
-                    continue;
-
-                }
+//                if (!(key instanceof String)) {
+//
+//                    log.warn("Will not store non-String key: " + key);
+//
+//                    continue;
+//
+//                }
 
                 final String name = (String) key;
 

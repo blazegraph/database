@@ -705,7 +705,7 @@ public class TruthMaintenance {
                                 "Explicit statement in the tempStore at depth="
                                         + depth + ", " + spo.toString(database));
                         
-                    } else if (inferenceEngine.isAxiom(spo.s(), spo.p(), spo.o())) {
+                    } else if (database.isAxiom(spo.s(), spo.p(), spo.o())) {
                         
                         /*
                          * Convert back to an axiom. We need this in case an

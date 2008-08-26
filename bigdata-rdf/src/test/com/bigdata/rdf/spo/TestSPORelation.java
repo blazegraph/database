@@ -28,8 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import java.util.Properties;
+
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -278,7 +282,12 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
      */
     public void test_insertQuery() {
 
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -490,7 +499,12 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
         final boolean backchain = false;
         final IEvaluationPlanFactory planFactory = DefaultEvaluationPlanFactory2.INSTANCE;
         
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 

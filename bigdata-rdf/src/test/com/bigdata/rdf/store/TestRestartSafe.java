@@ -28,16 +28,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.IOException;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
+import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * Test restart safety for the various indices.
@@ -56,7 +60,15 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
     
     public void test_restartSafe() throws IOException {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default vocabulary.
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        AbstractTripleStore store = getStore(properties);
         
         try {
         

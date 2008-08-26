@@ -48,13 +48,15 @@ Modifications:
 package com.bigdata.rdf.rules;
 
 import java.util.Arrays;
+import java.util.Properties;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.AbstractRuleDistinctTermScan;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -84,12 +86,15 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
      */
     public void test_getDistinctTermIdentifiers() {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
-            IStatementBuffer buffer = new StatementBuffer(store,
-                    100/* capacity */);
 
             URI A = new URIImpl("http://www.foo.org/A");
             URI B = new URIImpl("http://www.foo.org/B");
@@ -97,13 +102,17 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
             URI D = new URIImpl("http://www.foo.org/D");
             URI E = new URIImpl("http://www.foo.org/E");
 
-            buffer.add(A, B, C);
-            buffer.add(C, B, D);
-            buffer.add(A, E, C);
+            {
+                IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
 
-            // flush statements to the store.
-            buffer.flush();
+                buffer.add(A, B, C);
+                buffer.add(C, B, D);
+                buffer.add(A, E, C);
 
+                // flush statements to the store.
+                buffer.flush();
+            }
+            
             assertTrue(store.hasStatement(A, B, C));
             assertTrue(store.hasStatement(C, B, D));
             assertTrue(store.hasStatement(A, E, C));

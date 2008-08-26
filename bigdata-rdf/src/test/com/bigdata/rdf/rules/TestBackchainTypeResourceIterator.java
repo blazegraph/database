@@ -27,19 +27,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import java.util.Properties;
+
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -78,12 +83,16 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_subjectBound() {
      
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
         
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
+
         try {
 
-            // adds rdf:Type and rdfs:Resource to the store.
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final BigdataValueFactory f = store.getValueFactory();
             
@@ -118,8 +127,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     accessPath.iterator(),//
                     accessPath,//
                     store, //
-                    vocab.rdfType.get(), //
-                    vocab.rdfsResource.get()//
+                    vocab.get(RDF.TYPE), //
+                    vocab.get(RDFS.RESOURCE)//
                     );
                 
             }
@@ -161,12 +170,16 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_subjectBound2() {
      
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 
-            // adds rdf:Type and rdfs:Resource to the store.
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final BigdataValueFactory f = store.getValueFactory();
             
@@ -206,8 +219,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                         accessPath.iterator(),//
                         accessPath,//
                         store, //
-                        vocab.rdfType.get(), //
-                        vocab.rdfsResource.get() //
+                        vocab.get(RDF.TYPE), //
+                        vocab.get(RDFS.RESOURCE)//
                         );
                 
             }
@@ -246,12 +259,16 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_noneBound() {
         
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
         
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
+
         try {
 
-            // adds rdf:Type and rdfs:Resource to the store.
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final BigdataValueFactory f = store.getValueFactory();
             
@@ -290,8 +307,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                         accessPath.iterator(),//
                         accessPath,//
                         store, //
-                        vocab.rdfType.get(), //
-                        vocab.rdfsResource.get() //
+                        vocab.get(RDF.TYPE), //
+                        vocab.get(RDFS.RESOURCE)//
                 );
 
             }
@@ -354,12 +371,16 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_otherBound_01() {
         
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 
-            // adds rdf:Type and rdfs:Resource to the store.
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final BigdataValueFactory f = store.getValueFactory();
             
@@ -392,8 +413,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                         accessPath.iterator(),//
                         accessPath,//
                         store, //
-                        vocab.rdfType.get(), //
-                        vocab.rdfsResource.get() //
+                        vocab.get(RDF.TYPE), //
+                        vocab.get(RDFS.RESOURCE)//
                         );
                 
             }
@@ -434,11 +455,16 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
      */
     public void test_backchain_foo_type_resource() {
 
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
             
             final BigdataValueFactory f = store.getValueFactory();
             
@@ -450,6 +476,10 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             final long p = store.addTerm(P);
             final long o = store.addTerm(O);
 
+            final long rdfType = vocab.get(RDF.TYPE);
+
+            final long rdfsResource = vocab.get(RDFS.RESOURCE);
+            
             store.addStatements(new SPO[] {//
                     new SPO(s, p, o, StatementEnum.Explicit) //
                     }, 1);
@@ -467,40 +497,43 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             {
                 // where s is bound.
                 final IAccessPath<ISPO> accessPath = store.getAccessPath(s,
-                        vocab.rdfType.get(), vocab.rdfsResource.get());
+                        rdfType, //
+                        rdfsResource//
+                        );
 
                 final IChunkedOrderedIterator<ISPO> itr = BackchainTypeResourceIterator
                         .newInstance(//
                                 accessPath.iterator(),//
                                 accessPath,//
                                 store, //
-                                vocab.rdfType.get(), //
-                                vocab.rdfsResource.get() //
+                                rdfType, //
+                                rdfsResource//
                         );
 
                 AbstractTestCase.assertSameSPOs(new SPO[] { new SPO(s,
-                        vocab.rdfType.get(), vocab.rdfsResource.get(),
+                        rdfType, //
+                        rdfsResource,//
                         StatementEnum.Inferred), }, itr);
             }
 
             {
                 // where s is unbound.
                 final IAccessPath<ISPO> accessPath = store.getAccessPath(NULL,
-                        vocab.rdfType.get(), vocab.rdfsResource.get());
+                        rdfType, //
+                        rdfsResource//
+                );
                 
                 final IChunkedOrderedIterator<ISPO> itr = BackchainTypeResourceIterator.newInstance(//
                         accessPath.iterator(),//
                         accessPath,//
                         store, //
-                        vocab.rdfType.get(), //
-                        vocab.rdfsResource.get() //
+                        rdfType, //
+                        rdfsResource//
                 );
 
                 AbstractTestCase.assertSameSPOs(new SPO[] { //
-                        new SPO(s, vocab.rdfType.get(), vocab.rdfsResource
-                                .get(), StatementEnum.Inferred), //
-                        new SPO(o, vocab.rdfType.get(), vocab.rdfsResource
-                                .get(), StatementEnum.Inferred), //
+                        new SPO(s, rdfType, rdfsResource, StatementEnum.Inferred),
+                        new SPO(o, rdfType, rdfsResource, StatementEnum.Inferred),
                         }, itr);
             }
             

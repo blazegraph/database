@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.vocabulary.OWL;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
@@ -37,7 +40,9 @@ import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IPredicate;
@@ -64,28 +69,29 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
     private final static transient long NULL = IRawTripleStore.NULL;
 
-    final private InferenceEngine inf;
+    final private AbstractTripleStore database;
     final private TemporaryStore tempStore;
     final private IAccessPath<ISPO> accessPath;
 
     /**
      * 
-     * @param inf
+     * @param database
+     *            The database whose entailments will be backchained.
      * @param tempStore
      *            To be used by the backchainers.
      * @param accessPath
      *            The source {@link IAccessPath}.
      */
-    public BackchainAccessPath(InferenceEngine inf, TemporaryStore tempStore,
+    public BackchainAccessPath(AbstractTripleStore database, TemporaryStore tempStore,
             IAccessPath<ISPO> accessPath) {
 
-        if (inf == null)
+        if (database == null)
             throw new IllegalArgumentException();
         
         if (accessPath == null)
             throw new IllegalArgumentException();
 
-        this.inf = inf;
+        this.database = database;
         
         this.tempStore = tempStore;
         
@@ -171,15 +177,25 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
         final SPO spo = new SPO(predicate);
 
-        if (inf.rdfsOnly) {
+        final InferenceEngine inf = database.getInferenceEngine();
+        
+        final Vocabulary vocab = database.getVocabulary();
+        
+        final long rdfType = vocab.get(RDF.TYPE);
+
+        final long rdfsResource = vocab.get(RDFS.RESOURCE);
+        
+        final long owlSameAs = vocab.get(OWL.SAMEAS);
+        
+        if (!database.getAxioms().isOwlSameAs()) {
             
             // no owl:sameAs entailments.
             owlSameAsItr = null;
         
         } else if(inf.forwardChainOwlSameAsClosure && !inf.forwardChainOwlSameAsProperties) {
             
-            if (inf.database.getAccessPath(NULL, inf.owlSameAs.get(), NULL)
-                    .rangeCount(false/*exact*/) == 0L) {
+            if (inf.database.getAccessPath(NULL, owlSameAs, NULL).rangeCount(
+                    false/* exact */) == 0L) {
 
                 /*
                  * No owl:sameAs assertions in the KB, so we do not need to
@@ -193,8 +209,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
                 owlSameAsItr = new BackchainOwlSameAsPropertiesIterator(//
                         src,//
                         spo.s, spo.p, spo.o,//
-                        inf.database, //
-                        inf.owlSameAs.get(), tempStore);
+                        database, //
+                        owlSameAs, tempStore);
             }
             
         } else {
@@ -237,9 +253,9 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
             itr = BackchainTypeResourceIterator.newInstance(//
                     itr,//
                     accessPath,//
-                    inf.database, //
-                    inf.rdfType.get(), //
-                    inf.rdfsResource.get() //
+                    database, //
+                    rdfType, //
+                    rdfsResource //
                     );
             
         }

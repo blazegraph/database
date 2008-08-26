@@ -23,7 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.Rule;
@@ -47,13 +50,13 @@ public class RuleRdfs11 extends Rule {
      */
     private static final long serialVersionUID = -8896684126297662485L;
 
-    public RuleRdfs11(String relationName, RDFSVocabulary inf) {
+    public RuleRdfs11(String relationName, Vocabulary vocab) {
 
         super(  "rdfs11",//
-                new SPOPredicate(relationName,var("u"), inf.rdfsSubClassOf, var("x")), //
+                new SPOPredicate(relationName,var("u"), vocab.getConstant(RDFS.SUBCLASSOF), var("x")), //
                 new SPOPredicate[] { //
-                    new SPOPredicate(relationName,var("u"), inf.rdfsSubClassOf, var("v")),//
-                    new SPOPredicate(relationName,var("v"), inf.rdfsSubClassOf, var("x")) //
+                    new SPOPredicate(relationName,var("u"), vocab.getConstant(RDFS.SUBCLASSOF), var("v")),//
+                    new SPOPredicate(relationName,var("v"), vocab.getConstant(RDFS.SUBCLASSOF), var("x")) //
                 },
                 new IConstraint[] {
                     new NE(var("u"),var("v")),

@@ -27,19 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import java.util.Properties;
+
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleRdfs06;
-import com.bigdata.rdf.rules.RuleRdfs08;
-import com.bigdata.rdf.rules.RuleRdfs10;
-import com.bigdata.rdf.rules.RuleRdfs12;
-import com.bigdata.rdf.rules.RuleRdfs13;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.Rule;
 
@@ -81,7 +79,12 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
      */
     public void test_rdfs10_01() throws Exception {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -100,7 +103,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             assertEquals(1,store.getStatementCount());
 
             Rule r = new RuleRdfs10(store.getSPORelation().getNamespace(),
-                    new RDFSVocabulary(store));
+                    store.getVocabulary());
 
             // apply the rule.
             applyRule(store, r, -1/* solutionCount */, 1/* mutationCount */);
@@ -137,7 +140,12 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
      */
     public void test_rdfs10_02() throws Exception {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -158,7 +166,9 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U1, RDF.TYPE, RDFS.CLASS));
             assertEquals(2,store.getStatementCount());
 
-            Rule r = new RuleRdfs10(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
+            final Rule r = new RuleRdfs10(
+                    store.getSPORelation().getNamespace(), store
+                            .getVocabulary());
             
             // apply the rule.
             applyRule(store, r, -1/*solutionCount*/,2/*mutationCount*/);

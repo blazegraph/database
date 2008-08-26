@@ -24,7 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.NE;
 
@@ -49,16 +53,16 @@ public class RuleFastClosure11 extends AbstractRuleFastClosure_11_13 {
     private static final long serialVersionUID = 7370736449328735275L;
 
     /**
-     * @param inf
+     * @param vocab
      */
-    public RuleFastClosure11(String relationName,RDFSVocabulary inf) {
+    public RuleFastClosure11(String relationName, Vocabulary vocab) {
         
         super(  "fastClosure11",//
-                new SPOPredicate(relationName,var("x"), inf.rdfType, var("b")),//
+                new SPOPredicate(relationName,var("x"), vocab.getConstant(RDF.TYPE), var("b")),//
                 new SPOPredicate[] {//
                     new SPOPredicate(relationName,var("x"), var("y"), var("z")),//
-                    new SPOPredicate(relationName,var("y"), inf.rdfsSubPropertyOf, var("a")),//
-                    new SPOPredicate(relationName,var("a"), inf.rdfsDomain, var("b"))//
+                    new SPOPredicate(relationName,var("y"), vocab.getConstant(RDFS.SUBPROPERTYOF), var("a")),//
+                    new SPOPredicate(relationName,var("a"), vocab.getConstant(RDFS.DOMAIN), var("b"))//
                 },
                 new IConstraint[] {
                     new NE(var("y"),var("a"))

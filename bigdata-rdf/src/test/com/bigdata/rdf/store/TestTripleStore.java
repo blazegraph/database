@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.util.Properties;
 import java.util.UUID;
 
 import org.openrdf.model.BNode;
@@ -45,6 +46,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc;
@@ -57,9 +59,11 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
@@ -91,7 +95,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     public TestTripleStore(String name) {
         super(name);
     }
-
+    
     /**
      * Test helper verifies that the term is not in the lexicon, adds the term
      * to the lexicon, verifies that the term can be looked up by its assigned
@@ -165,7 +169,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_addTerm() {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default vocabulary.
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 
@@ -468,7 +480,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_statements() {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default vocabulary.
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
         
@@ -616,7 +636,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_addLookup_nativeAPI() {
             
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 
@@ -816,7 +841,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_addRemove_nativeAPI() {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 
@@ -887,8 +917,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_addInferredExplicitAxiom() {
 
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
         
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
+
         try {
             
             final BigdataValueFactory f = store.getValueFactory();
@@ -934,8 +969,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_addRemove_sesameAPI() throws SailException {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
         
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
+
         try {
 
             // verify nothing in the store.
@@ -990,14 +1030,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     /**
      * Test of
      * {@link IRawTripleStore#removeStatements(com.bigdata.relation.accesspath.IChunkedOrderedIterator)}
-     * 
-     * FIXME verify that there is a variant of this test with statement
-     * identifiers enabled in order to make sure that we are testing the closure
-     * computation over the statement identifiers.
      */
     public void test_removeStatements() {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 

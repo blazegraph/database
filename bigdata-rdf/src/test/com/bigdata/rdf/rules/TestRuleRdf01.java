@@ -27,10 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import java.util.Properties;
+
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.Rule;
 
@@ -65,7 +69,12 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
      */
     public void test_rdf01() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
             
@@ -84,7 +93,8 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertFalse(store.hasStatement(B, rdfType, rdfProperty ));
             assertEquals(1,store.getStatementCount());
     
-            Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
+            final Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),
+                    store.getVocabulary());
             
             applyRule(store, r, 1/* solutionCount*/,1/*mutationCount*/);
             
@@ -109,7 +119,12 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
      */
     public void test_rdf01_distinctPrefixScan() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -141,7 +156,8 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertFalse(store.hasStatement(E, rdfType, rdfProperty));
             assertEquals(3,store.getStatementCount());
 
-            Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
+            final Rule r = new RuleRdf01(store.getSPORelation().getNamespace(),
+                    store.getVocabulary());
 
             applyRule(store, r, 2/* solutionCount */, 2/* mutationCount */);
 

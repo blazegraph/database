@@ -28,19 +28,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.model.BigdataURIImpl;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.AbstractRuleFastClosure_3_5_6_7_9.SubPropertyClosureTask;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IConstant;
@@ -86,7 +89,12 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
      */
     public void test_getSubProperties() {
 
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 
@@ -105,12 +113,12 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
                     rdfsSubPropertyOf));
             assertTrue(store.hasStatement(B, rdfsSubPropertyOf, A));
 
-            final RDFSVocabulary inf = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final IRelation<ISPO> view = store.getSPORelation();
             
             final SubPropertyClosureTask task = new SubPropertyClosureTask(
-                    view, inf.rdfsSubPropertyOf);
+                    view, vocab.getConstant(RDFS.SUBPROPERTYOF));
 
             Set<Long> subProperties = task.getSubProperties();
 
@@ -161,7 +169,12 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
      */
     public void test_rule() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
 
@@ -210,11 +223,12 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
              * setup the rule execution.
              */
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             Rule rule = new MyRuleFastClosure6("myFastClosure6", store
                     .getSPORelation().getNamespace(), null/* focusStore */,
-                    inf.rdfsSubPropertyOf, inf.rdfsRange, R);
+                    vocab.getConstant(RDFS.SUBPROPERTYOF), //
+                    vocab.getConstant(RDFS.RANGE), R);
             
             applyRule(store, rule, -1/*@todo 2? solutionCount*/,1/*mutationCount*/);
 

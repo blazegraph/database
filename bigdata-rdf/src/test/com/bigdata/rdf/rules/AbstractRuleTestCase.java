@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutionException;
 import org.openrdf.model.Statement;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.AbstractStatementBuffer.StatementBuffer2;
@@ -42,6 +43,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -486,19 +488,25 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
      *            The source database.
      * 
      * @return The {@link TempTripleStore}.
-     * 
-     * @todo refactor to {@link AbstractTripleStore} as utility for export onto
-     *       a new or existing tripleStore?
      */
     protected TempTripleStore bulkExport(AbstractTripleStore db) {
 
-        final TempTripleStore tmp = new TempTripleStore(new Properties());
+        final Properties properties = new Properties();
+        
+        properties.setProperty(Options.ONE_ACCESS_PATH, "true");
+        
+        properties.setProperty(Options.JUSTIFY, "false");
+        
+        properties.setProperty(Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+        
+        final TempTripleStore tmp = new TempTripleStore(properties);
 
         final StatementBuffer sb = new StatementBuffer(tmp, 100000/* capacity */);
 
-        final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(db
-                .getInferenceEngine(), tmp.getIndexManager(), db.getAccessPath(
-                NULL, NULL, NULL)).iterator();
+        final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(db,
+                tmp.getIndexManager(), db.getAccessPath(NULL, NULL, NULL))
+                .iterator();
 
         final BigdataStatementIterator itr2 = db.asStatementIterator(itr1);
 

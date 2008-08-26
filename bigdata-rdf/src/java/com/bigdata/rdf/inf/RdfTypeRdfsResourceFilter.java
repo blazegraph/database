@@ -5,8 +5,11 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.rdf.rules.RDFSVocabulary;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
@@ -36,11 +39,11 @@ public class RdfTypeRdfsResourceFilter implements IElementFilter<ISPO>, External
      * 
      * @param vocab
      */
-    public RdfTypeRdfsResourceFilter(RDFSVocabulary vocab) {
+    public RdfTypeRdfsResourceFilter(Vocabulary vocab) {
         
-        this.rdfType = vocab.rdfType.get();
+        this.rdfType = vocab.get(RDF.TYPE);
         
-        this.rdfsResource = vocab.rdfsResource.get();
+        this.rdfsResource = vocab.get(RDFS.RESOURCE);
         
     }
 

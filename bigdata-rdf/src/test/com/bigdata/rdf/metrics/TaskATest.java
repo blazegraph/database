@@ -36,9 +36,9 @@ import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.axioms.RdfsAxioms;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.rio.LoadStats;
-import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -231,11 +231,11 @@ public class TaskATest
         properties.setProperty(DataLoader.Options.COMMIT,CommitEnum.Batch.toString());
 
         // Note: this turns off sameAs processing.
-        properties.setProperty(Options.RDFS_ONLY, "true");
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, RdfsAxioms.class.getName());
 
         // generate justifications for TM.
 //        properties.setProperty(Options.JUSTIFY, "true");
-        properties.setProperty(Options.JUSTIFY, "false");
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.JUSTIFY, "false");
 
         // forward chain (x rdf:type rdfs:Resource)
 //        properties.setProperty(
@@ -245,7 +245,7 @@ public class TaskATest
 
         // choice of the forward closure method.
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
-        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
+//        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
 
         /*
          * load (and optionally close) the data.

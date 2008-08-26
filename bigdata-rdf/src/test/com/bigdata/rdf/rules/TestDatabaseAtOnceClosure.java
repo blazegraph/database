@@ -59,14 +59,16 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.inferencer.fc.ForwardChainingRDFSInferencer;
 import org.openrdf.sail.memory.MemoryStore;
 
+import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.axioms.RdfsAxioms;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -101,7 +103,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         final String file = "small.rdf";
 
-        doFixedPointTest(file, ForwardClosureEnum.Full);
+        doFixedPointTest(file, FullClosure.class);
 
     }
 
@@ -109,7 +111,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         final String file = "small.rdf";
 
-        doFixedPointTest(file, ForwardClosureEnum.Fast);
+        doFixedPointTest(file, FastClosure.class);
 
     }
 
@@ -117,7 +119,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         final String file = "sample data.rdf";
 
-        doFixedPointTest(file, ForwardClosureEnum.Full);
+        doFixedPointTest(file, FullClosure.class);
 
     }
 
@@ -125,7 +127,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         final String file = "sample data.rdf";
 
-        doFixedPointTest(file, ForwardClosureEnum.Fast);
+        doFixedPointTest(file, FastClosure.class);
 
     }
 
@@ -134,7 +136,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         // final String file = "testOwlSameAs.rdf";
         final String file = "small owlSameAs.rdf";
         
-        doFixedPointTest(file, ForwardClosureEnum.Full);
+        doFixedPointTest(file, FullClosure.class);
     
     }
     
@@ -142,7 +144,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     
         final String file = "testOwlSameAs.rdf";
         
-        doFixedPointTest(file, ForwardClosureEnum.Fast);
+        doFixedPointTest(file, FastClosure.class);
     
     }
     
@@ -157,8 +159,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * 
      * @throws Exception
      */
-    protected void doFixedPointTest(String file, ForwardClosureEnum closureType)
-            throws Exception {
+    protected void doFixedPointTest(String file,
+            Class<? extends BaseClosure> closureClass) throws Exception {
 
         /*
          * Used to compute the entailments our own rules engine.
@@ -168,10 +170,15 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
             final Properties properties = getProperties();
 
-            properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+            properties
+                    .setProperty(
+                            com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                            RdfsAxioms.class.getName());
 
-            properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,
-                    closureType.toString());
+            properties
+                    .setProperty(
+                            com.bigdata.rdf.store.AbstractTripleStore.Options.CLOSURE_CLASS,
+                            closureClass.getName());
 
             /*
              * Don't compute closure in the data loader since it does TM, not
@@ -198,7 +205,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
          
             final Properties properties = new Properties();
             
-            properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+            properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                    NoAxioms.class.getName());
 
             groundTruth = new TempTripleStore(properties);
             
@@ -353,7 +361,12 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      */
     public void test_simpleFixPoint() throws Exception {
         
-        final AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
         
         try {
             
@@ -365,8 +378,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
             final BigdataURI D = f.createURI("http://www.bigdata.com/d");
             final BigdataURI SCO = f.asValue(RDFS.SUBCLASSOF);
             
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
-            
+            final Vocabulary vocab = store.getVocabulary();
+
             /*
              * Add the original statements.
              */

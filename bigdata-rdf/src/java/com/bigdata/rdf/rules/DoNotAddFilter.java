@@ -26,11 +26,14 @@ package com.bigdata.rdf.rules;
 
 import java.io.Serializable;
 
-import com.bigdata.rdf.inf.Axioms;
-import com.bigdata.rdf.inf.BaseAxioms;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+
+import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
@@ -53,11 +56,7 @@ public class DoNotAddFilter implements IElementFilter<ISPO>, Serializable {
      */
     private static final long serialVersionUID = -7833182476134679170L;
     
-    /**
-     * FIXME The axioms needs to be serializable. It is not right now. The whole
-     * {@link Axioms} class hierarchy really needs a refactor.
-     */
-    private transient final BaseAxioms axioms;
+    private final Axioms axioms;
     
     private final long rdfType;
     private final long rdfsResource;
@@ -65,22 +64,35 @@ public class DoNotAddFilter implements IElementFilter<ISPO>, Serializable {
     
     /**
      * 
+     * @param vocab
+     *            The {@link Vocabulary}
      * @param axioms
+     *            The {@link Axioms}.
      * @param forwardChainRdfTypeRdfsResource
+     *            <code>true</code> if we generate the entailments for (x
+     *            rdf:type rdfs:Resource) when the closure of the database is
+     *            updated.
      */
-    public DoNotAddFilter(RDFSVocabulary vocab, BaseAxioms axioms, boolean forwardChainRdfTypeRdfsResource) {
+    public DoNotAddFilter(Vocabulary vocab, Axioms axioms,
+            boolean forwardChainRdfTypeRdfsResource) {
+
+        if (vocab == null)
+            throw new IllegalArgumentException();
+
+        if (axioms == null)
+            throw new IllegalArgumentException();
         
         this.axioms = axioms;
-        
-        this.rdfType = vocab.rdfType.get();
-        
-        this.rdfsResource = vocab.rdfsResource.get();
+
+        this.rdfType = vocab.get(RDF.TYPE);
+
+        this.rdfsResource = vocab.get(RDFS.RESOURCE);
         
         this.forwardChainRdfTypeRdfsResource = forwardChainRdfTypeRdfsResource;
         
     }
 
-    public boolean accept(ISPO spo) {
+    public boolean accept(final ISPO spo) {
         
         if(AbstractTripleStore.isLiteral(spo.s())) {
             

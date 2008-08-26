@@ -618,8 +618,8 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final SPORelation spoRelation = (SPORelation)relation;
             
-            return new BackchainAccessPath(spoRelation.getContainer()
-                    .getInferenceEngine(), getTemporaryStore(), accessPath);
+            return new BackchainAccessPath(spoRelation.getContainer(),
+                    getTemporaryStore(), accessPath);
             
         }
         

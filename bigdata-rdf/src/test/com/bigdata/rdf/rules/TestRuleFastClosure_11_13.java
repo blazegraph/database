@@ -27,10 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * Test suite for {@link AbstractRuleFastClosure_11_13}.
@@ -74,7 +78,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             final long x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
             final long z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
 
-            final RDFSVocabulary inf = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             // told:
             {
@@ -83,10 +87,10 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
                         //
                         new SPO(x, y, z, StatementEnum.Explicit),
                         //
-                        new SPO(y, inf.rdfsSubPropertyOf.get(), a,
+                        new SPO(y, vocab.get(RDFS.SUBPROPERTYOF), a,
                                 StatementEnum.Explicit),
                         //
-                        new SPO(a, inf.rdfsDomain.get(), b,
+                        new SPO(a, vocab.get(RDFS.DOMAIN), b,
                                 StatementEnum.Explicit) };
 
                 store.addStatements(told, told.length);
@@ -106,7 +110,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
              * (?x, rdf:type, ?b).
              */
             RuleFastClosure11 rule = new RuleFastClosure11(store
-                    .getSPORelation().getNamespace(), inf);
+                    .getSPORelation().getNamespace(), vocab);
 
             /*
              * Test run the rule.
@@ -115,7 +119,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             applyRule(store, rule, 1/*solutionCount*/, 1/*mutationCount*/);
             
             // check entailments.
-            assertTrue(store.hasStatement(x, inf.rdfType.get(), b));
+            assertTrue(store.hasStatement(x, vocab.get(RDF.TYPE), b));
 
 //            store.commit();
 
@@ -146,7 +150,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             final long x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
             final long z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             // told:
             {
@@ -155,10 +159,10 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
                         //
                         new SPO(x, y, z, StatementEnum.Explicit),
                         //
-                        new SPO(y, inf.rdfsSubPropertyOf.get(), a,
+                        new SPO(y, vocab.get(RDFS.SUBPROPERTYOF), a,
                                 StatementEnum.Explicit),
                         //
-                        new SPO(a, inf.rdfsRange.get(), b,
+                        new SPO(a, vocab.get(RDFS.RANGE), b,
                                 StatementEnum.Explicit) };
 
                 store.addStatements(told, told.length);
@@ -178,7 +182,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
              * (?z, rdf:type, ?b).
              */
             RuleFastClosure13 rule = new RuleFastClosure13(store
-                    .getSPORelation().getNamespace(), inf);
+                    .getSPORelation().getNamespace(), vocab);
 
             /*
              * Test run the rule.
@@ -187,7 +191,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
             applyRule(store, rule, 1/*solutionCount*/, 1/*mutationCount*/);
 
             // check entailments.
-            assertTrue(store.hasStatement(z, inf.rdfType.get(), b));
+            assertTrue(store.hasStatement(z, vocab.get(RDF.TYPE), b));
 
 //            store.commit();
 

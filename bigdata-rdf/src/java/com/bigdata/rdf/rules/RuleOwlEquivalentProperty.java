@@ -27,7 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.vocabulary.OWL;
+
 import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.Rule;
 
 /**
@@ -47,14 +50,14 @@ public class RuleOwlEquivalentProperty extends Rule {
     private static final long serialVersionUID = 689296584050064929L;
 
     /**
-     * @param inf
+     * @param vocab
      */
-    public RuleOwlEquivalentProperty(String relationName, RDFSVocabulary inf) {
+    public RuleOwlEquivalentProperty(String relationName, Vocabulary vocab) {
 
         super(  "owl:equivalentProperty",//
-                new SPOPredicate(relationName,var("b"), inf.owlEquivalentProperty, var("a")), //
+                new SPOPredicate(relationName,var("b"), vocab.getConstant(OWL.EQUIVALENTPROPERTY), var("a")), //
                 new SPOPredicate[] { //
-                    new SPOPredicate(relationName,var("a"), inf.owlEquivalentProperty, var("b"))//
+                    new SPOPredicate(relationName,var("a"), vocab.getConstant(OWL.EQUIVALENTPROPERTY), var("b"))//
                 },//
                 null//constraints
                 );
