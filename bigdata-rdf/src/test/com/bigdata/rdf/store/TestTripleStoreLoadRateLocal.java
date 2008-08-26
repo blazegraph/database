@@ -35,8 +35,6 @@ import java.util.Properties;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.rules.InferenceEngine;
-import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
@@ -71,8 +69,8 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
         properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
         
         // choice of fast vs full closure (iff enabled below).
-        properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Full.toString());
-//        properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Fast.toString());
+//        properties.setProperty(Options.CLOSURE_CLASS,FastClosure.class.getName());
+//        properties.setProperty(Options.CLOSURE_CLASS,FullClosure.class.getName());
         
         // turn off the full text index for literals.
         properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
@@ -85,9 +83,7 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
     }
 
     /**
-     * Option to compute the database-at-once closure using either
-     * {@link ForwardClosureEnum#Fast} or {@link ForwardClosureEnum#Full} as
-     * specified in {@link #getProperties()}.
+     * Option to compute the database-at-once closure.
      */
     protected final boolean computeClosure = false;
 

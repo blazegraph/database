@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.rdf.rules;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.IRule;
 
 /**
@@ -89,7 +90,7 @@ public class TestMappedProgram extends AbstractRuleTestCase {
 
         try {
 
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final boolean parallel = false; // actual value should not matter.
 
@@ -121,7 +122,7 @@ public class TestMappedProgram extends AbstractRuleTestCase {
 
         try {
 
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final boolean parallel = false; // actual value should not matter.
 
@@ -156,7 +157,7 @@ public class TestMappedProgram extends AbstractRuleTestCase {
 
         try {
 
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final boolean parallel = false; // actual value should not matter.
 
@@ -188,7 +189,7 @@ public class TestMappedProgram extends AbstractRuleTestCase {
 
         try {
 
-            RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
             final boolean parallel = false; // actual value should not matter.
 

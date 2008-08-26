@@ -33,9 +33,8 @@ import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleOwlEquivalentClass;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.Rule;
 
 /**
@@ -86,12 +85,12 @@ public class TestRuleOwlEquivalentClass extends AbstractRuleTestCase {
 
             // verify statement(s).
             assertTrue(store.hasStatement(A, OWL.EQUIVALENTCLASS, B));
-            assertEquals(1,store.getStatementCount());
+            final long nbefore = store.getStatementCount();
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
-            Rule r = new RuleOwlEquivalentClass(store.getSPORelation()
-                    .getNamespace(),inf);
+            final Rule r = new RuleOwlEquivalentClass(store.getSPORelation()
+                    .getNamespace(), vocab);
             
             // apply the rule.
             applyRule(store,r, -1/*solutionCount*/,1/*mutationCount*/);
@@ -107,7 +106,7 @@ public class TestRuleOwlEquivalentClass extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(B, OWL.EQUIVALENTCLASS, A));
 
             // final #of statements in the store.
-            assertEquals(2,store.getStatementCount());
+            assertEquals(nbefore + 1, store.getStatementCount());
 
         } finally {
 

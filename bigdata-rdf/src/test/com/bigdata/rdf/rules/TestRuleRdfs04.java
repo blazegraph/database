@@ -36,10 +36,11 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.inf.NoAxioms;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Rule;
 
@@ -86,7 +87,12 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
      */
     public void test_rdfs4a() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -101,9 +107,10 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U, A, X));
             assertEquals(1,store.getStatementCount());
 
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
-            
-            final Rule r = new RuleRdfs04a(store.getSPORelation().getNamespace(),vocab);
+            final Vocabulary vocab = store.getVocabulary();
+
+            final Rule r = new RuleRdfs04a(store.getSPORelation()
+                    .getNamespace(), vocab);
             
             applyRule(store, r, -1/*solutionCount*/,1/* mutationCount*/);
 
@@ -133,7 +140,12 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
      */
     public void test_rdfs4b() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -148,7 +160,8 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U, A, V));
             assertEquals(1,store.getStatementCount());
 
-            final Rule r = new RuleRdfs04b(store.getSPORelation().getNamespace(),new RDFSVocabulary(store));
+            final Rule r = new RuleRdfs04b(store.getSPORelation()
+                    .getNamespace(), store.getVocabulary());
             
             applyRule(store, r, -1/*solutionCount*/,1/* mutationCount*/);
 
@@ -183,7 +196,12 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
      */
     public void test_rdfs4b_filterLiterals() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -203,12 +221,13 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
              * does not show in the database.
              */
             
-            final RDFSVocabulary vocab = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
+
+            final Rule r = new RuleRdfs04b(store.getSPORelation()
+                    .getNamespace(), vocab);
             
-            final Rule r = new RuleRdfs04b(store.getSPORelation().getNamespace(),vocab);
-            
-            final IElementFilter<ISPO> filter = new DoNotAddFilter(vocab, new NoAxioms(store),
-                    true/* forwardChainRdfTypeRdfsResource */);
+            final IElementFilter<ISPO> filter = new DoNotAddFilter(vocab, store
+                    .getAxioms(), true/* forwardChainRdfTypeRdfsResource */);
             
             applyRule(store, r, filter/*, false /*justified*/,
                     -1/* solutionCount */, 0/* mutationCount*/);

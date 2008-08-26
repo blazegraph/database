@@ -28,17 +28,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import java.util.Arrays;
+import java.util.Properties;
 
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.Justification.VisitedSPOSet;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.Constant;
@@ -102,7 +107,12 @@ public class TestJustifications extends AbstractRuleTestCase {
      */
     public void test_writeReadRetract() {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
 
@@ -130,8 +140,11 @@ public class TestJustifications extends AbstractRuleTestCase {
 
             final InferenceEngine inf = store.getInferenceEngine();
 
+            final Vocabulary vocab = store.getVocabulary();
+            
             // the rule.
-            final Rule rule = new RuleRdf01(store.getSPORelation().getNamespace(),inf);
+            final Rule rule = new RuleRdf01(store.getSPORelation()
+                    .getNamespace(), vocab);
 
             final IJoinNexus joinNexus = store.newJoinNexusFactory(
             		RuleContextEnum.DatabaseAtOnceClosure,
@@ -150,7 +163,7 @@ public class TestJustifications extends AbstractRuleTestCase {
 
             // the expected entailment.
             final SPO expectedEntailment = new SPO(//
-                    A, inf.rdfType.get(), inf.rdfProperty.get(),
+                    A, vocab.get(RDF.TYPE), vocab.get(RDF.PROPERTY),
                     StatementEnum.Inferred);
 
             {

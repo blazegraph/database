@@ -2614,23 +2614,8 @@ x. ZooKeeper integration for resource lock manager?
       - cache range counts (and maybe more) for historical access
         paths.
 
-      - Test w/ Sesame 2 custom lubm extensions - look for other
-        places where we can boost performance.
-
-      - Database-at-once closure for LDS, EDS, and JDS may require
-        advancing the historical read-behind point after each round of
-        closure, probably forming an overriden joinNexus.
-
-	Note that I changed READ-COMMITTED to readTimestamp in
-        AbstractStepTask#552, when submitting a task to the
-        concurrency manager.  Review this change!
-
-      * Should load axiom model into db when created unless inference
-        is disabled - this may require updates to a bunch of unit
-        tests if those tests assume that the db is empty.
-
-	There is no way to restrict the db to pure RDF vs RDFS vs etc.
-	The axiom / inference model should be an option.
+      - Test w/ Sesame 2 custom lubm benchmarking extensions - look
+        for other places where we can boost performance.
 
       * The LDS should be able to run the entire closure program as a
 	single task on the concurrency manager -- refactor until it
@@ -2641,43 +2626,20 @@ x. ZooKeeper integration for resource lock manager?
 
 	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
 
-    *** Closure is not correct for LDS!  I am not sure what the
-        problem is there.  Since writes are auto-commit, read-behind
-        should be automatic unless it is a historical read (both
-        unisolated and read-committed reads would advance as the
-        rounds advanced).
-
-	The problem shows up in TestTruthMaintenance and in the LUBM
-	test harness.  It DOES NOT show up in the database-at-once
-	closure unit tests.
+      - TempTripleStore use and abuse:
+ 
+        * add ITemporaryStoreFactory, add same to IJoinNexus, add as
+          argument to {@link BackchainAccessPath} (this may wind up as
+          an IIndexManager feature at some point).
 
         * Fix TruthMaintenance#applyExistingStatements() - should use
-	  bulk filter not point tests!
+          bulk filter not point tests!
 
-	* Closure for StatementIdentifers should reuse the same
+        * Closure for StatementIdentifers should reuse the same
           TemporaryStore and close() vs closeAndDelete().
 
-	* TruthMaintenance should reuse the same TemporaryStore (at
+        * TruthMaintenance should reuse the same TemporaryStore (at
           least for a given closure) and close() vs closeAndDelete().
-
-        * Messing with AbstractStepTask and newJoinNexusFactory(ATS).
-
-junit.framework.AssertionFailedError: Actual iterator exhausted before
-expected: nexpected=156, nactual=153, remaining={
-
-Inferred : <http://www.bigdata.com/b(140), rdf:type(8),
-rdfs:Class(12)>
-
-Inferred :< http://www.bigdata.com/b(140), rdfs:subClassOf(44),
-rdfs:Resource(40) >
-
-Inferred : < http://www.bigdata.com/b(140),rdfs:subClassOf(44),
-http://www.bigdata.com/b(140) >}
-
-	at junit.framework.Assert.fail(Assert.java:47)
-	at com.bigdata.rdf.rules.TestTruthMaintenance.assertSameGraphs(TestTruthMaintenance.java:1217)
-	at com.bigdata.rdf.rules.TestTruthMaintenance.test_closurecorrectness(TestTruthMaintenance.java:652)
-
 
       * The EDS and JDS should be able to run with overflow disabled
         and the SPO indices located on the same data service just as
@@ -2693,8 +2655,7 @@ http://www.bigdata.com/b(140) >}
 
       - Change the SAIL setup to use the Locator mechanism.
 
-      - Add LUBM factory variants for LDS, EDS, and JDS.  All three
-        configure from an IBigdataClient.  LDS and EDS must also
+      - Add LUBM factory variants for EDS and JDS.  LDS and EDS must
         handle the federation create.  For JDS, the federation should
         pre-exist and the client just connects.  Open and close for
         JDS is just connect and disconnect.  For LDS and EDS, we also
@@ -2839,7 +2800,3 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
 
 ------
-
-Commit:
-
-

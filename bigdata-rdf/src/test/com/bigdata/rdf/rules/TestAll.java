@@ -23,11 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.TestSPORelation;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.rdf.spo.TestSPORelation;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -77,9 +77,6 @@ public class TestAll extends TestCase {
          * test forward chainer rules.
          */
         
-        // test suite for the axiom models.
-        suite.addTestSuite(TestAxiomModel.class);
-
         // test suite for rule re-writes for RDF DB truth maintenance.
         suite.addTestSuite(TestTMUtility.class);
 

@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import java.util.Properties;
+
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
@@ -34,9 +36,11 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
-import com.bigdata.rdf.inf.NoAxioms;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Rule;
 
@@ -73,7 +77,12 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
      */
     public void test_rdfs3_filterLiterals() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
         
@@ -95,18 +104,18 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             assertEquals(3,store.getStatementCount());
 
             /*
-             * Note: The rule computes the entailment but it gets whacked by the
-             * DoNotAddFilter on the InferenceEngine, so it is counted here but
-             * does not show in the database.
+             * Note: The rule computes the entailement but it gets whacked by
+             * the DoNotAddFilter on the InferenceEngine, so it is counted here
+             * but does not show in the database.
              */
             
-            final RDFSVocabulary inf = new RDFSVocabulary(store);
-            
+            final Vocabulary vocab = store.getVocabulary();
+
             final Rule r = new RuleRdfs03(
-                    store.getSPORelation().getNamespace(), inf);
+                    store.getSPORelation().getNamespace(), vocab);
             
-            final IElementFilter<ISPO> filter = new DoNotAddFilter(inf,
-                    new NoAxioms(store), true/* forwardChainRdfTypeRdfsResource */);
+            final IElementFilter<ISPO> filter = new DoNotAddFilter(vocab,
+                    store.getAxioms(), true/* forwardChainRdfTypeRdfsResource */);
             
             applyRule(store, r, filter/* , false justified */,
                     -1/* solutionCount */, 1/* mutationCount*/);
@@ -133,7 +142,12 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
      */
     public void test_rdfs3_01() throws Exception {
         
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
 
         try {
         
@@ -150,9 +164,10 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(rdfType, rdfsRange, rdfsClass));
             assertEquals(2,store.getStatementCount());
 
-            final RDFSVocabulary inf = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
             
-            final Rule r = new RuleRdfs03(store.getSPORelation().getNamespace(),inf);
+            final Rule r = new RuleRdfs03(
+                    store.getSPORelation().getNamespace(), vocab);
 
             applyRule(store, r, -1/* solutionCount */, 1/* mutationCount */);
 

@@ -28,63 +28,29 @@ import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rdf.inf.Axioms;
+import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.axioms.RdfsAxioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
-import com.bigdata.rdf.inf.BaseAxioms;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.Justification;
-import com.bigdata.rdf.inf.OwlAxioms;
-import com.bigdata.rdf.inf.RdfsAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
-import com.bigdata.striterator.DelegateChunkedIterator;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Supports RDFS inference plus optional support for <code>owl:sameAs</code>,
- * <code>owl:equivalentProperty</code>, and <code>owl:equivalentClass</code>.
- * Additional entailments can be introduced using custom rules.
- * <p>
- * The {@link IRule}s are declarative, and it is easy to write new rules. In
- * order for the rules to be used by the {@link InferenceEngine} you need to
- * introduce them into the base class. There are two "programs" used to compute
- * and maintain closure. The "full" closure program is a simple fix point of the
- * RDFS+ entailments, except for the <code> foo rdf:type rdfs:Resource</code>
- * entailments which are normally generated at query time. The "fast" closure
- * program breaks nearly all cycles in the RDFS rules and runs nearly entirely
- * as a sequence of {@link IRule}s, including several custom rules. It is far
- * easier to modify the "full" closure program since any new rules can just be
- * dropped into place. Modifying the "fast" closure program requires careful
- * consideration of the entailments computed at each stage in order to determine
- * where a new rule would fit in. When support for <code>owl:sameAs</code>,
- * etc. processing is enabled, some of the entailments are computed by rules run
- * during forward closure and some of the entailments are computed by rules run
- * at query time.
+ * Flyweight object encapsulates some configuration state and provides methods
+ * to compute or update the closure of the database. An instance of this is
+ * obtained from {@link AbstractTripleStore#getInferenceEngine()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME test backchain iterator at scale.
- * 
- * @todo verify the code in places where it tests against a specific term
- *       identifer defined in {@link RDFSHelper} and not against the closure of
- *       the subclasses of or the subproperties of that term.
- * 
- * @todo provide declarative rule models for forward chaining so that the rules
- *       may be extended without having to edit the code.
- * 
- * @todo consider support for owl:inverseFunctionalProperty. Are there any other
- *       low hanging fruit there?
  * 
  * @todo Improve write efficiency for the proofs - they are slowing things way
  *       down. Perhaps turn off the range count metadata inside of the B+Tree
@@ -100,7 +66,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  *       existing assertions using the term whose term identifier is changed to
  *       be that of another term.
  */
-public class InferenceEngine extends RDFSVocabulary {
+public class InferenceEngine {
 
     final static public Logger log = Logger.getLogger(InferenceEngine.class);
 
@@ -117,35 +83,10 @@ public class InferenceEngine extends RDFSVocabulary {
             .toInt();
 
     /**
-     * True iff the Truth Maintenance strategy requires that we store
-     * {@link Justification}s for entailments.
+     * The database whose closure is being maintained.
      */
-    private final boolean justify;
+    final public AbstractTripleStore database;
     
-    /**
-     * The axiom model used by the inference engine.
-     */
-    private final BaseAxioms axiomModel;
-    
-    /**
-     * The configured axioms.
-     */
-    public Axioms getAxioms() {
-        
-        return axiomModel;
-        
-    }
-    
-    /**
-     * True iff the Truth Maintenance strategy requires that we store
-     * {@link Justification}s for entailments.
-     */
-    final public boolean isJustified() {
-        
-        return justify;
-        
-    }
-
     /**
      * A filter for keeping certain entailments out of the database. It is
      * configured based on how the {@link InferenceEngine} is configured.
@@ -153,32 +94,7 @@ public class InferenceEngine extends RDFSVocabulary {
      * @see DoNotAddFilter
      */
     public final DoNotAddFilter doNotAddFilter;
-    
-    /**
-     * Choice of the forward closure algorithm.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static enum ForwardClosureEnum {
-        
-        /**
-         * The "fast" algorithm breaks several cycles in the RDFS rules and is
-         * significantly faster.
-         * 
-         * @see InferenceEngine#fastForwardClosure(AbstractTripleStore, boolean)
-         */
-        Fast(),
 
-        /**
-         * The "full" algorithm runs the rules as a set to fixed point.
-         * 
-         * @see InferenceEngine#fullForwardClosure(AbstractTripleStore, boolean)
-         */
-        Full();
-        
-    }
-    
     /**
      * Options for the {@link InferenceEngine}.
      * 
@@ -187,33 +103,6 @@ public class InferenceEngine extends RDFSVocabulary {
      */
     public static interface Options {
 
-        /**
-         * When <code>true</code> (default {@value #DEFAULT_JUSTIFY}), proof
-         * chains for entailments generated by foward chaining are stored in the
-         * database. This option is required for truth maintenance when
-         * retracting assertion.
-         * <p>
-         * If you will not be retracting statements from the database then you
-         * can specify <code>false</code> for a significant performance boost
-         * during writes and a smaller profile on the disk.
-         * <p>
-         * This option does not effect query performance since the
-         * justifications are maintained in a distinct index and are only used
-         * when retracting assertions.
-         */
-        public static final String JUSTIFY = "justify"; 
-        
-        public static final String DEFAULT_JUSTIFY = "true"; 
-        
-        /**
-         * Choice of the forward closure algorithm.
-         *  
-         * @see ForwardClosureEnum
-         */
-        public static final String FORWARD_CLOSURE = "forwardClosure";
-
-        public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Fast.toString();
-        
         /**
          * When <code>true</code> (default <code>false</code>)
          * <code>(?x rdf:type rdfs:Resource)</code> entailments are computed
@@ -225,32 +114,27 @@ public class InferenceEngine extends RDFSVocabulary {
          * Note: The default is <code>false</code> since eagerly materializing
          * those entailments takes a lot of time and space.
          * 
+         * @see BackchainAccessPath
          * @see BackchainTypeResourceIterator
          */
-        public static final String FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE = "forwardChainRdfTypeRdfsResource";
+        String FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE = "forwardChainRdfTypeRdfsResource";
 
-        public static final String DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE = "false";
+        String DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE = "false";
 
         /**
-         * When true the rule model will only run rules for RDFS model theory
-         * (no OWL) and the OWL axioms will not be defined (default
-         * <code>false</code>).
-         */
-        public static final String RDFS_ONLY = "rdfsOnly";
-
-        public static final String DEFAULT_RDFS_ONLY = "false";
-        
-        /**
-         * When <code>true</code> (default <code>true</code>) the reflexive
-         * entailments for <code>owl:sameAs</code> are computed
-         * by forward chaining and stored in the database unless
-         * {@link #RDFS_ONLY} is used to completely disable those entailments.
-         * When <code>false</code> those entailments are not computed and
+         * When <code>true</code> (default
+         * {@value #DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE}) the reflexive
+         * entailments for <code>owl:sameAs</code> are computed by forward
+         * chaining and stored in the database unless
+         * {@link com.bigdata.rdf.store.AbstractTripleStore.Options#AXIOMS_CLASS}
+         * is used to completely disable those entailments, e.g., by specifying
+         * either {@link NoAxioms} or {@link RdfsAxioms}. When
+         * <code>false</code> those entailments are not computed and
          * <code>owl:sameAs</code> processing is disabled.
          */
-        public static final String FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "forwardChainOwlSameAsClosure";
+        String FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "forwardChainOwlSameAsClosure";
 
-        public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "true";
+        String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "true";
 
         /**
          * When <code>true</code> (default <code>false</code>) the
@@ -259,8 +143,7 @@ public class InferenceEngine extends RDFSVocabulary {
          * forward chained and stored in the database. When <code>false</code>,
          * rules that produce those entailments are turned off such that they
          * are neither computed NOR stored and the entailments may be accessed
-         * at query time using the
-         * {@link InferenceEngine#backchainIterator(long, long, long)}.
+         * at query time using the {@link BackchainAccessPath}.
          * <p>
          * Note: The default is <code>false</code> since those entailments can
          * take up a LOT of space in the store and are expensive to compute
@@ -269,12 +152,11 @@ public class InferenceEngine extends RDFSVocabulary {
          * performed if a fill triple scan is frequently requested, that is an
          * unusual case and significantly less data will be stored regardless.
          * 
-         * @see InferenceEngine#backchainIterator(long, long,
-         *      long)
+         * @see BackchainAccessPath
          */
-        public static final String FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "forwardChainOwlSameAsProperties";
+        String FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "forwardChainOwlSameAsProperties";
 
-        public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "false";
+        String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "false";
 
         /**
          * When <code>true</code> (default <code>true</code>) the
@@ -287,9 +169,9 @@ public class InferenceEngine extends RDFSVocabulary {
          * @todo implement backward chaining for owl:equivalentProperty and
          *       compare performance?
          */
-        public static final String FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "forwardChainOwlEquivalentProperty";
+        String FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "forwardChainOwlEquivalentProperty";
 
-        public static final String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "true";
+        String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "true";
 
         /**
          * When <code>true</code> (default <code>true</code>) the
@@ -302,46 +184,29 @@ public class InferenceEngine extends RDFSVocabulary {
          * @todo implement backward chaining for owl:equivalentClass and compare
          *       performance?
          */
-        public static final String FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "forwardChainOwlEquivalentClass";
+        String FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "forwardChainOwlEquivalentClass";
 
-        public static final String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "true";
+        String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "true";
 
     }
 
     /**
-     * Configure {@link InferenceEngine} using properties used to configure the
-     * database.
+     * Configure {@link InferenceEngine} using the properties used to configure
+     * the database.
      * 
      * @param database
+     *            The database.
      * 
      * @see AbstractTripleStore#getInferenceEngine()
      */
     public InferenceEngine(AbstractTripleStore database) {
-    
-        this(database.getProperties(), database);
+
+        if (database == null)
+            throw new IllegalArgumentException();
+
+        this.database = database;
         
-    }
-    
-    /**
-     * @param properties
-     *            Configuration {@link Options}.
-     * @param database
-     *            The database for which this class will compute entailments.
-     */
-    public InferenceEngine(Properties properties, AbstractTripleStore database) {
-
-        super((AbstractTripleStore) database);
-
-        this.justify = Boolean.parseBoolean(properties.getProperty(
-                Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
-       
-        log.info(Options.JUSTIFY+"="+justify);
-        
-        this.forwardClosure = ForwardClosureEnum
-                .valueOf(properties.getProperty(Options.FORWARD_CLOSURE,
-                        Options.DEFAULT_FORWARD_CLOSURE)); 
-
-        log.info(Options.FORWARD_CLOSURE+"="+forwardClosure);
+        final Properties properties = database.getProperties();
 
         this.forwardChainRdfTypeRdfsResource = Boolean.parseBoolean(properties
                 .getProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
@@ -350,13 +215,10 @@ public class InferenceEngine extends RDFSVocabulary {
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
                 + forwardChainRdfTypeRdfsResource);
 
-        this.rdfsOnly = Boolean.parseBoolean(properties
-                .getProperty(Options.RDFS_ONLY,
-                        Options.DEFAULT_RDFS_ONLY));
+        final boolean rdfsOnly = database.getAxioms().isRdfSchema()
+                && !database.getAxioms().isOwlSameAs();
 
-        log.info(Options.RDFS_ONLY + "=" + rdfsOnly);
-        
-        if(rdfsOnly) {
+        if (rdfsOnly) {
             
             this.forwardChainOwlSameAsClosure = false;
             this.forwardChainOwlSameAsProperties = false;
@@ -406,38 +268,20 @@ public class InferenceEngine extends RDFSVocabulary {
 
         }
         
-        // Note: used by the DoNotAddFilter.
-        axiomModel = (rdfsOnly ? new RdfsAxioms(database) : new OwlAxioms(
-                database));
-        
-        // Add axioms to the database (writes iff not defined).
-        axiomModel.addAxioms();
-        
-        doNotAddFilter = new DoNotAddFilter(this, axiomModel,
-                forwardChainRdfTypeRdfsResource);
+        doNotAddFilter = new DoNotAddFilter(database.getVocabulary(), database
+                .getAxioms(), forwardChainRdfTypeRdfsResource);
 
     }
     
     /**
-     * Set based on {@link Options#FORWARD_CLOSURE}. 
+     * The object that generates the {@link Program}s that we use to maintain
+     * the closure of the database.
+     * <p>
+     * Note: This is lazily instantiated in order to avoid a cyclid
+     * initialization dependency betweeen the {@link InferenceEngine} and the
+     * {@link BaseClosure} constructors.
      */
-    final protected ForwardClosureEnum forwardClosure;
-    
-    /**
-     * Set based on {@link Options#RDFS_ONLY}. When set, owl:sameAs and friends
-     * are disabled and only the RDFS MT entailments are used.
-     */
-    final protected boolean rdfsOnly;
-    
-    /**
-     * Set based on {@link Options#RDFS_ONLY}. When set, owl:sameAs and friends
-     * are disabled and only the RDFS MT entailments are used.
-     */
-    public final boolean isRdfsOnly() {
-        
-        return rdfsOnly;
-        
-    }
+    private BaseClosure baseClosure = null;
     
     /**
      * Set based on {@link Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE}. When
@@ -487,10 +331,12 @@ public class InferenceEngine extends RDFSVocabulary {
     
     /**
      * Compute the forward closure of a focusStore against the database using
-     * the algorithm selected by {@link Options#FORWARD_CLOSURE}.
+     * the algorithm selected by
+     * {@link AbstractTripleStore.Options#CLOSURE_CLASS}.
      * <p>
-     * Note: before calling this method, the caller SHOULD examine the
-     * statements in the focusStore and then database. For each statement in the
+     * Note: before calling this method with a non-<code>null</code>
+     * <i>focusStore</i>, the caller SHOULD examine the statements in the
+     * <i>focusStore</i> and then database. For each statement in the
      * focusStore, if this statement exists explicitly in the database then
      * remove it from the focusStore. If this statement exists implicitly in the
      * database. Regardless of whether the statement was explicit or inferred in
@@ -505,11 +351,10 @@ public class InferenceEngine extends RDFSVocabulary {
      * If you are loading data from some kind of resource, then see
      * {@link DataLoader} which already knows how to do this.
      * <p>
-     * See
-     * {@link TruthMaintenance#assertAll(com.bigdata.rdf.store.TempTripleStore)},
-     * which first handles statements already in the database, then calls this
-     * method, and finally copies the remaining explicit statements in the
-     * focusStore and the entailments into the database.
+     * See {@link TruthMaintenance#assertAll(TempTripleStore)}, which first
+     * handles statements already in the database, then calls this method, and
+     * finally copies the remaining explicit statements in the focusStore and
+     * the entailments into the database.
      * 
      * @param focusStore
      *            The data set that will be closed against the database
@@ -520,7 +365,7 @@ public class InferenceEngine extends RDFSVocabulary {
      */
     public ClosureStats computeClosure(AbstractTripleStore focusStore) {
         
-        return computeClosure(focusStore, isJustified());
+        return computeClosure(focusStore, database.isJustify());
         
     }
 
@@ -530,6 +375,13 @@ public class InferenceEngine extends RDFSVocabulary {
      * class as part of the algorithm for truth maintenance when retracting
      * statements from the database. It SHOULD NOT be used for any other purpose
      * or you may risk failing to generate justifications.
+     * <p>
+     * Note: While this is synchronized, there is a stronger constraint on truth
+     * maintenance -- only one process can safely update the closure of the
+     * database at a time. Concurrent closure updates will result in an
+     * incoherent knowledge base (the closure will not be at fixed point but the
+     * underlying indices will be coherent). Closure operations MUST be
+     * serialized to avoid inconsistency in the knowledge base.
      * 
      * @param focusStore
      *            The data set that will be closed against the database.
@@ -541,54 +393,25 @@ public class InferenceEngine extends RDFSVocabulary {
      * 
      * @see #computeClosure(AbstractTripleStore)
      */
-    public ClosureStats computeClosure(AbstractTripleStore focusStore,
-            boolean justify) {
+    public synchronized ClosureStats computeClosure(
+            AbstractTripleStore focusStore, boolean justify) {
 
-        final MappedProgram program;
+        if (baseClosure == null) {
 
-        switch (forwardClosure) {
-
-        case Fast:
-            program = getFastForwardClosureProgram(
-                    //
-                    database.getSPORelation().getNamespace(),
-                    (focusStore == null ? null : focusStore.getSPORelation()
-                            .getNamespace()),//
-                    forwardChainRdfTypeRdfsResource, //
-                    rdfsOnly,//
-                    forwardChainOwlSameAsClosure, //
-                    forwardChainOwlSameAsProperties,//
-                    forwardChainOwlEquivalentProperty,//
-                    forwardChainOwlEquivalentClass//
-            );
-            break;
-
-        case Full:
-
-            program = getFullClosureProgram(
-                    //
-                    database.getSPORelation().getNamespace(),
-                    (focusStore == null ? null : focusStore.getSPORelation()
-                            .getNamespace()),//
-                    forwardChainRdfTypeRdfsResource, //
-                    rdfsOnly,//
-                    forwardChainOwlSameAsClosure, //
-                    forwardChainOwlSameAsProperties,//
-                    forwardChainOwlEquivalentProperty,//
-                    forwardChainOwlEquivalentClass//
-            );
-
-            break;
-
-        default:
-            throw new AssertionError("fowardClosure=" + forwardClosure);
-
+            baseClosure = database.getClosureInstance();
+            
         }
-        
+
+        final MappedProgram program = baseClosure.getProgram(
+                database.getSPORelation().getNamespace(),//
+                (focusStore == null ? null : focusStore.getSPORelation()
+                        .getNamespace()) //
+                );
+
         if(log.isInfoEnabled()) {
             
-            log.info("\n\nforwardClosure=" + forwardClosure + ", program="
-                    + program);
+            log.info("\n\nforwardClosure=" + baseClosure.getClass().getName()
+                    + ", program=" + program);
             
         }
         
@@ -618,79 +441,18 @@ public class InferenceEngine extends RDFSVocabulary {
 
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
                     .getIndexManager());
-            
+
             final long mutationCount = joinNexus.runMutation(program);
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            return new ClosureStats(mutationCount,elapsed);
+            return new ClosureStats(mutationCount, elapsed);
 
         } catch (Exception ex) {
 
             throw new RuntimeException(ex);
             
         }
-        
-    }
-    
-    /**
-     * Return true iff the fully bound statement is an axiom.
-     * 
-     * @param s
-     * @param p
-     * @param o
-     * 
-     * @return
-     */
-    public boolean isAxiom(long s, long p, long o) {
-        
-        return axiomModel.isAxiom(s, p, o);
-        
-    }
-    
-    /**
-     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
-     * for the database and also backchain any entailments for which forward
-     * chaining has been turned off, including {@link RuleOwlSameAs2},
-     * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
-     * <p>
-     * Note: This creates a new {@link TemporaryStore} for each invocation. It
-     * will only be materialized on the disk if something writes at least 1M of
-     * data on it, but you can do better if you can reuse the same
-     * {@link TemporaryStore} across a bunch of operations. The rules already do
-     * this.
-     * 
-     * @param accessPath
-     *            The source {@link IAccessPath}
-     * 
-     * @return An iterator that will visit the statements in database that would
-     *         be visited by that {@link IAccessPath} query plus any necessary
-     *         entailments.
-     *         
-     * @deprecated by {@link BackchainAccessPath} ctor.
-     * 
-     * FIXME add ITemporaryStoreFactory, add same to IJoinNexus, add as argument
-     * to {@link BackchainAccessPath}, drop this method, and replace use of
-     * this method in modelsEqual with {@link BackchainAccessPath} ctor.
-     */
-    public IChunkedOrderedIterator<ISPO> backchainIterator(IAccessPath<ISPO> accessPath) {
-
-        final TemporaryStore tempStore = new TemporaryStore();
-
-        final IChunkedOrderedIterator<ISPO> src = new BackchainAccessPath(this,
-                tempStore, accessPath).iterator();
-
-        return new DelegateChunkedIterator<ISPO>(src) {
-
-            public void close() {
-
-                super.close();
-
-                tempStore.close();
-
-            }
-
-        };
         
     }
     

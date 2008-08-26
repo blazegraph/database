@@ -55,6 +55,7 @@ import org.openrdf.rio.RDFFormat;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
  * Test suite comparing full fix point closure of RDFS entailments against the
@@ -114,12 +115,10 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
             final Properties tmp = new Properties(properties);
 
-            tmp.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,
-                    InferenceEngine.ForwardClosureEnum.Full.toString());
-/*            
-            tmp.setProperty(DataLoader.Options.CLOSURE,
-                    ClosureEnum.None.toString());
-*/
+            tmp.setProperty(Options.CLOSURE_CLASS, FullClosure.class.getName());
+            /*
+             * tmp.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
+             */
             store1 = getStore(tmp);
 
         }
@@ -128,8 +127,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
             final Properties tmp = new Properties(properties);
 
-            tmp.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,
-                    InferenceEngine.ForwardClosureEnum.Fast.toString());
+            tmp.setProperty(Options.CLOSURE_CLASS, FastClosure.class.getName());
 /*
             tmp.setProperty(DataLoader.Options.CLOSURE,
                     ClosureEnum.None.toString());

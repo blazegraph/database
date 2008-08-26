@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 13, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.axioms;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -38,12 +38,35 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class NoAxioms extends BaseAxioms {
 
     /**
-     * @param db
+     * 
      */
-    public NoAxioms(AbstractTripleStore db) {
+    private static final long serialVersionUID = 4149879139683303198L;
+
+    /**
+     * De-serialization ctor.
+     */
+    public NoAxioms() {
+
+        super();
         
+    }
+    
+    public NoAxioms(AbstractTripleStore db) {
+
         super(db);
         
     }
 
+    final public boolean isRdfSchema() {
+        
+        return false;
+        
+    }
+    
+    final public boolean isOwlSameAs() {
+        
+        return false;
+        
+    }
+    
 }

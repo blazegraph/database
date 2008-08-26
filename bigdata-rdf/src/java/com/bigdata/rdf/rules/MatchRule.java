@@ -2,12 +2,15 @@ package com.bigdata.rdf.rules;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.inf.IN;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IVariable;
@@ -26,7 +29,7 @@ public class MatchRule extends Rule<SPO> {
      */
     private static final long serialVersionUID = -5002902183499739018L;
 
-    public MatchRule(String relationName, RDFSVocabulary inf,
+    public MatchRule(String relationName, Vocabulary vocab,
             IVariable<Long> lit, long[] preds,
             IConstant<Long> cls) {
 
@@ -34,8 +37,8 @@ public class MatchRule extends Rule<SPO> {
             new SPOPredicate(relationName, var("s"), var("t"), lit), //
             new SPOPredicate[] { //
                 new SPOPredicate(relationName, var("s"), var("p"), lit),//
-                new SPOPredicate(new String[]{relationName}, var("s"), inf.rdfType, var("t"),ExplicitSPOFilter.INSTANCE), //
-                new SPOPredicate(relationName, var("t"), inf.rdfsSubClassOf, cls) //
+                new SPOPredicate(new String[]{relationName}, var("s"), vocab.getConstant(RDF.TYPE), var("t"),ExplicitSPOFilter.INSTANCE), //
+                new SPOPredicate(relationName, var("t"), vocab.getConstant(RDFS.SUBCLASSOF), cls) //
                 },
             new IConstraint[] {
                 new IN(var("p"), preds) // p IN preds

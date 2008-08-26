@@ -33,12 +33,8 @@ import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.RDFSVocabulary;
-import com.bigdata.rdf.rules.RuleOwlSameAs1;
-import com.bigdata.rdf.rules.RuleOwlSameAs1b;
-import com.bigdata.rdf.rules.RuleOwlSameAs2;
-import com.bigdata.rdf.rules.RuleOwlSameAs3;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.Rule;
 
 /**
@@ -101,11 +97,12 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             // verify statement(s).
             assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
-            assertEquals(1,store.getStatementCount());
+            final long nbefore = store.getStatementCount();
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
-            
-            Rule r = new RuleOwlSameAs1(store.getSPORelation().getNamespace(),inf);
+            final Vocabulary vocab = store.getVocabulary();
+
+            final Rule r = new RuleOwlSameAs1(store.getSPORelation()
+                    .getNamespace(), vocab);
 
             // apply the rule.
             applyRule(store, r, -1/*solutionCount*/,1/*mutationCount*/);
@@ -121,7 +118,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(Y, OWL.SAMEAS, X));
 
             // final #of statements in the store.
-            assertEquals(2,store.getStatementCount());
+            assertEquals(nbefore + 1, store.getStatementCount());
 
         } finally {
 
@@ -160,11 +157,12 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             // verify statement(s).
             assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(Y, OWL.SAMEAS, Z));
-            assertEquals(2,store.getStatementCount());
+            final long nbefore = store.getStatementCount();
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
-            
-            Rule r = new RuleOwlSameAs1b(store.getSPORelation().getNamespace(),inf);
+            final Vocabulary vocab = store.getVocabulary();
+
+            final Rule r = new RuleOwlSameAs1b(store.getSPORelation()
+                    .getNamespace(), vocab);
 
             // apply the rule.
             applyRule(store, r, -1/*solutionCount*/,1/*mutationCount*/);
@@ -181,7 +179,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(X, OWL.SAMEAS, Z));
 
             // final #of statements in the store.
-            assertEquals(3,store.getStatementCount());
+            assertEquals(nbefore + 1, store.getStatementCount());
 
         } finally {
 
@@ -224,11 +222,12 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             // verify statement(s).
             assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(X, A, Z));
-            assertEquals(2,store.getStatementCount());
+            final long nbefore = store.getStatementCount();
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
-            
-            Rule r = new RuleOwlSameAs2(store.getSPORelation().getNamespace(),inf);
+            final Vocabulary vocab = store.getVocabulary();
+
+            final Rule r = new RuleOwlSameAs2(store.getSPORelation()
+                    .getNamespace(), vocab);
 
             // apply the rule.
             applyRule(store, r, -1/* solutionCount */, 1/* mutationCount */);
@@ -245,7 +244,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(Y, A, Z));
 
             // final #of statements in the store.
-            assertEquals(3,store.getStatementCount());
+            assertEquals(nbefore + 1, store.getStatementCount());
 
         } finally {
 
@@ -277,22 +276,27 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             URI X = new URIImpl("http://www.foo.org/X");
             URI Y = new URIImpl("http://www.foo.org/Y");
 
-            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            {
+
+                IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+
+                buffer.add(X, OWL.SAMEAS, Y);
+                buffer.add(Z, A, X);
+
+                // write on the store.
+                buffer.flush();
+                
+            }
             
-            buffer.add(X, OWL.SAMEAS, Y);
-            buffer.add(Z, A, X);
-
-            // write on the store.
-            buffer.flush();
-
             // verify statement(s).
             assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(Z, A, X));
-            assertEquals(2,store.getStatementCount());
+            final long nbefore = store.getStatementCount();
 
-            RDFSVocabulary inf = new RDFSVocabulary(store);
+            final Vocabulary vocab = store.getVocabulary();
 
-            Rule r = new RuleOwlSameAs3(store.getSPORelation().getNamespace(),inf);
+            final Rule r = new RuleOwlSameAs3(store.getSPORelation()
+                    .getNamespace(), vocab);
             
             // apply the rule.
             applyRule(store,r, -1/*solutionCount*/,1/*mutationCount*/);
@@ -309,7 +313,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(Z, A, Y));
 
             // final #of statements in the store.
-            assertEquals(3,store.getStatementCount());
+            assertEquals(nbefore + 1, store.getStatementCount());
 
         } finally {
 

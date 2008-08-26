@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,40 +22,39 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 30, 2005
+ * Created on Aug 26, 2008
  */
-package com.bigdata.rdf.inf;
 
-import java.util.Set;
+package com.bigdata.rdf.vocab;
 
-import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * @author personickm
+ * An empty {@link Vocabulary}.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public interface Axioms {
-    
-    public interface Triple {
+public class NoVocabulary extends BaseVocabulary {
 
-        URI getS();
-        
-        URI getP();
-        
-        URI getO();
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -5023634139839648847L;
+
+    /**
+     * De-serialization ctor.
+     */
+    public NoVocabulary() {
+    }
+
+    /**
+     * @param database
+     */
+    public NoVocabulary(AbstractTripleStore database) {
+
+        super(database);
         
     }
 
-    Set<Triple> getAxioms();
-    
-    Set<String> getVocabulary();
-    
-    boolean isAxiom( Statement stmt );
-    
-    boolean isAxiom( URI s, URI p, URI o );
-    
-    boolean isInVocabulary( URI uri );
-
-    int size();
-    
 }

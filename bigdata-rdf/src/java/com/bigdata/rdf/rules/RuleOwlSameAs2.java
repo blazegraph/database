@@ -26,7 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.vocabulary.OWL;
+
 import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.Rule;
 
@@ -50,19 +53,19 @@ public class RuleOwlSameAs2 extends Rule  {
     /**
      * @param vocab
      */
-    public RuleOwlSameAs2(String relationName, RDFSVocabulary vocab) {
+    public RuleOwlSameAs2(String relationName, Vocabulary vocab) {
 
         super(  "owlSameAs2",//
                 new SPOPredicate(relationName,var("y"), var("a"), var("z")), //
                 new SPOPredicate[] { //
-                    new SPOPredicate(relationName,var("x"), vocab.owlSameAs, var("y")),//
+                    new SPOPredicate(relationName,var("x"), vocab.getConstant(OWL.SAMEAS), var("y")),//
                     new SPOPredicate(relationName,var("x"), var("a"), var("z"))//
                 },
                 new IConstraint[]{
                     /*
                      * Reject (y sameAs z) as the head.
                      */
-                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),vocab.owlSameAs)
+                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),vocab.getConstant(OWL.SAMEAS))
 //                    , new NEConstant(var("a"),inf.owlSameAs.id)
                 }
         );

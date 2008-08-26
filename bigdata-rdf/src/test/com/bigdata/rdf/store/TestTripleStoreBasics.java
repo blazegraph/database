@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import com.bigdata.rdf.rules.TestMatch;
-
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase2;
@@ -96,6 +94,12 @@ public class TestTripleStoreBasics extends TestCase2 {
          */
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
+        // test suite for the vocabulary models and their persistence.
+        suite.addTest( com.bigdata.rdf.vocab.TestAll.suite() );
+        
+        // test suite for the axiom models and their persistence.
+        suite.addTest( com.bigdata.rdf.axioms.TestAll.suite() );
+        
         // test suite for the rule execution layer (query and closure operations).
         suite.addTest( com.bigdata.rdf.rules.TestAll.suite() );
 

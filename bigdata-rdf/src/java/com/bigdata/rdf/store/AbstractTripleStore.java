@@ -29,6 +29,7 @@ package com.bigdata.rdf.store;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,6 +73,10 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.axioms.Axioms;
+import com.bigdata.rdf.axioms.BaseAxioms;
+import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
@@ -85,13 +90,15 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.BaseClosure;
+import com.bigdata.rdf.rules.FastClosure;
+import com.bigdata.rdf.rules.FullClosure;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.rules.RuleFastClosure5;
 import com.bigdata.rdf.rules.RuleFastClosure6;
-import com.bigdata.rdf.rules.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -104,6 +111,10 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.spo.StatementWriter;
+import com.bigdata.rdf.vocab.BaseVocabulary;
+import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.rdf.vocab.RDFSVocabulary;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
@@ -136,6 +147,8 @@ import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
+import com.bigdata.sparse.INameFilter;
+import com.bigdata.sparse.ITPS;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedResolvingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
@@ -149,20 +162,12 @@ import cutthecrap.utils.striterators.EmptyIterator;
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
  * interface that is invariant across the choice of the backing store.
- * 
- * @todo Do the full quad store (vs the provenance mode, which uses the context
- *       position for statements about statements).
- *       <p>
- *       Make some of the indices optional such that we still have good access
- *       patterns but store less data when the quad is used as a statement
- *       identifier (by always using a distinct {@link BNode} as its value).
- *       There is no need for a pure triple store and the "bnode" trick can be
- *       used to model eagerly assigned statement identifiers. One question is
- *       whether the quad position can be left open (0L aka NULL). It seems that
- *       SPARQL might allow this, in which case we can save a lot of term
- *       identifiers that would otherwise be gobbled up eagerly. The quad
- *       position could of course be bound to some constant, in which case it
- *       would not be a statement identifier - more the context model.
+ * <p>
+ * By default, this class supports RDFS inference plus optional support for
+ * <code>owl:sameAs</code>, <code>owl:equivalentProperty</code>, and
+ * <code>owl:equivalentClass</code>. The {@link IRule}s are declarative, and
+ * it is easy to write new rules. Those {@link IRule}s can be introduced using
+ * custom {@link BaseClosure} implementations. See {@link Options#CLOSURE_CLASS}.
  * 
  * @todo sesame 2.x TCK (technology compatibility kit).
  * 
@@ -179,48 +184,6 @@ import cutthecrap.utils.striterators.EmptyIterator;
  * 
  * @todo Support rules (IF TripleExpr THEN ...) This is basically encapsulating
  *       the rule execution layer.
- * 
- * @todo There are two basic ways in which we are considering extending the
- *       platform to make statement identifiers useful.
- *       <ol>
- *       <li>Transparently convert ontology and data that uses RDF style
- *       reification such that it uses statement identifiers instead. There are
- *       a few drawbacks with this approach. One is that you still have to write
- *       high level queries in terms of RDF style reification, which means that
- *       we have not reduced the burden on the user significantly. There is also
- *       the possibility that the change would effect the semantics of RDF
- *       containers, or at least the relationship between the semantics of RDF
- *       containers and RDF style reification. The plus side of this approach is
- *       that the change could be completely transparent, but I am not sure that
- *       keeping RDF reification in any form - and especially in the queries -
- *       is a good idea.</li>
- *       <li>The other approach is to provide an extension of RDF/XML in which
- *       statements may be made and a high-level query language extension in
- *       which statement identifiers may be exploited to efficiently recover
- *       statements about statements. This approach has the advantage of being
- *       completely decoupled from the RDF reification semantics - it is a pure
- *       superset of the RDF data model and query language. Also, in this
- *       approach we can guarentee that the statement identifiers are purely an
- *       internal convenience of the database - much like blank nodes. In fact,
- *       statement identifiers can be created lazily - when there is a need to
- *       actually make a statement about a specific statement. </li>
- *       </ol>
- *       The second is where we are putting our effort right now. We are looking
- *       at doing this as a "database mode" which understands that there is a
- *       1:1 correspondence between a triple and a BNode used to identify the
- *       source in a named graph interchange syntax and that the default graph
- *       exposed via SPARQL is the RDF merge of the named graphs, and is
- *       leanified under that 1:1 correspondence assumption. All of which is to
- *       say that graph identifiers must be bnodes and have the semantics of
- *       statement identifiers in that database mode. You can then write a
- *       SPARQL query which uses a graph variable binding to recover statement
- *       metadata with resort to RDF style reification (aka statement models).
- *       <p>
- *       Statement identifiers are assigned when you add statements to the
- *       database, whether the statements are read from some RDF interchange
- *       syntax or added directly using
- *       {@link #addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)}
- *       and friends.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -245,14 +208,16 @@ abstract public class AbstractTripleStore extends
     /**
      * This is used to conditionally enable the logic to retract justifications
      * when the corresponding statements is retracted.
-     * 
-     * @deprecated by {@link SPORelation#justify}?
      */
     final private boolean justify;
     
     /**
      * True iff justification chains are being recorded for entailments and used
-     * to support truth maintenance
+     * to support truth maintenance.
+     * <P>
+     * Note: This is the same value that is reported by {@link SPORelation#justify}.
+     * 
+     * @see Options#JUSTIFY
      */
     final public boolean isJustify() {
         
@@ -324,7 +289,66 @@ abstract public class AbstractTripleStore extends
      * sequentially even when they are not flagged as a sequential program.
      */
     final private boolean forceSerialExecution;
+
+    /**
+     * The {@link Axioms} class.
+     * 
+     * @see com.bigdata.rdf.store.AbstractTripleStore.Options#AXIOMS_CLASS
+     */
+    final private Class<? extends BaseAxioms> axiomClass;
     
+    /**
+     * The {@link Vocabulary} class.
+     * 
+     * @see Options#VOCABULARY_CLASS
+     */
+    final private Class<? extends BaseVocabulary> vocabularyClass;
+    
+    /**
+     * The {@link BaseClosure} class.
+     * 
+     * @see Options#CLOSURE_CLASS
+     */
+    final private Class<? extends BaseClosure> closureClass;
+    
+    /**
+     * Return an instance of the class that is used to compute the closure of
+     * the database.
+     */
+    public BaseClosure getClosureInstance() {
+
+        try {
+
+            final Constructor<? extends BaseClosure> ctor = closureClass
+                    .getConstructor(new Class[] { AbstractTripleStore.class });
+
+            return ctor.newInstance(this);
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(e);
+
+        }
+        
+    }
+    
+    /**
+     * Return true iff the fully bound statement is an axiom.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * 
+     * @return
+     * 
+     * @todo longs or ISPO?
+     */
+    public boolean isAxiom(long s, long p, long o) {
+        
+        return getAxioms().isAxiom(s, p, o);
+        
+    }
+        
     /**
      * When <code>true</code> the database will support statement identifiers.
      * <p>
@@ -360,23 +384,24 @@ abstract public class AbstractTripleStore extends
      */
     final public BigdataValueFactoryImpl getValueFactory() {
 
-        if (valueFactory != null)
-            return valueFactory;
+        if (valueFactory == null) {
 
-        if(!lexicon) {
+            if (!lexicon) {
 
-            throw new UnsupportedOperationException();
+                throw new UnsupportedOperationException();
 
-        }
-        
-        synchronized(this) {
-            
-            if (valueFactory == null) {
-                
-                valueFactory = getLexiconRelation().getValueFactory();
-                
             }
-            
+
+            synchronized (this) {
+
+                if (valueFactory == null) {
+
+                    valueFactory = getLexiconRelation().getValueFactory();
+
+                }
+
+            }
+
         }
         
         return valueFactory;
@@ -439,7 +464,76 @@ abstract public class AbstractTripleStore extends
         String STORE_BLANK_NODES = "storeBlankNodes";
         
         String DEFAULT_STORE_BLANK_NODES = "false";
+
+        /**
+         * Boolean option (default <code>true</code>) enables support for a
+         * full text index that may be used to lookup literals by tokens found
+         * in the text of those literals.
+         */
+        String TEXT_INDEX = "textIndex";
+
+        String DEFAULT_TEXT_INDEX = "true";
         
+        /**
+         * The name of the class that will establish the pre-defined
+         * {@link Vocabulary} for the database (default
+         * {@value #DEFAULT_VOCABULARY_CLASS}). The class MUST extend
+         * {@link BaseVocabulary}. This option is ignored if the lexicon is
+         * disabled.
+         * <p>
+         * The {@link Vocabulary} is initialized by
+         * {@link AbstractTripleStore#create()} and its serialized state is
+         * stored in the global row store under the
+         * {@link TripleStoreSchema#VOCABULARY} property.
+         */
+        String VOCABULARY_CLASS = "vocabularyClass";
+
+        String DEFAULT_VOCABULARY_CLASS = RDFSVocabulary.class.getName();
+        
+        /**
+         * The {@link Axioms} model that will be used (default
+         * {@value Options#DEFAULT_AXIOMS_CLASS}). The value is the name of the
+         * class that will be instantiated by
+         * {@link AbstractTripleStore#create()}. The class must extend
+         * {@link BaseAxioms}. This option is ignored if the lexicon is
+         * disabled.
+         */
+        String AXIOMS_CLASS = "axiomsClass";
+        
+        String DEFAULT_AXIOMS_CLASS = OwlAxioms.class.getName();
+
+        /**
+         * The name of the {@link BaseClosure} class that will be used (default
+         * {@value Options#DEFAULT_CLOSURE_CLASS}). The value is the name of
+         * the class that will be used to generate the {@link Program} that
+         * computes the closure of the database. The class must extend
+         * {@link BaseClosure}. This option is ignored if the inference is
+         * disabled.
+         * <p>
+         * There are two pre-defined "programs" used to compute and maintain
+         * closure. The {@link FullClosure} program is a simple fix point of the
+         * RDFS+ entailments, except for the
+         * <code> foo rdf:type rdfs:Resource</code> entailments which are
+         * normally generated at query time. The {@link FastClosure} program
+         * breaks nearly all cycles in the RDFS rules and runs nearly entirely
+         * as a sequence of {@link IRule}s, including several custom rules.
+         * <p>
+         * It is far easier to modify the {@link FullClosure} program since any
+         * new rules can just be dropped into place. Modifying the
+         * {@link FastClosure} program requires careful consideration of the
+         * entailments computed at each stage in order to determine where a new
+         * rule would fit in.
+         * <p>
+         * Note: When support for <code>owl:sameAs</code>, etc. processing is
+         * enabled, some of the entailments are computed by rules run during
+         * forward closure and some of the entailments are computed by rules run
+         * at query time. Both {@link FastClosure} and {@link FullClosure} are
+         * aware of this and handle it correctly (e.g., as configured).
+         */
+        String CLOSURE_CLASS = "closureClass";
+        
+        String DEFAULT_CLOSURE_CLASS = FastClosure.class.getName();
+
         /**
          * Boolean option (default <code>false</code>) disables all but a
          * single statement index (aka access path).
@@ -454,14 +548,23 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_ONE_ACCESS_PATH = "false";
 
         /**
-         * Boolean option (default <code>true</code>) enables support for a
-         * full text index that may be used to lookup literals by tokens found
-         * in the text of those literals.
+         * When <code>true</code> (default {@value Options#DEFAULT_JUSTIFY}),
+         * proof chains for entailments generated by foward chaining are stored
+         * in the database. This option is required for truth maintenance when
+         * retracting assertion.
+         * <p>
+         * If you will not be retracting statements from the database then you
+         * can specify <code>false</code> for a significant performance boost
+         * during writes and a smaller profile on the disk.
+         * <p>
+         * This option does not effect query performance since the
+         * justifications are maintained in a distinct index and are only used
+         * when retracting assertions.
          */
-        String TEXT_INDEX = "textIndex";
+        String JUSTIFY = "justify";
 
-        String DEFAULT_TEXT_INDEX = "true";
-
+        String DEFAULT_JUSTIFY = "true";
+        
         /**
          * Boolean option (default {@value #DEFAULT_STATEMENT_IDENTIFIERS})
          * enables support for statement identifiers. A statement identifier is
@@ -626,15 +729,13 @@ abstract public class AbstractTripleStore extends
          * rule sets will be forced to execute sequentially even when they are
          * not flagged as a sequential program.
          * <p>
-         * The
-         * {@link com.bigdata.rdf.rules.InferenceEngine.Options#FORWARD_CLOSURE}
-         * option defaults to {@link ForwardClosureEnum#Fast} which has very
-         * little possible parallelism (it is mostly a sequential program by
-         * nature). For that reason, {@link #FORCE_SERIAL_EXECUTION} defaults to
-         * <code>false</code> since the overhead of parallel execution is more
-         * likely to lower the observed performance with such limited possible
-         * parallelism. However, when using {@link ForwardClosureEnum#Full} the
-         * benefits of parallelism MAY justify its overhead.
+         * The {@link #CLOSURE_CLASS} option defaults to {@link FastClosure},
+         * which has very little possible parallelism (it is mostly a sequential
+         * program by nature). For that reason, {@link #FORCE_SERIAL_EXECUTION}
+         * defaults to <code>false</code> since the overhead of parallel
+         * execution is more likely to lower the observed performance with such
+         * limited possible parallelism. However, when using {@link FullClosure}
+         * the benefits of parallelism MAY justify its overhead.
          * <p>
          * The following data are for LUBM datasets.
          * 
@@ -663,15 +764,15 @@ abstract public class AbstractTripleStore extends
          * "fast" closure program is so large that there is little reason to
          * consider parallel rule execution for the "full" closure program.
          * 
-         * @todo retry the U10 Full serial vs parallel rule execution examples
-         *       and look further into ways in which overhead might be reduced
-         *       for rule parallelism and also for when rule parallelism is not
-         *       enabled.
+         * @todo collect new timings for this option. The LUBM performance has
+         *       basically doubled since these data were collected. Look further
+         *       into ways in which overhead might be reduced for rule
+         *       parallelism and also for when rule parallelism is not enabled.
          */
         String FORCE_SERIAL_EXECUTION = "forceSerialExecution";
         
         String DEFAULT_FORCE_SERIAL_EXECUTION = "true";
-        
+
     }
 
     /**
@@ -692,9 +793,9 @@ abstract public class AbstractTripleStore extends
          */
 
         this.justify = Boolean.parseBoolean(properties.getProperty(
-                Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
+                com.bigdata.rdf.store.AbstractTripleStore.Options.JUSTIFY, com.bigdata.rdf.store.AbstractTripleStore.Options.DEFAULT_JUSTIFY));
 
-        log.info(Options.JUSTIFY + "=" + justify);
+        log.info(com.bigdata.rdf.store.AbstractTripleStore.Options.JUSTIFY + "=" + justify);
 
         this.lexicon = Boolean.parseBoolean(properties.getProperty(
                 Options.LEXICON, Options.DEFAULT_LEXICON));
@@ -712,6 +813,104 @@ abstract public class AbstractTripleStore extends
 
         log.info(Options.STATEMENT_IDENTIFIERS + "=" + statementIdentifiers);
 
+        if (lexicon) {
+
+            // vocabularyClass
+            {
+
+                final String className = properties.getProperty(
+                        Options.VOCABULARY_CLASS,
+                        Options.DEFAULT_VOCABULARY_CLASS);
+
+                log.info(Options.VOCABULARY_CLASS + "=" + className);
+
+                final Class cls;
+                try {
+                    cls = Class.forName(className);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException("Bad option: "
+                            + Options.VOCABULARY_CLASS, e);
+                }
+
+                if (!BaseVocabulary.class.isAssignableFrom(cls)) {
+                    throw new RuntimeException(Options.VOCABULARY_CLASS
+                            + ": Must extend: "
+                            + BaseVocabulary.class.getName());
+                }
+                vocabularyClass = cls;
+                
+            }
+            
+            // axiomsClass
+            {
+                
+                /*
+                 * Note: axioms may not be defined unless the lexicon is enabled
+                 * since the axioms require the lexicon in order to resolve
+                 * their expression as Statements into their expression as SPOs.
+                 */
+
+                final String className = properties.getProperty(
+                        Options.AXIOMS_CLASS, Options.DEFAULT_AXIOMS_CLASS);
+
+                log.info(Options.AXIOMS_CLASS + "=" + className);
+
+                final Class cls;
+                try {
+                    cls = Class.forName(className);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException("Bad option: "
+                            + Options.AXIOMS_CLASS, e);
+                }
+
+                if (!BaseAxioms.class.isAssignableFrom(cls)) {
+                    throw new RuntimeException(Options.AXIOMS_CLASS
+                            + ": Must extend: " + BaseAxioms.class.getName());
+                }
+                axiomClass = cls;
+            
+            }    
+            
+        } else {
+            
+            /*
+             * no axioms if no lexicon (the lexicon is required to write the
+             * axioms).
+             */
+            
+            axiomClass = NoAxioms.class;
+            
+            vocabularyClass = NoVocabulary.class;
+            
+        }
+        
+        // closureClass
+        {
+
+            final String className = properties.getProperty(
+                    Options.CLOSURE_CLASS,
+                    Options.DEFAULT_CLOSURE_CLASS);
+
+            log.info(Options.CLOSURE_CLASS + "=" + className);
+
+            final Class cls;
+            try {
+                cls = Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Bad option: "
+                        + Options.CLOSURE_CLASS, e);
+            }
+
+            if (!BaseClosure.class.isAssignableFrom(cls)) {
+                throw new RuntimeException(Options.CLOSURE_CLASS
+                        + ": Must extend: "
+                        + BaseClosure.class.getName());
+            }
+            
+            closureClass = cls;
+            
+        }
+        
         {
             
             forceSerialExecution = Boolean.parseBoolean(properties.getProperty(
@@ -914,6 +1113,89 @@ abstract public class AbstractTripleStore extends
             spoRelation.create();
 
             /*
+             * The axioms and the vocabulary both require the lexicon to
+             * pre-exist. The axioms also requires the SPORelation to pre-exist.
+             */
+            if(lexicon) {
+
+                /*
+                 * Setup the vocabulary.
+                 */
+                {
+                    
+                    assert vocab == null;
+
+                    try {
+
+                        final Constructor<? extends BaseVocabulary> ctor = vocabularyClass
+                                .getConstructor(new Class[] { AbstractTripleStore.class });
+
+                        // save reference.
+                        vocab = ctor.newInstance(new Object[] { this });
+
+                    } catch (Exception ex) {
+
+                        throw new RuntimeException(ex);
+
+                    }
+
+                    // initialize (writes on the lexicon).
+                    ((BaseVocabulary) vocab).init();
+
+                }
+                
+                /*
+                 * Setup the axiom model.
+                 */
+                {
+
+                    assert axioms == null;
+
+                    try {
+
+                        final Constructor<? extends BaseAxioms> ctor = axiomClass
+                                .getConstructor(new Class[] { AbstractTripleStore.class });
+
+                        // save reference.
+                        axioms = ctor.newInstance(new Object[] { this });
+
+                    } catch (Exception ex) {
+
+                        throw new RuntimeException(ex);
+
+                    }
+
+                    // initialize (writes on the lexicon and statement indices). 
+                    ((BaseAxioms)axioms).init();
+
+                }
+
+                /*
+                 * Update the global row store to set the axioms and the
+                 * vocabulary objects.
+                 */
+                {
+
+                    final Map<String, Object> map = new HashMap<String, Object>();
+
+                    // primary key.
+                    map.put(RelationSchema.NAMESPACE, getNamespace());
+
+                    // axioms.
+                    map.put(TripleStoreSchema.AXIOMS, axioms);
+
+                    // vocabulary.
+                    map.put(TripleStoreSchema.VOCABULARY, vocab);
+
+                    // Write the map on the row store.
+                    getIndexManager().getGlobalRowStore().write(
+                            RelationSchema.INSTANCE, map);
+
+                }
+
+            }
+        
+            /*
              * Note: A commit is required in order for a read-committed view to
              * have access to the registered indices.
              * 
@@ -948,6 +1230,10 @@ abstract public class AbstractTripleStore extends
                 lexiconRelation = null;
                 
                 valueFactory = null;
+
+                axioms = null;
+                
+                vocab = null;
                 
             }
 
@@ -964,6 +1250,114 @@ abstract public class AbstractTripleStore extends
         }
 
     }
+    
+    /**
+     * The configured axioms. This is stored in the global row store and set
+     * automatically if it is found in the {@link Properties}. Otherwise it is
+     * set by {@link #create()}.
+     * 
+     * @throws IllegalStateException
+     *             if there is no lexicon.
+     * 
+     * @see Options#LEXICON
+     * @see com.bigdata.rdf.store.AbstractTripleStore.Options#AXIOMS_CLASS
+     */
+    final public Axioms getAxioms() {
+
+        if (!lexicon)
+            throw new IllegalStateException();
+        
+        if (axioms == null) {
+            
+            synchronized (this) {
+
+                if (axioms == null) {
+
+                    // read from the global row store.
+                    final ITPS tps = getIndexManager().getGlobalRowStore()
+                            .read(RelationSchema.INSTANCE, getNamespace(),
+                                    Long.MAX_VALUE, new INameFilter() {
+
+                                        // just the value that we need.
+                                        public boolean accept(String name) {
+                                            return name
+                                                    .equals(TripleStoreSchema.AXIOMS);
+                                        }
+                                    });
+
+                    // extract the de-serialized axiom model.
+                    axioms = (Axioms) tps.get(TripleStoreSchema.AXIOMS)
+                            .getValue();
+
+                    if (axioms == null)
+                        throw new RuntimeException("No axioms defined? : "
+                                + this);
+
+                }
+
+            }
+            
+        }
+        
+        return axioms;
+        
+    }
+    private volatile Axioms axioms;
+
+    /**
+     * Return the configured {@link Vocabulary}. This consists of
+     * {@link BigdataValue}s of interest that have been pre-evaluated against
+     * the lexicon and are associated with their correct term identifiers.
+     * 
+     * @return The predefined vocabulary.
+     * 
+     * @throws IllegalStateException
+     *             if there is no lexicon.
+     * 
+     * @see Options#LEXICON
+     * @see Options#VOCABULARY_CLASS
+     */
+    final public Vocabulary getVocabulary() {
+
+        if (!lexicon)
+            throw new IllegalStateException();
+        
+        if(vocab == null) {
+            
+            synchronized (this) {
+
+                if (vocab == null) {
+
+                    // read from the global row store.
+                    final ITPS tps = getIndexManager().getGlobalRowStore()
+                            .read(RelationSchema.INSTANCE, getNamespace(),
+                                    Long.MAX_VALUE, new INameFilter() {
+
+                                        // just the value that we need.
+                                        public boolean accept(String name) {
+                                            return name
+                                                    .equals(TripleStoreSchema.VOCABULARY);
+                                        }
+                                    });
+
+                    // extract the de-serialized vocabulary.
+                    vocab = (Vocabulary) tps.get(TripleStoreSchema.VOCABULARY)
+                            .getValue();
+
+                    if (vocab == null)
+                        throw new RuntimeException("No vocabulary defined? : "
+                                + this);
+
+                }
+                
+            }
+            
+        }
+        
+        return vocab;
+        
+    }
+    private volatile Vocabulary vocab;
     
     /**
      * The {@link SPORelation} (triples and their access paths).
@@ -2831,6 +3225,9 @@ abstract public class AbstractTripleStore extends
         // only store the SPO index
         properties.setProperty(Options.ONE_ACCESS_PATH, "true");
 
+        // no axioms.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+
         final TempTripleStore tmp = new TempTripleStore(properties,this);
         
         /*
@@ -3276,7 +3673,7 @@ abstract public class AbstractTripleStore extends
 
         // instantiate the rule.
         final Rule r = new MatchRule(getSPORelation().getNamespace(),
-                getInferenceEngine(), lit, _preds, new Constant<Long>(_cls));
+                getVocabulary(), lit, _preds, new Constant<Long>(_cls));
 
         // bindings used to specialize the rule for each completed literal.
         final IBindingSet bindings = new ArrayBindingSet(r.getVariableCount());

@@ -29,6 +29,9 @@ package com.bigdata.rdf.rules;
 
 import java.util.Set;
 
+import org.openrdf.model.vocabulary.RDFS;
+
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
@@ -44,19 +47,19 @@ public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
     private static final long serialVersionUID = 8276555097415122677L;
 
     /**
-     * @param inf
+     * @param vocab
      * @param P
      */
     public RuleFastClosure3(
             final String database,
             final String focusStore,
-            final RDFSVocabulary inf) {
+            final Vocabulary vocab) {
         //, Set<Long> P) {
         
         super("fastClosure3",
                 database,
-                inf.rdfsSubPropertyOf,
-                inf.rdfsSubPropertyOf,
+                vocab.getConstant(RDFS.SUBPROPERTYOF),
+                vocab.getConstant(RDFS.SUBPROPERTYOF),
                 /*
                  * Custom rule executor factory.
                  */
@@ -67,10 +70,12 @@ public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
 
                         return new FastClosureRuleTask(database, focusStore,
                                 rule, joinNexus, buffer, /* P, */
-                                inf.rdfsSubPropertyOf, inf.rdfsSubPropertyOf) {
+                                vocab.getConstant(RDFS.SUBPROPERTYOF), //
+                                vocab.getConstant(RDFS.SUBPROPERTYOF)) {
 
                             /**
-                             * Note: This is the set {P} in the fast closure program.
+                             * Note: This is the set {P} in the fast closure
+                             * program.
                              */
                             public Set<Long> getSet() {
 

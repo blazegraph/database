@@ -1651,7 +1651,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * the InferenceEngine was configured.
                  */
                 
-                src = new BackchainAccessPath(getInferenceEngine(),
+                src = new BackchainAccessPath(database,
                         getTemporaryStore(), accessPath).iterator();
                 
             } else {

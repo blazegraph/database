@@ -23,7 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.vocabulary.RDF;
+
 import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * rdf1:
@@ -44,10 +47,10 @@ public class RuleRdf01 extends AbstractRuleDistinctTermScan {
      */
     private static final long serialVersionUID = -7423082674586471243L;
 
-    public RuleRdf01(String relationName,RDFSVocabulary inf) {
+    public RuleRdf01(String relationName,Vocabulary vocab) {
 
         super(  "rdf01",//
-                new SPOPredicate(relationName,var("a"), inf.rdfType, inf.rdfProperty), //
+                new SPOPredicate(relationName,var("a"), vocab.getConstant(RDF.TYPE), vocab.getConstant(RDF.PROPERTY)), //
                 new SPOPredicate[] { //
                     new SPOPredicate(relationName,var("u"), var("a"), var("y"))//
                 },//

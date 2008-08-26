@@ -27,7 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.rdf.spo.SPO;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+
+import com.bigdata.rdf.vocab.Vocabulary;
 
 public class RuleFastClosure9 extends AbstractRuleFastClosure_5_6_7_9 {
 
@@ -37,12 +40,17 @@ public class RuleFastClosure9 extends AbstractRuleFastClosure_5_6_7_9 {
     private static final long serialVersionUID = 1403722099363819443L;
 
     /**
-     * @param inf
+     * @param vocab
      * @param T
      */
-    public RuleFastClosure9(String database,String focusStore,RDFSVocabulary inf) {//, Set<Long> T) {
+    public RuleFastClosure9(String database, String focusStore, Vocabulary vocab) {
+        //, Set<Long> T
         
-        super("fastClosure9",database,focusStore,inf.rdfsSubPropertyOf,inf.rdfType);//, T);
+        super("fastClosure9",database,focusStore,//
+                vocab.getConstant(RDFS.SUBPROPERTYOF),//
+                vocab.getConstant(RDF.TYPE)//
+                );
+        //, T);
         
     }
     

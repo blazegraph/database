@@ -687,7 +687,7 @@ public class Justification implements Comparable<Justification> {
 
             if(head.getStatementType()!=StatementEnum.Inferred) return true;
             
-            if(inf.isAxiom(head.s(), head.p(), head.o())) return true;
+            if(db.isAxiom(head.s(), head.p(), head.o())) return true;
 
             if(!visited.add(head)) {
                 
@@ -727,7 +727,7 @@ public class Justification implements Comparable<Justification> {
 
                 if(DEBUG) log.debug("considering: "+spo.toString(db));
                 
-                if(inf.isAxiom(spo.s(), spo.p(), spo.o())) return true;
+                if(db.isAxiom(spo.s(), spo.p(), spo.o())) return true;
                 
                 if (spo.getStatementType() == StatementEnum.Explicit) {
 

@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import org.openrdf.model.vocabulary.RDFS;
+
+import com.bigdata.rdf.vocab.Vocabulary;
+
 
 public class RuleFastClosure6 extends AbstractRuleFastClosure_5_6_7_9 {
 
@@ -36,14 +40,17 @@ public class RuleFastClosure6 extends AbstractRuleFastClosure_5_6_7_9 {
     private static final long serialVersionUID = 2335860655936029008L;
 
     /**
-     * @param inf
+     * @param vocab
      * @param R
      */
-    public RuleFastClosure6(String database, String focusStore, RDFSVocabulary inf) {
+    public RuleFastClosure6(String database, String focusStore, Vocabulary vocab) {
         // Set<Long> R) {
 
-        super("fastClosure6", database, focusStore, inf.rdfsSubPropertyOf,
-                inf.rdfsRange);// , R);
+        super("fastClosure6", database, focusStore,//
+                vocab.getConstant(RDFS.SUBPROPERTYOF),//
+                vocab.getConstant(RDFS.RANGE)//
+                );
+        // , R);
 
     }
     

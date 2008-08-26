@@ -50,6 +50,7 @@ package com.bigdata.rdf.store;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.openrdf.model.Statement;
@@ -58,6 +59,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -68,6 +70,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer.StatementCyclesException;
 import com.bigdata.rdf.rio.StatementBuffer.UnificationException;
+import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -102,8 +105,13 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
      */
     public void test_statementIdentifiers() {
 
-        AbstractTripleStore store = getStore();
+        final Properties properties = super.getProperties();
         
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        AbstractTripleStore store = getStore(properties);
+
         try {
             
             if (!store.statementIdentifiers) {
@@ -402,8 +410,13 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
      */
     public void test_retractionOfStatementsAboutStatements() {
         
-        AbstractTripleStore store = getStore();
-
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
+        
         try {
 
             if(!store.statementIdentifiers) {
@@ -514,8 +527,13 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
      */
     public void test_retractionOfStatementsAboutStatements2() {
         
-        AbstractTripleStore store = getStore();
-
+        final Properties properties = super.getProperties();
+        
+        // override the default axiom model.
+        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
+        
         try {
 
             if(!store.statementIdentifiers) {

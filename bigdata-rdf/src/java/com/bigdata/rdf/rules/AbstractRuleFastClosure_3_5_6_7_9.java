@@ -36,6 +36,7 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.vocab.RDFSVocabulary;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
