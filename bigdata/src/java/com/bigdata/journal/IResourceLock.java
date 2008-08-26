@@ -1,21 +1,24 @@
 package com.bigdata.journal;
 
+import java.io.IOException;
+import java.rmi.Remote;
+
 /**
-     * A lock granted by an {@link IResourceLockManager}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+ * A lock granted by an {@link IResourceLockService}.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public interface IResourceLock extends Remote {
+
+    /**
+     * Release the lock.
      */
-    public interface IResourceLock {
+    public void unlock() throws IOException;
 
-        /**
-         * Release the lock.
-         */
-        public void unlock();
-        
-//        /**
-//         * The unique identifier for this lock.
-//         */
-//        public UUID uuid();
+    //        /**
+    //         * The unique identifier for this lock.
+    //         */
+    //        public UUID uuid();
 
-    }
+}

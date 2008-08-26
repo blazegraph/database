@@ -27,6 +27,7 @@
 
 package com.bigdata.rdf.store;
 
+import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -1083,8 +1084,7 @@ abstract public class AbstractTripleStore extends
 
         assertWritable();
         
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
+        final IResourceLock resourceLock = acquireExclusiveLock();
 
         final Properties tmp = getProperties();
         
@@ -1208,7 +1208,7 @@ abstract public class AbstractTripleStore extends
 
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
 
         }
 
@@ -1218,8 +1218,7 @@ abstract public class AbstractTripleStore extends
 
         assertWritable();
 
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
+        final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
 
@@ -1245,7 +1244,7 @@ abstract public class AbstractTripleStore extends
             
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
             
         }
 

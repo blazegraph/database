@@ -94,7 +94,7 @@ public class EmbeddedClient extends AbstractClient {
 
     }
 
-    synchronized public IBigdataFederation connect() {
+    synchronized public EmbeddedFederation connect() {
 
         if (fed == null) {
 

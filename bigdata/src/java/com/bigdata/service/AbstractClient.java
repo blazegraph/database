@@ -138,7 +138,10 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_THREAD_POOL_SIZE,
                     Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
 
-            log.info(Options.CLIENT_THREAD_POOL_SIZE + "=" + threadPoolSize);
+            if (log.isInfoEnabled())
+                log
+                        .info(Options.CLIENT_THREAD_POOL_SIZE + "="
+                                + threadPoolSize);
 
         }
 
@@ -149,7 +152,9 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_MAX_STALE_LOCATOR_RETRIES,
                     Options.DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES));
 
-            log.info(Options.CLIENT_MAX_STALE_LOCATOR_RETRIES + "=" + maxStaleLocatorRetries);
+            if (log.isInfoEnabled())
+                log.info(Options.CLIENT_MAX_STALE_LOCATOR_RETRIES + "="
+                        + maxStaleLocatorRetries);
 
             if (maxStaleLocatorRetries < 0) {
 
@@ -169,8 +174,9 @@ abstract public class AbstractClient implements IBigdataClient {
                                     Options.CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST,
                                     Options.DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST));
 
-            log.info(Options.CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST + "="
-                    + maxParallelTasksPerRequest);
+            if (log.isInfoEnabled())
+                log.info(Options.CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST + "="
+                        + maxParallelTasksPerRequest);
 
             if (maxParallelTasksPerRequest <= 0) {
 
@@ -189,7 +195,8 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_TASK_TIMEOUT,
                     Options.DEFAULT_CLIENT_TASK_TIMEOUT));
 
-            log.info(Options.CLIENT_TASK_TIMEOUT + "=" + taskTimeout);
+            if (log.isInfoEnabled())
+                log.info(Options.CLIENT_TASK_TIMEOUT + "=" + taskTimeout);
 
         }
 
@@ -200,8 +207,9 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.CLIENT_RANGE_QUERY_CAPACITY,
                             Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
 
-            log.info(Options.CLIENT_RANGE_QUERY_CAPACITY + "="
-                    + defaultRangeQueryCapacity);
+            if (log.isInfoEnabled())
+                log.info(Options.CLIENT_RANGE_QUERY_CAPACITY + "="
+                        + defaultRangeQueryCapacity);
             
         }
 
@@ -212,19 +220,21 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_BATCH_API_ONLY,
                     Options.DEFAULT_CLIENT_BATCH_API_ONLY));
 
-            log.info(Options.CLIENT_BATCH_API_ONLY + "=" + batchApiOnly);
+            if (log.isInfoEnabled())
+                log.info(Options.CLIENT_BATCH_API_ONLY + "=" + batchApiOnly);
             
         }
-        /*
-         * indexCacheCapacity
-         */
+        
+        // indexCacheCapacity
         {
 
             indexCacheCapacity = Integer.parseInt(properties.getProperty(
                     Options.CLIENT_INDEX_CACHE_CAPACITY,
                     Options.DEFAULT_CLIENT_INDEX_CACHE_CAPACITY));
 
-            log.info(Options.CLIENT_INDEX_CACHE_CAPACITY+"="+indexCacheCapacity);
+            if (log.isInfoEnabled())
+                log.info(Options.CLIENT_INDEX_CACHE_CAPACITY + "="
+                        + indexCacheCapacity);
 
             if (indexCacheCapacity <= 0)
                 throw new RuntimeException(Options.CLIENT_INDEX_CACHE_CAPACITY

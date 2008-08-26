@@ -765,7 +765,8 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
         
         final ICounter counter = new Counter(this, name, instrument);
         
-        log.info("parent="+getPath()+", name="+name);
+        if (log.isInfoEnabled())
+            log.info("parent=" + getPath()+", name="+name);
         
         children.put(name, counter);
         

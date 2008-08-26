@@ -491,7 +491,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: elapsed="+elapsed+"ms");
+        if(log.isInfoEnabled()) log.info("Done: elapsed="+elapsed+"ms");
 
     }
 
@@ -938,7 +938,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
              * committed state of the index.
              */
 
-            log.info("Submitted to the read service: "
+            if(log.isInfoEnabled()) log.info("Submitted to the read service: "
                     + task.getClass().getName() + ", timestamp="
                     + task.timestamp);
 
@@ -955,7 +955,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * not for the reads against the historical data.
                  */
 
-                log.info("Submitted to the transaction service: "
+                if(log.isInfoEnabled()) log.info("Submitted to the transaction service: "
                         + task.getClass().getName() + ", timestamp="
                         + task.timestamp);
 
@@ -970,7 +970,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * never more than one task with access to a given live index.
                  */
 
-                log.info("Submitted to the write service: "
+                if(log.isInfoEnabled()) log.info("Submitted to the write service: "
                         + task.getClass().getName() + ", timestamp="
                         + task.timestamp);
 
@@ -1006,9 +1006,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * submittinged. This causes clients to block until we are ready to
          * process their tasks.
          */
-        if(resourceManager instanceof StoreManager){
+        if (resourceManager instanceof StoreManager) {
             
-            if(!((StoreManager)resourceManager).awaitRunning()) {
+            if (!((StoreManager) resourceManager).awaitRunning()) {
 
                 throw new RejectedExecutionException(
                         "StoreManager is not available");
@@ -1019,7 +1019,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         if(backoff && service instanceof ThreadPoolExecutor) {
 
-            BlockingQueue<Runnable> queue = ((ThreadPoolExecutor)service).getQueue();
+            final BlockingQueue<Runnable> queue = ((ThreadPoolExecutor) service)
+                    .getQueue();
         
             final int queueCapacity = queue.remainingCapacity();
             

@@ -52,10 +52,11 @@ public class RelationSchema extends Schema {
     public transient static final RelationSchema INSTANCE = new RelationSchema();
     
     /**
+     * De-serialization ctor.
      * 
      * @see #INSTANCE
      */
-    protected RelationSchema() {
+    public RelationSchema() {
 
         super("__relation", NAMESPACE, KeyType.Unicode);
 

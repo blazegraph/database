@@ -111,9 +111,11 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         hostPathPrefix = ICounterSet.pathSeparator + fullyQualifiedHostName
                 + ICounterSet.pathSeparator;
 
-        log.info("hostname  : "+hostname);
-        log.info("FQDN      : "+fullyQualifiedHostName);
-        log.info("hostPrefix: "+hostPathPrefix);
+        if (INFO) {
+            log.info("hostname  : " + hostname);
+            log.info("FQDN      : " + fullyQualifiedHostName);
+            log.info("hostPrefix: " + hostPathPrefix);
+        }
         
     }
     
@@ -135,7 +137,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         if (interval <= 0)
             throw new IllegalArgumentException();
 
-        log.info("interval=" + interval);
+        if(INFO) log.info("interval=" + interval);
         
         this.interval = interval;
         
@@ -385,7 +387,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
         final String name_count = "Collection Count";
 
-        final String name_time = "Collection Time";
+        final String name_time = "Cumulative Collection Time";
 
         synchronized (counterSet) {
 
@@ -404,6 +406,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                     // memory pool names.
                     {
                         if (tmp.getChild(name_pools) == null) {
+                            
                             tmp.addCounter(name_pools,
                                     new Instrument<String>() {
 
@@ -414,8 +417,11 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                                                     .getMemoryPoolNames()));
 
                                         }
-                                    });
+                        
+                            });
+                        
                         }
+                        
                     }
 
                     // collection count.

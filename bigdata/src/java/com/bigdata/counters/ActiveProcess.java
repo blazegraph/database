@@ -94,7 +94,8 @@ public class ActiveProcess {
 
             }
 
-            log.info("command:\n" + sb);
+            if (log.isInfoEnabled())
+                log.info("command:\n" + sb);
 
         }
                     
@@ -202,10 +203,12 @@ public class ActiveProcess {
         
         if(readerFuture==null || readerFuture.isDone() || process == null || is == null) {
             
-            log.info("Not alive: readerFuture="
-                    + readerFuture
-                    + (readerFuture != null ? "done=" + readerFuture.isDone()
-                            : "") + ", process=" + process + ", is=" + is);
+            if (log.isInfoEnabled())
+                log.info("Not alive: readerFuture="
+                        + readerFuture
+                        + (readerFuture != null ? "done="
+                                + readerFuture.isDone() : "") + ", process="
+                        + process + ", is=" + is);
             
             return false;
             

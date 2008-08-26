@@ -41,7 +41,7 @@ import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IServiceShutdown;
 
 /**
- * A low-latency {@link IResourceLockManager} with deadlock detection,
+ * A low-latency {@link IResourceLockService} with deadlock detection,
  * escalation from shared (read/write) to exclusive, and resource hierarchy
  * locking. This is used primarily to support distributed operations on
  * relations, such as create/destroy vs use and lock of the relation owner for
@@ -111,8 +111,8 @@ import com.bigdata.service.IServiceShutdown;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ResourceLockManager extends AbstractService implements
-        IResourceLockManager, IServiceShutdown {
+abstract public class ResourceLockService extends AbstractService implements
+        IResourceLockService, IServiceShutdown {
 
     /**
      * 
@@ -124,7 +124,7 @@ abstract public class ResourceLockManager extends AbstractService implements
         
     };
     
-    public ResourceLockManager(Properties properties) {
+    public ResourceLockService(Properties properties) {
         
     }
     
@@ -212,7 +212,7 @@ abstract public class ResourceLockManager extends AbstractService implements
 
     }
 
-    private class Lock implements IResourceLock, Serializable {
+    private static class Lock implements IResourceLock, Serializable {
 
         /**
          * 
@@ -229,10 +229,13 @@ abstract public class ResourceLockManager extends AbstractService implements
 
         }
 
-        // @todo must proxy for jini/RMI
+        /**
+         * FIXME must proxy for jini/RMI (currently disabled as it forces
+         * serialization of the {@link ResourceLockService}).
+         */
         public void unlock() {
             
-            ResourceLockManager.this.unlock(this);
+//            ResourceLockService.this.unlock(this);
 
         }
 
@@ -270,7 +273,7 @@ abstract public class ResourceLockManager extends AbstractService implements
      */
     public Class getServiceIface() {
         
-        return IResourceLockManager.class;
+        return IResourceLockService.class;
         
     }
 

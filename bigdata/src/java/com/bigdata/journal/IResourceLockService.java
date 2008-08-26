@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.IOException;
+
 import com.bigdata.concurrent.TimeoutException;
+import com.bigdata.service.IService;
 
 /**
  * Interface for a low latency global lock service. Resources are identified by
@@ -44,7 +47,7 @@ import com.bigdata.concurrent.TimeoutException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IResourceLockManager {
+public interface IResourceLockService extends IService {
 
     /**
      * Acquire an exclusive lock on a resource hierarchy. The request will block
@@ -59,7 +62,7 @@ public interface IResourceLockManager {
      *             wrapping {@link InterruptedException} or
      *             {@link TimeoutException}
      */
-    public IResourceLock acquireExclusiveLock(String namespace);
+    public IResourceLock acquireExclusiveLock(String namespace) throws IOException;
 
     /**
      * Acquire an exclusive lock on a resource hierarchy. The request will block
@@ -77,7 +80,7 @@ public interface IResourceLockManager {
      *             wrapping {@link InterruptedException} or
      *             {@link TimeoutException}
      */
-    public IResourceLock acquireExclusiveLock(String namespace, long timeout);
+    public IResourceLock acquireExclusiveLock(String namespace, long timeout) throws IOException;
 
     /**
      * Acquire a shared lock on a resource hierarchy (permits concurrent read and/or write operations on
@@ -91,7 +94,7 @@ public interface IResourceLockManager {
      * @throws RuntimeException
      *             wrapping {@link InterruptedException}
      */
-    public IResourceLock acquireSharedLock(String namespace);
+    public IResourceLock acquireSharedLock(String namespace) throws IOException;
 
     /**
      * Acquire a shared lock on a resource hierarchy (permits concurrent read
@@ -110,6 +113,6 @@ public interface IResourceLockManager {
      *             wrapping {@link InterruptedException} or
      *             {@link TimeoutException}
      */
-    public IResourceLock acquireSharedLock(String namespace, long timeout);
+    public IResourceLock acquireSharedLock(String namespace, long timeout) throws IOException;
 
 }

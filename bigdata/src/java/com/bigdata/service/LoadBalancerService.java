@@ -146,6 +146,18 @@ abstract public class LoadBalancerService extends AbstractService
 
     final static protected Logger log = Logger.getLogger(LoadBalancerService.class);
 
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    static final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    static final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     final protected String ps = ICounterSet.pathSeparator;
     
     /**
@@ -791,7 +803,7 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected void setHostScores(HostScore[] a) {
 
-        log.info("#hostScores=" + a.length);
+        if(INFO) log.info("#hostScores=" + a.length);
         
         /*
          * sort scores into ascending order (least utilized to most utilized).
@@ -825,19 +837,23 @@ abstract public class LoadBalancerService extends AbstractService
             // update score in global map.
             activeHosts.put(score.hostname, score);
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(score.toString()); //@todo debug?
             
         }
         
-        log.info("The most active host was: " + a[a.length - 1]);
+        if(INFO) {
+            
+            log.info("The most active host was: " + a[a.length - 1]);
 
-        log.info("The least active host was: " + a[0]);
+            log.info("The least active host was: " + a[0]);
+        
+        }
         
         // Atomic replace of the old scores.
         LoadBalancerService.this.hostScores.set( a );
 
-        log.info("Updated scores for "+a.length+" hosts");
+        if(INFO) log.info("Updated scores for "+a.length+" hosts");
      
     }
     
@@ -849,7 +865,7 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected void setServiceScores(ServiceScore[] a) {
         
-        log.info("#serviceScores=" + a.length);
+        if(INFO) log.info("#serviceScores=" + a.length);
         
         /*
          * sort scores into ascending order (least utilized to most utilized).
@@ -883,19 +899,24 @@ abstract public class LoadBalancerService extends AbstractService
             // update score in global map.
             activeServices.put(score.serviceUUID, score);
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(score.toString()); //@todo debug?
 
         }
         
-        log.info("The most active service was: " + a[a.length - 1]);
+        if(INFO) {
+            
+            log.info("The most active service was: " + a[a.length - 1]);
 
-        log.info("The least active service was: " + a[0]);
+            log.info("The least active service was: " + a[0]);
+            
+        }
         
         // Atomic replace of the old scores.
         LoadBalancerService.this.serviceScores.set( a );
 
-        log.info("Updated scores for "+a.length+" services");
+        if (INFO)
+            log.info("Updated scores for " + a.length + " services");
 
     }
     
@@ -1009,7 +1030,7 @@ abstract public class LoadBalancerService extends AbstractService
                 if(!activeHosts.containsKey(hostname)) {
 
                     // Host is not active.
-                    log.info("Host is not active: "+hostname);
+                    if(INFO) log.info("Host is not active: "+hostname);
                     
                     continue;
                     
@@ -1108,7 +1129,7 @@ abstract public class LoadBalancerService extends AbstractService
                 if (hostScore == null) {
 
                     // Host is not active.
-                    log.info("Host is not active: " + hostname);
+                    if(INFO) log.info("Host is not active: " + hostname);
                     
                     continue;
                     
@@ -1571,7 +1592,9 @@ abstract public class LoadBalancerService extends AbstractService
             // per-host scores.
             {
 
-                log.info("Will setup counters for "+activeHosts.size()+" hosts");
+                if (INFO)
+                    log.info("Will setup counters for " + activeHosts.size()
+                            + " hosts");
                 
                 final CounterSet tmp = serviceRoot.makePath("hosts");
 
@@ -1583,7 +1606,8 @@ abstract public class LoadBalancerService extends AbstractService
 
                         if (tmp.getChild(hn) == null) {
 
-                            log.info("Adding counter for host: "+hn);
+                            if (INFO)
+                                log.info("Adding counter for host: " + hn);
                             
                             tmp.addCounter(hn, new HistoryInstrument<String>(new String[]{}));
                             
@@ -1615,7 +1639,9 @@ abstract public class LoadBalancerService extends AbstractService
             // per-service scores.
             {
                 
-                log.info("Will setup counters for "+activeServices.size()+" services");
+                if (INFO)
+                    log.info("Will setup counters for " + activeServices.size()
+                            + " services");
 
                 final CounterSet tmp = serviceRoot.makePath("services");
 
@@ -1701,7 +1727,8 @@ abstract public class LoadBalancerService extends AbstractService
         
         final File file = new File(logDir, "counters" + basename + ".xml");
 
-        if(log.isInfoEnabled()) log.info("Writing counters on "+file);
+        if (INFO)
+            log.info("Writing counters on " + file);
         
         OutputStream os = null;
         
@@ -1747,7 +1774,8 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected void join(UUID serviceUUID, String hostname) {
         
-        if(log.isInfoEnabled()) log.info("serviceUUID="+serviceUUID+", hostname="+hostname);
+        if (INFO)
+            log.info("serviceUUID=" + serviceUUID + ", hostname=" + hostname);
         
         lock.lock();
         
@@ -1755,7 +1783,8 @@ abstract public class LoadBalancerService extends AbstractService
 
             if(activeHosts.putIfAbsent(hostname, new HostScore(hostname))==null) {
 
-                log.info("New host joined: hostname="+hostname);
+                if (INFO)
+                    log.info("New host joined: hostname="+hostname);
                 
             }
             
@@ -1764,14 +1793,18 @@ abstract public class LoadBalancerService extends AbstractService
              */
             if(activeServices.putIfAbsent(serviceUUID, new ServiceScore(hostname, serviceUUID))!=null) {
              
-                log.info("Already joined: serviceUUID="+serviceUUID+", hostname="+hostname);
-                
+                if (INFO)
+                    log.info("Already joined: serviceUUID=" + serviceUUID
+                            + ", hostname=" + hostname);
+
                 return;
                 
             }
 
-            log.info("New service joined: hostname="+hostname+", serviceUUID="+serviceUUID);
-            
+            if (INFO)
+                log.info("New service joined: hostname=" + hostname
+                        + ", serviceUUID=" + serviceUUID);
+
             /*
              * Create history in counters.
              * 
@@ -1804,7 +1837,8 @@ abstract public class LoadBalancerService extends AbstractService
      */
     public void leave(String msg, UUID serviceUUID) {
 
-        if(log.isInfoEnabled()) log.info("msg="+msg+", serviceUUID=" + serviceUUID);
+        if (INFO)
+            log.info("msg=" + msg + ", serviceUUID=" + serviceUUID);
 
         lock.lock();
 
@@ -1848,8 +1882,8 @@ abstract public class LoadBalancerService extends AbstractService
     final private IInstrumentFactory instrumentFactory = DefaultInstrumentFactory.INSTANCE;
     
     /**
-     * Note: Only idata services are entered into the internal tables for the
-     * load balancer. Other kinds of services are noted and the reported
+     * Note: Only {@link IDataService}s are entered into the internal tables
+     * for the load balancer. Other kinds of services are noted and the reported
      * counters are aggregated.
      */
     public void notify(final String msg, final UUID serviceUUID,
@@ -1859,7 +1893,9 @@ abstract public class LoadBalancerService extends AbstractService
         
         try {
         
-            if(log.isInfoEnabled()) log.info(msg+" : iface="+serviceIFace+", uuid="+serviceUUID);
+            if (INFO)
+                log.info(msg + " : iface=" + serviceIFace + ", uuid="
+                        + serviceUUID);
 
             if (IDataService.class.getName().equals(serviceIFace)) {
 
@@ -1947,7 +1983,8 @@ abstract public class LoadBalancerService extends AbstractService
 
             if (score == null) {
 
-                log.info("Service is not scored: " + serviceUUID);
+                if (INFO)
+                    log.info("Service is not scored: " + serviceUUID);
 
                 return false;
 
@@ -1984,7 +2021,8 @@ abstract public class LoadBalancerService extends AbstractService
 
             if (score == null) {
 
-                log.info("Service is not scored: " + serviceUUID);
+                if (INFO)
+                    log.info("Service is not scored: " + serviceUUID);
 
                 return false;
 
@@ -2021,7 +2059,8 @@ abstract public class LoadBalancerService extends AbstractService
 
         }
 
-        log.info("highlyUtilized=" + highlyUtilized + " : " + score);
+        if (INFO)
+            log.info("highlyUtilized=" + highlyUtilized + " : " + score);
 
         return highlyUtilized;
 
@@ -2048,7 +2087,8 @@ abstract public class LoadBalancerService extends AbstractService
 
         }
 
-        log.info("underUtilized=" + underUtilized + " : " + score);
+        if (INFO)
+            log.info("underUtilized=" + underUtilized + " : " + score);
 
         return underUtilized;
         
@@ -2083,7 +2123,7 @@ abstract public class LoadBalancerService extends AbstractService
                     
                     if (minCount == 0) {
 
-                        log.info("No scores, minCount is zero - will return null.");
+                        if(INFO) log.info("No scores, minCount is zero - will return null.");
                         
                         return null;
                         
@@ -2357,7 +2397,7 @@ abstract public class LoadBalancerService extends AbstractService
 
                 if (maxCount > 0 && nok >= maxCount) {
 
-                    log.info("Satisifed maxCount=" + maxCount);
+                    if(INFO) log.info("Satisifed maxCount=" + maxCount);
 
                     break;
 
@@ -2365,7 +2405,7 @@ abstract public class LoadBalancerService extends AbstractService
 
                 if (minCount > 0 && maxCount == 0 && nok >= minCount) {
 
-                    log.info("Satisifed minCount=" + minCount);
+                    if(INFO) log.info("Satisifed minCount=" + minCount);
 
                     break;
 
@@ -2373,7 +2413,9 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
-            log.info("Found "+underUtilized.size()+" under-utilized and non-excluded services");
+            if (INFO)
+                log.info("Found " + underUtilized.size()
+                        + " under-utilized and non-excluded services");
             
             if(minCount > 0 && underUtilized.isEmpty()) {
 

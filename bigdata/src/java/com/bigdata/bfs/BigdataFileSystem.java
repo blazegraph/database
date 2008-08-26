@@ -423,10 +423,9 @@ public class BigdataFileSystem extends
     public void create() {
 
         assertWritable();
-        
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
 
+        final IResourceLock resourceLock = acquireExclusiveLock();
+        
         final Properties tmp = getProperties();
         
 //        final int branchingFactor = Integer.parseInt(tmp.getProperty(
@@ -498,19 +497,18 @@ public class BigdataFileSystem extends
 
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
 
         }
-
+        
     }
 
     public void destroy() {
 
         assertWritable();
 
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
-
+        final IResourceLock resourceLock = acquireExclusiveLock();
+        
         try {
 
             getIndexManager().dropIndex(getNamespace()+FILE_METADATA_INDEX_BASENAME);
@@ -521,7 +519,7 @@ public class BigdataFileSystem extends
             
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
             
         }
 
