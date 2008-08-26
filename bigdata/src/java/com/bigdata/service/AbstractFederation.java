@@ -66,6 +66,7 @@ import com.bigdata.journal.TaskCounters;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -162,7 +163,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
         // @todo run a final ReportTask?
         // @todo send leave() notice to the LBS?
 
-        log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
+        if (INFO)
+            log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
 
         client = null;
         
@@ -214,7 +216,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
             
         }
         
-        log.info("done: elapsed="+(System.currentTimeMillis()-begin));
+        if (INFO)
+            log.info("done: elapsed="+(System.currentTimeMillis()-begin));
         
         client = null;
         
@@ -449,7 +452,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
         if (task == null)
             throw new IllegalArgumentException();
 
-        log.info("Adding task: " + task.getClass());
+        if(INFO) log.info("Adding task: " + task.getClass());
 
         return sampleService.scheduleWithFixedDelay(task, initialDelay, delay,
                 unit);
@@ -547,14 +550,13 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             final Properties p = client.getProperties();
             
-            final boolean collectPlatformStatistics = Boolean
-                    .parseBoolean(p
-                            .getProperty(
-                                    com.bigdata.service.IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS,
-                                    com.bigdata.service.IBigdataClient.Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+            final boolean collectPlatformStatistics = Boolean.parseBoolean(p
+                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
 
-            log.info(com.bigdata.service.IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS
-                            + "=" + collectPlatformStatistics);
+            if (log.isInfoEnabled())
+                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+                        + collectPlatformStatistics);
 
             if (collectPlatformStatistics) {
                 
@@ -775,7 +777,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
      */
     synchronized public IIndex getIndex(String name,long timestamp) {
 
-        log.info("name="+name+" @ "+timestamp);
+        if (INFO)
+            log.info("name="+name+" @ "+timestamp);
         
         assertOpen();
 
@@ -791,7 +794,9 @@ abstract public class AbstractFederation implements IBigdataFederation {
             // No such index.
             if (mdmd == null) {
 
-                log.info("name="+name+" @ "+timestamp+" : is not registered");
+                if (INFO)
+                    log.info("name=" + name + " @ " + timestamp
+                            + " : is not registered");
                 
                 return null;
                 
@@ -802,11 +807,14 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             indexCache.put(nt, ndx, false/* dirty */);
 
-            log.info("name="+name+" @ "+timestamp+" : index exists.");
+            if (INFO)
+                log.info("name=" + name + " @ " + timestamp
+                        + " : index exists.");
             
         } else {
             
-            log.info("name="+name+" @ "+timestamp+" : cache hit.");
+            if (INFO)
+                log.info("name="+name+" @ "+timestamp+" : cache hit.");
             
         }
 
@@ -816,15 +824,17 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     public void dropIndex(String name) {
 
-        log.info("name="+name);
-        
+        if (INFO)
+            log.info("name=" + name);
+
         assertOpen();
 
         try {
-            
+
             getMetadataService().dropScaleOutIndex(name);
 
-            log.info("dropped scale-out index.");
+            if (INFO)
+                log.info("dropped scale-out index.");
             
             dropIndexFromCache(name);
 
@@ -867,7 +877,9 @@ abstract public class AbstractFederation implements IBigdataFederation {
                     if (timestamp == ITx.UNISOLATED
                             || timestamp == ITx.READ_COMMITTED) {
                     
-                        log.info("dropped from cache: "+name+" @ "+timestamp);
+                        if (INFO)
+                            log.info("dropped from cache: " + name + " @ "
+                                    + timestamp);
                         
                         // remove from the cache.
                         indexCache.remove(entry.getKey());

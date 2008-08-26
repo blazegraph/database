@@ -68,7 +68,7 @@ public class TimestampServiceClient {
     /**
      * Provides direct cached lookup of services by their {@link ServiceID}.
      */
-    public ServiceCache serviceMap = new ServiceCache();
+    private final ServiceCache serviceMap = new ServiceCache();
 
     /**
      * Begins discovery for the {@link ITimestampService}.
@@ -144,7 +144,8 @@ public class TimestampServiceClient {
 
         if (item == null) {
 
-            log.info("Cache miss.");
+            if (log.isInfoEnabled())
+                log.info("Cache miss.");
 
             item = handleCacheMiss(null/*filter*/);
                         
@@ -182,7 +183,8 @@ public class TimestampServiceClient {
 
         } catch (InterruptedException ex) {
 
-            log.info("Interrupted - no match.");
+            if (log.isInfoEnabled())
+                log.info("Interrupted - no match.");
 
             return null;
 
@@ -198,50 +200,11 @@ public class TimestampServiceClient {
 
         }
 
-        log.info("Found: " + item);
+        if (log.isInfoEnabled())
+            log.info("Found: " + item);
 
         return item;
 
     }
 
-//    /**
-//     * Filter only matches a service item where {@link ILoadBalancer} is
-//     * implemented.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class LoadBalancerFilter implements ServiceItemFilter {
-//
-//        public static final transient Logger log = Logger
-//                .getLogger(LoadBalancerFilter.class);
-//
-//        public static final transient ServiceItemFilter INSTANCE = new LoadBalancerFilter();
-//        
-//        public boolean check(ServiceItem item) {
-//
-//            if(item.service==null) {
-//                
-//                log.warn("Service is null: "+item);
-//
-//                return false;
-//                
-//            }
-//            
-//            if (item.service instanceof ILoadBalancer) {
-//               
-//                log.info("Matched: "+item);
-//                
-//                return true;
-//                
-//            }
-//
-//            log.debug("Ignoring: "+item);
-//            
-//            return false;
-//            
-//        }
-//        
-//    }
-    
 }

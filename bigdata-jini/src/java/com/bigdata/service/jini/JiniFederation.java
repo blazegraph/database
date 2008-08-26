@@ -36,7 +36,7 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 
-import com.bigdata.journal.IResourceLockManager;
+import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -58,7 +58,7 @@ public class JiniFederation extends AbstractDistributedFederation {
 
     protected LoadBalancerClient loadBalancerClient;
 
-    protected ResourceLockManagerClient resourceLockManagerClient;
+    protected ResourceLockClient resourceLockClient;
 
     protected TimestampServiceClient timestampServiceClient;
     
@@ -111,7 +111,7 @@ public class JiniFederation extends AbstractDistributedFederation {
             loadBalancerClient = new LoadBalancerClient(discoveryManager);
 
             // Start discovery for the resource lock manager.
-            resourceLockManagerClient = new ResourceLockManagerClient(discoveryManager);
+            resourceLockClient = new ResourceLockClient(discoveryManager);
 
         } catch (Exception ex) {
 
@@ -157,12 +157,12 @@ public class JiniFederation extends AbstractDistributedFederation {
         
     }
     
-    public IResourceLockManager getResourceLockManager() {
+    public IResourceLockService getResourceLockService() {
         
         // Note: return null if service not available/discovered.
-        if(resourceLockManagerClient == null) return null;
+        if(resourceLockClient == null) return null;
         
-        return resourceLockManagerClient.getResourceLockManager();
+        return resourceLockClient.getResourceLockService();
         
     }
     
@@ -237,6 +237,7 @@ public class JiniFederation extends AbstractDistributedFederation {
             if (metadataService == null
                     || dataServiceUUIDs.length < minDataServices) {
                 
+                if(INFO)
                 log.info("Waiting : metadataService="
                         + (metadataService == null ? "not " : "")
                         + " found; #dataServices=" + dataServiceUUIDs.length
@@ -249,6 +250,7 @@ public class JiniFederation extends AbstractDistributedFederation {
                 
             }
             
+            if(INFO)
             log.info("Have metadata service and "+dataServiceUUIDs.length+" data services");
             
             return dataServiceUUIDs.length;
@@ -271,7 +273,7 @@ public class JiniFederation extends AbstractDistributedFederation {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: elapsed="+elapsed+"ms");
+        if(INFO) log.info("Done: elapsed="+elapsed+"ms");
         
     }
     
@@ -287,7 +289,7 @@ public class JiniFederation extends AbstractDistributedFederation {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: elapsed="+elapsed+"ms");
+        if(INFO) log.info("Done: elapsed="+elapsed+"ms");
 
     }
 
@@ -296,11 +298,11 @@ public class JiniFederation extends AbstractDistributedFederation {
      */
     private void terminateDiscoveryProcesses() {
 
-        if (resourceLockManagerClient != null) {
+        if (resourceLockClient != null) {
 
-            resourceLockManagerClient.terminate();
+            resourceLockClient.terminate();
 
-            resourceLockManagerClient = null;
+            resourceLockClient = null;
             
         }
         

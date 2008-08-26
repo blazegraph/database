@@ -28,6 +28,7 @@
 
 package com.bigdata.relation;
 
+import java.io.IOException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,6 +39,8 @@ import java.util.concurrent.ExecutorService;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IResourceLock;
+import com.bigdata.journal.IResourceLockService;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.RelationSchema;
@@ -316,4 +319,48 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
         
     }
 
+    /**
+     * Acquires an exclusive lock for the {@link #getNamespace()}.
+     * 
+     * @return the lock.
+     * 
+     * @throws RuntimeException if anything goes wrong.
+     * 
+     * @see IResourceLockService
+     */
+    protected IResourceLock acquireExclusiveLock() {
+
+        try {
+
+            return getIndexManager().getResourceLockService()
+                    .acquireExclusiveLock(getNamespace());
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
+    /**
+     * Release the lock.
+     * 
+     * @param resourceLock
+     *            The lock.
+     */
+    protected void unlock(IResourceLock resourceLock) {
+        
+        try {
+            
+            resourceLock.unlock();
+            
+        } catch (IOException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+        
+    }
+    
 }

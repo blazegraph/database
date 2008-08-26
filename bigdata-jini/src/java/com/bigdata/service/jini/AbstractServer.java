@@ -257,17 +257,19 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     protected void setSecurityManager() {
 
-        SecurityManager sm = System.getSecurityManager();
+        final SecurityManager sm = System.getSecurityManager();
         
         if (sm == null) {
 
             System.setSecurityManager(new SecurityManager());
          
-            log.info("Set security manager");
+            if (INFO)
+                log.info("Set security manager");
 
         } else {
-            
-            log.info("Security manager already in place: "+sm.getClass());
+
+            if (INFO)
+                log.info("Security manager already in place: " + sm.getClass());
             
         }
 
@@ -419,6 +421,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 
             } else {
                 
+                if(INFO)
                 log.info("New service instance - ServiceID will be assigned");
                 
                 /*
@@ -542,12 +545,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 //
 //            setupClients(discoveryManager);
 
-            log.info("Creating service impl...");
+            if(INFO) log.info("Creating service impl...");
             
             // init w/ client's properties.
             impl = newService(client.getProperties());
 
-            log.info("Service impl is "+impl);
+            if(INFO) log.info("Service impl is "+impl);
             
         } catch(Exception ex) {
         
@@ -565,6 +568,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
             proxy = exporter.export(impl);
             
+            if(INFO)
             log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
 
         } catch (ExportException ex) {
@@ -665,6 +669,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     synchronized protected boolean unexport(boolean force) {
 
+        if(INFO)
         log.info("force=" + force + ", proxy=" + proxy);
 
         try {
@@ -712,6 +717,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         
         is.close();
 
+        if(INFO)
         log.info("Read ServiceID=" + serviceID+" from "+file);
 
         return serviceID;
@@ -728,6 +734,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     public void serviceIDNotify(ServiceID serviceID) {
 
+        if(INFO)
         log.info("serviceID=" + serviceID);
 
         this.serviceID = serviceID;
@@ -745,6 +752,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 
                 dout.close();
                 
+                if(INFO)
                 log.info("ServiceID saved: file=" + serviceIdFile+", serviceID="+serviceID);
 
             } catch (Exception ex) {
@@ -803,6 +811,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
                 } else {
                     
+                    if(INFO)
                     log.info("Service remains registered with "+a.length+" service registrats");
                     
                 }
@@ -1069,7 +1078,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 
             } catch (InterruptedException ex) {
                 
-                log.info(""+ex);
+                if(INFO) log.info(""+ex);
 
             } finally {
                 
@@ -1142,7 +1151,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         
         shutdownNow();
         
-        log.info("Deleting: " + serviceIdFile);
+        if(INFO) log.info("Deleting: " + serviceIdFile);
 
         if (!serviceIdFile.delete()) {
 

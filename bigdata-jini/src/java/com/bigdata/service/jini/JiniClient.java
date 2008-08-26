@@ -219,8 +219,9 @@ public class JiniClient extends AbstractClient {
 
         } else {
             
-            log.info("Security manager already in place: "+sm.getClass());
-            
+            if (log.isInfoEnabled())
+                log.info("Security manager already in place: " + sm.getClass());
+
         }
 
     }

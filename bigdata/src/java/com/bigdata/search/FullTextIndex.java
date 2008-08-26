@@ -438,8 +438,7 @@ public class FullTextIndex extends AbstractRelation {
 
         final IIndexManager indexManager = getIndexManager();
 
-        final IResourceLock resourceLock = indexManager.getResourceLockManager().acquireExclusiveLock(
-                getNamespace());
+        final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
 
@@ -465,7 +464,7 @@ public class FullTextIndex extends AbstractRelation {
 
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
 
         }
         
@@ -479,8 +478,7 @@ public class FullTextIndex extends AbstractRelation {
 
         final IIndexManager indexManager = getIndexManager();
 
-        final IResourceLock lock = indexManager.getResourceLockManager()
-                .acquireExclusiveLock(getNamespace());
+        final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
 
@@ -488,7 +486,7 @@ public class FullTextIndex extends AbstractRelation {
 
         } finally {
 
-            lock.unlock();
+            unlock(resourceLock);
 
         }
         

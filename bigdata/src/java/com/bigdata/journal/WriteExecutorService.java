@@ -605,7 +605,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             MDC.remove("taskState");
 
-            log.info("nrunning="+nrunning);
+            if(INFO) log.info("nrunning="+nrunning);
             
             assert nrunning >= 0;
             
@@ -681,7 +681,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * warning.
                      */
                     
-                    log.info("Validation failed: task=" + r);//, t);
+                    if(INFO) log.info("Validation failed: task=" + r);//, t);
 
                 } else if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 
@@ -705,9 +705,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * has been registered.
                      */
  
-                    log.info("No such index: task=" + r);//, t);
+                    if(INFO) log.info("No such index: task=" + r);//, t);
                     
-
                 } else if(InnerCause.isInnerCause(t, StaleLocatorException.class)) {
 
                     /*
@@ -720,7 +719,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * appropriate index partition.
                      */
  
-                    log.info("Stale locator: task=" + r);//, t);
+                    if(INFO) log.info("Stale locator: task=" + r);//, t);
                     
 //                    log.info(this.toString(), t);
                     
@@ -910,7 +909,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          */
         if( abort.get() ) {
 
-            log.info("Abort in progress.");
+            if(INFO) log.info("Abort in progress.");
         
             // signal so that abort() will no longer await this task's completion.
             waiting.signal();
@@ -996,7 +995,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // note: the task counters use nanos rather than millis.
             final long nanoTime_beginWait = System.nanoTime();
 
-            log.info("This thread will run group commit: "+Thread.currentThread()+" : "+r);
+            if (INFO)
+                log.info("This thread will run group commit: "
+                        + Thread.currentThread() + " : " + r);
 
             /*
              * Note: Synchronous overflow processing has a stronger
@@ -1097,7 +1098,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             if (shouldOverflow && nrunning.get() == 0) {
 
-                log.info("Will do overflow now: nrunning="+nrunning);
+                if (INFO)
+                    log.info("Will do overflow now: nrunning=" + nrunning);
 
                 // this task will do synchronous overflow processing.
                 MDC.put("taskState","doSyncOverflow");
@@ -1106,7 +1108,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                 MDC.put("taskState","didSyncOverflow");
 
-                log.info("Did overflow.");
+                if (INFO)
+                    log.info("Did overflow.");
                 
             }
             
@@ -1200,7 +1203,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             if (awaitPaused(timeout)) {
 
-                log.info("write service is paused: #running=" + nrunning);
+                if (INFO)
+                    log.info("write service is paused: #running=" + nrunning);
 
             }
 
@@ -1512,7 +1516,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         }
         
-        log.info("Write service is paused: #running="+nrunning);
+        if (INFO)
+            log.info("Write service is paused: #running=" + nrunning);
         
         return true;
 
@@ -1621,7 +1626,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             if (timestamp == 0L) {
 
-                log.info("Nothing to commit");
+                if (INFO)
+                    log.info("Nothing to commit");
 
                 return true;
                 
@@ -1729,7 +1735,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * will reach the caller.
              */
             
-            log.info("Interrupting tasks awaiting commit.");
+            if (INFO)
+                log.info("Interrupting tasks awaiting commit.");
             
             final Iterator<Map.Entry<Thread, AbstractTask>> itr = active
                     .entrySet().iterator();
@@ -1756,11 +1763,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
-            log.info("Interrupted "+ninterrupted+" tasks.");
+            if (INFO)
+                log.info("Interrupted " + ninterrupted + " tasks.");
             
             // wait for active tasks to complete.
 
-            log.info("Waiting for running tasks to complete: nrunning="+nrunning);
+            if (INFO)
+                log.info("Waiting for running tasks to complete: nrunning="
+                        + nrunning);
 
             while (nrunning.get() > 0) {
                 
@@ -1795,7 +1805,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
             
-            log.info("Doing abort: nrunning="+nrunning);
+            if (INFO)
+                log.info("Doing abort: nrunning=" + nrunning);
             
             // Nothing is running.
             assert nrunning.get() == 0;
@@ -1817,7 +1828,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
-            log.info("Did abort");
+            if (INFO)
+                log.info("Did abort");
             
         } catch(Throwable t) {
             

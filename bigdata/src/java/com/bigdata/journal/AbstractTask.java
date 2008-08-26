@@ -1514,7 +1514,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             if (isTransaction) {
 
-                log.info("Running isolated operation: timestamp="+timestamp);
+                if (INFO)
+                    log.info("Running isolated operation: timestamp="
+                            + timestamp);
                 
                 if(tx.isReadOnly()) {
 
@@ -1591,7 +1593,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     /**
      * Call {@link #doTask()} for an unisolated write task.
      * <p>
-     * Note: This coordinates with {@link IConcurrencyManager#getResourceLockManager()}
+     * Note: This coordinates with {@link IConcurrencyManager#getResourceLockService()}
      * to force a schedule on tasks that write on unisolated indices.
      * 
      * @throws Exception
@@ -2110,9 +2112,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
 
-        public IResourceLockManager getResourceLockManager() {
+        public IResourceLockService getResourceLockService() {
             
-            return delegate.getResourceLockManager();
+            return delegate.getResourceLockService();
             
         }
 
@@ -2455,9 +2457,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
         
-        public IResourceLockManager getResourceLockManager() {
+        public IResourceLockService getResourceLockService() {
             
-            return delegate.getResourceLockManager();
+            return delegate.getResourceLockService();
             
         }
 
@@ -2663,8 +2665,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             return delegate.getResourceLocator();
         }
 
-        public IResourceLockManager getResourceLockManager() {
-            return delegate.getResourceLockManager();
+        public IResourceLockService getResourceLockService() {
+            return delegate.getResourceLockService();
         }
 
         public void registerIndex(IndexMetadata indexMetadata) {

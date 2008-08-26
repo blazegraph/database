@@ -771,14 +771,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final DefaultResourceLocator resourceLocator;
     
-    public IResourceLockManager getResourceLockManager() {
+    public IResourceLockService getResourceLockService() {
         
         assertOpen();
         
         return resourceLockManager;
         
     }
-    private ResourceLockManager resourceLockManager;
+    private ResourceLockService resourceLockManager;
 
     public ExecutorService getExecutorService() {
         

@@ -30,4 +30,11 @@ public class TripleStoreSchema extends RelationSchema {
      */
     public static final String VOCABULARY = ns + "vocabulary";
 
+    /**
+     * De-serialization ctor.
+     */
+    public TripleStoreSchema() {
+        
+    }
+    
 }

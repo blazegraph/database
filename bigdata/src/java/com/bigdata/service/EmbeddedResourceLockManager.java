@@ -31,13 +31,13 @@ package com.bigdata.service;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.journal.ResourceLockManager;
+import com.bigdata.journal.ResourceLockService;
 
 /** 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedResourceLockManager extends ResourceLockManager {
+public class EmbeddedResourceLockManager extends ResourceLockService {
 
     /**
      * 

@@ -34,6 +34,7 @@ import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
+import com.bigdata.service.jini.ResourceLockServer;
 import com.bigdata.service.jini.TimestampServer;
 
 /**
@@ -80,6 +81,10 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
     /**
      * Starts in {@link #setUp()}.
      */
+    protected ResourceLockServer resourceLockServer0;
+    /**
+     * Starts in {@link #setUp()}.
+     */
     JiniClient client;
     
     public void setUp() throws Exception {
@@ -89,6 +94,24 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
 
 //      final String groups = ".groups = new String[]{\"" + getName() + "\"}";
       
+        /*
+         * Start up a resource lock server.
+         */
+        resourceLockServer0 = new ResourceLockServer(new String[] {
+                "src/resources/config/standalone/ResourceLockServer0.config"
+//                , AbstractServer.ADVERT_LABEL+groups 
+                });
+
+        new Thread() {
+
+            public void run() {
+                
+                resourceLockServer0.run();
+                
+            }
+            
+        }.start();
+
         /*
          * Start up a timestamp server.
          */
@@ -188,6 +211,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
                       });
 
       // Wait until all the services are up.
+      AbstractServerTestCase.getServiceID(resourceLockServer0);
       AbstractServerTestCase.getServiceID(timestampServer0);
       AbstractServerTestCase.getServiceID(metadataServer0);
       AbstractServerTestCase.getServiceID(dataServer0);
@@ -196,15 +220,47 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
 
       IBigdataFederation fed = client.connect();
       
-      // verify that the client has/can get the metadata service.
-      for (int i = 0; i < 3; i++) {
+      // wait/verify that the client has/can get the various services.
+        for (int i = 0; i < 3; i++) {
+
+            int nwaiting = 0;
+
+            if (fed.getResourceLockService() == null) {
+                log.warn("No resource lock service yet...");
+                nwaiting++;
+            }
+
             if (fed.getMetadataService() == null) {
                 log.warn("No metadata service yet...");
-                Thread.sleep(1000/*ms*/);
-          }
+                nwaiting++;
+            }
+
+            if (fed.getTimestampService() == null) {
+                log.warn("No timestamp service yet...");
+                nwaiting++;
+            }
+
+            if (fed.getLoadBalancerService() == null) {
+                log.warn("No load balancer service yet...");
+                nwaiting++;
+            }
+
+            if (nwaiting > 0) {
+
+                log.warn("Waiting for " + nwaiting + " services");
+
+                Thread.sleep(1000/* ms */);
+                
+            }
+
       }
-      assertNotNull("No metadata service?", fed.getMetadataService());
+
+      assertNotNull("No lock service?", fed.getResourceLockService());
+
       assertNotNull("No timestamp service?", fed.getTimestampService());
+
+      assertNotNull("No metadata service?", fed.getMetadataService());
+
       assertNotNull("No load balancer service?", fed.getLoadBalancerService());
 
     }

@@ -90,7 +90,7 @@ public interface IIndexStore {
      * service may be used for any resource whether or not they correspond to
      * the global index namespace.
      */
-    public IResourceLockManager getResourceLockManager();
+    public IResourceLockService getResourceLockService();
 
     /**
      * The database wide timestamp of the most recent commit on the store or 0L

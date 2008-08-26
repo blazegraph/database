@@ -175,15 +175,15 @@ public class ServiceCache implements ServiceDiscoveryListener {
 
         final int n = maxCount == 0 ? getServiceCount() : maxCount;
         
-        Vector<ServiceItem> v = new Vector<ServiceItem>( n );
+        final Vector<ServiceItem> v = new Vector<ServiceItem>( n );
         
-        Iterator<Map.Entry<ServiceID, ServiceItem>> itr = serviceIdMap.entrySet().iterator();
+        final Iterator<Map.Entry<ServiceID, ServiceItem>> itr = serviceIdMap.entrySet().iterator();
         
         while(itr.hasNext()) {
             
-            Map.Entry<ServiceID, ServiceItem> entry = itr.next();
+            final Map.Entry<ServiceID, ServiceItem> entry = itr.next();
             
-            ServiceItem item = entry.getValue();
+            final ServiceItem item = entry.getValue();
             
             if (filter == null || filter.check(item)) {
 

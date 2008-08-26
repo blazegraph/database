@@ -357,7 +357,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     private final ExecutorService executorService;
     
-    synchronized public IResourceLockManager getResourceLockManager() {
+    synchronized public IResourceLockService getResourceLockService() {
         
         assertOpen();
         
@@ -371,7 +371,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         return resourceLockManager;
         
     }
-    private ResourceLockManager resourceLockManager;
+    private ResourceLockService resourceLockManager;
 
     public void close() {
 

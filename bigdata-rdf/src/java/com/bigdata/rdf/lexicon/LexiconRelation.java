@@ -253,9 +253,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     public void create() {
 
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
-
+        final IResourceLock resourceLock = acquireExclusiveLock();
+        
         try {
 
             super.create();
@@ -284,7 +283,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
 
         }
 
@@ -292,8 +291,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     public void destroy() {
 
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
+        final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
 
@@ -320,7 +318,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
 
         }
 

@@ -16,16 +16,15 @@ import net.jini.io.context.ClientSubject;
 import org.apache.log4j.MDC;
 
 import com.bigdata.counters.httpd.CounterSetHTTPDServer;
-import com.bigdata.journal.ResourceLockManager;
+import com.bigdata.journal.ResourceLockService;
 import com.bigdata.service.LoadBalancerService;
 
 /**
  * The resource lock manager server.
  * <p>
- * The {@link ResourceLockManagerServer} starts the
- * {@link ResourceLockManagerService}. The server and service are configured
- * using a {@link Configuration} file whose name is passed to the
- * {@link ResourceLockManagerServer#ResourceLockManagerServer(String[])}
+ * The {@link ResourceLockServer} starts the {@link ResourceLockService}. The
+ * server and service are configured using a {@link Configuration} file whose
+ * name is passed to the {@link ResourceLockServer#ResourceLockServer(String[])}
  * constructor or {@link #main(String[])}.
  * <p>
  * 
@@ -34,7 +33,7 @@ import com.bigdata.service.LoadBalancerService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResourceLockManagerServer extends AbstractServer {
+public class ResourceLockServer extends AbstractServer {
     
     /**
      * Creates a new service.
@@ -42,18 +41,18 @@ public class ResourceLockManagerServer extends AbstractServer {
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
-    public ResourceLockManagerServer(String[] args) {
+    public ResourceLockServer(String[] args) {
 
         super(args);
         
     }
     
     /**
-     * Starts a new {@link ResourceLockManagerServer}. This can be done
+     * Starts a new {@link ResourceLockServer}. This can be done
      * programmatically by executing
      * 
      * <pre>
-     * new ResourceLockManagerServer(args).run();
+     * new ResourceLockServer(args).run();
      * </pre>
      * 
      * within a {@link Thread}.
@@ -63,7 +62,7 @@ public class ResourceLockManagerServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new ResourceLockManagerServer(args) {
+        new ResourceLockServer(args) {
             
             /**
              * Overriden to use {@link System#exit()} since this is the command
@@ -94,22 +93,22 @@ public class ResourceLockManagerServer extends AbstractServer {
     @Override
     protected Remote newService(Properties properties) {
         
-        return new AdministrableLoadBalancer(this, properties);
+        return new AdministrableResourceLockService(this, properties);
         
     }
 
     /**
-     * Adds jini administration interfaces to the basic {@link ResourceLockManager}.
+     * Adds jini administration interfaces to the basic {@link ResourceLockService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableLoadBalancer extends ResourceLockManager
+    public static class AdministrableResourceLockService extends ResourceLockService
             implements RemoteAdministrable, RemoteDestroyAdmin {
 
-        protected ResourceLockManagerServer server;
+        protected ResourceLockServer server;
 
-        public AdministrableLoadBalancer(ResourceLockManagerServer server,
+        public AdministrableResourceLockService(ResourceLockServer server,
                 Properties properties) {
 
             super(properties);
@@ -120,7 +119,7 @@ public class ResourceLockManagerServer extends AbstractServer {
         
         public Object getAdmin() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            if(INFO) log.info(""+getServiceUUID());
 
             return server.proxy;
             
@@ -200,7 +199,7 @@ public class ResourceLockManagerServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info("" + getServiceUUID());
+            if(INFO) log.info("" + getServiceUUID());
 
             new Thread() {
 
@@ -208,7 +207,7 @@ public class ResourceLockManagerServer extends AbstractServer {
 
                     server.destroy();
                     
-                    log.info(getServiceUUID()+" - Service stopped.");
+                    if(INFO) log.info(getServiceUUID()+" - Service stopped.");
 
                 }
 
@@ -277,76 +276,7 @@ public class ResourceLockManagerServer extends AbstractServer {
            return clientAddr.getCanonicalHostName();
            
        }
-       
-// /*
-// * JoinAdmin
-// */
-//        
-// public void addLookupAttributes(Entry[] arg0) throws RemoteException {
-//            
-// log.info("");
-//            
-//        }
-//
-//        public void addLookupGroups(String[] arg0) throws RemoteException {
-//
-//            log.info("");
-//
-//        }
-//
-//        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//
-//            log.info("");
-//            
-//        }
-//
-//        public Entry[] getLookupAttributes() throws RemoteException {
-//
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public String[] getLookupGroups() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public LookupLocator[] getLookupLocators() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
-//         
-//            log.info("");
-//            
-//        }
-//
-//        public void removeLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//
-//        }
-//
-//        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-        
+               
     }
 
 }

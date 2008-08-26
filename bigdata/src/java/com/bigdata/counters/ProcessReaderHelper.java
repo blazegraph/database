@@ -119,11 +119,17 @@ public abstract class ProcessReaderHelper extends
     public void run() {
         
         try {
+         
             readProcess();
+            
         } catch (InterruptedException e) {
-            AbstractStatisticsCollector.log.info("Interrupted - will halt.");
+            
+            log.info("Interrupted - will halt.");
+            
         } catch (Exception e) {
-            AbstractStatisticsCollector.log.fatal(e.getMessage(),e);
+            
+            log.fatal(e.getMessage(), e);
+            
         }
         
     }

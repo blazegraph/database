@@ -53,7 +53,7 @@ import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
-import com.bigdata.journal.IResourceLockManager;
+import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITransactionManager;
@@ -500,7 +500,7 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public IResourceLockManager getResourceLockManager() {
+        public IResourceLockService getResourceLockService() {
             // TODO Auto-generated method stub
             return null;
         }

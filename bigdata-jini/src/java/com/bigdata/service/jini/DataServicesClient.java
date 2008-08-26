@@ -86,7 +86,7 @@ public class DataServicesClient {
     /**
      * Provides direct cached lookup {@link ServiceItem}s by {@link ServiceID}.
      */
-    public ServiceCache serviceMap = new ServiceCache();
+    final ServiceCache serviceMap = new ServiceCache();
 
     /**
      * When <code>true</code> {@link ServiceItem}s for {@link DataService}s

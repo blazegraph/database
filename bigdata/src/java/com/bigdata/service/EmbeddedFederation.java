@@ -44,10 +44,10 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.IResourceLockManager;
+import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.ResourceLockManager;
+import com.bigdata.journal.ResourceLockService;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
@@ -91,7 +91,7 @@ public class EmbeddedFederation extends AbstractFederation {
     private TimestampService timestampService;
     
     /** The (in process) {@link LockManager} */
-    private ResourceLockManager resourceLockManager;
+    private ResourceLockService resourceLockManager;
     
     /**
      * The (in process) {@link LoadBalancerService}.
@@ -141,9 +141,9 @@ public class EmbeddedFederation extends AbstractFederation {
     }
     
     /**
-     * The (in process) {@link IResourceLockManager}.
+     * The (in process) {@link IResourceLockService}.
      */
-    public IResourceLockManager getResourceLockManager() {
+    public IResourceLockService getResourceLockService() {
         
         return resourceLockManager;
         

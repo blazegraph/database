@@ -40,6 +40,7 @@ import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
+import com.bigdata.service.jini.ResourceLockServer;
 import com.bigdata.service.jini.TimestampServer;
 
 /**
@@ -167,6 +168,10 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     /**
      * Starts in {@link #setUpFederation()}.
      */
+    protected ResourceLockServer resourceLockServer0;
+    /**
+     * Starts in {@link #setUpFederation()}.
+     */
     protected LoadBalancerServer loadBalancerServer0;
     /**
      * Starts in {@link #setUpFederation()}.
@@ -210,8 +215,26 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
 //      final String groups = ".groups = new String[]{\"" + getName() + "\"}";
 
-        log.warn("Starting data services.");
+        log.warn("Starting services.");
         
+        /*
+         * Start up a resource lock server.
+         */
+        resourceLockServer0 = new ResourceLockServer(new String[] {
+                "src/resources/config/standalone/ResourceLockServer0.config"
+//                , AbstractServer.ADVERT_LABEL+groups 
+                });
+
+        new Thread() {
+
+            public void run() {
+                
+                resourceLockServer0.run();
+                
+            }
+            
+        }.start();
+
         /*
          * Start up a timestamp server.
          */
@@ -312,6 +335,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
                       });
 
       // Wait until all the services are up.
+      AbstractServerTestCase.getServiceID(resourceLockServer0);
       AbstractServerTestCase.getServiceID(timestampServer0);
       AbstractServerTestCase.getServiceID(metadataServer0);
       AbstractServerTestCase.getServiceID(dataServer0);

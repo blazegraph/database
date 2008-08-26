@@ -280,8 +280,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     public void create() {
 
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
+        final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
 
@@ -338,7 +337,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
 
         }
 
@@ -350,8 +349,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     public void destroy() {
 
-        final IResourceLock resourceLock = getIndexManager()
-                .getResourceLockManager().acquireExclusiveLock(getNamespace());
+        final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
 
@@ -387,11 +385,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         } finally {
 
-            resourceLock.unlock();
+            unlock(resourceLock);
 
         }
         
     }
+    
     private IIndex spo;
     private IIndex pos;
     private IIndex osp;

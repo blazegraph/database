@@ -71,7 +71,7 @@ public class LoadBalancerClient {
      * Provides direct cached lookup of {@link LoadBalancerService}s by their
      * {@link ServiceID}.
      */
-    public ServiceCache serviceMap = new ServiceCache();
+    private final ServiceCache serviceMap = new ServiceCache();
 
     /**
      * Begins discovery for the {@link ILoadBalancerService} service.
@@ -200,7 +200,8 @@ public class LoadBalancerClient {
 
         }
 
-        log.info("Found: " + item);
+        if (log.isInfoEnabled())
+            log.info("Found: " + item);
 
         return item;
 
