@@ -57,6 +57,8 @@ import com.bigdata.service.IMetadataService;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo rewrite {@link #setUp()} to use the {@link JiniServicesHelper}
  */
 public class TestBigdataClient extends AbstractServerTestCase {
 

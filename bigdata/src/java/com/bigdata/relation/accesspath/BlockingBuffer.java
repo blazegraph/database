@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.striterator.IAsynchronousIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -407,6 +408,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
     /**
      * The returned iterator is NOT thread-safe and does NOT support remove().
+     * It will implement {@link IAsynchronousIterator}.
      * 
      * @return The iterator (this is a singleton).
      */
@@ -424,7 +426,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class BlockingIterator implements IChunkedOrderedIterator<E> {
+    private class BlockingIterator implements IChunkedOrderedIterator<E>, IAsynchronousIterator<E> {
         
         /**
          * <code>true</code> iff this iterator is open - it is closed when the

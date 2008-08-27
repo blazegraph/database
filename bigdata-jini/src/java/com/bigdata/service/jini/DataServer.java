@@ -32,10 +32,8 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
-import java.util.UUID;
 
 import net.jini.config.Configuration;
-import net.jini.discovery.DiscoveryManagement;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -43,13 +41,7 @@ import net.jini.io.context.ClientSubject;
 import org.apache.log4j.MDC;
 
 import com.bigdata.journal.IResourceManager;
-import com.bigdata.journal.ITimestampService;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.IMetadataService;
-import com.bigdata.service.MetadataService;
 
 /**
  * The bigdata data server.
@@ -70,22 +62,6 @@ import com.bigdata.service.MetadataService;
  */
 public class DataServer extends AbstractServer {
 
-//    /**
-//     * Handles discovery of the {@link DataService}s and
-//     * {@link MetadataService}s.
-//     */
-//    protected DataServicesClient dataServicesClient;
-//
-//    /**
-//     * Handles discovery of the {@link ILoadBalancerService}.
-//     */
-//    protected LoadBalancerClient loadBalancerClient;
-//    
-//    /**
-//     * Handles discovery of the {@link ITimestampService}.
-//     */
-//    protected TimestampServiceClient timestampServiceClient;
-    
     /**
      * Creates a new {@link DataServer}.
      * 
@@ -145,101 +121,21 @@ public class DataServer extends AbstractServer {
         
     }
     
-//    /**
-//     * Initialize the {@link #timestampServiceClient},
-//     * {@link #dataServicesClient}, and {@link #loadBalancerClient}. This is a
-//     * pre-condition for actually instantiating the
-//     * {@link #newService(Properties)}.
-//     */
-//    protected void setupClients(DiscoveryManagement discoveryManager)
-//            throws Exception {
-//        
-//        assert discoveryManager != null;
-//
-//        timestampServiceClient = new TimestampServiceClient(discoveryManager);
-//
-//        dataServicesClient = new DataServicesClient(discoveryManager);
-//
-//        loadBalancerClient = new LoadBalancerClient(discoveryManager);
-//
-//    }
-    
     protected Remote newService(Properties properties) {
 
-        return new AdministrableDataService(this,properties).start();
-        
+        return new AdministrableDataService(this, properties).start();
+
     }
-    
-//    synchronized protected void terminate() {
-//
-//        if (dataServicesClient != null) {
-//
-//            try {
-//
-//                dataServicesClient.terminate();
-//                
-//            } catch(Exception ex) {
-//                
-//                log.error("Could not terminate the data services client: "+ex, ex);
-//                
-//            } finally {
-//                
-//                dataServicesClient = null;
-//                
-//            }
-//
-//        }
-//        
-//        if (loadBalancerClient != null) {
-//
-//            try {
-//
-//                loadBalancerClient.terminate();
-//
-//            } catch(Exception ex) {
-//                
-//                log.error("Could not terminate the load balancer client: "+ex, ex);
-//                
-//            } finally {
-//                
-//                loadBalancerClient = null;
-//                
-//            }
-//
-//        }
-//        
-//        if (timestampServiceClient != null) {
-//
-//            try {
-//
-//                timestampServiceClient.terminate();
-//
-//            } catch (Exception ex) {
-//
-//                log.error("Could not terminate the timestamp service client: "
-//                        + ex, ex);
-//
-//            } finally {
-//
-//                timestampServiceClient = null;
-//
-//            }
-//            
-//        }
-//        
-//        super.terminate();
-//
-//    }
-    
+
     /**
      * Extends the behavior to close and delete the journal in use by the data
      * service.
      */
     public void destroy() {
 
-        DataService service = (DataService)impl;
+        final DataService service = (DataService)impl;
         
-        IResourceManager resourceManager = service.getResourceManager();
+        final IResourceManager resourceManager = service.getResourceManager();
         
         super.destroy();
         
@@ -259,8 +155,8 @@ public class DataServer extends AbstractServer {
         
         protected DataServer server;
         
-        public AdministrableDataService(DataServer server,Properties properties) {
-            
+        public AdministrableDataService(DataServer server, Properties properties) {
+
             super(properties);
             
             this.server = server;
@@ -269,7 +165,8 @@ public class DataServer extends AbstractServer {
         
         public Object getAdmin() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            if (INFO)
+                log.info("" + getServiceUUID());
 
             return server.proxy;
             
@@ -303,35 +200,35 @@ public class DataServer extends AbstractServer {
             
             try {
                 
-                InetAddress clientAddr = ((ClientHost) ServerContext
+                final InetAddress clientAddr = ((ClientHost) ServerContext
                         .getServerContextElement(ClientHost.class))
                         .getClientHost();
-                
-                MDC.put("clientname",clientAddr.getHostName());
-                
+
+                MDC.put("clientname", clientAddr.getHostName());
+
             } catch (ServerNotActiveException e) {
-                
+
                 /*
                  * This exception gets thrown if the client has made a direct
                  * (vs RMI) call so we just ignore it.
                  */
-                
+
             }
-            
-            MDC.put("hostname",server.getHostName());
-            
+
+            MDC.put("hostname", server.getHostName());
+
         }
 
         protected void clearLoggingContext() {
-            
+
             MDC.remove("hostname");
 
             MDC.remove("clientname");
 
             super.clearLoggingContext();
-            
+
         }
-        
+
         /*
          * DestroyAdmin
          */
@@ -344,7 +241,7 @@ public class DataServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            if(INFO) log.info(""+getServiceUUID());
 
             new Thread() {
 
@@ -352,7 +249,8 @@ public class DataServer extends AbstractServer {
 
                     server.destroy();
                     
-                    log.info(getServiceUUID()+" - Service stopped.");
+                    if (INFO)
+                        log.info(getServiceUUID()+" - Service stopped.");
 
                 }
 
@@ -386,132 +284,7 @@ public class DataServer extends AbstractServer {
             return server.getClient().getFederation();
             
         }
-        
-//        public IDataService getDataService(UUID serviceUUID) {
-//
-//            if (server.dataServicesClient == null) {
-//
-//                log.warn("dataServicesClient is not initialized.");
-//
-//                return null;
-//
-//            }
-//
-//            return server.dataServicesClient.getDataService(serviceUUID);
-//
-//        }
-//
-//        public IMetadataService getMetadataService() {
-//
-//            if (server.dataServicesClient == null) {
-//
-//                log.warn("dataServicesClient is not initialized.");
-//
-//                return null;
-//
-//            }
-//
-//            return server.dataServicesClient.getMetadataService();
-//
-//        }
-//
-//        public ILoadBalancerService getLoadBalancerService() {
-//
-//            if (server.loadBalancerClient == null) {
-//
-//                log.warn("loadBalancerClient is not initialized.");
-//
-//                return null;
-//
-//            }
-//            
-//            return server.loadBalancerClient.getLoadBalancerService();
-//
-//        }
-//
-//        public ITimestampService getTimestampService() {
-//
-//            if (server.timestampServiceClient == null) {
-//
-//                log.warn("timestampServiceClient is not initialized.");
-//
-//                return null;
-//
-//            }
-//
-//            return server.timestampServiceClient.getTimestampService();
-//            
-//        }
-        
-// /*
-// * JoinAdmin
-// */
-//        
-// public void addLookupAttributes(Entry[] arg0) throws RemoteException {
-//            
-// log.info("");
-//            
-//        }
-//
-//        public void addLookupGroups(String[] arg0) throws RemoteException {
-//
-//            log.info("");
-//
-//        }
-//
-//        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//
-//            log.info("");
-//            
-//        }
-//
-//        public Entry[] getLookupAttributes() throws RemoteException {
-//
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public String[] getLookupGroups() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public LookupLocator[] getLookupLocators() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
-//         
-//            log.info("");
-//            
-//        }
-//
-//        public void removeLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//
-//        }
-//
-//        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-        
+
     }
 
 }

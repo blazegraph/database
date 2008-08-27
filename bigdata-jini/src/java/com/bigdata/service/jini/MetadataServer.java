@@ -32,7 +32,6 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
-import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.export.ServerContext;
@@ -41,10 +40,7 @@ import net.jini.io.context.ClientSubject;
 
 import org.apache.log4j.MDC;
 
-import com.bigdata.journal.ITimestampService;
-import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 
@@ -59,10 +55,6 @@ import com.bigdata.service.MetadataService;
  * On startup, the metadata service discovers active data services configured in
  * the same group. While running, it tracks when data services start and stop so
  * that it can (re-)allocate index partitions as necessary.
- * 
- * @todo aggregate host load data and service RPC events and report them
- *       periodically so that we can track load and make load balancing
- *       decisions.
  * 
  * @todo should destroy destroy the service instance or the persistent state as
  *       well? Locally, or as replicated?
@@ -128,12 +120,6 @@ public class MetadataServer extends DataServer {
         
     }
     
-//    protected void terminate() {
-//        
-//        super.terminate();
-//
-//    }
-
     /**
      * Adds jini administration interfaces to the basic {@link MetadataService}.
      * 
@@ -148,17 +134,19 @@ public class MetadataServer extends DataServer {
         /**
          * @param properties
          */
-        public AdministrableMetadataService(MetadataServer server, Properties properties) {
+        public AdministrableMetadataService(MetadataServer server,
+                Properties properties) {
 
             super(properties);
-            
+
             this.server = server;
-            
+
         }
 
         public Object getAdmin() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            if (INFO)
+                log.info("" + getServiceUUID());
 
             return server.proxy;
 
@@ -190,7 +178,7 @@ public class MetadataServer extends DataServer {
             
             try {
                 
-                InetAddress clientAddr = ((ClientHost) ServerContext
+                final InetAddress clientAddr = ((ClientHost) ServerContext
                         .getServerContextElement(ClientHost.class))
                         .getClientHost();
                 
@@ -226,24 +214,6 @@ public class MetadataServer extends DataServer {
             
         }
 
-//        public ILoadBalancerService getLoadBalancerService() {
-//            
-//            return server.loadBalancerClient.getLoadBalancerService();
-//            
-//        }
-//
-//        public IDataService getDataService(UUID serviceUUID) {
-//
-//            return server.dataServicesClient.getDataService(serviceUUID);
-//            
-//        }
-//        
-//        public ITimestampService getTimestampService() {
-//            
-//            return server.timestampServiceClient.getTimestampService();
-//            
-//        }
-
         /*
          * DestroyAdmin
          */
@@ -263,8 +233,9 @@ public class MetadataServer extends DataServer {
                 public void run() {
 
                     server.destroy();
-                    
-                    log.info(getServiceUUID()+" - Service stopped.");
+
+                    if (INFO)
+                        log.info(getServiceUUID()+" - Service stopped.");
 
                 }
 

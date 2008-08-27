@@ -409,6 +409,14 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
             
         }
 
+        if (resourceLockServer0 != null) {
+            
+            resourceLockServer0.destroy();
+            
+            resourceLockServer0 = null;
+            
+        }
+
     }
     
     /**

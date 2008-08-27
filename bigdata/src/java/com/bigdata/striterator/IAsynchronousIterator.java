@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,30 +20,20 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Aug 27, 2008
  */
 
 package com.bigdata.striterator;
 
-import java.util.Comparator;
-
 /**
- * An interface representing the natural traversal orders for the different
- * indices for some class of relation.
- * 
+ * Marker interface for iterators that are running asynchronously.
+ *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @param <E>
- *            The generic type of the elements in the relation.
  */
-public interface IKeyOrder<E> {
-
-    /**
-     * Return the comparator that places elements into the natural order for the
-     * associated index.
-     */
-    public Comparator<E> getComparator();
+public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
 
 }

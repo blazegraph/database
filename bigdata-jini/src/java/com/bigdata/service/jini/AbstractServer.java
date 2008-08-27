@@ -360,7 +360,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         /*
          * Read jini configuration & service properties 
          */
-        
+
+        // first, for the JiniClient (not started until later).
+        client = JiniClient.newInstance(args);
+
         Entry[] entries = null;
 //        LookupLocator[] unicastLocators = null;
 //        String[] groups = null;
@@ -393,13 +396,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
              * Configuration.
              */
 
-            // The exporter used to expose the service proxy.
-            exporter = (Exporter) config.getEntry(//
-                    SERVICE_LABEL, // component
-                    "exporter", // name
-                    Exporter.class // type (of the return object)
-                    );
+//            // The exporter used to expose the service proxy.
+//            exporter = (Exporter) config.getEntry(//
+//                    SERVICE_LABEL, // component
+//                    "exporter", // name
+//                    Exporter.class // type (of the return object)
+//                    );
 
+            exporter = client.getExporter();
+            
             // The file on which the ServiceID will be written. 
             serviceIdFile = (File) config.getEntry(SERVICE_LABEL,
                     "serviceIdFile", File.class); // default
@@ -421,8 +426,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 
             } else {
                 
-                if(INFO)
-                log.info("New service instance - ServiceID will be assigned");
+                if (INFO)
+                    log.info("New service instance - ServiceID will be assigned");
                 
                 /*
                  * Make sure that the parent directory exists.
@@ -510,8 +515,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
          */
         try {
 
-            client = JiniClient.newInstance(args);
-        
             client.connect();
             
         } catch(Throwable t) {
@@ -545,12 +548,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 //
 //            setupClients(discoveryManager);
 
-            if(INFO) log.info("Creating service impl...");
-            
+            if (INFO)
+                log.info("Creating service impl...");
+
             // init w/ client's properties.
             impl = newService(client.getProperties());
 
-            if(INFO) log.info("Service impl is "+impl);
+            if (INFO)
+                log.info("Service impl is " + impl);
             
         } catch(Exception ex) {
         
@@ -568,8 +573,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
             proxy = exporter.export(impl);
             
-            if(INFO)
-            log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
+            if (INFO)
+                log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
 
         } catch (ExportException ex) {
 
@@ -669,8 +674,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     synchronized protected boolean unexport(boolean force) {
 
-        if(INFO)
-        log.info("force=" + force + ", proxy=" + proxy);
+        if (INFO)
+            log.info("force=" + force + ", proxy=" + proxy);
 
         try {
             
@@ -711,16 +716,22 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     public ServiceID readServiceId(File file) throws IOException {
 
-        FileInputStream is = new FileInputStream(file);
-        
-        ServiceID serviceID = new ServiceID(new DataInputStream(is));
-        
-        is.close();
+        final FileInputStream is = new FileInputStream(file);
 
-        if(INFO)
-        log.info("Read ServiceID=" + serviceID+" from "+file);
+        try {
 
-        return serviceID;
+            final ServiceID serviceID = new ServiceID(new DataInputStream(is));
+
+            if (INFO)
+                log.info("Read ServiceID=" + serviceID + " from " + file);
+
+            return serviceID;
+
+        } finally {
+
+            is.close();
+
+        }
         
     }
 
@@ -734,8 +745,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     public void serviceIDNotify(ServiceID serviceID) {
 
-        if(INFO)
-        log.info("serviceID=" + serviceID);
+        if (INFO)
+            log.info("serviceID=" + serviceID);
 
         this.serviceID = serviceID;
         
@@ -743,18 +754,25 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             
             try {
             
-                DataOutputStream dout = new DataOutputStream(
+                final DataOutputStream dout = new DataOutputStream(
                         new FileOutputStream(serviceIdFile));
             
-                serviceID.writeBytes(dout);
+                try {
                 
-                dout.flush();
-                
-                dout.close();
-                
-                if(INFO)
-                log.info("ServiceID saved: file=" + serviceIdFile+", serviceID="+serviceID);
+                    serviceID.writeBytes(dout);
 
+                    dout.flush();
+                    
+                    if (INFO)
+                        log.info("ServiceID saved: file=" + serviceIdFile
+                                + ", serviceID=" + serviceID);
+
+                } finally {
+                    
+                    dout.close();
+                    
+                }
+                
             } catch (Exception ex) {
 
                 log.error("Could not save ServiceID", ex);
@@ -807,12 +825,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
                 if (a.length == 0) {
 
-                    log.error("Service not registered with any service registrars");
+                    log
+                            .error("Service not registered with any service registrars");
 
                 } else {
-                    
-                    if(INFO)
-                    log.info("Service remains registered with "+a.length+" service registrats");
+
+                    if (INFO)
+                        log.info("Service remains registered with " + a.length
+                                + " service registrars");
                     
                 }
 
@@ -866,7 +886,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
          */
         try {
         
-            log.info("Unexporting the service proxy.");
+            if(INFO) log.info("Unexporting the service proxy.");
             
             unexport(true/* force */);
             
@@ -1078,7 +1098,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 
             } catch (InterruptedException ex) {
                 
-                if(INFO) log.info(""+ex);
+                if (INFO)
+                    log.info("" + ex);
 
             } finally {
                 
@@ -1151,7 +1172,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         
         shutdownNow();
         
-        if(INFO) log.info("Deleting: " + serviceIdFile);
+        if (INFO)
+            log.info("Deleting: " + serviceIdFile);
 
         if (!serviceIdFile.delete()) {
 

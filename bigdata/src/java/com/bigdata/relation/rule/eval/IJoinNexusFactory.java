@@ -70,5 +70,5 @@ public interface IJoinNexusFactory extends Serializable {
      *            rule execution.
      */
     IJoinNexus newInstance(IIndexManager indexManager);
-    
+
 }

@@ -39,6 +39,7 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.LookupDiscovery;
+import net.jini.export.Exporter;
 
 import com.bigdata.service.AbstractClient;
 import com.bigdata.util.NV;
@@ -141,30 +142,41 @@ public class JiniClient extends AbstractClient {
         final Configuration config;
         final String[] groups;
         final LookupLocator[] lookupLocators;
+        final Exporter exporter;
         final Properties properties;
 
         public JiniConfig(Configuration config, String[] groups,
-                LookupLocator[] lookupLocators, Properties properties) {
+                LookupLocator[] lookupLocators, Exporter exporter,
+                Properties properties) {
 
             this.config = config;
             
             this.groups = groups;
 
             this.lookupLocators = lookupLocators;
+
+            this.exporter = exporter;
             
             this.properties = properties;
-
+            
+            if(log.isInfoEnabled()) {
+                
+                log.info(toString());
+                
+            }
+            
         }
 
         public String toString() {
             
             return "JiniConfig"//
-                    + "{groups="
+                    + "{ groups="
                     + (groups == null ? "N/A" : "" + Arrays.toString(groups))//
-                    + ",locators="
+                    + ", locators="
                     + (lookupLocators == null ? "N/A" : ""
                             + Arrays.toString(lookupLocators))//
-                    + ",properties="+properties
+                    + ", exporter="+(exporter==null?"N/A":""+exporter)
+                    + ", properties="+properties
                     + "}";
             
         }
@@ -200,6 +212,17 @@ public class JiniClient extends AbstractClient {
         
     }
 
+    /**
+     * Return the configured {@link Exporter}
+     * 
+     * @return The {@link Exporter}.
+     */
+    public Exporter getExporter() {
+        
+        return jiniConfig.exporter;
+        
+    }
+    
     /**
      * Conditionally install a suitable security manager if there is none in
      * place. This is required before the client can download code. The code
@@ -247,6 +270,7 @@ public class JiniClient extends AbstractClient {
 
         final String[] groups;
         final LookupLocator[] lookupLocators;
+        final Exporter exporter;
         final Properties properties;
         try {
 
@@ -273,6 +297,18 @@ public class JiniClient extends AbstractClient {
                     .getEntry(
                     AbstractServer.ADVERT_LABEL, "unicastLocators",
                     LookupLocator[].class, null/* default */);
+
+            /*
+             * Extract how the Exporter will be provisioned from the
+             * Configuration (MAY be null).
+             */
+
+            // The exporter used to expose proxy objects.
+            exporter = (Exporter) config.getEntry(//
+                    AbstractServer.SERVICE_LABEL, // component
+                    "exporter", // name
+                    Exporter.class // type (of the return object)
+                    );
 
             {
                 
@@ -328,7 +364,8 @@ public class JiniClient extends AbstractClient {
             
             }
 
-            return new JiniConfig(config, groups, lookupLocators, properties);
+            return new JiniConfig(config, groups, lookupLocators, exporter,
+                    properties);
             
         } catch (Exception ex) {
 

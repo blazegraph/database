@@ -28,14 +28,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.jini;
 
 import java.io.IOException;
+import java.rmi.Remote;
+import java.rmi.server.ExportException;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
+import net.jini.export.Exporter;
 
+import com.bigdata.btree.IDataSerializer;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
@@ -44,6 +49,11 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniClient.JiniConfig;
+import com.bigdata.striterator.IAsynchronousIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.striterator.IRemoteChunk;
+import com.bigdata.striterator.IRemoteChunkedIterator;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
@@ -81,7 +91,8 @@ public class JiniFederation extends AbstractDistributedFederation {
 
         super(client);
     
-        if(INFO) log.info(jiniConfig.toString());
+        if (INFO)
+            log.info(jiniConfig.toString());
         
         final String[] groups = jiniConfig.groups;
         
@@ -115,7 +126,8 @@ public class JiniFederation extends AbstractDistributedFederation {
 
         } catch (Exception ex) {
 
-            log.fatal("Problem initiating service discovery: " + ex.getMessage(), ex);
+            log.fatal("Problem initiating service discovery: "
+                    + ex.getMessage(), ex);
 
             try {
 
@@ -215,7 +227,8 @@ public class JiniFederation extends AbstractDistributedFederation {
      * @throws TimeoutException
      *             If a timeout occurs.
      */
-    public int awaitServices(int minDataServices, long timeout) throws InterruptedException, TimeoutException {
+    public int awaitServices(int minDataServices, long timeout)
+            throws InterruptedException, TimeoutException {
 
         assertOpen();
 
@@ -250,8 +263,9 @@ public class JiniFederation extends AbstractDistributedFederation {
                 
             }
             
-            if(INFO)
-            log.info("Have metadata service and "+dataServiceUUIDs.length+" data services");
+            if (INFO)
+                log.info("Have metadata service and " + dataServiceUUIDs.length
+                        + " data services");
             
             return dataServiceUUIDs.length;
             
@@ -289,7 +303,8 @@ public class JiniFederation extends AbstractDistributedFederation {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if(INFO) log.info("Done: elapsed="+elapsed+"ms");
+        if (INFO)
+            log.info("Done: elapsed=" + elapsed + "ms");
 
     }
 
@@ -340,6 +355,12 @@ public class JiniFederation extends AbstractDistributedFederation {
 
     }
 
+    private static final String ERR_RESOLVE = "Could not resolve: ";
+
+    private static final String ERR_DESTROY_ADMIN = "Could not destroy: ";
+    
+    private static final String ERR_NO_DESTROY_ADMIN = "Does not implement DestroyAdmin: ";
+    
     public void destroy() {
 
         assertOpen();
@@ -359,7 +380,7 @@ public class JiniFederation extends AbstractDistributedFederation {
 
                 } catch (Exception ex) {
 
-                    log.error("Could not resolve dataService: uuid" + uuid);
+                    log.error(ERR_RESOLVE + uuid);
 
                     continue;
 
@@ -371,7 +392,7 @@ public class JiniFederation extends AbstractDistributedFederation {
 
                 } catch (IOException e) {
 
-                    log.error("Could not destroy dataService: " + ds, e);
+                    log.error(ERR_DESTROY_ADMIN + ds, e);
 
                 }
 
@@ -393,7 +414,7 @@ public class JiniFederation extends AbstractDistributedFederation {
 
                 } catch (IOException e) {
 
-                    log.error("Could not destroy dataService: " + mds, e);
+                    log.error(ERR_DESTROY_ADMIN + mds, e);
 
                 }
 
@@ -417,15 +438,13 @@ public class JiniFederation extends AbstractDistributedFederation {
 
                     } catch (IOException e) {
 
-                        log.error("Could not destroy loadBalancerService: "
-                                + loadBalancerService, e);
+                        log.error(ERR_DESTROY_ADMIN + loadBalancerService, e);
 
                     }
 
                 } else {
 
-                    log
-                            .warn("Can not destroy: The load balancer does not implement DestroyAdmin");
+                    log.warn(ERR_NO_DESTROY_ADMIN + loadBalancerService);
 
                 }
 
@@ -448,15 +467,13 @@ public class JiniFederation extends AbstractDistributedFederation {
 
                     } catch (IOException e) {
 
-                        log.error("Could not destroy timestampService: "
-                                + timestampService, e);
+                        log.error(ERR_DESTROY_ADMIN + timestampService, e);
 
                     }
 
                 } else {
 
-                    log
-                            .warn("Can not destroy: The timestamp service does not implement DestroyAdmin");
+                    log.warn(ERR_NO_DESTROY_ADMIN + timestampService);
 
                 }
 
@@ -497,5 +514,143 @@ public class JiniFederation extends AbstractDistributedFederation {
     }
 
     private long lastKnownCommitTime;
+
+    /**
+     * Export and return a proxy object. The client will have to wrap the proxy
+     * object to get back an {@link IChunkedOrderedIterator} interface.
+     * 
+     * FIXME optimize when an {@link IAsynchronousIterator}. if the iterator
+     * thinks that it can be complete quickly (LT chunkSize elements in LT 5ms)
+     * then return a fully buffered iterator.
+     * 
+     * @todo custom serialization and compression of elements in a chunk along
+     *       the same lines as {@link IDataSerializer}.
+     */
+    @Override
+    public Object getProxy(IChunkedOrderedIterator sourceIterator) {
+        
+        final long begin = System.currentTimeMillis();
+        
+        // the JiniClient has the configured Exporter.
+        final Exporter exporter = getClient().getExporter();
+        
+        // wrap the iterator with an exportable object.
+        final Remote impl = new RemoteChunkedIterator(sourceIterator);
+        
+        /*
+         * Export and return the proxy.
+         */
+        final Remote proxy;
+        try {
+
+            // export proxy.
+            proxy = exporter.export(impl);
+            
+            if (INFO) {
+
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                log.info("Exported proxy: elapsed=" + elapsed + ", proxy="
+                        + proxy + "(" + proxy.getClass() + ")");
+                
+            }
+            
+            // return proxy to caller.
+            return proxy;
+
+        } catch (ExportException ex) {
+
+            throw new RuntimeException("Export error: " + ex, ex);
+            
+        }
+        
+    }
+
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    private static class RemoteChunkedIterator<E> implements
+            IRemoteChunkedIterator<E> {
+
+        private final IChunkedOrderedIterator<E> src;
+
+        public RemoteChunkedIterator(IChunkedOrderedIterator<E> src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            this.src = src;
+
+        }
+
+        public void close() throws IOException {
+
+            src.close();
+
+        }
+
+        public IRemoteChunk<E> nextChunk() throws IOException {
+
+            if (!src.hasNext()) {
+
+                return new Chunk<E>(true/* exhausted */, src.getKeyOrder(),
+                        null);
+
+            }
+
+            final E[] a = src.nextChunk();
+
+            return new Chunk<E>(src.hasNext(), src.getKeyOrder(), a);
+
+        }
+
+    }
+
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    private static class Chunk<E> implements IRemoteChunk<E> {
+
+        private final boolean exhausted;
+
+        private final IKeyOrder<E> keyOrder;
+
+        private final E[] a;
+
+        public Chunk(final boolean exhausted, final IKeyOrder<E> keyOrder, E[] a) {
+
+            this.exhausted = exhausted;
+
+            this.keyOrder = keyOrder; // MAY be null.
+
+            this.a = a; // MUST be null if no elements to be sent.
+
+        }
+
+        public E[] getChunk() {
+
+            return a;
+
+        }
+
+        public IKeyOrder<E> getKeyOrder() {
+
+            return keyOrder;
+
+        }
+
+        public boolean isExhausted() {
+
+            return exhausted;
+
+        }
+
+    }
 
 }

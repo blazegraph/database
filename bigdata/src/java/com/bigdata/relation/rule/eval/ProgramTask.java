@@ -45,6 +45,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.DataService.IDataServiceAwareProcedure;
@@ -288,8 +289,22 @@ public class ProgramTask implements IProgramTask,
                 /*
                  * Execute a query.
                  */
+                final IChunkedOrderedIterator ret = executeQuery(step);
                 
-                return executeQuery(step);
+                if (indexManager instanceof AbstractDistributedFederation) {
+
+                    /*
+                     * Note: The distributed federation (JDS) uses RMI and
+                     * requires either a "thick" iterator (fully buffered) or a
+                     * proxy object.
+                     */
+                    
+                    return ((AbstractDistributedFederation) indexManager)
+                            .getProxy(ret);
+                    
+                }
+
+                return ret;
 
             }
 
@@ -361,33 +376,6 @@ public class ProgramTask implements IProgramTask,
             if (log.isDebugEnabled())
                 log.debug("Returning iterator reading on async query task");
 
-            /*
-             * FIXME The distributed federation (JDS) requires a proxy object.
-             * 
-             * When using RMI the return iterator for a QUERY needs be a proxy
-             * for the remote iterator running on the data service that is
-             * actually executing that proxy (this is only true for remote data
-             * services).
-             * 
-             * When the proxy iterator is closed by the client the close needs
-             * to make it back to the data service where it must cancel the
-             * Future(s) writing on the buffer.
-             * 
-             * @todo add factory to IJoinNexus so that this can be overriden for
-             * the JDS
-             * 
-             * @todo when returning a proxy for a Future whose get() returns the
-             * iterator reading from the query buffer, the proxy should note
-             * whether or not the iterator is exhausted each time it fetches the
-             * next chunk and should only fetch chunks - if the caller want to
-             * use the element at a time aspect of the iterator it should still
-             * fetch a chunk and then step through the elements until the next
-             * chunk is required.
-             */
-
-//            return new ClosableIteratorFuture<ISolution, RuleStats>(buffer,
-//                    future);
-            
             return buffer.iterator();
 
         } catch (Exception ex) {

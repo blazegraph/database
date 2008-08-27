@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 22, 2006
  */
 
-package com.bigdata.nio;
+package com.bigdata.io;
 
 import java.io.File;
 import java.io.IOException;
@@ -329,8 +329,8 @@ public class TestIO extends TestCase {
             }
 
             if (synchAfterTest) {
-                fileChannel.force(false); // force data, but do not force
-                                            // metadata.
+                // force data, but do not force metadata.
+                fileChannel.force(false);
             }
 
             long endNanos = System.nanoTime();
@@ -346,10 +346,13 @@ public class TestIO extends TestCase {
             System.err.println(""+nf.format(getUnitsPerSecond(pagesToWrite, elapsedNanos))
                     + " pages per second");
             long megabytesWritten = pagesToWrite * pageSize / MegaByte;
-            System.err.println(""+fpf.format(megabytesWritten)+" metabytes written");
+            System.err.println(""+fpf.format(megabytesWritten)+" megabytes written");
             System.err.println(""
                     + fpf.format(getUnitsPerSecond(megabytesWritten,
                             elapsedNanos)) + " megabytes per second");
+            System.err.println(""
+                    + fpf.format(getUnitsPerSecond(megabytesWritten*8,
+                            elapsedNanos)) + " megabits per second");
             System.err.println("writeThroughIOs="+writeThrough);
             System.err.println("synchAfterTest="+synchAfterTest);
 

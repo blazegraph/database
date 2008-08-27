@@ -640,7 +640,6 @@ public class ResultSet implements Externalizable {
             
             keys = new RandomAccessByteArray( 0, 0, new byte[ntuples][] );
             
-            
             tupleSerializer.getLeafKeySerializer().read(in, keys);
             
         } else {
