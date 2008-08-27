@@ -244,15 +244,7 @@ public class AtomicRowWriteRead extends AbstractAtomicRowReadOrWrite {
             long timestamp, final String col) {
         
         final TPS tps = atomicRead(getKeyBuilder(ndx), ndx, schema, primaryKey,
-                timestamp, new INameFilter() {
-
-            public boolean accept(String name) {
-                
-                return name.equals(col);
-
-            }
-            
-        });
+                timestamp, new SingleColumnFilter(col));
         
         /*
          * Locate the previous non-null value for the counter column and

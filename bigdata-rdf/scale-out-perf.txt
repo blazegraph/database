@@ -2413,20 +2413,12 @@ Priority list:
 x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
        at http://esw.w3.org/topic/LargeTripleStores.
 
-       * Benchmark requirements to DaveL and DanH.
-
-       * Increase the journal chunk size.
-
-       * Verify correctness for U1 before beginning server-based runs.
+       * Increase the journal chunk size and split point.  Initially,
+         disable overflow for EDS, JDS.
 
        - Note the time writing on the statement indices during closure
          and compare it with the time reading on those indices.  What
          takes more time?  For which rules?
-
-       * Modify test harness for concurrent data load, or simply load
-         data via our own test harness but with the same set of
-         options for the triple store (justify=false, testIndex=false,
-         statementIdentifiers=false).
 
        First, do a pure bulk load - triples only.
 
@@ -2436,13 +2428,10 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
 	    - Without overflow processing the triple store will take
               up more space due to the WORM nature of the store.
 
-	    - leading prefix compress can help to compenate for this,
+	    * leading prefix compress can help to compenate for this,
               but it has not been implemented yet.
 
        Then compute the database at once closure.
-
-	    - why does serial rule execution do better?  Will this
-              also have an impact on concurrent query performance?
 
 	    - add some of the missing rules for LUBM competeness,
               e.g., owl:inversePropertyOf, etc.
@@ -2450,7 +2439,7 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
        Then run LUBM benchmarks (rewrite Sesame2 queries to native
        JOINs).
 
-	    - Update our Sesame disto since they have been working on
+	    - Update our Sesame distro since they have been working on
               their optimizer.
 
        Do this for U100, U1000, and U8000 on one machine and then for
@@ -2458,11 +2447,6 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
        Put the statement indices on one host (make sure that optimized
        joins are enabled) and the lexicon on another.  The full text
        index can be on a third.  Read the source data from NFS.
-
-       - Jini-aware iterator required for the asynchronous distributed
-         join iterator (and even for the special case where the
-         statement indices are co-located so we can do optimized
-         joins, which applies here).
 
        - Once I have these numbers, go back and try again to work
          through dynamic partitioning, load balancing.
@@ -2476,81 +2460,12 @@ x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
        - Then run the LUBM benchmarks again against the distributed,
          key-range partitioned indices.
 
-x. *** unroll loops for faster distributed joins.
-
-   There is a strong relationship between a byte[][] keys iterator
-   such as the {@link PrefixFilter} and an unrolled JOIN operator.
-   This is especially true when the unrolled N is small, since it is
-   cheap to send the tuples that we want to JOIN to the target data
-   service.
-
 x. Full text index performance.
 
    - Do not re-index terms found in the forward index?  This is
      definately faster but it lacks the robust guarentee of the
      unisolated write pattern (all clients write on both all indices
      to guarentee consistent index states).
-
-4. performance testing for data load and closure
-
-   try w/o UnisolatedReadWriteIndex 
-
-   alibaba: 7/31
-
-   w/ text index and sids, no closure, DPP2 workstation.
-   Loaded 1 resources: 45655 stmts added in 8.375 secs, rate= 5451, commitLatency=250ms
-
-   w/o text index or sids, no closure, DPP2 workstation.
-   Loaded 1 resources: 45655 stmts added in 6.485 secs, rate= 7040, commitLatency=265ms
-
-   w/o text index or sids, database-at-once closure, forceSerial=false, DPP2 workstation.
-   Loaded 1 resources: 45655 stmts added in 6.375 secs, rate= 7161, commitLatency=203ms
-   Computed fixed point: program=fullForwardClosure, rounds=3, elapsed=11922ms
-
-   w/o text index or sids, database-at-once closure, forceSerial=true, DPP2 workstation.
-   Loaded 1 resources: 45655 stmts added in 6.516 secs, rate= 7006, commitLatency=234ms
-   Computed fixed point: program=fullForwardClosure, rounds=1, elapsed=3468ms
-
-   D620 after loading several other files.
-   WordnetN+S:  273681 stmts added in 15.407 secs, rate= 17763, commitLatency=266ms
-   Alibaba:      45655 stmts added in 1.672 secs, rate= 27305, commitLatency=172ms
-   NCIOncology: 464841 stmts added in 26.187 secs, rate= 17750, commitLatency=266ms
-
-   * Verify correct handling migration of elements from the
-     Unsynchronized buffer to the target buffer.
-   
-   * Hypothesis for poor performance when using parallel rule
-     execution is lock contention for the buffer on which the
-     solutions are being written by the rule set (or possible,
-     contention for the index locks).  If true, then there should be
-     less effect for the fastClosure method since that is mostly a
-     sequential program (it has a few fix point steps).
-
-     One solution is to give each thread (this equates to each rule
-     instance that is being executed) its own local buffer (100s to
-     1000s of solutions for the local buffer) and to flush those
-     buffers onto the shared buffer when they overflow.  Make sure
-     that the per-rule buffers are not larger than the global buffer,
-     and probably not larger than 1/10 of the global buffer.
-
-     When the local buffer is flushed, we need to acquire and hold a
-     lock on the shared buffer as 100s to 1000s of solution references
-     are copied (and to flush if this would overflow the shared
-     buffer).  This means that we can't use the BlockingQueue since it
-     will always acquire a lock per add().
-
-     A variant is to have the BlockingBuffer collection ISolution[]s.
-     That way each local buffer is copied in its entirety into the
-     next ISolution[] and we only acquire a single lock.
-
-     Also make sure that there is no lock contention when flushing the
-     shared buffer during execution.  This is possible since
-     concurrent threads are still writing on the shared buffer.  (It
-     is not possible when the shared buffer is flushed after a round
-     since there are no threads writing on the buffer at that time.)
-
-   - Done. Details missing for fast closure programs (total and
-     details).
 
 x. GOM style "rows" for IRelation yeilding schema flexible JOINs.
    Could even just use GOM for this, but I would also have to extend
@@ -2599,6 +2514,28 @@ x. ZooKeeper integration for resource lock manager?
 
 ============================================================
 
+
+   - TempTripleStore use and abuse:
+ 
+     * add ITemporaryStoreFactory, add same to IJoinNexus, add as
+       argument to {@link BackchainAccessPath} (this may wind up as an
+       IIndexManager feature at some point).
+
+     * Fix TruthMaintenance#applyExistingStatements() - should use
+       bulk filter not point tests!
+
+     * Closure for StatementIdentifers should reuse the same
+       TemporaryStore and close() vs closeAndDelete().
+
+     * TruthMaintenance should reuse the same TemporaryStore (at least
+       for a given closure) and close() vs closeAndDelete().
+
+     * The SAIL must periodically discard its old temporary store
+       (just let go of the reference and it will be closed in a timely
+       fashion) and create a new one.  It gets used by the backchain
+       access path for simple (StatementPattern) queries and for JOINs
+       when nativeJoins is disabled.
+
    - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
 
       - Is the closure really at a fixed point?  Re-load and re-close
@@ -2608,8 +2545,6 @@ x. ZooKeeper integration for resource lock manager?
         of fast closure might produce additional entailments.
 	
 	Look into this with MikeP.
-
-      - Unroll joins then distribute joins.  w/ MikeP
 
       - cache range counts (and maybe more) for historical access
         paths.
@@ -2626,64 +2561,120 @@ x. ZooKeeper integration for resource lock manager?
 
 	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
 
-      - TempTripleStore use and abuse:
- 
-        * add ITemporaryStoreFactory, add same to IJoinNexus, add as
-          argument to {@link BackchainAccessPath} (this may wind up as
-          an IIndexManager feature at some point).
-
-        * Fix TruthMaintenance#applyExistingStatements() - should use
-          bulk filter not point tests!
-
-        * Closure for StatementIdentifers should reuse the same
-          TemporaryStore and close() vs closeAndDelete().
-
-        * TruthMaintenance should reuse the same TemporaryStore (at
-          least for a given closure) and close() vs closeAndDelete().
-
-      * The EDS and JDS should be able to run with overflow disabled
-        and the SPO indices located on the same data service just as
-        efficiently as the LTS or LDS.
-
-        It would be nice if we could constrain the placement of the
-        SPO indices onto a host and run with (much of) the same
-        efficiency as the LTS or LDS but with overflow.  There will be
-        some cost if the MDS is remote as the #of partitions grows.
-
-      - Make sure that the SAIL query is against the last commited
-        state of the store.
-
-      - Change the SAIL setup to use the Locator mechanism.
-
-      - Add LUBM factory variants for EDS and JDS.  LDS and EDS must
-        handle the federation create.  For JDS, the federation should
-        pre-exist and the client just connects.  Open and close for
-        JDS is just connect and disconnect.  For LDS and EDS, we also
-        just connect and disconnect, but that has the semantics of
-        shutting down the federation when we disconnect.
-
       * Examine the pure access path read rate for LTS, LDS, EDS, and
         JDS.  This is query6 and query 14.  Both queries produce a lot
         of tuples.  Tune up the access path read until it is good on
         all of these configurations.
 
+      * EDS, JDS
+
+        * Unroll joins and distribute joins.
+
+	   There is a strong relationship between a byte[][] keys
+	   iterator such as the {@link PrefixFilter} and an unrolled
+	   JOIN operator.  This is especially true when the unrolled N
+	   is small, since it is cheap to send the tuples that we want
+	   to JOIN to the target data service.
+
+	   It needs to be modified to (a) unroll to inner loop of the
+	   join; and (b) partition the join such that the outer loop
+	   is split across the data services where the index partition
+	   resides. This makes the outer loop extremely efficient,
+	   distributes the computation over the cluster, and
+	   parallelizes the inner loop so that we do at most N queries
+	   - one query per index partition spanned by the queries
+	   framed for the inner loop by the bindings selected in the
+	   outer loop for a given chunk.  A large chunk size for the
+	   outer loop is also effective since the reads are local and
+	   this reduces the #of times that we will unroll the inner
+	   loop.
+
+	- Change service monitors to use a singleton daemon thread
+          with weak references to the queues and the counters
+          (outputs) and reduce the sampling rate -- all to see if we
+          can reduce the CPU burden of multiple services.
+
+        - Either verify overflow or disable overflow for EDS, JDS.
+
+        - Option to constrain the placement of the SPO indices onto a
+          host and run with (much of) the same efficiency as the LTS
+          or LDS but with overflow.  There will be some cost if the
+          MDS is remote as the #of partitions grows.
+
+	- Closure is MUCH slower (10x).
+
+	   - Try on a server platform for LDS, EDS, JDS.  I may be
+             exhausting the machine resources.
+
+	- Change the default split point back to the default.
+
+	- During verification of scale-out data load (JDS U10)
+
+Caused by: java.lang.IllegalStateException
+	at com.bigdata.rdf.spo.SPO.setStatementType(SPO.java:653)
+	at com.bigdata.rdf.spo.BulkCompleteConverter.convert(BulkCompleteConverter.java:135)
+	at com.bigdata.rdf.spo.SPOConvertingIterator.convert(SPOConvertingIterator.java:59)
+	at com.bigdata.rdf.spo.SPOConvertingIterator.hasNext(SPOConvertingIterator.java:93)
+	at com.bigdata.rdf.store.ConcurrentDataLoader$VerifyStatementBuffer.incrementalWrite(ConcurrentDataLoader.java:1637)
+	at com.bigdata.rdf.rio.StatementBuffer.flush(StatementBuffer.java:377)
+	at com.bigdata.rdf.rio.PresortRioLoader.success(PresortRioLoader.java:71)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf2(BasicRioLoader.java:214)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:145)
+	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.readData(ConcurrentDataLoader.java:1493)
+	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.run(ConcurrentDataLoader.java:1404)
+
+      * Feature 1.  MikeP wants a DISTINCT option on the elements for
+        a rule.  It is easy in a chunk since the elements are in
+        sorted order and we can discard any that are equal() in the
+        sequence in which they are encountered.  If the data exceeds
+        one chunk then transparently create / use the TemporaryStore
+        (via its factory) and create an single access path relation on
+        that temporary store that is used to enforce distinct.  The
+        iterator will filter out elements that have already been
+        visited and stream through new elements so we do not have to
+        wait on the source to be exhausted before the client sees some
+        data.  (Is there a way to use the mutation API for this or
+        just hard code it?)
+
+      * Feature 2. MikeP wants an expansion pattern for predicates in
+        the tail of a rule.  The expander would see each binding set
+
+	I want to be able to 'fake' a bindingset for a particular join
+	dimension (tail) in the rule:
+
+head: S ?p ?sameO
+
+tails:
+
+?sameS sameAs S + { ?sameS = S }
+
+?sameS ?p ?o
+
+?o sameAs ?sameO + { ?sameO = ?o }
+
+or the more declarative expression.
+
+{ 
+    S ?p ?o 
+UNION 
+    S sameAs ?sameS 
+    ?sameS ?p ?o 
+} 
+OPTIONAL 
+{ 
+    ?o sameAs ?sameO 
+} 
+
       * JDS
 
-        - Jini smart proxy iterator and then test scale-out joins
-          (EDS, JDS).  note that EDS does not use RMI and therefore
-          does not serialize anything while JDS requires that we cross
-          machine boundaries with RMI.
+        - Jini smart proxy async iterator (query).
 
-	- Can use the ConcurrentDataLoader with one host directing the
-          loads using the LUBM harness or can use the
-          ConcurrentDataLoader directly and have multiple machines
-          loading concurrently (something that will become a m/r job
-          eventually).
+        - Jini smart proxy for ResourceLock.
+	    
+	    The state is just the lock UUID, so this can be done
+	    easily enough.
 
-	- Can test a single host running queries easily enough.
-
-	- Testing concurrent query under load will require more
-          adaptation (it should be a m/r job).
+	    A real impl. might use ZooKeeper.
 
    - (Various MikeP)
 

@@ -51,7 +51,6 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
-import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -210,32 +209,47 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         } else {
 
-            /*
-             * Align the predicate's constraint with the striterator filter
-             * constructor.
-             * 
-             * @todo redefined IElementFilter as IFilter
-             */
-            
             this.filter = new FilterConstructor<R>();
             
-            this.filter.addFilter(new TupleFilter<R>(){
-                
-                private static final long serialVersionUID = 1L;
-
-                @SuppressWarnings("unchecked")
-                public boolean isValid(ITuple<R> tuple) {
-                    
-                    final R obj = (R) tuple.getObject();
-                
-                    return constraint.accept( obj );
-                    
-                }
-
-            });
+            this.filter.addFilter(new ElementFilter<R>(constraint));
 
         }
         
+    }
+
+    /**
+     * Align the predicate's constraint with the striterator filter constructor.
+     * 
+     * @todo redefined IElementFilter as IFilter
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <R>
+     */
+    public static class ElementFilter<R> extends TupleFilter<R> {
+        
+        private static final long serialVersionUID = 1L;
+
+        private final IElementFilter<R> constraint;
+        
+        public ElementFilter(IElementFilter<R> constraint) {
+            
+            if (constraint == null)
+                throw new IllegalArgumentException();
+            
+            this.constraint = constraint;
+            
+        }
+        
+        @SuppressWarnings("unchecked")
+        public boolean isValid(ITuple<R> tuple) {
+            
+            final R obj = (R) tuple.getObject();
+        
+            return constraint.accept( obj );
+            
+        }
+
     }
 
     public String toString() {
@@ -454,22 +468,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          * data.
          */
         final Iterator<R> src = new Striterator(rangeIterator(capacity, flags,
-                filter)).addFilter(new Resolver() {
-
-            private static final long serialVersionUID = 0L;
-
-            /*
-             * Resolve tuple to element type.
-             */
-            @Override
-            protected R resolve(Object arg0) {
-
-                final ITuple tuple = (ITuple) arg0;
-
-                return (R)tuple.getObject();
-
-            }
-        });
+                filter)).addFilter(new TupleObjectResolver());
 
         if (fullyBufferedRead) {
 
@@ -492,7 +491,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         }
 
     }
-    
+
     /**
      * Fully buffers all elements that would be visited by the
      * {@link IAccessPath} iterator.

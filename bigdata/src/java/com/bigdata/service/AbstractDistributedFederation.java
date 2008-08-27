@@ -44,6 +44,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * This class encapsulates access to the services for a remote bigdata
@@ -486,5 +487,26 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
         return true;
         
     }
+
+    /**
+     * Return a proxy object for an iterator suiteable for use in an RMI
+     * environment.
+     * <p>
+     * Note: The method MAY either return an {@link IRemoteChunkedIterator} -or-
+     * return a "thick" iterator that fully buffers the results. A "thick"
+     * iterator is generally better if the results would fit within a single
+     * "chunk" since you avoid additional RMI calls.
+     * 
+     * @param itr
+     *            The source iterator.
+     * 
+     * @return Either a thick iterator (when the results would fit within a
+     *         single chunk) or an {@link IRemoteChunkedIterator} (when multiple
+     *         chunks are expected).
+     * 
+     * @throws IllegalArgumentException
+     *             if the iterator is <code>null</code>.
+     */
+    public abstract Object getProxy(IChunkedOrderedIterator itr);
 
 }

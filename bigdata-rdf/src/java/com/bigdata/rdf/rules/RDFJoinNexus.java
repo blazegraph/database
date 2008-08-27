@@ -86,7 +86,6 @@ import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTaskFactory;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.service.AbstractDistributedFederation;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
@@ -96,6 +95,8 @@ import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IRemoteChunkedIterator;
+import com.bigdata.striterator.WrappedRemoteChunkedIterator;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
@@ -138,8 +139,6 @@ public class RDFJoinNexus implements IJoinNexus {
 
     /**
      * The default factory for rule evaluation.
-     * 
-     * @todo configure for scale-out variants?
      */
     private final IRuleTaskFactory defaultTaskFactory;
 
@@ -1181,21 +1180,21 @@ public class RDFJoinNexus implements IJoinNexus {
             throw new IllegalArgumentException();
 
         final IIndexManager indexManager = getIndexManager();
-        
-        if(indexManager instanceof IBigdataFederation) {
-            
-            final IBigdataFederation fed = (IBigdataFederation)indexManager;
-            
-            if(fed instanceof LocalDataServiceFederation) {
-                
+
+        if (indexManager instanceof IBigdataFederation) {
+
+            final IBigdataFederation fed = (IBigdataFederation) indexManager;
+
+            if (fed instanceof LocalDataServiceFederation) {
+
                 final DataService dataService = ((LocalDataServiceFederation) fed)
-                .getDataService();
+                        .getDataService();
 
                 // single data service program execution.
                 return runDataServiceProgram(dataService, action, step);
 
             }
-            
+
             // distributed program execution.
             return runDistributedProgram(fed, action, step);
             
@@ -1240,21 +1239,9 @@ public class RDFJoinNexus implements IJoinNexus {
      * {@link EmbeddedFederation} (which uses key-range partitioned indices) and
      * {@link AbstractDistributedFederation}s that are truly multi-machine and
      * use RMI.
-     * 
-     * FIXME This is not optimized for distributed joins. It is actually using
-     * the {@link ClientIndexView} and the {@link ProgramTask} - this is
-     * NOT efficient!!! It needs to be modified to (a) unroll to inner loop of
-     * the join; and (b) partition the join such that the outer loop is split
-     * across the data services where the index partition resides. This makes
-     * the outer loop extremely efficient, distributes the computation over the
-     * cluster, and parallelizes the inner loop so that we do at most N queries -
-     * one query per index partition spanned by the queries framed for the inner
-     * loop by the bindings selected in the outer loop for a given chunk.  A large
-     * chunk size for the outer loop is also effective since the reads are local
-     * and this reduces the #of times that we will unroll the inner loop.
      */
-    protected Object runDistributedProgram(IBigdataFederation fed,
-            ActionEnum action, IStep step) throws Exception {
+    protected Object runDistributedProgram(final IBigdataFederation fed,
+            final ActionEnum action, final IStep step) throws Exception {
 
         if (log.isInfoEnabled()) {
 
@@ -1266,7 +1253,21 @@ public class RDFJoinNexus implements IJoinNexus {
         final IProgramTask innerTask = new ProgramTask(action, step,
                 getJoinNexusFactory(), getIndexManager());
 
-        return innerTask.call();
+        final Object ret = innerTask.call();
+        
+        if(!(ret instanceof IRemoteChunkedIterator)) {
+            
+            return ret;
+            
+        }
+
+        /*
+         * The federation is using RMI so we got back a proxy object. We wrap
+         * that proxy object so that it looks like an IChunkedOrderedIterator
+         * and return it to the caller.
+         */
+        
+        return new WrappedRemoteChunkedIterator((IRemoteChunkedIterator) ret);
 
     }
 

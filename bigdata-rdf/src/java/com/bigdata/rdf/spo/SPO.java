@@ -650,7 +650,7 @@ public class SPO implements ISPO, Comparable<SPO> {
         
         if(this.type != null && this.type != type) {
             
-            throw new IllegalStateException();
+            throw new IllegalStateException("newValue="+type+", spo="+this);
             
         }
         

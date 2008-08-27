@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,30 +20,48 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Aug 27, 2008
  */
 
-package com.bigdata.striterator;
-
-import java.util.Comparator;
+package com.bigdata.sparse;
 
 /**
- * An interface representing the natural traversal orders for the different
- * indices for some class of relation.
+ * Filter for a specific column name.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @param <E>
- *            The generic type of the elements in the relation.
  */
-public interface IKeyOrder<E> {
+public class SingleColumnFilter implements INameFilter {
+
+    private static final long serialVersionUID = 3070828654283555268L;
+    
+    final private String name;
 
     /**
-     * Return the comparator that places elements into the natural order for the
-     * associated index.
+     * 
+     * @param name
+     *            The column name that you want.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
      */
-    public Comparator<E> getComparator();
+    public SingleColumnFilter(String name) {
 
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        this.name = name;
+
+    }
+
+    public boolean accept(String name) {
+
+        return this.name.equals(name);
+
+    }
+        
+    
 }

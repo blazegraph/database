@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,28 +22,38 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Jan 26, 2007
+ * Created on Aug 27, 2008
  */
 
 package com.bigdata.striterator;
 
-import java.util.Comparator;
+import java.io.IOException;
+import java.rmi.Remote;
 
 /**
- * An interface representing the natural traversal orders for the different
- * indices for some class of relation.
+ * Interface for objects proxying for asynchronous chunked iterators. This is
+ * used to export iterators. We wrap an {@link IChunkedIterator} with an object
+ * that implements this interface, and then export a proxy for that object. On
+ * the client, we wrap the proxy so as to hide the {@link IOException}s and
+ * regain our original interface signature.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @param <E>
- *            The generic type of the elements in the relation.
  */
-public interface IKeyOrder<E> {
+public interface IRemoteChunkedIterator<E> extends Remote {
 
     /**
-     * Return the comparator that places elements into the natural order for the
-     * associated index.
+     * Close the remote iterator.
+     * 
+     * @throws IOException
      */
-    public Comparator<E> getComparator();
+    public void close() throws IOException;
 
+    /**
+     * Return the next "chunk" from the iterator.
+     * 
+     * @return The next {@link IRemoteChunk}.
+     */
+    public IRemoteChunk<E> nextChunk() throws IOException;
+    
 }

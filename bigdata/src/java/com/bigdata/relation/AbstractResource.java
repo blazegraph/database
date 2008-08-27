@@ -330,10 +330,46 @@ abstract public class AbstractResource<E> implements IMutableResource<E>{
      */
     protected IResourceLock acquireExclusiveLock() {
 
+        final int maxtries = 3;
+        
+        int ntries = 0;
+        
+        final long millis = 10;
+        
+        IResourceLockService lockService;
+        
+        while ((lockService = indexManager.getResourceLockService()) == null
+                && ntries < maxtries) {
+            
+            if(log.isInfoEnabled()) {
+                
+                log.info("Will retry");
+                
+            }
+            
+            ntries++;
+            
+            try {
+                
+                Thread.sleep(millis);
+                
+            } catch (InterruptedException ex) {
+             
+                throw new RuntimeException(ex);
+                
+            }
+            
+        }
+        
+        if (lockService == null) {
+            
+            throw new RuntimeException("Could not locate lock service");
+            
+        }
+        
         try {
 
-            return getIndexManager().getResourceLockService()
-                    .acquireExclusiveLock(getNamespace());
+            return lockService.acquireExclusiveLock(getNamespace());
 
         } catch (IOException ex) {
 

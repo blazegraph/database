@@ -27,7 +27,6 @@
 
 package com.bigdata.rdf.store;
 
-import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -150,6 +149,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.sparse.INameFilter;
 import com.bigdata.sparse.ITPS;
+import com.bigdata.sparse.SingleColumnFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedResolvingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
@@ -1274,16 +1274,13 @@ abstract public class AbstractTripleStore extends
 
                     // read from the global row store.
                     final ITPS tps = getIndexManager().getGlobalRowStore()
-                            .read(RelationSchema.INSTANCE, getNamespace(),
-                                    Long.MAX_VALUE, new INameFilter() {
-
-                                        // just the value that we need.
-                                        public boolean accept(String name) {
-                                            return name
-                                                    .equals(TripleStoreSchema.AXIOMS);
-                                        }
-                                    });
-
+                            .read(
+                                    RelationSchema.INSTANCE,
+                                    getNamespace(),
+                                    Long.MAX_VALUE,
+                                    new SingleColumnFilter(
+                                            TripleStoreSchema.AXIOMS));
+                    
                     // extract the de-serialized axiom model.
                     axioms = (Axioms) tps.get(TripleStoreSchema.AXIOMS)
                             .getValue();
@@ -1329,15 +1326,12 @@ abstract public class AbstractTripleStore extends
 
                     // read from the global row store.
                     final ITPS tps = getIndexManager().getGlobalRowStore()
-                            .read(RelationSchema.INSTANCE, getNamespace(),
-                                    Long.MAX_VALUE, new INameFilter() {
-
-                                        // just the value that we need.
-                                        public boolean accept(String name) {
-                                            return name
-                                                    .equals(TripleStoreSchema.VOCABULARY);
-                                        }
-                                    });
+                            .read(
+                                    RelationSchema.INSTANCE,
+                                    getNamespace(),
+                                    Long.MAX_VALUE,
+                                    new SingleColumnFilter(
+                                            TripleStoreSchema.VOCABULARY));
 
                     // extract the de-serialized vocabulary.
                     vocab = (Vocabulary) tps.get(TripleStoreSchema.VOCABULARY)
