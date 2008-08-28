@@ -56,7 +56,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -83,7 +82,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataValueFactoryImpl implements ValueFactory, BigdataValueFactory {
+public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     /**
      * @see IRawTripleStore#NULL
@@ -190,7 +189,7 @@ public class BigdataValueFactoryImpl implements ValueFactory, BigdataValueFactor
      * @see #newBNodeContext()
      */
     public BigdataBNodeImpl createBNode() {
-
+        
         return createBNode(nextID());
 
     }

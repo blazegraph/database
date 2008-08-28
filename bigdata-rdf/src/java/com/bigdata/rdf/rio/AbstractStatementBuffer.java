@@ -31,10 +31,13 @@ import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Class for efficiently converting {@link Statement}s into
- * {@link BigdataStatement}s, including resolving term identifiers (or
- * adding entries to the lexicon for unknown terms) as required. The class
- * does not write the converted {@link BigdataStatement}s onto the
- * database, but that can be easily done using a resolving iterator pattern.
+ * {@link BigdataStatement}s, including resolving term identifiers (or adding
+ * entries to the lexicon for unknown terms) as required. The class does not
+ * write the converted {@link BigdataStatement}s onto the database, but that
+ * can be easily done using a resolving iterator pattern.
+ * 
+ * @todo In fact, RIO also keeps a blank node map so that it can reuse the same
+ *       blank node object if it sees the same ID more than once.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -42,8 +45,8 @@ import com.bigdata.rdf.store.IRawTripleStore;
  *            The generic type of the source {@link Statement} added to the
  *            buffer by the callers.
  * @param <G>
- *            The generic type of the {@link BigdataStatement}s stored in
- *            the buffer.
+ *            The generic type of the {@link BigdataStatement}s stored in the
+ *            buffer.
  */
 abstract public class AbstractStatementBuffer<F extends Statement, G extends BigdataStatement>
         implements IStatementBuffer<F> {

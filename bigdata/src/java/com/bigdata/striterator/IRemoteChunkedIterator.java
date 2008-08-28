@@ -39,6 +39,8 @@ import java.rmi.Remote;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <E>
+ *            The generic type of the elements visited by the source iterator.
  */
 public interface IRemoteChunkedIterator<E> extends Remote {
 

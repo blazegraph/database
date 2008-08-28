@@ -28,18 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
-import com.bigdata.striterator.IChunkedIterator;
+import java.io.Serializable;
 
 /**
  * Filter for accepting or rejecting visited elements.
  * 
- * @todo define api for declaring or adding filters for {@link IChunkedIterator}
- *       or IFilteredIterator?
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IElementFilter<E> {
+public interface IElementFilter<E> extends Serializable {
 
     /**
      * True iff the argument is matched by the filter.

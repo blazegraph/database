@@ -131,7 +131,7 @@ import com.sun.jini.start.ServiceStarter;
 abstract public class AbstractServer implements Runnable, LeaseListener, ServiceIDListener
 {
     
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(AbstractServer.class);
 
     /**
@@ -158,23 +158,50 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     public final static transient String ADVERT_LABEL = "AdvertDescription";
 
-    private ServiceID serviceID;
-    private JiniClient client;
-//    private DiscoveryManagement discoveryManager;
-    private JoinManager joinManager;
-    private Configuration config;
     /**
-     * The file where the {@link ServiceID} will be written/read. 
+     * The {@link ServiceID} for this server is either read from a local file or
+     * assigned by the registrar (iff this is a new service instance). When
+     * assigned, it is assigned the asynchronously.
+     */
+    private ServiceID serviceID;
+
+    /**
+     * The file where the {@link ServiceID} will be written/read.
      */
     protected File serviceIdFile;
+
     /**
-     * Responsible for exporting a proxy for the service.
+     * The {@link JiniClient} is used to locate the other services in the
+     * {@link IBigdataFederation}.
+     */
+    private JiniClient client;
+
+    /**
+     * Used to manage the join/leave of the service hosted by this server with
+     * Jini service registrar(s).
+     */
+    private JoinManager joinManager;
+
+    /**
+     * The {@link Configuration} read based on the args[] provided when the
+     * server is started.
+     */
+    private Configuration config;
+
+    /**
+     * Responsible for exporting a proxy for the service. Note that the
+     * {@link Exporter} is paired to a single service instance. It CAN NOT be
+     * used to export more than one object at a time! Therefore the
+     * {@link Configuration} entry for the <code>exporter</code> only effects
+     * how <em>this</em> server exports its service.
      */
     private Exporter exporter;
+
     /**
      * The service implementation object.
      */
     protected Remote impl;
+
     /**
      * The exported proxy for the service implementation object.
      */
@@ -361,13 +388,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
          * Read jini configuration & service properties 
          */
 
-        // first, for the JiniClient (not started until later).
-        client = JiniClient.newInstance(args);
-
         Entry[] entries = null;
-//        LookupLocator[] unicastLocators = null;
-//        String[] groups = null;
-//        Properties properties = null;
         boolean readServiceIDFromFile = false;
         
         try {
@@ -382,29 +403,18 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             entries = (Entry[]) config.getEntry(ADVERT_LABEL, "entries",
                     Entry[].class, null/* default */);
 
-//            groups = (String[]) config.getEntry(ADVERT_LABEL, "groups",
-//                    String[].class, LookupDiscovery.ALL_GROUPS/* default */);
-//
-//            log.info("groups="+Arrays.toString(groups));
-            
-//            unicastLocators = (LookupLocator[]) config.getEntry(
-//                    ADVERT_LABEL, "unicastLocators",
-//                    LookupLocator[].class, null/* default */);
-
             /*
              * Extract how the service will provision itself from the
              * Configuration.
              */
 
-//            // The exporter used to expose the service proxy.
-//            exporter = (Exporter) config.getEntry(//
-//                    SERVICE_LABEL, // component
-//                    "exporter", // name
-//                    Exporter.class // type (of the return object)
-//                    );
+            // The exporter used to expose the service proxy.
+            exporter = (Exporter) config.getEntry(//
+                    SERVICE_LABEL, // component
+                    "exporter", // name
+                    Exporter.class // type (of the return object)
+                    );
 
-            exporter = client.getExporter();
-            
             // The file on which the ServiceID will be written. 
             serviceIdFile = (File) config.getEntry(SERVICE_LABEL,
                     "serviceIdFile", File.class); // default
@@ -453,22 +463,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
                 
             }
 
-//            /*
-//             * Read the properties file used to configure the service.
-//             */
-//            final File propertyFile = (File) config.getEntry(SERVICE_LABEL,
-//                    "propertyFile", File.class);
-//
-//            try {
-//                
-//                properties = getProperties(propertyFile);
-//                
-//            } catch(IOException ex) {
-//                
-//                fatal("Problem reading properties: " + propertyFile, ex);
-//                
-//            }
-
         } catch(ConfigurationException ex) {
             
             fatal("Configuration error: "+ex, ex);
@@ -483,30 +477,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
          * service discovery.
          */
         Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
-
-//        /*
-//         * Start service discovery.
-//         */
-//        try {
-//            /*
-//             * Note: This class will perform multicast discovery if ALL_GROUPS
-//             * is specified and otherwise requires you to specify one or more
-//             * unicast locators (URIs of hosts running discovery services). As
-//             * an alternative, you can use LookupDiscovery, which always does
-//             * multicast discovery.
-//             */
-//            discoveryManager = new LookupDiscoveryManager(
-//                    groups, unicastLocators, null /*DiscoveryListener*/
-//            );
-//
-////          DiscoveryManagement discoveryManager = new LookupDiscovery(
-////                  groups);
-//            
-//        } catch (IOException e) {
-//            
-//            fatal("Could not start service discovery: "+e, e);
-//            
-//        }
         
         /*
          * Start the client - this provides a means to connect to the other
@@ -515,6 +485,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
          */
         try {
 
+            // read the client configuration.
+            client = JiniClient.newInstance(args);
+
+            // connect to the federation (starts service discovery for the client).
             client.connect();
             
         } catch(Throwable t) {
@@ -534,19 +508,17 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
              * AbstractServer since their own constructor will not have been
              * executed yet.
              * 
-//             * Some of those problems are worked around using setupClients() to
-//             * allow the server to configure various helper "clients".
-//             * 
-//             * FIXME If you explicitly assign values to those clients when the
-//             * fields are declared, e.g., [timestampServiceClient=null] then the
-//             * ctor will overwrite the values set by [newService] since it is
-//             * running before those initializations are performed. This is
-//             * really crufty, may be JVM dependent, and needs to be refactored
-//             * to avoid this subclass ctor init problem.
+             * Some of those problems are worked around using a JiniClient to
+             * handle all aspects of service discovery (how this service locates
+             * the other services in the federation).
+             * 
+             * Note: If you explicitly assign values to those clients when the
+             * fields are declared, e.g., [timestampServiceClient=null] then the
+             * ctor will overwrite the values set by [newService] since it is
+             * running before those initializations are performed. This is
+             * really crufty, may be JVM dependent, and needs to be refactored
+             * to avoid this subclass ctor init problem.
              */
-//            assert discoveryManager != null;
-//
-//            setupClients(discoveryManager);
 
             if (INFO)
                 log.info("Creating service impl...");
@@ -1252,15 +1224,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 //        }
 //        
 //    }
-
-//    /**
-//     * Invoked before {@link #newService(Properties)} in order to give a subclass
-//     * of {@link AbstractServer} a chance to setup any service discover clients
-//     * on which it depends, e.g., a {@li 
-//     * @param discoveryManager
-//     * @return
-//     */
-//    abstract protected void setupClients(DiscoveryManagement discoveryManager ) throws Exception;
 
     /**
      * This method is responsible for creating the remote service implementation

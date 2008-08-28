@@ -196,9 +196,9 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
      * <p>
      * When the striterator is also an {@link IChunkedIterator} then
      * {@link #remove()} semantics face an additional difficulty. If the source
-     * iterator is being consumed a {@link #nextChunk() chunk} at a time, then
-     * {@link #remove()} only has the semantics of removing the last element in
-     * the chunk.
+     * iterator is being consumed a {@link IChunkedIterator#nextChunk() chunk}
+     * at a time, then {@link #remove()} only has the semantics of removing the
+     * last element in the chunk.
      * 
      * @throws UnsupportedOperationException
      *             For the above reasons, {@link #remove()} is NOT supported for

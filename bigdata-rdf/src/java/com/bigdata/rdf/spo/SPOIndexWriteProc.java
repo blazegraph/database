@@ -31,6 +31,7 @@ import java.io.IOException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
@@ -163,6 +164,9 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         // used to generate the values that we write on the index.
         final ByteArrayBuffer tmp = new ByteArrayBuffer(1+8/*max size*/);
         
+        // true iff logging is enabled and this is the SPO index.
+        final boolean isSPO = INFO?ndx.getIndexMetadata().getName().endsWith(SPOKeyOrder.SPO.getIndexName()):false;
+        
         for (int i = 0; i < n; i++) {
 
             // the key encodes the {s:p:o} of the statement.
@@ -215,6 +219,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         .serializeValue(tmp, false/* override */,
                         newType, new_sid/*MAY be NULL*/));
 
+                if(isSPO&&DEBUG) {
+                    log.debug("new SPO: key="+BytesUtil.toString(key)+", sid="+new_sid);
+                }
+                
                 writeCount++;
 
             } else {
@@ -241,6 +249,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         ndx.insert(key, SPO
                                 .serializeValue(tmp, false/*override*/, newType, NULL/*sid*/));
 
+                        if(isSPO&&DEBUG) {
+                            log.debug("Downgrading SPO: key="+BytesUtil.toString(key)+", oldType="+oldType+", newType="+newType);
+                        }
+                        
                         writeCount++;
 
                     }
@@ -277,6 +289,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         ndx.insert(key, SPO
                                 .serializeValue(tmp, false/*override*/, maxType, sid));
 
+                        if(isSPO&&DEBUG) {
+                            log.debug("Changing statement type: key="+BytesUtil.toString(key)+", oldType="+oldType+", newType="+newType+", maxType="+maxType+", sid="+sid);
+                        }
+                        
                         writeCount++;
 
                     }
@@ -287,6 +303,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
+        if (isSPO&&INFO)
+            log.info("Wrote " + writeCount + " SPOs on ndx="
+                    + ndx.getIndexMetadata().getName());
+        
         return Long.valueOf(writeCount);
 
     }

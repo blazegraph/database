@@ -71,45 +71,78 @@ public abstract class AbstractRuleFastClosure_5_6_7_9 extends
      * @param propertyId
      */
     public AbstractRuleFastClosure_5_6_7_9(
-            String name,
+            final String name,
             final String database,
             final String focusStore,
             final IConstant<Long> rdfsSubPropertyOf,
             final IConstant<Long> propertyId) {
 
         super(name, database, rdfsSubPropertyOf, propertyId,
-        /*
-         * Custom rule executor factory.
+                new FastClosure_5_6_7_9_RuleTaskFactory(database, focusStore,
+                        rdfsSubPropertyOf, propertyId));
+
+    }
+
+    /**
+     * Custom rule executor factory.
+     */
+    static class FastClosure_5_6_7_9_RuleTaskFactory implements
+            IRuleTaskFactory {
+
+        /**
+         * 
          */
-        new IRuleTaskFactory() {
+        private static final long serialVersionUID = -5156896913776443471L;
 
-            public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-                    IBuffer<ISolution> buffer) {
+        private final String database;
 
-                return new FastClosureRuleTask(database, focusStore, rule,
-                        joinNexus, buffer, /* P, */
-                        rdfsSubPropertyOf, propertyId) {
+        private final String focusStore;
 
-                    public Set<Long> getSet() {
+        private final IConstant<Long> rdfsSubPropertyOf;
 
-                        final Set<Long> set = getSubPropertiesOf(propertyId);
-                        
-                        if(log.isDebugEnabled()) {
+        private final IConstant<Long> propertyId;
+        
+        public FastClosure_5_6_7_9_RuleTaskFactory(
+                final String database,
+                final String focusStore,
+                final IConstant<Long> rdfsSubPropertyOf,
+                final IConstant<Long> propertyId) {
+            
+            this.database = database;
+            
+            this.focusStore = focusStore;
+            
+            this.rdfsSubPropertyOf = rdfsSubPropertyOf;
+            
+            this.propertyId = propertyId;
+            
+        }
+        
+        public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
+                IBuffer<ISolution> buffer) {
 
-                            log.debug("propertyId=" + propertyId + ", set="
-                                    + set.toString());
-                            
-                        }
-                        
-                        return set;
+            return new FastClosureRuleTask(database, focusStore, rule,
+                    joinNexus, buffer, /* P, */
+                    rdfsSubPropertyOf, propertyId) {
+
+                public Set<Long> getSet() {
+
+                    final Set<Long> set = getSubPropertiesOf(propertyId);
+
+                    if (log.isDebugEnabled()) {
+
+                        log.debug("propertyId=" + propertyId + ", set="
+                                + set.toString());
 
                     }
 
-                };
+                    return set;
 
-            }
+                }
 
-        });
+            };
+
+        }
 
     }
 

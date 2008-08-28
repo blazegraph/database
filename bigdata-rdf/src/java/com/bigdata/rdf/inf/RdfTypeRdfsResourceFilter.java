@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
@@ -65,17 +66,17 @@ public class RdfTypeRdfsResourceFilter implements IElementFilter<ISPO>, External
 
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
-        rdfType = in.readLong();
+        rdfType = LongPacker.unpackLong(in);
 
-        rdfsResource = in.readLong();
+        rdfsResource = LongPacker.unpackLong(in);
         
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        out.writeLong(rdfType);
+        LongPacker.packLong(out,rdfType);
 
-        out.writeLong(rdfsResource);
+        LongPacker.packLong(out,rdfsResource);
         
     }
     

@@ -89,12 +89,11 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
     public void test_U10() throws IOException {
 
-        String file = "../rdf-data/lehigh/U10";
+        final String file = "../rdf-data/lehigh/U10";
 
-        // FIXME correct baseURL for leigh?
-        String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
-
-        doTest(new File(file), baseURL, RDFFormat.RDFXML, new FilenameFilter() {
+        final String baseURI = file;
+        
+        doTest(new File(file), baseURI, RDFFormat.RDFXML, new FilenameFilter() {
 
             public boolean accept(File dir, String name) {
                 return !name.endsWith(".txt");
@@ -107,10 +106,9 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
         String file = "../rdf-data/lehigh/U5";
 
-        // FIXME correct baseURL for leigh?
-        String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
-
-        doTest(new File(file), baseURL, RDFFormat.RDFXML, new FilenameFilter() {
+        final String baseURI = file;
+        
+        doTest(new File(file), baseURI, RDFFormat.RDFXML, new FilenameFilter() {
 
             public boolean accept(File dir, String name) {
                 return !name.endsWith(".txt");
@@ -121,14 +119,11 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
     
     public void test_U1() throws IOException {
         
-        String file = "../rdf-data/lehigh/U1";
-//      String file = "../rdf-data/lehigh/U10/University0_0.owl";
-      
-      // FIXME correct baseURL for leigh?
-      String baseURL = "c:\\usr\\local\\lehigh benchmark\\University0_0.owl";
-      
-      doTest(new File(file), baseURL, RDFFormat.RDFXML,
-              new FilenameFilter() {
+        final String file = "../rdf-data/lehigh/U1";
+
+        final String baseURI = file;
+
+        doTest(new File(file), baseURI, RDFFormat.RDFXML, new FilenameFilter() {
 
                 public boolean accept(File dir, String name) {
                     return ! name.endsWith(".txt");

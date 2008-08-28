@@ -40,7 +40,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class InferredSPOFilter implements IElementFilter<ISPO>, Serializable {
+public class InferredSPOFilter implements IElementFilter<ISPO> {
 
     /**
      * 
@@ -52,6 +52,9 @@ public class InferredSPOFilter implements IElementFilter<ISPO>, Serializable {
      */
     static public final transient IElementFilter<ISPO> INSTANCE = new InferredSPOFilter();
 
+    /**
+     * De-serialization ctor.
+     */
     private InferredSPOFilter() {
 
         super();

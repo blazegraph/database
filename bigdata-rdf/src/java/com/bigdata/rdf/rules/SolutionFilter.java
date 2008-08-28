@@ -1,7 +1,5 @@
 package com.bigdata.rdf.rules;
 
-import java.io.Serializable;
-
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ISolution;
 
@@ -12,7 +10,7 @@ import com.bigdata.relation.rule.eval.ISolution;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SolutionFilter<E> implements IElementFilter<ISolution<E>>, Serializable {
+public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
 
     /**
      * 
@@ -20,7 +18,7 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>>, Serializ
     private static final long serialVersionUID = 6747357650593183644L;
     
     private final IElementFilter<E> delegate;
-    
+
     public SolutionFilter(IElementFilter<E> delegate) {
         
         if (delegate == null)

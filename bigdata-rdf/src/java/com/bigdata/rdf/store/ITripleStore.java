@@ -127,6 +127,11 @@ public interface ITripleStore {
      * The #of BNodes in the store.
      * <p>
      * This may be an estimate when using partitioned indices.
+     * <p>
+     * This will always return ZERO (0) if
+     * {@link AbstractTripleStore.Options#STORE_BLANK_NODES} is
+     * <code>false</code> since there will not be any blank nodes in the
+     * lexicon.
      */
     public long getBNodeCount();
 

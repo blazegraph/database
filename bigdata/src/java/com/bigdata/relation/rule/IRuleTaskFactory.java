@@ -28,18 +28,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.io.Serializable;
+
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.IStepTask;
 
 /**
- * A factory for objects that handle the execution of an {@link IRule}.
+ * A factory for objects that handle the execution of an {@link IRule}. This
+ * interface is {@link Serializable} since instances of the interface must
+ * travel with the {@link IRule} to which they are attached.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRuleTaskFactory {
+public interface IRuleTaskFactory extends Serializable {
 
     /**
      * The object will be used to evaluate the rule for the {@link IRule}.
@@ -55,6 +59,7 @@ public interface IRuleTaskFactory {
      * 
      * @return <code>null</code> unless custom evaluation is desired.
      */
-    public IStepTask newTask(IRule rule, IJoinNexus joinNexus, IBuffer<ISolution> buffer);
+    public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
+            IBuffer<ISolution> buffer);
 
 }

@@ -31,6 +31,9 @@ package com.bigdata.service;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.Banner;
 
 /**
@@ -40,6 +43,20 @@ import com.bigdata.Banner;
  * @version $Id$
  */
 abstract public class AbstractClient implements IBigdataClient {
+    
+    protected static final Logger log = Logger.getLogger(IBigdataClient.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
     
     /**
      * The properties specified to the ctor.

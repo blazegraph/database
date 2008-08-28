@@ -782,6 +782,9 @@ public class ClientIndexView implements IClientIndex {
         
         final ITupleIterator<PartitionLocator> itr;
 
+        // the values are the locators (keys are not required).
+        final int flags = IRangeQuery.VALS;
+        
         if (reverseScan) {
          
             /*
@@ -795,8 +798,8 @@ public class ClientIndexView implements IClientIndex {
             itr = mdi.rangeIterator(//
                     fromKey,//
                     toKey, //
-                    0, // capacity, //
-                    IRangeQuery.VALS|IRangeQuery.REVERSE,// the values are the locators.
+                    0, // capacity
+                    flags | IRangeQuery.REVERSE,
                     null // filter
                     );
 
@@ -819,8 +822,8 @@ public class ClientIndexView implements IClientIndex {
             itr = mdi.rangeIterator(//
                     _fromKey,//
                     toKey, //
-                    0, // capacity, //
-                    IRangeQuery.VALS,// the values are the locators.
+                    0, // capacity
+                    flags,//
                     null // filter
                     );
 

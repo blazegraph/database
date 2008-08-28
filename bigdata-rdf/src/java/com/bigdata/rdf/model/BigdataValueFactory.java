@@ -46,7 +46,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BigdataValueFactory {
+public interface BigdataValueFactory extends ValueFactory {
 
     /**
      * Returns a factory that will assign its blank node IDs within a globally

@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
@@ -779,6 +780,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final long reverseIndexTime;
         // time to insert terms into the text indexer.
         final long fullTextIndexTime;
+        // The #of terms that could not be resolved (iff readOnly == true).
+        final AtomicInteger nunknown = new AtomicInteger();
 
         /*
          * Insert into the forward index (term -> id). This will either assign a
@@ -924,6 +927,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                                         if (!readOnly)
                                             throw new AssertionError();
                                         
+                                        nunknown.incrementAndGet();
+                                        
                                     } else {
                                         
                                         a[i].obj.setTermId(termId);
@@ -1053,6 +1058,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
+        if (log.isInfoEnabled() && readOnly && nunknown.get() > 0) {
+         
+            log.info("There are " + nunknown + " unknown terms out of "
+                    + numTerms + " given");
+            
+        }
+        
         if (numTerms > 1000 || elapsed > 3000) {
 
             if(log.isInfoEnabled())

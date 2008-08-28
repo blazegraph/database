@@ -155,15 +155,18 @@ public class ActiveProcess {
          * until the readerFuture becomes available.
          */
 
-        log.info("starting process reader: "+processReader);
+        if (log.isInfoEnabled())
+            log.info("starting process reader: " + processReader);
 
         processReader.start(is);
 
-        log.info("submitting process reader task: "+processReader);
+        if (log.isInfoEnabled())
+            log.info("submitting process reader task: "+processReader);
 
         readerFuture = readService.submit(processReader);
-        
-        log.info("readerFuture: done="+readerFuture.isDone());
+
+        if (log.isInfoEnabled())
+            log.info("readerFuture: done="+readerFuture.isDone());
 
     }
 

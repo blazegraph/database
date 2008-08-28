@@ -142,11 +142,11 @@ public class JiniClient extends AbstractClient {
         final Configuration config;
         final String[] groups;
         final LookupLocator[] lookupLocators;
-        final Exporter exporter;
+//        final Exporter exporter;
         final Properties properties;
 
         public JiniConfig(Configuration config, String[] groups,
-                LookupLocator[] lookupLocators, Exporter exporter,
+                LookupLocator[] lookupLocators, //Exporter exporter,
                 Properties properties) {
 
             this.config = config;
@@ -155,7 +155,7 @@ public class JiniClient extends AbstractClient {
 
             this.lookupLocators = lookupLocators;
 
-            this.exporter = exporter;
+//            this.exporter = exporter;
             
             this.properties = properties;
             
@@ -175,7 +175,7 @@ public class JiniClient extends AbstractClient {
                     + ", locators="
                     + (lookupLocators == null ? "N/A" : ""
                             + Arrays.toString(lookupLocators))//
-                    + ", exporter="+(exporter==null?"N/A":""+exporter)
+//                    + ", exporter="+(exporter==null?"N/A":""+exporter)
                     + ", properties="+properties
                     + "}";
             
@@ -212,16 +212,16 @@ public class JiniClient extends AbstractClient {
         
     }
 
-    /**
-     * Return the configured {@link Exporter}
-     * 
-     * @return The {@link Exporter}.
-     */
-    public Exporter getExporter() {
-        
-        return jiniConfig.exporter;
-        
-    }
+//    /**
+//     * Return the configured {@link Exporter}
+//     * 
+//     * @return The {@link Exporter}.
+//     */
+//    public Exporter getExporter() {
+//        
+//        return jiniConfig.exporter;
+//        
+//    }
     
     /**
      * Conditionally install a suitable security manager if there is none in
@@ -270,7 +270,7 @@ public class JiniClient extends AbstractClient {
 
         final String[] groups;
         final LookupLocator[] lookupLocators;
-        final Exporter exporter;
+//        final Exporter exporter;
         final Properties properties;
         try {
 
@@ -298,17 +298,17 @@ public class JiniClient extends AbstractClient {
                     AbstractServer.ADVERT_LABEL, "unicastLocators",
                     LookupLocator[].class, null/* default */);
 
-            /*
-             * Extract how the Exporter will be provisioned from the
-             * Configuration (MAY be null).
-             */
-
-            // The exporter used to expose proxy objects.
-            exporter = (Exporter) config.getEntry(//
-                    AbstractServer.SERVICE_LABEL, // component
-                    "exporter", // name
-                    Exporter.class // type (of the return object)
-                    );
+//            /*
+//             * Extract how the Exporter will be provisioned from the
+//             * Configuration (MAY be null).
+//             */
+//
+//            // The exporter used to expose proxy objects.
+//            exporter = (Exporter) config.getEntry(//
+//                    AbstractServer.SERVICE_LABEL, // component
+//                    "exporter", // name
+//                    Exporter.class // type (of the return object)
+//                    );
 
             {
                 
@@ -364,7 +364,7 @@ public class JiniClient extends AbstractClient {
             
             }
 
-            return new JiniConfig(config, groups, lookupLocators, exporter,
+            return new JiniConfig(config, groups, lookupLocators, //exporter,
                     properties);
             
         } catch (Exception ex) {

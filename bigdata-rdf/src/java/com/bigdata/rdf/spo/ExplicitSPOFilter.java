@@ -29,7 +29,6 @@ package com.bigdata.rdf.spo;
 
 import java.io.IOException;
 import java.io.ObjectStreamException;
-import java.io.Serializable;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -40,7 +39,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class ExplicitSPOFilter implements IElementFilter<ISPO>, Serializable {
+final public class ExplicitSPOFilter implements IElementFilter<ISPO> {
 
     /**
      * 
@@ -52,6 +51,9 @@ final public class ExplicitSPOFilter implements IElementFilter<ISPO>, Serializab
      */
     static public final transient IElementFilter<ISPO> INSTANCE = new ExplicitSPOFilter();
     
+    /**
+     * De-serialization constructor.
+     */
     private ExplicitSPOFilter() {
         
     }

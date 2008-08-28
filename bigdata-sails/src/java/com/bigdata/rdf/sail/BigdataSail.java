@@ -1884,18 +1884,30 @@ public class BigdataSail extends SailBase implements Sail {
                     if (var.hasValue()) {
 
                         // the Sesame Value object.
-                        Value val = var.getValue();
+                        final Value val = var.getValue();
 
                         // Lookup the resolve BigdataValue object.
-                        val = values.get(val);
+                        final BigdataValue val2 = values.get(val);
 
-                        assert val != null : "value not found: "+var.getValue();
+                        assert val2 != null : "value not found: "+var.getValue();
                         
                         if (DEBUG)
-                            log.debug("value: "+val+" : "+((BigdataValue)val).getTermId());
+                            log.debug("value: " + val + " : " + val2 + " ("
+                                    + val2.getTermId() + ")");
+
+                        if (val2.getTermId() == NULL) {
+
+                            /*
+                             * Since the term identifier is NULL this value is
+                             * not known to the kb.
+                             */
+                            
+                            log.info("Not in knowledge base: " + val2);
+                            
+                        }
                         
                         // replace the constant in the query.
-                        var.setValue(val);
+                        var.setValue(val2);
 
                     }
                 }

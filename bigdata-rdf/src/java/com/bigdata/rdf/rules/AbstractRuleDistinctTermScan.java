@@ -134,18 +134,50 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
             
         }
 
-        // @todo may serialize to much state?
-        taskFactory = new IRuleTaskFactory() {
+        taskFactory = new DistinctTermScanRuleTaskFactory(h, keyOrder);        
+    }
+    
+    /**
+     * Factory for custom evaluation of the distinct term scan rule.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class DistinctTermScanRuleTaskFactory implements
+            IRuleTaskFactory {
 
-            public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-                    IBuffer<ISolution> buffer) {
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3290328271137950004L;
 
-                return new DistinctTermScan(rule, joinNexus, buffer, h,
-                        keyOrder);
+        /**
+         * The sole unbound variable in the head of the rule.
+         */
+        private final IVariable<Long> h;
+        
+        /**
+         * The access path that corresponds to the position of the unbound
+         * variable reference from the head.
+         */
+        private final SPOKeyOrder keyOrder;
 
-            }
+        public DistinctTermScanRuleTaskFactory(IVariable<Long> h,
+                SPOKeyOrder keyOrder) {
+
+            this.h = h;
+
+            this.keyOrder = keyOrder;
             
-        };
+        }
+        
+        public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
+                IBuffer<ISolution> buffer) {
+
+            return new DistinctTermScan(rule, joinNexus, buffer, h,
+                    keyOrder);
+
+        }
         
     }
     

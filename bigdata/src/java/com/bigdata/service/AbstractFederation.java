@@ -87,6 +87,20 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  */
 abstract public class AbstractFederation implements IBigdataFederation {
 
+    protected static final Logger log = Logger.getLogger(IBigdataFederation.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     private IBigdataClient client;
     
     public IBigdataClient getClient() {

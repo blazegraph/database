@@ -31,19 +31,25 @@ import java.io.IOException;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
 import java.util.Arrays;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+
+import net.jini.config.Configuration;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
+import net.jini.jeri.BasicILFactory;
+import net.jini.jeri.BasicJeriExporter;
+import net.jini.jeri.InvocationLayerFactory;
+import net.jini.jeri.tcp.TcpServerEndpoint;
 
-import com.bigdata.btree.IDataSerializer;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
@@ -51,9 +57,6 @@ import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniClient.JiniConfig;
 import com.bigdata.striterator.IAsynchronousIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.striterator.IRemoteChunk;
-import com.bigdata.striterator.IRemoteChunkedIterator;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
@@ -515,27 +518,57 @@ public class JiniFederation extends AbstractDistributedFederation {
 
     private long lastKnownCommitTime;
 
+    private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
+    
     /**
      * Export and return a proxy object. The client will have to wrap the proxy
      * object to get back an {@link IChunkedOrderedIterator} interface.
+     * <p>
+     * Note: This is used for {@link IRule} evaluation in which there is at
+     * least one JOIN. It DOES NOT get use for simple access path scans. Those
+     * use {@link IRangeQuery#rangeIterator()} instead.
      * 
      * FIXME optimize when an {@link IAsynchronousIterator}. if the iterator
      * thinks that it can be complete quickly (LT chunkSize elements in LT 5ms)
      * then return a fully buffered iterator.
      * 
-     * @todo custom serialization and compression of elements in a chunk along
-     *       the same lines as {@link IDataSerializer}.
+     * @todo Allow {@link Configuration} of the {@link Exporter} for the proxy
+     *       iterators. However, since the {@link Exporter} is paired to a
+     *       single object the configuration of the {@link Exporter} will
+     *       require an additional level of indirection when compared to the
+     *       {@link Configuration} of an {@link AbstractServer}'s
+     *       {@link Exporter}.
      */
     @Override
     public Object getProxy(IChunkedOrderedIterator sourceIterator) {
         
         final long begin = System.currentTimeMillis();
         
-        // the JiniClient has the configured Exporter.
-        final Exporter exporter = getClient().getExporter();
+        /*
+         * Setup the Exporter for the iterator.
+         * 
+         * Note: This uses TCP Server sockets.
+         * 
+         * Note: This uses [port := 0], which means a random port is assigned.
+         * 
+         * Note: Distributed garbage collection is enabled since the proxied
+         * iterator CAN become locally weakly reachable sooner than the client
+         * can close() the iterator (or perhaps even consume the iterator!)
+         * Distributed garbage collection handles this for us and automatically
+         * unexports the proxied iterator once it is no longer strongly
+         * referenced by the client.
+         * 
+         * Note: The VM WILL NOT be kept alive by the exported proxy.
+         * 
+         * Note: The invocation layer factory is reused for each exported proxy
+         * (but the exporter itself is paired 1:1 with the exported proxy).
+         */
+        final Exporter exporter = new BasicJeriExporter(TcpServerEndpoint
+                .getInstance(0/* port */), invocationLayerFactory,
+                true/* enableDCG */, false/*keepAlive*/);
         
         // wrap the iterator with an exportable object.
-        final Remote impl = new RemoteChunkedIterator(sourceIterator);
+        final RemoteChunkedIterator impl = new RemoteChunkedIterator(sourceIterator);
         
         /*
          * Export and return the proxy.
@@ -546,12 +579,47 @@ public class JiniFederation extends AbstractDistributedFederation {
             // export proxy.
             proxy = exporter.export(impl);
             
+//            // set the exporter so that the object can unexport itself on close()
+//            impl.exporter = exporter;
+            
             if (INFO) {
 
                 final long elapsed = System.currentTimeMillis() - begin;
 
                 log.info("Exported proxy: elapsed=" + elapsed + ", proxy="
                         + proxy + "(" + proxy.getClass() + ")");
+                
+            }
+
+            if (sourceIterator instanceof IAsynchronousIterator) {
+                
+                /*
+                 * This is an approximation of a spin lock designed to wait for
+                 * some results to buffer up on the source iterator.
+                 * 
+                 * FIXME Make the async iterator expose more state so that we
+                 * can wait until it is either fully buffered (the blocking
+                 * buffer is closed so no more results will be written) or until
+                 * it has a chunk of results for us (if that happens first).
+                 * 
+                 * @todo if we find that the source iterator can not produce
+                 * anything more (because the blocking buffer is closed) then we
+                 * should optimize and just return a single RemoteChunk and we
+                 * do not need to export anything.
+                 * 
+                 * @todo we can also spin lock on each nextChunk() request so
+                 * that we always get back a full chunk.
+                 */
+                
+                try {
+                
+                    Thread.sleep(1/* millis */);
+                    
+                } catch (InterruptedException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                }
                 
             }
             
@@ -564,93 +632,6 @@ public class JiniFederation extends AbstractDistributedFederation {
             
         }
         
-    }
-
-    /**
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <E>
-     */
-    private static class RemoteChunkedIterator<E> implements
-            IRemoteChunkedIterator<E> {
-
-        private final IChunkedOrderedIterator<E> src;
-
-        public RemoteChunkedIterator(IChunkedOrderedIterator<E> src) {
-
-            if (src == null)
-                throw new IllegalArgumentException();
-
-            this.src = src;
-
-        }
-
-        public void close() throws IOException {
-
-            src.close();
-
-        }
-
-        public IRemoteChunk<E> nextChunk() throws IOException {
-
-            if (!src.hasNext()) {
-
-                return new Chunk<E>(true/* exhausted */, src.getKeyOrder(),
-                        null);
-
-            }
-
-            final E[] a = src.nextChunk();
-
-            return new Chunk<E>(src.hasNext(), src.getKeyOrder(), a);
-
-        }
-
-    }
-
-    /**
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <E>
-     */
-    private static class Chunk<E> implements IRemoteChunk<E> {
-
-        private final boolean exhausted;
-
-        private final IKeyOrder<E> keyOrder;
-
-        private final E[] a;
-
-        public Chunk(final boolean exhausted, final IKeyOrder<E> keyOrder, E[] a) {
-
-            this.exhausted = exhausted;
-
-            this.keyOrder = keyOrder; // MAY be null.
-
-            this.a = a; // MUST be null if no elements to be sent.
-
-        }
-
-        public E[] getChunk() {
-
-            return a;
-
-        }
-
-        public IKeyOrder<E> getKeyOrder() {
-
-            return keyOrder;
-
-        }
-
-        public boolean isExhausted() {
-
-            return exhausted;
-
-        }
-
     }
 
 }

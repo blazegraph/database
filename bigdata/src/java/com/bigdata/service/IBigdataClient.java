@@ -79,8 +79,6 @@ import com.bigdata.resources.StaleLocatorException;
  */
 public interface IBigdataClient {
 
-    public static final Logger log = Logger.getLogger(IBigdataClient.class);
-
     /**
      * Connect to a bigdata federation. If the client is already connected, then
      * the existing connection is returned.

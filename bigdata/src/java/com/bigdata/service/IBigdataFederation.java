@@ -51,19 +51,6 @@ import com.bigdata.sparse.SparseRowStore;
  */
 public interface IBigdataFederation extends IIndexManager {
 
-    public Logger log = Logger.getLogger(IBigdataFederation.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
     /**
      * Return the client object that was used to connect to the federation.
      * 

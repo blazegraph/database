@@ -41,6 +41,11 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class SPOPredicate implements IPredicate<ISPO> {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1396017399712849975L;
+
     private final String[] relationName;
     
     private final IVariableOrConstant<Long> s;

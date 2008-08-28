@@ -66,8 +66,7 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
 
     private static final long serialVersionUID = 2500001864793869957L;
 
-    final private transient KeyBuilder keyBuilder = new KeyBuilder(
-            Bytes.SIZEOF_LONG * IRawTripleStore.N);
+    private transient KeyBuilder keyBuilder;
 
     public DistinctTermAdvancer() {
 
@@ -76,6 +75,19 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
     @Override
     protected void advance(ITuple<SPO> tuple) {
 
+        if (keyBuilder == null) {
+
+            /*
+             * Note: It appears that you can not set this either implictly or
+             * explicitly during ctor initialization if you want it to exist
+             * during de-serialization. Hence it is initialized lazily here.
+             * This is Ok since the iterator pattern is single threaded.
+             */
+            
+            keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * IRawTripleStore.N);
+
+        }
+        
         final long id = KeyBuilder
                 .decodeLong(tuple.getKeyBuffer().array(), 0/* offset */);
 

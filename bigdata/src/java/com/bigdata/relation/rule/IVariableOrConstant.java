@@ -28,13 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.io.Serializable;
+
 /**
  * Abstraction models either a constant or an unbound variable.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IVariableOrConstant<E> {
+public interface IVariableOrConstant<E> extends Serializable {
 
     /**
      * Return <code>true</code> iff this is a variable.
