@@ -35,7 +35,7 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.Rio;
 
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Parses data but does not load it into the indices.
@@ -53,9 +53,9 @@ public class BasicRioLoader implements IRioLoader {
     
     Vector<RioLoaderListener> listeners;
 
-    private final BigdataValueFactoryImpl valueFactory;
+    private final BigdataValueFactory valueFactory;
     
-    public BasicRioLoader(BigdataValueFactoryImpl valueFactory) {
+    public BasicRioLoader(BigdataValueFactory valueFactory) {
         
         if (valueFactory == null)
             throw new IllegalArgumentException();
@@ -168,8 +168,9 @@ public class BasicRioLoader implements IRioLoader {
             throw new IllegalArgumentException();
             
         }
-        
-        log.info("format="+rdfFormat+", verify="+verifyData);
+
+        if (INFO)
+            log.info("format=" + rdfFormat + ", verify=" + verifyData);
         
         final RDFParser parser = getParser(rdfFormat);
         
@@ -206,10 +207,10 @@ public class BasicRioLoader implements IRioLoader {
 
             insertTime = System.currentTimeMillis() - insertStart;
 
-            if(log.isInfoEnabled())
-            log.info("parse complete: elapsed=" + insertTime
-                    + "ms, toldTriples=" + stmtsAdded + ", tps="
-                    + getInsertRate());
+            if (INFO)
+                log.info("parse complete: elapsed=" + insertTime
+                        + "ms, toldTriples=" + stmtsAdded + ", tps="
+                        + getInsertRate());
             
             success();
 

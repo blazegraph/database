@@ -39,8 +39,8 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rules.AbstractRuleFastClosure_3_5_6_7_9.FastClosureRuleTask;
 import com.bigdata.rdf.rules.AbstractRuleFastClosure_3_5_6_7_9.SubPropertyClosureTask;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -277,30 +277,68 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
                 final Set<Long> set) {
 
             super(name, database, rdfsSubPropertyOf, propertyId,
-            /*
-             * Custom rule executor factory.
-             */
-            new IRuleTaskFactory() {
+                    new MyFastClosure_6_RuleTaskFactory(database,
+                            focusStore, rdfsSubPropertyOf, propertyId, set));
+        }
 
-                public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-                        IBuffer<ISolution> buffer) {
+    }
 
-                    return new FastClosureRuleTask(database, focusStore, rule,
-                            joinNexus, buffer, /* P, */
-                            rdfsSubPropertyOf, propertyId) {
+    /**
+     * Custom rule evaluation overriden to use a hand-built {@link Set}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class MyFastClosure_6_RuleTaskFactory implements IRuleTaskFactory {
 
-                        public Set<Long> getSet() {
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3058590276200820350L;
 
-                            // the hand-built property set closure.
-                            return set;
+        final String database;
 
-                        }
+        final String focusStore;
 
-                    };
+        final IConstant<Long> rdfsSubPropertyOf;
+
+        final IConstant<Long> propertyId;
+        
+        final Set<Long> set;
+        
+        public MyFastClosure_6_RuleTaskFactory(final String database,
+                final String focusStore,
+                final IConstant<Long> rdfsSubPropertyOf,
+                final IConstant<Long> propertyId,
+                final Set<Long> set) {
+
+            this.database = database;
+            
+            this.focusStore = focusStore;
+            
+            this.rdfsSubPropertyOf = rdfsSubPropertyOf;
+            
+            this.propertyId = propertyId;
+            
+            this.set = set;
+
+        }
+
+        public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
+                IBuffer<ISolution> buffer) {
+
+            return new FastClosureRuleTask(database, focusStore, rule,
+                    joinNexus, buffer, /* P, */
+                    rdfsSubPropertyOf, propertyId) {
+
+                public Set<Long> getSet() {
+
+                    // the hand-built property set closure.
+                    return set;
 
                 }
 
-            });
+            };
 
         }
 

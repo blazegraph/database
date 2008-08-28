@@ -346,20 +346,34 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.filter = joinNexusFactory.filter;
         
-        this.defaultTaskFactory = new IRuleTaskFactory() {
-
-            public IStepTask newTask(IRule rule,IJoinNexus joinNexus, IBuffer<ISolution> buffer) {
-                
-                return new NestedSubqueryTask(rule, joinNexus, buffer);
-                
-            }
-            
-        };
+        this.defaultTaskFactory = new DefaultRuleTaskFactory();
         
         this.planFactory = joinNexusFactory.planFactory;
    
     }
 
+    /**
+     * Default factory for tasks to execute {@link IRule}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class DefaultRuleTaskFactory implements IRuleTaskFactory {
+        
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -6751546625682021618L;
+
+        public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
+                IBuffer<ISolution> buffer) {
+
+            return new NestedSubqueryTask(rule, joinNexus, buffer);
+
+        }
+
+    }
+    
     public IJoinNexusFactory getJoinNexusFactory() {
         
         return joinNexusFactory;

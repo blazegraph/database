@@ -147,7 +147,6 @@ import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
-import com.bigdata.sparse.INameFilter;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SingleColumnFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -449,12 +448,16 @@ abstract public class AbstractTripleStore extends
         /**
          * Boolean option (default {@value #DEFAULT_STORE_BLANK_NODES})
          * controls whether or not we store blank nodes in the forward mapping
-         * of the lexicon. When <code>false</code> blank node semantics are
-         * enforced and you CAN NOT unify blank nodes based on their IDs in the
-         * lexicon. When <code>true</code>, you are able to violate blank
-         * node semantics and force unification of blank nodes by assigning the
-         * ID from the RDF interchange syntax to the blank node. RIO has an
-         * option that will allow you to do this. When this option is also
+         * of the lexicon.
+         * <p>
+         * When <code>false</code> blank node semantics are enforced, you CAN
+         * NOT unify blank nodes based on their IDs in the lexicon, and
+         * {@link AbstractTripleStore#getBNodeCount()} is disabled.
+         * <p>
+         * When <code>true</code>, you are able to violate blank node
+         * semantics and force unification of blank nodes by assigning the ID
+         * from the RDF interchange syntax to the blank node. RIO has an option
+         * that will allow you to do this. When this option is also
          * <code>true</code>, then you will in fact be able to resolve
          * pre-existing blank nodes using their identifiers. The tradeoff is
          * time and space : if you have a LOT of document using blank nodes then
@@ -1704,9 +1707,12 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    // @todo also statement identifer count.
+    /**
+     * Note: Will always return zero (0) if {@value Options#STORE_BLANK_NODES}
+     * is <code>false</code>.
+     */
     final public long getBNodeCount() {
-
+        
         byte[] fromKey = new byte[] { KeyBuilder
                 .encodeByte(ITermIndexCodes.TERM_CODE_BND) };
 

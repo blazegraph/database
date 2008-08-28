@@ -509,10 +509,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         if (limit <= 0)
             throw new IllegalArgumentException();
 
-        if(log.isDebugEnabled()) {
-            
-            log.debug("limit="+limit);
-            
+        if (log.isDebugEnabled()) {
+
+            log.debug("limit=" + limit);
+
         }
         
         int nread = 0;

@@ -96,11 +96,11 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
      *            {@link FastClosureRuleTask}.
      */
     public AbstractRuleFastClosure_3_5_6_7_9(//
-            String name,
-            String relationName,
+            final String name,
+            final String relationName,
             final IConstant<Long> rdfsSubPropertyOf,
             final IConstant<Long> propertyId,
-            IRuleTaskFactory taskFactory
+            final IRuleTaskFactory taskFactory
     // , Set<Long> P
     ) {
 

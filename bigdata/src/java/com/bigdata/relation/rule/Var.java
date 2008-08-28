@@ -1,7 +1,6 @@
 package com.bigdata.relation.rule;
 
 import java.io.ObjectStreamException;
-import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,9 +28,10 @@ import java.util.Map;
  *       make it easier to place constraints directly on the variable so that it
  *       can limit the types of binding that it will accept. Constraints on
  *       {@link IPredicate}s limit the matched tuples. Constraints on rules
- *       limit the binding patterns across the rule.
+ *       limit the binding patterns across the rule.  (In fact, variables can be
+ *       "named" by their index into the binding set for most purposes.)
  */
-final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>>, Serializable 
+final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>> 
 {
 
     private static final long serialVersionUID = -7100443208125002485L;

@@ -16,7 +16,7 @@ import com.bigdata.relation.rule.IRuleTaskFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RunRuleAndFlushBufferTaskFactory implements IRuleTaskFactory, Serializable {
+public class RunRuleAndFlushBufferTaskFactory implements IRuleTaskFactory {
 
     /**
      * 

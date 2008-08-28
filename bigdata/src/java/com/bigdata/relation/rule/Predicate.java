@@ -40,6 +40,11 @@ import com.bigdata.relation.accesspath.IElementFilter;
  */
 public class Predicate<E> implements IPredicate<E> {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -790293263213387491L;
+
     private final int arity;
     
     /** #of unbound variables. */

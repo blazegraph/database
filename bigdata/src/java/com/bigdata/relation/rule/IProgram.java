@@ -53,7 +53,7 @@ import com.bigdata.relation.rule.eval.ISolution;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IProgram extends Serializable, IStep {
+public interface IProgram extends IStep {
 
     /**
      * <code>true</code> iff the {@link #steps()} MAY be executed in parallel.

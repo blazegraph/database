@@ -31,6 +31,11 @@ package com.bigdata.relation.rule;
  */
 final public class Constant<E> implements IConstant<E> {
     
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -2967861242470442497L;
+    
     final private E value;
     
     final public boolean isVar() {

@@ -890,9 +890,7 @@ public class DataLoader {
                 /*
                  * compute the closure.
                  * 
-                 * FIXME closure stats are not being reported out, e.g., to the DataLoader.
-                 * 
-                 * Also, batch closure logically belongs in the outer method.
+                 * @todo batch closure logically belongs in the outer method.
                  */
                 
                 if (log.isInfoEnabled())

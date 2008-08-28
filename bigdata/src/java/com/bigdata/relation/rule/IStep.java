@@ -28,6 +28,8 @@
 
 package com.bigdata.relation.rule;
 
+import java.io.Serializable;
+
 /**
  * An {@link IStep} is either a single {@link IRule} or a complex
  * {@link IProgram}.
@@ -35,7 +37,7 @@ package com.bigdata.relation.rule;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IStep {
+public interface IStep extends Serializable {
 
     /**
      * The name of the program.

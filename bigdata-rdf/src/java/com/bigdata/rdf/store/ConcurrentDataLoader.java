@@ -270,19 +270,14 @@ public class ConcurrentDataLoader {
 
     /**
      * Create and run a concurrent data load operation.
+     * <p>
+     * Note: the URI form of the file filename for each individual file to be
+     * loaded is taken as the baseURI for that file. This is standard practice.
      * 
      * @param client
      *            ...
      * @param nthreads
      *            The #of concurrent loaders.
-     * @param baseURL
-     *            The baseURL and <code>""</code> if none is required.
-     * @param fallback
-     *            An attempt will be made to determine the interchange syntax
-     *            using {@link RDFFormat}. If no determination can be made then
-     *            the loader will presume that the files are in the format
-     *            specified by this parameter (if any). Files whose format can
-     *            not be determined will be logged as errors.
      * @param nclients
      *            The #of client processes that will share the data load
      *            process. Each client process MUST be started independently in
@@ -297,11 +292,6 @@ public class ConcurrentDataLoader {
      *            equally among the clients. (If the data to be loaded are
      *            pre-partitioned then you do not need to specify either
      *            <i>nclients</i> or <i>clientNum</i>.)
-     * 
-     * @todo the baseURL is ignored and probably should either be dropped or
-     *       made part of the visitation pattern for something with richer
-     *       metadata than a file system. right now it always uses the
-     *       individual file to be loaded as the baseURL for that file.
      */
     public ConcurrentDataLoader(IBigdataClient client, int nthreads,
             int nclients, int clientNum) {
@@ -544,7 +534,8 @@ public class ConcurrentDataLoader {
      */
     public boolean awaitCompletion(long timeout, TimeUnit unit) throws InterruptedException {
 
-        log.info(counters.toString());
+        if (INFO)
+            log.info(counters.toString());
         
         final long beginWait = System.currentTimeMillis();
         
@@ -576,7 +567,7 @@ public class ConcurrentDataLoader {
 
             if (loadActiveCount == 0 && loadQueueSize == 0 && errorQueueSize == 0) {
 
-                log.info("complete");
+                if(INFO) log.info("complete");
 
                 return true;
                 
@@ -661,7 +652,7 @@ public class ConcurrentDataLoader {
 
         if (file.isDirectory()) {
 
-            log.info("Scanning directory: " + file);
+            if(INFO) log.info("Scanning directory: " + file);
 
             final File[] files = filter == null ? file.listFiles() : file
                     .listFiles(filter);
@@ -678,7 +669,7 @@ public class ConcurrentDataLoader {
              * Processing a standard file.
              */
 
-            log.info("Scanning file: " + file);
+            if(INFO) log.info("Scanning file: " + file);
 
             nscanned.incrementAndGet();
 
@@ -708,7 +699,7 @@ public class ConcurrentDataLoader {
                     
                 if ((nscanned.get() /* file.getPath().hashCode() */% nclients == clientNum)) {
 
-                    log.info("Client" + clientNum + " tasked: " + file);
+                    if(INFO) log.info("Client" + clientNum + " tasked: " + file);
 
                     submitTask(file.toString(), taskFactory );
 
@@ -737,7 +728,7 @@ public class ConcurrentDataLoader {
      */
     public void submitTask(String resource,ITaskFactory taskFactory) throws InterruptedException {
         
-        log.info("Processing: resource=" + resource);
+        if(INFO) log.info("Processing: resource=" + resource);
         
         final Runnable target;
         try {
@@ -2050,6 +2041,19 @@ public class ConcurrentDataLoader {
      */
     public static class RDFLoadTaskFactory extends AbstractRDFTaskFactory {
 
+        /**
+         * 
+         * @param db
+         * @param bufferCapacity
+         * @param verifyData
+         * @param fallback
+         *            An attempt will be made to determine the interchange
+         *            syntax using {@link RDFFormat}. If no determination can
+         *            be made then the loader will presume that the files are in
+         *            the format specified by this parameter (if any). Files
+         *            whose format can not be determined will be logged as
+         *            errors.
+         */
         public RDFLoadTaskFactory(AbstractTripleStore db, int bufferCapacity,
                 boolean verifyData, RDFFormat fallback) {
 

@@ -246,7 +246,7 @@ public class TypeperfCollector extends AbstractProcessCollector {
                 // counter names need to be double quoted for the command line.
                 command.add("\"" + decl.getCounterNameForWindows() + "\"");
 
-                log.info("Will collect: \""
+                if(INFO) log.info("Will collect: \""
                         + decl.getCounterNameForWindows() + "\" as "
                         + decl.getPath());
 
@@ -344,8 +344,19 @@ public class TypeperfCollector extends AbstractProcessCollector {
              */
             csvReader.setTailDelayMillis(100/* ms */);
 
-            // read headers from the file.
-            csvReader.readHeaders();
+            try {
+                
+                // read headers from the file.
+                csvReader.readHeaders();
+                
+            } catch (IOException ex) {
+
+                if (!Thread.currentThread().isInterrupted())
+                    throw ex;
+                
+                log.info("Interrupted - done.");
+                
+            }
 
             /*
              * replace the first header definition so that we get clean
@@ -377,11 +388,11 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
                 for (final InstrumentForWPC decl : decls) {
 
-                    String path = decl.getPath();
+                    final String path = decl.getPath();
                     // String path = hostPathPrefix + decl.getPath();
 
-                    log.info("setHeader[i=" + i
-                            + "]=" + path);
+                    if (INFO)
+                        log.info("setHeader[i=" + i + "]=" + path);
 
                     csvReader.setHeader(i++, new Header(path));
 

@@ -51,6 +51,11 @@ public class WrappedRemoteChunkedIterator<E> implements
     private IRemoteChunkedIterator<E> src;
 
     /**
+     * The #of {@link IRemoteChunk}s read from the source so far.
+     */
+    private long nchunks = 0L;
+    
+    /**
      * If the source will not return any _more_ chunks. There will still be data
      * in the current chunk if {@link #a} is non-null and {@link #index} is less
      * than the #of elements in {@link #a}.
@@ -64,7 +69,7 @@ public class WrappedRemoteChunkedIterator<E> implements
     private int index;
     
     /** The {@link IKeyOrder} for the source iterator (may be null). */
-    private final IKeyOrder<E> keyOrder;
+    private IKeyOrder<E> keyOrder;
 
     /**
      * 
@@ -76,18 +81,13 @@ public class WrappedRemoteChunkedIterator<E> implements
         if (src == null)
             throw new IllegalArgumentException();
 
+        // save reference.
+        this.src = src;
+        
         try {
 
-            final IRemoteChunk<E> chunk = src.nextChunk();
-            
-            exhausted = chunk.isExhausted();
-            
-            a = chunk.getChunk();
-
-            index = 0;
-
-            // save once.
-            keyOrder = chunk.getKeyOrder();
+            // pre-fetch the first chunk.
+            readChunkFromSource();
             
         } catch (IOException ex) {
 
@@ -122,6 +122,58 @@ public class WrappedRemoteChunkedIterator<E> implements
         
     }
 
+    /**
+     * Reads a chunk from the source.
+     * 
+     * @throws IOException
+     *             If there is an RMI problem.
+     */
+    private void readChunkFromSource() throws IOException {
+
+        // read a chunk from the source.
+        final IRemoteChunk<E> chunk = src.nextChunk();
+
+        if (nchunks == 0) {
+
+            // save once.
+            keyOrder = chunk.getKeyOrder();
+
+        }
+
+        exhausted = chunk.isExhausted();
+
+        a = chunk.getChunk();
+
+        index = 0;
+
+        if (log.isInfoEnabled()) {
+
+            log.info("nchunks=" + nchunks + ", sourceExhausted=" + exhausted
+                    + ", elementsInChunk=" + a.length);
+
+        }
+        
+        nchunks++;
+
+    }
+
+    /**
+     * Variant traps and masquerades the {@link IOException}.
+     */
+    private void readChunkFromSource2() {
+
+        try {
+
+            readChunkFromSource();
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+    
     public boolean hasNext() {
      
         if (exhausted && (a == null || index >= a.length)) {
@@ -135,7 +187,18 @@ public class WrappedRemoteChunkedIterator<E> implements
             
         }
 
-        // there is something remaining.
+        /*
+         * There is something remaining.
+         */
+        
+        if (index >= a.length) {
+
+            // pre-fetch the next chunk if we are done with the last one.
+
+            readChunkFromSource2();
+            
+        }
+
         return true;
         
     }
@@ -145,28 +208,15 @@ public class WrappedRemoteChunkedIterator<E> implements
         if (!hasNext())
             throw new NoSuchElementException();
         
-        if (index >= a.length) {
-            
-            try {
+        final E e = a[index++];
+        
+        if (log.isDebugEnabled()) {
 
-                final IRemoteChunk<E> chunk = src.nextChunk();
-                
-                exhausted = chunk.isExhausted();
-                
-                a = chunk.getChunk();
-
-                index = 0;
-                
-            } catch (IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
+            log.debug("e=" + e + ", index=" + index + ", chunkSize=" + a.length);
             
         }
-
-        return a[index++];
         
+        return e;
     }
 
     @SuppressWarnings("unchecked")
@@ -188,6 +238,12 @@ public class WrappedRemoteChunkedIterator<E> implements
              */
             
             ret = a;
+
+            if (log.isDebugEnabled()) {
+
+                log.debug("returning entire chunk: chunkSize=" + a.length);
+                
+            }
             
         } else {
 
@@ -209,6 +265,12 @@ public class WrappedRemoteChunkedIterator<E> implements
             
             System.arraycopy(a, index, ret, 0, remaining);
             
+            if (log.isDebugEnabled()) {
+
+                log.debug("returning remainder of chunk: remaining=" + remaining);
+                
+            }
+
         }
         
         // indicate that all elements in the current have been consumed.
@@ -252,6 +314,12 @@ public class WrappedRemoteChunkedIterator<E> implements
 
         if (src != null) {
 
+            if(log.isInfoEnabled()) {
+                
+                log.info("Closing remote iterator");
+                
+            }
+            
             try {
 
                 src.close();

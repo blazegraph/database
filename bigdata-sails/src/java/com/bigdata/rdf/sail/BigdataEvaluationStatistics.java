@@ -4,7 +4,10 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.Dataset;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStatistics;
 
@@ -12,12 +15,18 @@ import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IRule;
 
 /**
  * Uses range counts to give cost estimates based on the size of the expected
- * results.
+ * results. Note that this class is NOT used when {@link Options#NATIVE_JOINS}
+ * is enabled since the {@link IRule} execution will automatically assign its
+ * own evaluation plan and that evaluation plan will be informed by the range
+ * counts.
+ * 
+ * See {@link BigdataSailConnection#evaluate(TupleExpr, Dataset, BindingSet, boolean)}
  * 
  * @todo if a {@link StatementPattern} is to read against the default context
  *       and that is a merge of pre-defined contexts then we need to use the
@@ -35,11 +44,6 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
     /**
      * When <code>true</code>, range counts will be obtained and used to
      * influence the join order.
-     * 
-     * @todo we do not need to override anything here if we are converting the
-     *       Sesame query operations to native {@link IRule}s since the
-     *       {@link IRule}s will self-optimize. Especially, we do not want to
-     *       compute the range counts twice for each query!
      */
     private final boolean useRangeCounts = true;
 
@@ -57,6 +61,13 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
 
     }
 
+    /**
+     * These uses range counts on the various {@link StatementPattern}s to
+     * influence the cardinality.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     protected class BigdataCardinalityCalculator extends CardinalityCalculator {
 
         public BigdataCardinalityCalculator(Set<String> boundVars) {

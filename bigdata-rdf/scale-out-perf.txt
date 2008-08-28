@@ -2535,16 +2535,16 @@ x. ZooKeeper integration for resource lock manager?
        fashion) and create a new one.  It gets used by the backchain
        access path for simple (StatementPattern) queries and for JOINs
        when nativeJoins is disabled.
+       
+     * Some of the BigdataClient impls use a temporary store to cache
+       information locally.  This should periodically be dropped as it
+       can grow without bound.
+
+     * The ResourceManager uses either an in-memory or a temporary
+       store for the indices it maintains for the resources that is is
+       managing.
 
    - Bulk loads on the DPP (U100, U1000, U8000) and LUBM query tests.
-
-      - Is the closure really at a fixed point?  Re-load and re-close
-        on U1 shows a non-zero (2439) mutation count.  rdfs02 (12) and
-        rdfs09 (2421) are not at a fixed point.  However, this is with
-        the fast closure program, so I could believe that re-execution
-        of fast closure might produce additional entailments.
-	
-	Look into this with MikeP.
 
       - cache range counts (and maybe more) for historical access
         paths.
@@ -2566,6 +2566,12 @@ x. ZooKeeper integration for resource lock manager?
         of tuples.  Tune up the access path read until it is good on
         all of these configurations.
 
+      * Use a cache in front of the LexiconRelation to quickly resolve
+        terms to their identifiers for commonly seen terms.  This
+        should help to reduce the latency for high-level query since
+        we will avoid hits on the lexicon when converting the query
+        Values into BigdataValues.
+
       * EDS, JDS
 
         * Unroll joins and distribute joins.
@@ -2579,15 +2585,16 @@ x. ZooKeeper integration for resource lock manager?
 	   It needs to be modified to (a) unroll to inner loop of the
 	   join; and (b) partition the join such that the outer loop
 	   is split across the data services where the index partition
-	   resides. This makes the outer loop extremely efficient,
-	   distributes the computation over the cluster, and
-	   parallelizes the inner loop so that we do at most N queries
-	   - one query per index partition spanned by the queries
-	   framed for the inner loop by the bindings selected in the
-	   outer loop for a given chunk.  A large chunk size for the
-	   outer loop is also effective since the reads are local and
-	   this reduces the #of times that we will unroll the inner
-	   loop.
+	   resides and run each split in parallel.
+	   
+	   This makes the outer loop extremely efficient, distributes
+	   the computation over the cluster, and parallelizes the
+	   inner loop so that we do at most N queries - one query per
+	   index partition spanned by the queries framed for the inner
+	   loop by the bindings selected in the outer loop for a given
+	   chunk.  A large chunk size for the outer loop is also
+	   effective since the reads are local and this reduces the
+	   #of times that we will unroll the inner loop.
 
 	- Change service monitors to use a singleton daemon thread
           with weak references to the queues and the counters
@@ -2667,7 +2674,14 @@ OPTIONAL
 
       * JDS
 
-        - Jini smart proxy async iterator (query).
+includeInferred = true (LTS?)
+query	Time	Result#
+querySPOScan	1725	144941
+
+includeInferred = false
+BIGDATA_JDSTest_1
+query	Time	Result#
+querySPOScan	3639	100924
 
         - Jini smart proxy for ResourceLock.
 	    
@@ -2791,3 +2805,29 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
 
 ------
+
+Made many things Serializable for JiniFederation rule execution.
+
+Exporter is paired 1:1 with a proxied object, so returned the
+AbstractServer behavior to read its Exporter from the Configuration
+and hard-coded the Exporter setup for the proxied iterator objects.
+
+Modified the Exporter setup for the proxy iterator to specify
+[keepAlive := false].  The JVM now exits normally whether or not there
+are outstanding iterators running.
+
+Added lubm test harness options for optional closure on laod, query
+w/o inference, etc.
+
+Jini smart proxy async iterator now working for high-level query. It
+uses distributed GC to unexport the proxy once the client no longer
+strongly references the iterator proxy.
+
+*** Spin lock waiting for full chunks for the proxied iterator and
+    return the chunk itself if the iterator is exhaused in the first
+    chunk.
+
+*** Tune serialization for elements materialized by high-level query
+    (it is using java default serialization).
+
+*** Backchaining for JDS hurts.

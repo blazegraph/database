@@ -33,6 +33,7 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -60,34 +61,61 @@ public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
                 database,
                 vocab.getConstant(RDFS.SUBPROPERTYOF),
                 vocab.getConstant(RDFS.SUBPROPERTYOF),
-                /*
-                 * Custom rule executor factory.
+                new FastClosure_3_RuleTaskFactory(database, focusStore, vocab));
+        
+    }
+
+    /**
+     * Custom rule executor factory.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class FastClosure_3_RuleTaskFactory implements IRuleTaskFactory {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -7577223026737453989L;
+
+        final private String database;
+
+        final private String focusStore;
+
+        final private IConstant<Long> rdfsSubPropertyOf;
+
+        public FastClosure_3_RuleTaskFactory(final String database,
+                final String focusStore, final Vocabulary vocab) {
+
+            this.database = database;
+
+            this.focusStore = focusStore;
+
+            rdfsSubPropertyOf = vocab.getConstant(RDFS.SUBPROPERTYOF);
+
+        }
+
+        public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
+                IBuffer<ISolution> buffer) {
+
+            return new FastClosureRuleTask(database, focusStore, rule,
+                    joinNexus, buffer, /* P, */
+                    rdfsSubPropertyOf, //
+                    rdfsSubPropertyOf) {
+
+                /**
+                 * Note: This is the set {P} in the fast closure
+                 * program.
                  */
-                new IRuleTaskFactory() {
+                public Set<Long> getSet() {
 
-                    public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-                            IBuffer<ISolution> buffer) {
+                    return getSubProperties();
 
-                        return new FastClosureRuleTask(database, focusStore,
-                                rule, joinNexus, buffer, /* P, */
-                                vocab.getConstant(RDFS.SUBPROPERTYOF), //
-                                vocab.getConstant(RDFS.SUBPROPERTYOF)) {
+                }
 
-                            /**
-                             * Note: This is the set {P} in the fast closure
-                             * program.
-                             */
-                            public Set<Long> getSet() {
+            };
 
-                                return getSubProperties();
-
-                            }
-
-                        };
-
-                    }
-
-                });// , P);
+        }
 
     }
 

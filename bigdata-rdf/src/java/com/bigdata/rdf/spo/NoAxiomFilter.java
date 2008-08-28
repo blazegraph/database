@@ -29,7 +29,6 @@ package com.bigdata.rdf.spo;
 
 import java.io.IOException;
 import java.io.ObjectStreamException;
-import java.io.Serializable;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -41,7 +40,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NoAxiomFilter implements IElementFilter<ISPO>, Serializable {
+public class NoAxiomFilter implements IElementFilter<ISPO> {
 
     /**
      * 
@@ -53,6 +52,9 @@ public class NoAxiomFilter implements IElementFilter<ISPO>, Serializable {
      */
     static public final transient IElementFilter<ISPO> INSTANCE = new NoAxiomFilter();
     
+    /**
+     * De-serialization ctor.
+     */
     private NoAxiomFilter() {
         
     }

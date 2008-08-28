@@ -665,6 +665,7 @@ abstract public class StoreManager extends ResourceEvents implements
             log.error("Could not get free space: dir=" + dir + " : "
                             + t, t);
             
+            // the error is logger and ignored.
             return -1L;
             
         }

@@ -38,10 +38,6 @@ public class RuleFastClosure7 extends AbstractRuleFastClosure_5_6_7_9 {
      */
     private static final long serialVersionUID = 4263414863195213769L;
 
-    /**
-     * @param vocab
-     * @param C
-     */
     public RuleFastClosure7(String database, String focusStore,
             Vocabulary vocab) {
             // Set<Long> C
