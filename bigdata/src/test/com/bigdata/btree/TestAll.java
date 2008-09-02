@@ -105,6 +105,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestMutableBTreeCursors.class);
         // stackable tuple filters
         suite.addTest(com.bigdata.btree.filter.TestAll.suite());
+        // chunked iterators.
+        suite.addTestSuite(TestChunkedIterators.class);
 
         // test delete semantics (also see the isolation package).
         suite.addTestSuite( TestRemoveAll.class );
@@ -179,10 +181,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBigdataMap.class );
         suite.addTestSuite( TestBigdataSet.class );
         
-        // FIXME this test has not been written (FusedView still uses the iterator API - not the cursor API).
-//      suite.addTestSuite(TestFusedViewCursors.class);
-
-        // FIXME this test belongs in the isolation package.
+        // @todo this test belongs in the isolation package.
 //      suite.addTestSuite(TestIsolatedFusedViewCursors.class);
 
         // test index procedures.

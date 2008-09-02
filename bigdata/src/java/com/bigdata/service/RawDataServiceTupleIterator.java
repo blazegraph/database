@@ -33,9 +33,9 @@ import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractChunkedTupleIterator;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.AbstractChunkedTupleIterator;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.IIndexStore;
@@ -57,7 +57,7 @@ import com.bigdata.rawstore.IBlock;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RawDataServiceTupleIterator extends AbstractChunkedTupleIterator {
+public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator<E> {
     
     public static final transient Logger log = Logger
             .getLogger(RawDataServiceTupleIterator.class);

@@ -36,7 +36,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.filter.ChunkedLocalRangeIterator;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
@@ -628,7 +627,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class ChunkedIterator extends ChunkedLocalRangeIterator {
+    private class ChunkedIterator<E> extends ChunkedLocalRangeIterator<E> {
 
         private ChunkedIterator(IIndex ndx, byte[] fromKey, byte[] toKey,
                 int capacity, int flags, IFilterConstructor filter) {

@@ -26,19 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 1, 2008
  */
 
-package com.bigdata.btree.filter;
+package com.bigdata.btree;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleCursor;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
@@ -46,18 +41,26 @@ import com.bigdata.rawstore.IRawStore;
 /**
  * Chunked range iterator running against a local index or index view.
  * <p>
- * Note: When {@link IRangeQuery#REMOVEALL} is specified the iterator will
- * populate its buffers up to the capacity and then delete behind once the
- * buffer is full or as soon as the iterator is exhausted. This approach works
- * with the somewhat faster {@link ITupleIterator} construct. Otherwise an
- * {@link ITupleCursor} would be required.
+ * Note: When {@link IRangeQuery#REMOVEALL} is specified without the
+ * {@link IRangeQuery#CURSOR} flag, the iterator will populate its buffers up to
+ * the capacity and then delete behind once the buffer is full or as soon as the
+ * iterator is exhausted. This approach works with the somewhat faster
+ * {@link ITupleIterator} construct. When the {@link IRangeQuery#CURSOR} flag is
+ * specified, we directly use the {@link ITupleCursor} interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ChunkedLocalRangeIterator extends AbstractChunkedTupleIterator {
+public class ChunkedLocalRangeIterator<E> extends AbstractChunkedTupleIterator<E> {
 
+    /** The backing {@link IIndex}. */
     protected final IIndex ndx;
+    
+    /** Iff {@link IRangeQuery#REMOVEALL} was specified. */
+    private final boolean removeAll;
+
+    /** Iff {@link IRangeQuery#CURSOR} was specified. */
+    private final boolean cursor;
     
     /**
      * @param fromKey
@@ -76,6 +79,10 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedTupleIterator {
         
         this.ndx = ndx;
         
+        removeAll  = (flags & IRangeQuery.REMOVEALL) != 0;
+        
+        cursor = (flags & IRangeQuery.CURSOR) != 0;
+        
     }
 
     /**
@@ -83,28 +90,33 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedTupleIterator {
      * index object.
      */
     @Override
-    protected ResultSet getResultSet(long timestamp, byte[] fromKey, byte[] toKey, int capacity,
-            int flags, IFilterConstructor filter) {
+    protected ResultSet getResultSet(final long timestamp,
+            final byte[] fromKey, final byte[] toKey, final int capacity,
+            final int flags, final IFilterConstructor filter) {
 
         /*
-         * Note: This turns off the REMOVEALL flag for the result set's query in
-         * order to avoid a cyclic dependency. The AbstractBTree will use a
-         * ChunkedRangeIterator if REMOVEALL is specified, which would cause a
-         * stack overflow. Instead, since the ChunkedRangeIterator is handling
-         * delete behind itself, we turn OFF this flag for the underlying
-         * iterator.
+         * Note: This turns off the REMOVEALL flag unless CURSOR was also
+         * specified.
          */
-        final int tmpFlags = flags & ~IRangeQuery.REMOVEALL;
+        final int tmpFlags = (removeAll && !cursor) //
+                ? flags & ~IRangeQuery.REMOVEALL //
+                : flags;
         
         /*
          * Figure out the upper bound on the #of tuples that could be
          * materialized.
          * 
          * Note: the upper bound on the #of key-value pairs in the range is
-         * truncated to an [int].
+         * Integer.MAX_VALUE.
+         * 
+         * @todo Shouldn't the upper bound be something a little less large,
+         * such as 100,000? If the upper bound is in fact the limit on the #of
+         * tuples to be buffered at a time, then Integer.MAX_VALUE is simply too
+         * large.
          */
         
-        final int rangeCount = (int) ndx.rangeCount(fromKey, toKey);
+        final int rangeCount = (int) Math.min((long) Integer.MAX_VALUE, ndx
+                .rangeCount(fromKey, toKey));
 
         final int limit = (rangeCount > capacity ? capacity : rangeCount);
 
@@ -120,12 +132,19 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedTupleIterator {
         final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, limit,
                 tmpFlags | IRangeQuery.KEYS, filter);
         
+        /*
+         * @todo shouldn't we pass [flags] (not [tmpFlags]) into the ctor? we
+         * don't need to materialize the keys to the remote caller, just so we
+         * can get the [lastKey].
+         */ 
         return new ResultSet(ndx, limit, tmpFlags, itr);
         
     }
 
     /**
-     * Visits the next tuple, queuing it for removal.
+     * Visits the next tuple, queuing it for removal unless
+     * {@link IRangeQuery#CURSOR} was specified, in which case it is deleted
+     * immediately.
      * <p>
      * Note: Queuing for removal is done only for the local index so that data
      * service range iterators will do their deletes on the local index when
@@ -133,17 +152,21 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedTupleIterator {
      * back a batch delete to the index later (this would also make
      * {@link IRangeQuery#REMOVEALL} non-atomic).
      */
-    public ITuple next() {
+    public ITuple<E> next() {
 
-        ITuple tuple = super.next();
+        final ITuple<E> tuple = super.next();
 
-        if ((flags & IRangeQuery.REMOVEALL) != 0) {
+        if (removeAll) {
 
-            /*
-             * Queue the key for removal.
-             */
-            
-            remove();
+            if (!cursor) {
+                
+                /*
+                 * Queue the key for removal IFF CURSOR was NOT specified.
+                 */
+
+                remove();
+                
+            }
 
         }
 
@@ -232,7 +255,8 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedTupleIterator {
     }
 
     /**
-     * Always returns 0L.  This value is ignored by {@link #getResultSet(long, byte[], byte[], int, int, ITupleFilter)}.
+     * Always returns 0L. This value is ignored by
+     * {@link #getResultSet(long, byte[], byte[], int, int, ITupleFilter)}.
      */
     @Override
     protected long getTimestamp() {

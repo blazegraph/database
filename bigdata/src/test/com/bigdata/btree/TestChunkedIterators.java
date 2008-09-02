@@ -26,19 +26,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 12, 2008
  */
 
-package com.bigdata.btree.filter;
+package com.bigdata.btree;
 
+import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.NOPTupleSerializer;
-import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -619,6 +617,411 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             tuple = itr.next();
             assertEquals("getKey()", new byte[] { 1 }, tuple.getKey());
             assertEquals("getValue()", new byte[] { 1 }, tuple.getValue());
+            
+        }
+
+    }
+
+    /**
+     * Unit test for (de-)serialization of {@link ResultSet}s used by the
+     * chunked iterators.
+     */
+    public void test_deserialization() {
+
+        doDeserializationTest(1000/* N */, true/* deleteMarkers */);
+
+        doDeserializationTest(1000/* N */, false/* deleteMarkers */);
+        
+    }
+    
+    protected void doDeserializationTest(int N, boolean deleteMarkers) {
+        
+        final String name = "testIndex";
+
+        final IndexMetadata metadata = new IndexMetadata(name, UUID
+                .randomUUID());
+        
+        // optionally enable delete markers.
+        metadata.setDeleteMarkers(deleteMarkers);
+
+        // the default serializer will work fine for this.
+        final ITupleSerializer<Long, String> tupleSer = new DefaultTupleSerializer<Long, String>(
+                new DefaultKeyBuilderFactory(new Properties()));
+        
+        metadata.setTupleSerializer(tupleSer);
+        
+        final BTree ndx = BTree.create(new SimpleMemoryRawStore(), metadata);
+
+        {
+            /*
+             * Test with an empty index.
+             */
+            doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
+                    0/* capacity */, IRangeQuery.DEFAULT/* flags */, null/* filter */);
+
+        }
+        
+        final TupleData<Long, String>[] data = new TupleData[N];
+        
+        for (int i = 0; i < N; i++) {
+            
+            /*
+             * note: avoids possibility of duplicate keys and generates the data
+             * in a known order
+             */ 
+            data[i] = new TupleData<Long, String>(i * 2L, getRandomString(
+                    100/* len */, i/* id */), tupleSer); 
+        
+            // add to the tree as we go.
+            ndx.insert(data[i].k, data[i].v);
+            
+        }
+        
+        /*
+         * Verify a full index scan.
+         */
+        doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
+                0/* capacity */, IRangeQuery.DEFAULT/* flags */, null/* filter */);
+
+        /*
+         * Verify key-range scans.
+         */
+
+        doDeserializationTest(ndx, tupleSer.serializeKey(2L)/* fromKey */,
+                null/* toKey */, 0/* capacity */,
+                IRangeQuery.DEFAULT/* flags */, null/* filter */);
+        
+        doDeserializationTest(ndx, null/* fromKey */, tupleSer
+                .serializeKey(20L)/* toKey */, 0/* capacity */,
+                IRangeQuery.DEFAULT/* flags */, null/* filter */);
+        
+        doDeserializationTest(ndx, tupleSer.serializeKey(2L)/* fromKey */,
+                tupleSer.serializeKey(10L)/* toKey */, 0/* capacity */,
+                IRangeQuery.DEFAULT/* flags */, null/* filter */);
+        
+        /*
+         * Verify with overriden capacity.
+         */
+
+        doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
+                100/* capacity */, IRangeQuery.DEFAULT/* flags */, null/* filter */);
+        
+        // and key-range constraint.
+        doDeserializationTest(ndx, tupleSer.serializeKey(2L)/* fromKey */,
+                tupleSer.serializeKey(10L)/* toKey */, 1/* capacity */,
+                IRangeQuery.DEFAULT/* flags */, null/* filter */);
+
+        /*
+         * Verify with different flags.
+         */
+
+        doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
+                0/* capacity */, IRangeQuery.KEYS/* flags */, null/* filter */);
+        
+        doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
+                0/* capacity */, IRangeQuery.VALS/* flags */, null/* filter */);
+
+        doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
+                0/* capacity */,
+                IRangeQuery.DEFAULT | IRangeQuery.REVERSE/* flags */, null/* filter */);
+
+        doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
+                0/* capacity */,
+                IRangeQuery.DEFAULT | IRangeQuery.CURSOR/* flags */, null/* filter */);
+
+        /*
+         * Force all tuples to be removed.
+         */
+        final int n1;
+        {
+
+            final ITupleIterator itr = ndx
+                    .rangeIterator(null/* fromKey */, null/* toKey */,
+                            0/* capacity */, IRangeQuery.DEFAULT
+                                    | IRangeQuery.REMOVEALL/* flags */, null/* filter */);
+
+            int i = 0;
+            while (itr.hasNext()) {
+
+                itr.next();
+
+                i++;
+
+            }
+
+            n1 = i;
+
+        }
+
+        // visited all elements
+        assertNotSame(N, n1);
+
+        /*
+         * Visit again - both iterators should be empty now.
+         */
+        final int n0 = doDeserializationTest(ndx, null/* fromKey */,
+                null/* toKey */, 0/* capacity */,
+                IRangeQuery.DEFAULT/* flags */, null/* filter */);
+
+        // should be an empty iterator.
+        assertEquals(0, n0);
+
+        /*
+         * Visit again, but specify the flag for visiting the deleted tuples.
+         */
+        final int n2 = doDeserializationTest(ndx, null/* fromKey */,
+                null/* toKey */, N/* capacity */, IRangeQuery.DEFAULT
+                        | IRangeQuery.DELETED/* flags */, null/* filter */);
+
+        if (ndx.getIndexMetadata().getDeleteMarkers()) {
+            /*
+             * If delete markers are enabled, then should visit the same #of
+             * tuples as the iterator before we deleted those tuples.
+             */
+            assertEquals(n1, n2);
+        } else {
+            /*
+             * Otherwise should visit NO tuples.
+             */
+            assertEquals(0, n2);
+        }
+        
+    }
+
+    /**
+     * Test helper requests an {@link ITupleIterator} using the specified
+     * parameters directly on the {@link BTree} (ground truth for the purposes
+     * of this test) and indirectly via an {@link AbstractChunkedTupleIterator}.
+     * The {@link AbstractChunkedTupleIterator} is layered in order to force
+     * (de-)serialization of each {@link ResultSet}. The iterators are then
+     * compared and should visit the same {@link ITuple}s in the same order.
+     * 
+     * @param ndx
+     * @param fromKey
+     * @param toKey
+     * @param capacity
+     * @param flags
+     * @param filterCtor
+     * 
+     * @return The #of tuples visited.
+     * 
+     * @throws AssertionError
+     *             if the tuples visited differ in any manner.
+     */
+    protected int doDeserializationTest(final BTree ndx, final byte[] fromKey,
+            final byte[] toKey, final int capacity, final int flags,
+            final IFilterConstructor filterCtor) {
+
+        // the ground truth iterator.
+        final ITupleIterator<String> itre = ndx.rangeIterator(fromKey, toKey, capacity,
+                flags, filterCtor);
+
+        final ITupleIterator<String> itre2 = ndx.rangeIterator(fromKey, toKey, capacity,
+                flags, filterCtor);
+
+//        if(true) return assertSameIterator(itre, itre2);
+        
+        final ITupleIterator<String> itra = new ChunkedLocalRangeIterator<String>(ndx,
+                fromKey, toKey, capacity, flags, filterCtor) {
+            
+            protected ResultSet getResultSet(long timestamp, byte[] fromKey,
+                    byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
+
+                final ResultSet rset = super.getResultSet(timestamp, fromKey, toKey,
+                        capacity, flags, filter);
+                
+//                if(true) return rset;
+                
+                final byte[] data = SerializerUtil.serialize(rset);
+                
+                final ResultSet rset2 = (ResultSet)SerializerUtil.deserialize(data); 
+
+                final byte[] data2 = SerializerUtil.serialize(rset2);
+
+                if (!BytesUtil.bytesEqual(data, data2)) {
+
+                    throw new AssertionError("Re-serialization differs");
+                    
+                }
+                
+                // return the de-serialized version.
+                return rset2;
+                
+            }
+            
+        };
+
+        return assertSameIterator(itre, itra);
+        
+    }
+
+    /**
+     * Compares the data in the {@link ITuple}s visited by two iterators.
+     * 
+     * @param itre
+     *            The 'expected' iterator.
+     * @param itra
+     *            The 'actual' iterator.
+     * 
+     * @return The #of tuples visited.
+     * 
+     * @throws AssertionError
+     *             if the tuples visited differ in any manner.
+     * 
+     * @todo refactor into base class for B+Tree unit tests.
+     */
+    protected int assertSameIterator(final ITupleIterator itre,
+            final ITupleIterator itra) {
+        
+        int i = 0;
+
+        while (itre.hasNext()) {
+
+            assertTrue(itra.hasNext());
+
+            final ITuple te = itre.next();
+
+            final ITuple ta = itra.next();
+
+            assertEquals("flags", te.flags(), ta.flags());
+
+            if ((te.flags() & IRangeQuery.KEYS) != 0) {
+
+                assertEquals("key[]", te.getKey(), ta.getKey());
+
+            }
+
+            if ((te.flags() & IRangeQuery.VALS) != 0) {
+
+                assertEquals("value[]", te.getValue(), ta.getValue());
+
+            }
+
+            assertEquals("visitCount", te.getVisitCount(), ta.getVisitCount());
+            
+            assertEquals("versionTimestamp", te.getVersionTimestamp(), ta
+                    .getVersionTimestamp());
+
+            if (te.isDeletedVersion() != ta.isDeletedVersion()) {
+                
+                log.error("expected[" + i + "]=" + te);
+                
+                log.error("  actual[" + i + "]=" + ta);
+                
+                fail("deleteMarker: expecting=" + te.isDeletedVersion()
+                        + ", actual=" + ta.isDeletedVersion());
+                
+            }
+            
+//            assertEquals("deleteMarker", te.isDeletedVersion(), ta
+//                    .isDeletedVersion());
+
+            /*
+             * note: the source index will always be zero unless you are reading
+             * from a fused view.
+             */
+            assertEquals("sourceIndex", te.getSourceIndex(), ta
+                    .getSourceIndex());
+
+            {
+
+                /*
+                 * Compare objects de-serialized from the tuple. If the
+                 * operation is not supported for the expected iterator, then it
+                 * should also be not supported for the actual iterator.
+                 */
+                boolean unsupported = false;
+                Object oe = null;
+                try {
+                    oe = te.getObject();
+                } catch (UnsupportedOperationException ex) {
+                    oe = null;
+                    unsupported = true;
+                }
+
+                Object oa = null;
+                try {
+                    oa = ta.getObject();
+                    if (unsupported)
+                        fail("Should not be able to de-serialize an object here");
+                } catch (UnsupportedOperationException ex) {
+                    if (log.isInfoEnabled()) {
+                        log.info("Ignoring expected exception: " + ex);
+                    }
+                }
+
+                if (oe == null) {
+
+                    assertNull(oa);
+
+                } else {
+
+                    assertTrue(oe.equals(oa));
+
+                }
+
+            }
+
+            i++;
+
+        }
+
+        assertFalse(itra.hasNext());
+
+        return i;
+
+    }
+    
+    /**
+     * Helper class pairs an application key and value with the generated sort
+     * key for that application key.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <K>
+     *            The generic type of the application key.
+     * @param <V>
+     *            The generic type of the application value.
+     */
+    static class TupleData<K, V> implements Comparable<TupleData<K,V>> {
+        
+        /** The application key. */
+        final public K k;
+        
+        /** The application value. */
+        final public V v;
+        
+        /** The generated sort key (unsigned byte[]). */
+        final public byte[] sortKey;
+
+        /**
+         * 
+         * @param k
+         *            The application key.
+         * @param v
+         *            The application value.
+         * @param tupleSer
+         *            Used to generate the sort key and (de-)serialize the
+         *            application value.
+         */
+        public TupleData(final K k, final V v, final ITupleSerializer<K, V> tupleSer) {
+
+            this.k = k;
+
+            this.v = v;
+
+            this.sortKey = tupleSer.serializeKey(k);
+
+        }
+
+        /**
+         * Places into order by the {@link #sortKey}. This is the same order
+         * that the data will be in when they are inserted into the B+Tree,
+         * except that the B+Tree does not permit duplicate keys.
+         */
+        public int compareTo(TupleData<K, V> o) {
+
+            return BytesUtil.compareBytes(sortKey, o.sortKey);
             
         }
 

@@ -51,7 +51,7 @@ import com.bigdata.io.SerializerUtil;
  * @version $Id$
  */
 public class DefaultTupleSerializer<K extends Object, V extends Object>
-        implements ITupleSerializer, Externalizable {
+        implements ITupleSerializer<K, V>, Externalizable {
 
     /**
      * 
@@ -262,13 +262,13 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * De-serializes an object from the {@link ITuple#getValue() value} stored
      * in the tuple (ignores the key stored in the tuple).
      */
-    public Object deserialize(ITuple tuple) {
+    public V deserialize(ITuple tuple) {
 
         if (tuple == null)
             throw new IllegalArgumentException();
 
         // @todo tuple.getValueStream()
-        return SerializerUtil.deserialize(tuple.getValue());
+        return (V)SerializerUtil.deserialize(tuple.getValue());
         
     }
 
@@ -283,7 +283,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * @throws UnsupportedOperationException
      *             always.
      */
-    public Object deserializeKey(ITuple tuple) {
+    public K deserializeKey(ITuple tuple) {
         
         throw new UnsupportedOperationException();
         

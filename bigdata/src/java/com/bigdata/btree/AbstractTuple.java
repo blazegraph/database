@@ -36,6 +36,8 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IBlock;
 
 /**
+ * Abstract base class with much of the functionality of {@link ITuple}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -336,7 +338,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      *       and {@link ITuple#getSourceIndex()} should be implemented by this
      *       class (or maybe add a setSourceIndex() to be more flexible).
      */
-    public void copy(int index, ILeafData leaf) {
+    public void copy(final int index, final ILeafData leaf) {
         
         nvisited++;
         
@@ -534,9 +536,24 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      */
     public String toString() {
         
+        return toString(this);
+        
+    }
+    
+    /**
+     * Utility method returns a {@link String} representation of an
+     * {@link ITuple}.
+     * 
+     * @param tuple
+     *            The {@link ITuple}.
+     *            
+     * @return The {@link String} representation of that {@link ITuple}.
+     */
+    public static String toString(ITuple tuple) {
+
         Object obj;
         try {
-            obj = getObject();
+            obj = tuple.getObject();
         } catch(UnsupportedOperationException ex) {
             // note: indicates Not Available rather than [null].
             obj = "N/A";
@@ -551,16 +568,44 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
             obj = t.getMessage();
         }
         
-        return super.toString()+
-        "{nvisited="+nvisited+
-        ", flags="+flagString(flags)+
-        (versionDeleted ? ", deleted" : "")+
-        (versionTimestamp == 0L ? "" : ", timestamp="+ getVersionTimestamp())+
-        ", key="+(getKeysRequested()?Arrays.toString(getKey()):"N/A")+
-        ", val="+(getValuesRequested()?(isNull()?"null":Arrays.toString(getValue())):"N/A")+
-        ", obj="+(obj instanceof byte[]?Arrays.toString((byte[])obj):obj)+
-        "}";
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append(tuple.getClass().getName() + "@" + tuple.hashCode());
+
+        sb.append("{ nvisited=" + tuple.getVisitCount());
+
+        sb.append(", flags=" + flagString(tuple.flags()));
+
+        if (tuple.isDeletedVersion()) {
+            
+            sb.append(", deleted");
+            
+        }
+
+        if (tuple.getVersionTimestamp() != 0L) {
+            
+            sb.append(", timestamp=" + tuple.getVersionTimestamp());
+            
+        }
+
+        sb.append(", key="
+                + (tuple.getKeysRequested() ? Arrays.toString(tuple.getKey())
+                        : "N/A"));
+
+        sb.append(", val="
+                + (tuple.getValuesRequested() ? (tuple.isNull() ? "null"
+                        : Arrays.toString(tuple.getValue())) : "N/A"));
+
+        sb.append(", obj="
+                        + (obj instanceof byte[] ? Arrays
+                                .toString((byte[]) obj) : obj));
+
+        sb.append(", sourceIndex="+tuple.getSourceIndex());
         
+        sb.append("}");
+
+        return sb.toString();
+
     }
 
     /**
@@ -573,7 +618,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      */
     public static String flagString(final int flags) {
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         // #of flags that are turned on.
         int onCount = 0;

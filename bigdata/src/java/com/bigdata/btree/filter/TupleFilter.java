@@ -132,12 +132,17 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
                 this.returnValue = new AbstractTuple<E>(nextValue.flags()) {
 
                     public int getSourceIndex() {
+                        
                         return sourceIndex;
+                        
                     }
 
                     public ITupleSerializer getTupleSerializer() {
+                        
                         return tupleSer;
+                        
                     }
+
                 };
 
             } else {
