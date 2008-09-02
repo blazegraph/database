@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -349,26 +350,40 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         
         final String fileStr = file == null ? "" : file.toString();
         
-        return new AbstractResourceMetadata(fileStr, buf.getExtent(), uuid, createTime) {
-        
-            private static final long serialVersionUID = 1L;
-
-            public boolean isJournal() {
-                return false;
-            }
-        
-            public boolean isIndexSegment() {
-                return false;
-            }
-        
-        };
+        return new ResourceMetadata(this, fileStr);
         
     }
-    
+
+    /**
+     * Static class since must be {@link Serializable}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static final class ResourceMetadata extends AbstractResourceMetadata {
+
+        public ResourceMetadata(TemporaryRawStore store, String fileStr) {
+
+            super(fileStr, store.buf.getExtent(), store.uuid, store.createTime);
+
+        }
+
+        private static final long serialVersionUID = 1L;
+
+        public boolean isJournal() {
+            return false;
+        }
+
+        public boolean isIndexSegment() {
+            return false;
+        }
+
+    }
+
     final public DiskOnlyStrategy getBufferStrategy() {
-        
+
         return buf;
-        
+
     }
 
     /**

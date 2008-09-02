@@ -51,7 +51,7 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionedTupleIterator implements ITupleIterator {
+public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
     protected static final transient Logger log = Logger
             .getLogger(PartitionedTupleIterator.class);
@@ -540,7 +540,7 @@ public class PartitionedTupleIterator implements ITupleIterator {
 
     }
     
-    public ITuple next() {
+    public ITuple<E> next() {
 
         if (!hasNext()) {
 
@@ -552,9 +552,12 @@ public class PartitionedTupleIterator implements ITupleIterator {
 
         final long nvisited = this.nvisited;
         
-        final ITuple sourceTuple = src.next();
+        final ITuple<E> sourceTuple = src.next();
 
-        return new DelegateTuple( sourceTuple ) {
+        /*
+         * Override the visitCount.
+         */
+        return new DelegateTuple<E>( sourceTuple ) {
             
             public long getVisitCount() {
                 

@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.mdi;
 
+import java.io.Serializable;
 import java.util.UUID;
 
 import com.bigdata.btree.IndexSegment;
@@ -36,7 +37,7 @@ import com.bigdata.resources.ResourceManager;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IResourceMetadata extends Cloneable {
+public interface IResourceMetadata extends Serializable, Cloneable {
 
     /**
      * True iff this resource is an {@link IndexSegment}. Each

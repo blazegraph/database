@@ -47,6 +47,10 @@ import com.bigdata.service.IDataService;
 /**
  * An object used to stream key scan results back to the client.
  * 
+ * @todo harmonize this with {@link ILeafData}? We could reuse the same
+ *       serialization logic with extensions for the additional metadata
+ *       conveyed by the {@link ResultSet}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -74,6 +78,12 @@ public class ResultSet implements Externalizable {
 
     private long[] versionTimestamps;
     
+    /**
+     * <code>null</code> unless delete markers were enabled for the source
+     * index. When non-<code>null</code>, a ONE (1) means that the
+     * corresponding tuple was deleted while a ZERO (0) means that the
+     * corresponding tuple was NOT deleted.
+     */
     private byte[] deleteMarkers;
 
     private byte[] sourceIndices;
@@ -83,9 +93,15 @@ public class ResultSet implements Externalizable {
     private long commitTime;
     
     /**
-     * Set automatically based on the first visited {@link ITuple} (this allows
-     * the {@link ITupleSerializer} to be overriden by an {@link ITupleFilter}
-     * chain).
+     * Set automatically based on the first visited {@link ITuple}. By setting
+     * this value lazily, the {@link ITupleSerializer} can be overriden by an
+     * {@link ITupleFilter} chain. For example, the logical row scan for the
+     * SparseRowStore does this when it converts between the sparse row format
+     * that is actually stored in the index and the timestamped property sets
+     * that are visited by the logical row scan.
+     * <p>
+     * Note: This means that the ITupleSerializer will be null if the iterator
+     * does not visit any elements!
      */
     private ITupleSerializer tupleSerializer;
     
@@ -144,8 +160,8 @@ public class ResultSet implements Externalizable {
     }
 
     /**
-     * The {@link ITupleSerializer} that may be used to de-serialize the tuples
-     * in the {@link ResultSet}.
+     * The {@link ITupleSerializer} that should be used to de-serialize the
+     * tuples in the {@link ResultSet}.
      */
     final public ITupleSerializer getTupleSerializer() {
         
@@ -408,7 +424,7 @@ public class ResultSet implements Externalizable {
 
         if (this.deleteMarkers != null) {
 
-            byte[] deleteMarkers = new byte[limit];
+            final byte[] deleteMarkers = new byte[limit];
             
             System.arraycopy(this.deleteMarkers, 0, deleteMarkers, 0, ntuples);
 
@@ -418,7 +434,7 @@ public class ResultSet implements Externalizable {
 
         if (this.versionTimestamps != null) {
 
-            long[] versionTimestamps = new long[limit];
+            final long[] versionTimestamps = new long[limit];
 
             System.arraycopy(this.versionTimestamps, 0, versionTimestamps, 0, ntuples);
 
@@ -428,7 +444,7 @@ public class ResultSet implements Externalizable {
 
         if(this.sourceIndices != null) {
 
-            byte[] sourceIndices = new byte[limit];
+            final byte[] sourceIndices = new byte[limit];
             
             System.arraycopy(this.sourceIndices, 0, sourceIndices, 0, ntuples);
             
@@ -529,7 +545,7 @@ public class ResultSet implements Externalizable {
         
         assertRunning();
 
-        if(isFull() && limit<0) {
+        if (isFull() && limit < 0) {
             
             resize();
             
@@ -570,7 +586,7 @@ public class ResultSet implements Externalizable {
     }
     
     /**
-     * true once {@link #init(int)} has been called and until
+     * <code>true</code> once {@link #init(int)} has been called and until
      * {@link #done(byte[])} is called.
      */
     protected void assertRunning() {
@@ -640,7 +656,15 @@ public class ResultSet implements Externalizable {
             
             keys = new RandomAccessByteArray( 0, 0, new byte[ntuples][] );
             
-            tupleSerializer.getLeafKeySerializer().read(in, keys);
+            if (ntuples > 0) {
+             
+                assert tupleSerializer != null;
+                
+                assert tupleSerializer.getLeafKeySerializer() != null;
+                
+                tupleSerializer.getLeafKeySerializer().read(in, keys);
+                
+            }
             
         } else {
             
@@ -652,7 +676,11 @@ public class ResultSet implements Externalizable {
             
             vals = new RandomAccessByteArray(0, 0, new byte[ntuples][]);
             
-            tupleSerializer.getLeafValueSerializer().read(in, vals);
+            if (ntuples > 0) {
+
+                tupleSerializer.getLeafValueSerializer().read(in, vals);
+
+            }
             
         } else {
             
@@ -666,13 +694,29 @@ public class ResultSet implements Externalizable {
 
             if (ntuples > 0) {
 
-                InputBitStream ibs = new InputBitStream((InputStream) in, 0/* unbuffered! */);
+//                if(writebits) {
+                final InputBitStream ibs = new InputBitStream((InputStream) in,
+                        0/* unbuffered! */);
 
                 // @todo ibs.read() does not handle ntuples==0 gracefully.
-                
-                ibs.read(deleteMarkers, ntuples/* len */);
 
+//              Note: read(byte[], len) appears to have problems.
+//                
+//              ibs.read(deleteMarkers, ntuples/* len */);
+
+                for(int i=0; i<ntuples; i++) {
+
+                    deleteMarkers[i] = (byte)(ibs.readBit() == 0 ? 0 : 1);
+                    
+                }
+                
                 // ibs.close();
+ 
+//                } else {
+//                    
+//                    in.readFully(deleteMarkers, 0/*off*/, ntuples/*len*/);
+//                    
+//                }
 
             }
             
@@ -757,25 +801,44 @@ public class ResultSet implements Externalizable {
 //            
 //        }
             
-        if (keys != null) {
+        if (keys != null && ntuples > 0) {
 
             tupleSerializer.getLeafKeySerializer().write(out, keys);
-            
+
         }
 
-        if (vals != null) {
+        if (vals != null && ntuples > 0) {
 
             tupleSerializer.getLeafValueSerializer().write(out, vals);
 
         }
         
+        /*
+         * @todo reuse the delete marker serialization logic for this and the
+         * NodeSerializer (abstract out an interface).
+         */
         if (deleteMarkers != null && ntuples > 0) {
             
-            OutputBitStream obs = new OutputBitStream((OutputStream) out, 0/* unbuffered! */);
+//            if(writebits) {
+            final OutputBitStream obs = new OutputBitStream((OutputStream) out,
+                    0/* unbuffered! */);
             
-            obs.write(deleteMarkers, ntuples/*len*/);
+//            obs.write(deleteMarkers, ntuples/*len*/);
+            
+            // note: write(byte[], len) appears to have problems.
+            for (int i = 0; i < ntuples; i++) {
+            
+                obs.writeBit(deleteMarkers[i] == 1);
+                
+            }
             
             obs.flush();
+
+//            } else {
+//                for(int i=0; i<ntuples; i++) {
+//                    out.write(deleteMarkers, 0/*off*/, ntuples/*len*/);
+//                }
+//            }
             
         }
         
@@ -804,15 +867,15 @@ public class ResultSet implements Externalizable {
              * Note: if only one source then we do not need the source indices
              * since the source index is always zero.
              */
-            
-            for(int i=0; i<ntuples; i++) {
-                
+
+            for (int i = 0; i < ntuples; i++) {
+
                 out.writeByte(sourceIndices[i]);
-                
+
             }
-            
+
         }
-        
+
     }
 
     /**
@@ -841,7 +904,7 @@ public class ResultSet implements Externalizable {
      * @param flags
      *            The flags specified for the iterator. See {@link IRangeQuery}.
      */
-    protected ResultSet(IIndex ndx, int flags) {
+    protected ResultSet(final IIndex ndx, final int flags) {
 
         if (ndx == null)
             throw new IllegalArgumentException();
@@ -879,13 +942,14 @@ public class ResultSet implements Externalizable {
      * @param itr
      *            The source iterator.
      */
-    public ResultSet(IIndex ndx, int capacity, int flags, ITupleIterator itr) {
+    public ResultSet(final IIndex ndx, final int capacity, final int flags,
+            final ITupleIterator itr) {
 
         this(ndx, flags);
-        
+
         // initialize the buffers.
         init(capacity);
-        
+
         /*
          * Copy tuples into the result set buffers.
          */
@@ -898,6 +962,19 @@ public class ResultSet implements Externalizable {
 
             if (tupleSerializer == null) {
 
+                /*
+                 * Set lazily in case the ITupleSerializer was overridden by a
+                 * filter chain that converts the object type of the elements
+                 * serialized within the tuple. For example, the logical row
+                 * scan for the SparseRowStore does this when it converts
+                 * between the sparse row format that is actually stored in the
+                 * index and the timestamped property sets that are visited by
+                 * the logical row scan.
+                 * 
+                 * Note: This means that the ITupleSerializer will be null if
+                 * the iterator does not visit any elements!
+                 */
+                
                 tupleSerializer = tuple.getTupleSerializer();
 
             }
@@ -922,5 +999,10 @@ public class ResultSet implements Externalizable {
         done(exhausted, lastKey);
 
     }
+    
+//    /**
+//     * FIXME Remove. This is for debugging.
+//     */
+//    private static final boolean writebits = false;
     
 }

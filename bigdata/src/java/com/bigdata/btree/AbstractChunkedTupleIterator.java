@@ -26,22 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 1, 2008
  */
 
-package com.bigdata.btree.filter;
+package com.bigdata.btree;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -49,7 +43,6 @@ import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.IBlock;
-import com.bigdata.service.DataServiceTupleIterator;
 
 /**
  * A chunked iterator that proceeds a {@link ResultSet} at a time. This
@@ -60,10 +53,10 @@ import com.bigdata.service.DataServiceTupleIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
+abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<E> {
 
     public static final transient Logger log = Logger
-            .getLogger(DataServiceTupleIterator.class);
+            .getLogger(AbstractChunkedTupleIterator.class);
 
     /**
      * Error message used by {@link #getKey()} when the iterator was not
@@ -298,7 +291,8 @@ abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
         assert !exhausted;
 
         if (log.isInfoEnabled())
-            log.info("fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
+            log.info("nqueries=" + nqueries + ", fromKey="
+                    + BytesUtil.toString(fromKey) + ", toKey="
                     + BytesUtil.toString(toKey));
 
         // initial query.
@@ -314,6 +308,14 @@ abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
 
         nqueries++;
 
+        if (log.isInfoEnabled()) {
+
+            log.info("Got chunk: ntuples=" + rset.getNumTuples()
+                    + ", exhausted=" + rset.isExhausted() + ", lastKey="
+                    + BytesUtil.toString(rset.getLastKey()));
+            
+        }
+        
     }
 
     /**
@@ -462,7 +464,7 @@ abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
         
     }
 
-    public ITuple next() {
+    public ITuple<E> next() {
 
         if (!hasNext()) {
 
@@ -488,7 +490,7 @@ abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class ResultSetTuple implements ITuple {
+    public class ResultSetTuple implements ITuple<E> {
 
         protected ResultSetTuple() {
 
@@ -627,12 +629,12 @@ abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
             
         }
         
-        public Object getObject() {
+        public E getObject() {
             
             if (lastVisited == -1)
                 throw new IllegalStateException();
 
-            return rset.getTupleSerializer().deserialize(this); 
+            return (E)rset.getTupleSerializer().deserialize(this); 
             
         }
         
@@ -696,14 +698,10 @@ abstract public class AbstractChunkedTupleIterator implements ITupleIterator {
         }
 
         public String toString() {
-            return super.toString()+
-            "{nvisited="+nvisited+
-            (isDeletedVersion()? ", deleted" : "")+
-            (getVersionTimestamp() == 0L ? "" : ", timestamp="+ getVersionTimestamp())+
-            ", key="+(getKeysRequested()?Arrays.toString(getKey()):"N/A")+
-            ", val="+(getValuesRequested()?(isNull()?"null":Arrays.toString(getValue())):"N/A")+
-            "}";
-            }
+            
+            return AbstractTuple.toString(this);
+            
+        }
 
     }
 

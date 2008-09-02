@@ -333,6 +333,75 @@ public class FusedTupleIterator<I extends ITupleIterator<E>, E> implements
     }
 
     /**
+     * {@link ITuple} revealing a tuple selected from a {@link FusedView} by a
+     * {@link FusedTupleIterator}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    private static class FusedTuple<E> extends DelegateTuple<E> {
+
+        private final int sourceIndex;
+
+        private final long nvisited;
+
+        /**
+         * Note: Not whether or not this tuple is deleted but rather whether or
+         * not the {@link FusedTupleIterator} is visiting deleted tuples.
+         * 
+         * @see FusedTupleIterator#deleted
+         */
+        private final boolean deleted;
+        
+        public FusedTuple(final ITuple<E> delegate, final int sourceIndex,
+                final long nvisited, final boolean deleted) {
+
+            super(delegate);
+
+            this.sourceIndex = sourceIndex;
+
+            this.nvisited = nvisited;
+
+            this.deleted = deleted;
+            
+        }
+
+        /**
+         * Turn off the deleted flag unless {@link IRangeQuery#DELETED} was
+         * specified for the {@link FusedTupleIterator} view.
+         */
+        public int flags() {
+
+            int flags = super.flags();
+
+            if (!deleted) {
+
+                flags &= ~IRangeQuery.DELETED;
+
+            }
+
+            return flags;
+
+        }
+
+        public int getSourceIndex() {
+
+            return sourceIndex;
+
+        }
+
+        /** return the total visited count. */
+        @Override
+        public long getVisitCount() {
+
+            return nvisited;
+
+        }
+
+    }
+
+    /**
      * Consume the {@link #current} source {@link ITuple}.
      * 
      * @return The {@link #current} tuple.
@@ -344,41 +413,8 @@ public class FusedTupleIterator<I extends ITupleIterator<E>, E> implements
         // save index of the iterator whose tuple is to be visited.
         final int sourceIndex = lastVisited = current;
         
-        final ITuple<E> tuple = new DelegateTuple<E>(sourceTuple[current]) {
-
-            /**
-             * Turn off the deleted flag unless DELETED was specified for the
-             * fused iterator view.
-             */
-            public int flags() {
-
-                int flags = super.flags();
-                
-                if (!deleted) {
-                    
-                    flags &= ~IRangeQuery.DELETED;
-
-                }
-
-                return flags;
-                
-            }
-            
-            public int getSourceIndex() {
-                
-                return sourceIndex;
-                
-            }
-            
-            /** return the total visited count. */
-            @Override
-            public long getVisitCount() {
-
-                return nvisited;
-                
-            }
-
-        };
+        final ITuple<E> tuple = new FusedTuple<E>(sourceTuple[current],
+                sourceIndex, nvisited, deleted);
 
         // clear tuples from other sources having the same key as the current tuple.
         clearCurrent();
@@ -392,7 +428,7 @@ public class FusedTupleIterator<I extends ITupleIterator<E>, E> implements
         return tuple;
 
     }
-
+    
     /**
      * <p>
      * Clear tuples from other sources having the same key as the current tuple.

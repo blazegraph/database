@@ -30,6 +30,7 @@ package com.bigdata.rawstore;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
@@ -130,59 +131,82 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
     }
     
     public IResourceMetadata getResourceMetadata() {
-        
-        return new IResourceMetadata() {
 
-            public boolean equals(IResourceMetadata o) {
-             
-                return this == o;
-                
-            }
+        return new ResourceMetadata(file);
 
-            public long getCreateTime() {
-                
-                // does not support commit
-                return 0L;
-                
-            }
+    }
 
-            public String getFile() {
+    /**
+     * Static class since must be {@link Serializable}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static final class ResourceMetadata implements IResourceMetadata {
 
-                // no backing file.
-                return file.toString();
-                
-            }
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -419665851049132640L;
 
-            public UUID getUUID() {
+        private final String fileStr;
 
-                // no UUID.
-                return null;
-                
-            }
+        private final long length;
 
-            public boolean isIndexSegment() {
+        public ResourceMetadata(File file) {
 
-                // not index segment.
-                return false;
-                
-            }
+            this.fileStr = file.toString();
 
-            public boolean isJournal() {
-                
-                // not journal.
-                return false;
-                
-            }
+            this.length = file.length();
 
-            public long size() {
+        }
 
-                // #of bytes not available.
-                return 0L;
-                
-            }
+        public boolean equals(IResourceMetadata o) {
 
-        };
-        
+            return this == o;
+
+        }
+
+        public long getCreateTime() {
+
+            // does not support commit
+            return 0L;
+
+        }
+
+        public String getFile() {
+
+            return fileStr;
+
+        }
+
+        public UUID getUUID() {
+
+            // no UUID.
+            return null;
+
+        }
+
+        public boolean isIndexSegment() {
+
+            // not index segment.
+            return false;
+
+        }
+
+        public boolean isJournal() {
+
+            // not journal.
+            return false;
+
+        }
+
+        public long size() {
+
+            return length;
+
+        }
+
     }
 
     /**

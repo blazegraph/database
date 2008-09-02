@@ -28,7 +28,6 @@ package com.bigdata.btree;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.filter.AbstractChunkedTupleIterator;
 
 /**
  * Visits the values of a {@link Leaf} in the external key ordering. There is

@@ -37,12 +37,6 @@ public class Tuple<E> extends AbstractTuple<E> {
 
     public final AbstractBTree btree;
     
-    public int getSourceIndex() {
-        
-        return 0;
-        
-    }
-    
     public Tuple(AbstractBTree btree, int flags) {
 
         super(flags);
@@ -54,6 +48,12 @@ public class Tuple<E> extends AbstractTuple<E> {
         
     }
 
+    public int getSourceIndex() {
+        
+        return 0;
+        
+    }
+    
     public ITupleSerializer getTupleSerializer() {
 
         return btree.getIndexMetadata().getTupleSerializer();

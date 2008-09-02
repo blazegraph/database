@@ -1028,6 +1028,8 @@ public class NodeSerializer {
 
     }
 
+    
+    
     /**
      * Write out the delete markers.
      * 
@@ -1036,7 +1038,7 @@ public class NodeSerializer {
      * 
      * @throws IOException
      * 
-     * @todo customizable serializer interface configured in {@link IndexMetadata}.
+     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
      */
     protected void putDeleteMarkers(DataOutputBuffer os, ILeafData leaf)
             throws IOException {
@@ -1046,7 +1048,7 @@ public class NodeSerializer {
         if (n == 0)
             return;
 
-        OutputBitStream obs = new OutputBitStream(os, 0/* unbuffered! */);
+        final OutputBitStream obs = new OutputBitStream(os, 0/* unbuffered! */);
 
         for (int i = 0; i < n; i++) {
 
@@ -1072,9 +1074,10 @@ public class NodeSerializer {
     protected void getDeleteMarkers(DataInput is, int n, boolean[] deleteMarkers)
             throws IOException {
 
-        if(n==0) return;
-        
-        InputBitStream ibs = new InputBitStream((InputStream) is, 0/* unbuffered! */);
+        if (n == 0)
+            return;
+
+        final InputBitStream ibs = new InputBitStream((InputStream) is, 0/* unbuffered! */);
 
         for (int i = 0; i < n; i++) {
 
@@ -1095,7 +1098,7 @@ public class NodeSerializer {
      * 
      * @throws IOException
      * 
-     * @todo customizable serializer interface configured in {@link IndexMetadata}.
+     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
      * 
      * @todo Experiment with other serialization schemes. One of the more
      *       obvious would be a huffman encoding of the timestamps since I

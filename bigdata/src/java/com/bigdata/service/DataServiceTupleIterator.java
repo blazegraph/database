@@ -44,7 +44,7 @@ import com.bigdata.resources.StaleLocatorException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServiceTupleIterator extends RawDataServiceTupleIterator {
+public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> {
     
     public static final transient Logger log = Logger
             .getLogger(DataServiceTupleIterator.class);

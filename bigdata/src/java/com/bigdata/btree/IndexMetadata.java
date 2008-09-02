@@ -672,21 +672,27 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable, I
   
         this.overflowHandler = null;
         
-//        /*
-//         * FIXME I have made the default split points a bit lower for now. This
-//         * will trigger splits sooner and lead to the more interesting regions
-//         * of the phase space more quickly. Once I explore those regions a bit I
-//         * will be able to set better defaults in any case.
-//         */
-//        this.splitHandler = new DefaultSplitHandler(
-//                1 * Bytes.megabyte32, // minimumEntryCount
-//              5 * Bytes.megabyte32, // entryCountPerSplit
-////                500 * Bytes.kilobyte32, // minimumEntryCount
-////                1 * Bytes.megabyte32, // entryCountPerSplit
-//                1.5, // overCapacityMultiplier
-//                .75, // underCapacityMultiplier
-//                20   // sampleRate
-//                );
+        /*
+         * Note: Use these settings to trigger splits sooner and thus enter the
+         * more interesting regions of the phase space more quickly BUT DO NOT
+         * use these settings for deployment!
+         */
+//        final int minimumEntryCount = 1 * Bytes.kilobyte32;
+//        final int entryCountPerSplit = 5 * Bytes.megabyte32;
+        
+        /*
+         * Use these settings as the default for release/deployment.
+         */
+        final int minimumEntryCount = 500 * Bytes.kilobyte32;
+        final int entryCountPerSplit = 1 * Bytes.megabyte32;
+
+        this.splitHandler = new DefaultSplitHandler(
+                minimumEntryCount,
+                entryCountPerSplit,
+                1.5, // overCapacityMultiplier
+                .75, // underCapacityMultiplier
+                20   // sampleRate
+                );
 
     }
 
