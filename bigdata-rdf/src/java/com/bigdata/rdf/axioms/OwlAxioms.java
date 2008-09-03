@@ -88,6 +88,21 @@ public class OwlAxioms extends RdfsAxioms {
         axioms.add( valueFactory.createStatement( OWL.SAMEAS, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
         axioms.add( valueFactory.createStatement( OWL.SAMEAS, RDFS.SUBPROPERTYOF, OWL.SAMEAS, null, StatementEnum.Axiom));
  
+        // axioms for owl:inverseOf
+        axioms.add( valueFactory.createStatement( OWL.INVERSEOF, RDF.TYPE, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.INVERSEOF, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.INVERSEOF, RDFS.SUBPROPERTYOF, OWL.INVERSEOF, null, StatementEnum.Axiom));
+ 
+        // axioms for owl:Class, owl:ObjectProperty, owl:TransitiveProperty, and owl:DatatypeProperty
+        axioms.add( valueFactory.createStatement( OWL.CLASS, RDFS.SUBCLASSOF, RDFS.CLASS, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.CLASS, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDFS.SUBPROPERTYOF, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDFS.SUBPROPERTYOF, OWL.OBJECTPROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDFS.SUBPROPERTYOF, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+ 
     }
 
     final public boolean isOwlSameAs() {

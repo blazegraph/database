@@ -25,6 +25,8 @@ abstract public class BaseClosure {
     final protected boolean forwardChainOwlSameAsProperties;
     final protected boolean forwardChainOwlEquivalentProperty;
     final protected boolean forwardChainOwlEquivalentClass;
+    final protected boolean forwardChainOwlTransitiveProperty;
+    final protected boolean forwardChainOwlInverseOf;
 
     /**
      * The {@link Axioms} declared for the database.
@@ -71,6 +73,10 @@ abstract public class BaseClosure {
         forwardChainOwlEquivalentProperty = inf.forwardChainOwlEquivalentProperty;
 
         forwardChainOwlEquivalentClass = inf.forwardChainOwlEquivalentClass;
+        
+        forwardChainOwlTransitiveProperty = !rdfsOnly;
+        
+        forwardChainOwlInverseOf = !rdfsOnly;
         
     }
 

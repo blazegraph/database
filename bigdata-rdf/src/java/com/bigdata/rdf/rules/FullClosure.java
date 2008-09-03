@@ -88,6 +88,20 @@ public class FullClosure extends BaseClosure {
 
         if(!rdfsOnly) {
 
+            if (forwardChainOwlTransitiveProperty) {
+            
+                program.addStep(new RuleOwlTransitiveProperty(db,vocab));
+                
+            }
+            
+            if (forwardChainOwlInverseOf) {
+            
+                program.addStep(new RuleOwlInverseOf1(db,vocab));
+            
+                program.addStep(new RuleOwlInverseOf2(db,vocab));
+                
+            }
+            
             if (forwardChainOwlSameAsClosure) {
 
                 program.addStep(new RuleOwlSameAs1(db,vocab));
