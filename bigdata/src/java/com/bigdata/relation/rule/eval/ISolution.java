@@ -46,6 +46,9 @@ import com.bigdata.relation.rule.IRule;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <E>
+ *            The generic type of elements materialized from the head of the
+ *            rule.
  */
 public interface ISolution<E> {
 
@@ -65,7 +68,7 @@ public interface ISolution<E> {
      * @return The {@link IRule} -or- <code>null</code> if the rule was not
      *         requested.
      */
-    public IRule getRule();
+    public IRule<E> getRule();
     
     /**
      * Return the {@link IBindingSet} for this solution (optional operation).

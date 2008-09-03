@@ -30,12 +30,13 @@ package com.bigdata.service;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
@@ -316,6 +317,16 @@ public interface IBigdataClient {
 
         String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true"; 
 
+        /**
+         * The maximum extent for a {@link TemporaryStore} before a new
+         * {@link TemporaryStore} will be created by
+         * {@link IIndexStore#getTempStore()} for an {@link IBigdataClient}
+         * (default {@value #DEFAULT_TEMP_STORE_MAX_EXTENT}).
+         */
+        String TEMP_STORE_MAX_EXTENT = "tempStore.maxExtent";
+
+        String DEFAULT_TEMP_STORE_MAX_EXTENT = "" + (5 * Bytes.gigabyte);
+        
     };
 
 }

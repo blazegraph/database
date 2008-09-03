@@ -17,21 +17,29 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Efficiently resolve term identifiers in Bigdata {@link ISolution}s to
- * RDF {@link BigdataValue}s in Sesame 2 {@link BindingSet}s.
+ * Efficiently resolve term identifiers in Bigdata {@link ISolution}s to RDF
+ * {@link BigdataValue}s in Sesame 2 {@link BindingSet}s.
  * 
  * @todo The resolution of term identifiers to terms should happen during
  *       asynchronous read-ahead for even better performance (less latency).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME refactor as {@link IChunkedIterator} and alignment class converting
+ * {@link IChunkedIterator} to {@link CloseableIteration}. We should probably
+ * also refactor the {@link BigdataStatementIteratorImpl} in the same manner.
+ * The refactored classes belong in the bigdata-rdf package since they can be
+ * used outside of the SAIL context.
  */
 public class BigdataSolutionResolverator implements CloseableIteration<BindingSet, SailException>
 {

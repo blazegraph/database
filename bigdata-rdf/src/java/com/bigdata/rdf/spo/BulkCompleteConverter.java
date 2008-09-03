@@ -54,7 +54,8 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
+import com.bigdata.striterator.IChunkConverter;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Bulk completes the {@link StatementEnum} and/or statement identifier (SID)
@@ -63,18 +64,18 @@ import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BulkCompleteConverter implements SPOConverter {
+public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
 
     private final IIndex ndx;
 
-    final SPOTupleSerializer tupleSer;
+    private final SPOTupleSerializer tupleSer;
     
     /**
      * 
      * @param ndx
      *            The SPO index.
      */
-    public BulkCompleteConverter(IIndex ndx) {
+    public BulkCompleteConverter(final IIndex ndx) {
         
         this.ndx = ndx;
         
@@ -83,12 +84,20 @@ public class BulkCompleteConverter implements SPOConverter {
 
     }
 
-    public ISPO[] convert(ISPO[] chunk) {
+    public ISPO[] convert(IChunkedOrderedIterator<ISPO> src) {
 
-        if (chunk == null)
+        if (src == null)
             throw new IllegalArgumentException();
         
-        Arrays.sort(chunk, SPOComparator.INSTANCE);
+        final ISPO[] chunk = src.nextChunk();
+        
+        if (!SPOKeyOrder.SPO.equals(src.getKeyOrder())) {
+            
+            // Sort unless already in SPO order.
+            
+            Arrays.sort(chunk, SPOComparator.INSTANCE);
+            
+        }
 
 //        // Thread-local key builder.
 //        final RdfKeyBuilder keyBuilder = getKeyBuilder();

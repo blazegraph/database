@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.rdf.rules;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 import org.openrdf.model.Literal;
@@ -62,6 +61,10 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.Var;
+import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Unit tests for {@link AbstractTripleStore#match(Literal[], URI[], URI)}.
@@ -172,6 +175,8 @@ public class TestMatch extends AbstractTripleStoreTestCase {
 
                     bindingSet.put("t", chiefScientist);
 
+                    bindingSet.put("p", RDFS.LABEL);
+
                     bindingSet.put("lit", new LiteralImpl("bryan"));
                     
                     expected.put(new LiteralImpl("bryan"), bindingSet);
@@ -185,65 +190,98 @@ public class TestMatch extends AbstractTripleStoreTestCase {
 
                     bindingSet.put("t", chiefScientist);
 
+                    bindingSet.put("p", RDFS.LABEL);
+
                     bindingSet.put("lit", new LiteralImpl("bryan thompson"));
                     
                     expected.put(new LiteralImpl("bryan thompson"), bindingSet);
                     
                 }
                 
-                Iterator<Map<String, Value>> itr = store.match(//
+                final IChunkedIterator<ISolution> itr = store.match(//
                         new Literal[] { new LiteralImpl("bryan") },//
                         new URI[] { RDFS.LABEL },//
                         person//
                         );
 
-                while(itr.hasNext()) {
-                    
-                    final Map<String,Value> actualBindingSet = itr.next();
-                    
-                    if(expected.isEmpty()) {
+                try {
 
-                        fail("Nothing else is expected: found="+actualBindingSet);
-                        
+                    while (itr.hasNext()) {
+
+                        final ISolution actualSolution = itr.next();
+
+                        if (log.isInfoEnabled())
+                            log.info("Solution: " + actualSolution);
+
+                        if (expected.isEmpty()) {
+
+                            fail("Nothing else is expected: found="
+                                    + actualSolution);
+
+                        }
+
+                        final IBindingSet actualBindingSet = actualSolution
+                                .getBindingSet();
+
+                        final Literal lit = (Literal) actualBindingSet.get(Var
+                                .var("lit"));
+
+                        final Map<String, Value> expectedBindingSet = expected
+                                .remove(lit);
+
+                        if (expectedBindingSet == null) {
+
+                            fail("Not expecting: " + actualBindingSet);
+
+                        }
+
+                        assertEquals("s", expectedBindingSet.get("s"),
+                                actualBindingSet.get(Var.var("s")));
+
+                        assertEquals("t", expectedBindingSet.get("t"),
+                                actualBindingSet.get(Var.var("t")));
+
+                        assertEquals("p", expectedBindingSet.get("p"),
+                                actualBindingSet.get(Var.var("p")));
+
                     }
-                    
-                    final Literal lit = (Literal)actualBindingSet.get("lit");
-                    
-                    log.info("Found: "+lit);
-                    
-                    final Map<String,Value> expectedBindingSet = expected.remove(lit);
-                    
-                    if (expectedBindingSet == null) {
-                        
-                        fail("Not expecting: "+actualBindingSet);
-                        
+
+                    if (!expected.isEmpty()) {
+
+                        fail("Additional terms were expected: not found="
+                                + expected);
+
                     }
-                    
-                    assertEquals(expectedBindingSet,actualBindingSet);
-                    
+
+                } finally {
+
+                    itr.close();
+
                 }
 
-                if(!expected.isEmpty()) {
-                    
-                    fail("Additional terms were expected: not found="+expected);
-                    
-                }
-                
             }
-            
+                        
             /*
              * Do a completion scan on "paul". There should be NO matches since
              * there is no explicit type for that subject.
              */
             {
                 
-                Iterator<Map<String, Value>> itr = store.match(//
+                final IChunkedIterator<ISolution> itr = store.match(//
                         new Literal[] { new LiteralImpl("paul") },//
                         new URI[] { RDFS.LABEL },//
                         person//
                         );
 
-                assertFalse(itr.hasNext());
+                try {
+                
+                    assertFalse(itr.hasNext());
+                    
+                } finally {
+                    
+                    itr.close();
+                    
+                }
                 
             }
             

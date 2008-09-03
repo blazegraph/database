@@ -105,7 +105,6 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.JustificationWriter;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOConvertingIterator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
@@ -150,14 +149,13 @@ import com.bigdata.service.IClientIndex;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SingleColumnFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.ChunkedResolvingIterator;
+import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
-
-import cutthecrap.utils.striterators.EmptyIterator;
 
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
@@ -2186,7 +2184,8 @@ abstract public class AbstractTripleStore extends
         final SPOPredicate p = new SPOPredicate(//
                 new String[] { r.getNamespace() },//
                 Var.var("s"), Var.var("p"), Var.var("o"),//
-                filter//
+                false/* optional */, filter,//
+                null/* expander */
         );
 
         return getSPORelation().getAccessPath(keyOrder, p);
@@ -2916,7 +2915,7 @@ abstract public class AbstractTripleStore extends
     public IChunkedOrderedIterator<ISPO> bulkFilterStatements(
             final IChunkedOrderedIterator<ISPO> itr, final boolean present) {
         
-        return new SPOConvertingIterator(itr, new BulkFilterConverter(
+        return new ChunkedConvertingIterator(itr, new BulkFilterConverter(
                 getSPOIndex(), present));
         
     }
@@ -2937,7 +2936,7 @@ abstract public class AbstractTripleStore extends
 
     public IChunkedOrderedIterator<ISPO> bulkCompleteStatements(final IChunkedOrderedIterator<ISPO> itr) {
         
-        return new SPOConvertingIterator(itr, new BulkCompleteConverter(
+        return new ChunkedConvertingIterator(itr, new BulkCompleteConverter(
                 getSPOIndex()));
 
     }
@@ -3500,9 +3499,9 @@ abstract public class AbstractTripleStore extends
     }
     
     /**
-     * Specialized JOIN operation using the full text index to identify possible
-     * completions of the given literals for which there exists a subject
-     * <code>s</code> such that:
+     * Specialized {@link IRule} execution using the full text index to identify
+     * possible completions of the given literals for which there exists a
+     * subject <code>s</code> such that:
      * 
      * <pre>
      * SELECT ?s, ?t, ?lit
@@ -3530,16 +3529,17 @@ abstract public class AbstractTripleStore extends
      *            All subjects visited by the iterator will be instances of this
      *            class.
      * 
-     * @return An iterator visiting bindings sets. Each binding set will have
-     *         bound values for <code>s</code>, <code>t</code>, and
-     *         <code>lit</code> where those variables are defined per the
+     * @return An {@link ICloseableIterator} visiting {@link ISolution}s. The
+     *         {@link IBindingSet} for each {@link ISolution} will have bound
+     *         values for <code>s</code>, <code>t</code>, <code>p</code>,
+     *         and <code>lit</code> where those variables are defined per the
      *         pseudo-code JOIN above.
      * 
      * @throws InterruptedException
      *             if the operation is interrupted.
      */
-    public Iterator<Map<String, Value>> match(Literal[] lits, URI[] preds,
-            URI cls) {
+    public IChunkedIterator<ISolution> match(final Literal[] lits,
+            final URI[] preds, final URI cls) {
 
         if (lits == null || lits.length == 0)
             throw new IllegalArgumentException();
@@ -3575,24 +3575,24 @@ abstract public class AbstractTripleStore extends
                 
                 log.warn("No known predicates: preds="+preds);
                 
-                return EmptyIterator.DEFAULT;
-                
+                return new EmptyChunkedIterator<ISolution>(null/* keyOrder */);
+
             }
-            
+
         }
-        
+
         /*
          * Translate the class constraint into a term identifier.
          * 
          * @todo batch translate with the predicates (above).
          */
         final long _cls = getTermId(cls);
-        
+
         if (_cls == NULL) {
-         
-            log.warn("Unknown class: class="+cls);
-            
-            return EmptyIterator.DEFAULT;
+
+            log.warn("Unknown class: class=" + cls);
+
+            return new EmptyChunkedIterator<ISolution>(null/* keyOrder */);
             
         }
 
@@ -3601,7 +3601,8 @@ abstract public class AbstractTripleStore extends
          */
         final IProgram program = getMatchProgram(lits, _preds, _cls);
         
-        final int solutionFlags = IJoinNexus.ELEMENT;
+        final int solutionFlags = IJoinNexus.BINDINGS;
+//        final int solutionFlags = IJoinNexus.ELEMENT;
 
         // @todo any filter to apply here?
 		final IJoinNexus joinNexus = newJoinNexusFactory(
@@ -3616,18 +3617,20 @@ abstract public class AbstractTripleStore extends
          */
         try {
         
-            return new BindingSetIterator(//
-                  new BigdataStatementIteratorImpl(this,
-                  new ChunkedResolvingIterator<ISPO,ISolution>(joinNexus.runQuery(program)){
-
-                    @Override
-                    protected ISPO resolve(ISolution e) {
-                        
-                        return (ISPO) e.get();
-                        
-                    }
-                      
-                  }));
+            return joinNexus.runQuery(program);
+            
+//            return new BindingSetIterator(//
+//                  new BigdataStatementIteratorImpl(this,
+//                  new ChunkedResolvingIterator<ISPO,ISolution>(joinNexus.runQuery(program)){
+//
+//                    @Override
+//                    protected ISPO resolve(ISolution e) {
+//                        
+//                        return (ISPO) e.get();
+//                        
+//                    }
+//                      
+//                  }));
     
         } catch(Exception ex) {
             
@@ -3636,7 +3639,6 @@ abstract public class AbstractTripleStore extends
             throw new RuntimeException(ex);
             
         }
-
 
     }
 
@@ -3662,13 +3664,14 @@ abstract public class AbstractTripleStore extends
      *         produce {@link ISolution}s corresponding to the head of the
      *         {@link MatchRule}.
      */
-    protected Program getMatchProgram(Literal[] lits, long[] _preds,
-            long _cls) {
+    protected Program getMatchProgram(final Literal[] lits,
+            final long[] _preds, final long _cls) {
         
-        final Iterator<Long> termIdIterator = getLexiconRelation().prefixScan(lits);
+        final Iterator<Long> termIdIterator = getLexiconRelation().prefixScan(
+                lits);
 
         // the term identifier for the completed literal.
-        final IVariable<Long>lit = Var.var("lit");
+        final IVariable<Long> lit = Var.var("lit");
 
         // instantiate the rule.
         final Rule r = new MatchRule(getSPORelation().getNamespace(),
@@ -3677,7 +3680,7 @@ abstract public class AbstractTripleStore extends
         // bindings used to specialize the rule for each completed literal.
         final IBindingSet bindings = new ArrayBindingSet(r.getVariableCount());
 
-        final Program program = new Program("match",true/*parallel*/);
+        final Program program = new Program("match", true/* parallel */);
         
         // specialize and apply to each completed literal.
         while (termIdIterator.hasNext()) {

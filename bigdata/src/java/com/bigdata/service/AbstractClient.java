@@ -84,6 +84,7 @@ abstract public class AbstractClient implements IBigdataClient {
     private final int maxParallelTasksPerRequest;
     private final long taskTimeout;
     private final int indexCacheCapacity;
+    private final long tempStoreMaxExtent;
     
     /*
      * IBigdataClient API.
@@ -128,6 +129,12 @@ abstract public class AbstractClient implements IBigdataClient {
     public int getIndexCacheCapacity() {
         
         return indexCacheCapacity;
+        
+    }
+    
+    public long getTempStoreMaxExtent() {
+        
+        return tempStoreMaxExtent;
         
     }
     
@@ -255,6 +262,23 @@ abstract public class AbstractClient implements IBigdataClient {
 
             if (indexCacheCapacity <= 0)
                 throw new RuntimeException(Options.CLIENT_INDEX_CACHE_CAPACITY
+                        + " must be positive");
+
+        }
+
+        // tempStoreMaxExtent
+        {
+
+            tempStoreMaxExtent = Long.parseLong(properties.getProperty(
+                    Options.TEMP_STORE_MAX_EXTENT,
+                    Options.DEFAULT_TEMP_STORE_MAX_EXTENT));
+
+            if (log.isInfoEnabled())
+                log.info(Options.TEMP_STORE_MAX_EXTENT + "="
+                        + tempStoreMaxExtent);
+
+            if (tempStoreMaxExtent < 0)
+                throw new RuntimeException(Options.TEMP_STORE_MAX_EXTENT
                         + " must be non-negative");
 
         }

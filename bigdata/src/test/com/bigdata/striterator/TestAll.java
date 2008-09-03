@@ -67,6 +67,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestResolver.class);
         
         suite.addTestSuite(TestChunkedFilter.class);
+
+        suite.addTestSuite(TestDistinctFilter.class);
          
         return suite;
         

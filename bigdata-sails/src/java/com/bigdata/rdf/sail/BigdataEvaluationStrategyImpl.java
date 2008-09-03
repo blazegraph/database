@@ -321,9 +321,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                     o = new Constant<Long>(id);
                 }
             }
-            tails.add(new SPOPredicate(new String[] { SPO }, s, p, o,
+            tails.add(new SPOPredicate(new String[] { SPO }, s, p, o, false, // optional
                     !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
-                            : null));
+                            : null, null// expander
+                    ));
         }
         final IRule rule = new Rule(
                 "nativeJoin",

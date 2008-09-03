@@ -78,6 +78,7 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IPartitionMetadata;
@@ -1820,6 +1821,12 @@ abstract public class StoreManager extends ResourceEvents implements
         public IResourceLockService getResourceLockService() {
 
             return getFederation().getResourceLockService();
+            
+        }
+
+        public TemporaryStore getTempStore() {
+            
+            return getFederation().getTempStore();
             
         }
         

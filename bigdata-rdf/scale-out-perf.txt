@@ -2482,6 +2482,16 @@ x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
    *** FileVersionDeleter is not quite correct yet.  Make sure that we
        have good tests for the fence posts on this one.
 
+   *** Block API support is not complete for scale-out.
+
+       - iterators need to be verified for passing through the
+         sourceIndex.
+
+       - block read needs to be verified, including the behavior
+         during synchronous overflow.
+
+       - block write needs to be tuned up.
+
    *** Text indexer for the repo.
 
        - define a schema property for the text index.  if the property
@@ -2596,10 +2606,16 @@ x. ZooKeeper integration for resource lock manager?
 	   effective since the reads are local and this reduces the
 	   #of times that we will unroll the inner loop.
 
+	- NestedSubqueryJoin: Compare parallel subquery evaluation
+          with an Advancer populated with a chunk (or split of a
+          chunk).
+
 	- Change service monitors to use a singleton daemon thread
           with weak references to the queues and the counters
           (outputs) and reduce the sampling rate -- all to see if we
           can reduce the CPU burden of multiple services.
+
+	- Reduce latency for historical iterators via LDS.
 
         - Either verify overflow or disable overflow for EDS, JDS.
 
@@ -2612,8 +2628,6 @@ x. ZooKeeper integration for resource lock manager?
 
 	   - Try on a server platform for LDS, EDS, JDS.  I may be
              exhausting the machine resources.
-
-	- Change the default split point back to the default.
 
 	- During verification of scale-out data load (JDS U10)
 
@@ -2629,59 +2643,6 @@ Caused by: java.lang.IllegalStateException
 	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:145)
 	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.readData(ConcurrentDataLoader.java:1493)
 	at com.bigdata.rdf.store.ConcurrentDataLoader$ReaderTask.run(ConcurrentDataLoader.java:1404)
-
-      * Feature 1.  MikeP wants a DISTINCT option on the elements for
-        a rule.  It is easy in a chunk since the elements are in
-        sorted order and we can discard any that are equal() in the
-        sequence in which they are encountered.  If the data exceeds
-        one chunk then transparently create / use the TemporaryStore
-        (via its factory) and create an single access path relation on
-        that temporary store that is used to enforce distinct.  The
-        iterator will filter out elements that have already been
-        visited and stream through new elements so we do not have to
-        wait on the source to be exhausted before the client sees some
-        data.  (Is there a way to use the mutation API for this or
-        just hard code it?)
-
-      * Feature 2. MikeP wants an expansion pattern for predicates in
-        the tail of a rule.  The expander would see each binding set
-
-	I want to be able to 'fake' a bindingset for a particular join
-	dimension (tail) in the rule:
-
-head: S ?p ?sameO
-
-tails:
-
-?sameS sameAs S + { ?sameS = S }
-
-?sameS ?p ?o
-
-?o sameAs ?sameO + { ?sameO = ?o }
-
-or the more declarative expression.
-
-{ 
-    S ?p ?o 
-UNION 
-    S sameAs ?sameS 
-    ?sameS ?p ?o 
-} 
-OPTIONAL 
-{ 
-    ?o sameAs ?sameO 
-} 
-
-      * JDS
-
-includeInferred = true (LTS?)
-query	Time	Result#
-querySPOScan	1725	144941
-
-includeInferred = false
-BIGDATA_JDSTest_1
-query	Time	Result#
-querySPOScan	3639	100924
 
         - Jini smart proxy for ResourceLock.
 	    
@@ -2703,10 +2664,12 @@ querySPOScan	3639	100924
        for the complete set of sameAs entailments before the client
        can read the 1st triple from the iterator.
      
-     * Consider a rewrite of the owl:sameAs backchainer as a rewrite
+     4. Consider a rewrite of the owl:sameAs backchainer as a rewrite
        of the statement pattern in the query into 3 statement patterns
        that use the native rule execution to accomplish the same ends
        as the owl:sameAs backchainer.
+
+       - if we do optional, then raise it into Sesame2 query as well.
 
      * Handle inverseOf and TransitiveProperty.
 
@@ -2806,22 +2769,15 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
 ------
 
-Made many things Serializable for JiniFederation rule execution.
+*** Try JDS.U1 with full materialization (forward chain type resource
+    since we are ignoring owl:sameAs).  If this brings up the
+    performance for JDS, EDS and LDS then know WHY they are slow.
 
-Exporter is paired 1:1 with a proxied object, so returned the
-AbstractServer behavior to read its Exporter from the Configuration
-and hard-coded the Exporter setup for the proxied iterator objects.
+    Add cached range counts and see if that helps w/o forward
+    chaining.
 
-Modified the Exporter setup for the proxy iterator to specify
-[keepAlive := false].  The JVM now exits normally whether or not there
-are outstanding iterators running.
-
-Added lubm test harness options for optional closure on laod, query
-w/o inference, etc.
-
-Jini smart proxy async iterator now working for high-level query. It
-uses distributed GC to unexport the proxy once the client no longer
-strongly references the iterator proxy.
+    See if there are optimizations for type resource expansion that
+    are not in place yet.
 
 *** Spin lock waiting for full chunks for the proxied iterator and
     return the chunk itself if the iterator is exhaused in the first
@@ -2830,4 +2786,14 @@ strongly references the iterator proxy.
 *** Tune serialization for elements materialized by high-level query
     (it is using java default serialization).
 
-*** Backchaining for JDS hurts.
+*** Make sure to re-enable NIO for benchmarking in the run configs.
+
+*** Make sure that everyone is using getTempStore().
+
+*** Re-test all of bigdata-rdf and the lubm loads and query correctness.
+
+*** Refactor BigdataSolutionResolverator and then fix the match()
+    execution (bulk extractor) - it needs to resolve term identifiers
+    to Values.
+
+*** Rent checks?

@@ -47,6 +47,9 @@ Modifications:
 
 package com.bigdata.rdf.rules;
 
+import java.lang.ref.WeakReference;
+import java.util.WeakHashMap;
+
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
@@ -223,18 +226,43 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
     }
 
+    //@todo refactor singleton factory into base class or utility class.
     public IJoinNexus newInstance(IIndexManager indexManager) {
 
-        return new RDFJoinNexus(this, indexManager);
+        synchronized (joinNexusCache) {
 
+            final WeakReference<IJoinNexus> ref = joinNexusCache
+                    .get(indexManager);
+
+            IJoinNexus joinNexus = ref == null ? null : ref.get();
+
+            if (joinNexus == null) {
+
+                joinNexus = new RDFJoinNexus(this, indexManager);
+
+                joinNexusCache.put(indexManager, new WeakReference<IJoinNexus>(
+                        joinNexus));
+
+            }
+
+            return joinNexus;
+
+        }
+        
     }
 
+    private final transient WeakHashMap<IIndexManager, WeakReference<IJoinNexus>> joinNexusCache = new WeakHashMap<IIndexManager, WeakReference<IJoinNexus>>();
+    
     public long getReadTimestamp() {
+        
         return readTimestamp;
+        
     }
 
     public long getWriteTimestamp() {
+        
         return writeTimestamp;
+        
     }
 
 }

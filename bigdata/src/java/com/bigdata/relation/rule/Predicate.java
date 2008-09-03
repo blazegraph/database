@@ -54,8 +54,12 @@ public class Predicate<E> implements IPredicate<E> {
     
     private final IVariableOrConstant[] values;
     
+    private final boolean optional;
+    
     private final IElementFilter<E> constraint;
 
+    private final ISolutionExpander<E> expander;
+    
     /**
      * Copy constructor creates a new instance of this class with any unbound
      * variables overriden by their bindings from the given binding set (if
@@ -74,18 +78,22 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.values = src.values.clone();
 
+        this.optional = src.optional;
+        
         this.constraint = src.constraint;
 
+        this.expander = src.expander;
+        
         /*
          * Now override any unbound variables for which we were giving bindings.
          */
 
         int nvars = src.nvars;
         
-        for(int i=0; i<values.length && nvars>0; i++) {
-            
-            if(values[i].isConstant()) continue;
-            
+        for (int i = 0; i < values.length && nvars > 0; i++) {
+
+            if (values[i].isConstant()) continue;
+
             final IVariable var = (IVariable) values[i];
             
             final IConstant val = bindingSet.get(var);
@@ -116,16 +124,16 @@ public class Predicate<E> implements IPredicate<E> {
     protected Predicate(Predicate<E> src, String[] relationName) {
 
         if (relationName == null) {
-            
+
             throw new IllegalArgumentException();
-            
+
         }
-        
-        for(int i=0; i<relationName.length; i++) {
-            
+
+        for (int i = 0; i < relationName.length; i++) {
+
             if (relationName[i] == null)
                 throw new IllegalArgumentException();
-            
+
         }
 
         if (relationName.length == 0)
@@ -139,11 +147,16 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.values = src.values;
 
+        this.optional = src.optional;
+        
         this.constraint = src.constraint;
+        
+        this.expander = src.expander;
         
     }
     
     /**
+     * Simplified ctor.
      * 
      * @param relationName
      *            Identifies the relation to be queried.
@@ -152,21 +165,28 @@ public class Predicate<E> implements IPredicate<E> {
      */
     public Predicate(String relationName, IVariableOrConstant[] values) {
         
-        this(new String[]{relationName}, values, null/* constraint */);
+        this(new String[] { relationName }, values, false/* optional */,
+                null/* constraint */, null/*expander*/);
         
     }
 
     /**
+     * Fully specified ctor.
      * 
      * @param relationName
      *            Identifies the relation(s) in the view.
      * @param values
      *            The values (order is important!).
+     * @param optional
+     *            true iff the predicate is optional when evaluated in a JOIN.
      * @param constraint
      *            An optional constraint.
+     * @param expander
+     *            Allows selective override of the predicate evaluation.
      */
     public Predicate(String[] relationName, IVariableOrConstant[] values,
-            IElementFilter<E> constraint) {
+            boolean optional, IElementFilter<E> constraint,
+            ISolutionExpander<E> expander) {
 
         if (relationName == null)
             throw new IllegalArgumentException();
@@ -196,7 +216,11 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.values = values;
         
+        this.optional = optional;
+        
         this.constraint = constraint;
+        
+        this.expander = expander;
         
     }
     
@@ -233,12 +257,24 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
 
-    public IElementFilter<E> getConstraint() {
+    final public boolean isOptional() {
+        
+        return optional;
+        
+    }
+    
+    final public IElementFilter<E> getConstraint() {
 
         return constraint;
         
     }
 
+    final public ISolutionExpander<E> getSolutionExpander() {
+        
+        return expander;
+        
+    }
+    
     final public int getVariableCount() {
 
         return nvars;

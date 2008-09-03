@@ -162,7 +162,8 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
      *            deleted regardless as soon as the store is
      *            {@link #close() closed}.
      */
-    public TemporaryRawStore(final long maximumExtent, final int offsetBits, final File file) {
+    public TemporaryRawStore(final long maximumExtent, final int offsetBits,
+            final File file) {
         
         super(offsetBits);
         

@@ -63,7 +63,15 @@ public interface IJoinNexusFactory extends Serializable {
     long getReadTimestamp();
     
     /**
-     * New instance.
+     * Singleton factory for an {@link IJoinNexus} instance for the given
+     * <i>indexManager</i>.
+     * <p>
+     * Note: The use of a singleton pattern helps to reduce the proliferation of
+     * distinct {@link IJoinNexus} instances for a given combination of
+     * {@link IJoinNexusFactory} and {@link IIndexManager} objects. A distinct
+     * {@link IJoinNexus} instance is of course generated when the
+     * {@link IJoinNexusFactory} is de-serialized, e.g., during RMI, and when a
+     * different {@link IIndexManager} is used.
      * 
      * @param indexManager
      *            Used to locate relations and parallelize operations during

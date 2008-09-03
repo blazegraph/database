@@ -33,16 +33,13 @@ import java.util.Set;
 
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.striterator.DistinctFilter;
 
 /**
  * Conjunctive query of N {@link IPredicate}s with optional {@link IConstraint}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo support joins across RDF and non-RDF data. This will require some
- *       relaxing of assumptions concerning the type of relations in the RDF
- *       rule execution.
  * 
  * @param E
  *            The generic type of the [E]lements materialized by the head of the
@@ -53,6 +50,14 @@ import com.bigdata.relation.rule.eval.ActionEnum;
  */
 public interface IRule<E> extends IStep {
 
+    /**
+     * <code>true</code> if a {@link DistinctFilter} should be applied when
+     * the rule is evaluated as a <em>query</em>. The {@link IRule} MUST
+     * declare a {@link #getHead() head}. Solutions are considered distinct iff
+     * they have the same bindings for the {@link #getHead() head}.
+     */
+    public boolean isDistinct();
+    
     /**
      * The #of distinct variables declared by the rule.
      */

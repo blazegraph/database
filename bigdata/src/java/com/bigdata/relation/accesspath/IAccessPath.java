@@ -84,15 +84,19 @@ public interface IAccessPath<R> extends Iterable<R> {
     /**
      * The index selected for the access path.
      * <p>
-     * Note: The access path typically incorporates additional constraints from
-     * the specified {@link IPredicate} that are not present on the simple
-     * {@link IIndex} returned by this method.
+     * Note: The access path may incorporate additional constraints from the
+     * specified {@link IPredicate} that are not present on the {@link IIndex}
+     * returned by this method.
      */
     public IIndex getIndex();
     
     /**
      * The raw iterator for traversing the selected index within the key range
      * implied by {@link IPredicate}.
+     * <p>
+     * Note: The access path may incorporate additional constraints from the
+     * specified {@link IPredicate} that are not present on the raw
+     * {@link ITupleIterator} returned by this method.
      */
     public ITupleIterator<R> rangeIterator();
 
@@ -137,8 +141,7 @@ public interface IAccessPath<R> extends Iterable<R> {
     public IChunkedOrderedIterator<R> iterator(int limit, int capacity);
 
     /**
-     * Remove all elements selected by the {@link IPredicate} (batch, parallel,
-     * chunked, NO truth maintenance).
+     * Remove all elements selected by the {@link IPredicate}.
      * 
      * @return The #of elements that were removed.
      */

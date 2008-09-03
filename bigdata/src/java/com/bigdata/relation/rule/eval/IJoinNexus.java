@@ -365,5 +365,5 @@ public interface IJoinNexus {
      *             or {@link TemporaryStore}
      */
     void makeWriteSetsVisible();
-
+    
 }
