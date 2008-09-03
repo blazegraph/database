@@ -85,6 +85,11 @@ public class RDFSVocabulary extends BaseVocabulary {
         add(OWL.SAMEAS);
         add(OWL.EQUIVALENTCLASS);
         add(OWL.EQUIVALENTPROPERTY);
+        add(OWL.INVERSEOF);
+        add(OWL.CLASS);
+        add(OWL.OBJECTPROPERTY);
+        add(OWL.TRANSITIVEPROPERTY);
+        add(OWL.DATATYPEPROPERTY);
 
     }
 

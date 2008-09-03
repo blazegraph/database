@@ -43,6 +43,20 @@ public class FastClosure extends BaseClosure {
 
         if (!rdfsOnly) {
 
+            if (forwardChainOwlTransitiveProperty) {
+                
+                program.addClosureOf(new RuleOwlTransitiveProperty(db,vocab));
+                
+            }
+            
+            if (forwardChainOwlInverseOf) {
+            
+                program.addClosureOf(new RuleOwlInverseOf1(db,vocab));
+            
+                program.addClosureOf(new RuleOwlInverseOf2(db,vocab));
+                
+            }
+            
             // owl:equivalentProperty
             if (forwardChainOwlEquivalentProperty) {
 
