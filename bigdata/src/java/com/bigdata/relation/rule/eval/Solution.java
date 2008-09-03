@@ -53,7 +53,7 @@ public class Solution<E> implements ISolution<E>, Serializable {
     private static final long serialVersionUID = 5477431033714540993L;
     
     private final E e;
-    private final IRule rule;
+    private final IRule<E> rule;
     private final IBindingSet bindingSet;
     
     /**
@@ -77,7 +77,7 @@ public class Solution<E> implements ISolution<E>, Serializable {
      *             if any parameter is <code>null</code>.
      */
     @SuppressWarnings("unchecked")
-    public Solution(final IJoinNexus joinNexus, final IRule rule,
+    public Solution(final IJoinNexus joinNexus, final IRule<E> rule,
             final IBindingSet bindingSet) {
         
         if (joinNexus == null)
@@ -143,7 +143,7 @@ public class Solution<E> implements ISolution<E>, Serializable {
         
     }
 
-    public IRule getRule() {
+    public IRule<E> getRule() {
 
         return rule;
         
@@ -154,7 +154,7 @@ public class Solution<E> implements ISolution<E>, Serializable {
         return bindingSet;
         
     }
-
+    
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();

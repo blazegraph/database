@@ -62,6 +62,7 @@ import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -2105,6 +2106,25 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             return new GlobalFileSystemHelper(this).getReadCommitted();
             
         }
+
+        /**
+         * Returns an {@link TemporaryStore} local to a specific
+         * {@link AbstractTask}.
+         * <p>
+         * Note: While data can not be shared across {@link AbstractTask}s
+         * using the returned {@link TemporaryStore}, you can create an
+         * {@link ILocatableResource} on a {@link TemporaryStore} and then
+         * locate it from within the {@link AbstractTask}. This has the
+         * advantage that the isolation and read/write constraints of the
+         * {@link AbstractTask} will be imposed on access to the
+         * {@link ILocatableResource}s
+         */
+        public TemporaryStore getTempStore() {
+            
+            return tempStoreFactory.getTempStore();
+            
+        }
+        private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
         
         public IResourceLocator getResourceLocator() {
             
@@ -2451,6 +2471,25 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         }
 
+        /**
+         * Returns an {@link TemporaryStore} local to a specific
+         * {@link AbstractTask}.
+         * <p>
+         * Note: While data can not be shared across {@link AbstractTask}s
+         * using the returned {@link TemporaryStore}, you can create an
+         * {@link ILocatableResource} on a {@link TemporaryStore} and then
+         * locate it from within the {@link AbstractTask}. This has the
+         * advantage that the isolation and read/write constraints of the
+         * {@link AbstractTask} will be imposed on access to the
+         * {@link ILocatableResource}s
+         */
+        public TemporaryStore getTempStore() {
+            
+            return tempStoreFactory.getTempStore();
+            
+        }
+        private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
+        
         public DefaultResourceLocator getResourceLocator() {
             
             return resourceLocator;
@@ -2671,6 +2710,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         public void registerIndex(IndexMetadata indexMetadata) {
             delegate.registerIndex(indexMetadata);
+        }
+
+        public TemporaryStore getTempStore() {
+            return delegate.getTempStore();
         }
         
     }

@@ -45,6 +45,8 @@ import java.util.NoSuchElementException;
  *            The generic type of the elements after applying this filter. This
  *            will differ from {@link E} iff the filter is transforming the
  *            element type.
+ *            
+ * @todo This class is redundent with the {@link ChunkedConvertingIterator}
  */
 abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
         implements IFilter<I, E, F> {

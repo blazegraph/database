@@ -664,7 +664,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 : new Constant<Long>(o));
         
         return getAccessPath(new SPOPredicate(new String[] { getNamespace() },
-                S, P, O, filter));
+                S, P, O, false/* optional */, filter, null/* expander */));
         
     }
 

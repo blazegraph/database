@@ -42,6 +42,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
@@ -218,13 +219,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     }
 
     /**
-     * Align the predicate's constraint with the striterator filter constructor.
-     * 
-     * @todo redefined IElementFilter as IFilter
+     * Align the predicate's {@link IElementFilter} constraint with
+     * {@link ITupleFilter} so that the {@link IElementFilter} can be evaluated
+     * close to the data by an {@link ITupleIterator}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * @param <R>
+     *            The generic type of the elements presented to the filter.
      */
     public static class ElementFilter<R> extends TupleFilter<R> {
         
@@ -232,7 +234,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         private final IElementFilter<R> constraint;
         
-        public ElementFilter(IElementFilter<R> constraint) {
+        public ElementFilter(final IElementFilter<R> constraint) {
             
             if (constraint == null)
                 throw new IllegalArgumentException();

@@ -762,6 +762,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
     
+    public TemporaryStore getTempStore() {
+        
+        return tempStoreFactory.getTempStore();
+        
+    }
+    private final TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
+
     public DefaultResourceLocator getResourceLocator() {
 
         assertOpen();

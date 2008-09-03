@@ -52,7 +52,8 @@ import java.util.Arrays;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
-import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
+import com.bigdata.striterator.IChunkConverter;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Bulk filters for {@link ISPO}s either present or NOT present in the target
@@ -61,13 +62,13 @@ import com.bigdata.rdf.spo.SPOConvertingIterator.SPOConverter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BulkFilterConverter implements SPOConverter {
+public class BulkFilterConverter implements IChunkConverter<ISPO,ISPO> {
 
     private final IIndex ndx;
 
     private final boolean present;
 
-    final SPOTupleSerializer tupleSer;
+    private final SPOTupleSerializer tupleSer;
     
     /**
      * 
@@ -77,7 +78,7 @@ public class BulkFilterConverter implements SPOConverter {
      *            true if true, filter for statements that exist in the db,
      *            otherwise filter for statements that do not exist
      */
-    public BulkFilterConverter(IIndex ndx, boolean present) {
+    public BulkFilterConverter(final IIndex ndx, final boolean present) {
         
         this.ndx = ndx;
         
@@ -88,12 +89,20 @@ public class BulkFilterConverter implements SPOConverter {
 
     }
 
-    public ISPO[] convert(ISPO[] chunk) {
+    public ISPO[] convert(IChunkedOrderedIterator<ISPO> src) {
 
-        if (chunk == null)
+        if (src == null)
             throw new IllegalArgumentException();
         
-        Arrays.sort(chunk, SPOComparator.INSTANCE);
+        final ISPO[] chunk = src.nextChunk();
+        
+        if (!SPOKeyOrder.SPO.equals(src.getKeyOrder())) {
+            
+            // Sort unless already in SPO order.
+            
+            Arrays.sort(chunk, SPOComparator.INSTANCE);
+            
+        }
                 
 //        // Thread-local key builder.
 //        final RdfKeyBuilder keyBuilder = getKeyBuilder();

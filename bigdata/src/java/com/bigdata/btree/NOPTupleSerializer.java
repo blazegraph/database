@@ -33,7 +33,9 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Properties;
 
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 
@@ -62,16 +64,37 @@ public class NOPTupleSerializer extends DefaultTupleSerializer {
         
     }
 
+    /**
+     * Normally callers will use an {@link ASCIIKeyBuilderFactory} since
+     * Unicode support is not required 
+     * @param keyBuilderFactory
+     * 
+     * @see ASCIIKeyBuilderFactory
+     */
     public NOPTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
 
         super(keyBuilderFactory);
         
     }
 
+    /**
+     * @param obj
+     *            The key.
+     *            
+     * @return <i>obj</i> iff it is a <code>byte[]</code> and otherwise
+     *         converts <i>obj</i> to a byte[] using
+     *         {@link IKeyBuilder#append(Object)}.
+     */
     public byte[] serializeKey(Object obj) {
 
         if (obj == null)
             throw new IllegalArgumentException();
+        
+        if(obj instanceof byte[]) {
+            
+            return (byte[]) obj;
+            
+        }
         
         return getKeyBuilder().reset().append(obj).getKey();
         

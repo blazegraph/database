@@ -43,8 +43,6 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
-    public static transient final int DEFAULT_CHUNK_SIZE = 10000;
-    
     private boolean open = true;
 
     /**
@@ -99,8 +97,8 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      *            source iterator running on the server(s).
      */
     @SuppressWarnings("unchecked")
-    public ChunkedWrappedIterator(Iterator<E> src, int chunkSize,
-            IKeyOrder<E> keyOrder, final IElementFilter<E> filter) {
+    public ChunkedWrappedIterator(final Iterator<E> src, final int chunkSize,
+            final IKeyOrder<E> keyOrder, final IElementFilter<E> filter) {
         
         if (src == null)
             throw new IllegalArgumentException();

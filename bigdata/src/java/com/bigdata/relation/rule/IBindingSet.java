@@ -58,6 +58,10 @@ import com.bigdata.relation.rule.eval.RuleState;
  *       <p>
  *       The {@link IConstant} interface might have to disappear for this as
  *       well. I am not convinced that it adds much.
+ *       <p>
+ *       To obtain a {@link Var} you MUST go to the {@link IVariable} factory on
+ *       the {@link IRule}.  (It is easy to find violators since all vars are
+ *       currently assigned by a single factory.)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

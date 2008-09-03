@@ -42,9 +42,6 @@ import java.util.Iterator;
  *            The generic type of the elements visited by the source iterator.
  * @param <F>
  *            The generic type of the elements visited by the filtered iterator.
- * 
- * @todo remove {@link Serializable} - we never serialize filters, only filter
- *       constructors.  Also remove serialization identifiers from all impls.
  */
 public interface IFilter<I extends Iterator<E>, E, F> extends Serializable {
 

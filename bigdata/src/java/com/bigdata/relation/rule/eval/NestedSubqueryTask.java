@@ -31,14 +31,17 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Evaluation of an {@link IRule} using nested subquery (one or more JOINs plus
- * any filters specified for the predicates in the tail or the rule itself).
+ * any {@link IElementFilter}s specified for the predicates in the tail or
+ * {@link IConstraint}s on the {@link IRule} itself).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -348,7 +348,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      */
     synchronized public ICounterSet getCounters() {
 
-        if(counterSet==null) {
+        if (counterSet == null) {
 
             counterSet = getBasicCounterSet();
 
@@ -582,9 +582,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
          * node is clean and therefore that there are no dirty nodes or leaves
          * in the hard reference queue.
          */
-        writeRetentionQueue.clear(true/*clearRefs*/);
-        if(readRetentionQueue!=null) {
-            readRetentionQueue.clear(true/*clearRefs*/);
+        writeRetentionQueue.clear(true/* clearRefs */);
+        
+        if (readRetentionQueue != null) {
+            
+            readRetentionQueue.clear(true/* clearRefs */);
+            
         }
 
         /*

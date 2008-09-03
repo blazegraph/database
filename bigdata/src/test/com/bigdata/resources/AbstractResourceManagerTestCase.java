@@ -58,6 +58,7 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.RegisterIndexTask;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
@@ -506,6 +507,11 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public BigdataFileSystem getGlobalFileSystem() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public TemporaryStore getTempStore() {
             // TODO Auto-generated method stub
             return null;
         }

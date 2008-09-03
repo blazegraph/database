@@ -26,7 +26,9 @@ package com.bigdata.journal;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.GlobalRowStoreSchema;
@@ -68,6 +70,31 @@ public interface IIndexStore {
      * @see BigdataFileSystem
      */
     public BigdataFileSystem getGlobalFileSystem();
+    
+    /**
+     * A factory for {@link TemporaryStore}s. {@link TemporaryStore}s are
+     * thread-safe and may be used by multiple processes at once. Old
+     * {@link TemporaryStore}s are eventually retired by the factory and their
+     * storage is reclaimed once they are finalized (after they are no longer in
+     * use by any process). The decision to retire a {@link TemporaryStore} is
+     * either made implicitly, when it is no longer weakly reachable, or
+     * explicitly, when it has grown large enough that no new processes should
+     * begin using that {@link TemporaryStore}. In the latter case, the
+     * {@link TemporaryStore} will remain available to the process(es) using it
+     * and a new {@link TemporaryStore} will be allocated and made available to
+     * the caller.
+     * <p>
+     * It is important that processes do not hold a hard reference to a
+     * {@link TemporaryStore} beyond the end of the process as that will prevent
+     * the {@link TemporaryStore} from being finalized. Holding reference to an
+     * {@link AbstractBTree} created on a {@link TemporaryStore} is equivilent
+     * to holding a hard reference to the {@link TemporaryStore} itself since
+     * the {@link AbstractBTree} holds onto the backing {@link IRawStore} using
+     * a hard reference.
+     * 
+     * @return A {@link TemporaryStore}.
+     */
+    public TemporaryStore getTempStore();
     
     /**
      * Return the default locator for resources that are logical index

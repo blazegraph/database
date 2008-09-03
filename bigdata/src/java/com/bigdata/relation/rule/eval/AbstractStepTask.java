@@ -424,7 +424,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
          * means that the task will run with the live index objects when they
          * are local and with IClientIndex objects when the index is remote.
          * 
-         * Note; In general, mixtures of live and remote index objects do not
+         * Note: In general, mixtures of live and remote index objects do not
          * occur since indices are either partitioned (a federation) or
          * monolithic (a Journal).
          * 

@@ -63,6 +63,8 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TaskCounters;
+import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -101,9 +103,9 @@ abstract public class AbstractFederation implements IBigdataFederation {
     protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-    private IBigdataClient client;
+    private AbstractClient client;
     
-    public IBigdataClient getClient() {
+    public AbstractClient getClient() {
         
         assertOpen();
         
@@ -530,7 +532,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
         if (client == null)
             throw new IllegalArgumentException();
 
-        this.client = client;
+        this.client = (AbstractClient) client;
 
         final int threadPoolSize = client.getThreadPoolSize();
 
@@ -546,6 +548,9 @@ abstract public class AbstractFederation implements IBigdataFederation {
                     threadPoolSize, DaemonThreadFactory.defaultThreadFactory());
 
         }
+        
+        tempStoreFactory = new TemporaryStoreFactory(this.client
+                .getTempStoreMaxExtent());
         
         /*
          * indexCache
@@ -975,6 +980,13 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
     }
     private final GlobalFileSystemHelper globalFileSystemHelper = new GlobalFileSystemHelper(this);
+
+    public TemporaryStore getTempStore() {
+        
+        return tempStoreFactory.getTempStore();
+        
+    }
+    private final TemporaryStoreFactory tempStoreFactory;
 
     /**
      * Periodically send performance counter data to the

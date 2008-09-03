@@ -76,6 +76,12 @@ public class Rule<E> implements IRule<E> {
     final private IPredicate[] tail;
 
     /**
+     * <code>true</code> iff a DISTINCT constraint will be imposed when the
+     * rule is evaluated as a query.
+     */
+    final private boolean distinct;
+    
+    /**
      * Optional constraints on the bindings.
      */
     final private IConstraint[] constraints;
@@ -90,49 +96,55 @@ public class Rule<E> implements IRule<E> {
      */
     final private Set<IVariable> vars;
 
-    public int getVariableCount() {
+    final public int getVariableCount() {
         
         return vars.size();
         
     }
 
-    public Iterator<IVariable> getVariables() {
+    final public Iterator<IVariable> getVariables() {
         
         return vars.iterator();
         
     }
     
-    public int getTailCount() {
+    final public int getTailCount() {
         
         return tail.length;
         
     }
     
-    public IPredicate getHead() {
+    final public IPredicate getHead() {
         
         return head;
         
     }
     
-    public Iterator<IPredicate> getTail() {
+    final public Iterator<IPredicate> getTail() {
         
         return Arrays.asList(tail).iterator();
         
     }
 
-    public IPredicate getTail(int index) {
+    final public IPredicate getTail(int index) {
         
         return tail[index];
         
     }
+
+    final public boolean isDistinct() {
+        
+        return distinct;
+        
+    }
     
-    public int getConstraintCount() {
+    final public int getConstraintCount() {
         
         return constraints == null ? 0 : constraints.length;
         
     }
 
-    public IConstraint getConstraint(int index) {
+    final public IConstraint getConstraint(int index) {
         
         if (constraints == null)
             throw new IndexOutOfBoundsException();
@@ -141,7 +153,7 @@ public class Rule<E> implements IRule<E> {
         
     }
     
-    public Iterator<IConstraint> getConstraints() {
+    final public Iterator<IConstraint> getConstraints() {
         
         return Arrays.asList(constraints).iterator();
         
@@ -239,11 +251,12 @@ public class Rule<E> implements IRule<E> {
     public Rule(String name, IPredicate head, IPredicate[] tail,
             IConstraint[] constraints) {
 
-        this(name, head, tail, constraints, null/* task */);
+        this(name, head, tail, false/* distinct */, constraints, null/* task */);
         
     }
 
     /**
+     * Fully specified ctor.
      * 
      * @param name
      *            The name of the rule.
@@ -254,6 +267,9 @@ public class Rule<E> implements IRule<E> {
      *            {@link ActionEnum}.
      * @param tail
      *            The predicates in the tail of the rule.
+     * @param distinct
+     *            <code>true</code> iff a DISTINCT constraint will be applied
+     *            when the {@link IRule} is evaluated as a query.
      * @param constraints
      *            The constraints on the rule (optional).
      * @param taskFactory
@@ -261,7 +277,8 @@ public class Rule<E> implements IRule<E> {
      *            <code>null</code>).
      */
     public Rule(String name, IPredicate head, IPredicate[] tail,
-            IConstraint[] constraints, IRuleTaskFactory taskFactory) {
+            boolean distinct, IConstraint[] constraints,
+            IRuleTaskFactory taskFactory) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -338,6 +355,8 @@ public class Rule<E> implements IRule<E> {
         // make the collection immutable.
         this.vars = Collections.unmodifiableSet(vars);
 
+        this.distinct = distinct;
+        
         // constraint(s) on the variable bindings (MAY be null).
         this.constraints = constraints;
 
@@ -421,8 +440,8 @@ public class Rule<E> implements IRule<E> {
         
         final IRuleTaskFactory taskFactory = getTaskFactory();
 
-        final IRule<E> newRule = new Rule<E>(name, newHead, newTail, newConstraint,
-                taskFactory);
+        final IRule<E> newRule = new Rule<E>(name, newHead, newTail, distinct,
+                newConstraint, taskFactory);
 
         return newRule;
 

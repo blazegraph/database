@@ -109,6 +109,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 new SPOPredicate[] {//
                 new SPOPredicate(relationName, var("x"), var("{P}"), var("y")) //
                 },//
+                false, // distinct
                 null, // constraints
                 taskFactory
         );

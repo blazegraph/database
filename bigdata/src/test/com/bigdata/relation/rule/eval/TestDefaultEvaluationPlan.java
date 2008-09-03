@@ -338,7 +338,10 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         }
 
         public IRuleStatisticsFactory getRuleStatisticsFactory() {
-            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public byte[] getSortKey(ISolution solution) {
             return null;
         }
 

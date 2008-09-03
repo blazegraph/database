@@ -35,10 +35,18 @@ public class MatchRule extends Rule<SPO> {
 
     super(  "matchRule", //
             new SPOPredicate(relationName, var("s"), var("t"), lit), //
-            new SPOPredicate[] { //
-                new SPOPredicate(relationName, var("s"), var("p"), lit),//
-                new SPOPredicate(new String[]{relationName}, var("s"), vocab.getConstant(RDF.TYPE), var("t"),ExplicitSPOFilter.INSTANCE), //
-                new SPOPredicate(relationName, var("t"), vocab.getConstant(RDFS.SUBCLASSOF), cls) //
+            new SPOPredicate[] {
+                //
+                new SPOPredicate(relationName, var("s"), var("p"), lit),
+                //
+                new SPOPredicate(new String[] { relationName },
+                                var("s"), vocab.getConstant(RDF.TYPE),
+                                var("t"), false/*optional*/,
+                                ExplicitSPOFilter.INSTANCE,
+                                null/*expander*/),
+                //
+                new SPOPredicate(relationName, var("t"), vocab
+                                .getConstant(RDFS.SUBCLASSOF), cls) //
                 },
             new IConstraint[] {
                 new IN(var("p"), preds) // p IN preds

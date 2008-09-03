@@ -36,10 +36,13 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.BigdataValue;
@@ -47,6 +50,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -93,6 +97,8 @@ import com.bigdata.service.IClientIndex;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedConvertingIterator;
+import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IRemoteChunkedIterator;
@@ -1113,8 +1119,47 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
-        return (IChunkedOrderedIterator<ISolution>) runProgram(
+        IChunkedOrderedIterator<ISolution> itr = (IChunkedOrderedIterator<ISolution>) runProgram(
                 ActionEnum.Query, step);
+
+        if (step.isRule() && ((IRule) step).isDistinct()) {
+
+            /*
+             * Impose a DISTINCT constraint based on the variable bindings
+             * selected by the head of the rule. The DistinctFilter will be
+             * backed by a TemporaryStore if more than one chunk of solutions is
+             * generated. That TemporaryStore will exist on the client where the
+             * query was issued. It will be finalized when it is no longer
+             * referenced.
+             */
+
+            final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG
+                    * IRawTripleStore.N);
+            
+            itr = new ChunkedConvertingIterator<ISolution, ISolution>(itr,
+                    new DistinctFilter<ISolution>(indexManager) {
+
+                /**
+                 * Distinct iff the {s:p:o} are distinct.
+                 * 
+                 * @todo make this more general. It is hardcoded to an
+                 *       {@link ISPO} and can not handle joins on other
+                 *       relations.
+                 */
+                public byte[] getSortKey(ISolution solution) {
+
+                    final ISPO spo = (ISPO)solution.get();
+                    
+                    return keyBuilder.reset().append(spo.s()).append(
+                                    spo.p()).append(spo.o()).getKey();
+                    
+                }
+
+            });
+
+        }
+
+        return itr;
 
     }
 

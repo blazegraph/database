@@ -74,7 +74,11 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     private final int liveIndexCacheCapacity = 20;
     
     /**
+     * A {@link TemporaryStore} that can scale-up. The backing file will be
+     * created using the Java temporary file mechanism.
      * 
+     * @see WormAddressManager#SCALE_UP_OFFSET_BITS
+     * @see #getTempFile()
      */
     public TemporaryStore() {
 
@@ -83,9 +87,12 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
 
     /**
+     * A {@link TemporaryStore} provisioned with the specified <i>offsetBits</i>.
+     * The backing file will be created using the Java temporary file mechanism.
+     * 
      * @param offsetBits
      *            This determines the capacity of the store file and the maximum
-     *            length of a record.  The value is passed through to
+     *            length of a record. The value is passed through to
      *            {@link WormAddressManager#WormAddressManager(int)}.
      */
     public TemporaryStore(int offsetBits) {
@@ -399,5 +406,14 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 		return 0L;
 		
 	}
+
+    /**
+     * Always returns <i>this</i> {@link TemporaryStore}.
+     */
+    public TemporaryStore getTempStore() {
+        
+        return this;
+        
+    }
     
 }

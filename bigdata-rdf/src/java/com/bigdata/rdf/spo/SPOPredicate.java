@@ -28,6 +28,7 @@ import java.util.Arrays;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
@@ -54,8 +55,12 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     private final IVariableOrConstant<Long> o;
 
+    private final boolean optional;
+    
     private final IElementFilter<ISPO> constraint;
 
+    private final ISolutionExpander<ISPO> expander;
+    
     public String getOnlyRelationName() {
         
         if (relationName.length != 1)
@@ -83,17 +88,39 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
+    /**
+     * Partly specified ctor.
+     * 
+     * @param relationName
+     * @param s
+     * @param p
+     * @param o
+     */
     public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
-        this(new String[]{relationName}, s, p, o, null/* constraint */);
+        this(new String[] { relationName }, s, p, o, false/* optional */,
+                null/* constraint */, null/* expander */);
         
     }
     
+    /**
+     * Fully specified ctor.
+     * 
+     * @param relationName
+     * @param s
+     * @param p
+     * @param o
+     * @param constraint
+     */
     public SPOPredicate(String[] relationName,
-            IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
-            IElementFilter<ISPO> constraint) {
+            IVariableOrConstant<Long> s,//
+            IVariableOrConstant<Long> p,//
+            IVariableOrConstant<Long> o,//
+            final boolean optional,
+            IElementFilter<ISPO> constraint,//
+            ISolutionExpander<ISPO> expander
+            ) {
         
         if (relationName == null)
             throw new IllegalArgumentException();
@@ -122,8 +149,12 @@ public class SPOPredicate implements IPredicate<ISPO> {
         this.s = s;
         this.p = p;
         this.o = o;
+
+        this.optional = optional;
         
         this.constraint = constraint;
+        
+        this.expander = expander;// MAY be null.
         
     }
 
@@ -153,8 +184,12 @@ public class SPOPredicate implements IPredicate<ISPO> {
         this.o = src.o;
         
         this.relationName = relationName; // override.
+     
+        this.optional = src.optional;
         
         this.constraint = src.constraint;
+        
+        this.expander = src.expander;
         
     }
 
@@ -198,19 +233,19 @@ public class SPOPredicate implements IPredicate<ISPO> {
 //        
 //    }
 
-    public IVariableOrConstant<Long> s() {
+    final public IVariableOrConstant<Long> s() {
         
         return s;
         
     }
     
-    public IVariableOrConstant<Long> p() {
+    final public IVariableOrConstant<Long> p() {
         
         return p;
         
     }
 
-    public IVariableOrConstant<Long> o() {
+    final public IVariableOrConstant<Long> o() {
         
         return o;
         
@@ -220,7 +255,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * Return true iff all arguments of the predicate are bound (vs
      * variables).
      */
-    public boolean isFullyBound() {
+    final public boolean isFullyBound() {
 
         return !s.isVar() && !p.isVar() && !o.isVar();
 
@@ -229,7 +264,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
     /**
      * The #of arguments in the predicate that are variables (vs constants).
      */
-    public int getVariableCount() {
+    final public int getVariableCount() {
         
         return (s.isVar() ? 1 : 0) + (p.isVar() ? 1 : 0) + (o.isVar() ? 1 : 0);
         
@@ -276,7 +311,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
             }
         }
         
-        return new SPOPredicate(relationName, s, p, o, constraint);
+        return new SPOPredicate(relationName, s, p, o, optional, constraint,
+                expander);
         
     }
 
@@ -324,9 +360,21 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     }
 
-    public IElementFilter<ISPO> getConstraint() {
+    final public boolean isOptional() {
+        
+        return optional;
+        
+    }
+    
+    final public IElementFilter<ISPO> getConstraint() {
 
         return constraint;
+        
+    }
+
+    final public ISolutionExpander<ISPO> getSolutionExpander() {
+        
+        return expander;
         
     }
 
@@ -348,7 +396,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         return true;
         
     }
-    
+
 //    public boolean equals(SPOPredicate other) {
 //        
 //        if(this == other) return true;

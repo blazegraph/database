@@ -35,6 +35,7 @@ import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.ISolution;
 
 /**
@@ -84,6 +85,33 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      * The #of elements in the relation view.
      */
     public int getRelationCount();
+    
+    /**
+     * <code>true</code> iff the predicate is optional when evaluated as the
+     * right-hand side of a join. An optional predicate will match once after
+     * all matches in the data have been exhausted. By default, the match will
+     * NOT bind any variables that have been determined to be bound by the
+     * predicate based on the computed {@link IEvaluationPlan}.
+     * <p>
+     * For mutation, some {@link IRelation}s may require that all variables
+     * appearing in the head are bound. This and similar constraints can be
+     * enforced using {@link IConstraint}s on the {@link IRule}.
+     * <p>
+     * More control over the behavior of optionals may be gained through the use
+     * of an {@link ISolutionExpander} pattern.
+     * 
+     * @return <code>true</code> iff this predicate is optional when
+     *         evaluating a JOIN.
+     */
+    public boolean isOptional();
+
+    /**
+     * Returns the object that may be used to selectively override the
+     * evaluation of the predicate.
+     * 
+     * @return The {@link ISolutionExpander}.
+     */
+    public ISolutionExpander<E> getSolutionExpander();
     
     /**
      * An optional constraint on the visitable elements.
