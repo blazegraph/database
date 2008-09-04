@@ -28,9 +28,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.Properties;
 
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -85,8 +83,10 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
      */
     public BackchainOwlSameAsPropertiesSPIterator(
             IChunkedOrderedIterator<ISPO> src, long s, long p,
-            AbstractTripleStore db, final long sameAs, TemporaryStore tempStore) {
-        super(src, db, sameAs, tempStore);
+            AbstractTripleStore db, final long sameAs) {
+        
+        super(src, db, sameAs);
+        
         /*
          * Collect up additional properties (p and o values) for the known s
          * value by examining the values which are owl:sameAs s. The p might or

@@ -30,7 +30,9 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -47,6 +49,7 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
+
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.IFilter;
 import cutthecrap.utils.striterators.Resolver;

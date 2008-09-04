@@ -104,15 +104,18 @@ public class InferenceEngine {
     public static interface Options {
 
         /**
-         * When <code>true</code> (default <code>false</code>)
+         * When <code>true</code> (default
+         * {@value #DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE})
          * <code>(?x rdf:type rdfs:Resource)</code> entailments are computed
          * AND stored in the database. When <code>false</code>, rules that
          * produce those entailments are turned off such that they are neither
          * computed NOR stored and a backward chainer or magic sets technique
          * must be used to generate the entailments at query time.
          * <p>
-         * Note: The default is <code>false</code> since eagerly materializing
-         * those entailments takes a lot of time and space.
+         * Note: Eagerly materializing those entailments takes a lot of time and
+         * space but it reduces time during query IF you are asking for these
+         * entailments (many realistic queries do not). Therefore it is
+         * generally a win to turn this option off.
          * 
          * @see BackchainAccessPath
          * @see BackchainTypeResourceIterator
@@ -137,7 +140,8 @@ public class InferenceEngine {
         String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "true";
 
         /**
-         * When <code>true</code> (default <code>false</code>) the
+         * When <code>true</code> (default
+         * {@value #DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES}) the
          * entailments that replication properties between instances that are
          * identified as "the same" using <code>owl:sameAs</code> will be
          * forward chained and stored in the database. When <code>false</code>,
@@ -159,7 +163,8 @@ public class InferenceEngine {
         String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "false";
 
         /**
-         * When <code>true</code> (default <code>true</code>) the
+         * When <code>true</code> (default
+         * {@value #DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY}) the
          * entailments for <code>owl:equivilantProperty</code> are computed by
          * forward chaining and stored in the database. When <code>false</code>,
          * rules that produce those entailments are turned off such that they
@@ -174,7 +179,8 @@ public class InferenceEngine {
         String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "true";
 
         /**
-         * When <code>true</code> (default <code>true</code>) the
+         * When <code>true</code> (default
+         * {@value #DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS}) the
          * entailments for <code>owl:equivilantClass</code> are computed by
          * forward chaining and stored in the database. When <code>false</code>,
          * rules that produce those entailments are turned off such that they
@@ -189,19 +195,21 @@ public class InferenceEngine {
         String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "true";
 
         /**
-         * When <code>true</code> (default <code>true</code>) the
-         * entailments for <code>owl:InverseOf</code> are computed by
-         * forward chaining and stored in the database. When <code>false</code>,
-         * rules that produce those entailments are turned off such that they
-         * are neither computed NOR stored and a backward chainer or magic sets
-         * technique must be used to generate the entailments at query time.
+         * When <code>true</code> (default
+         * {@value #FORWARD_CHAIN_OWL_INVERSE_OF}) the entailments for
+         * <code>owl:InverseOf</code> are computed by forward chaining and
+         * stored in the database. When <code>false</code>, rules that
+         * produce those entailments are turned off such that they are neither
+         * computed NOR stored and a backward chainer or magic sets technique
+         * must be used to generate the entailments at query time.
          */
         String FORWARD_CHAIN_OWL_INVERSE_OF = "forwardChainOwlInverseOf";
 
         String DEFAULT_FORWARD_CHAIN_OWL_INVERSE_OF = "false";
 
         /**
-         * When <code>true</code> (default <code>true</code>) the
+         * When <code>true</code> (default
+         * {@value #DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY}) the
          * entailments for <code>owl:TransitiveProperty</code> are computed by
          * forward chaining and stored in the database. When <code>false</code>,
          * rules that produce those entailments are turned off such that they

@@ -505,8 +505,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         final StatementBuffer sb = new StatementBuffer(tmp, 100000/* capacity */);
 
         final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(db,
-                tmp.getIndexManager(), db.getAccessPath(NULL, NULL, NULL))
-                .iterator();
+                db.getAccessPath(NULL, NULL, NULL)).iterator();
 
         final BigdataStatementIterator itr2 = db.asStatementIterator(itr1);
 

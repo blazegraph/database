@@ -51,6 +51,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see BigdataSolutionResolverator
  */
 public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 

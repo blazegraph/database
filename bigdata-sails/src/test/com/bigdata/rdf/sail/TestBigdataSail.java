@@ -174,15 +174,15 @@ public class TestBigdataSail extends TestCase {
             
         }
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
 
         properties.setProperty(Options.FILE, file.toString());
 
-        BigdataSail sail = new BigdataSail(properties);
+        final BigdataSail sail = new BigdataSail(properties);
 
         try {
 
-            SailConnection conn = sail.getConnection();
+            final SailConnection conn = sail.getConnection();
             
             conn.close();
             
@@ -234,46 +234,54 @@ public class TestBigdataSail extends TestCase {
             
         }
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
 
         properties.setProperty(Options.FILE, file.toString());
 
-        BigdataSail sail = new BigdataSail(properties);
+        final BigdataSail sail = new BigdataSail(properties);
 
-        SailConnection conn = sail.getConnection();
+        final SailConnection conn = sail.getConnection();
         
-        SailConnection readConn = sail.asReadCommittedView();
+        final SailConnection readConn = sail.asReadCommittedView();
         
         try {
 
             final URI s = new URIImpl("http://www.bigdata.com/s");
-            
+
             final URI p = new URIImpl("http://www.bigdata.com/p");
 
             final Value o = new LiteralImpl("o");
 
             // add a statement.
             conn.addStatement(s, p, o);
-            
+
             // verify read back within the connection.
             {
-                
+
                 int n = 0;
 
-                CloseableIteration<? extends Statement, SailException> itr = conn
+                final CloseableIteration<? extends Statement, SailException> itr = conn
                         .getStatements(s, p, o, false/* includeInferred */);
 
-                while (itr.hasNext()) {
+                try {
 
-                    BigdataStatement stmt = (BigdataStatement) itr.next();
+                    while (itr.hasNext()) {
 
-                    assertEquals("subject", s, stmt.getSubject());
-                    assertEquals("predicate", p, stmt.getPredicate());
-                    assertEquals("object", o, stmt.getObject());
-//                    // @todo what value should the context have?
-//                    assertEquals("context", null, stmt.getContext());
+                        BigdataStatement stmt = (BigdataStatement) itr.next();
 
-                    n++;
+                        assertEquals("subject", s, stmt.getSubject());
+                        assertEquals("predicate", p, stmt.getPredicate());
+                        assertEquals("object", o, stmt.getObject());
+                        // // @todo what value should the context have?
+                        // assertEquals("context", null, stmt.getContext());
+
+                        n++;
+
+                    }
+
+                } finally {
+
+                    itr.close();
 
                 }
 
@@ -305,26 +313,34 @@ public class TestBigdataSail extends TestCase {
 
             // verify read back in the read-committed view.
             {
-                
+
                 int n = 0;
 
-                CloseableIteration<? extends Statement, SailException> itr = conn
+                final CloseableIteration<? extends Statement, SailException> itr = conn
                         .getStatements(s, p, o, false/* includeInferred */);
 
-                while (itr.hasNext()) {
+                try {
 
-                    BigdataStatement stmt = (BigdataStatement) itr.next();
+                    while (itr.hasNext()) {
 
-                    assertEquals("subject", s, stmt.getSubject());
-                    assertEquals("predicate", p, stmt.getPredicate());
-                    assertEquals("object", o, stmt.getObject());
-//                    // @todo what value should the context have?
-//                    assertEquals("context", null, stmt.getContext());
+                        BigdataStatement stmt = (BigdataStatement) itr.next();
 
-                    n++;
+                        assertEquals("subject", s, stmt.getSubject());
+                        assertEquals("predicate", p, stmt.getPredicate());
+                        assertEquals("object", o, stmt.getObject());
+                        // // @todo what value should the context have?
+                        // assertEquals("context", null, stmt.getContext());
 
+                        n++;
+
+                    }
+
+                } finally {
+
+                    itr.close();
+                    
                 }
-
+                
                 assertEquals("#statements visited", 1, n);
                 
             }

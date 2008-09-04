@@ -252,7 +252,7 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * Logger.
      */
-    private static final Logger log = Logger.getLogger(BigdataSail.class);
+    final protected static Logger log = Logger.getLogger(BigdataSail.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
@@ -1651,8 +1651,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * the InferenceEngine was configured.
                  */
                 
-                src = new BackchainAccessPath(database,
-                        getTemporaryStore(), accessPath).iterator();
+                src = new BackchainAccessPath(database, accessPath).iterator();
                 
             } else {
 

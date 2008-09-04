@@ -126,7 +126,9 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
 
         }
 
-        log.info("wrote "+n+" tuples of which "+updateCount+" were updated rows");
+        if (INFO)
+            log.info("wrote " + n + " tuples of which " + updateCount
+                    + " were updated rows");
         
         return updateCount;
         

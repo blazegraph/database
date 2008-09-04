@@ -83,8 +83,9 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
         super(name);
         
     }
-    
-    public void test_query() throws SailException, IOException, RDFHandlerException, QueryEvaluationException {
+
+    public void test_query() throws SailException, IOException,
+            RDFHandlerException, QueryEvaluationException {
 
         if (!((BigdataSail) sail).database.getStatementIdentifiers()) {
 
@@ -99,9 +100,11 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
          */
         {
  
-            DataLoader dataLoader = sail.database.getDataLoader();
+            final DataLoader dataLoader = sail.database.getDataLoader();
 
-            dataLoader.loadData("src/test/com/bigdata/rdf/sail/provenance01.rdf", ""/*baseURL*/, RDFFormat.RDFXML);
+            dataLoader.loadData(
+                    "src/test/com/bigdata/rdf/sail/provenance01.rdf",
+                    ""/*baseURL*/, RDFFormat.RDFXML);
             
         }
         
@@ -117,9 +120,9 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
             final String rdfXml;
             try {
 
-                Writer w = new StringWriter();
+                final Writer w = new StringWriter();
 
-                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+                final RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
 
                 rdfWriter.startRDF();
 
@@ -141,9 +144,13 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
             } finally {
 
                 try {
+                    
                     itr.close();
+
                 } catch (SailException e) {
+                    
                     throw new RuntimeException(e);
+                    
                 }
 
             }
@@ -153,7 +160,7 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
 
         }
         
-        SailConnection conn = sail.getConnection();
+        final SailConnection conn = sail.getConnection();
 
         try {
 
@@ -168,17 +175,15 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
             final Literal mike = new LiteralImpl("mike");
 
             /*
-             * This is the hand-coded query.
+             * This is a hand-coded query.
              * 
-             * FIXME Try changing the evaluation order in the hand-coded join
-             * and verify that the join is evaluated correctly. When statement
-             * identifiers are enabled, the only way to bind the context
-             * position is to already have a statement on hand - there is no
-             * index which can be used to look up a statement by its context and
-             * the context is always a blank node.
+             * Note: When statement identifiers are enabled, the only way to
+             * bind the context position is to already have a statement on hand -
+             * there is no index which can be used to look up a statement by its
+             * context and the context is always a blank node.
              */
 
-            TupleExpr tupleExpr = new Join(//
+            final TupleExpr tupleExpr = new Join(//
                     new StatementPattern(//
                             new Var("X", y),//
                             new Var("1", RDF.TYPE),//
@@ -195,14 +200,15 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
              * Note: a [null] DataSet will cause context to be ignored when the
              * query is processed.
              */
-            DatasetImpl dataSet = null; //new DatasetImpl();
+            final DatasetImpl dataSet = null; //new DatasetImpl();
 
-            BindingSet bindingSet = new QueryBindingSet();
+            final BindingSet bindingSet = new QueryBindingSet();
 
-            CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
+            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
                     .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
 
-            log.info("Verifying query.");
+            if (log.isInfoEnabled())
+                log.info("Verifying query.");
 
             /*
              * These are the expected results for the query (the bindings for Y).
@@ -226,11 +232,11 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
 
                 while (itr.hasNext()) {
 
-                    BindingSet solution = itr.next();
+                    final BindingSet solution = itr.next();
 
                     System.out.println("solution[" + i + "] : " + solution);
 
-                    Value actual = solution.getValue("Y");
+                    final Value actual = solution.getValue("Y");
 
                     assertTrue("Not expecting Y=" + actual, expected
                             .remove(actual));

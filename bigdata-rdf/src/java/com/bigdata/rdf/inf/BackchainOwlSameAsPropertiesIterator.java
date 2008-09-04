@@ -31,12 +31,10 @@ import java.io.StringWriter;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -111,39 +109,34 @@ public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIter
      * @param sameAs
      *            The term identifier that corresponds to owl:sameAs for the
      *            database.
-     * @param tempStore
-     *            A {@link TemporaryStore} that may be used to create
-     *            {@link TempTripleStore}s to support scalable processing of
-     *            sameAs queries.
      */
     public BackchainOwlSameAsPropertiesIterator(
             IChunkedOrderedIterator<ISPO> src, long s, long p, long o,
-            AbstractTripleStore db, final long sameAs,
-            TemporaryStore tempStore) {
+            AbstractTripleStore db, final long sameAs) {
 
         if (s != NULL && o != NULL) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesSPOIterator(
-                            src, s, p, o, db, sameAs,tempStore);
+                            src, s, p, o, db, sameAs);
             
         } else if (s != NULL && o == NULL) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesSPIterator(
-                            src, s, p, db, sameAs,tempStore);
+                            src, s, p, db, sameAs);
             
         } else if (s == NULL && o != NULL) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesPOIterator(
-                            src, p, o, db, sameAs,tempStore);
+                            src, p, o, db, sameAs);
             
         } else if (s == NULL && o == NULL) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesPIterator(
-                            src, p, db, sameAs,tempStore);
+                            src, p, db, sameAs);
             
         } else throw new AssertionError();
         

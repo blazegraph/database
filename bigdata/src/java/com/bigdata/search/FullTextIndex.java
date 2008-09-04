@@ -252,18 +252,18 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class FullTextIndex extends AbstractRelation {
 
-    final public Logger log = Logger.getLogger(FullTextIndex.class);
+    final protected static Logger log = Logger.getLogger(FullTextIndex.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
     
     /**
@@ -405,7 +405,8 @@ public class FullTextIndex extends AbstractRelation {
             overwrite = Boolean.parseBoolean(properties.getProperty(
                     Options.OVERWRITE, Options.DEFAULT_OVERWRITE));
 
-            log.info(Options.OVERWRITE + "=" + overwrite);
+            if (INFO)
+                log.info(Options.OVERWRITE + "=" + overwrite);
 
         }
 
@@ -415,6 +416,7 @@ public class FullTextIndex extends AbstractRelation {
             timeout = Long.parseLong(properties.getProperty(
                     Options.INDEXER_TIMEOUT, Options.DEFAULT_INDEXER_TIMEOUT));
 
+            if (INFO)
             log.info(Options.INDEXER_TIMEOUT+ "=" + timeout);
 
         }
@@ -457,7 +459,7 @@ public class FullTextIndex extends AbstractRelation {
 
             indexManager.registerIndex(indexMetadata);
 
-            if (log.isInfoEnabled())
+            if(INFO)
                 log.info("Registered new text index: name=" + name);
 
             ndx = getIndex(name);
@@ -472,7 +474,8 @@ public class FullTextIndex extends AbstractRelation {
 
     public void destroy() {
 
-        log.info("");
+        if (INFO)
+            log.info("");
 
         assertWritable();
 
@@ -859,7 +862,13 @@ public class FullTextIndex extends AbstractRelation {
     public void index(TokenBuffer buffer, long docId, int fieldId,
             String languageCode, Reader r) {
 
-        assertWritable();
+        /*
+         * Note: You can invoke this on a read-only index. It is only overflow
+         * of the TokenBuffer that requires a writable index. Overflow itself
+         * will only occur on {document,field} tuple boundaries, so it will
+         * never overflow when indexing a search query.
+         */
+//        assertWritable();
         
         int n = 0;
         
@@ -1134,14 +1143,14 @@ public class FullTextIndex extends AbstractRelation {
         if (maxRank <= 0)
             throw new IllegalArgumentException();
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("languageCode=[" + languageCode + "], text=[" + query + "]");
 
         // tokenize the query.
         final TermFrequencyData qdata;
         {
             
-            TokenBuffer buffer = new TokenBuffer(1,this);
+            final TokenBuffer buffer = new TokenBuffer(1, this);
             
             index(buffer, 0L/*docId*/, 0/*fieldId*/, languageCode, new StringReader(query));
             
@@ -1219,15 +1228,17 @@ public class FullTextIndex extends AbstractRelation {
          * hits.
          */
         
-        log.info("Rank ordering "+nhits+" hits by relevance");
+        if (INFO)
+            log.info("Rank ordering "+nhits+" hits by relevance");
         
-        Hit[] a = hits.values().toArray(new Hit[0]);
+        final Hit[] a = hits.values().toArray(new Hit[0]);
         
         Arrays.sort(a);
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: "+nhits+" hits in "+elapsed+"ms");
+        if (INFO)
+            log.info("Done: " + nhits + " hits in " + elapsed + "ms");
 
         /*
          * Note: The caller will only see those documents which satisify both

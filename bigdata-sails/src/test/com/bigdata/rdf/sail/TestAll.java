@@ -68,8 +68,9 @@ public class TestAll extends TestCase {
         /*
          * log4j defaults to DEBUG which will produce simply huge amounts of
          * logging information when running the unit tests. Therefore we
-         * explicitly set the default logging level to WARN. If you are using a
-         * log4j configuration file then this is unlikely to interact with your
+         * explicitly set the default logging level to WARN unless it has
+         * already been set to another value. If you are using a log4j
+         * configuration file then this is unlikely to interact with your
          * configuration, and in any case you can override specific loggers.
          */
         {
@@ -100,44 +101,8 @@ public class TestAll extends TestCase {
         // test of high-level query on a graph with statements about statements.
         suite.addTestSuite(TestProvenanceQuery.class);
         
-// FIXME Restore the following tests after adapting to Sesame 2.x
+// Restore the following tests after adapting to Sesame 2.x
 //        
-//        // test suite for SAIL transaction semantics.
-//        suite.addTestSuite(TestSAILTransactionSemantics.class);
-//
-//        /*
-//         * @todo write a test to verify that concurrent attempts to start a
-//         * transaction using startTransaction() will be serialized such that
-//         * only a single writer is allowed.
-//         * 
-//         * @todo write BigdataReadCommittedRdf(Schema)Repository classes and
-//         * verify that concurrent readers against those classes are allowed
-//         * while writers are serialized by the BigdataRdf(Schema)Repository.
-//         * 
-//         * @todo if we support full transactions, then concurrent readers and
-//         * writers should be allowed by the SAIL. in this case use thread local
-//         * variables to associate the tx with the thread. readers will still use
-//         * read-committed semantics since there is no means to create a
-//         * read-only transaction with the SAIL.
-//         */
-//        
-//        // test suite for access to the statement type.
-//        suite.addTestSuite(TestStatementWithType.class);
-//        
-//        // test suite for entailments.
-//        suite.addTestSuite(TestEntailments.class);
-//        
-//        // test suite for RDFS closure correctness.
-//        suite.addTestSuite(TestRDFSClosure.class);
-//
-//        // test suite for RDFS closure correctness with incremental load (TM).
-//        suite.addTestSuite(TestRDFSIncrementalClosure.class);
-//
-//        // test suite for RDFS closure correctness with incremental delete (TM).
-//        suite.addTestSuite(TestRDFSTruthMaintenance.class);
-// -----------------
-        
-        
 //        /*
 //         * Pickup the Sesame 1.x test suite.
 //         * 

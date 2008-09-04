@@ -63,8 +63,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.Var;
-import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Unit tests for {@link AbstractTripleStore#match(Literal[], URI[], URI)}.
@@ -198,7 +197,7 @@ public class TestMatch extends AbstractTripleStoreTestCase {
                     
                 }
                 
-                final IChunkedIterator<ISolution> itr = store.match(//
+                final ICloseableIterator<IBindingSet> itr = store.match(//
                         new Literal[] { new LiteralImpl("bryan") },//
                         new URI[] { RDFS.LABEL },//
                         person//
@@ -208,24 +207,23 @@ public class TestMatch extends AbstractTripleStoreTestCase {
 
                     while (itr.hasNext()) {
 
-                        final ISolution actualSolution = itr.next();
+                        final IBindingSet actualBindingSet= itr.next();
 
                         if (log.isInfoEnabled())
-                            log.info("Solution: " + actualSolution);
+                            log.info(actualBindingSet.toString());
 
                         if (expected.isEmpty()) {
 
                             fail("Nothing else is expected: found="
-                                    + actualSolution);
+                                    + actualBindingSet);
 
                         }
-
-                        final IBindingSet actualBindingSet = actualSolution
-                                .getBindingSet();
 
                         final Literal lit = (Literal) actualBindingSet.get(Var
                                 .var("lit"));
 
+                        assertNotNull("lit not bound: "+actualBindingSet, lit);
+                        
                         final Map<String, Value> expectedBindingSet = expected
                                 .remove(lit);
 
@@ -267,7 +265,7 @@ public class TestMatch extends AbstractTripleStoreTestCase {
              */
             {
                 
-                final IChunkedIterator<ISolution> itr = store.match(//
+                final ICloseableIterator<IBindingSet> itr = store.match(//
                         new Literal[] { new LiteralImpl("paul") },//
                         new URI[] { RDFS.LABEL },//
                         person//

@@ -70,30 +70,25 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
     private final static transient long NULL = IRawTripleStore.NULL;
 
     final private AbstractTripleStore database;
-    final private TemporaryStore tempStore;
     final private IAccessPath<ISPO> accessPath;
 
     /**
      * 
      * @param database
      *            The database whose entailments will be backchained.
-     * @param tempStore
-     *            To be used by the backchainers.
      * @param accessPath
      *            The source {@link IAccessPath}.
      */
-    public BackchainAccessPath(AbstractTripleStore database, TemporaryStore tempStore,
+    public BackchainAccessPath(AbstractTripleStore database,
             IAccessPath<ISPO> accessPath) {
 
         if (database == null)
             throw new IllegalArgumentException();
-        
+
         if (accessPath == null)
             throw new IllegalArgumentException();
 
         this.database = database;
-        
-        this.tempStore = tempStore;
         
         this.accessPath = accessPath;
         
@@ -210,7 +205,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
                         src,//
                         spo.s, spo.p, spo.o,//
                         database, //
-                        owlSameAs, tempStore);
+                        owlSameAs);
             }
             
         } else {

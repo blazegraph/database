@@ -34,18 +34,18 @@ import com.bigdata.rawstore.Bytes;
  */
 public class ReadIndexTask implements Callable<Object> {
 
-    final public Logger log = Logger.getLogger(ReadIndexTask.class);
+    final protected static Logger log = Logger.getLogger(ReadIndexTask.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
     private final String queryTerm;
@@ -94,20 +94,23 @@ public class ReadIndexTask implements Callable<Object> {
      *         {@link Long}.
      */
     public Long call() throws Exception {
-        
-        long nhits = 0;
-        
-        if(DEBUG) {
-            
-            log.debug("queryTerm="+queryTerm+", termWeight="+queryTermWeight);
-            
-        }
-        
-        while(itr.hasNext()) {
 
-            if(Thread.currentThread().isInterrupted()) {
-                
-                log.info("Interrupted: queryTerm="+queryTerm+", nhits="+nhits);
+        long nhits = 0;
+
+        if (DEBUG) {
+
+            log.debug("queryTerm=" + queryTerm + ", termWeight="
+                    + queryTermWeight);
+
+        }
+
+        while (itr.hasNext()) {
+
+            if (Thread.currentThread().isInterrupted()) {
+
+                if (INFO)
+                    log.info("Interrupted: queryTerm=" + queryTerm + ", nhits="
+                            + nhits);
                 
                 break;
                 

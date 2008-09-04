@@ -52,6 +52,11 @@ public class Rule<E> implements IRule<E> {
      * Singleton factory for {@link Var}s (delegates to {@link Var#var(String)}).
      * 
      * @see Var#var(String)
+     * 
+     * @todo it is a good idea to use this factory rather than
+     *       {@link Var#var(String)} as the latter MAY be replaced by
+     *       per-rule-instance variables rather than globally canonical
+     *       variables.
      */
     static protected Var var(String name) {
     

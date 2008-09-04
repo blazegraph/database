@@ -23,18 +23,18 @@ import com.bigdata.io.ByteArrayBuffer;
  */
 public class TokenBuffer {
 
-    final public Logger log = Logger.getLogger(TokenBuffer.class);
+    final protected static Logger log = Logger.getLogger(TokenBuffer.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final protected static  boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final protected static  boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
     /** The object on which the buffer will write when it overflows. */
@@ -65,7 +65,7 @@ public class TokenBuffer {
     private long lastFieldId;
 
     /**
-     * 
+     * Ctor.
      * @param capacity
      *            The #of distinct {document,field} tuples that can be held in
      *            the buffer before it will overflow. The buffer will NOT
@@ -277,7 +277,8 @@ public class TokenBuffer {
             
         }
         
-        log.info("count="+count+", ndocs="+ndocs+", nfields="+nfields+", nterms="+nterms);
+        if (INFO)
+            log.info("count="+count+", ndocs="+ndocs+", nfields="+nfields+", nterms="+nterms);
         
         /*
          * Generate keys[] and vals[].
@@ -343,11 +344,11 @@ public class TokenBuffer {
          * @todo vals[] not used if only the token presence is recorded.
          */
 
-        byte[][] keys = new byte[nterms][];
+        final byte[][] keys = new byte[nterms][];
         
-        byte[][] vals = new byte[nterms][];
+        final byte[][] vals = new byte[nterms][];
         
-        for(int i=0; i<nterms; i++) {
+        for (int i = 0; i < nterms; i++) {
             
             keys[i] = a[i].key;
 
@@ -372,8 +373,8 @@ public class TokenBuffer {
      * 
      * @return The #of pre-existing records that were updated.
      */
-    protected long writeOnIndex(int n,byte[][] keys, byte[][]vals) {
-        
+    protected long writeOnIndex(int n, byte[][] keys, byte[][] vals) {
+
         final IntegerAggregator resultHandler = new IntegerAggregator();
         
         textIndexer.getIndex().submit(0, //fromIndex
