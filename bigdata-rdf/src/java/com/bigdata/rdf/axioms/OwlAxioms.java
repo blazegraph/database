@@ -95,14 +95,30 @@ public class OwlAxioms extends RdfsAxioms {
  
         // axioms for owl:Class, owl:ObjectProperty, owl:TransitiveProperty, and owl:DatatypeProperty
         axioms.add( valueFactory.createStatement( OWL.CLASS, RDFS.SUBCLASSOF, RDFS.CLASS, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.CLASS, RDFS.SUBCLASSOF, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.CLASS, RDFS.SUBCLASSOF, OWL.CLASS, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.CLASS, RDF.TYPE, RDFS.CLASS, null, StatementEnum.Axiom));
         axioms.add( valueFactory.createStatement( OWL.CLASS, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
-        axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDFS.SUBPROPERTYOF, RDF.PROPERTY, null, StatementEnum.Axiom));
+        
+        axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDFS.SUBCLASSOF, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDFS.SUBCLASSOF, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDFS.SUBCLASSOF, OWL.OBJECTPROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDF.TYPE, RDFS.CLASS, null, StatementEnum.Axiom));
         axioms.add( valueFactory.createStatement( OWL.OBJECTPROPERTY, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
-        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDFS.SUBPROPERTYOF, OWL.OBJECTPROPERTY, null, StatementEnum.Axiom));
+
+        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDFS.SUBCLASSOF, OWL.OBJECTPROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDFS.SUBCLASSOF, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDFS.SUBCLASSOF, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDFS.SUBCLASSOF, OWL.TRANSITIVEPROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDF.TYPE, RDFS.CLASS, null, StatementEnum.Axiom));
         axioms.add( valueFactory.createStatement( OWL.TRANSITIVEPROPERTY, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
-        axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDFS.SUBPROPERTYOF, RDF.PROPERTY, null, StatementEnum.Axiom));
+
+        axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDFS.SUBCLASSOF, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDFS.SUBCLASSOF, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDFS.SUBCLASSOF, OWL.DATATYPEPROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDF.TYPE, RDFS.CLASS, null, StatementEnum.Axiom));
         axioms.add( valueFactory.createStatement( OWL.DATATYPEPROPERTY, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
- 
+        
     }
 
     final public boolean isOwlSameAs() {
