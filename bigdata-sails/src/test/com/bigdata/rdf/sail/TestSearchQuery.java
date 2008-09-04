@@ -77,7 +77,7 @@ import com.bigdata.rdf.store.BNS;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSearchQuery extends AbstractBigdataSailTestCase {
+public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
     public TestSearchQuery() {
         
@@ -102,112 +102,137 @@ public class TestSearchQuery extends AbstractBigdataSailTestCase {
         }
     }
 
-    /**
-     * Overriden to use a persistent backing store.
-     */
-    public Properties getProperties() {
-        
-        Properties properties = super.getProperties();
-        
-        // use a disk-based mode since we will re-open the store to test restart safety.
-        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+//    /**
+//     * Overriden to use a persistent backing store.
+//     */
+//    public Properties getProperties() {
+//        
+//        Properties properties = super.getProperties();
+//        
+//        // use a disk-based mode since we will re-open the store to test restart safety.
+//        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+//
+//        properties.setProperty(Options.FILE,file.toString());
+//        
+//        return properties;
+//        
+//    }
 
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return properties;
-        
-    }
-
-    /**
-     * Overriden to cause the backing store to be deleted.
-     */
-    protected void tearDown() throws Exception {
+//    /**
+//     * Overriden to cause the backing store to be deleted.
+//     */
+//    protected void tearDown() throws Exception {
+//    
+//        if (sail != null) {
+//
+//            sail.getDatabase().closeAndDelete();
+//
+//        }
+//        
+//    }
     
-        if (sail != null) {
+    public void test_query() throws SailException, IOException,
+            RDFHandlerException, QueryEvaluationException {
 
-            sail.getDatabase().closeAndDelete();
+        // overriden to use a disk-backed file.
+        final Properties properties = super.getProperties();
 
-        }
-        
-    }
-    
-    public void test_query() throws SailException, IOException, RDFHandlerException, QueryEvaluationException {
+        // use a disk-based mode since we will re-open the store to test restart
+        // safety.
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-        if (!sail.database.getStatementIdentifiers()) {
+        properties.setProperty(Options.CREATE_TEMP_FILE, "false");
 
-            log.warn("Statement identifiers are not enabled");
+        properties.setProperty(Options.FILE, file.toString());
 
-            return;
+        BigdataSail sail = getSail(properties);
 
-        }
+        try {
 
-        /*
-         * Load data into the sail.
-         */
-        {
- 
-            StatementBuffer sb = new StatementBuffer(sail.database,100/*capacity*/);
-            
-            sb.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
-                    new LiteralImpl("Yellow Rose"));
+//            if (!sail.database.getStatementIdentifiers()) {
+//
+//                log.warn("Statement identifiers are not enabled");
+//
+//                return;
+//
+//            }
 
-            sb.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
-                    new LiteralImpl("Red Rose"));
-
-            sb.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
-                    new LiteralImpl("Old Yellow House"));
-
-            sb.flush();
-            
             /*
-             * Commit the changes to the database.
+             * Load data into the sail.
              */
-            sail.getDatabase().commit();
+            {
+
+                StatementBuffer sb = new StatementBuffer(sail.database, 100/* capacity */);
+
+                sb.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
+                        new LiteralImpl("Yellow Rose"));
+
+                sb.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
+                        new LiteralImpl("Red Rose"));
+
+                sb.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
+                        new LiteralImpl("Old Yellow House"));
+
+                sb.flush();
+
+                /*
+                 * Commit the changes to the database.
+                 */
+                sail.getDatabase().commit();
+
+            }
+
+            log.info("#statements before search: "
+                    + sail.database.getExactStatementCount());
+
+            doSearchTest(((BigdataSail) sail).getConnection());
+
+            doSearchTest(((BigdataSail) sail).asReadCommittedView());
+
+            log.info("#statements before restart: "
+                    + sail.database.getExactStatementCount());
+
+            // re-open the SAIL.
+            sail = reopenSail(sail);
+
+            log.info("#statements after restart: "
+                    + sail.database.getExactStatementCount());
+
+            doSearchTest(((BigdataSail) sail).getConnection());
+
+            doSearchTest(((BigdataSail) sail).asReadCommittedView());
+            
+        } finally {
+
+            sail.shutdownAndDelete();
 
         }
-
-        System.err.println("#statements before search: "+sail.database.getExactStatementCount());
-
-        doSearchTest(((BigdataSail)sail).getConnection());
-
-        doSearchTest(((BigdataSail)sail).asReadCommittedView());
-
-        System.err.println("#statements before restart: "+sail.database.getExactStatementCount());
-
-        sail.shutDown();
-
-        sail = new BigdataSail(getProperties());
-
-        System.err.println("#statements after restart: "+sail.database.getExactStatementCount());
-
-        doSearchTest(((BigdataSail)sail).getConnection());
-
-        doSearchTest(((BigdataSail)sail).asReadCommittedView());
         
     }
 
     /**
      * This runs a hand-coded query corresponding to a SPARQL query using the
-     * bigdata:search magic predicate.
+     * {@link BNS#SEARCH} magic predicate.
      * 
      * <pre>
      * select ?evidence
      * where
      * { ?evidence rdf:type &lt;the type&gt; .
-     * ?evidence ?anypredicate ?label .
-     *      ?label bigdata:search &quot;the query&quot; .
-     *      }
+     *   ?evidence ?anypredicate ?label .
+     *   ?label bigdata:search &quot;the query&quot; .
+     * }
      * </pre>
      */
-    protected void doSearchTest(SailConnection conn) throws SailException, QueryEvaluationException {
+    protected void doSearchTest(SailConnection conn) throws SailException,
+            QueryEvaluationException {
       
         try {
 
-            TupleExpr tupleExpr = new StatementPattern(//
+            final TupleExpr tupleExpr = new StatementPattern(//
                     new Var("X"),//
                     new Var("1", new URIImpl(BNS.SEARCH)),//
                     new Var("2", new LiteralImpl("Yellow"))//
-            );
+                    );
 
             /*
              * Create a data set consisting of the contexts to be queried.
@@ -215,44 +240,46 @@ public class TestSearchQuery extends AbstractBigdataSailTestCase {
              * Note: a [null] DataSet will cause context to be ignored when the
              * query is processed.
              */
-            DatasetImpl dataSet = null; //new DatasetImpl();
+            final DatasetImpl dataSet = null; //new DatasetImpl();
 
-            BindingSet bindingSet = new QueryBindingSet();
+            final BindingSet bindingSet = new QueryBindingSet();
 
-            CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
+            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
                     .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
+
+            try {
 
             log.info("Verifying query.");
 
-            /*
-             * These are the expected results for the query (the bindings for X).
-             */
+                /*
+                 * These are the expected results for the query (the bindings
+                 * for X).
+                 */
 
-            final Set<Value> expected = new HashSet<Value>();
+                final Set<Value> expected = new HashSet<Value>();
 
-            expected.add(new LiteralImpl("Yellow Rose"));
-            
-            expected.add(new LiteralImpl("Old Yellow House"));
-            
-            /*
-             * Verify that the query results is the correct solutions.
-             */
+                expected.add(new LiteralImpl("Yellow Rose"));
 
-            final int nresults = expected.size();
-            
-            try {
+                expected.add(new LiteralImpl("Old Yellow House"));
+
+                /*
+                 * Verify that the query results is the correct solutions.
+                 */
+
+                final int nresults = expected.size();
 
                 int i = 0;
 
                 while (itr.hasNext()) {
 
-                    BindingSet solution = itr.next();
+                    final BindingSet solution = itr.next();
 
                     System.out.println("solution[" + i + "] : " + solution);
 
-                    Value actual = solution.getValue("X");
+                    final Value actual = solution.getValue("X");
 
-                    System.out.println("X[" + i + "] = " + actual +" ("+actual.getClass().getName()+")");
+                    System.out.println("X[" + i + "] = " + actual + " ("
+                            + actual.getClass().getName() + ")");
 
                     assertTrue("Not expecting X=" + actual, expected
                             .remove(actual));
@@ -276,7 +303,12 @@ public class TestSearchQuery extends AbstractBigdataSailTestCase {
         }
 
     }
-    
+
+    /**
+     * Unit test used to track down a commit problem.
+     * 
+     * @throws Exception
+     */
     public void test_restart() throws Exception {
 
         final boolean doYouWantMeToBreak = true;
@@ -308,107 +340,139 @@ public class TestSearchQuery extends AbstractBigdataSailTestCase {
                     new LiteralImpl("SYSTAP")));
         }
         
-        /*
-         * Setup the repo over the existing sail (the sail was setup by the test
-         * harness).
-         */
-        
-        BigdataSailRepository repo = new BigdataSailRepository(sail);
-        {
-            repo.initialize();
-        }
-        
-        { // load ontology and optionally the entity data.
-            final RepositoryConnection cxn = repo.getConnection();
-            cxn.setAutoCommit(false);
-            try {
-                log.info("loading ontology");
-                cxn.add(test_restart_1);
-                if (!doYouWantMeToBreak) {
-                    // optionally load the entity data here.
-                    log.info("loading entity data");
-                    cxn.add(test_restart_2);
-                }
-                cxn.commit();
-            } catch (Exception ex) {
-                cxn.rollback();
-                throw ex;
-            } finally {
-                cxn.close();
-            }
-        }
-        
-        if (doYouWantMeToBreak) {
-            // load the entity data.
-            final RepositoryConnection cxn = repo.getConnection();
-            cxn.setAutoCommit(false);
-            try {
-                    log.info("loading entity data");
-                    cxn.add(test_restart_2);
-                    cxn.commit();
-            } catch (Exception ex) {
-                cxn.rollback();
-                throw ex;
-            } finally {
-                cxn.close();
-            }
-        }
-        
-        { // run the query (free text search)
-            final String query = 
-                "construct { ?s <"+RDF.TYPE+"> <"+ENTITY+"> . } " +
-                "where     { ?s <"+RDF.TYPE+"> <"+ENTITY+"> . ?s ?p ?lit . ?lit <"+BNS.SEARCH+"> \"systap\" . }";
-            final RepositoryConnection cxn = repo.getConnection();
-            try {
-                // silly construct queries, can't guarantee distinct results
-                final Set<Statement> results = new LinkedHashSet<Statement>();
-                final GraphQuery graphQuery = 
-                    cxn.prepareGraphQuery(
-                        QueryLanguage.SPARQL, query);
-                graphQuery.evaluate(new StatementCollector(results));
-                for(Statement stmt : results) {
-                    log.info(stmt);
-                }
-                assertTrue(results.contains(new StatementImpl(SYSTAP, RDF.TYPE, ENTITY)));
-            } finally {
-                cxn.close();
-            }
-        }
-        
-        // shutdown the KB and the backing database.
-        repo.shutDown();
+        // overriden to use a disk-backed file.
+        final Properties properties = super.getProperties();
 
-        // re-open the backing database and the KB.
-        sail = new BigdataSail(getProperties());
-        
-        // setup the repo again.
-        repo = new BigdataSailRepository(sail);
-        {
-            repo.initialize();
+        // use a disk-based mode since we will re-open the store to test restart
+        // safety.
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+
+        properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+
+        properties.setProperty(Options.FILE, file.toString());
+
+        BigdataSail sail = getSail(properties);
+
+        try {
+
+            /*
+             * Setup the repo over the sail.
+             */
+
+            {
+
+                final BigdataSailRepository repo = new BigdataSailRepository(
+                        sail);
+
+                repo.initialize();
+
+                { // load ontology and optionally the entity data.
+                    final RepositoryConnection cxn = repo.getConnection();
+                    cxn.setAutoCommit(false);
+                    try {
+                        log.info("loading ontology");
+                        cxn.add(test_restart_1);
+                        if (!doYouWantMeToBreak) {
+                            // optionally load the entity data here.
+                            log.info("loading entity data");
+                            cxn.add(test_restart_2);
+                        }
+                        cxn.commit();
+                    } catch (Exception ex) {
+                        cxn.rollback();
+                        throw ex;
+                    } finally {
+                        cxn.close();
+                    }
+                }
+
+                if (doYouWantMeToBreak) {
+                    // load the entity data.
+                    final RepositoryConnection cxn = repo.getConnection();
+                    cxn.setAutoCommit(false);
+                    try {
+                        log.info("loading entity data");
+                        cxn.add(test_restart_2);
+                        cxn.commit();
+                    } catch (Exception ex) {
+                        cxn.rollback();
+                        throw ex;
+                    } finally {
+                        cxn.close();
+                    }
+                }
+
+                { // run the query (free text search)
+                    final String query = "construct { ?s <" + RDF.TYPE + "> <"
+                            + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
+                            + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
+                            + BNS.SEARCH + "> \"systap\" . }";
+                    final RepositoryConnection cxn = repo.getConnection();
+                    try {
+                        // silly construct queries, can't guarantee distinct
+                        // results
+                        final Set<Statement> results = new LinkedHashSet<Statement>();
+                        final GraphQuery graphQuery = cxn.prepareGraphQuery(
+                                QueryLanguage.SPARQL, query);
+                        graphQuery.evaluate(new StatementCollector(results));
+                        for (Statement stmt : results) {
+                            log.info(stmt);
+                        }
+                        assertTrue(results.contains(new StatementImpl(SYSTAP,
+                                RDF.TYPE, ENTITY)));
+                    } finally {
+                        cxn.close();
+                    }
+                }
+
+                // shutdown the KB and the backing database.
+                repo.shutDown();
+
+            }
+
+            // re-open the backing database and the KB.
+            sail = reopenSail(sail);
+
+            // setup the repo again.
+            {
+                final BigdataSailRepository repo = new BigdataSailRepository(
+                        sail);
+
+                repo.initialize();
+
+                { // run the query again
+                    final String query = "construct { ?s <" + RDF.TYPE + "> <"
+                            + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
+                            + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
+                            + BNS.SEARCH + "> \"systap\" . }";
+                    final RepositoryConnection cxn = repo.getConnection();
+                    try {
+                        // silly construct queries, can't guarantee distinct
+                        // results
+                        final Set<Statement> results = new LinkedHashSet<Statement>();
+                        final GraphQuery graphQuery = cxn.prepareGraphQuery(
+                                QueryLanguage.SPARQL, query);
+                        graphQuery.evaluate(new StatementCollector(results));
+                        for (Statement stmt : results) {
+                            log.info(stmt);
+                        }
+                        assertTrue("Lost commit?", results
+                                .contains(new StatementImpl(SYSTAP, RDF.TYPE,
+                                        ENTITY)));
+                    } finally {
+                        cxn.close();
+                    }
+
+                }
+
+            }
+
+        } finally {
+
+            sail.shutdownAndDelete();
+
         }
 
-        { // run the query again
-            final String query = "construct { ?s <" + RDF.TYPE + "> <" + ENTITY
-                    + "> . } " + "where     { ?s <" + RDF.TYPE + "> <" + ENTITY
-                    + "> . ?s ?p ?lit . ?lit <" + BNS.SEARCH
-                    + "> \"systap\" . }";
-            final RepositoryConnection cxn = repo.getConnection();
-            try {
-                // silly construct queries, can't guarantee distinct results
-                final Set<Statement> results = new LinkedHashSet<Statement>();
-                final GraphQuery graphQuery = cxn.prepareGraphQuery(
-                        QueryLanguage.SPARQL, query);
-                graphQuery.evaluate(new StatementCollector(results));
-                for (Statement stmt : results) {
-                    log.info(stmt);
-                }
-                assertTrue("Lost commit?", results.contains(new StatementImpl(
-                        SYSTAP, RDF.TYPE, ENTITY)));
-            } finally {
-                cxn.close();
-            }
-        }        
-        
     }
 
 }

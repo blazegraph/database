@@ -55,18 +55,18 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBigdataSail extends TestCase {
+public class TestBootstrapBigdataSail extends TestCase {
 
     /**
      * 
      */
-    public TestBigdataSail() {
+    public TestBootstrapBigdataSail() {
     }
 
     /**
      * @param arg0
      */
-    public TestBigdataSail(String arg0) {
+    public TestBootstrapBigdataSail(String arg0) {
         super(arg0);
     }
 

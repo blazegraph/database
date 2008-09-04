@@ -111,10 +111,11 @@ abstract public class AbstractTestCase
     /**
      * Invoked from {@link TestCase#setUp()} for each test in the suite.
      */
-    public void setUp(ProxyTestCase testCase) throws Exception {
+    protected void setUp(ProxyTestCase testCase) throws Exception {
 
         begin = System.currentTimeMillis();
         
+        if (log.isInfoEnabled())
         log.info("\n\n================:BEGIN:" + testCase.getName()
                 + ":BEGIN:====================");
 
@@ -123,10 +124,11 @@ abstract public class AbstractTestCase
     /**
      * Invoked from {@link TestCase#tearDown()} for each test in the suite.
      */
-    public void tearDown(ProxyTestCase testCase) throws Exception {
+    protected void tearDown(ProxyTestCase testCase) throws Exception {
 
         long elapsed = System.currentTimeMillis() - begin;
         
+        if (log.isInfoEnabled())
         log.info("\n================:END:" + testCase.getName()
                 + " ("+elapsed+"ms):END:====================\n");
 
@@ -134,12 +136,6 @@ abstract public class AbstractTestCase
     
     private long begin;
     
-    public void tearDown() throws Exception {
-        
-        super.tearDown();
-        
-    }
-
     //
     // Properties
     //
@@ -603,6 +599,7 @@ abstract public class AbstractTestCase
             if (!map.isEmpty()) {
 
                 // @todo convert term identifiers before rendering.
+                if (log.isInfoEnabled())
                 log.info("Iterator empty but still expecting: " + map.values());
 
                 fail("Expecting: " + map.size() + " more statements: "+map.values());
@@ -674,6 +671,7 @@ abstract public class AbstractTestCase
      */
     public void assertStatementIndicesConsistent(AbstractTripleStore db, final int maxerrors) {
 
+        if (log.isInfoEnabled())
         log.info("Verifying statement indices");
         
         AtomicInteger nerrs = new AtomicInteger(0);
@@ -723,6 +721,7 @@ abstract public class AbstractTestCase
             final int maxerrors
     ) {
 
+        if (log.isInfoEnabled())
         log.info("Verifying " + keyOrderExpected + " against "
                         + keyOrderActual);
 
@@ -999,7 +998,8 @@ abstract public class AbstractTestCase
                 
             }
             
-            TestCase2.log.info("There are " + termSet.size()
+            if (log.isInfoEnabled())
+            log.info("There are " + termSet.size()
                     + " distinct terms in the parsed statements.");
 
             /*
@@ -1132,7 +1132,9 @@ abstract public class AbstractTestCase
 
                     }
                     
-                    TestCase2.log.info("Verified "+i+" statements parsed from file.");
+                    if (log.isInfoEnabled())
+                        log.info("Verified " + i
+                                + " statements parsed from file.");
 
                 } finally {
 

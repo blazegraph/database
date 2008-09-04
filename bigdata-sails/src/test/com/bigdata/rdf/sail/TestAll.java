@@ -90,16 +90,14 @@ public class TestAll extends TestCase {
         TestSuite suite = new TestSuite("Sesame 2.x integration");
        
         // bootstrap tests for the BigdataSail
-        suite.addTestSuite(TestBigdataSail.class);
+        suite.addTestSuite(TestBootstrapBigdataSail.class);
 
-        // test of the search magic predicate
-        suite.addTestSuite(TestSearchQuery.class);
+        // run the test suite with statement identifiers enabled.
+        suite.addTest(TestBigdataSailWithSids.suite());
         
-        // high-level query tests.
-        suite.addTestSuite(TestQuery.class);
-
-        // test of high-level query on a graph with statements about statements.
-        suite.addTestSuite(TestProvenanceQuery.class);
+        // run the test suite without statement identifiers enabled.
+        suite.addTest(TestBigdataSailWithoutSids.suite());
+        
         
 // Restore the following tests after adapting to Sesame 2.x
 //        
