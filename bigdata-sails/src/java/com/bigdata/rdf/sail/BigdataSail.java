@@ -526,6 +526,28 @@ public class BigdataSail extends SailBase implements Sail {
     }
 
     /**
+     * Shuts down the sail and deletes the backing database (used by the unit
+     * tests).
+     */
+    void shutdownAndDelete() {
+        
+        closeOnShutdown = false;
+        
+        try {
+
+            shutDown();
+
+            database.closeAndDelete();
+
+        } catch (Throwable t) {
+
+            log.error("Problem during shutdown: " + t, t);
+
+        }
+        
+    }
+    
+    /**
      * A factory returning the singleton read-committed view of the database.
      * This view is safe for concurrent query operations.
      * <p>

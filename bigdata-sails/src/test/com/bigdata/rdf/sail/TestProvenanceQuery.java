@@ -60,19 +60,17 @@ import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataStatementImpl;
-import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.rdf.store.DataLoader;
 
 /**
  * Test suite for high-level query against a graph containing statements about
  * statements.
  * 
- * FIXME test result bindings
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
+public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
     public TestProvenanceQuery() {
         
@@ -87,6 +85,10 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
     public void test_query() throws SailException, IOException,
             RDFHandlerException, QueryEvaluationException {
 
+        final BigdataSail sail = getSail();
+        
+        try {
+        
         if (!((BigdataSail) sail).database.getStatementIdentifiers()) {
 
             log.warn("Statement identifiers are not enabled");
@@ -259,6 +261,12 @@ public class TestProvenanceQuery extends AbstractBigdataSailTestCase {
 
         }
 
+        } finally {
+            
+            sail.shutdownAndDelete();
+            
+        }
+        
     }
 
 }

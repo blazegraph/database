@@ -35,6 +35,7 @@ import info.aduna.iteration.CloseableIteration;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -59,12 +60,10 @@ import com.bigdata.rdf.store.DataLoader;
 /**
  * Unit tests for high-level query.
  * 
- * @todo add unit tests for the join optimization.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestQuery extends AbstractBigdataSailTestCase {
+public class TestQuery extends ProxyBigdataSailTestCase {
 
     /**
      * 
@@ -86,10 +85,10 @@ public class TestQuery extends AbstractBigdataSailTestCase {
     
     /**
      * Load the data set (LUBM with 1 university).
+     * 
+     * @throws IOException 
      */
-    protected void setUp() throws Exception {
-
-        super.setUp();
+    protected void loadData(BigdataSail sail) throws IOException {
 
         File dir = new File("src/resources/U1");
 
@@ -154,14 +153,21 @@ public class TestQuery extends AbstractBigdataSailTestCase {
      * 
      * @throws SailException
      * @throws QueryEvaluationException
+     * @throws IOException 
      */
-    public void test_query() throws SailException, QueryEvaluationException {
+    public void test_query() throws SailException, QueryEvaluationException, IOException {
 
 //        assertEquals(new URIImpl(
 //                "http://www.Department0.University0.edu/GraduateStudent44"),
 //                new BigdataURIImpl("http://www.Department0.University0.edu/GraduateStudent44",IRawTripleStore.NULL));
 
-        SailConnection conn = sail.getConnection();
+        final BigdataSail sail = getSail();
+        
+        try {
+        
+        loadData(sail);
+        
+        final SailConnection conn = sail.getConnection();
 
         final URI graduateStudent = new URIImpl(ub+"GraduateStudent");
 
@@ -262,6 +268,12 @@ public class TestQuery extends AbstractBigdataSailTestCase {
 
             conn.close();
 
+        }
+        
+        } finally {
+            
+            sail.shutdownAndDelete();
+            
         }
 
     }
