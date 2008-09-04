@@ -1,5 +1,8 @@
 package com.bigdata.rdf.rules;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -43,24 +46,80 @@ public class FastClosure extends BaseClosure {
 
         if (!rdfsOnly) {
 
-            if (forwardChainOwlTransitiveProperty) {
-                
-                program.addClosureOf(new RuleOwlTransitiveProperty(db,vocab));
-                
-            }
-            
-            if (forwardChainOwlInverseOf) {
-            
-                program.addClosureOf(new RuleOwlInverseOf1(db,vocab));
-            
-                program.addClosureOf(new RuleOwlInverseOf2(db,vocab));
-                
-            }
-            
-            // owl:equivalentProperty
-            if (forwardChainOwlEquivalentProperty) {
+            /**
+             * @TODO If these steps are truely independent, should they be
+             *       executed as a sequence instead? What is faster (also, what
+             *       is faster when parallel or when only sequential execution
+             *       is allowed).
+             */
+            if (false) {
 
-                program.addClosureOf(new RuleOwlEquivalentProperty(db, vocab));
+                /*
+                 * Executes the closure of each rule in turn.
+                 */
+                
+                if (forwardChainOwlTransitiveProperty) {
+
+                    program.addClosureOf(new RuleOwlTransitiveProperty(db,
+                            vocab));
+
+                }
+
+                if (forwardChainOwlInverseOf) {
+
+                    program.addClosureOf(new RuleOwlInverseOf1(db, vocab));
+
+                    program.addClosureOf(new RuleOwlInverseOf2(db, vocab));
+
+                }
+
+                // owl:equivalentProperty
+                if (forwardChainOwlEquivalentProperty) {
+
+                    program.addClosureOf(new RuleOwlEquivalentProperty(db,
+                            vocab));
+
+                }
+
+            } else {
+                
+                /*
+                 * Combines the rules into a set and computes the closure of
+                 * that set.
+                 */
+                
+                final List<IRule> tmp = new LinkedList<IRule>();
+
+                if (forwardChainOwlTransitiveProperty) {
+
+                    tmp.add(new RuleOwlTransitiveProperty(db, vocab));
+
+                }
+
+                if (forwardChainOwlInverseOf) {
+
+                    tmp.add(new RuleOwlInverseOf1(db, vocab));
+
+                    tmp.add(new RuleOwlInverseOf2(db, vocab));
+
+                }
+
+                // owl:equivalentProperty
+                if (forwardChainOwlEquivalentProperty) {
+
+                    tmp.add(new RuleOwlEquivalentProperty(db, vocab));
+
+                }
+
+                if (!tmp.isEmpty()) {
+
+                    /*
+                     * Fix point whatever set of rules were selected above.
+                     */
+
+                    program.addClosureOf(tmp.toArray(new IRule[] {}));
+
+                }
 
             }
 
