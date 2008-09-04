@@ -74,9 +74,9 @@ abstract public class BaseClosure {
 
         forwardChainOwlEquivalentClass = inf.forwardChainOwlEquivalentClass;
         
-        forwardChainOwlTransitiveProperty = !rdfsOnly;
+        forwardChainOwlTransitiveProperty = inf.forwardChainOwlTransitiveProperty;
         
-        forwardChainOwlInverseOf = !rdfsOnly;
+        forwardChainOwlInverseOf = inf.forwardChainOwlInverseOf;
         
     }
 
