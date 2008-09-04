@@ -1,6 +1,4 @@
-package com.bigdata.rdf.sail;
-
-import info.aduna.iteration.CloseableIteration;
+package com.bigdata.rdf.store;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -10,38 +8,33 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.impl.MapBindingSet;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Efficiently resolve term identifiers in Bigdata {@link ISolution}s to RDF
- * {@link BigdataValue}s in Sesame 2 {@link BindingSet}s.
+ * {@link BigdataValue}s.
  * 
  * @todo The resolution of term identifiers to terms should happen during
  *       asynchronous read-ahead for even better performance (less latency).
  * 
+ * @todo Another approach would be to serialize the term for the object position
+ *       into the value in the OSP index. That way we could pre-materialize the
+ *       term for some common access patterns.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME refactor as {@link IChunkedIterator} and alignment class converting
- * {@link IChunkedIterator} to {@link CloseableIteration}. We should probably
- * also refactor the {@link BigdataStatementIteratorImpl} in the same manner.
- * The refactored classes belong in the bigdata-rdf package since they can be
- * used outside of the SAIL context.
+ * @see BigdataStatementIteratorImpl
  */
-public class BigdataSolutionResolverator implements CloseableIteration<BindingSet, SailException>
+public class BigdataSolutionResolverator implements ICloseableIterator<IBindingSet>
 {
 
     final protected static Logger log = Logger.getLogger(BigdataSolutionResolverator.class);
@@ -139,7 +132,7 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
         
     }
 
-    public BindingSet next() {
+    public IBindingSet next() {
 
         if (!hasNext())
             throw new NoSuchElementException();
@@ -217,8 +210,8 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
         // the current solution
         final ISolution solution = chunk[lastIndex];
 
-        // resolve the solution to a Sesame2 BindingSet
-        final BindingSet bindingSet = getBindingSet(solution);
+        // resolve the solution to an IBindingSet containing Values (vs termIds)
+        final IBindingSet bindingSet = getBindingSet(solution);
                 
         if (log.isDebugEnabled()) {
             
@@ -234,36 +227,52 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
 
     /**
      * Resolve the term identifiers in the {@link ISolution} using the map
-     * populated when we fetched the current chunk and return a Sesame2
-     * {@link BindingSet} populated with the corresponding
-     * {@link BigdataValue}s.
+     * populated when we fetched the current chunk and return the
+     * {@link IBindingSet} for that solution in which term identifiers have been
+     * resolved to their corresponding {@link BigdataValue}s.
      * 
      * @param solution
-     *            A solution for a {@link TupleExpr} whose bindings are term
-     *            identifiers.
-     *            
-     * @return The corresponding Sesame 2 {@link BindingSet} in which the
-     *         term identifiers have been resolved to {@link BigdataValue}s.
+     *            A solution whose {@link Long}s will be interepreted as term
+     *            identifiers and resolved to the corresponding
+     *            {@link BigdataValue}s.
+     * 
+     * @return The corresponding {@link IBindingSet} in which the term
+     *         identifiers have been resolved to {@link BigdataValue}s.
+     *         
+     * @throws IllegalStateException
+     *             if the {@link IBindingSet} was not materialized with the
+     *             {@link ISolution}.
+     * 
+     * @todo this points out a problem where we would be better off strongly
+     *       typing the term identifiers with their own class rather than using
+     *       {@link Long} since we can not distinguish a {@link Long}
+     *       materialized by a join against some non-RDF relation from a
+     *       {@link Long} that is a term identifier.
      */
-    private BindingSet getBindingSet(ISolution solution) {
+    protected IBindingSet getBindingSet(ISolution solution) {
 
         assert solution != null;
 
-        final IBindingSet sourceBindingSet = solution.getBindingSet();
+        final IBindingSet bindingSet = solution.getBindingSet();
         
-        assert sourceBindingSet != null;
+        if(bindingSet == null) {
+            
+            throw new IllegalStateException("BindingSet was not materialized");
+            
+        }
         
-        final int n = sourceBindingSet.size();
-
-        final MapBindingSet bindingSet = new MapBindingSet(n /* capacity */);
-
-        final Iterator<Map.Entry<IVariable,IConstant>> itr = sourceBindingSet.iterator();
+        final Iterator<Map.Entry<IVariable,IConstant>> itr = bindingSet.iterator();
 
         while(itr.hasNext()) {
 
             final Map.Entry<IVariable,IConstant> entry = itr.next();
             
-            final Long termId = (Long)entry.getValue().get();
+            final Object boundValue = entry.getValue().get();
+            
+            if (!(boundValue instanceof Long))
+                continue;
+            
+            final Long termId = (Long)boundValue;
             
             final BigdataValue value = terms.get(termId);
 
@@ -271,15 +280,14 @@ public class BigdataSolutionResolverator implements CloseableIteration<BindingSe
                 throw new RuntimeException("Could not resolve termId="
                         + termId);
             
-            bindingSet.addBinding(entry.getKey().getName(), value);
+            // replace the binding.
+            bindingSet.set(entry.getKey(), new Constant<BigdataValue>(
+                    value));
             
         }
-
-        // verify all bindings are present.
-        assert bindingSet.size() == n;
         
         return bindingSet;
-        
+
     }
     
     /**

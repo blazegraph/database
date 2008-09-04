@@ -647,7 +647,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @param s
      * @param p
      * @param o
-     * @param filter Optional filter to be evaluated close to the data.
+     * @param filter
+     *            Optional filter to be evaluated close to the data.
      * @return
      */
     @SuppressWarnings("unchecked")
@@ -664,7 +665,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 : new Constant<Long>(o));
         
         return getAccessPath(new SPOPredicate(new String[] { getNamespace() },
-                S, P, O, false/* optional */, filter, null/* expander */));
+                S, P, O, null/* context */, false/* optional */, filter, null/* expander */));
         
     }
 
@@ -672,6 +673,14 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * Return the {@link IAccessPath} that is most efficient for the specified
      * predicate based on an analysis of the bound and unbound positions in the
      * predicate.
+     * <p>
+     * Note: When statement identifiers are enabled, the only way to bind the
+     * context position is to already have an {@link SPO} on hand. There is no
+     * index which can be used to look up an {@link SPO} by its context and the
+     * context is always a blank node.
+     * 
+     * @param pred
+     *            The predicate.
      * 
      * @return The best access path for that predicate.
      */
@@ -683,6 +692,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
         final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
         final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
+        // Note: Context is ignored!
 
         final IAccessPath<ISPO> accessPath;
         

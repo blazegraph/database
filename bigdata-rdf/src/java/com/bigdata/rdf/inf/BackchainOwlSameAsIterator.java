@@ -3,9 +3,9 @@ package com.bigdata.rdf.inf;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -33,10 +33,8 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
 
     protected IChunkedOrderedIterator<ISPO> src;
     
-    private final TemporaryStore tempStore;
-    
     public BackchainOwlSameAsIterator(IChunkedOrderedIterator<ISPO> src,
-            AbstractTripleStore db, long sameAs, TemporaryStore tempStore) {
+            AbstractTripleStore db, long sameAs) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -47,19 +45,11 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
         if (sameAs == NULL)
             throw new IllegalArgumentException();
         
-        if (tempStore == null)
-            throw new IllegalArgumentException();
-        
-        if (!tempStore.isOpen())
-            throw new IllegalArgumentException();
-        
         this.src = src;
         
         this.db = db;
         
         this.sameAs = sameAs;
-        
-        this.tempStore = tempStore;
     
     }
     
@@ -113,7 +103,7 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
         // only store the SPO index
         props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
-        return new TempTripleStore(tempStore, props, db);
+        return new TempTripleStore(db.getIndexManager().getTempStore(), props, db);
     }
 
     protected void dumpSPO(ISPO spo) {

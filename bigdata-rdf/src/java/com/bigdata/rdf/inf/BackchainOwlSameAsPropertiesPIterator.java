@@ -28,7 +28,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 import java.util.Set;
-import com.bigdata.journal.TemporaryStore;
+
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -80,9 +80,9 @@ public class BackchainOwlSameAsPropertiesPIterator extends
      */
     public BackchainOwlSameAsPropertiesPIterator(
             IChunkedOrderedIterator<ISPO> src, long p, AbstractTripleStore db,
-            final long sameAs, TemporaryStore tempStore) {
+            final long sameAs) {
 
-        super(src, db, sameAs, tempStore);
+        super(src, db, sameAs);
 
     }
     

@@ -2183,9 +2183,13 @@ abstract public class AbstractTripleStore extends
         
         final SPOPredicate p = new SPOPredicate(//
                 new String[] { r.getNamespace() },//
-                Var.var("s"), Var.var("p"), Var.var("o"),//
-                false/* optional */, filter,//
-                null/* expander */
+                Var.var("s"),//
+                Var.var("p"),//
+                Var.var("o"),//
+                null, // context
+                false, // optional
+                filter,//
+                null // expander
         );
 
         return getSPORelation().getAccessPath(keyOrder, p);
@@ -3529,16 +3533,16 @@ abstract public class AbstractTripleStore extends
      *            All subjects visited by the iterator will be instances of this
      *            class.
      * 
-     * @return An {@link ICloseableIterator} visiting {@link ISolution}s. The
-     *         {@link IBindingSet} for each {@link ISolution} will have bound
-     *         values for <code>s</code>, <code>t</code>, <code>p</code>,
-     *         and <code>lit</code> where those variables are defined per the
+     * @return An {@link ICloseableIterator} visiting {@link IBindingSet}s.
+     *         Each {@link IBindingSet} will have bound {@link BigdataValue}s
+     *         for <code>s</code>, <code>t</code>, <code>p</code>, and
+     *         <code>lit</code> where those variables are defined per the
      *         pseudo-code JOIN above.
      * 
      * @throws InterruptedException
      *             if the operation is interrupted.
      */
-    public IChunkedIterator<ISolution> match(final Literal[] lits,
+    public ICloseableIterator<IBindingSet> match(final Literal[] lits,
             final URI[] preds, final URI cls) {
 
         if (lits == null || lits.length == 0)
@@ -3575,7 +3579,7 @@ abstract public class AbstractTripleStore extends
                 
                 log.warn("No known predicates: preds="+preds);
                 
-                return new EmptyChunkedIterator<ISolution>(null/* keyOrder */);
+                return new EmptyChunkedIterator<IBindingSet>(null/* keyOrder */);
 
             }
 
@@ -3592,7 +3596,7 @@ abstract public class AbstractTripleStore extends
 
             log.warn("Unknown class: class=" + cls);
 
-            return new EmptyChunkedIterator<ISolution>(null/* keyOrder */);
+            return new EmptyChunkedIterator<IBindingSet>(null/* keyOrder */);
             
         }
 
@@ -3612,12 +3616,13 @@ abstract public class AbstractTripleStore extends
 				.newInstance(getIndexManager());
 
         /*
-         * Resolve ISolutions to their SPO elements in chunks, SPO[] chunks to
-         * Statements, and Statemens to a Map<String,Object> or some such.
+         * Resolve ISolutions to their binding sets and efficiently resolves
+         * term identifiers in those binding sets to BigdataValues.
          */
         try {
         
-            return joinNexus.runQuery(program);
+            return new BigdataSolutionResolverator(this, joinNexus
+                    .runQuery(program));
             
 //            return new BindingSetIterator(//
 //                  new BigdataStatementIteratorImpl(this,

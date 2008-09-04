@@ -55,6 +55,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     private final IVariableOrConstant<Long> o;
 
+    /** The context position MAY be <code>null</code>. */
+    private final IVariableOrConstant<Long> c;
+
     private final boolean optional;
     
     private final IElementFilter<ISPO> constraint;
@@ -82,14 +85,20 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
+    /**
+     * The arity is 3 unless the context position was given (as either a
+     * variable or bound to a constant) in which case it is 4.
+     */
     public final int arity() {
         
-        return 3;
+        return c == null ? 3 : 4;
         
     }
 
     /**
-     * Partly specified ctor.
+     * Partly specified ctor. The context will be <code>null</code>. The
+     * predicate is NOT optional. No constraint is specified. No expander is
+     * specified.
      * 
      * @param relationName
      * @param s
@@ -99,8 +108,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
     public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
-        this(new String[] { relationName }, s, p, o, false/* optional */,
-                null/* constraint */, null/* expander */);
+        this(new String[] { relationName }, s, p, o, null/* c */,
+                false/* optional */, null/* constraint */, null/* expander */);
         
     }
     
@@ -111,12 +120,18 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param s
      * @param p
      * @param o
+     * @parma c MAY be <code>null</code>.
+     * @param optional
      * @param constraint
+     *            MAY be <code>null</code>.
+     * @param expander
+     *            MAY be <code>null</code>.
      */
     public SPOPredicate(String[] relationName,
             IVariableOrConstant<Long> s,//
             IVariableOrConstant<Long> p,//
             IVariableOrConstant<Long> o,//
+            IVariableOrConstant<Long> c,//
             final boolean optional,
             IElementFilter<ISPO> constraint,//
             ISolutionExpander<ISPO> expander
@@ -125,7 +140,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         if (relationName == null)
             throw new IllegalArgumentException();
        
-        for(int i=0; i<relationName.length; i++) {
+        for (int i = 0; i < relationName.length; i++) {
             
             if (relationName[i] == null)
                 throw new IllegalArgumentException();
@@ -149,10 +164,11 @@ public class SPOPredicate implements IPredicate<ISPO> {
         this.s = s;
         this.p = p;
         this.o = o;
+        this.c = c; // MAY be null.
 
         this.optional = optional;
         
-        this.constraint = constraint;
+        this.constraint = constraint; /// MAY be null.
         
         this.expander = expander;// MAY be null.
         
@@ -182,6 +198,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         this.s = src.s;
         this.p = src.p;
         this.o = src.o;
+        this.c = src.c;
         
         this.relationName = relationName; // override.
      
@@ -201,6 +218,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
             return p;
         case 2:
             return o;
+        case 3:
+            if(c!=null) return c;
+            // fall through
         default:
             throw new IndexOutOfBoundsException(""+index);
         }
@@ -251,9 +271,15 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
     
+    final public IVariableOrConstant<Long> c() {
+        
+        return c;
+        
+    }
+    
     /**
-     * Return true iff all arguments of the predicate are bound (vs
-     * variables).
+     * Return true iff the {s,p,o} arguments of the predicate are bound (vs
+     * variables) - the context position is NOT tested.
      */
     final public boolean isFullyBound() {
 
@@ -262,7 +288,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
     }
 
     /**
-     * The #of arguments in the predicate that are variables (vs constants).
+     * The #of arguments in the predicate that are variables (vs constants) (the
+     * context position is NOT counted).
      */
     final public int getVariableCount() {
         
@@ -311,7 +338,21 @@ public class SPOPredicate implements IPredicate<ISPO> {
             }
         }
         
-        return new SPOPredicate(relationName, s, p, o, optional, constraint,
+        final IVariableOrConstant<Long> c;
+        {
+            if (this.c != null && this.c.isVar()
+                    && bindingSet.isBound((IVariable) this.c)) {
+
+                c = bindingSet.get((IVariable) this.c);
+
+            } else {
+
+                c = this.c;
+
+            }
+        }
+        
+        return new SPOPredicate(relationName, s, p, o, c, optional, constraint,
                 expander);
         
     }
@@ -354,6 +395,16 @@ public class SPOPredicate implements IPredicate<ISPO> {
                 || !bindingSet.isBound((IVariable) o) ? o.toString()
                 : bindingSet.get((IVariable) o));
 
+        if (c != null) {
+
+            sb.append(", ");
+
+            sb.append(c.isConstant() || bindingSet == null
+                    || !bindingSet.isBound((IVariable) c) ? c.toString()
+                    : bindingSet.get((IVariable) c));
+
+        }
+        
         sb.append(")");
 
         return sb.toString();
@@ -383,13 +434,23 @@ public class SPOPredicate implements IPredicate<ISPO> {
         if (this == other)
             return true;
         
-        final int arity = 3;
+        final int arity = arity();
         
         if(arity != other.arity()) return false;
         
         for(int i=0; i<arity; i++) {
             
-            if(!get(i).equals(other.get(i))) return false; 
+            final IVariableOrConstant<Long> x = get(i);
+            
+            final IVariableOrConstant<Long> y = other.get(i);
+            
+            // handles context when null.
+            if (x == null && y != null)
+                return false;
+            
+            // handles non-null on this predicate.
+            if (!x.equals(y))
+                return false; 
             
         }
         

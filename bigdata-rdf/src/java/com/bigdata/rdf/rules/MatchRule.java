@@ -40,10 +40,14 @@ public class MatchRule extends Rule<SPO> {
                 new SPOPredicate(relationName, var("s"), var("p"), lit),
                 //
                 new SPOPredicate(new String[] { relationName },
-                                var("s"), vocab.getConstant(RDF.TYPE),
-                                var("t"), false/*optional*/,
-                                ExplicitSPOFilter.INSTANCE,
-                                null/*expander*/),
+                                var("s"), //
+                                vocab.getConstant(RDF.TYPE),//
+                                var("t"), //
+                                null, // context
+                                false, //optional
+                                ExplicitSPOFilter.INSTANCE,// filter
+                                null // expander
+                                ),
                 //
                 new SPOPredicate(relationName, var("t"), vocab
                                 .getConstant(RDFS.SUBCLASSOF), cls) //

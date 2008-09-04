@@ -29,6 +29,7 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IPredicate;
@@ -49,9 +50,9 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * Extended to rewrite Sesame {@link TupleExpr}s onto native {@link Rule}s and
  * to evaluate magic predicates for full text search, etc.
  * 
- * @todo capture more kinds of {@link BinaryTupleOperator} and
- *       {@link UnaryTupleOperator} using native rule evaluation, including
- *       rolling filters and options into the native rules, etc.
+ * FIXME Capture more kinds of {@link BinaryTupleOperator} and
+ * {@link UnaryTupleOperator} using native rule evaluation, including rolling
+ * filters and optionals into the native rules, etc.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -259,8 +260,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * {@link EmptyIteration} is returned rather than evaluating the query.
      */
     @Override
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Join join, BindingSet bindings)
-        throws QueryEvaluationException
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            Join join, BindingSet bindings) throws QueryEvaluationException
     {
         if (nativeJoins == false) {
             return super.evaluate(join, bindings);
@@ -321,9 +322,37 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                     o = new Constant<Long>(id);
                 }
             }
-            tails.add(new SPOPredicate(new String[] { SPO }, s, p, o, false, // optional
-                    !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
-                            : null, null// expander
+            final IVariableOrConstant<Long> c;
+            {
+                final Var var = stmtPattern.getContextVar();
+                if (var == null) {
+                    // context position is not used.
+                    c = null;
+                } else {
+                    final Value val = var.getValue();
+                    if (val != null) {
+                        /*
+                         * Note: The context position is used as a statement
+                         * identifier (SID). SIDs may be used to retrieve
+                         * provenance statements (statements about statement)
+                         * using high-level query. SIDs are represented as blank
+                         * nodes and is not possible to have them bound in the
+                         * original query. They only become bound during query
+                         * evaluation.
+                         */
+                        throw new QueryEvaluationException(
+                                "Context position is a statement identifier and may not be bound in the original query: "
+                                        + join);
+                    }
+                    final String name = var.getName();
+                    c = com.bigdata.relation.rule.Var.var(name);
+                }
+            }
+            tails.add(new SPOPredicate(new String[] { SPO },//
+                    s, p, o, c, //
+                    false, // optional
+                    !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE : null,
+                    null// expander
                     ));
         }
         final IRule rule = new Rule(
@@ -348,10 +377,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             collectStatementPatterns(left, stmtPatterns);
             collectStatementPatterns(right, stmtPatterns);
         } else {
-            throw new RuntimeException("encountered unexpected TupleExpr: " + tupleExpr.getClass());
+            throw new RuntimeException("encountered unexpected TupleExpr: "
+                    + tupleExpr.getClass());
         }
     }
-    
+
     /**
      * Run a rule based on a {@link TupleExpr} as a query.
      * 
@@ -366,14 +396,14 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     protected CloseableIteration<BindingSet, QueryEvaluationException> runQuery(
             final TupleExpr tupleExpr, final IRule rule)
             throws QueryEvaluationException {
-        
+
         if (log.isInfoEnabled()) {
 
             log.info("Running tupleExpr as native rule:\n" + tupleExpr + ",\n"
                     + rule);
-            
+
         }
-        
+
         // run the query as a native rule.
         final IChunkedOrderedIterator<ISolution> itr1;
         try {
@@ -403,61 +433,18 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         /*
          * Efficiently resolve term identifiers in Bigdata ISolutions to RDF
          * Values in Sesame 2 BindingSets.
-         * 
-         * @todo Another approach would be to serialize the term for the object
-         * position into the value in the OSP index. That way we could
-         * pre-materialize the term for some common access patterns.
          */
-
         final BigdataSolutionResolverator itr2 = new BigdataSolutionResolverator(
                 database, itr1);
 
-        // align exceptions for SAIL with those for Query.
-        return new QueryEvaluationIterator<BindingSet>(itr2);
+        /*
+         * Align the iterator with the Sesame 2 API.
+         */
+        final Bigdata2Sesame2BindingSetIterator<QueryEvaluationException> itr3 = new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+                itr2);
+        
+        return itr3;
         
     }
-
-//    private static final class CustomEvaluationPlanFactory implements IEvaluationPlanFactory {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = 5557700123364184677L;
-//
-//        private final int[] order;
-//        
-//        public CustomEvaluationPlanFactory(int[] order) {
-//        
-//            this.order = order;
-//            
-//        }
-//        
-//        public IEvaluationPlan newPlan(final IJoinNexus joinNexus, final IRule rule) {
-//
-//            return new IEvaluationPlan() {
-//
-//                public int[] getOrder() {
-//
-//                    return order;
-//                    
-//                }
-//
-//                public boolean isEmpty() {
-//
-//                    return false;
-//                    
-//                }
-//              
-//                public long rangeCount(int tailIndex) {
-//                    
-//                    return joinNexus.getRangeCountFactory().rangeCount(rule.getTail(tailIndex));
-//                    
-//                }
-//                
-//            };
-//            
-//        }
-//        
-//    }
 
 }
