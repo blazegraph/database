@@ -83,46 +83,9 @@ public class FastClosure extends BaseClosure {
 
             } else {
                 
-                /*
-                 * Combines the rules into a set and computes the closure of
-                 * that set.
-                 */
                 
-                final List<IRule> tmp = new LinkedList<IRule>();
-
-                if (forwardChainOwlTransitiveProperty) {
-
-                    tmp.add(new RuleOwlTransitiveProperty(db, vocab));
-
-                }
-
-                if (forwardChainOwlInverseOf) {
-
-                    tmp.add(new RuleOwlInverseOf1(db, vocab));
-
-                    tmp.add(new RuleOwlInverseOf2(db, vocab));
-
-                }
-
-                // owl:equivalentProperty
-                if (forwardChainOwlEquivalentProperty) {
-
-                    tmp.add(new RuleOwlEquivalentProperty(db, vocab));
-
-                }
-
-                if (!tmp.isEmpty()) {
-
-                    /*
-                     * Fix point whatever set of rules were selected above.
-                     */
-
-                    program.addClosureOf(tmp.toArray(new IRule[] {}));
-
-                }
-
             }
-
+                
         }
 
         /*
@@ -266,6 +229,47 @@ public class FastClosure extends BaseClosure {
 
         if (!rdfsOnly) {
             
+            { 
+                /*
+                 * Combines the rules into a set and computes the closure of
+                 * that set.
+                 */
+                
+                final List<IRule> tmp = new LinkedList<IRule>();
+    
+                if (forwardChainOwlTransitiveProperty) {
+    
+                    tmp.add(new RuleOwlTransitiveProperty(db, vocab));
+    
+                }
+    
+                if (forwardChainOwlInverseOf) {
+    
+                    tmp.add(new RuleOwlInverseOf1(db, vocab));
+    
+                    tmp.add(new RuleOwlInverseOf2(db, vocab));
+    
+                }
+    
+                // owl:equivalentProperty
+                if (forwardChainOwlEquivalentProperty) {
+    
+                    tmp.add(new RuleOwlEquivalentProperty(db, vocab));
+    
+                }
+    
+                if (!tmp.isEmpty()) {
+    
+                    /*
+                     * Fix point whatever set of rules were selected above.
+                     */
+    
+                    program.addClosureOf(tmp.toArray(new IRule[] {}));
+    
+                }
+                
+            }
+
             // owl:sameAs
             if (forwardChainOwlSameAsClosure) {
 
