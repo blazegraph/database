@@ -196,64 +196,86 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
             final int tailIndex = getTailIndex(orderIndex);
             
-            while (itr.hasNext()) {
-
+            if (itr.hasNext() == false && rule.getTail(orderIndex).isOptional()) {
+                
                 if (orderIndex + 1 < tailCount) {
-
-                    // Nested subquery.
-
-                    final Object[] chunk;
-                    if (reorderChunkToTargetOrder) {
-                        
-                        /*
-                         * Re-order the chunk into the target order for the
-                         * _next_ access path.
-                         * 
-                         * FIXME This imples that we also know the set of
-                         * indices on which we need to read for a rule before we
-                         * execute the rule. That knowledge should be captured
-                         * and fed into the LDS and EDS/JDS rule execution logic
-                         * in order to optimize JOINs.
-                         */
-                        
-                        // target chunk order.
-                        final IKeyOrder targetKeyOrder = ruleState.keyOrder[getTailIndex(orderIndex + 1)];
-
-                        // Next chunk of results from the current access path.
-                        chunk = itr.nextChunk(targetKeyOrder);
-                        
-                    } else {
-                        
-                        // Next chunk of results from the current access path.
-                        chunk = itr.nextChunk();
-                        
-                    }
-
-                    ruleStats.chunkCount[tailIndex]++;
-
-                    // Issue the nexted subquery.
-                    runSubQueries(orderIndex, chunk, bindingSet);
-
-                } else {
-
-                    // bottomed out.
                     
-                    /*
-                     * Next chunk of results from that access path. The order of
-                     * the elements in this chunk does not matter since this is
-                     * the last join dimension.
-                     */
-                    final Object[] chunk = itr.nextChunk();
+                    apply(orderIndex+1, bindingSet);
+                    
+                } else {
+                    
+                    final ISolution solution = joinNexus.newSolution(rule,
+                            bindingSet);
 
-                    ruleStats.chunkCount[tailIndex]++;
+                    ruleStats.solutionCount++;
 
-                    // evaluate the chunk and emit any solutions.
-                    emitSolutions(orderIndex, chunk, bindingSet);
+                    buffer.add(solution);
                     
                 }
+                
+            }
+            else {
 
-            } // while
+                while (itr.hasNext()) {
 
+                    if (orderIndex + 1 < tailCount) {
+    
+                        // Nested subquery.
+    
+                        final Object[] chunk;
+                        if (reorderChunkToTargetOrder) {
+                            
+                            /*
+                             * Re-order the chunk into the target order for the
+                             * _next_ access path.
+                             * 
+                             * FIXME This imples that we also know the set of
+                             * indices on which we need to read for a rule before we
+                             * execute the rule. That knowledge should be captured
+                             * and fed into the LDS and EDS/JDS rule execution logic
+                             * in order to optimize JOINs.
+                             */
+                            
+                            // target chunk order.
+                            final IKeyOrder targetKeyOrder = ruleState.keyOrder[getTailIndex(orderIndex + 1)];
+    
+                            // Next chunk of results from the current access path.
+                            chunk = itr.nextChunk(targetKeyOrder);
+                            
+                        } else {
+                            
+                            // Next chunk of results from the current access path.
+                            chunk = itr.nextChunk();
+                            
+                        }
+    
+                        ruleStats.chunkCount[tailIndex]++;
+    
+                        // Issue the nexted subquery.
+                        runSubQueries(orderIndex, chunk, bindingSet);
+    
+                    } else {
+    
+                        // bottomed out.
+                        
+                        /*
+                         * Next chunk of results from that access path. The order of
+                         * the elements in this chunk does not matter since this is
+                         * the last join dimension.
+                         */
+                        final Object[] chunk = itr.nextChunk();
+    
+                        ruleStats.chunkCount[tailIndex]++;
+    
+                        // evaluate the chunk and emit any solutions.
+                        emitSolutions(orderIndex, chunk, bindingSet);
+                        
+                    }
+    
+                } // while
+
+            }
+            
         } finally {
 
             itr.close();
@@ -310,7 +332,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      */
     protected void runSubQueries(final int orderIndex, final Object[] chunk,
             final IBindingSet bindingSet) {
-
+/*
         final boolean optional = rule.getTail(getTailIndex(orderIndex+1)).isOptional();
         
         if(optional) {
@@ -320,7 +342,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             return;
             
         }
-        
+*/        
         /*
          * FIXME The problem with deciding here where to run the subqueries is
          * that we need to make the decision when it comes time to execute a
