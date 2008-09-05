@@ -95,7 +95,7 @@ public class NestedSubqueryTask implements IStepTask {
         this.ruleState = new RuleState(rule, joinNexus);
 
         this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(rule,
-                ruleState.plan);
+                ruleState.plan, ruleState.keyOrder);
         
     }
     
@@ -264,7 +264,7 @@ public class NestedSubqueryTask implements IStepTask {
                             final ISolution solution = joinNexus.newSolution(
                                     rule, bindingSet);
             
-                            ruleStats.solutionCount++;
+                            ruleStats.solutionCount.incrementAndGet();
                             
                             buffer.add( solution );
                             

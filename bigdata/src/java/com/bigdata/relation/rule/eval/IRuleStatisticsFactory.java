@@ -30,6 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * A factory for rule statistics objects.
@@ -46,7 +47,16 @@ public interface IRuleStatisticsFactory {
     
     /**
      * Used for the execution of a single {@link IRule}.
+     * 
+     * @param rule
+     *            The rule.
+     * @param plan
+     *            The {@link IEvaluationPlan}.
+     * @param keyOrder
+     *            Identifies which index will be used at each step in the
+     *            evaluation plan (the indices are correlated with the tail
+     *            predicate index, not the evaluation order index).
      */
-    RuleStats newInstance(IRule step, IEvaluationPlan plan);
+    RuleStats newInstance(IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder);
     
 }

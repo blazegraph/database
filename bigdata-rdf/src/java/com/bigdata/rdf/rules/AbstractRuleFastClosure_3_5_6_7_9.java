@@ -357,7 +357,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                                 buffer.add(joinNexus.newSolution(rule,
                                         bindingSet));
 
-                                stats.solutionCount++;
+                                stats.solutionCount.incrementAndGet();
 
                             }
 

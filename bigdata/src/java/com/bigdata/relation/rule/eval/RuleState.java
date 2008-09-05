@@ -91,13 +91,13 @@ public class RuleState {
     final protected Map<Var, Integer> depends;
 
     /**
-     * An array of the {@link IKeyOrder}s that will be used for each predicate
-     * in the tail of the rule. The array is correlated with the predicates
-     * index in the tail of the rule NOT with its evaluation order. This
-     * information may be used to re-order a chunk into the {@link IKeyOrder}
-     * for the next join dimension. This increases performance by making sure
-     * that ordered reads are used by the subqueries for any given chunk on some
-     * join dimension.
+     * An array of the {@link IKeyOrder} that will be used for each predicate in
+     * the tail of the rule. The array is correlated with the predicates index
+     * in the tail of the rule NOT with its evaluation order. This information
+     * may be used to re-order a chunk into the {@link IKeyOrder} for the next
+     * join dimension. This increases performance by making sure that ordered
+     * reads are used by the subqueries for any given chunk on some join
+     * dimension.
      */
     final protected IKeyOrder[] keyOrder;
     

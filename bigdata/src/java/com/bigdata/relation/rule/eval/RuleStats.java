@@ -38,6 +38,7 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Statistics about what an {@link IStep} did when it was executed.
@@ -85,6 +86,8 @@ public class RuleStats {
             this.evalOrder = new int[tailCount];
 
             this.permutation = new int[tailCount];
+
+            this.keyOrder = new IKeyOrder[tailCount];
             
             this.chunkCount = new long[tailCount];
 
@@ -99,6 +102,8 @@ public class RuleStats {
             this.evalOrder = null;
 
             this.permutation = null;
+            
+            this.keyOrder = null;
             
             this.chunkCount = null;
             
@@ -127,8 +132,12 @@ public class RuleStats {
      *            The {@link IRule}.
      * @param plan
      *            The {@link IEvaluationPlan}.
+     * @param keyOrder
+     *            Identifies which index will be used at each step in the
+     *            evaluation plan (the indices are correlated with the tail
+     *            predicate index, not the evaluation order index).
      */
-    public RuleStats(IRule rule, IEvaluationPlan plan) {
+    public RuleStats(IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
         
         this(rule);
         
@@ -138,12 +147,14 @@ public class RuleStats {
         
         System.arraycopy(order, 0, evalOrder, 0, tailCount);
 
+        System.arraycopy(keyOrder, 0, this.keyOrder, 0, tailCount);
+
         /*
-         * Construct the permutation of the tail index order for the
-         * rule that corresponds to the evaluation order.
+         * Construct the permutation of the tail index order for the rule that
+         * corresponds to the evaluation order.
          * 
-         * permutation[i] is the sequence in the evaluation order at
-         * which tail[i] is evaluated.
+         * permutation[i] is the sequence in the evaluation order at which
+         * tail[i] is evaluated.
          */
         for (int i = 0; i < tailCount; i++) {
 
@@ -154,7 +165,7 @@ public class RuleStats {
         for (int i = 0; i < tailCount; i++) {
             
             /*
-             * Copy range count data.
+             * Copy range count data, etc.
              * 
              * @todo This data is normally cached, but for some rules and some
              * evaluation planners the plan is formed without requesting some
@@ -199,7 +210,7 @@ public class RuleStats {
      * not they are written onto an {@link IMutableRelation} and regardless of
      * whether or not they duplicate a solution already computed.
      */
-    public long solutionCount;
+    public AtomicLong solutionCount = new AtomicLong();
     
     /**
      * The #of elements that were actually added to (or removed from) the
@@ -241,6 +252,13 @@ public class RuleStats {
      * evaluation order at which <code>tail[i]</code> was evaluated.
      */
     public final int[] permutation;
+    
+    /**
+     * An array of the {@link IKeyOrder} that was used for each predicate in the
+     * tail of the rule. The array is correlated with the predicates index in
+     * the tail of the rule NOT with its evaluation order.
+     */
+    public final IKeyOrder[] keyOrder;
     
     /**
      * The #of chunks materialized for each predicate in the body of the rule
@@ -302,6 +320,9 @@ public class RuleStats {
      * <dl>
      * <dt>evalOrder</dt>
      * <dd>The evaluation order for the predicate(s) in the rule.</dd>
+     * <dt>keyOrder</dt>
+     * <dd>The {@link IKeyOrder} for the predicate(s) in the rule. Basically,
+     * this tells you which index was used for each predicate.</dd>
      * <dt>chunkCount</dt>
      * <dd>The #of chunks that were generated for the left-hand side of the
      * JOIN for each predicate in the tail of the rule.</dd>
@@ -341,7 +362,7 @@ public class RuleStats {
      
         return "rule, elapsed"
                 + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
-                + ", evalOrder, subqueryCount, chunkCount, elementCount, rangeCount"
+                + ", evalOrder, keyOrder, subqueryCount, chunkCount, elementCount, rangeCount"
                 + ", tailIndex, tailPredicate"
         ;
         
@@ -373,6 +394,8 @@ public class RuleStats {
         
         // the symbol used when the elapsed time was zero, so count/sec is divide by zero.
         final String DZ = "0";
+        
+        final long solutionCount = this.solutionCount.get();
         
         final String solutionCountStr = solutionCount == 0 ? ZE : "" + solutionCount;
 
@@ -407,6 +430,7 @@ public class RuleStats {
             if(!joinDetails) {
             
             sb.append(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q);
+            sb.append(", "+(titles?"keyOrder=":"")+q+toString(keyOrder)+q);
             sb.append(", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q);
             sb.append(", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q);
             sb.append(", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q);
@@ -425,6 +449,7 @@ public class RuleStats {
                     
                     sb.append(", "+permutation[i]);
                     
+                    sb.append(", "+keyOrder[i]);
                     sb.append(", "+subqueryCount[i]);
                     sb.append(", "+chunkCount[i]);
                     sb.append(", "+elementCount[i]);
@@ -464,8 +489,30 @@ public class RuleStats {
     }
     
     private String depthStr = ".........";
-    
+
     private StringBuilder toString(final int[] a) {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append("[");
+        
+        for (int i = 0; i < a.length; i++) {
+            
+            if (i > 0)
+                sb.append(" ");
+            
+            sb.append(a[i]);
+            
+        }
+        
+        sb.append("]");
+        
+        return sb;
+        
+    }
+
+
+    private StringBuilder toString(final Object[] a) {
         
         final StringBuilder sb = new StringBuilder();
         
@@ -621,7 +668,7 @@ public class RuleStats {
             
         }
         
-        solutionCount += o.solutionCount;
+        solutionCount.addAndGet( o.solutionCount.get() );
         
         mutationCount.addAndGet(o.mutationCount.get());
     
