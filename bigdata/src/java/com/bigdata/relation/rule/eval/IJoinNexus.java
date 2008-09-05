@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
+import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.IIndexManager;
@@ -41,12 +42,15 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Interface provides an interoperability nexus for the {@link IPredicate}s,
@@ -79,6 +83,13 @@ public interface IJoinNexus {
      * The factory object for range counts used by {@link IEvaluationPlan}s.
      */
     IRangeCountFactory getRangeCountFactory();
+
+    /**
+     * The {@link ExecutorService} to be used for parallelization of JOINs.
+     * Unlike some other {@link ExecutorService} applications, this SHOULD have
+     * a maximum pool size in order to avoid overwhelming the host.
+     */
+    ExecutorService getJoinService();
     
     /**
      * The kind of operation that is being executed (Query, Insert, or Delete).
@@ -114,6 +125,23 @@ public interface IJoinNexus {
      */
     void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet);
 
+    /**
+     * Return a 'fake' binding for the given variable in the specified
+     * predicate. The binding should be such that it is of a legal type for the
+     * slot in the predicate associated with that variable. This is used to
+     * discovery the {@link IKeyOrder} associated with the {@link IAccessPath}
+     * that will be used to evaluate the predicate when it appears in the tail
+     * of an {@link IRule} for a given {@link IEvaluationPlan}.
+     * 
+     * @param predicate
+     *            The predicate.
+     * @param var
+     *            A variable appearing in that predicate.
+     *            
+     * @return The 'fake' binding.
+     */
+    IConstant fakeBinding(IPredicate predicate, Var var);
+    
     /**
      * Create a new {@link ISolution}. The behavior of this method generally
      * depends on bit flags specified when the {@link IJoinNexus} was created.

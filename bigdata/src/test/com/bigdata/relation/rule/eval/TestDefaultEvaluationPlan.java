@@ -31,6 +31,7 @@ package com.bigdata.relation.rule.eval;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import junit.framework.TestCase2;
 
@@ -42,6 +43,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
@@ -342,6 +344,16 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         }
 
         public byte[] getSortKey(ISolution solution) {
+            return null;
+        }
+
+        public ExecutorService getJoinService() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IConstant fakeBinding(IPredicate predicate, Var var) {
+            // TODO Auto-generated method stub
             return null;
         }
 

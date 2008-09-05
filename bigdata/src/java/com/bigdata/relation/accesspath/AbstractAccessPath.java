@@ -337,7 +337,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
         if(log.isDebugEnabled()) {
             
-            log.debug(this.toString());
+            log.debug(toString());
             
         }
         

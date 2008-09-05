@@ -30,9 +30,14 @@ package com.bigdata.rdf.rules;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -62,6 +67,7 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
@@ -69,6 +75,7 @@ import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultRangeCountFactory;
@@ -82,7 +89,7 @@ import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
-import com.bigdata.relation.rule.eval.NestedSubqueryTask;
+import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTaskFactory;
@@ -101,6 +108,7 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IRemoteChunkedIterator;
 import com.bigdata.striterator.WrappedRemoteChunkedIterator;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
@@ -121,6 +129,8 @@ public class RDFJoinNexus implements IJoinNexus {
     private final long writeTimestamp;
     
     private final long readTimestamp;
+
+    private final boolean forceSerialExecution;
     
     private final boolean justify;
     
@@ -372,10 +382,70 @@ public class RDFJoinNexus implements IJoinNexus {
         public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
                 IBuffer<ISolution> buffer) {
 
-            return new NestedSubqueryTask(rule, joinNexus, buffer);
+//            return new NestedSubqueryTask(rule, joinNexus, buffer);
+            return new NestedSubqueryWithJoinThreadsTask(rule, joinNexus, buffer);
 
         }
 
+    }
+    
+    /**
+     * @todo configure via the {@link RDFJoinNexusFactory}.
+     */
+    public ExecutorService getJoinService() {
+    
+        if (joinService == null) {
+
+            synchronized (this) {
+
+                if (joinService == null) {
+
+//                    joinService = BigdataExecutors.newCachedThreadPool();
+                    
+                    final int corePoolSize = 5;
+                    final int maximumPoolSize = 20;
+                    final long keepAliveTime = 60;// seconds
+                    final int workQueueCapacity = 1000;//maximumPoolSize * 10;
+                    final BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<Runnable>(
+                            workQueueCapacity);
+                    
+                    joinService = new ThreadPoolExecutor(corePoolSize,
+                            maximumPoolSize, keepAliveTime, TimeUnit.SECONDS,
+                            workQueue, DaemonThreadFactory
+                                    .defaultThreadFactory(),
+                            new ThreadPoolExecutor.CallerRunsPolicy());
+                    
+//                    joinService = (ThreadPoolExecutor)Executors
+//                            .newCachedThreadPool(DaemonThreadFactory
+//                                    .defaultThreadFactory());
+
+                }
+
+            }
+
+        }
+
+        return joinService;
+        
+    }
+    private volatile ThreadPoolExecutor joinService = null;
+    
+    protected void finalize() throws Throwable {
+        
+        if (joinService != null) {
+            
+            log.warn("Shutting down the joinService: #active="
+                    + joinService.getActiveCount() + ", #completed="
+                    + joinService.getCompletedTaskCount() + ", poolSize="
+                    + joinService.getPoolSize() + ", largestPoolSize="
+                    + joinService.getLargestPoolSize());
+            
+            joinService.shutdownNow();
+            
+        }
+        
+        super.finalize();
+        
     }
     
     public IJoinNexusFactory getJoinNexusFactory() {
@@ -395,8 +465,6 @@ public class RDFJoinNexus implements IJoinNexus {
         return rangeCountFactory;
         
     }
-    
-    final private transient boolean forceSerialExecution;
     
     final public boolean forceSerialExecution() {
 
@@ -737,6 +805,14 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
+    public IConstant fakeBinding(IPredicate pred, Var var) {
+
+        return fakeTermId;
+
+    }
+
+    private static transient IConstant<Long> fakeTermId = new Constant<Long>(-1L);
+    
     /*
      * Note: This finds "non-problems". In fact, we only clear downstream
      * bindings in order to get the access path right for the next subquery. We
