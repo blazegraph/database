@@ -396,6 +396,8 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         final int tailIndex = getTailIndex(orderIndex);
 
+        final boolean optional = rule.getTail(getTailIndex(orderIndex+1)).isOptional();
+        
         for (Object e : chunk) {
 
             if (DEBUG) {
