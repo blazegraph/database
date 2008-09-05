@@ -37,7 +37,7 @@ import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.Rule;
 
 /**
- * owl:TransitiveProperty
+ * owl:TransitiveProperty1
  * 
  * <pre>
  * (a rdf:type owl:TransitiveProperty), (x a y), (y a z) -&gt; (x a z)
@@ -46,7 +46,7 @@ import com.bigdata.relation.rule.Rule;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RuleOwlTransitiveProperty extends Rule
+public class RuleOwlTransitiveProperty1 extends Rule
 {
 
     /**
@@ -57,9 +57,9 @@ public class RuleOwlTransitiveProperty extends Rule
     /**
      * @param vocab
      */
-    public RuleOwlTransitiveProperty(String relationName, Vocabulary vocab) {
+    public RuleOwlTransitiveProperty1(String relationName, Vocabulary vocab) {
 
-        super(  "owlTransitiveProperty",//
+        super(  "owlTransitiveProperty1",//
                 new SPOPredicate(relationName,var("x"), var("a"), var("z")), //
                 new SPOPredicate[] { //
                     new SPOPredicate(relationName,var("a"), vocab.getConstant(RDF.TYPE), vocab.getConstant(OWL.TRANSITIVEPROPERTY)),//

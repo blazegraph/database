@@ -90,7 +90,9 @@ public class FullClosure extends BaseClosure {
 
             if (forwardChainOwlTransitiveProperty) {
             
-                program.addStep(new RuleOwlTransitiveProperty(db,vocab));
+                program.addStep(new RuleOwlTransitiveProperty1(db,vocab));
+                
+                program.addStep(new RuleOwlTransitiveProperty2(db,vocab));
                 
             }
             

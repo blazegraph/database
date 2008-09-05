@@ -102,7 +102,7 @@ public class TestRuleOwlTransitiveProperty extends AbstractRuleTestCase {
 
             final Vocabulary vocab = store.getVocabulary();
 
-            final Rule r = new RuleOwlTransitiveProperty(store.getSPORelation()
+            final Rule r = new RuleOwlTransitiveProperty1(store.getSPORelation()
                     .getNamespace(), vocab);
 
             // apply the rule.
