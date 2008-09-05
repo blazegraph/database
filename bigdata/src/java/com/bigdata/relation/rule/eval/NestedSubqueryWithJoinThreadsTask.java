@@ -311,6 +311,16 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     protected void runSubQueries(final int orderIndex, final Object[] chunk,
             final IBindingSet bindingSet) {
 
+        final boolean optional = rule.getTail(getTailIndex(orderIndex+1)).isOptional();
+        
+        if(optional) {
+
+            evaluateOptionals(orderIndex,chunk,bindingSet);
+            
+            return;
+            
+        }
+        
         /*
          * FIXME The problem with deciding here where to run the subqueries is
          * that we need to make the decision when it comes time to execute a
@@ -395,8 +405,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             final Object[] chunk, final IBindingSet bindingSet) {
 
         final int tailIndex = getTailIndex(orderIndex);
-
-        final boolean optional = rule.getTail(getTailIndex(orderIndex+1)).isOptional();
         
         for (Object e : chunk) {
 
@@ -589,6 +597,101 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
                 final ISolution solution = joinNexus.newSolution(rule,
                         bindingSet);
+
+                ruleStats.solutionCount++;
+
+                buffer.add(solution);
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Considers each remaining predicate in the tail for the evaluation order
+     * in turn and scans the access path for that tail, setting any bindings.
+     * Regardless of whether or not there is a match in the data, we proceed to
+     * the next tail in the evaluation order. When we have processed the last
+     * tail in the evaluation order, then we emit an {@link ISolution} for the
+     * {@link IRule}. (This requires that all optionals are evaluated last and
+     * the evaluation plan is responsible for that.)
+     * 
+     * @param _orderIndex
+     *            The index in the evaluation order.
+     * @param _chunk
+     *            A chunk of elements from the right-most join dimension.
+     * @param _bindingSet
+     *            The bindings from the prior joins.
+     */
+    protected void evaluateOptionals(final int _orderIndex, final Object[] _chunk,
+            final IBindingSet _bindingSet) {
+        
+        
+        for (Object _e : _chunk) {
+
+            if (DEBUG) {
+                log.debug("Considering: " + _e.toString()
+                        + ", orderIndex=" + _orderIndex + ", rule="
+                        + rule.getName());
+            }
+
+            ruleStats.elementCount[getTailIndex(_orderIndex)]++;
+
+            // clone the original binding set.
+            final IBindingSet bset = _bindingSet.clone();
+
+            // rip through the rest of the tails in the evaluation order.
+            boolean valid = true;
+            for (int i = _orderIndex + 1; valid && i < tailCount; i++) {
+
+                final int tailIndex = getTailIndex(i);
+
+                final IChunkedOrderedIterator itr2 = getAccessPath(i, bset)
+                        .iterator();
+
+                while (valid && itr2.hasNext()) {
+
+                    final Object[] chunk2 = itr2.nextChunk();
+                    
+                    for (Object e2 : chunk2) {
+
+                        if (DEBUG) {
+                            log.debug("Considering: " + e2.toString()
+                                    + ", orderIndex=" + i + ", rule="
+                                    + rule.getName());
+                        }
+
+                        ruleStats.elementCount[tailIndex]++;
+
+                        // bind variables from the current element.
+                        if (!ruleState.bind(tailIndex, _e, bset)) {
+
+                            // violates a constraint on the rule.
+
+                            valid = false;
+
+                            break;
+
+                        }
+
+                    }
+                
+                }
+
+            }
+
+            if (valid) {
+
+                /*
+                 * emit entailment
+                 */
+
+                if (DEBUG) {
+                    log.debug("solution: " + bset);
+                }
+
+                final ISolution solution = joinNexus.newSolution(rule, bset);
 
                 ruleStats.solutionCount++;
 
