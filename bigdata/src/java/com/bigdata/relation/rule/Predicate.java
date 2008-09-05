@@ -364,6 +364,12 @@ public class Predicate<E> implements IPredicate<E> {
         }
 
         sb.append(")");
+        
+        if(isOptional()) {
+            
+            sb.append("[optional]");
+            
+        }
 
         return sb.toString();
 
