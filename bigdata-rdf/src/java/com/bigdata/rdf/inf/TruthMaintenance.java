@@ -432,8 +432,8 @@ public class TruthMaintenance {
         if (log.isInfoEnabled())
             log.info("Computed closure in " + elapsed + "ms");
         
-        if (log.isInfoEnabled())
-            log.info("\n\ntempStore:\n"
+        if (log.isDebugEnabled())
+            log.debug("\n\ntempStore:\n"
                     + tempStore.dumpStore(database, true, true, false, true));
 
         tempStore.closeAndDelete();

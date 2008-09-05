@@ -46,44 +46,12 @@ public class FastClosure extends BaseClosure {
 
         if (!rdfsOnly) {
 
-            /**
-             * @TODO If these steps are truely independent, should they be
-             *       executed as a sequence instead? What is faster (also, what
-             *       is faster when parallel or when only sequential execution
-             *       is allowed).
-             */
-            if (false) {
+            // owl:equivalentProperty
+            if (forwardChainOwlEquivalentProperty) {
 
-                /*
-                 * Executes the closure of each rule in turn.
-                 */
-                
-                if (forwardChainOwlTransitiveProperty) {
+                program.addClosureOf(new RuleOwlEquivalentProperty(db,
+                        vocab));
 
-                    program.addClosureOf(new RuleOwlTransitiveProperty(db,
-                            vocab));
-
-                }
-
-                if (forwardChainOwlInverseOf) {
-
-                    program.addClosureOf(new RuleOwlInverseOf1(db, vocab));
-
-                    program.addClosureOf(new RuleOwlInverseOf2(db, vocab));
-
-                }
-
-                // owl:equivalentProperty
-                if (forwardChainOwlEquivalentProperty) {
-
-                    program.addClosureOf(new RuleOwlEquivalentProperty(db,
-                            vocab));
-
-                }
-
-            } else {
-                
-                
             }
                 
         }
@@ -239,8 +207,10 @@ public class FastClosure extends BaseClosure {
     
                 if (forwardChainOwlTransitiveProperty) {
     
-                    tmp.add(new RuleOwlTransitiveProperty(db, vocab));
+                    tmp.add(new RuleOwlTransitiveProperty1(db, vocab));
     
+                    tmp.add(new RuleOwlTransitiveProperty2(db, vocab));
+                    
                 }
     
                 if (forwardChainOwlInverseOf) {
@@ -248,13 +218,6 @@ public class FastClosure extends BaseClosure {
                     tmp.add(new RuleOwlInverseOf1(db, vocab));
     
                     tmp.add(new RuleOwlInverseOf2(db, vocab));
-    
-                }
-    
-                // owl:equivalentProperty
-                if (forwardChainOwlEquivalentProperty) {
-    
-                    tmp.add(new RuleOwlEquivalentProperty(db, vocab));
     
                 }
     
