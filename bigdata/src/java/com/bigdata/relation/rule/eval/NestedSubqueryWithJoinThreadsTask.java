@@ -263,30 +263,10 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
             final long nsolutions = ruleStats.solutionCount.get() - solutionsBefore;
             
-            if (nsolutions == 0L && rule.getTail(tailIndex).isOptional()) {
-
-                /*
-                 * There were no solutions in the data that satisified the
-                 * constraints on the rule and this tail is optional.
-                 */
+            if (nsolutions == 0L) {
                 
-                if (orderIndex + 1 < tailCount) {
-
-                    // ignore optional with no solutions in the data.
-                    apply(orderIndex + 1, bindingSet);
-
-                } else {
-
-                    // emit solution since last tail is optional.
-                    final ISolution solution = joinNexus.newSolution(rule,
-                            bindingSet);
-
-                    ruleStats.solutionCount.incrementAndGet();
-
-                    buffer.add(solution);
-
-                }
-
+                applyOptional(orderIndex, bindingSet);
+                
             }
             
         } finally {
@@ -295,6 +275,47 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         }
 
+    }
+
+    /**
+     * Method to be invoked IFF there were no solutions in the data that
+     * satisified the constraints on the rule. If the tail is optional, then
+     * subquery evaluation will simply skip the tail and proceed with the
+     * successor of the tail in the evaluation order. If the tail is the last
+     * tail in the evaluation order, then a solution will be emitted for the
+     * binding set.
+     * 
+     * @param orderIndex
+     *            The index into the evaluation order.
+     * @param bindingSet
+     *            The bindings from the prior join(s) (if any).
+     */
+    protected void applyOptional(final int orderIndex,
+            final IBindingSet bindingSet) {
+
+        final int tailIndex = getTailIndex(orderIndex);
+        
+        if( rule.getTail(tailIndex).isOptional()) {
+            
+            if (orderIndex + 1 < tailCount) {
+
+                // ignore optional with no solutions in the data.
+                apply(orderIndex + 1, bindingSet);
+
+            } else {
+
+                // emit solution since last tail is optional.
+                final ISolution solution = joinNexus.newSolution(rule,
+                        bindingSet);
+
+                ruleStats.solutionCount.incrementAndGet();
+
+                buffer.add(solution);
+
+            }
+
+        }
+        
     }
     
     /**
