@@ -105,11 +105,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     private boolean empty = false;
     
     public boolean isEmpty() {
-        
-        calc();
-        
         return empty;
-        
     }
     
     /**
@@ -314,6 +310,9 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * the join dimensions.  If there are shared variables but also some
      * unshared variables, then the join cardinality will be the maximum
      * cardinality from each join dimension.
+     * <p>
+     * Any join involving an optional will have infinite cardinality, so that
+     * optionals get placed at the end.
      *  
      * @param d1
      *          the first join dimension
@@ -323,6 +322,9 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      *          the join cardinality
      */
     protected long computeJoinCardinality(IJoinDimension d1, IJoinDimension d2) {
+        if (d1.isOptional() || d2.isOptional()) {
+            return Long.MAX_VALUE;
+        }
         final boolean sharedVars = hasSharedVars(d1, d2);
         final boolean unsharedVars = hasUnsharedVars(d1, d2);
         final long joinCardinality;
@@ -418,10 +420,11 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * A join dimension can be either a tail, or a previous join.  Either way
      * we need to know its cardinality, its variables, and its tails.
      */
-    private static interface IJoinDimension {
+    private interface IJoinDimension {
         long getCardinality();
         Set<String> getVars();
         String toJoinString();
+        boolean isOptional();
     }
 
     /**
@@ -429,7 +432,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * tails, or one tail and another join.  Theoretically it could be two
      * joins as well, which might be a future optimization worth thinking about.
      */
-    private static class Join implements IJoinDimension {
+    private class Join implements IJoinDimension {
         
         private final IJoinDimension d1, d2;
         private final long cardinality;
@@ -459,6 +462,10 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             return cardinality;
         }
         
+        public boolean isOptional() {
+            return false;
+        }
+        
         public String toJoinString() {
             return d1.toJoinString() + " X " + d2.toJoinString();
         }
@@ -468,7 +475,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
     /**
      * A tail implementation of a join dimension. 
      */
-    private static class Tail implements IJoinDimension {
+    private class Tail implements IJoinDimension {
 
         private final int tail;
         private final long cardinality;
@@ -490,6 +497,10 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
         public Set<String> getVars() {
             return vars;
+        }
+        
+        public boolean isOptional() {
+            return rule.getTail(tail).isOptional();
         }
         
         public String toJoinString() {
