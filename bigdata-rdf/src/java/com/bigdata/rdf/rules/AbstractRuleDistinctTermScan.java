@@ -327,7 +327,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
 
                             buffer.add(joinNexus.newSolution(rule, bindingSet));
 
-                            ruleStats.solutionCount++;
+                            ruleStats.solutionCount.incrementAndGet();
 
                         }
 

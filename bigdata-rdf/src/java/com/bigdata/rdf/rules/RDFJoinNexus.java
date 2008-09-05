@@ -106,6 +106,7 @@ import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.striterator.IRemoteChunkedIterator;
 import com.bigdata.striterator.WrappedRemoteChunkedIterator;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -176,9 +177,9 @@ public class RDFJoinNexus implements IJoinNexus {
             
         }
 
-        public RuleStats newInstance(IRule rule, IEvaluationPlan plan) {
+        public RuleStats newInstance(IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
          
-            return new RDFRuleStats(null, readTimestamp, rule, plan);
+            return new RDFRuleStats(null, readTimestamp, rule, plan, keyOrder);
 
         }
         
@@ -192,14 +193,15 @@ public class RDFJoinNexus implements IJoinNexus {
          *       can figure out who that is, you will see term identifiers
          *       rather than {@link BigdataValue}s.
          */
-        public RuleStats newInstancex(IRule rule, IEvaluationPlan plan) {
+        public RuleStats newInstancex(IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
             
             return new RDFRuleStats(
                     (indexManager instanceof IBigdataFederation ? null
                             : indexManager), //
                         readTimestamp, //
                         rule, //
-                        plan //
+                        plan, //
+                        keyOrder
                         );
             
         }
@@ -236,9 +238,9 @@ public class RDFJoinNexus implements IJoinNexus {
          * @param plan
          */
         public RDFRuleStats(IIndexManager indexManager, long timestamp,
-                IRule rule, IEvaluationPlan plan) {
+                IRule rule, IEvaluationPlan plan, IKeyOrder[] keyOrder) {
 
-            super(rule, plan);
+            super(rule, plan, keyOrder);
 
             this.indexManager = indexManager;
             

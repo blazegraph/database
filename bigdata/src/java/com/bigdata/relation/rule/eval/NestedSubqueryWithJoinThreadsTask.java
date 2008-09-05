@@ -107,7 +107,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         // note: evaluation order is fixed by now.
         this.ruleStats = joinNexus.getRuleStatisticsFactory().newInstance(rule,
-                ruleState.plan);
+                ruleState.plan, ruleState.keyOrder);
         
         this.tailCount = rule.getTailCount();
         
@@ -195,84 +195,97 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         try {
 
             final int tailIndex = getTailIndex(orderIndex);
+
+            /*
+             * Handles non-optionals and optionals with solutions in the
+             * data.
+             */
             
-            if (itr.hasNext() == false && rule.getTail(orderIndex).isOptional()) {
+            final long solutionsBefore = ruleStats.solutionCount.get();
+            
+            while (itr.hasNext()) {
+
+                if (orderIndex + 1 < tailCount) {
+
+                    // Nested subquery.
+
+                    final Object[] chunk;
+                    if (reorderChunkToTargetOrder) {
+                        
+                        /*
+                         * Re-order the chunk into the target order for the
+                         * _next_ access path.
+                         * 
+                         * FIXME This imples that we also know the set of
+                         * indices on which we need to read for a rule before we
+                         * execute the rule. That knowledge should be captured
+                         * and fed into the LDS and EDS/JDS rule execution logic
+                         * in order to optimize JOINs.
+                         */
+                        
+                        // target chunk order.
+                        final IKeyOrder targetKeyOrder = ruleState.keyOrder[getTailIndex(orderIndex + 1)];
+
+                        // Next chunk of results from the current access path.
+                        chunk = itr.nextChunk(targetKeyOrder);
+                        
+                    } else {
+                        
+                        // Next chunk of results from the current access path.
+                        chunk = itr.nextChunk();
+                        
+                    }
+
+                    ruleStats.chunkCount[tailIndex]++;
+
+                    // Issue the nested subquery.
+                    runSubQueries(orderIndex, chunk, bindingSet);
+
+                } else {
+
+                    // bottomed out.
+                    
+                    /*
+                     * Next chunk of results from that access path. The order of
+                     * the elements in this chunk does not matter since this is
+                     * the last join dimension.
+                     */
+                    final Object[] chunk = itr.nextChunk();
+
+                    ruleStats.chunkCount[tailIndex]++;
+
+                    // evaluate the chunk and emit any solutions.
+                    emitSolutions(orderIndex, chunk, bindingSet);
+                    
+                }
+
+            } // while
+
+            final long nsolutions = ruleStats.solutionCount.get() - solutionsBefore;
+            
+            if (nsolutions == 0L && rule.getTail(orderIndex).isOptional()) {
+
+                /*
+                 * There were no solutions in the data that satisified the
+                 * constraints on the rule and this tail is optional.
+                 */
                 
                 if (orderIndex + 1 < tailCount) {
-                    
-                    apply(orderIndex+1, bindingSet);
-                    
+
+                    // ignore optional with no solutions in the data.
+                    apply(orderIndex + 1, bindingSet);
+
                 } else {
-                    
+
+                    // emit solution since last tail is optional.
                     final ISolution solution = joinNexus.newSolution(rule,
                             bindingSet);
 
-                    ruleStats.solutionCount++;
+                    ruleStats.solutionCount.incrementAndGet();
 
                     buffer.add(solution);
-                    
+
                 }
-                
-            }
-            else {
-
-                while (itr.hasNext()) {
-
-                    if (orderIndex + 1 < tailCount) {
-    
-                        // Nested subquery.
-    
-                        final Object[] chunk;
-                        if (reorderChunkToTargetOrder) {
-                            
-                            /*
-                             * Re-order the chunk into the target order for the
-                             * _next_ access path.
-                             * 
-                             * FIXME This imples that we also know the set of
-                             * indices on which we need to read for a rule before we
-                             * execute the rule. That knowledge should be captured
-                             * and fed into the LDS and EDS/JDS rule execution logic
-                             * in order to optimize JOINs.
-                             */
-                            
-                            // target chunk order.
-                            final IKeyOrder targetKeyOrder = ruleState.keyOrder[getTailIndex(orderIndex + 1)];
-    
-                            // Next chunk of results from the current access path.
-                            chunk = itr.nextChunk(targetKeyOrder);
-                            
-                        } else {
-                            
-                            // Next chunk of results from the current access path.
-                            chunk = itr.nextChunk();
-                            
-                        }
-    
-                        ruleStats.chunkCount[tailIndex]++;
-    
-                        // Issue the nexted subquery.
-                        runSubQueries(orderIndex, chunk, bindingSet);
-    
-                    } else {
-    
-                        // bottomed out.
-                        
-                        /*
-                         * Next chunk of results from that access path. The order of
-                         * the elements in this chunk does not matter since this is
-                         * the last join dimension.
-                         */
-                        final Object[] chunk = itr.nextChunk();
-    
-                        ruleStats.chunkCount[tailIndex]++;
-    
-                        // evaluate the chunk and emit any solutions.
-                        emitSolutions(orderIndex, chunk, bindingSet);
-                        
-                    }
-    
-                } // while
 
             }
             
@@ -332,17 +345,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      */
     protected void runSubQueries(final int orderIndex, final Object[] chunk,
             final IBindingSet bindingSet) {
-/*
-        final boolean optional = rule.getTail(getTailIndex(orderIndex+1)).isOptional();
         
-        if(optional) {
-
-            evaluateOptionals(orderIndex,chunk,bindingSet);
-            
-            return;
-            
-        }
-*/        
         /*
          * FIXME The problem with deciding here where to run the subqueries is
          * that we need to make the decision when it comes time to execute a
@@ -620,102 +623,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 final ISolution solution = joinNexus.newSolution(rule,
                         bindingSet);
 
-                ruleStats.solutionCount++;
-
-                buffer.add(solution);
-
-            }
-
-        }
-
-    }
-
-    /**
-     * Considers each remaining predicate in the tail for the evaluation order
-     * in turn and scans the access path for that tail, setting any bindings.
-     * Regardless of whether or not there is a match in the data, we proceed to
-     * the next tail in the evaluation order. When we have processed the last
-     * tail in the evaluation order, then we emit an {@link ISolution} for the
-     * {@link IRule}. (This requires that all optionals are evaluated last and
-     * the evaluation plan is responsible for that.)
-     * 
-     * @param _orderIndex
-     *            The index in the evaluation order.
-     * @param _chunk
-     *            A chunk of elements from the right-most join dimension.
-     * @param _bindingSet
-     *            The bindings from the prior joins.
-     */
-    protected void evaluateOptionals(final int _orderIndex, final Object[] _chunk,
-            final IBindingSet _bindingSet) {
-        
-        
-        for (Object _e : _chunk) {
-
-            if (DEBUG) {
-                log.debug("Considering: " + _e.toString()
-                        + ", orderIndex=" + _orderIndex + ", rule="
-                        + rule.getName());
-            }
-
-            ruleStats.elementCount[getTailIndex(_orderIndex)]++;
-
-            // clone the original binding set.
-            final IBindingSet bset = _bindingSet.clone();
-
-            // rip through the rest of the tails in the evaluation order.
-            boolean valid = true;
-            for (int i = _orderIndex + 1; valid && i < tailCount; i++) {
-
-                final int tailIndex = getTailIndex(i);
-
-                final IChunkedOrderedIterator itr2 = getAccessPath(i, bset)
-                        .iterator();
-
-                while (valid && itr2.hasNext()) {
-
-                    final Object[] chunk2 = itr2.nextChunk();
-                    
-                    for (Object e2 : chunk2) {
-
-                        if (DEBUG) {
-                            log.debug("Considering: " + e2.toString()
-                                    + ", orderIndex=" + i + ", rule="
-                                    + rule.getName());
-                        }
-
-                        ruleStats.elementCount[tailIndex]++;
-
-                        // bind variables from the current element.
-                        if (!ruleState.bind(tailIndex, _e, bset)) {
-
-                            // violates a constraint on the rule.
-
-                            valid = false;
-
-                            break;
-
-                        }
-
-                    }
-                
-                }
-
-            }
-
-            if (valid) {
-
-                /*
-                 * emit entailment
-                 */
-
-                if (DEBUG) {
-                    log.debug("solution: " + bset);
-                }
-
-                final ISolution solution = joinNexus.newSolution(rule, bset);
-
-                ruleStats.solutionCount++;
+                ruleStats.solutionCount.incrementAndGet();
 
                 buffer.add(solution);
 
