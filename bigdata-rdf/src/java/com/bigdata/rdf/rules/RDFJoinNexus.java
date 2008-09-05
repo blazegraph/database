@@ -699,13 +699,20 @@ public class RDFJoinNexus implements IJoinNexus {
         final IRelation relation = getTailRelationView(predicate);
         
         // find the best access path for the predicate for that relation.
-        final IAccessPath accessPath = relation.getAccessPath(predicate);
+        IAccessPath accessPath = relation.getAccessPath(predicate);
 
+        if (predicate.getSolutionExpander() != null) {
+            
+            // allow the predicate to wrap the access path.
+            accessPath = predicate.getSolutionExpander().getAccessPath(accessPath);
+            
+        }
+        
         if(backchain && relation instanceof SPORelation) {
 
             final SPORelation spoRelation = (SPORelation)relation;
             
-            return new BackchainAccessPath(spoRelation.getContainer(),
+            accessPath = new BackchainAccessPath(spoRelation.getContainer(),
                     accessPath);
             
         }
