@@ -263,7 +263,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
             final long nsolutions = ruleStats.solutionCount.get() - solutionsBefore;
             
-            if (nsolutions == 0L && rule.getTail(orderIndex).isOptional()) {
+            if (nsolutions == 0L && rule.getTail(tailIndex).isOptional()) {
 
                 /*
                  * There were no solutions in the data that satisified the
