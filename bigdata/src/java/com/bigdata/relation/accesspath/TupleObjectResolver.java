@@ -7,10 +7,11 @@ import cutthecrap.utils.striterators.Resolver;
 
 /**
  * Resolve an {@link ITuple} to its {@link Tuple#getObject()}.
- *  
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <R>
+ *            The generic type of the resolved object.
  */
 public class TupleObjectResolver<R> extends Resolver {
 

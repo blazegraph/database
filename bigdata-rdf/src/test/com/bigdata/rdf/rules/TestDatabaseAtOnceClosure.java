@@ -47,6 +47,11 @@ Modifications:
 
 package com.bigdata.rdf.rules;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
+import java.io.InputStream;
 import java.util.Properties;
 
 import org.openrdf.model.Statement;
@@ -132,7 +137,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     }
 
     public void test_fixedPoint_TestOwlSameAs_Full() throws Exception {
-    
+        
         // final String file = "testOwlSameAs.rdf";
         final String file = "small owlSameAs.rdf";
         
@@ -141,13 +146,64 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     }
     
     public void test_fixedPoint_TestOwlSameAs_Fast() throws Exception {
-    
-        final String file = "testOwlSameAs.rdf";
+        
+        // final String file = "testOwlSameAs.rdf";
+        final String file = "small owlSameAs.rdf";
         
         doFixedPointTest(file, FastClosure.class);
     
     }
     
+    public void test_fixedPoint_LUBM_U1_As_Full() throws Exception {
+
+        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
+                new FilenameFilter() {
+
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(".owl");
+                    }
+                });
+
+        doFixedPointTest(files, FullClosure.class);
+
+    }
+
+    public void test_fixedPoint_LUBM_U1_As_Fast() throws Exception {
+
+        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
+                new FilenameFilter() {
+
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(".owl");
+                    }
+                });
+
+        doFixedPointTest(files, FastClosure.class);
+
+    }
+
+    /**
+     * Reads files matching the filter from the directory.
+     * 
+     * @param dir
+     *            The directory.
+     * @param filter
+     *            The filter.
+     */
+    private File[] readFiles(File dir, FilenameFilter filter) {
+
+        assertTrue("No such file or directory: " + dir, dir.exists());
+
+        assertTrue("Not a directory: " + dir, dir.isDirectory());
+
+        final File[] files = dir.listFiles(filter);
+
+        assertNotNull("Could not read directory: " + dir, files);
+        
+        return files;
+        
+    }
+
     /**
      * Compares ground truth for the closure of the source RDF/XML file (as
      * computed by Sesame 2) against the closure as computed by bigdata.
@@ -162,6 +218,24 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
     protected void doFixedPointTest(String file,
             Class<? extends BaseClosure> closureClass) throws Exception {
 
+        doFixedPointTest(new File[] { new File(file) }, closureClass);
+        
+    }
+
+    /**
+     * Compares ground truth for the closure of the source RDF/XML file(s) (as
+     * computed by Sesame 2) against the closure as computed by bigdata.
+     * 
+     * @param files
+     *            The RDF/XML files.
+     * @param closureType
+     *            The closure program to be applied by bigdata.
+     * 
+     * @throws Exception
+     */
+    protected void doFixedPointTest(File[] files,
+                Class<? extends BaseClosure> closureClass) throws Exception {
+            
         /*
          * Used to compute the entailments our own rules engine.
          */
@@ -170,11 +244,13 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
             final Properties properties = getProperties();
 
+            // restrict to RDFS only since that is what Sesame 2 will compute.
             properties
                     .setProperty(
                             com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
                             RdfsAxioms.class.getName());
 
+            // use the specified closure algorithm.
             properties
                     .setProperty(
                             com.bigdata.rdf.store.AbstractTripleStore.Options.CLOSURE_CLASS,
@@ -232,8 +308,37 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            
 	            try {
 	            	
-	            	cxn.add(getClass().getResourceAsStream(file), 
-	            			"", RDFFormat.RDFXML);
+                    for(File file : files) {
+                        
+                        InputStream is = null;
+
+                        try {
+                        
+                            is = new FileInputStream(file);
+                            
+                        } catch (FileNotFoundException ex) {
+                            
+                            is = getClass()
+                                    .getResourceAsStream(file.toString());
+                            
+                        }
+                        
+                        if(is == null) {
+                            
+                            fail("No such file or resource: "+file);
+                            
+                        }
+
+                        cxn.add(is, file.toURI().toString()/* baseURI */,
+                                RDFFormat.RDFXML);
+
+                        if(log.isInfoEnabled()) {
+                         
+                            log.info("Loaded: "+file);
+                            
+                        }
+                        
+                    }
 	            	
 	            	cxn.commit();
 	            	
@@ -253,9 +358,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            	
 	                buf.flush();
 	                
-	                if (log.isInfoEnabled()) {
+	                if (log.isDebugEnabled()) {
 
-                        log.info("\ngroundTruth:\n" + groundTruth.dumpStore());
+                        log.debug("\ngroundTruth:\n" + groundTruth.dumpStore());
                         
                     }
 	                
@@ -277,12 +382,35 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                  * Loads the same data into the closure store and computes the
                  * closure.
                  */
+                
+                for(File file : files) {
         		
-        		closure.getDataLoader().loadData(
-        				getClass().getResourceAsStream(file), 
-	            		"", RDFFormat.RDFXML);
+                    InputStream is = null;
 
-//                closure.commit();
+                    try {
+                    
+                        is = new FileInputStream(file);
+                        
+                    } catch (FileNotFoundException ex) {
+                        
+                        is = getClass()
+                                .getResourceAsStream(file.toString());
+                        
+                    }
+                    
+                    if(is == null) {
+                        
+                        fail("No such file or resource: "+file);
+                        
+                    }
+
+                    closure.getDataLoader().loadData(is,
+                            file.toURI().toString()/* baseURL */,
+                            RDFFormat.RDFXML);
+                
+                }
+
+// closure.commit();
 //                
                 /*
                  * compute the database at once closure.
@@ -297,9 +425,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 closure.getInferenceEngine()
                         .computeClosure(null/* focusStore */);
                 
-                if (log.isInfoEnabled()) {
+                if (log.isDebugEnabled()) {
 
-                    log.info("\nclosure:\n" + closure.dumpStore());
+                    log.debug("\nclosure:\n" + closure.dumpStore());
                     
                 }
                 

@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
+import java.util.concurrent.ExecutorService;
+
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -35,10 +37,12 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IRuleTaskFactory;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -153,6 +157,14 @@ public class DelegateJoinNexus implements IJoinNexus {
 
     public IRuleStatisticsFactory getRuleStatisticsFactory() {
         return delegate.getRuleStatisticsFactory();
+    }
+
+    public ExecutorService getJoinService() {
+        return delegate.getJoinService();
+    }
+
+    public IConstant fakeBinding(IPredicate predicate, Var var) {
+        return delegate.fakeBinding(predicate, var);
     }
 
 }

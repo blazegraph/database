@@ -30,10 +30,12 @@ package com.bigdata.relation.accesspath;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.striterator.IAsynchronousIterator;
@@ -63,6 +65,18 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
     protected static Logger log = Logger.getLogger(BlockingBuffer.class);
     
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     /**
      * <code>true</code> until the buffer is {@link #close()}ed.
      */
@@ -151,7 +165,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public BlockingBuffer(int capacity) {
 
-        this(capacity, null/* keyOrder */, null/*filter*/);
+        this(capacity, null/* keyOrder */, null/* filter */);
 
     }
     
@@ -263,7 +277,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
         this.open = false;
 
-        log.info("closed.");
+        if (INFO)
+            log.info("closed.");
         
     }
     
@@ -335,7 +350,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         if (!accept(e)) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("reject: " + e.toString());
 
             return;
@@ -346,7 +361,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
         // wait if the queue is full.
         int ntries = 0;
+        // initial delay before the 1st log message.
         long timeout = 100;
+        // Note: controls time between log messages NOT the wait time.
+        final long maxTimeout = 10000;
         while (true) {
 
             try {
@@ -364,8 +382,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     ntries++;
                     
                     final long elapsed = System.currentTimeMillis() - begin;
-                    
-                    timeout = Math.min(10000, timeout*= 2);
+
+                    timeout = Math.min(maxTimeout, timeout *= 2);
                     
                     log.warn("waiting - queue is full: ntries=" + ntries
                             + ", elapsed=" + elapsed + ", timeout=" + timeout
@@ -385,7 +403,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
             // item now on the queue.
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("added: " + e.toString());
             
             return;
@@ -420,8 +438,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
     /**
      * An inner class that reads from the buffer. This is not thread-safe - it
-     * makes no attempt to be atomic in its operations in {@link #next()} or
-     * {@link #nextChunk()}.
+     * makes no attempt to be atomic in its operations in {@link #hasNext()},
+     * {@link #next()} or {@link #nextChunk()}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -443,11 +461,22 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         private boolean open = true;
 
         /**
+         * The next element to be returned (from the head of the queue).
+         * <p>
+         * Note: We use {@link #nextE} because {@link BlockingQueue} does not
+         * offer a method in which we peek with a timeout, only in which we poll
+         * with a timeout. Therefore we poll with a timeout and if poll()
+         * returns an element, then we set it on {@link #nextE}.
+         */
+        private E nextE = null;
+        
+        /**
          * Create an iterator that reads from the buffer.
          */
         private BlockingIterator() {
        
-            log.info("Starting iterator.");
+            if (INFO)
+                log.info("Starting iterator.");
             
         }
        
@@ -471,7 +500,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         public void close() {
 
-            log.debug("");
+            if (DEBUG)
+                log.debug("");
             
             if (!open)
                 return;
@@ -488,7 +518,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * we cancel the future if it is not yet done.
                  */
                 
-                if(log.isDebugEnabled()) {
+                if(DEBUG) {
                     
                     log.debug("will cancel future: "+future);
                     
@@ -496,7 +526,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 future.cancel(true/* mayInterruptIfRunning */);
                 
-                if(log.isDebugEnabled()) {
+                if(DEBUG) {
                     
                     log.debug("did cancel future: "+future);
                     
@@ -507,6 +537,57 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         }
 
         private volatile boolean didCheckFuture = false;
+        
+        private final void checkFuture() {
+
+            if (!didCheckFuture && future != null && future.isDone()) {
+
+                if (INFO)
+                    log.info("Future is done");
+
+                // don't re-execute this code.
+                didCheckFuture = true;
+
+                /*
+                 * Make sure the buffer is closed. In fact, the caller probably
+                 * does not need to close the buffer since we do it here when
+                 * their task completes.
+                 */
+                BlockingBuffer.this.close();
+
+                try {
+
+                    // look for an error from the Future.
+                    future.get();
+
+                } catch (InterruptedException e) {
+
+                    if (INFO)
+                        log.info(e.getMessage());
+
+                    // itr will not deliver any more elements.
+                    close();
+
+                } catch (ExecutionException e) {
+
+                    log.error(e, e);
+
+                    // itr will not deliver any more elements.
+                    close();
+
+                    // rethrow exception.
+                    throw new RuntimeException(e);
+
+                }
+
+                /*
+                 * Fall through. If there is anything in the queue then we still
+                 * need to drain it!
+                 */
+
+            }
+
+        }
 
         /**
          * Return <code>true</code> if there are elements in the buffer that
@@ -519,150 +600,134 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         public boolean hasNext() {
 
-            log.debug("begin");
+            if (DEBUG)
+                log.debug("begin");
 
-            assertNotAborted();
-
-            if(!open) {
-                
-                log.info("iterator is closed");
-                
-                return false;
-                
-            }
-
-            /*
-             * Note: hasNext must wait until the buffer is closed and all
-             * elements in the queue have been consumed before it can conclude
-             * that there will be nothing more that it can visit. This re-tests
-             * whether or not the buffer is open after a timeout and continues
-             * to loop until the buffer is closed AND there are no more elements
-             * in the queue.
-             */
-            
             final long begin = System.currentTimeMillis();
             
-            while (BlockingBuffer.this.open || !queue.isEmpty()) {
+            int ntries = 0;
+            // initial delay before the 1st log message.
+            long timeout = 100;
+            // maximum delay between log messages (NOT the wait time).
+            final long maxTimeout = 10000;
 
-                if (!didCheckFuture && future != null && future.isDone()) {
+            /*
+             * Loop while the BlockingBuffer is open -or- there is an element
+             * available.
+             * 
+             * Note: hasNext() must wait until the buffer is closed and all
+             * elements in the queue (and nextE) have been consumed before it
+             * can conclude that there will be nothing more that it can visit.
+             * This re-tests whether or not the buffer is open after a timeout
+             * and continues to loop until the buffer is closed AND there are no
+             * more elements in the queue.
+             */
+            
+            while (BlockingBuffer.this.open || nextE != null || !queue.isEmpty()) {
 
-                    log.info("Future is done");
-
-                    // don't re-execute this code.
-                    didCheckFuture = true;
-                    
-                    /*
-                     * Make sure the buffer is closed. In fact, the caller
-                     * probably does not need to close the buffer since we do it
-                     * here when their task completes.
-                     */
-                    BlockingBuffer.this.close();
-
-                    try {
-
-                        // look for an error from the Future.
-                        future.get();
-                        
-                    } catch (InterruptedException e) {
-                        
-                        log.info("Interrupted");
-                        
-                    } catch (ExecutionException e) {
-
-                        log.error(e,e);
-                        
-                        throw new RuntimeException(e);
-                        
-                    }
-
-                    /*
-                     * Fall through. If there is anything in the queue then we
-                     * still need to drain it!
-                     */
-                    
-                }
-
+                checkFuture();
+                
                 assertNotAborted();
 
-                /*
-                 * Use a set limit on wait and recheck whether or not the
-                 * buffer has been closed asynchronously.
-                 */
-
-                final E spo = queue.peek();
-
-                if (spo == null) {
+                if(!open) {
                     
-                    try {
-                        /*
-                         * @todo if this threashold is large (100ms is large)
-                         * then it places an unacceptable latency on short
-                         * queries since the total query can often be evaluated
-                         * in less than 100ms. However, if it is small then we
-                         * might loop while waiting for the results to be
-                         * materialized. Perhaps an explicit condition would be
-                         * better or using an increasing wait (or a fixed
-                         * sequence of total time waiting).
-                         */
-                        final long sleepMillis = 1;
-                        Thread.sleep(sleepMillis);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
+                    if (INFO)
+                        log.info("iterator is closed");
                     
-                    final long now = System.currentTimeMillis();
-                    
-                    final long elapsed = now - begin;
-
-                    // @todo use a movable threshold to avoid too frequent retriggering
-                    if (elapsed > 2000) {
-
-                        if (future == null) {
-
-                            /*
-                             * This can arise if you fail to set the future on
-                             * the buffer such that the iterator can not monitor
-                             * it. If the future completes (esp. with an error)
-                             * then the iterator can keep looking for another
-                             * element but the source is no longer writing on
-                             * the buffer and nothing will show up.
-                             */
-                            
-                            log.error("Future not set on buffer");
-                            
-                        } else {
-                            
-                            /*
-                             * This could be a variety of things such as waiting
-                             * on a mutex that is already held, e.g., an index
-                             * lock, that results in a deadlock between the
-                             * process writing on the buffer and the process
-                             * reading from the buffer. If you are careful with
-                             * who gets the unisolated view then this should not
-                             * be a problem.
-                             */
-                            
-                            log.warn("Iterator is not progressing...");
-
-                        }
-                        
-                    }
-                    
-                    continue;
+                    return false;
                     
                 }
                 
-                if (log.isDebugEnabled())
-                    log.debug("next: " + spo.toString());
+                if (nextE != null) {
+
+                    // we already have the next element on hand.
+                    return true;
+                    
+                }
+
+                try {
+
+                    /*
+                     * Poll the queue with a timeout. If there is nothing on the
+                     * queue, then increase the timeout and retry from the top
+                     * (this will re-check whether or not the buffer has been
+                     * closed asynchronously).
+                     * 
+                     * Note: DO NOT sleep() here. Polling will use a Condition
+                     * to wake up when there is something in the queue. If you
+                     * sleep() here then ANY timeout can introduce an
+                     * unacceptable latency since many queries can be evaluated
+                     * in LT 10ms !
+                     */
+
+                    if ((nextE = queue.poll(timeout, TimeUnit.MILLISECONDS)) != null) {
+                        
+                        if (DEBUG)
+                            log.debug("next: " + nextE);
+
+                        return true;
+
+                    }
+                    
+                } catch (InterruptedException ex) {
+
+                    if (INFO)
+                        log.info(ex.getMessage());
+
+                    // itr will not deliver any more elements.
+                    close();
+                    
+                    return false;
+                    
+                }
                 
-                return true;
+                /*
+                 * Nothing available yet on the queue.
+                 */
+
+                // increase the timeout.
+                timeout = Math.min(maxTimeout, timeout *= 2);
+
+                ntries++;
+
+                final long now = System.currentTimeMillis();
+
+                final long elapsed = now - begin;
+
+                /*
+                 * This could be a variety of things such as waiting on a mutex
+                 * that is already held, e.g., an index lock, that results in a
+                 * deadlock between the process writing on the buffer and the
+                 * process reading from the buffer. If you are careful with who
+                 * gets the unisolated view then this should not be a problem.
+                 */
+
+                log.warn("Iterator is not progressing: ntries=" + ntries
+                        + ", elapsed=" + elapsed);
+
+                if (elapsed > 2000 && future == null) {
+
+                    /*
+                     * This can arise if you fail to set the future on the
+                     * buffer such that the iterator can not monitor it. If the
+                     * future completes (esp. with an error) then the iterator
+                     * can keep looking for another element but the source is no
+                     * longer writing on the buffer and nothing will show up.
+                     */
+
+                    log.error("Future not set on buffer");
+
+                }
+
+                continue;
                 
             }
 
-            if (log.isInfoEnabled())
-                log.info("Exhausted: bufferOpen=" + BlockingBuffer.this.open
-                        + ", size=" + queue.size());
-            
+            if (INFO)
+                log.info("Exhausted: bufferOpen="
+                    + BlockingBuffer.this.open + ", nextE=" + nextE != null
+                    + ", size=" + queue.size());
+
             return false;
 
         }
@@ -675,28 +740,22 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             }
 
-            log.debug("");
+//            if (DEBUG)
+//                log.debug("");
 
-            assert !queue.isEmpty();
+//            assert !queue.isEmpty();
+
+            assert nextE != null;
             
-            final E spo;
+            // we already have the next element.
+            final E e = nextE;
 
-            try {
-
-                spo = queue.take();
-                
-            } catch(InterruptedException ex) {
-                
-                close();
-                
-                throw new RuntimeException("Closed by interrupt", ex);
-                
-            }
+            nextE = null;
             
-            if (log.isDebugEnabled())
-                log.debug("next: " + spo.toString());
+            if (DEBUG)
+                log.debug("next: " + e);
 
-            return spo;
+            return e;
 
         }
 
@@ -723,7 +782,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
              * will give the buffer a chance to build up some data and make the
              * chunk-at-a-time processing more efficient.
              */
-            final int chunkSize = queue.size();
+            final int chunkSize = queue.size() + 1/* nextE */;
 
             E[] chunk = null;
 
@@ -732,6 +791,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             while (n < chunkSize) {
 
                 final E e = next();
+                
+                assert e != null;
                 
                 if (chunk == null) {
 
@@ -745,13 +806,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
             }
             
-            if(log.isInfoEnabled()) {
-            
+            if (INFO) {
+
                 final long elapsed = System.currentTimeMillis() - begin;
-                
-                log.info("obtained chunk: size="+n+", elapsed="+elapsed+" ms");
-                
+
+                log.info("obtained chunk: size=" + n + ", elapsed=" + elapsed
+                        + " ms");
+
             }
+            
+            assert chunk != null;
             
             return chunk;
             

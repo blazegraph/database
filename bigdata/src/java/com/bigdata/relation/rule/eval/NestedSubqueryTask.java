@@ -161,7 +161,7 @@ public class NestedSubqueryTask implements IStepTask {
         final int tailCount = rule.getTailCount();
         
         // note: evaluation order is fixed by now.
-        final int order = ruleState.order[orderIndex];
+        final int tailIndex = ruleState.order[orderIndex];
         
         if (orderIndex < 0 || orderIndex >= tailCount)
             throw new IllegalArgumentException();
@@ -172,7 +172,7 @@ public class NestedSubqueryTask implements IStepTask {
         final IChunkedOrderedIterator itr;
         {
 
-            final IPredicate predicate = rule.getTail(order)
+            final IPredicate predicate = rule.getTail(tailIndex)
                     .asBound(bindingSet);
 
             final IAccessPath accessPath = joinNexus
@@ -180,8 +180,8 @@ public class NestedSubqueryTask implements IStepTask {
 
             if (log.isDebugEnabled()) {
 
-                log.debug("orderIndex=" + orderIndex + ", tailIndex=" + order
-                        + ", tail=" + ruleState.rule.getTail(order)
+                log.debug("orderIndex=" + orderIndex + ", tailIndex=" + tailIndex
+                        + ", tail=" + ruleState.rule.getTail(tailIndex)
                         + ", bindingSet=" + bindingSet + ", accessPath="
                         + accessPath);
 
@@ -198,7 +198,7 @@ public class NestedSubqueryTask implements IStepTask {
                 // next chunk of results from that access path.
                 final Object[] chunk = itr.nextChunk();
 
-                ruleStats.chunkCount[order]++;
+                ruleStats.chunkCount[tailIndex]++;
 
                 if (orderIndex + 1 < tailCount) {
 
@@ -208,11 +208,12 @@ public class NestedSubqueryTask implements IStepTask {
 
                         if (log.isDebugEnabled()) {
                             log.debug("Considering: " + e.toString()
-                                    + ", tailIndex=" + orderIndex + ", rule="
+                                    + ", orderIndex=" + orderIndex
+                                    + ", tailIndex=" + tailIndex + ", rule="
                                     + rule.getName());
                         }
 
-                        ruleStats.elementCount[order]++;
+                        ruleStats.elementCount[tailIndex]++;
 
                         /*
                          * Then bind this statement, which propagates bindings
@@ -223,11 +224,11 @@ public class NestedSubqueryTask implements IStepTask {
 
                         ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
                         
-                        if (ruleState.bind(order, e, bindingSet)) {
+                        if (ruleState.bind(tailIndex, e, bindingSet)) {
 
                             // run the subquery.
                             
-                            ruleStats.subqueryCount[order]++;
+                            ruleStats.subqueryCount[tailIndex]++;
 
                             apply1(orderIndex + 1);
                             
@@ -247,10 +248,10 @@ public class NestedSubqueryTask implements IStepTask {
                                     + rule.getName());
                         }
 
-                        ruleStats.elementCount[order]++;
+                        ruleStats.elementCount[tailIndex]++;
 
                         // bind variables from the current element.
-                        if (ruleState.bind(order, e, bindingSet)) {
+                        if (ruleState.bind(tailIndex, e, bindingSet)) {
 
                             /*
                              * emit entailment
