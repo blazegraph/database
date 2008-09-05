@@ -107,6 +107,9 @@ public class TestAll extends TestCase {
         // Note: rdfs 5 and 11 use the same base class.
         suite.addTestSuite(TestRuleRdfs11.class);
 
+        // test suite for optionals.
+        suite.addTestSuite(TestOptionals.class);
+        
         // test suite for the "match" rule (entity matching).
         suite.addTestSuite(TestMatch.class);
         

@@ -425,6 +425,12 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         sb.append(")");
 
+        if(isOptional()) {
+            
+            sb.append("[optional]");
+            
+        }
+        
         return sb.toString();
 
     }
