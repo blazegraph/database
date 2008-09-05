@@ -114,6 +114,24 @@ public class SPOPredicate implements IPredicate<ISPO> {
     }
     
     /**
+     * Partly specified ctor. The context will be <code>null</code>. 
+     * No constraint is specified. No expander is specified.
+     * 
+     * @param relationName
+     * @param s
+     * @param p
+     * @param o
+     */
+    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
+            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
+            final boolean optional) {
+
+        this(new String[] { relationName }, s, p, o, null/* c */,
+                optional, null/* constraint */, null/* expander */);
+        
+    }
+    
+    /**
      * Fully specified ctor.
      * 
      * @param relationName

@@ -323,7 +323,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      */
     protected long computeJoinCardinality(IJoinDimension d1, IJoinDimension d2) {
         if (d1.isOptional() || d2.isOptional()) {
-            return Long.MAX_VALUE;
+            return Long.MAX_VALUE-1;
         }
         final boolean sharedVars = hasSharedVars(d1, d2);
         final boolean unsharedVars = hasUnsharedVars(d1, d2);
@@ -332,7 +332,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
             // no shared vars - take the sum
             // joinCardinality = d1.getCardinality() + d2.getCardinality();
             // different approach - give preference to shared variables
-            joinCardinality = Long.MAX_VALUE;
+            joinCardinality = Long.MAX_VALUE-1;
         } else {
             if (unsharedVars == false) {
                 // shared vars and no unshared vars - take the min
