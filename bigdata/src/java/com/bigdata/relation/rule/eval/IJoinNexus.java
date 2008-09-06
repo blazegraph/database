@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.IMutableRelation;
@@ -88,6 +89,9 @@ public interface IJoinNexus {
      * The {@link ExecutorService} to be used for parallelization of JOINs.
      * Unlike some other {@link ExecutorService} applications, this SHOULD have
      * a maximum pool size in order to avoid overwhelming the host.
+     * 
+     * @deprecated Use {@link IIndexStore#getExecutorService()} instead. See
+     *             {@link NestedSubqueryWithJoinThreadsTask}.
      */
     ExecutorService getJoinService();
     

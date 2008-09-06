@@ -415,7 +415,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                             ActionEnum.Query, IJoinNexus.BINDINGS,
                             null, // filter
                             false, // justify 
-                            tripleSource.includeInferred, // backchain
+                            tripleSource.includeInferred&&tripleSource.conn.isQueryTimeExpander(), // backchain
                             planFactory
                             );
 
