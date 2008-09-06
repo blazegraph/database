@@ -24,7 +24,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class BigdataTripleSource implements TripleSource {
 
-    private final BigdataSailConnection conn;
+    protected final BigdataSailConnection conn;
     
     public final boolean includeInferred;
     

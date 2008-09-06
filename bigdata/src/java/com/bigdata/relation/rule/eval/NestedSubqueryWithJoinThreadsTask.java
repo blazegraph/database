@@ -38,6 +38,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -46,6 +47,8 @@ import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -53,7 +56,14 @@ import com.bigdata.striterator.IKeyOrder;
  * Evaluation of an {@link IRule} using nested subquery (one or more JOINs plus
  * any {@link IElementFilter}s specified for the predicates in the tail or
  * {@link IConstraint}s on the {@link IRule} itself). The subqueries are formed
- * into tasks and submitted to an {@link ExecutorService}. 
+ * into tasks and submitted to an {@link ExecutorService}. The effective
+ * parallelism is limited by the #of elements visited in a chunk for the first
+ * join dimension, as only those subqueries will be parallelized. Subqueries for
+ * 2nd+ join dimensions are run in the caller's thread to ensure liveness.
+ * 
+ * @todo Scale-out joins should be distributed. A scale-out join run with this
+ *       task will use {@link ClientIndexView}s. All work (other than the
+ *       iterator scan) will be performed on the client running the join.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -83,6 +93,16 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     protected final RuleState ruleState;
     protected final RuleStats ruleStats;
     protected final int tailCount;
+
+    /**
+     * When <code>true</code>, subqueries for the first join dimension will
+     * be issued in parallel.
+     */
+    protected final boolean parallelSubqueries;
+
+    /**
+     * The {@link ExecutorService} to which parallel subqueries are submitted.
+     */
     protected final ThreadPoolExecutor joinService;
     
     public NestedSubqueryWithJoinThreadsTask(final IRule rule,
@@ -111,7 +131,17 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         
         this.tailCount = rule.getTailCount();
         
-        this.joinService = (ThreadPoolExecutor) (forceSerialExecution ? null
+        final IIndexManager im = joinNexus.getIndexManager();
+        
+        /*
+         * Note: Parallel subqueries provide a 2x multipler for EDS and a 6x
+         * multiplier for JDS (faster closure as measured on LUBM U1).  There
+         * is a slight penalty for LTS (.99x) and LDS (.88x). 
+         */
+        this.parallelSubqueries = (im instanceof IBigdataFederation && ((IBigdataFederation) im)
+                .isScaleOut());
+        
+        this.joinService = (ThreadPoolExecutor) (!parallelSubqueries ? null
                 : useJoinService ? joinNexus.getJoinService() : joinNexus
                         .getIndexManager().getExecutorService());
         
@@ -368,21 +398,33 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             final IBindingSet bindingSet) {
         
         /*
-         * FIXME The problem with deciding here where to run the subqueries is
-         * that we need to make the decision when it comes time to execute a
-         * specific subquery. At this stage all we want to do is build the
-         * subquery tasks. The joinService should choose whether to run them in
-         * the caller's thread, start a new thread, or run leave them on the
-         * queue for a bit.
+         * Note: At this stage all we want to do is build the subquery tasks.
+         * For the _most_ part , the joinService should choose whether to run
+         * the tasks in the caller's thread, start a new thread, or run leave
+         * them on the work queue for a bit.
          * 
-         * Note: The IJoinNexus#getJoinService() is currently configured to
-         * force a task to run in the caller's thread when it's work queue is
-         * full so it does not need to handle that here as well.
+         * The CRITICAL exception is that if ALL workers wait on tasks in the
+         * work queue then the JOIN will NOT progress.
          * 
-         * Note: Most joins rapidly become more selective with a good evaluation
-         * plan. Therefore we always force the subquery to run in the caller's
-         * thread beyond the 2nd join index since there is an expectation that
-         * the #of results for the subquery will be small.
+         * This problem arises because of the control structure is recursion. An
+         * element [e] from a chunk on the 1st join dimension can cause a large
+         * number of tasks to be executed and the task for [e] is not complete
+         * until those tasks are complete. This means that [e] is tying up a
+         * worker thread while all nested subqueries for [e] are evaluated.
+         * 
+         * We work around this by only parallelizing subqueries for each element
+         * in each chunk of the 1st join dimension. We can not simply let the
+         * size of the thread pool grow without bound as it will (very) rapidly
+         * exhaust the machine resources for some queries. Forcing the
+         * evaluation of subqueries after the 1st join dimension in the caller's
+         * thread ensures liveness while providing an effective parallelism up
+         * to the minimum of {chunk size, the #of elements visited on the first
+         * chunk, and the maximum size of the thread pool}.
+         * 
+         * Note: Many joins rapidly become more selective with a good evaluation
+         * plan and there is an expectation that the #of results for the
+         * subquery will be small. However, this is NOT always true. Some
+         * queries will have a large fan out from the first join dimension.
          * 
          * Note: The other reason to force the subquery to run in the caller's
          * thread is when there are already too many threads executing
@@ -396,7 +438,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
          * Those subqueries are just run in the caller's thread.
          */
         
-        if (forceSerialExecution || orderIndex > 0 || chunk.length <= 1
+        if (!parallelSubqueries || orderIndex > 0 || chunk.length <= 1
 //                || !useJoinService
 //                || (orderIndex > 2 || joinService.getQueue().size() > 100)
                 ) {
@@ -425,14 +467,19 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
     private static final boolean reorderChunkToTargetOrder = true;
     
-    private static final boolean forceSerialExecution = true;
-    
     /**
      * Controls which thread pool is used for parallelization of subqueries.
      * When <code>true</code> uses the {@link IJoinNexus#getJoinService()}
      * otherwise uses {@link IIndexStore#getExecutorService()}.
+     * <p>
+     * Note: The IJoinNexus#getJoinService() is currently configured to force a
+     * task to run in the caller's thread when it's work queue is full. However,
+     * this is not enough to satisify the liveness constraint (progress halts
+     * when all workers are waiting on subtasks in the work queue).
      * 
-     * FIXME get rid of IJoinNexus#getJoinService()?
+     * FIXME get rid of {@link IJoinNexus#getJoinService()}? The
+     * {@link IIndexStore#getExecutorService()} appears to be perfectly
+     * sufficient.
      */
     private static final boolean useJoinService = false;
     

@@ -45,6 +45,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link NestedSubqueryWithJoinThreadsTask}
  */
 public class NestedSubqueryTask implements IStepTask {
 

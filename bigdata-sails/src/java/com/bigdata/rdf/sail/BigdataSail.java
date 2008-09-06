@@ -108,7 +108,6 @@ import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 import org.openrdf.sail.helpers.SailBase;
 
-import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
@@ -139,7 +138,6 @@ import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-
 
 /**
  * Sesame <code>2.x</code> integration.
@@ -247,6 +245,18 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_NATIVE_JOINS = "true";
         
+        /**
+         * Option (default <code>true</code>) may be used to explicitly
+         * disable query-time expansion for entailments NOT computed during
+         * closure. In particular, this may be used to disable the query time
+         * expansion of (x rdf:type rdfs:Resource) and owl:sameAs. (Those
+         * entailments are fast for the {@link LocalTripleStore} but have not
+         * been optimized for scale-out deployments.)
+         */
+        public static final String QUERY_TIME_EXPANDER = "queryTimeExpander";
+        
+        public static final String DEFAULT_QUERY_TIME_EXPANDER = "true";
+        
     }
 
     /**
@@ -292,18 +302,32 @@ public class BigdataSail extends SailBase implements Sail {
     
     /**
      * The configured capacity for the statement buffer(s).
+     * 
+     * @see Options#BUFFER_CAPACITY
      */
     final private int bufferCapacity;
     
     /**
      * When true, the RDFS closure will be maintained.
+     * 
+     * @see Options#TRUTH_MAINTENANCE
      */
     final private boolean truthMaintenance;
     
     /**
      * When true, SAIL will delegate joins to bigdata internal joins.
+     * 
+     * @see Options#NATIVE_JOINS
      */
     final private boolean nativeJoins;
+    
+    /**
+     * When true, SAIL will compute entailments at query time that were excluded
+     * from forward closure.
+     * 
+     * @see Options#QUERY_TIME_EXPANDER
+     */
+    final private boolean queryTimeExpander;
     
     /**
      * Set <code>true</code> by ctor variants that open/create the database
@@ -472,6 +496,19 @@ public class BigdataSail extends SailBase implements Sail {
             log
                     .info(BigdataSail.Options.NATIVE_JOINS + "="
                             + nativeJoins);
+
+        }
+
+        // queryTimeExpander
+        {
+            
+            queryTimeExpander = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.QUERY_TIME_EXPANDER,
+                    BigdataSail.Options.DEFAULT_QUERY_TIME_EXPANDER));
+
+            log
+                    .info(BigdataSail.Options.QUERY_TIME_EXPANDER+ "="
+                            + queryTimeExpander);
 
         }
 
@@ -901,32 +938,44 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * A {@link BigdataSailConnection} local {@link TemporaryStore}.
+         * When true, SAIL will compute entailments at query time that were excluded
+         * from forward closure.
          * 
-         * @todo explicitly close with the {@link BigdataSailConnection}? I
-         *       believe that some connection instances may be reused (for read
-         *       historical views and for the read-committed view).
+         * @see Options#QUERY_TIME_EXPANDER
          */
-        protected TemporaryStore getTemporaryStore() {
+        public final boolean isQueryTimeExpander() {
 
-            if (tempStore == null) {
-                
-                synchronized (this) {
-                
-                    if (tempStore == null) {
-                    
-                        tempStore = new TemporaryStore();
-                        
-                    }
-                    
-                }
-                
-            }
-            
-            return tempStore;
+            return queryTimeExpander;
             
         }
-        private volatile TemporaryStore tempStore = null; 
+        
+//        /**
+//         * A {@link BigdataSailConnection} local {@link TemporaryStore}.
+//         * 
+//         * @todo explicitly close with the {@link BigdataSailConnection}? I
+//         *       believe that some connection instances may be reused (for read
+//         *       historical views and for the read-committed view).
+//         */
+//        protected TemporaryStore getTemporaryStore() {
+//
+//            if (tempStore == null) {
+//                
+//                synchronized (this) {
+//                
+//                    if (tempStore == null) {
+//                    
+//                        tempStore = new TemporaryStore();
+//                        
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            return tempStore;
+//            
+//        }
+//        private volatile TemporaryStore tempStore = null; 
         
         /*
          * SailConnectionListener support.
@@ -1665,7 +1714,8 @@ public class BigdataSail extends SailBase implements Sail {
             
             final IChunkedOrderedIterator<ISPO> src;
             
-            if(/*getTruthMaintenance() &&*/ includeInferred) {
+            if (/* getTruthMaintenance() && */includeInferred
+                    && isQueryTimeExpander()) {
 
                 /*
                  * Obtain an iterator that will generate any missing entailments
@@ -1678,8 +1728,8 @@ public class BigdataSail extends SailBase implements Sail {
             } else {
 
                 /*
-                 * Otherwise NO entailments are permitted and we only return the
-                 * statements actually present in the database.
+                 * Otherwise we only return the statements actually present in
+                 * the database.
                  * 
                  * Note: An ExplicitSPOFilter is set above that enforces this.
                  */
