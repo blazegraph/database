@@ -183,8 +183,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         Join join = getFirstJoin();
         int t1 = ((Tail) join.getD1()).getTail();
         int t2 = ((Tail) join.getD2()).getTail();
-        order[0] = rangeCount(t1) <= rangeCount(t2) ? t1 : t2;
-        order[1] = rangeCount(t1) <= rangeCount(t2) ? t2 : t1;
+        order[0] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
+        order[1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
         used[order[0]] = true;
         used[order[1]] = true;
         for (int i = 2; i < tailCount; i++) {
@@ -294,6 +294,18 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
         return rangeCount[tailIndex];
 
+    }
+
+    /**
+     * Return the cardinality of a particular tail, which is the range count
+     * if not optional and infinite if optional.
+     */
+    public long cardinality(final int tailIndex) {
+        if (rule.getTail(tailIndex).isOptional()) {
+            return Long.MAX_VALUE;
+        } else {
+            return rangeCount(tailIndex);
+        }
     }
     
     public String toString() {

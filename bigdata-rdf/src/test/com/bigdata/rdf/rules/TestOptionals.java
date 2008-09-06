@@ -114,10 +114,10 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
                     ( db, 100/* capacity */
                       );
 
-                buffer.add(A, RDF.TYPE, RDFS.RESOURCE);
+                buffer.add(A, RDF.TYPE, X);
                 buffer.add(A, RDFS.LABEL, foo);
                 buffer.add(A, RDFS.COMMENT, bar);
-                buffer.add(B, RDF.TYPE, RDFS.RESOURCE);
+                buffer.add(B, RDF.TYPE, X);
                 // buffer.add(B, RDFS.LABEL, foo);
                 buffer.add(B, RDFS.COMMENT, bar);
                 
@@ -138,7 +138,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
 //            final long e = noClosure.getTermId(E);
 //            final long v = noClosure.getTermId(V);
             // final long w = db.getTermId(W); termIds.put(W, w);
-            // final long x = db.getTermId(X); termIds.put(X, x);
+            final long x = db.getTermId(X); termIds.put(X, x);
             // final long y = db.getTermId(Y); termIds.put(Y, y);
             // final long z = db.getTermId(Z); termIds.put(Z, z);
             // final long SAMEAS = db.getTermId(OWL.SAMEAS); termIds.put(OWL.SAMEAS, SAMEAS);
@@ -161,7 +161,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
                 final String SPO = db.getSPORelation().getNamespace();
                 final IVariableOrConstant<Long> s = Var.var("s");
                 final IVariableOrConstant<Long> type = new Constant<Long>(TYPE);
-                final IVariableOrConstant<Long> resource = new Constant<Long>(RESOURCE);
+                final IVariableOrConstant<Long> t = new Constant<Long>(x);
                 final IVariableOrConstant<Long> label = new Constant<Long>(LABEL);
                 final IVariableOrConstant<Long> comment = new Constant<Long>(COMMENT);
                 final IVariableOrConstant<Long> l = Var.var("l");
@@ -169,7 +169,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
                 final IRule rule =
                         new Rule("test_optional", null, // head
                                 new IPredicate[] {
-                                        new SPOPredicate(SPO, s, type, resource),
+                                        new SPOPredicate(SPO, s, type, t),
                                         new SPOPredicate(SPO, s, comment, c),
                                         new SPOPredicate(SPO, s, label, l, true) },
                                 // constraints on the rule.
@@ -209,7 +209,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
                 final String SPO = db.getSPORelation().getNamespace();
                 final IVariableOrConstant<Long> s = Var.var("s");
                 final IVariableOrConstant<Long> type = new Constant<Long>(TYPE);
-                final IVariableOrConstant<Long> resource = new Constant<Long>(RESOURCE);
+                final IVariableOrConstant<Long> t = new Constant<Long>(x);
                 final IVariableOrConstant<Long> label = new Constant<Long>(LABEL);
                 final IVariableOrConstant<Long> comment = new Constant<Long>(COMMENT);
                 final IVariableOrConstant<Long> l = Var.var("l");
@@ -217,7 +217,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
                 final IRule rule =
                         new Rule("test_optional", null, // head
                                 new IPredicate[] {
-                                        new SPOPredicate(SPO, s, type, resource),
+                                        new SPOPredicate(SPO, s, type, t),
                                         new SPOPredicate(SPO, s, label, l, true),
                                         new SPOPredicate(SPO, s, comment, c) },
                                 // constraints on the rule.
@@ -254,7 +254,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
                 final String SPO = db.getSPORelation().getNamespace();
                 final IVariableOrConstant<Long> s = Var.var("s");
                 final IVariableOrConstant<Long> type = new Constant<Long>(TYPE);
-                final IVariableOrConstant<Long> resource = new Constant<Long>(RESOURCE);
+                final IVariableOrConstant<Long> t = new Constant<Long>(x);
                 final IVariableOrConstant<Long> label = new Constant<Long>(LABEL);
                 final IVariableOrConstant<Long> comment = new Constant<Long>(COMMENT);
                 final IVariableOrConstant<Long> l = Var.var("l");
@@ -262,7 +262,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
                 final IRule rule =
                         new Rule("test_optional", null, // head
                                 new IPredicate[] {
-                                        new SPOPredicate(SPO, s, type, resource),
+                                        new SPOPredicate(SPO, s, type, t),
                                         new SPOPredicate(SPO, s, label, l, true),
                                         new SPOPredicate(SPO, s, comment, c, true) },
                                 // constraints on the rule.
