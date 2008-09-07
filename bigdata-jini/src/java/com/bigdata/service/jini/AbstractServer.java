@@ -131,8 +131,7 @@ import com.sun.jini.start.ServiceStarter;
 abstract public class AbstractServer implements Runnable, LeaseListener, ServiceIDListener
 {
     
-    protected static final transient Logger log = Logger
-            .getLogger(AbstractServer.class);
+    protected static final transient Logger log = Logger.getLogger(AbstractServer.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
@@ -959,7 +958,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     synchronized protected void terminate() {
 
-        log.info("Terminating service management threads.");
+        if (INFO)
+            log.info("Terminating service management threads.");
 
         if (joinManager != null) {
             
@@ -991,24 +991,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             
         }
         
-//        if(discoveryManager != null) {
-//
-//            try {
-//
-//                discoveryManager.terminate();
-//
-//            } catch (Exception ex) {
-//
-//                log.error("Could not terminate the discovery manager: "+ex, ex);
-//                
-//            } finally {
-//                
-//                discoveryManager = null;
-//                
-//            }
-//            
-//        }
-
     }
     
     /**
@@ -1016,7 +998,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     public void run() {
 
-        log.info("Started server.");
+        if (INFO)
+            log.info("Started server.");
 
         /*
          * Note: I have found the Runtime shutdown hook to be much more robust
@@ -1071,7 +1054,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             } catch (InterruptedException ex) {
                 
                 if (INFO)
-                    log.info("" + ex);
+                    log.info(ex.getLocalizedMessage());
 
             } finally {
                 
@@ -1109,7 +1092,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             
             try {
 
-                log.info("Running shutdown.");
+                if (INFO)
+                    log.info("Running shutdown.");
 
                 /*
                  * Note: This is the "server" shutdown. It will delegate to the
@@ -1140,7 +1124,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      */
     public void destroy() {
 
-        log.info("");
+        if (INFO)
+            log.info("");
         
         shutdownNow();
         
@@ -1272,7 +1257,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
         public boolean unregister(Object arg0) {
             
-            log.info("");
+            if (INFO)
+                log.info("");
             
             return true;
             

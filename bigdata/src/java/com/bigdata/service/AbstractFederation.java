@@ -68,7 +68,6 @@ import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -551,62 +550,52 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
         tempStoreFactory = new TemporaryStoreFactory(this.client
                 .getTempStoreMaxExtent());
-        
+
         /*
          * indexCache
          */
         {
 
             indexCache = new WeakValueCache<NT, IClientIndex>(
-                    new LRUCache<NT, IClientIndex>(client.getIndexCacheCapacity()));
-            
+                    new LRUCache<NT, IClientIndex>(client
+                            .getIndexCacheCapacity()));
+
         }
-        
-        /*
-         * Start collecting performance counters from the OS.
-         */
-        {
+
+        if (client.getCollectPlatformStatistics()) {
+
+            /*
+             * Start collecting performance counters from the OS.
+             */
+            
+            final UUID clientUUID = client.getClientUUID();
+
+            if (INFO)
+                log.info("Starting performance counter collection: uuid="
+                        + clientUUID);
 
             final Properties p = client.getProperties();
-            
-            final boolean collectPlatformStatistics = Boolean.parseBoolean(p
-                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
-                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
 
-            if (log.isInfoEnabled())
-                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
-                        + collectPlatformStatistics);
+            p.setProperty(  AbstractStatisticsCollector.Options.PROCESS_NAME,
+                            "service" + ICounterSet.pathSeparator
+                                    + IBigdataClient.class.getName()
+                                    + ICounterSet.pathSeparator
+                                    + clientUUID.toString());
 
-            if (collectPlatformStatistics) {
-                
-                final UUID clientUUID = client.getClientUUID();
+            statisticsCollector = AbstractStatisticsCollector.newInstance(p);
 
-                if (log.isInfoEnabled())
-                    log.info("Starting performance counter collection: uuid="
-                            + clientUUID);
+            statisticsCollector.start();
 
-                p.setProperty(AbstractStatisticsCollector.Options.PROCESS_NAME,
-                        "service" + ICounterSet.pathSeparator
-                                + IBigdataClient.class.getName()
-                                + ICounterSet.pathSeparator
-                                + clientUUID.toString());
-
-                statisticsCollector = AbstractStatisticsCollector
-                        .newInstance(p);
-
-                statisticsCollector.start();
-
-            }
-        
         }
 
-        /*
-         * Setup sampling on the client's thread pool. This collects interesting
-         * statistics about the thread pool for reporting to the load balancer
-         * service.
-         */
-        {
+        if(client.getCollectQueueStatistics()){
 
+            /*
+             * Setup sampling on the client's thread pool. This collects
+             * interesting statistics about the thread pool for reporting to the
+             * load balancer service.
+             */
+            
             final long initialDelay = 0; // initial delay in ms.
             final long delay = 1000; // delay in ms.
             final TimeUnit unit = TimeUnit.MILLISECONDS;
@@ -646,25 +635,24 @@ abstract public class AbstractFederation implements IBigdataFederation {
             
         }
 
-        /*
-         * HTTPD service reporting out statistics on a randomly assigned
-         * port. The port is reported to the load balancer and also written
-         * into the file system. The httpd service will be shutdown with the
-         * connection to the federation.
-         * 
-         * @todo write port into the [serviceDir], but serviceDir needs to
-         * be declared!
-         * 
-         * @todo option to disable this service (and also for the data service).
-         */
-        {
+        final int httpdPort = client.getHttpdPort();
+        if (httpdPort != -1) {
+            
+            /*
+             * HTTPD service reporting out statistics on either a specified or a
+             * randomly assigned port. The port is reported to the load balancer
+             * and also written into the file system. The httpd service will be
+             * shutdown with the connection to the federation.
+             * 
+             * @todo write port into the [serviceDir], but serviceDir needs to
+             * be declared!
+             */
             
             try {
 
                 final CounterSet counterSet = (CounterSet) getCounterSet();
                 
-                httpd = new CounterSetHTTPD(
-                        0/* random port */, counterSet );
+                httpd = new CounterSetHTTPD(httpdPort, counterSet);
                 
                 // the URL that may be used to access the local httpd.
                 final String url = "http://"

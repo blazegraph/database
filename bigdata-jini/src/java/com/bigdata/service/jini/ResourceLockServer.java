@@ -119,7 +119,8 @@ public class ResourceLockServer extends AbstractServer {
         
         public Object getAdmin() throws RemoteException {
 
-            if(INFO) log.info(""+getServiceUUID());
+            if (INFO)
+                log.info("" + getServiceUUID());
 
             return server.proxy;
             
@@ -199,15 +200,17 @@ public class ResourceLockServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            if(INFO) log.info("" + getServiceUUID());
+            if (INFO)
+                log.info("" + getServiceUUID());
 
             new Thread() {
 
                 public void run() {
 
                     server.destroy();
-                    
-                    if(INFO) log.info(getServiceUUID()+" - Service stopped.");
+
+                    if (INFO)
+                        log.info(getServiceUUID() + " - Service stopped.");
 
                 }
 

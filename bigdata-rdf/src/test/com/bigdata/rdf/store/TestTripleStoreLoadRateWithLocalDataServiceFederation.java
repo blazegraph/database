@@ -107,8 +107,8 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
         // turn off text indexing.
         properties.setProperty(Options.TEXT_INDEX,"false");
 
-        // change the default port for httpd exposed by the load balancer. 
-        properties.setProperty(com.bigdata.service.LoadBalancerService.Options.HTTPD_PORT,"8080");
+//        // change the default port for httpd exposed by the load balancer. 
+//        properties.setProperty(com.bigdata.service.LoadBalancerService.Options.HTTPD_PORT,"8080");
         
         return properties;
         

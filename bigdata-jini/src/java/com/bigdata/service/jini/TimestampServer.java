@@ -35,7 +35,6 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
-import net.jini.discovery.DiscoveryManagement;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -105,12 +104,7 @@ public class TimestampServer extends AbstractServer {
         }.run();
 
     }
-
-//    @Override
-//    protected void setupClients(DiscoveryManagement discoveryManager) {
-//        
-//    }
-    
+   
     @Override
     protected Remote newService(Properties properties) {
         
@@ -142,7 +136,8 @@ public class TimestampServer extends AbstractServer {
         
         public Object getAdmin() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            if (INFO)
+                log.info("" + getServiceUUID());
 
             return server.proxy;
             
@@ -216,7 +211,8 @@ public class TimestampServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            if (INFO)
+                log.info("" + getServiceUUID());
 
             new Thread() {
 
@@ -224,7 +220,8 @@ public class TimestampServer extends AbstractServer {
 
                     server.destroy();
                     
-                    log.info(getServiceUUID()+" - Service stopped.");
+                    if (INFO)
+                        log.info(getServiceUUID() + " - Service stopped.");
 
                 }
 
@@ -263,75 +260,6 @@ public class TimestampServer extends AbstractServer {
             return serviceUUID;
             
         }
-
-// /*
-// * JoinAdmin
-// */
-//        
-// public void addLookupAttributes(Entry[] arg0) throws RemoteException {
-//            
-// log.info("");
-//            
-//        }
-//
-//        public void addLookupGroups(String[] arg0) throws RemoteException {
-//
-//            log.info("");
-//
-//        }
-//
-//        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//
-//            log.info("");
-//            
-//        }
-//
-//        public Entry[] getLookupAttributes() throws RemoteException {
-//
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public String[] getLookupGroups() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public LookupLocator[] getLookupLocators() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
-//         
-//            log.info("");
-//            
-//        }
-//
-//        public void removeLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//
-//        }
-//
-//        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
 
     }
 

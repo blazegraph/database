@@ -344,14 +344,17 @@ public class ConcurrentDataLoader {
     }
 
     /**
-     * Cancel the statistics task if it's still running.
+     * Make sure the {@link #loadService} was shutdown and cancel the statistics
+     * task if it's still running.
      */
     protected void finalize() throws Throwable {
 
         super.finalize();
 
-        loadServiceStatisticsFuture.cancel(true/* mayInterrupt */);
+        shutdownNow();
 
+        loadServiceStatisticsFuture.cancel(true/* mayInterrupt */);
+        
     }
     
     public void shutdown() {

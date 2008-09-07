@@ -44,11 +44,12 @@ public class RunRuleAndFlushBufferTask implements IStepTask, Serializable {
     
     public RuleStats call() throws Exception {
 
+        // run the rule.
         final RuleStats ruleStats = stepTask.call();
         
         if(log.isDebugEnabled()) {
             
-            log.debug("Flushing buffer.");
+            log.debug("Flushing buffer: size="+buffer.size()+", class="+buffer.getClass().getName());
             
         }
         
@@ -58,8 +59,8 @@ public class RunRuleAndFlushBufferTask implements IStepTask, Serializable {
 
         if(log.isDebugEnabled()) {
             
-            log.debug("Flushed buffer: mutationCount=" + mutationCount
-                    + ", stats=" + ruleStats);
+            log.debug("Flushed buffer: mutationCount=" + mutationCount);
+//            + ", stats=" + ruleStats);
             
         }
 

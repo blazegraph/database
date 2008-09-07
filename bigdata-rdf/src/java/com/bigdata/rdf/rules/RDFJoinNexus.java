@@ -1309,7 +1309,17 @@ public class RDFJoinNexus implements IJoinNexus {
             final IBigdataFederation fed = (IBigdataFederation) indexManager;
 
             if (fed instanceof LocalDataServiceFederation) {
+                if(false) {
+                    /*
+                     * FIXME Remove this code block. I am using it to examine
+                     * performance penalties due to rules executed using
+                     * ClientIndexView's rather than locally on the data
+                     * service.
+                     */ 
+                    log.warn("LDS is using distributed program execution!!!");
+                    return runDistributedProgram(fed, action, step);
 
+                }
                 final DataService dataService = ((LocalDataServiceFederation) fed)
                         .getDataService();
 

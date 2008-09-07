@@ -116,8 +116,8 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
         // Enable the o/s specific statistics collection for the test run.
 //        properties.setProperty(EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS,"true");
 
-        // change the default port for httpd exposed by the load balancer. 
-        properties.setProperty(com.bigdata.service.LoadBalancerService.Options.HTTPD_PORT,"8080");
+//        // change the default port for httpd exposed by the load balancer. 
+//        properties.setProperty(com.bigdata.service.LoadBalancerService.Options.HTTPD_PORT,"8080");
 
         return properties;
         

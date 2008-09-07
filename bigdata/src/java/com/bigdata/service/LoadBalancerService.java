@@ -35,13 +35,11 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
-import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.journal.QueueStatisticsTask.IQueueCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * The {@link LoadBalancerService} collects a variety of performance counters
@@ -495,10 +493,10 @@ abstract public class LoadBalancerService extends AbstractService
      */
     final protected ScheduledExecutorService updateService;
 
-    /**
-     * The optional httpd service.
-     */
-    private AbstractHTTPD httpd;
+//    /**
+//     * The optional httpd service.
+//     */
+//    private AbstractHTTPD httpd;
 
     /**
      * The delay between writes of the {@link CounterSet} on a log file.
@@ -547,16 +545,17 @@ abstract public class LoadBalancerService extends AbstractService
          */
         String DEFAULT_UPDATE_DELAY = ""+(60*1000);
     
-        /**
-         * The port on which the load balancer will run its <code>httpd</code>
-         * service (default {@value #DEFAULT_HTTPD_PORT}) -or- ZERO (0) to NOT
-         * start the <code>httpd</code> service. This service may be used to
-         * view the telemetry reported by the various services in the federation
-         * that are, or have been, joined with the load balancer.
-         */
-        String HTTPD_PORT = "httpd.port";
-        
-        String DEFAULT_HTTPD_PORT = "8080";
+//        /**
+//         * The port on which the load balancer will run its <code>httpd</code>
+//         * service (default {@value #DEFAULT_HTTPD_PORT}), ZERO (0) to use a
+//         * random port, or <code>-1</code> to NOT start the <code>httpd</code>
+//         * service. This service may be used to view the telemetry reported by
+//         * the various services in the federation that are, or have been, joined
+//         * with the load balancer.
+//         */
+//        String HTTPD_PORT = "httpd.port";
+//        
+//        String DEFAULT_HTTPD_PORT = "8080";
      
         /**
          * The path of the directory where the load balancer will log a copy of
@@ -609,7 +608,8 @@ abstract public class LoadBalancerService extends AbstractService
 
             logDir = new File(val);
 
-            log.info(Options.LOG_DIR + "=" + logDir);                
+            if (INFO)
+                log.info(Options.LOG_DIR + "=" + logDir);                
 
             // ensure exists.
             logDir.mkdirs();
@@ -622,8 +622,9 @@ abstract public class LoadBalancerService extends AbstractService
             logDelayMillis = Long.parseLong(properties.getProperty(
                     Options.LOG_DELAY, Options.DEFAULT_LOG_DELAY));
 
-            log.info(Options.LOG_DELAY + "=" + logDelayMillis);
-            
+            if (INFO)
+                log.info(Options.LOG_DELAY + "=" + logDelayMillis);
+
         }
 
         // logMaxFiles
@@ -632,7 +633,8 @@ abstract public class LoadBalancerService extends AbstractService
             logMaxFiles = Integer.parseInt(properties.getProperty(
                     Options.LOG_MAX_FILES, Options.DEFAULT_LOG_MAX_FILES));
 
-            log.info(Options.LOG_MAX_FILES + "=" + logMaxFiles);
+            if (INFO)
+                log.info(Options.LOG_MAX_FILES + "=" + logMaxFiles);
 
         }
         
@@ -643,7 +645,8 @@ abstract public class LoadBalancerService extends AbstractService
                     Options.UPDATE_DELAY,
                     Options.DEFAULT_UPDATE_DELAY));
 
-            log.info(Options.UPDATE_DELAY + "=" + delay);
+            if (INFO)
+                log.info(Options.UPDATE_DELAY + "=" + delay);
 
             /*
              * Wait a bit longer for the first update task since service may be
@@ -655,41 +658,50 @@ abstract public class LoadBalancerService extends AbstractService
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
             updateService = Executors
-            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                            .defaultThreadFactory());
             
             updateService.scheduleWithFixedDelay(new UpdateTask(), initialDelay,
                     delay, unit);
 
         }
 
-        /*
-         * HTTPD service reporting out statistics. This will be shutdown with
-         * the load balancer.
-         */
-        {
-            
-            final int port = Integer.parseInt(properties.getProperty(
-                    Options.HTTPD_PORT,
-                    Options.DEFAULT_HTTPD_PORT));
-
-            log.info(Options.HTTPD_PORT+"="+port);
-            
-            if (port < 0)
-                throw new RuntimeException(Options.HTTPD_PORT
-                        + " may not be negative");
-            
-            AbstractHTTPD httpd = null;
-            if (port != 0) {
-                try {
-                    httpd = new CounterSetHTTPD(port,counters);
-                } catch (IOException e) {
-                    log.error("Could not start httpd on port=" + port, e);
-                }
-            }
-            this.httpd = httpd;
-            
-        }
+//        /*
+//         * HTTPD service reporting out statistics. This will be shutdown with
+//         * the load balancer.
+//         */
+//        {
+//            
+//            final int port = Integer.parseInt(properties.getProperty(
+//                    Options.HTTPD_PORT,
+//                    Options.DEFAULT_HTTPD_PORT));
+//
+//            if (INFO)
+//                log.info(Options.HTTPD_PORT + "=" + port);
+//            
+//            if (port < 0 && port != -1)
+//                throw new RuntimeException(Options.HTTPD_PORT
+//                        + " must be zero (random port), -1 (disabled), or positive");
+//            
+//            AbstractHTTPD httpd = null;
+//
+//            if (port != -1) {
+//            
+//                try {
+//                
+//                    httpd = new CounterSetHTTPD(port, counters);
+//                    
+//                } catch (IOException e) {
+//                    
+//                    log.error("Could not start httpd on port=" + port, e);
+//                    
+//                }
+//                
+//            }
+//            
+//            this.httpd = httpd;
+//            
+//        }
         
     }
     
@@ -711,22 +723,24 @@ abstract public class LoadBalancerService extends AbstractService
 
         if(!isOpen()) return;
         
-        log.info("begin");
+        if (INFO)
+            log.info("begin");
         
         updateService.shutdown();
         
-        if (httpd != null) {
-            
-            httpd.shutdown();
-         
-            httpd = null;
-            
-        }
+//        if (httpd != null) {
+//            
+//            httpd.shutdown();
+//         
+//            httpd = null;
+//            
+//        }
 
         // log the final state of the counters.
         logCounters("final");
         
-        log.info("done");
+        if (INFO)
+            log.info("done");
 
     }
 
@@ -738,13 +752,13 @@ abstract public class LoadBalancerService extends AbstractService
         
         updateService.shutdownNow();
         
-        if (httpd != null) {
-
-            httpd.shutdownNow();
-         
-            httpd = null;
-            
-        }
+//        if (httpd != null) {
+//
+//            httpd.shutdownNow();
+//         
+//            httpd = null;
+//            
+//        }
 
         // log the final state of the counters.
         logCounters("final");

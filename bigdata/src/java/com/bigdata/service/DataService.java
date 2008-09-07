@@ -225,21 +225,41 @@ abstract public class DataService extends AbstractService
 //        // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
 //        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
 
-        /**
-         * Boolean option for the collection of statistics from the underlying
-         * operating system (default
-         * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
-         * 
-         * @see AbstractStatisticsCollector#newInstance(Properties)
-         * 
-         * @todo add option (default true) to run a local httpd service on a
-         *       random port and then advertise that port to the LBS via a
-         *       one-shot counter. You can then click through to the ds local
-         *       httpd service to see the live counters.
-         */
-        String COLLECT_PLATFORM_STATISTICS = "collectPlatformStatistics";
-
-        String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true"; 
+//        /**
+//         * Boolean option for the collection of statistics from the underlying
+//         * operating system (default
+//         * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
+//         * 
+//         * @see AbstractStatisticsCollector#newInstance(Properties)
+//         */
+//        String COLLECT_PLATFORM_STATISTICS = "collectPlatformStatistics";
+//
+//        String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true";
+//
+//        /**
+//         * Boolean option for the collection of statistics from the various
+//         * queues using to run tasks (default
+//         * {@link #DEFAULT_COLLECT_QUEUE_STATISTICS}).
+//         * 
+//         * @see QueueStatisticsTask
+//         */
+//        String COLLECT_QUEUE_STATISTICS = "collectQueueStatistics";
+//
+//        String DEFAULT_COLLECT_QUEUE_STATISTICS = "true";
+//
+//        /**
+//         * Integer option specifies the port on which an httpd service will be
+//         * started that exposes the {@link CounterSet} for the client. When ZERO
+//         * (0), a random port will be used. The httpd service may be disabled by
+//         * specifying <code>-1</code> as the port.
+//         */
+//        String HTTPD_PORT = "httpdPort";
+//
+//        /**
+//         * The default http service port is ZERO (0), which means that a random
+//         * port will be choosen.
+//         */
+//        String DEFAULT_HTTPD_PORT = "0";
         
         /**
          * The delay between scheduled invocations of the {@link ReportTask} (60
@@ -293,17 +313,31 @@ abstract public class DataService extends AbstractService
      * Note: this value is not bound until the {@link #getServiceUUID()} reports
      * a non-null value.
      * 
-     * @see StartPerformanceCounterCollectionTask
+     * @see StartDeferredTasksTask
      * @see ReportTask
      */
     private AbstractStatisticsCollector statisticsCollector;
 
-    /**
-     * true if we will collect O/S statistics.
-     * 
-     * @see Options#COLLECT_PLATFORM_STATISTICS
-     */
-    final boolean collectPlatformStatistics;
+//    /**
+//     * <code>true</code> iff we will collect O/S statistics.
+//     * 
+//     * @see Options#COLLECT_PLATFORM_STATISTICS
+//     */
+//    final boolean collectPlatformStatistics;
+//    
+//    /**
+//     * <code>true</code> iff we will collect queue statistics.
+//     * 
+//     * @see Options#COLLECT_QUEUE_STATISTICS
+//     */
+//    final boolean collectQueueStatistics;
+//
+//    /**
+//     * The port on which the httpd service will be started.
+//     * 
+//     * @see Options#HTTPD_PORT
+//     */
+//    final int httpdPort;
     
     /**
      * Runs a {@link ReportTask} communicating performance counters on a
@@ -371,24 +405,6 @@ abstract public class DataService extends AbstractService
                 return DataService.this.getFederation();
                                 
             }
-
-//            public IMetadataService getMetadataService() {
-//                
-//                return getFederation().getMetadataService();
-//                                
-//            }
-//            
-//            public ILoadBalancerService getLoadBalancerService() {
-//
-//                return getFederation().getLoadBalancerService();
-//                
-//            }
-//
-//            public IDataService getDataService(UUID serviceUUID) {
-//                
-//                return getFederation().getDataService(serviceUUID);
-//                
-//            }
             
             public UUID getDataServiceUUID() {
 
@@ -445,17 +461,45 @@ abstract public class DataService extends AbstractService
 
         this.properties = (Properties) properties.clone();
 
-        {
-
-            collectPlatformStatistics = Boolean.parseBoolean(properties
-                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
-                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
-
-            log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
-                    + collectPlatformStatistics);
-
-        }
-
+//        {
+//
+//            collectPlatformStatistics = Boolean.parseBoolean(properties
+//                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+//                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+//
+//            if (INFO)
+//                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+//                        + collectPlatformStatistics);
+//
+//        }
+//
+//        {
+//
+//            collectQueueStatistics = Boolean.parseBoolean(properties
+//                    .getProperty(Options.COLLECT_QUEUE_STATISTICS,
+//                            Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
+//
+//            if (INFO)
+//                log.info(Options.COLLECT_QUEUE_STATISTICS + "="
+//                        + collectQueueStatistics);
+//
+//        }
+//
+//        {
+//
+//            httpdPort = Integer.parseInt(properties.getProperty(
+//                    Options.HTTPD_PORT, Options.DEFAULT_HTTPD_PORT));
+//
+//            if (INFO)
+//                log.info(Options.HTTPD_PORT + "=" + httpdPort);
+//
+//            if (httpdPort < 0 && httpdPort != -1)
+//                throw new RuntimeException(
+//                        Options.HTTPD_PORT
+//                                + " must be -1 (disabled), 0 (random port), or positive");
+//
+//        }
+        
     }
     
     /**
@@ -550,7 +594,7 @@ abstract public class DataService extends AbstractService
                     .newSingleThreadScheduledExecutor(DaemonThreadFactory
                             .defaultThreadFactory());
 
-            reportService.scheduleWithFixedDelay(new StartPerformanceCounterCollectionTask(),
+            reportService.scheduleWithFixedDelay(new StartDeferredTasksTask(),
                     150, // initialDelay (ms)
                     150, // delay
                     TimeUnit.MILLISECONDS // unit
@@ -608,9 +652,6 @@ abstract public class DataService extends AbstractService
             
         }
         
-// if (INFO)
-//            log.info(getCounters().toString());
-
     }
 
     /**
@@ -929,141 +970,43 @@ abstract public class DataService extends AbstractService
         return getCounters().asXML(null/*filter*/);
         
     }
-
-//    /**
-//     * Writes out periodic status information.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     * @version $Id$
-//     */
-//    public class StatusTask implements Runnable {
-//
-//        /**
-//         * Note: The logger is named for this class, but since it is an inner
-//         * class the name uses a "$" delimiter (vs a ".") between the outer and
-//         * the inner class names.
-//         */
-//        final protected Logger log = Logger.getLogger(StatusTask.class);
-//
-//        /**
-//         * True iff the {@link #log} level is INFO or less.
-//         */
-//        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-//                .toInt();
-//
-//        protected final Pattern filter;
-//
-//        /**
-//         * 
-//         * @param regex
-//         *            An optional regular expression. When non-<code>null</code>
-//         *            and non-empty this will be compiled into a filter for
-//         *            {@link ICounterSet#toString(Pattern)}.
-//         */
-//        public StatusTask(String regex) {
-//
-//            Pattern filter;
-//            
-//            if(regex!=null && regex.trim().length()>0) {
-//            
-//                try {
-//
-//                    filter = Pattern.compile(regex);
-//                    
-//                } catch(Exception ex) {
-//                    
-//                    log.error("Could not compile regex: ["+regex+"]", ex);
-//                    
-//                    filter = null;
-//                    
-//                }
-//                
-//            } else {
-//                
-//                filter = null;
-//                
-//            }
-//            
-//            this.filter = filter;
-//
-//        }
-//
-//        /**
-//         * Note: Don't throw anything here since we don't want to have the task
-//         * suppressed!
-//         */
-//        public void run() {
-//
-//            try {
-//
-//                if (INFO)
-//                    log.info(getStatus());
-//                
-//            } catch (Throwable t) {
-//
-//                log.warn("Problem in status task?", t);
-//
-//            }
-//
-//        }
-//        
-//        protected String getStatus() {
-//
-//            if(!resourceManager.isRunning()) {
-//                
-//                return "Resource manager not running.";
-//                
-//            }
-//            
-////            try {
-//                if (getServiceUUID() != null) {
-//                  
-//                    return "Service UUID not available yet.";
-//                    
-//                }
-////            } catch (IOException e) {
-////                // Note: should not be thrown for a local function call.
-////                throw new RuntimeException(e);
-////            }
-//            
-//            final String s = getCounters().toString(filter);
-//
-//            return s;
-//            
-//        }
-//        
-//    }
-
+    
     /**
      * This task runs periodically. Once {@link IDataService#getServiceUUID()}
      * reports a non-<code>null</code> value AND
      * {@link ResourceManager#isRunning()} reports <code>true</code>, it will
-     * start an appropriate {@link AbstractStatisticsCollector} and a
-     * {@link ReportTask}. The {@link ReportTask} will relay the performance
-     * counters to the {@link ILoadBalancerService}. At that point this task
-     * will throw an exception in order to prevent it from being re-executed by
-     * the {@link DataService#reportService}.
+     * start an (optional) {@link AbstractStatisticsCollector}, an (optional)
+     * httpd service, and the (required) {@link ReportTask}.
+     * <p>
+     * Note: The {@link ReportTask} will relay any collected performance
+     * counters to the {@link ILoadBalancerService}, but it also lets the
+     * {@link ILoadBalancerService} know which services exist which is important
+     * for some of its functions.
+     * <p>
+     * Once these task(s) have been started, this task will throw an exception
+     * in order to prevent it from being re-executed by the
+     * {@link DataService#reportService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class StartPerformanceCounterCollectionTask implements Runnable {
+    protected class StartDeferredTasksTask implements Runnable {
 
         /**
          * Note: The logger is named for this class, but since it is an inner
          * class the name uses a "$" delimiter (vs a ".") between the outer and
          * the inner class names.
          */
-        final protected Logger log = Logger.getLogger(StartPerformanceCounterCollectionTask.class);
+        final protected Logger log = Logger.getLogger(StartDeferredTasksTask.class);
         
-        public StartPerformanceCounterCollectionTask() {
+        public StartDeferredTasksTask() {
         
         }
 
         /**
          * @throws RuntimeException
-         *             once the performance counter collection task is running.
+         *             once the deferred task(s) are running to prevent
+         *             re-execution of this startup task.
          */
         public void run() {
 
@@ -1071,7 +1014,7 @@ abstract public class DataService extends AbstractService
             
             try {
                 
-                started = startCollection();
+                started = startDeferredTasks();
                 
             } catch (Throwable t) {
 
@@ -1084,12 +1027,11 @@ abstract public class DataService extends AbstractService
             if (started) {
 
                 /*
-                 * Note: This exception is thrown once we have started
-                 * performance counter collection.
+                 * Note: This exception is thrown once this task has executed
+                 * successfully.
                  */
                 
-                throw new RuntimeException(
-                        "Task aborting after normal completion - performance collection is now running");
+                throw new RuntimeException("Normal completion.");
                 
             }
             
@@ -1107,7 +1049,7 @@ abstract public class DataService extends AbstractService
          *             exception (it never should since it is a local method
          *             call).
          */
-        protected boolean startCollection() throws IOException {
+        protected boolean startDeferredTasks() throws IOException {
 
             if(!resourceManager.isOpen()) {
                 
@@ -1149,10 +1091,7 @@ abstract public class DataService extends AbstractService
             /*
              * Start collecting performance counters from the OS.
              */
-            if(collectPlatformStatistics) {
-
-                log.info("Service UUID was assigned - will start performance counter collection: uuid="
-                                + uuid);
+            if (getFederation().getClient().getCollectPlatformStatistics()) {
 
                 final Properties p = getProperties();
 
@@ -1172,18 +1111,21 @@ abstract public class DataService extends AbstractService
                  */
                 ((CounterSet)getCounters()).attach(statisticsCollector.getCounters());
 
+                if (INFO)
+                    log.info("Collecting platform statistics: uuid=" + uuid);
+
             }
             
             /*
-             * Start task to report service and platform counters to the load
-             * balancer.
+             * Start task to report service and counters to the load balancer.
              */
             {
             
                 final long delay = Long.parseLong(properties.getProperty(
                         Options.REPORT_DELAY, Options.DEFAULT_REPORT_DELAY));
 
-                log.info(Options.REPORT_DELAY + "=" + delay);
+                if (INFO)
+                    log.info(Options.REPORT_DELAY + "=" + delay);
 
                 final TimeUnit unit = TimeUnit.MILLISECONDS;
 
@@ -1209,31 +1151,34 @@ abstract public class DataService extends AbstractService
                 reportService.scheduleWithFixedDelay(new ReportTask(),
                         initialDelay, delay, unit);
 
-                log.info("Started ReportTask.");
+                if(INFO) log.info("Started ReportTask.");
             
             }
-            
-            /*
-             * HTTPD service reporting out statistics on a randomly assigned
-             * port. The port is reported to the load balancer and also written
-             * into the file system. The httpd service will be shutdown with the
-             * data service.
-             * 
-             * Note: some counter sets need to be dynamically (re-)attached in
-             * order to present a current view. This httpd instance overrides
-             * doGet() in order to refresh the data before generating the view.
-             * 
-             * @todo write port into the [serviceDir], but serviceDir needs to
-             * be declared!
-             */
-            {
+
+            final int httpdPort = getFederation().getClient().getHttpdPort();
+
+            if (httpdPort != -1) {
+                
+                /*
+                 * HTTPD service reporting out statistics on either a specified
+                 * or a randomly assigned port. The port is reported to the load
+                 * balancer and also written into the file system. The httpd
+                 * service will be shutdown with the data service.
+                 * 
+                 * Note: some counter sets need to be dynamically (re-)attached
+                 * in order to present a current view. This httpd instance
+                 * overrides doGet() in order to refresh the data before
+                 * generating the view.
+                 * 
+                 * @todo write port into the [serviceDir], but serviceDir needs
+                 * to be declared!
+                 */
                 
                 try {
 
                     final CounterSet counterSet = (CounterSet) getCounters();
                     
-                    DataService.this.httpd = new CounterSetHTTPD(
-                            0/* random port */, counterSet ) {
+                    DataService.this.httpd = new CounterSetHTTPD(httpdPort, counterSet ) {
                         
                         public Response doGet(String uri, String method, Properties header,
                                 Map<String, Vector<String>> parms) throws Exception {
