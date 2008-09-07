@@ -33,8 +33,10 @@ import java.util.UUID;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.StaleLocatorException;
@@ -168,13 +170,37 @@ public interface IBigdataClient {
      * @see Options#CLIENT_TASK_TIMEOUT
      */
     public long getTaskTimeout();
-    
+
     /**
      * The capacity of the client's {@link IIndex} proxy cache.
      * 
      * @see Options#CLIENT_INDEX_CACHE_CAPACITY
      */
     public int getIndexCacheCapacity();
+
+    /**
+     * <code>true</code> iff performance counters will be collected for the
+     * platform on which the client is running.
+     * 
+     * @see Options#COLLECT_PLATFORM_STATISTICS
+     */
+    public boolean getCollectPlatformStatistics();
+
+    /**
+     * <code>true</code> iff statistics will be collected for work queues.
+     * 
+     * @see Options#COLLECT_QUEUE_STATISTICS
+     */
+    public boolean getCollectQueueStatistics();
+
+    /**
+     * The port on which the optional httpd service will be run. The httpd
+     * service exposes statistics about the client, its work queues, the
+     * platform on which it is running, etc.
+     * 
+     * @see Options#HTTPD_PORT
+     */
+    public int getHttpdPort();
     
     /**
      * An object wrapping the properties used to configure the client.
@@ -294,7 +320,7 @@ public interface IBigdataClient {
          * 
          * @see #DEFAULT_CLIENT_INDEX_CACHE_CAPACITY
          */
-        String CLIENT_INDEX_CACHE_CAPACITY = "indexCacheCapacity";
+        String CLIENT_INDEX_CACHE_CAPACITY = "client.indexCacheCapacity";
 
         /**
          * The default for the {@link #CLIENT_INDEX_CACHE_CAPACITY} option.
@@ -307,16 +333,43 @@ public interface IBigdataClient {
          * {@value #DEFAULT_COLLECT_PLATFORM_STATISTICS}).
          * 
          * @see AbstractStatisticsCollector#newInstance(Properties)
-         * 
-         * @todo add option (default true) to run a local httpd service on a
-         *       random port and then advertise that port to the LBS via a
-         *       one-shot counter. You can then click through to the ds local
-         *       httpd service to see the live counters.
          */
-        String COLLECT_PLATFORM_STATISTICS = "collectPlatformStatistics";
+        String COLLECT_PLATFORM_STATISTICS = "client.collectPlatformStatistics";
 
         String DEFAULT_COLLECT_PLATFORM_STATISTICS = "true"; 
 
+        /**
+         * Boolean option for the collection of statistics from the various
+         * queues using to run tasks (default
+         * {@link #DEFAULT_COLLECT_QUEUE_STATISTICS}).
+         * 
+         * @see QueueStatisticsTask
+         */
+        String COLLECT_QUEUE_STATISTICS = "client.collectQueueStatistics";
+
+        String DEFAULT_COLLECT_QUEUE_STATISTICS = "true";
+
+        /**
+         * Integer option specifies the port on which an httpd service will be
+         * started that exposes the {@link CounterSet} for the client. When ZERO
+         * (0), a random port will be used. The httpd service may be disabled by
+         * specifying <code>-1</code> as the port.
+         * <p>
+         * Note: The httpd service for the {@link LoadBalancerService} is
+         * normally run on a known port in order to make it easy to locate that
+         * service, e.g., port 80, 8000 or 8080, etc. This MUST be overriden for
+         * the {@link LoadBalancerService} it its configuration since
+         * {@link #DEFAULT_HTTPD_PORT} will otherwise cause a random port to be
+         * assigned.
+         */
+        String HTTPD_PORT = "client.httpdPort";
+
+        /**
+         * The default http service port is ZERO (0), which means that a random
+         * port will be choosen.
+         */
+        String DEFAULT_HTTPD_PORT = "0";
+        
         /**
          * The maximum extent for a {@link TemporaryStore} before a new
          * {@link TemporaryStore} will be created by

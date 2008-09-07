@@ -366,6 +366,11 @@ public class SparseRowStore {
      */
     public ITPS read(Schema schema, Object primaryKey, long timestamp,
             INameFilter filter) {
+
+        if (INFO)
+            log.info("schema=" + schema.getName() + ", primaryKey="
+                    + primaryKey + ", timestamp=" + timestamp + ", filter="
+                    + (filter == null ? "N/A" : filter.getClass().getName()));
         
         final AtomicRowRead proc = new AtomicRowRead(schema, primaryKey, timestamp,
                 filter);
@@ -490,10 +495,18 @@ public class SparseRowStore {
     public TPS write(Schema schema, Map<String, Object> propertySet,
             long timestamp, INameFilter filter, IPrecondition precondition) {
         
+        final Object primaryKey = propertySet.get(schema.getPrimaryKeyName());
+
+        if (INFO)
+            log.info("schema=" + schema.getName() + ", primaryKey="
+                    + primaryKey + ", timestamp=" + timestamp + ", filter="
+                    + (filter == null ? "N/A" : filter.getClass().getName())+
+                    ", precondition="
+                    + (precondition == null ? "N/A" : precondition.getClass()
+                            .getName()));
+
         final AtomicRowWriteRead proc = new AtomicRowWriteRead(schema,
                 propertySet, timestamp, filter, precondition);
-
-        final Object primaryKey = propertySet.get(schema.getPrimaryKeyName());
 
         final byte[] key = schema.fromKey(
                 ndx.getIndexMetadata().getKeyBuilder(), primaryKey).getKey();
@@ -548,6 +561,11 @@ public class SparseRowStore {
         if (primaryKey == null)
             throw new IllegalArgumentException();
         
+        if (INFO)
+            log.info("schema=" + schema + ", primaryKey=" + primaryKey
+                    + ", timestamp=" + timestamp + ", filter="
+                    + (filter == null ? "N/A" : filter.getClass().getName()));
+            
         final AtomicRowDelete proc = new AtomicRowDelete(schema, primaryKey,
                 timestamp, filter);
         
@@ -592,6 +610,21 @@ public class SparseRowStore {
             Object fromKey, Object toKey, int capacity, long timestamp,
             INameFilter nameFilter) {
         
+        if (INFO)
+            log.info("schema="
+                    + schema
+                    + ", fromKey="
+                    + fromKey
+                    + ", toKey="
+                    + toKey
+                    + ", capacity="
+                    + capacity
+                    + ", timestamp="
+                    + timestamp
+                    + ", filter="
+                    + (nameFilter == null ? "N/A" : nameFilter.getClass()
+                            .getName()));
+        
         final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
 
         if (fromKey != null) {
@@ -607,34 +640,15 @@ public class SparseRowStore {
             
         }
 
-//        if (false) {
-//            
-//            /*
-//             * FIXME This is forcing a direct call on a local index and will
-//             * fail if the index is remote, etc. I am just doing this to test
-//             * the procedure logic.
-//             */
-//            
-//            AtomicRowScan proc = new AtomicRowScan(schema, (byte[]) fromKey,
-//                    (byte[]) toKey, timestamp, nameFilter, capacity);
-//
-//            final TPSList results = proc.apply(ndx);
-//
-//            return results.iterator();
-//
-//        } else {
-            
-            return new Striterator(ndx.rangeIterator((byte[]) fromKey, (byte[]) toKey, capacity,
-                    IRangeQuery.DEFAULT,
-                    new FilterConstructor<ITPV>()
-                            .addFilter(new AtomicRowFilter(schema, timestamp,
-                                    nameFilter)))).addFilter(new Resolver(){
-                                        @Override
-                                        protected Object resolve(Object obj) {
-                                            return ((ITuple<TPS>)obj).getObject();
-                                        }});
-            
-//        }
+        return new Striterator(ndx.rangeIterator((byte[]) fromKey, (byte[]) toKey, capacity,
+                IRangeQuery.DEFAULT,
+                new FilterConstructor<ITPV>()
+                        .addFilter(new AtomicRowFilter(schema, timestamp,
+                                nameFilter)))).addFilter(new Resolver(){
+                                    @Override
+                                    protected Object resolve(Object obj) {
+                                        return ((ITuple<TPS>)obj).getObject();
+                                    }});
         
     }
 

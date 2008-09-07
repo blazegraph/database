@@ -468,7 +468,8 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      */
     public void start() {
 
-        log.info("Starting collection.");
+        if (INFO)
+            log.info("Starting collection.");
 
         installShutdownHook();
 
@@ -480,7 +481,8 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      */
     public void stop() {
         
-        log.info("Stopping collection.");
+        if (INFO)
+            log.info("Stopping collection.");
 
     }
 

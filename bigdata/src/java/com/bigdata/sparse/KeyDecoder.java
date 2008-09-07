@@ -257,7 +257,7 @@ public class KeyDecoder {
             this.primaryKeyTypeOffset = schemaBytesLength;
             
             this.primaryKeyOffset = primaryKeyOffset;
-            
+            // note: ArrayIndexOutOfBounds with index==-1 means ICU library not on classpath!
             this.primaryKeyType = KeyType.getKeyType(KeyBuilder.decodeByte(key[primaryKeyTypeOffset]));
             
         }

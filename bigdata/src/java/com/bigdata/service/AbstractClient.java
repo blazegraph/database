@@ -85,6 +85,9 @@ abstract public class AbstractClient implements IBigdataClient {
     private final long taskTimeout;
     private final int indexCacheCapacity;
     private final long tempStoreMaxExtent;
+    private final boolean collectPlatformStatistics;
+    private final boolean collectQueueStatistics;
+    private final int httpdPort;
     
     /*
      * IBigdataClient API.
@@ -138,6 +141,24 @@ abstract public class AbstractClient implements IBigdataClient {
         
     }
     
+    public boolean getCollectPlatformStatistics() {
+        
+        return collectPlatformStatistics;
+        
+    }
+    
+    public boolean getCollectQueueStatistics() {
+        
+        return collectQueueStatistics;
+        
+    }
+    
+    public int getHttpdPort() {
+        
+        return httpdPort;
+        
+    }
+    
     /**
      * 
      * @param properties
@@ -162,9 +183,8 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_THREAD_POOL_SIZE,
                     Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
 
-            if (log.isInfoEnabled())
-                log
-                        .info(Options.CLIENT_THREAD_POOL_SIZE + "="
+            if (INFO)
+                log.info(Options.CLIENT_THREAD_POOL_SIZE + "="
                                 + threadPoolSize);
 
         }
@@ -176,7 +196,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_MAX_STALE_LOCATOR_RETRIES,
                     Options.DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES));
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(Options.CLIENT_MAX_STALE_LOCATOR_RETRIES + "="
                         + maxStaleLocatorRetries);
 
@@ -198,7 +218,7 @@ abstract public class AbstractClient implements IBigdataClient {
                                     Options.CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST,
                                     Options.DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST));
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(Options.CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST + "="
                         + maxParallelTasksPerRequest);
 
@@ -219,7 +239,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_TASK_TIMEOUT,
                     Options.DEFAULT_CLIENT_TASK_TIMEOUT));
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(Options.CLIENT_TASK_TIMEOUT + "=" + taskTimeout);
 
         }
@@ -231,7 +251,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.CLIENT_RANGE_QUERY_CAPACITY,
                             Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(Options.CLIENT_RANGE_QUERY_CAPACITY + "="
                         + defaultRangeQueryCapacity);
             
@@ -256,7 +276,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_INDEX_CACHE_CAPACITY,
                     Options.DEFAULT_CLIENT_INDEX_CACHE_CAPACITY));
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(Options.CLIENT_INDEX_CACHE_CAPACITY + "="
                         + indexCacheCapacity);
 
@@ -273,13 +293,54 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.TEMP_STORE_MAX_EXTENT,
                     Options.DEFAULT_TEMP_STORE_MAX_EXTENT));
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info(Options.TEMP_STORE_MAX_EXTENT + "="
                         + tempStoreMaxExtent);
 
             if (tempStoreMaxExtent < 0)
                 throw new RuntimeException(Options.TEMP_STORE_MAX_EXTENT
                         + " must be non-negative");
+
+        }
+
+        {
+            
+            collectPlatformStatistics = Boolean.parseBoolean(properties
+                    .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
+                            Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
+
+            if (INFO)
+                log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
+                        + collectPlatformStatistics);
+            
+        }
+
+        {
+            
+            collectQueueStatistics = Boolean.parseBoolean(properties
+                    .getProperty(Options.COLLECT_QUEUE_STATISTICS,
+                            Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
+
+            if (INFO)
+                log.info(Options.COLLECT_QUEUE_STATISTICS + "="
+                        + collectQueueStatistics);
+            
+        }
+
+        {
+
+            httpdPort = Integer.parseInt(properties.getProperty(
+                    Options.HTTPD_PORT,
+                    Options.DEFAULT_HTTPD_PORT));
+
+            if (INFO)
+                log.info(Options.HTTPD_PORT+ "="
+                        + httpdPort);
+
+            if (httpdPort < 0 && httpdPort != -1)
+                throw new RuntimeException(
+                        Options.HTTPD_PORT
+                                + " must be -1 (disabled), 0 (random port), or positive");
 
         }
         

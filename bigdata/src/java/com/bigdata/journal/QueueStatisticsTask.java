@@ -12,12 +12,21 @@ import com.bigdata.counters.Instrument;
 /**
  * Helper class maintains the moving average of the length of a queue.
  * 
+ * @todo {@link ThreadPoolExecutor#getActiveCount()},
+ *       {@link ThreadPoolExecutor#getTaskCount()}, and
+ *       {@link ThreadPoolExecutor#getCompletedTaskCount()} all obtain a lock
+ *       and then iterate over the workers. This makes them heavier operations
+ *       than you might otherwise expect!
+ *       <p>
+ *       Consider subclassing {@link ThreadPoolExecutor} to maintain these
+ *       counters more cheaply.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class QueueStatisticsTask implements Runnable {
 
-    protected static Logger log = Logger.getLogger(QueueStatisticsTask.class);
+    protected static final Logger log = Logger.getLogger(QueueStatisticsTask.class);
     
     /**
      * The service that is being monitored.

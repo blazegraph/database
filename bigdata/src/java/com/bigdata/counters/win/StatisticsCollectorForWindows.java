@@ -43,7 +43,8 @@ public class StatisticsCollectorForWindows extends AbstractStatisticsCollector {
 
     public void start() {
 
-        log.info("starting collectors");
+        if (INFO)
+            log.info("starting collectors");
         
         super.start();
         
@@ -53,7 +54,8 @@ public class StatisticsCollectorForWindows extends AbstractStatisticsCollector {
 
     public void stop() {
 
-        log.info("stopping collectors");
+        if (INFO)
+            log.info("stopping collectors");
         
         super.stop();
         

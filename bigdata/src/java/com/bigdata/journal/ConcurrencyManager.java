@@ -41,6 +41,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -309,11 +310,17 @@ public class ConcurrencyManager implements IConcurrencyManager {
     final protected WriteExecutorService writeService;
 
     /**
+     * When <code>true</code> the {@link #sampleService} will be used run
+     * {@link QueueStatisticsTask}s that collect statistics on the
+     * {@link #readService}, {@link #writeService}, and the
+     * {@link #txWriteService}.
+     */
+    final private boolean collectQueueStatistics;
+    
+    /**
      * Used to sample some counters at a once-per-second rate.
      */
-    final protected ScheduledExecutorService sampleService = Executors
-            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+    final private ScheduledExecutorService sampleService;
         
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
@@ -405,6 +412,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         writeService.shutdown();
 
+        if (sampleService != null)
+            sampleService.shutdown();
+
         try {
 
             log.info("Awaiting transaction service termination");
@@ -447,7 +457,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
             long timeout = shutdownTimeout-elapsed;
 
-            log.info("Awaiting write service termination: will wait "+timeout+"ms");
+            if (INFO)
+                log.info("Awaiting write service termination: will wait "
+                        + timeout + "ms");
 
             if(!writeService.awaitTermination(timeout, unit)) {
                 
@@ -463,7 +475,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
     
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: elapsed="+elapsed+"ms");
+        if (INFO)
+            log.info("Done: elapsed=" + elapsed + "ms");
         
     }
 
@@ -489,9 +502,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         writeService.shutdownNow();
 
+        if (sampleService != null)
+            sampleService.shutdown();
+
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if(log.isInfoEnabled()) log.info("Done: elapsed="+elapsed+"ms");
+        if (INFO)
+            log.info("Done: elapsed=" + elapsed + "ms");
 
     }
 
@@ -546,7 +563,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             }
 
-            log.info(ConcurrencyManager.Options.TX_SERVICE_CORE_POOL_SIZE + "=" + txServicePoolSize);
+            if (INFO)
+                log.info(ConcurrencyManager.Options.TX_SERVICE_CORE_POOL_SIZE
+                        + "=" + txServicePoolSize);
 
         }
 
@@ -566,9 +585,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             }
 
-            log
-                    .info(ConcurrencyManager.Options.READ_SERVICE_CORE_POOL_SIZE + "="
-                            + readServicePoolSize);
+            if (INFO)
+                log.info(ConcurrencyManager.Options.READ_SERVICE_CORE_POOL_SIZE
+                        + "=" + readServicePoolSize);
 
         }
 
@@ -587,7 +606,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             }
 
-            log.info(ConcurrencyManager.Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
+            if (INFO)
+                log.info(ConcurrencyManager.Options.SHUTDOWN_TIMEOUT + "="
+                        + shutdownTimeout);
 
         }
 
@@ -640,8 +661,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                log.info(ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE + "="
-                        + writeServiceCorePoolSize);
+                if (INFO)
+                    log.info(ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE
+                                    + "=" + writeServiceCorePoolSize);
 
             }
 
@@ -660,8 +682,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                log.info(ConcurrencyManager.Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE + "="
-                        + writeServiceMaximumPoolSize);
+                if (INFO)
+                    log.info(ConcurrencyManager.Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE
+                                    + "=" + writeServiceMaximumPoolSize);
 
             }
 
@@ -689,7 +712,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                log.info(ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
+                if(INFO)
+                    log.info(ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
                         + writeServiceQueueCapacity);
 
             }
@@ -701,8 +725,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         ConcurrencyManager.Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS,
                         ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS));
                 
-                log.info(ConcurrencyManager.Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS + "="
-                        + writeServicePrestart);
+                if (INFO)
+                    log.info(ConcurrencyManager.Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS
+                                    + "=" + writeServicePrestart);
 
             }
             
@@ -724,8 +749,25 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
         
-        // Setup once-per-second sampling for some counters.
         {
+
+            collectQueueStatistics = Boolean
+                    .parseBoolean(properties
+                            .getProperty(
+                                    IBigdataClient.Options.COLLECT_QUEUE_STATISTICS,
+                                    IBigdataClient.Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
+
+            if (INFO)
+                log.info(IBigdataClient.Options.COLLECT_QUEUE_STATISTICS + "="
+                        + collectQueueStatistics);
+
+        }
+        
+        if (collectQueueStatistics) {
+
+            /*
+             * Setup once-per-second sampling for some counters.
+             */
 
             // @todo config.
             final double w = QueueStatisticsTask.DEFAULT_WEIGHT;
@@ -742,6 +784,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
             readServiceQueueStatisticsTask = new QueueStatisticsTask("readService",
                     readService, countersHR, w);
 
+            sampleService = Executors.newSingleThreadScheduledExecutor(DaemonThreadFactory
+                    .defaultThreadFactory());
+                    
             sampleService.scheduleWithFixedDelay(writeServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
             
@@ -751,6 +796,16 @@ public class ConcurrencyManager implements IConcurrencyManager {
             sampleService.scheduleWithFixedDelay(readServiceQueueStatisticsTask,
                     initialDelay, delay, unit);
 
+        } else {
+            
+            writeServiceQueueStatisticsTask = null;
+
+            txWriteServiceQueueStatisticsTask = null;
+            
+            readServiceQueueStatisticsTask = null;
+            
+            sampleService = null;
+            
         }
         
     }
@@ -822,39 +877,45 @@ public class ConcurrencyManager implements IConcurrencyManager {
                     setValue(System.currentTimeMillis() - serviceStartTime);
                 }
             });
-            
-            // readService
-            {
-                readServiceQueueStatisticsTask
-                        .addCounters(countersRoot.makePath(IConcurrencyManagerCounters.readService));
+
+            if (collectQueueStatistics) {
+
+                // readService
+                {
+                    readServiceQueueStatisticsTask.addCounters(countersRoot
+                            .makePath(IConcurrencyManagerCounters.readService));
+
+                }
+
+                // txWriteService
+                {
+
+                    txWriteServiceQueueStatisticsTask
+                            .addCounters(countersRoot
+                                    .makePath(IConcurrencyManagerCounters.txWriteService));
+
+                }
+
+                // writeService
+                {
+
+                    writeServiceQueueStatisticsTask
+                            .addCounters(countersRoot
+                                    .makePath(IConcurrencyManagerCounters.writeService));
+
+                    /*
+                     * The lock manager for the write service.
+                     */
+
+                    countersRoot
+                            .makePath(
+                                    IConcurrencyManagerCounters.writeServiceLockManager)
+                            .attach(writeService.getLockManager().getCounters());
+
+                }
 
             }
 
-            // txWriteService
-            {
-
-                txWriteServiceQueueStatisticsTask
-                        .addCounters(countersRoot
-                                .makePath(IConcurrencyManagerCounters.txWriteService));
-
-            }
-
-            // writeService
-            {
-
-                writeServiceQueueStatisticsTask.addCounters(countersRoot
-                        .makePath(IConcurrencyManagerCounters.writeService));
-                
-                /*
-                 * The lock manager for the write service.
-                 */
-
-                countersRoot.makePath(
-                        IConcurrencyManagerCounters.writeServiceLockManager)
-                        .attach(writeService.getLockManager().getCounters());
-
-            }
-            
         }
         
         return countersRoot;
@@ -1089,7 +1150,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         assertOpen();
         
-        List<Future<? extends Object>> futures = new LinkedList<Future<? extends Object>>();
+        final List<Future<? extends Object>> futures = new LinkedList<Future<? extends Object>>();
 
         boolean done = false;
 

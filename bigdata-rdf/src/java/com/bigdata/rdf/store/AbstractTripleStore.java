@@ -123,6 +123,7 @@ import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.RelationSchema;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
@@ -144,6 +145,7 @@ import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
 import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.sparse.ITPS;
@@ -770,6 +772,13 @@ abstract public class AbstractTripleStore extends
          *       basically doubled since these data were collected. Look further
          *       into ways in which overhead might be reduced for rule
          *       parallelism and also for when rule parallelism is not enabled.
+         * 
+         * @todo rename as parallel_rule_execution.
+         * 
+         * @todo all of the things bearing on rule execution are valid for any
+         *       {@link ILocatableResource} but they do not need to be as global
+         *       as {@link IBigdataClient.Options}. Perhaps an Options on the
+         *       {@link ILocatableResource} itself would do?
          */
         String FORCE_SERIAL_EXECUTION = "forceSerialExecution";
         
@@ -1290,6 +1299,9 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No axioms defined? : "
                                 + this);
 
+                    if (INFO)
+                        log.info("read axioms: "+axioms.size());
+                    
                 }
 
             }
@@ -1341,7 +1353,10 @@ abstract public class AbstractTripleStore extends
                     if (vocab == null)
                         throw new RuntimeException("No vocabulary defined? : "
                                 + this);
-
+                    
+                    if (INFO)
+                        log.info("read vocabular: "+vocab.size());
+                    
                 }
                 
             }
