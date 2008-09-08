@@ -83,29 +83,30 @@ public class JournalMetadata extends AbstractResourceMetadata {
     }
 
     /**
-     * Note: The extent of the journal at the time that this ctor executes will
-     * be reported by {@link #size()}. If the journal is subsequently extended
-     * {@link #size()} will NOT reflect its new extent.
+     * The {@link JournalMetadata} state will not change as writes are made on
+     * the journal since it does not reflect anything exception the {@link UUID},
+     * the filename, and the create time.
      * 
      * @param journal
+     *            The journal.
      */
     public JournalMetadata(AbstractJournal journal) {
 
-        this(getFileString(journal), journal.getBufferStrategy().getExtent(),
+        this(getFileString(journal), //journal.getBufferStrategy().getExtent(),
                 journal.getRootBlockView().getUUID(), journal
                         .getRootBlockView().getCreateTime());
 
     }
 
-    public JournalMetadata(File file, long nbytes, UUID uuid, long commitTime) {
+    public JournalMetadata(File file, /*long nbytes,*/ UUID uuid, long commitTime) {
         
-        this(file.getName(),nbytes,uuid,commitTime);
+        this(file.getName()/*,nbytes*/,uuid,commitTime);
         
     }
 
-    JournalMetadata(String file, long nbytes, UUID uuid, long commitTime) {
+    JournalMetadata(String file, /*long nbytes, */UUID uuid, long commitTime) {
 
-        super(file, nbytes, uuid, commitTime);
+        super(file, /*nbytes, */ uuid, commitTime);
 
     }
 

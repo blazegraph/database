@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -78,18 +79,22 @@ public class StressTestLockContention extends ProxyTestCase {
      * 
      * @todo I will sometimes see errors reported by this test when running as
      *       part of the total test suite but never when run by itself.
+     * 
+     * @todo if the [backoff] property for the {@link ConcurrencyManager} is
+     *       disabled (and it does not work with cached thread pools) then you
+     *       may see a {@link RejectedExecutionException} from this test.
      */
     public void test_lockContention() throws InterruptedException {
 
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
         
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
         
         final String[] resource = new String[]{"foo","bar","baz"};
 
         final int ntasks = 20000;
         
-        Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
+        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
 
         for (int i = 0; i < ntasks; i++) {
 

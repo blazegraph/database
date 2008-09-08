@@ -43,6 +43,7 @@ import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.AbstractResource;

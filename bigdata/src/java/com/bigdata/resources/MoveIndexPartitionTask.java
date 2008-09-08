@@ -290,7 +290,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             if (this.dataService != null)
                 throw new IllegalStateException();
 
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info("Set dataService: " + dataService);
 
             this.dataService = dataService;
@@ -433,7 +433,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 
             }
 
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info("Copied " + ncopied + " index entries from "
                     + sourceIndexName);
             
@@ -568,7 +568,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 
                 if (rset.isExhausted()) {
 
-                    if(log.isInfoEnabled())
+                    if(INFO)
                         log.info("Copied "+ncopied+" tuples in "+nchunks+" chunks");
                     
                     break;
@@ -600,7 +600,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                     pmd.getRightSeparatorKey()//
                     );
             
-            if(log.isInfoEnabled())
+            if(INFO)
                 log.info("Updating metadata index: name=" + scaleOutIndexName
                     + ", oldLocator=" + oldLocator + ", newLocator=" + newLocator);
 

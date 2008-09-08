@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -281,15 +282,29 @@ abstract public class AbstractTripleStore extends
      * {@link IAccessPath#iterator(int, int)} is LTE this threshold then do a
      * fully buffered (synchronous) read. Otherwise we will do an asynchronous
      * read.
+     * 
+     * @see Options#FULLY_BUFFERED_READ_THRESHOLD
      */
     final public int fullyBufferedReadThreshold;
     
     /**
      * When <code>true</code>, rule sets will be forced to execute
      * sequentially even when they are not flagged as a sequential program.
+     * 
+     * @see Options#FORCE_SERIAL_EXECUTION
      */
     final private boolean forceSerialExecution;
 
+    /**
+     * The maximum #of subqueries for the first join dimension that will be
+     * issued in parallel. Use ZERO(0) to avoid submitting tasks to the
+     * {@link ExecutorService} entirely and ONE (1) to submit a single task at a
+     * time to the {@link ExecutorService}.
+     * 
+     * @see Options#MAX_PARALLEL_SUBQUERIES
+     */
+    final private int maxParallelSubqueries;
+    
     /**
      * The {@link Axioms} class.
      * 
@@ -784,6 +799,16 @@ abstract public class AbstractTripleStore extends
         
         String DEFAULT_FORCE_SERIAL_EXECUTION = "true";
 
+        /**
+         * The maximum #of subqueries for the first join dimension that will be
+         * issued in parallel. Use ZERO(0) to avoid submitting tasks to the
+         * {@link ExecutorService} entirely and ONE (1) to submit a single task
+         * at a time to the {@link ExecutorService}.
+         */
+        String MAX_PARALLEL_SUBQUERIES = "maxParallelSubqueries";
+        
+        String DEFAULT_MAX_PARALLEL_SUBQUERIES = "5";
+
     }
 
     /**
@@ -804,25 +829,30 @@ abstract public class AbstractTripleStore extends
          */
 
         this.justify = Boolean.parseBoolean(properties.getProperty(
-                com.bigdata.rdf.store.AbstractTripleStore.Options.JUSTIFY, com.bigdata.rdf.store.AbstractTripleStore.Options.DEFAULT_JUSTIFY));
+                Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
 
-        log.info(com.bigdata.rdf.store.AbstractTripleStore.Options.JUSTIFY + "=" + justify);
+        if (INFO)
+            log.info(Options.JUSTIFY + "=" + justify);
 
         this.lexicon = Boolean.parseBoolean(properties.getProperty(
                 Options.LEXICON, Options.DEFAULT_LEXICON));
 
-        log.info(Options.LEXICON + "=" + lexicon);
+        if (INFO)
+            log.info(Options.LEXICON + "=" + lexicon);
 
         this.oneAccessPath = Boolean.parseBoolean(properties.getProperty(
                 Options.ONE_ACCESS_PATH, Options.DEFAULT_ONE_ACCESS_PATH));
 
-        log.info(Options.ONE_ACCESS_PATH + "=" + oneAccessPath);
+        if (INFO)
+            log.info(Options.ONE_ACCESS_PATH + "=" + oneAccessPath);
 
         this.statementIdentifiers = Boolean.parseBoolean(properties
                 .getProperty(Options.STATEMENT_IDENTIFIERS,
                         Options.DEFAULT_STATEMENT_IDENTIFIERS));
 
-        log.info(Options.STATEMENT_IDENTIFIERS + "=" + statementIdentifiers);
+        if (INFO)
+            log.info(Options.STATEMENT_IDENTIFIERS + "="
+                            + statementIdentifiers);
 
         if (lexicon) {
 
@@ -833,7 +863,8 @@ abstract public class AbstractTripleStore extends
                         Options.VOCABULARY_CLASS,
                         Options.DEFAULT_VOCABULARY_CLASS);
 
-                log.info(Options.VOCABULARY_CLASS + "=" + className);
+                if (INFO)
+                    log.info(Options.VOCABULARY_CLASS + "=" + className);
 
                 final Class cls;
                 try {
@@ -864,7 +895,8 @@ abstract public class AbstractTripleStore extends
                 final String className = properties.getProperty(
                         Options.AXIOMS_CLASS, Options.DEFAULT_AXIOMS_CLASS);
 
-                log.info(Options.AXIOMS_CLASS + "=" + className);
+                if (INFO)
+                    log.info(Options.AXIOMS_CLASS + "=" + className);
 
                 final Class cls;
                 try {
@@ -902,7 +934,8 @@ abstract public class AbstractTripleStore extends
                     Options.CLOSURE_CLASS,
                     Options.DEFAULT_CLOSURE_CLASS);
 
-            log.info(Options.CLOSURE_CLASS + "=" + className);
+            if (INFO)
+                log.info(Options.CLOSURE_CLASS + "=" + className);
 
             final Class cls;
             try {
@@ -928,8 +961,26 @@ abstract public class AbstractTripleStore extends
                     Options.FORCE_SERIAL_EXECUTION,
                     Options.DEFAULT_FORCE_SERIAL_EXECUTION));
 
-            log.info(Options.FORCE_SERIAL_EXECUTION + "="
-                    + forceSerialExecution); 
+            if (INFO)
+                log.info(Options.FORCE_SERIAL_EXECUTION + "="
+                        + forceSerialExecution); 
+            
+        }
+
+        {
+            
+            maxParallelSubqueries = Integer.parseInt(properties.getProperty(
+                    Options.MAX_PARALLEL_SUBQUERIES,
+                    Options.DEFAULT_MAX_PARALLEL_SUBQUERIES));
+
+            if (maxParallelSubqueries < 0)
+                throw new IllegalArgumentException(
+                        Options.MAX_PARALLEL_SUBQUERIES
+                                + " must be non-negative.");
+            
+            if (INFO)
+                log.info(Options.MAX_PARALLEL_SUBQUERIES + "="
+                        + maxParallelSubqueries); 
             
         }
         
@@ -944,7 +995,7 @@ abstract public class AbstractTripleStore extends
                         Options.MUTATION_BUFFER_CAPACITY + " must be positive");
             }
 
-            log.info(Options.MUTATION_BUFFER_CAPACITY + "="
+            if(INFO) log.info(Options.MUTATION_BUFFER_CAPACITY + "="
                     + mutationBufferCapacity);
 
         }
@@ -960,7 +1011,9 @@ abstract public class AbstractTripleStore extends
                         Options.QUERY_BUFFER_CAPACITY + " must be positive");
             }
 
-            log.info(Options.QUERY_BUFFER_CAPACITY + "=" + queryBufferCapacity);
+            if (INFO)
+                log.info(Options.QUERY_BUFFER_CAPACITY + "="
+                        + queryBufferCapacity);
             
         }
 
@@ -976,8 +1029,9 @@ abstract public class AbstractTripleStore extends
                                 + " must be positive");
             }
 
-            log.info(Options.FULLY_BUFFERED_READ_THRESHOLD + "="
-                    + fullyBufferedReadThreshold);
+            if (INFO)
+                log.info(Options.FULLY_BUFFERED_READ_THRESHOLD + "="
+                        + fullyBufferedReadThreshold);
             
         }
 
@@ -3517,8 +3571,10 @@ abstract public class AbstractTripleStore extends
             
         }
         
-        return new RDFJoinNexusFactory(ruleContext, action, writeTimestamp,
-                readTimestamp, forceSerialExecution, justify, backchain,
+        return new RDFJoinNexusFactory(ruleContext, action, //
+                writeTimestamp, readTimestamp, //
+                forceSerialExecution, maxParallelSubqueries, //
+                justify, backchain,
                 mutationBufferCapacity, queryBufferCapacity,
                 fullyBufferedReadThreshold, solutionFlags,
                 filter, planFactory);

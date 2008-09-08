@@ -37,6 +37,7 @@ import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
@@ -129,15 +130,15 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         fed = client.connect();
 
         metadataService = fed.getMetadataService();
-        System.err.println("metadataService: "+metadataService.getServiceUUID());
+        log.info("metadataService: "+metadataService.getServiceUUID());
 
         dataService0 = ((EmbeddedFederation)fed).getDataService(0);
-        System.err.println("dataService0   : "+dataService0.getServiceUUID());
+        log.info("dataService0   : "+dataService0.getServiceUUID());
 
         if (((EmbeddedFederation) fed).getDataServiceCount() > 1) {
         
             dataService1 = ((EmbeddedFederation)fed).getDataService(1);
-            System.err.println("dataService1   : "+dataService1.getServiceUUID());
+            log.info("dataService1   : "+dataService1.getServiceUUID());
             
         }
         
@@ -181,7 +182,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
             
         }
         
-        System.err.println("Removing: "+f);
+        log.info("Removing: "+f);
         
         if (!f.delete())
             throw new RuntimeException("Could not remove: " + f);
@@ -311,7 +312,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
                 throw new RuntimeException(e);
             }
 
-            System.err.println("Still awaiting overflow: priorOverflowCounter="
+            log.info("\nStill awaiting overflow: priorOverflowCounter="
                     + priorOverflowCounter + ", dataService=" + dataService);
 
             final long elapsed = System.currentTimeMillis() - begin;
@@ -332,7 +333,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        System.err.println("Overflow complete: elapsed=" + elapsed
+        log.info("\nOverflow complete: elapsed=" + elapsed
                 + " ms : priorOverflowCounter=" + priorOverflowCounter
                 + ", newOverflowCounter=" + newOverflowCounter);
 
@@ -376,7 +377,10 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
             
             n++;
          
-            log.info(SerializerUtil.deserialize(itr.next().getValue()));
+            final ITuple tuple = itr.next();
+            
+            if (log.isInfoEnabled())
+                log.info(SerializerUtil.deserialize(tuple.getValue()));
             
         }
         

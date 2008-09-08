@@ -252,6 +252,11 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
     final private IBufferStrategy _bufferStrategy;
 
     /**
+     * A description of the journal as a resource.
+     */
+    final private JournalMetadata journalMetadata;
+    
+    /**
      * The object used by the journal to compute the checksums of its root
      * blocks (this object is NOT thread-safe so there is one instance per
      * journal).
@@ -1110,6 +1115,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
          */
         setupCommitters();
 
+        // save resource description.
+        this.journalMetadata = new JournalMetadata(this);
+        
         // report event.
         ResourceManager.openJournal(getFile() == null ? null : getFile()
                 .toString(), size(), getBufferStrategy().getBufferMode());
@@ -1526,7 +1534,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     public IResourceMetadata getResourceMetadata() {
         
-        return new JournalMetadata(this);
+        return journalMetadata;
         
     }
     

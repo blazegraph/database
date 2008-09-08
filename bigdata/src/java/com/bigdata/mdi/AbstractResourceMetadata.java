@@ -34,7 +34,6 @@ import java.io.ObjectOutput;
 import java.util.HashMap;
 import java.util.UUID;
 
-import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
@@ -58,10 +57,10 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
      */
     private String filename;
     
-    /**
-     * The size of that file in bytes.
-     */
-    private long nbytes;
+//    /**
+//     * The size of that file in bytes.
+//     */
+//    private long nbytes;
 
     /**
      * The unique identifier for the resource.
@@ -84,19 +83,19 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
     }
 
-    protected AbstractResourceMetadata(String filename, long nbytes,
+    protected AbstractResourceMetadata(String filename, //long nbytes,
             UUID uuid, long createTime) {
 
         if (filename == null || uuid == null)
             throw new IllegalArgumentException();
 
-        if (nbytes <= 0)
-            throw new IllegalArgumentException(
-                    "Store file size is non-positive");
+//        if (nbytes <= 0)
+//            throw new IllegalArgumentException(
+//                    "Store file size is non-positive");
 
         this.filename = filename;
         
-        this.nbytes = nbytes;
+//        this.nbytes = nbytes;
         
         this.uuid = uuid;
 
@@ -137,7 +136,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         // Note: compares UUIDs first.
 
         if (uuid.equals(o.getUUID()) && filename.equals(o.getFile())
-                && nbytes == o.size() 
+//                && nbytes == o.size() 
                 && createTime == o.getCreateTime()) {
 
             return true;
@@ -154,11 +153,11 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
     }
 
-    public final long size() {
-        
-        return nbytes;
-        
-    }
+//    public final long size() {
+//        
+//        return nbytes;
+//        
+//    }
 
     final public UUID getUUID() {
         
@@ -181,7 +180,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         if (version != 0x0)
             throw new IOException("Unknown version: " + version);
 
-        nbytes = LongPacker.unpackLong(in);
+//        nbytes = LongPacker.unpackLong(in);
         
         uuid = new UUID(in.readLong(),in.readLong());
         
@@ -195,7 +194,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
 
         ShortPacker.packShort(out, VERSION0);
         
-        LongPacker.packLong(out, nbytes);
+//        LongPacker.packLong(out, nbytes);
         
         out.writeLong(uuid.getMostSignificantBits());
 
@@ -213,8 +212,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
     public String toString() {
         
         return getClass().getSimpleName()+
-        "{size="+size()+
-        ",filename="+getFile()+
+        "{filename="+getFile()+
         ",uuid="+getUUID()+
         ",createTime="+getCreateTime()+
         "}";

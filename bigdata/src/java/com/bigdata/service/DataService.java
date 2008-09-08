@@ -158,7 +158,7 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  */
 abstract public class DataService extends AbstractService
     implements IDataService, IServiceShutdown //IWritePipeline
-    {
+{
 
     public static final Logger log = Logger.getLogger(DataService.class);
 
@@ -1427,7 +1427,7 @@ abstract public class DataService extends AbstractService
             
             // Add to the logging context for the current thread.
             
-            MDC.put("serviceUUID", serviceUUID.toString());
+            MDC.put("serviceUUID", serviceUUID);
 
         } catch(Throwable t) {
             /*
@@ -1501,16 +1501,8 @@ abstract public class DataService extends AbstractService
                     ? ITx.READ_COMMITTED
                     : timestamp);
 
-            final AbstractTask task = new AbstractTask(concurrencyManager, startTime,
-                    name) {
-
-                protected Object doTask() throws Exception {
-                    
-                    return getIndex(getOnlyResource()).getIndexMetadata();
-                    
-                }
-                
-            };
+            final AbstractTask task = new GetIndexMetadataTask(
+                    concurrencyManager, startTime, name);
 
             return (IndexMetadata) concurrencyManager.submit(task).get();
 
@@ -1522,6 +1514,31 @@ abstract public class DataService extends AbstractService
         
     }
 
+    /**
+     * Retrieves the {@link IndexMetadata} for the named index as of the
+     * specified timestamp.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class GetIndexMetadataTask extends AbstractTask {
+
+        public GetIndexMetadataTask(ConcurrencyManager concurrencyManager,
+                long startTime, String name) {
+
+            super(concurrencyManager, startTime, name);
+            
+        }
+
+        @Override
+        protected IndexMetadata doTask() throws Exception {
+            
+            return getIndex(getOnlyResource()).getIndexMetadata();
+            
+        }
+        
+    }
+    
     /**
      * Note: This chooses {@link ITx#READ_COMMITTED} if the the index has
      * {@link ITx#UNISOLATED} isolation and the {@link IIndexProcedure} is an

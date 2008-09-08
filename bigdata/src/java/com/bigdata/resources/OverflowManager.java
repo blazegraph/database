@@ -404,7 +404,8 @@ abstract public class OverflowManager extends IndexManager {
                             Options.OVERFLOW_ENABLED,
                             Options.DEFAULT_OVERFLOW_ENABLED));
 
-            log.info(Options.OVERFLOW_ENABLED+"="+overflowEnabled);
+            if(INFO)
+                log.info(Options.OVERFLOW_ENABLED+"="+overflowEnabled);
             
         }
 
@@ -416,7 +417,8 @@ abstract public class OverflowManager extends IndexManager {
                             Options.OVERFLOW_TIMEOUT,
                             Options.DEFAULT_OVERFLOW_TIMEOUT));
 
-            log.info(Options.OVERFLOW_TIMEOUT + "=" + overflowTimeout);
+            if(INFO)
+                log.info(Options.OVERFLOW_TIMEOUT + "=" + overflowTimeout);
             
         }
 
@@ -427,7 +429,8 @@ abstract public class OverflowManager extends IndexManager {
                     .getProperty(Options.COPY_INDEX_THRESHOLD,
                             Options.DEFAULT_COPY_INDEX_THRESHOLD));
 
-            log.info(Options.COPY_INDEX_THRESHOLD + "="
+            if(INFO)
+                log.info(Options.COPY_INDEX_THRESHOLD + "="
                     + copyIndexThreshold);
 
             if (copyIndexThreshold < 0) {
@@ -447,7 +450,8 @@ abstract public class OverflowManager extends IndexManager {
                     .getProperty(Options.MINIMUM_ACTIVE_INDEX_PARTITIONS,
                             Options.DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS));
 
-            log.info(Options.MINIMUM_ACTIVE_INDEX_PARTITIONS + "="
+            if(INFO)
+                log.info(Options.MINIMUM_ACTIVE_INDEX_PARTITIONS + "="
                     + minimumActiveIndexPartitions);
 
             if (minimumActiveIndexPartitions <= 0) {
@@ -467,7 +471,8 @@ abstract public class OverflowManager extends IndexManager {
                     Options.MAXIMUM_MOVES_PER_TARGET,
                     Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET));
 
-            log.info(Options.MAXIMUM_MOVES_PER_TARGET + "="
+            if(INFO)
+                log.info(Options.MAXIMUM_MOVES_PER_TARGET + "="
                     + maximumMovesPerTarget);
 
             if (maximumMovesPerTarget < 0) {
@@ -493,7 +498,8 @@ abstract public class OverflowManager extends IndexManager {
 
             }
 
-            log.info(Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
+            if(INFO)
+                log.info(Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
 
         }
 
@@ -526,7 +532,8 @@ abstract public class OverflowManager extends IndexManager {
         
         final long begin = System.currentTimeMillis();
 
-        log.info("Begin");
+        if(INFO)
+            log.info("Begin");
         
         /*
          * overflowService shutdown
@@ -575,7 +582,8 @@ abstract public class OverflowManager extends IndexManager {
         
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: elapsed="+elapsed+"ms");
+        if(INFO)
+            log.info("Done: elapsed="+elapsed+"ms");
         
     }
 
@@ -585,16 +593,21 @@ abstract public class OverflowManager extends IndexManager {
         
         final long begin = System.currentTimeMillis();
         
-        log.info("Begin");
+        if (INFO)
+            log.info("Begin");
 
         if(overflowService!=null)
             overflowService.shutdownNow();
 
         super.shutdownNow();
         
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        log.info("Done: elapsed="+elapsed+"ms");
+        if(INFO) {
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            log.info("Done: elapsed=" + elapsed + "ms");
+            
+        }
         
     }
 
@@ -742,7 +755,8 @@ abstract public class OverflowManager extends IndexManager {
 
         if (asyncOverflowEnabled.get()) {
 
-            log.info("Will start asynchronous overflow processing.");
+            if (INFO)
+                log.info("Will start asynchronous overflow processing.");
 
             /*
              * Start the asynchronous processing of the named indices on the old
@@ -820,7 +834,8 @@ abstract public class OverflowManager extends IndexManager {
      */
     protected long doSynchronousOverflow(Set<String> copied) {
         
-        log.info("begin");
+        if (INFO)
+            log.info("begin");
         
         /*
          * Note: We assign the same timestamp to the createTime of the new
@@ -851,7 +866,8 @@ abstract public class OverflowManager extends IndexManager {
             // // remove from list of open journals.
             // storeCache.remove(oldJournal.getRootBlockView().getUUID());
 
-            log.info("Closed out the old journal.");
+            if (INFO)
+                log.info("Closed out the old journal.");
 
         }
 
@@ -928,7 +944,7 @@ abstract public class OverflowManager extends IndexManager {
             bytesUnderManagement.addAndGet(oldJournal.getBufferStrategy().getExtent());
             bytesUnderManagement.addAndGet(-newJournal.getBufferStrategy().getExtent());
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("New live journal: " + newJournal.getFile());
 
         }
@@ -1262,7 +1278,8 @@ abstract public class OverflowManager extends IndexManager {
          */
         purgeOldResources();
         
-        log.info("end");
+        if(INFO)
+            log.info("end");
         
         return lastCommitTime;
 

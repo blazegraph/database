@@ -305,7 +305,8 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
              * update task runs.
              */
             
-            log.info("No splits were identified - will do build instead.");
+            if (INFO)
+                log.info("No splits were identified - will do build instead.");
 
             // the file to be generated.
             final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
@@ -329,9 +330,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
         // The #of splits.
         final int nsplits = splits.length;
         
-        if(INFO)
-        log.info("Will build index segments for " + nsplits
-                + " splits for " + name+" : "+Arrays.toString(splits));
+        if (INFO)
+            log.info("Will build index segments for " + nsplits
+                    + " splits for " + name + " : " + Arrays.toString(splits));
         
         // validate the splits before processing them.
         validateSplits(src, splits);
@@ -385,7 +386,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             }
         }
 
-        log.info("Generated "+splits.length+" index segments: name="+name);
+        if (INFO)
+            log.info("Generated " + splits.length + " index segments: name="
+                    + name);
 
         // form the split result.
         final SplitResult result = new SplitResult(name, indexMetadata, splits,
@@ -499,7 +502,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
             } else {
                 btree = (BTree) ((FusedView) src).getSources()[0];
             }
-            log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+btree.getCheckpoint());
+            if (INFO)
+                log.info("src=" + name + ",counter=" + src.getCounter().get()
+                        + ",checkpoint=" + btree.getCheckpoint());
 
             final LocalPartitionMetadata pmd = (LocalPartitionMetadata)split.pmd;
 
@@ -519,15 +524,17 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                 
             }
             
-            log.info("begin: name=" + name + ", outFile=" + outFile + ", pmd="
-                    + pmd);
+            if (INFO)
+                log.info("begin: name=" + name + ", outFile=" + outFile
+                        + ", pmd=" + pmd);
             
             // build the index segment from the key range.
             final BuildResult result = resourceManager.buildIndexSegment(name,
                     src, outFile, lastCommitTime, fromKey, toKey);
 
-            log.info("done: name=" + name + ", outFile=" + outFile + ", pmd="
-                    + pmd);
+            if (INFO)
+                log.info("done: name=" + name + ", outFile=" + outFile
+                        + ", pmd=" + pmd);
             
             return result;
             
@@ -678,9 +685,14 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
 //            final BTree src = (BTree) resourceManager.getIndexOnStore(name,
 //                    ITx.UNISOLATED, resourceManager.getLiveJournal()); 
             
-            log.info("src="+name+",counter="+src.getCounter().get()+",checkpoint="+src.getCheckpoint());
+            if (INFO) {
+            
+                log.info("src=" + name + ",counter=" + src.getCounter().get()
+                        + ",checkpoint=" + src.getCheckpoint());
 
-            log.info("src=" + name + ", splitResult=" + splitResult);
+                log.info("src=" + name + ", splitResult=" + splitResult);
+                
+            }
 
             // the value of the counter on the source BTree.
             final long oldCounter = src.getCounter().get();
@@ -791,8 +803,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                 // upper bound (exclusive) for copy.
                 final byte[] toKey = pmd.getRightSeparatorKey();
                 
-                log.info("Copying data to new btree: index="
-                        + scaleOutIndexName + ", pmd=" + pmd);
+                if (INFO)
+                    log.info("Copying data to new btree: index="
+                            + scaleOutIndexName + ", pmd=" + pmd);
                 
                 /*
                  * Copy all data in this split from the source index.
@@ -802,18 +815,25 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                  */
                 final long ncopied = btree.rangeCopy(src, fromKey, toKey, false/*overflow*/);
                 
-                log.info("Copied " + ncopied
-                        + " index entries from the live index " + name
-                        + " onto " + name2);
+                if (INFO)
+                    log.info("Copied " + ncopied
+                            + " index entries from the live index " + name
+                            + " onto " + name2);
                 
                 // register it on the live journal
-                log.info("Registering index: "+name2);
+                
+                if (INFO)
+                    log.info("Registering index: " + name2);
+                
                 getJournal().registerIndex(name2, btree);
                 
             }
 
             // drop the source index (the old index partition)
-            log.info("Dropping source index: "+name);
+            
+            if(INFO)
+                log.info("Dropping source index: " + name);
+            
             getJournal().dropIndex(name);
             
             /*
@@ -836,8 +856,9 @@ public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
                             ),
                     locators);
 
-            if(INFO)log.info("Notified metadata service: name=" + name
-                    + " was split into " + Arrays.toString(locators));
+            if (INFO)
+                log.info("Notified metadata service: name=" + name
+                        + " was split into " + Arrays.toString(locators));
 
             // will notify tasks that index partition was split.
             resourceManager.setIndexPartitionGone(name, "split");

@@ -159,12 +159,12 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.getRuleStatisticsFactory();
     }
 
-    public ExecutorService getJoinService() {
-        return delegate.getJoinService();
-    }
-
     public IConstant fakeBinding(IPredicate predicate, Var var) {
         return delegate.fakeBinding(predicate, var);
+    }
+
+    public int getMaxParallelSubqueries() {
+        return delegate.getMaxParallelSubqueries();
     }
 
 }

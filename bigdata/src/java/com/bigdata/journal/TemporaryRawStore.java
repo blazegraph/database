@@ -365,7 +365,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
 
         public ResourceMetadata(TemporaryRawStore store, String fileStr) {
 
-            super(fileStr, store.buf.getExtent(), store.uuid, store.createTime);
+            super(fileStr, /*store.buf.getExtent(),*/ store.uuid, store.createTime);
 
         }
 

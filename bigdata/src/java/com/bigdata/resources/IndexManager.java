@@ -31,6 +31,7 @@ package com.bigdata.resources;
 import java.io.File;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -48,12 +49,14 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.concurrent.NamedLock;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.Tx;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -63,9 +66,11 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.MetadataService;
+import com.bigdata.util.NT;
 
 /**
  * Class encapsulates logic and handshaking for tracking which indices (and
@@ -130,6 +135,36 @@ abstract public class IndexManager extends StoreManager {
     public interface Options extends StoreManager.Options {
      
         /**
+         * The capacity of the LRU cache of open {@link IIndex}s. The capacity
+         * of this cache indirectly controls how many {@link IIndex}s will be
+         * held open. The main reason for keeping an {@link IIndex} open is to
+         * reuse its buffers, including its node and leaf cache, if another
+         * request arrives "soon" which would require on that {@link IIndex}.
+         * <p>
+         * The effect of this parameter is indirect owning to the semantics of
+         * weak references and the control of the JVM over when they are
+         * cleared. Once an index becomes weakly reachable, the JVM will
+         * eventually GC the index object, thereby effectively closing it (or at
+         * least releasing all resources associated with that index). Since
+         * indices which are strongly reachable are never "closed" this provides
+         * our guarentee that indices are never closed if they are in use.
+         * <p>
+         * Note: The {@link IIndex}s managed by this class are a
+         * {@link FusedView} of {@link AbstractBTree}s. Each
+         * {@link AbstractBTree} has a hard reference to the backing
+         * {@link IRawStore} and will keep the {@link IRawStore} from being
+         * finalized as long as a hard reference exists to the
+         * {@link AbstractBTree} (the reverse is not true - an {@link IRawStore}
+         * reference does NOT hold a hard reference to {@link AbstractBTree}s
+         * on that {@link IRawStore}).
+         * 
+         * @see #DEFAULT_INDEX_CACHE_CAPACITY
+         */
+        String INDEX_CACHE_CAPACITY = "indexCacheCapacity";
+        
+        String DEFAULT_INDEX_CACHE_CAPACITY = "20";
+        
+        /**
          * The capacity of the LRU cache of open {@link IndexSegment}s. The
          * capacity of this cache indirectly controls how many
          * {@link IndexSegment}s will be held open. The main reason for keeping
@@ -164,15 +199,73 @@ abstract public class IndexManager extends StoreManager {
     }
     
     /**
+     * Cache of added/retrieved btrees by name and timestamp.
+     * <p>
+     * Map from the name and timestamp of an index to a weak reference for the
+     * corresponding {@link IIndex}. Entries will be cleared from this map
+     * after they have become only weakly reachable.
+     * <p>
+     * Note: The capacity of the backing hard reference LRU effects how many
+     * _clean_ indices can be held in the cache. Dirty indices remain strongly
+     * reachable owing to their existence in the {@link Name2Addr#commitList}.
+     * 
+     * FIXME {@link ITx#READ_COMMITTED} indices are NOT allowed into this cache.
+     * This is the same problem that is documented in
+     * {@link DefaultResourceLocator}.
+     * <p>
+     * Each time there is a commit for a given BTree, the READ_COMMITTED view of
+     * that BTree needs to be replaced by the most recently committed view,
+     * which is a different BTree object and is loaded from a different
+     * checkpoint record.
+     * <p>
+     * The problem would go aways if we modify BTree such that it was directly
+     * aware of read-committed semantics. In that case the BTree would have to
+     * re-load its state from the backing store if there had been an intervening
+     * checkpoint on the corresponding live BTree.
+     */
+    final private WeakValueCache<NT, IIndex> indexCache;
+    
+    /**
      * A canonicalizing cache for {@link IndexSegment}.
      * 
-     * FIXME make sure this cache purges entries that have not been touched in
-     * the last N seconds, where N might be 60.
-     * 
      * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
+     * 
+     * @todo make sure this cache purges entries that have not been touched in
+     *       the last N seconds, where N might be 60.
+     * 
+     * @todo do we really need this if we also have {@link #indexCache}?
      */
     final private WeakValueCache<UUID, IndexSegment> indexSegmentCache;
 
+    /**
+     * Provides locks on a per-{name+timestamp} basis for higher concurrency.
+     */
+    private final transient NamedLock<NT> namedLock = new NamedLock<NT>();
+    
+    /**
+     * The #of entries in the hard reference cache for {@link IIndex}s. There
+     * MAY be more {@link IIndex}s open than are reported by this method if
+     * there are hard references held by the application to those {@link IIndex}s.
+     * {@link IIndex}s that are not fixed by a hard reference will be quickly
+     * finalized by the JVM.
+     */
+    public int getIndexCacheSize() {
+        
+        return indexCache.size();
+        
+    }
+    
+    /**
+     * The configured capacity of the index cache.
+     * 
+     * @see Options#INDEX_CACHE_CAPACITY
+     */
+    public int getIndexCacheCapacity() {
+        
+        return indexCache.capacity();
+        
+    }
+    
     /**
      * The #of entries in the hard reference cache for {@link IndexSegment}s.
      * There MAY be more {@link IndexSegment}s open than are reported by this
@@ -244,13 +337,14 @@ abstract public class IndexManager extends StoreManager {
         assert name != null;
         
         assert reason != null;
-        
-        synchronized(staleLocatorCache) {
-        
-            log.info("name="+name+", reason="+reason);
-            
+
+        synchronized (staleLocatorCache) {
+
+            if (INFO)
+                log.info("name=" + name + ", reason=" + reason);
+
             staleLocatorCache.put(name, reason, true);
-            
+
         }
         
     }
@@ -269,6 +363,28 @@ abstract public class IndexManager extends StoreManager {
         super(properties);
      
         /*
+         * indexCacheCapacity
+         */
+        {
+            
+            final int indexCacheCapacity = Integer.parseInt(properties.getProperty(
+                    Options.INDEX_CACHE_CAPACITY,
+                    Options.DEFAULT_INDEX_CACHE_CAPACITY));
+
+            if (INFO)
+                log.info(Options.INDEX_CACHE_CAPACITY + "="
+                        + indexCacheCapacity);
+
+            if (indexCacheCapacity <= 0)
+                throw new RuntimeException(Options.INDEX_CACHE_CAPACITY
+                        + " must be non-negative");
+
+            indexCache = new WeakValueCache<NT, IIndex>(
+                    new LRUCache<NT, IIndex>(indexCacheCapacity));
+         
+        }
+        
+        /*
          * indexSegmentCacheCapacity
          */
         {
@@ -277,7 +393,9 @@ abstract public class IndexManager extends StoreManager {
                     Options.INDEX_SEGMENT_CACHE_CAPACITY,
                     Options.DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY));
 
-            log.info(Options.INDEX_SEGMENT_CACHE_CAPACITY+"="+indexSegmentCacheCapacity);
+            if (INFO)
+                log.info(Options.INDEX_SEGMENT_CACHE_CAPACITY + "="
+                        + indexSegmentCacheCapacity);
 
             if (indexSegmentCacheCapacity <= 0)
                 throw new RuntimeException(Options.INDEX_SEGMENT_CACHE_CAPACITY
@@ -466,9 +584,10 @@ abstract public class IndexManager extends StoreManager {
 
                     if (seg == null) {
 
-                        log.info("Loading index segment from store: name="
-                                        + name + ", file="
-                                        + resourceMetadata.getFile());
+                        if (INFO)
+                            log.info("Loading index segment from store: name="
+                                    + name + ", file="
+                                    + resourceMetadata.getFile());
 
                         // Open an index segment.
                         seg = segStore.loadIndexSegment();
@@ -486,35 +605,18 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        if(INFO) log.info("name=" + name + ", timestamp=" + timestamp + ", store="
-                + store + " : " + btree);
+        if (INFO)
+            log.info("name=" + name + ", timestamp=" + timestamp + ", store="
+                    + store + " : " + btree);
 
         return btree;
 
     }
 
-    /**
-     * Return the ordered {@link AbstractBTree} sources for an index or a view
-     * of an index partition. The {@link AbstractBTree}s are ordered from the
-     * most recent to the oldest and together comprise a coherent view of an
-     * index partition.
-     * 
-     * @param name
-     *            The name of the index.
-     * @param timestamp
-     *            The startTime of an active transaction, <code>0L</code> for
-     *            the current unisolated index view, or <code>-timestamp</code>
-     *            for a historical view no later than the specified timestamp.
-     * 
-     * @return The sources for the index view -or- <code>null</code> if the
-     *         index was not defined as of the timestamp.
-     * 
-     * @see FusedView
-     */
     public AbstractBTree[] getIndexSources(String name, long timestamp) {
 
-        if(INFO)
-        log.info("name=" + name + ", timestamp=" + timestamp);
+        if (INFO)
+            log.info("name=" + name + ", timestamp=" + timestamp);
 
         /*
          * Open the index on the journal for that timestamp.
@@ -525,21 +627,22 @@ abstract public class IndexManager extends StoreManager {
             // the corresponding journal (can be the live journal).
             final AbstractJournal journal = getJournal(timestamp);
 
-            if(journal == null) {
-                
-                log.warn("No journal with data for timestamp: name="+name+", timestamp="+timestamp);
-                
+            if (journal == null) {
+
+                log.warn("No journal with data for timestamp: name=" + name
+                        + ", timestamp=" + timestamp);
+
                 return null;
-                
+
             }
-            
+
             btree = (BTree) getIndexOnStore(name, timestamp, journal);
 
             if (btree == null) {
 
-                if(INFO)
-                log.info("No such index: name=" + name + ", timestamp="
-                        + timestamp);
+                if (INFO)
+                    log.info("No such index: name=" + name + ", timestamp="
+                            + timestamp);
 
                 return null;
 
@@ -560,7 +663,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
         
-        return getIndexSources(name,timestamp,btree);
+        return getIndexSources(name, timestamp, btree);
 
     }
 
@@ -579,7 +682,9 @@ abstract public class IndexManager extends StoreManager {
 
             // An unpartitioned index (one source).
 
-            log.info("Unpartitioned index: name=" + name + ", ts=" + timestamp);
+            if (INFO)
+                log.info("Unpartitioned index: name=" + name + ", ts="
+                        + timestamp);
 
             return new AbstractBTree[] { btree };
 
@@ -651,7 +756,8 @@ abstract public class IndexManager extends StoreManager {
 
                 }
 
-                log.info("Added to view: " + resource);
+                if (INFO)
+                    log.info("Added to view: " + resource);
 
                 sources[i] = ndx;
 
@@ -659,8 +765,9 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        log.info("Opened index partition:  name=" + name + ", timestamp="
-                + timestamp);
+        if (INFO)
+            log.info("Opened index partition:  name=" + name + ", timestamp="
+                    + timestamp);
 
         return sources;
 
@@ -677,129 +784,134 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        final boolean isTransaction = timestamp > ITx.UNISOLATED;
+        final NT nt = new NT(name, timestamp);
         
-        final ITx tx = (isTransaction ? getConcurrencyManager()
-                .getTransactionManager().getTx(timestamp) : null); 
-        
-        if(isTransaction) {
+        final Lock lock = namedLock.acquireLock(nt);
 
-            if(tx == null) {
+        try {
+
+            if (timestamp != ITx.READ_COMMITTED) {
+             
+                // test the indexCache.
+                synchronized (indexCache) {
+
+                    final IIndex ndx = indexCache.get(nt);
+
+                    if (ndx != null) {
+
+                        if (INFO)
+                            log.info("Cache hit: " + nt);
+
+                        return ndx;
+
+                    }
+
+                }
                 
-                log.warn("Unknown transaction: name="+name+", tx="+timestamp);
-                
-                return null;
-                    
-            }
-            
-            if(!tx.isActive()) {
-                
-                // typically this means that the transaction has already prepared.
-                log.warn("Transaction not active: name=" + name + ", tx="
-                        + timestamp + ", prepared=" + tx.isPrepared()
-                        + ", complete=" + tx.isComplete() + ", aborted="
-                        + tx.isAborted());
-
-                return null;
-                
-            }
-                                
-        }
-        
-        if( isTransaction && tx == null ) {
-        
-            /*
-             * Note: This will happen both if you attempt to use a transaction
-             * identified that has not been registered or if you attempt to use
-             * a transaction manager after the transaction has been either
-             * committed or aborted.
-             */
-            
-            log.warn("No such transaction: name=" + name + ", tx=" + tx);
-
-            return null;
-            
-        }
-        
-        final boolean readOnly = (timestamp < ITx.UNISOLATED)
-                || (isTransaction && tx.isReadOnly());
-
-        final IIndex tmp;
-
-        if (isTransaction) {
-
-            /*
-             * Isolated operation.
-             * 
-             * Note: The backing index is always a historical state of the named
-             * index.
-             * 
-             * Note: Tx#getIndex(String name) serializes concurrent requests for
-             * the same index (thread-safe).
-             */
-
-            final IIndex isolatedIndex = tx.getIndex(name);
-
-            if (isolatedIndex == null) {
-
-                log.warn("No such index: name="+name+", tx="+timestamp);
-                
-                return null;
-
             }
 
-            tmp = isolatedIndex;
+            // is this a transactional view?
+            final boolean isTransaction = timestamp > ITx.UNISOLATED;
 
-        } else {
+            // lookup transaction iff transactional view.
+            final ITx tx = (isTransaction ? getConcurrencyManager()
+                    .getTransactionManager().getTx(timestamp) : null);
 
-            /*
-             * Note: serializes concurrent requests for the same index
-             * (thread-safe).
-             * 
-             * FIXME In fact, this serializes all requests for any index which
-             * limits concurrency. Change to use a per (name) lock using a
-             * LockManager to serialize the requests. Use a different lock for
-             * the historical read and the unisolated requests since they access
-             * different views.
-             * 
-             * Note: neither a per (name,timestamp) lock nor a per
-             * (name,commitRecord) lock makes sense since they fail to capture
-             * the essential distinction which is {journal, checkpointAddr}. The
-             * journal is identified by the timestamp and then the
-             * checkpointAddr is identified using the Name2Addr for the
-             * commitRecord on that journal identified by the timestamp.
-             * 
-             * Is there an API change to getIndexSources() which would let us
-             * use this distinction and thereby only serialize requests for
-             * exactly the same historical view?
-             * 
-             * FIXME Make sure that the synchronization changes are also made to
-             * Journal.
-             * 
-             * FIXME Make sure that we properly synchronize getIndexSources(),
-             * getJournal(), and getIndexOnStore().
-             * 
-             * @todo review use of synchronization and make sure that there is
-             * no way in which we can double-open a store or index.
-             */
-//            synchronized (this) 
-            {
+            if (isTransaction) {
 
                 /*
-                 * historical read -or- read-committed operation.
+                 * Handle transactional views.
+                 */
+                
+                if (tx == null) {
+
+                    log.warn("Unknown transaction: name=" + name + ", tx="
+                            + timestamp);
+
+                    return null;
+
+                }
+
+                if (!tx.isActive()) {
+
+                    // typically this means that the transaction has already
+                    // prepared.
+                    log.warn("Transaction not active: name=" + name + ", tx="
+                            + timestamp + ", prepared=" + tx.isPrepared()
+                            + ", complete=" + tx.isComplete() + ", aborted="
+                            + tx.isAborted());
+
+                    return null;
+
+                }
+
+            }
+
+            if (isTransaction && tx == null) {
+
+                /*
+                 * Note: This will happen both if you attempt to use a
+                 * transaction identified that has not been registered or if you
+                 * attempt to use a transaction manager after the transaction
+                 * has been either committed or aborted.
+                 */
+
+                log.warn("No such transaction: name=" + name + ", tx=" + tx);
+
+                return null;
+
+            }
+
+            final boolean readOnly = (timestamp < ITx.UNISOLATED)
+                    || (isTransaction && tx.isReadOnly());
+
+            final IIndex tmp;
+
+            if (isTransaction) {
+
+                /*
+                 * Isolated operation.
+                 * 
+                 * Note: The backing index is always a historical state of the
+                 * named index.
+                 * 
+                 * Note: Tx#getIndex(String name) serializes concurrent requests
+                 * for the same index (thread-safe).
+                 */
+
+                final IIndex isolatedIndex = tx.getIndex(name);
+
+                if (isolatedIndex == null) {
+
+                    log.warn("No such index: name=" + name + ", tx="
+                            + timestamp);
+
+                    return null;
+
+                }
+
+                tmp = isolatedIndex;
+
+            } else {
+
+                /*
+                 * Non-transactional view.
                  */
 
                 if (readOnly) {
+
+                    /*
+                     * historical read -or- read-committed operation.
+                     */
 
                     final AbstractBTree[] sources = getIndexSources(name,
                             timestamp);
 
                     if (sources == null) {
 
-                        log.info("No such index: name=" + name + ", timestamp="
-                                + timestamp
-//                                , new RuntimeException("stacktrace")
-                        );
+                        if (INFO)
+                            log.info("No such index: name=" + name
+                                    + ", timestamp=" + timestamp);
 
                         return null;
 
@@ -831,7 +943,8 @@ abstract public class IndexManager extends StoreManager {
 
                     assert timestamp == ITx.UNISOLATED;
 
-                    // Check to see if an index partition was split, joined or
+                    // Check to see if an index partition was split, joined
+                    // or
                     // moved.
                     final String reason = getIndexPartitionGone(name);
 
@@ -847,8 +960,9 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources == null) {
 
-                        log.info("No such index: name=" + name + ", timestamp="
-                                + timestamp);
+                        if (INFO)
+                            log.info("No such index: name=" + name
+                                    + ", timestamp=" + timestamp);
 
                         return null;
 
@@ -870,9 +984,27 @@ abstract public class IndexManager extends StoreManager {
 
             }
 
+            if (timestamp != ITx.READ_COMMITTED) {
+
+                // update the indexCache.
+                if (INFO)
+                    log.info("Adding to cache: " + nt);
+
+                synchronized (indexCache) {
+
+                    indexCache.put(nt, tmp, true/* dirty */);
+
+                }
+
+            }
+            
+            return tmp;
+
+        } finally {
+
+            lock.unlock();
+
         }
-        
-        return tmp;
 
     }
 
@@ -1020,9 +1152,11 @@ abstract public class IndexManager extends StoreManager {
             }
             
             nentries = i;
-            
-            log.info("There are "+nentries+" non-deleted index entries: "+name);
-            
+
+            if (INFO)
+                log.info("There are " + nentries
+                        + " non-deleted index entries: " + name);
+
         }
         
          /*
@@ -1053,10 +1187,10 @@ abstract public class IndexManager extends StoreManager {
          /*
           * Describe the index segment.
           */
-         final long length = outFile.length();
+//         final long length = outFile.length();
          final SegmentMetadata segmentMetadata = new SegmentMetadata(//
                  outFile, //
-                length, //
+//                length, //
                 builder.segmentUUID, //
                 createTime //
         );

@@ -347,14 +347,14 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
-        public ExecutorService getJoinService() {
+        public IConstant fakeBinding(IPredicate predicate, Var var) {
             // TODO Auto-generated method stub
             return null;
         }
 
-        public IConstant fakeBinding(IPredicate predicate, Var var) {
+        public int getMaxParallelSubqueries() {
             // TODO Auto-generated method stub
-            return null;
+            return 0;
         }
 
     }

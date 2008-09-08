@@ -362,7 +362,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
             nwritten += nentries;
             
-            System.err.println("Populating the index: nrounds=" + nrounds
+            log.info("Populating the index: nrounds=" + nrounds
                     + ", nwritten=" + nwritten + ", nentries="
                     + groundTruth.getEntryCount() + " ("
                     + fed.getIndex(name, ITx.UNISOLATED).rangeCount(null, null)
@@ -379,7 +379,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Compare the index against ground truth after overflow.
          */
         
-        System.err.println("Verifying scale-out index against ground truth");
+        log.info("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
 
@@ -391,7 +391,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
                         
             final byte[] fromKey = new byte[]{};
             
-            PartitionLocator locator = fed.getMetadataIndex(name,
+            final PartitionLocator locator = fed.getMetadataIndex(name,
                     ITx.READ_COMMITTED).get(fromKey);
             
             final byte[] toKey = locator.getRightSeparatorKey();
@@ -413,7 +413,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
                 
             }
             
-            System.err.println("Will delete " + ndelete + " of " + rangeCount
+            log.info("Will delete " + ndelete + " of " + rangeCount
                     + " entries from " + locator + " to trigger underflow");
             
             groundTruth.submit(0/*fromIndex*/,ndelete/*toIndex*/, keys, null/* vals */,
@@ -445,7 +445,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Compare the index against ground truth after overflow.
          */
         
-        System.err.println("Verifying scale-out index against ground truth");
+        log.info("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
 
@@ -494,7 +494,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Compare the index against ground truth after overflow.
          */
         
-        System.err.println("Verifying scale-out index against ground truth");
+        log.info("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
         

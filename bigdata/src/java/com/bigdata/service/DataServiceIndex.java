@@ -52,6 +52,7 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 
@@ -134,6 +135,16 @@ public class DataServiceIndex implements IClientIndex {
     private final boolean batchOnly;
     
     /**
+     * We cache some stuff for historical reads.
+     */
+    private final boolean historicalRead;
+    
+    /**
+     * Eagerly materialized and cached iff {@link #historicalRead}.
+     */
+    private IndexMetadata indexMetadata = null;
+    
+    /**
      * Creates a view onto an unpartitioned index living on an embedded data
      * service.
      * 
@@ -152,7 +163,11 @@ public class DataServiceIndex implements IClientIndex {
      */
     public DataServiceIndex(LocalDataServiceFederation fed, String name, long timestamp) {
 
-        if(fed == null) throw new IllegalArgumentException();
+        if (fed == null)
+            throw new IllegalArgumentException();
+
+        if (name == null)
+            throw new IllegalArgumentException();
         
         this.name = name;
         
@@ -164,13 +179,39 @@ public class DataServiceIndex implements IClientIndex {
 
         this.batchOnly = fed.getClient().getBatchApiOnly();
         
+        this.historicalRead = TimestampUtility.isHistoricalRead(timestamp);
+        
+        if(historicalRead) {
+            
+            try {
+
+                indexMetadata = dataService.getIndexMetadata(name,timestamp);
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+        
     }
     
     public IndexMetadata getIndexMetadata() {
 
+        if (historicalRead) {
+
+            // cached.
+            
+            assert indexMetadata != null;
+            
+            return indexMetadata;
+            
+        }
+
         try {
 
-            return dataService.getIndexMetadata(name,timestamp);
+            return dataService.getIndexMetadata(name, timestamp);
 
         } catch (Exception ex) {
 
@@ -341,7 +382,7 @@ public class DataServiceIndex implements IClientIndex {
 
     public long rangeCount() {
         
-        return rangeCount(null,null);
+        return rangeCount(null, null);
         
     }
     

@@ -432,19 +432,19 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         for (int j = 0; j < nresources; j++) {
 
-            boolean isIndexSegment = in.readBoolean();
+            final boolean isIndexSegment = in.readBoolean();
             
-            String filename = in.readUTF();
+            final String filename = in.readUTF();
 
-            long nbytes = LongPacker.unpackLong(in);
+//            long nbytes = LongPacker.unpackLong(in);
 
-            UUID uuid = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
+            final UUID uuid = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
 
-            long commitTime = in.readLong();
+            final long commitTime = in.readLong();
             
             resources[j] = (isIndexSegment //
-                    ? new SegmentMetadata(filename, nbytes, uuid, commitTime) //
-                    : new JournalMetadata(filename, nbytes, uuid, commitTime) //
+                    ? new SegmentMetadata(filename, /*nbytes,*/ uuid, commitTime) //
+                    : new JournalMetadata(filename, /*nbytes,*/ uuid, commitTime) //
                     );
 
         }
@@ -488,13 +488,13 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         for (int j = 0; j < nresources; j++) {
 
-            IResourceMetadata rmd = resources[j];
+            final IResourceMetadata rmd = resources[j];
 
             out.writeBoolean(rmd.isIndexSegment());
             
             out.writeUTF(rmd.getFile());
 
-            LongPacker.packLong(out,rmd.size());
+//            LongPacker.packLong(out,rmd.size());
 
             final UUID resourceUUID = rmd.getUUID();
             

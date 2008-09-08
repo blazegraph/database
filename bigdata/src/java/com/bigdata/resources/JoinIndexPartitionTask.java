@@ -176,7 +176,8 @@ public class JoinIndexPartitionTask extends AbstractResourceManagerTask {
             
             final long ncopied = btree.rangeCopy(src, null, null, true/*overflow*/);
             
-            log.info("Copied " + ncopied + " index entries from " + name);
+            if (INFO)
+                log.info("Copied " + ncopied + " index entries from " + name);
             
             // the new left separator.
             leftSeparator = pmd.getRightSeparatorKey();

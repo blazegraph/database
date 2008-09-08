@@ -1391,9 +1391,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
         MDC.put("taskname", getTaskName());
 
-        MDC.put("timestamp", ""+timestamp);
+        MDC.put("timestamp", Long.valueOf(timestamp));
         
-        MDC.put("resources", Arrays.toString(resource));
+        MDC.put("resources", resource);
         
     }
 

@@ -67,7 +67,7 @@ import com.bigdata.service.EmbeddedClient.Options;
  */
 public class EmbeddedFederation extends AbstractFederation {
 
-    public static final Logger log = Logger.getLogger(EmbeddedFederation.class);
+    protected static final Logger log = Logger.getLogger(EmbeddedFederation.class);
 
     /**
      * The #of data service instances.
@@ -132,7 +132,7 @@ public class EmbeddedFederation extends AbstractFederation {
     /**
      * The (in process) {@link ITimestampService}.
      */
-    public ITimestampService getTimestampService() {
+    final public ITimestampService getTimestampService() {
 
         // Note: return null if service not available/discovered.
         
@@ -143,7 +143,7 @@ public class EmbeddedFederation extends AbstractFederation {
     /**
      * The (in process) {@link IResourceLockService}.
      */
-    public IResourceLockService getResourceLockService() {
+    final public IResourceLockService getResourceLockService() {
         
         return resourceLockManager;
         
@@ -152,7 +152,7 @@ public class EmbeddedFederation extends AbstractFederation {
     /**
      * The (in process) {@link LoadBalancerService}.
      */
-    public ILoadBalancerService getLoadBalancerService() {
+    final public ILoadBalancerService getLoadBalancerService() {
 
         // Note: return null if service not available/discovered.
 
@@ -163,7 +163,7 @@ public class EmbeddedFederation extends AbstractFederation {
     /**
      * The (in process) {@link MetadataService}.
      */
-    public IMetadataService getMetadataService() {
+    final public IMetadataService getMetadataService() {
 
         // Note: return null if service not available/discovered.
 
@@ -179,7 +179,7 @@ public class EmbeddedFederation extends AbstractFederation {
      * @return The {@link DataService} for that UUID or <code>null</code> if
      *         there is no data service instance with that service UUID.
      */
-    public IDataService getDataService(UUID serviceUUID) {
+    final public IDataService getDataService(UUID serviceUUID) {
 
         // Note: return null if service not available/discovered.
 
@@ -190,7 +190,7 @@ public class EmbeddedFederation extends AbstractFederation {
     /**
      * The #of configured data services in the embedded federation.
      */
-    public int getDataServiceCount() {
+    final public int getDataServiceCount() {
         
         return ndataServices;
         
@@ -205,7 +205,7 @@ public class EmbeddedFederation extends AbstractFederation {
      * 
      * @return The data service at that index.
      */
-    public DataService getDataService(int index) {
+    final public DataService getDataService(int index) {
         
         assertOpen();
 
@@ -213,7 +213,7 @@ public class EmbeddedFederation extends AbstractFederation {
         
     }
     
-    public UUID[] getDataServiceUUIDs(int maxCount) {
+    final public UUID[] getDataServiceUUIDs(int maxCount) {
 
         assertOpen();
 
@@ -235,7 +235,7 @@ public class EmbeddedFederation extends AbstractFederation {
         
     }
 
-    public IDataService getAnyDataService() {
+    final public IDataService getAnyDataService() {
         
         return getDataService(0);
         
@@ -701,7 +701,7 @@ public class EmbeddedFederation extends AbstractFederation {
      */
     synchronized public void shutdown() {
         
-        log.info("begin");
+        if(INFO) log.info("begin");
         
         super.shutdown();
         
@@ -739,7 +739,7 @@ public class EmbeddedFederation extends AbstractFederation {
 
         }
         
-        log.info("done");
+        if(INFO) log.info("done");
 
     }
     
@@ -748,7 +748,7 @@ public class EmbeddedFederation extends AbstractFederation {
      */
     synchronized public void shutdownNow() {
         
-        log.info("begin");
+        if(INFO) log.info("begin");
 
         super.shutdownNow();
         
@@ -786,13 +786,13 @@ public class EmbeddedFederation extends AbstractFederation {
 
         }
         
-        log.info("done");
+        if(INFO) log.info("done");
         
     }
     
     public void destroy() {
 
-        log.info("");
+        if(INFO) log.info("");
 
         for (int i=0; i<dataService.length; i++) {
 
@@ -841,7 +841,7 @@ public class EmbeddedFederation extends AbstractFederation {
     /**
      * Return <code>true</code>.
      */
-    public boolean isScaleOut() {
+    final public boolean isScaleOut() {
         
         return true;
         
@@ -850,13 +850,13 @@ public class EmbeddedFederation extends AbstractFederation {
     /**
      * Return <code>false</code>.
      */
-    public boolean isDistributed() {
+    final public boolean isDistributed() {
         
         return false;
         
     }
     
-    public boolean isStable() {
+    final public boolean isStable() {
 
         return !isTransient;
 

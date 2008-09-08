@@ -46,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.io.FileSystemUtils;
@@ -365,6 +366,11 @@ abstract public class StoreManager extends ResourceEvents implements
     final protected WeakValueCache<UUID, IRawStore> storeCache;
 
     /**
+     * Provides locks on a per-{resourceUUID} basis for higher concurrency.
+     */
+    private final transient NamedLock<UUID> namedLock = new NamedLock<UUID>();
+    
+    /**
      * The #of entries in the hard reference cache for {@link IRawStore}s,
      * including both {@link ManagedJournal}s and IndexSegment}s. There MAY be
      * more {@link IRawStore}s open than are reported by this method if there
@@ -496,7 +502,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             try {
 
-                log.info("Waiting on startup : " + dataDir + " ...");
+                if (INFO)
+                    log.info("Waiting on startup : " + dataDir + " ...");
 
                 Thread.sleep(1000/* ms */);
 
@@ -721,7 +728,8 @@ abstract public class StoreManager extends ResourceEvents implements
                             Options.IGNORE_BAD_FILES,
                             Options.DEFAULT_IGNORE_BAD_FILES));
 
-            log.info(Options.IGNORE_BAD_FILES + "=" + ignoreBadFiles);
+            if (INFO)
+                log.info(Options.IGNORE_BAD_FILES + "=" + ignoreBadFiles);
 
         }
 
@@ -734,19 +742,16 @@ abstract public class StoreManager extends ResourceEvents implements
                     .getProperty(Options.STORE_CACHE_CAPACITY,
                             Options.DEFAULT_STORE_CACHE_CAPACITY));
 
-            log.info(Options.STORE_CACHE_CAPACITY + "=" + storeCacheCapacity);
+            if (INFO)
+                log.info(Options.STORE_CACHE_CAPACITY + "="
+                        + storeCacheCapacity);
 
             if (storeCacheCapacity <= 0)
                 throw new RuntimeException(Options.STORE_CACHE_CAPACITY
                         + " must be non-negative");
 
             storeCache = new WeakValueCache<UUID, IRawStore>(
-            // WeakValueCache.INITIAL_CAPACITY,//
-                    // WeakValueCache.LOAD_FACTOR, //
-                    new LRUCache<UUID, IRawStore>(storeCacheCapacity)
-            // new WeakCacheEntryFactory<UUID,IndexSegment>(),
-            // new ClearReferenceListener()
-            );
+                    new LRUCache<UUID, IRawStore>(storeCacheCapacity));
 
         }
 
@@ -756,7 +761,8 @@ abstract public class StoreManager extends ResourceEvents implements
             minReleaseAge = Long.parseLong(properties.getProperty(
                     Options.MIN_RELEASE_AGE, Options.DEFAULT_MIN_RELEASE_AGE));
 
-            log.info(Options.MIN_RELEASE_AGE + "=" + minReleaseAge);
+            if (INFO)
+                log.info(Options.MIN_RELEASE_AGE + "=" + minReleaseAge);
 
             if (minReleaseAge < 0L) {
 
@@ -784,8 +790,9 @@ abstract public class StoreManager extends ResourceEvents implements
         journalIndex = JournalIndex.create(tmpStore);
         segmentIndex = IndexSegmentIndex.create(tmpStore);
 
-        log.info("Current working directory: "
-                + new File(".").getAbsolutePath());
+        if (INFO)
+            log.info("Current working directory: "
+                    + new File(".").getAbsolutePath());
 
         // true iff transient journals is requested.
         isTransient = BufferMode.valueOf(properties.getProperty(
@@ -828,7 +835,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 // Note: stored in canonical form.
                 dataDir = new File(val).getCanonicalFile();
 
-                log.info(Options.DATA_DIR + "=" + dataDir);
+                if(INFO)
+                    log.info(Options.DATA_DIR + "=" + dataDir);
 
                 journalsDir = new File(dataDir, "journals").getCanonicalFile();
 
@@ -842,7 +850,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (!dataDir.exists()) {
 
-                log.info("Creating: " + dataDir);
+                if (INFO)
+                    log.info("Creating: " + dataDir);
 
                 if (!dataDir.mkdirs()) {
 
@@ -855,7 +864,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (!journalsDir.exists()) {
 
-                log.info("Creating: " + journalsDir);
+                if(INFO)
+                    log.info("Creating: " + journalsDir);
 
                 if (!journalsDir.mkdirs()) {
 
@@ -868,7 +878,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (!segmentsDir.exists()) {
 
-                log.info("Creating: " + segmentsDir);
+                if(INFO)
+                    log.info("Creating: " + segmentsDir);
 
                 if (!segmentsDir.mkdirs()) {
 
@@ -923,11 +934,13 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
 
-            log.info(Options.TMP_DIR + "=" + tmpDir);
+            if(INFO)
+                log.info(Options.TMP_DIR + "=" + tmpDir);
 
             if (!tmpDir.exists()) {
 
-                log.info("Creating temp directory: " + tmpDir);
+                if(INFO)
+                    log.info("Creating temp directory: " + tmpDir);
 
                 if (!tmpDir.mkdirs()) {
 
@@ -997,11 +1010,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 starting.set(false);
 
-                log.info("Startup "
-                        + (isOpen() ? "successful" : "failed")
-                        + " : "
-                        + (isTransient ? "transient" : Options.DATA_DIR + "="
-                                + dataDir));
+                if (INFO)
+                    log.info("Startup "
+                            + (isOpen() ? "successful" : "failed")
+                            + " : "
+                            + (isTransient ? "transient" : Options.DATA_DIR
+                                    + "=" + dataDir));
 
             }
 
@@ -1039,7 +1053,8 @@ abstract public class StoreManager extends ResourceEvents implements
              * Verify that the concurrency manager has been set and wait a while
              * it if is not available yet.
              */
-            log.info("Waiting for concurrency manager");
+            if (INFO)
+                log.info("Waiting for concurrency manager");
             for (int i = 0; i < 3; i++) {
                 try {
                     getConcurrencyManager();
@@ -1056,7 +1071,8 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             if (!isTransient) {
 
-                log.info("Starting scan of data directory: " + dataDir);
+                if (INFO)
+                    log.info("Starting scan of data directory: " + dataDir);
 
                 final Stats stats = new Stats();
 
@@ -1064,7 +1080,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 final int nbad = stats.badFiles.size();
 
-                log.info("Scan results: " + stats);
+                if(INFO)
+                    log.info("Scan results: " + stats);
 
                 if (!stats.badFiles.isEmpty()) {
 
@@ -1106,7 +1123,8 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             {
 
-                log.info("Creating/opening the live journal: dataDir="
+                if(INFO)
+                    log.info("Creating/opening the live journal: dataDir="
                         + dataDir);
 
                 if (Thread.interrupted())
@@ -1136,7 +1154,10 @@ abstract public class StoreManager extends ResourceEvents implements
                      * logic with the same problem.
                      */
 
-                    log.info("Creating initial journal: dataDir=" + dataDir);
+                    if(INFO)
+                        log
+                                .info("Creating initial journal: dataDir="
+                                        + dataDir);
 
                     // unique file name for new journal.
                     if (isTransient) {
@@ -1185,7 +1206,8 @@ abstract public class StoreManager extends ResourceEvents implements
                     final IResourceMetadata resource = journalIndex
                             .find(Long.MAX_VALUE);
 
-                    log.info("Will open as live journal: " + resource);
+                    if(INFO)
+                        log.info("Will open as live journal: " + resource);
 
                     assert resource != null : "No resource? : timestamp="
                             + Long.MAX_VALUE;
@@ -1199,8 +1221,9 @@ abstract public class StoreManager extends ResourceEvents implements
                         
                     }
 
-                    log.info("Opening most recent journal: " + file
-                            + ", resource=" + resource);
+                    if(INFO)
+                        log.info("Opening most recent journal: " + file
+                                + ", resource=" + resource);
 
                     newJournal = false;
 
@@ -1214,8 +1237,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 }
 
-                log.info("Open/create of live journal: newJournal="
-                        + newJournal + ", file=" + file);
+                if(INFO)
+                    log.info("Open/create of live journal: newJournal="
+                            + newJournal + ", file=" + file);
 
                 // Create/open journal.
                 {
@@ -1232,7 +1256,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     }
 
-                    // add to set of open stores.
+                    /*
+                     * Add to set of open stores.
+                     * 
+                     * Note: Not synchronized() since we are single-threaded
+                     * during startup.
+                     */
                     storeCache
                             .put(tmp.getRootBlockView().getUUID(), tmp, false/* dirty */);
 
@@ -1278,7 +1307,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
     synchronized public void shutdown() {
 
-        log.info("");
+        if (INFO)
+            log.info("");
 
         final boolean wasOpen = this.open.get();
 
@@ -1313,7 +1343,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
     synchronized public void shutdownNow() {
 
-        log.info("");
+        if(INFO)
+            log.info("");
 
         final boolean wasOpen = this.open.get();
 
@@ -1440,7 +1471,8 @@ abstract public class StoreManager extends ResourceEvents implements
         if (Thread.interrupted())
             throw new InterruptedException();
 
-        log.info("Scanning file: " + file + ", stats=" + stats);
+        if (INFO)
+            log.info("Scanning file: " + file + ", stats=" + stats);
 
         stats.nfiles++;
 
@@ -1543,7 +1575,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        log.info("Found " + resource + " in " + file);
+        if (INFO)
+            log.info("Found " + resource + " in " + file);
 
         if (!file.getName().equals(new File(resource.getFile()).getName())) {
 
@@ -1579,6 +1612,10 @@ abstract public class StoreManager extends ResourceEvents implements
 
     /**
      * Closes ALL open store files.
+     * <p>
+     * Note: This is invoked by {@link #shutdown()} and {@link #shutdownNow()}.
+     * We do not need to synchronize on {@link #storeCache} since those methods
+     * are already synchronized.
      */
     private void closeStores() {
 
@@ -1629,8 +1666,8 @@ abstract public class StoreManager extends ResourceEvents implements
      * {@link #openStore(UUID)} to open the resource using the {@link UUID}
      * specified by {@link IResourceMetadata#getUUID()}.
      * <p>
-     * Note: This also adds the extent of the store in bytes as reported by
-     * {@link IResourceMetadata#size()} to {@link #bytesUnderManagement}.
+     * Note: This also adds the size of the store in bytes as reported by the OS
+     * to {@link #bytesUnderManagement}.
      * 
      * @param resourceMetadata
      *            The metadata describing that resource.
@@ -1667,13 +1704,18 @@ abstract public class StoreManager extends ResourceEvents implements
 
         final UUID uuid = resourceMetadata.getUUID();
 
-        if (storeCache.get(uuid) != null) {
+        synchronized (storeCache) {
+        
+            if (storeCache.get(uuid) != null) {
 
-            throw new RuntimeException("Resource already open?: "
-                    + resourceMetadata);
+                throw new RuntimeException("Resource already open?: "
+                        + resourceMetadata);
 
+            }
+        
         }
 
+        final long extent;
         if (!isTransient) {
 
             if (!file.exists()) {
@@ -1696,7 +1738,15 @@ abstract public class StoreManager extends ResourceEvents implements
 
             // add new entry.
             resourceFiles.put(uuid, file);
+            
+            // size of the file.
+            extent = file.length();
 
+        } else {
+            
+            // transient resource - no extent.
+            extent = 0L;
+            
         }
 
         if (resourceMetadata.isJournal()) {
@@ -1712,7 +1762,7 @@ abstract public class StoreManager extends ResourceEvents implements
         /*
          * Track the #of bytes under management.
          */
-        bytesUnderManagement.addAndGet(resourceMetadata.size());
+        bytesUnderManagement.addAndGet(extent);
 
     }
 
@@ -1910,13 +1960,15 @@ abstract public class StoreManager extends ResourceEvents implements
 
         synchronized (journalIndex) {
 
+            // @todo add a weak reference cache in front of this by timestamp?
             resource = journalIndex.find(Math.abs(timestamp));
 
         }
 
         if (resource == null) {
 
-            log.info("No such journal: timestamp=" + timestamp);
+            if (INFO)
+                log.info("No such journal: timestamp=" + timestamp);
 
             return null;
 
@@ -1942,15 +1994,8 @@ abstract public class StoreManager extends ResourceEvents implements
      *             if <i>uuid</i> is <code>null</code>.
      * @throws RuntimeException
      *             if something goes wrong.
-     * 
-     * FIXME per-store lock to reduce latency using {@link NamedLock}.
-     * <p>
-     * Since these operations can have modest latency, especially if we open an
-     * fully buffered index segment, it would be nice to use a per-store (or
-     * store UUID) lock to avoid imposing latency on threads requiring access to
-     * different stores.
      */
-    synchronized public IRawStore openStore(UUID uuid) {
+    public IRawStore openStore(UUID uuid) {
 
         assertRunning();
 
@@ -1961,168 +2006,198 @@ abstract public class StoreManager extends ResourceEvents implements
         }
 
         /*
-         * Check to see if the given resource is already open.
+         * Note: These operations can have modest latency, especially if we open
+         * an fully buffered index segment. Therefore we use a per-store
+         * (actually, per-resource UUID, which is the same thing) lock to avoid
+         * imposing latency on threads requiring access to different stores.
          */
+        final Lock lock = namedLock.acquireLock(uuid);
 
-        IRawStore store = storeCache.get(uuid);
+        try {
 
-        if (store != null) {
+            /*
+             * Check to see if the given resource is already open.
+             * 
+             * Note: [storeCache] is not thread-safe, so we synchronize on it
+             * explicitly.
+             */
 
-            if (!store.isOpen()) {
+            IRawStore store;
+            synchronized(storeCache) {
+                
+                store = storeCache.get(uuid);
+                
+            }
 
-                if (store instanceof IndexSegmentStore) {
+            if (store != null) {
 
-                    /*
-                     * We can simply re-open an index segment's store file.
-                     */
+                if (!store.isOpen()) {
 
-                    // Note: relative to the data directory!
-                    final File file = resourceFiles.get(uuid);
+                    if (store instanceof IndexSegmentStore) {
 
-                    if (file == null) {
+                        /*
+                         * We can simply re-open an index segment's store file.
+                         */
 
-                        throw new NoSuchStoreException(uuid);
+                        // Note: relative to the data directory!
+                        final File file = resourceFiles.get(uuid);
+
+                        if (file == null) {
+
+                            throw new NoSuchStoreException(uuid);
+
+                        }
+
+                        if (!file.exists()) {
+
+                            throw new RuntimeException(
+                                    "Resource file missing? uuid=" + uuid
+                                            + ", file=" + file);
+
+                        }
+
+                        // re-open the store file.
+                        ((IndexSegmentStore) store).reopen();
+
+                        // re-opening the store.
+                        segmentStoreReopenCount.incrementAndGet();
+
+                        // done.
+                        return store;
+
+                    } else {
+
+                        /*
+                         * Note: Journals should not be closed without also
+                         * removing them from the list of open resources. The
+                         * live journal SHOULD NOT be closed except during
+                         * shutdown or overflow (when it is replaced by a new
+                         * live journal).
+                         */
+
+                        throw new AssertionError();
 
                     }
-
-                    if (!file.exists()) {
-
-                        throw new RuntimeException(
-                                "Resource file missing? uuid=" + uuid
-                                        + ", file=" + file);
-
-                    }
-
-                    // re-open the store file.
-                    ((IndexSegmentStore) store).reopen();
-
-                    // re-opening the store.
-                    segmentStoreReopenCount.incrementAndGet();
-
-                    // done.
-                    return store;
-
-                } else {
-
-                    /*
-                     * Note: Journals should not be closed without also removing
-                     * them from the list of open resources. The live journal
-                     * SHOULD NOT be closed except during shutdown or overflow
-                     * (when it is replaced by a new live journal).
-                     */
-
-                    throw new AssertionError();
 
                 }
 
-            }
-
-            return store;
-
-        }
-
-        if (store == null) {
-
-            /*
-             * Attempt to open the resource.
-             */
-
-            // Lookup filename by resource UUID.
-            final File file = resourceFiles.get(uuid);
-
-            if (file == null) {
-
-                throw new NoSuchStoreException(uuid);
+                return store;
 
             }
 
-            if (!file.exists()) {
-
-                throw new RuntimeException("Resource file missing? uuid="
-                        + uuid + ", file=" + file);
-
-            }
-
-            final UUID actualUUID;
-
-            if (file.getName().endsWith(Options.JNL)) {
+            if (store == null) {
 
                 /*
-                 * Open a historical journal.
-                 * 
-                 * Note: The live journal is never opened by this code path. It
-                 * is opened when the resource manager is instantiated and it
-                 * will remain open except during shutdown and overflow (when it
-                 * is replaced by a new live journal).
+                 * Attempt to open the resource.
                  */
 
-                final Properties properties = getProperties();
+                // Lookup filename by resource UUID.
+                final File file = resourceFiles.get(uuid);
 
-                properties.setProperty(Options.FILE, file.toString());
+                if (file == null) {
 
-                // All historical journals are read-only!
-                // Note: disables the write cache among other things.
-                properties.setProperty(Options.READ_ONLY, "true");
+                    throw new NoSuchStoreException(uuid);
 
-                final AbstractJournal journal = new ManagedJournal(properties);
+                }
 
-                final long closeTime = journal.getRootBlockView()
-                        .getCloseTime();
+                if (!file.exists()) {
 
-                // verify journal was closed for writes.
-                assert closeTime != 0 : "Journal not closed for writes? "
-                        + " : file=" + file + ", uuid=" + uuid + ", closeTime="
-                        + closeTime;
+                    throw new RuntimeException("Resource file missing? uuid="
+                            + uuid + ", file=" + file);
 
-                assert journal.isReadOnly();
+                }
 
-                actualUUID = journal.getRootBlockView().getUUID();
+                final UUID actualUUID;
 
-                store = journal;
+                if (file.getName().endsWith(Options.JNL)) {
 
-                // opened another journal.
-                journalReopenCount.incrementAndGet();
+                    /*
+                     * Open a historical journal.
+                     * 
+                     * Note: The live journal is never opened by this code path.
+                     * It is opened when the resource manager is instantiated
+                     * and it will remain open except during shutdown and
+                     * overflow (when it is replaced by a new live journal).
+                     */
 
-            } else {
+                    final Properties properties = getProperties();
 
-                IndexSegmentStore segStore = new IndexSegmentStore(file);
+                    properties.setProperty(Options.FILE, file.toString());
 
-                actualUUID = segStore.getCheckpoint().segmentUUID;
+                    // All historical journals are read-only!
+                    // Note: disables the write cache among other things.
+                    properties.setProperty(Options.READ_ONLY, "true");
 
-                store = segStore;
+                    final AbstractJournal journal = new ManagedJournal(
+                            properties);
 
-                // opened another index segment store.
-                segmentStoreReopenCount.incrementAndGet();
+                    final long closeTime = journal.getRootBlockView()
+                            .getCloseTime();
+
+                    // verify journal was closed for writes.
+                    assert closeTime != 0 : "Journal not closed for writes? "
+                            + " : file=" + file + ", uuid=" + uuid
+                            + ", closeTime=" + closeTime;
+
+                    assert journal.isReadOnly();
+
+                    actualUUID = journal.getRootBlockView().getUUID();
+
+                    store = journal;
+
+                    // opened another journal.
+                    journalReopenCount.incrementAndGet();
+
+                } else {
+
+                    IndexSegmentStore segStore = new IndexSegmentStore(file);
+
+                    actualUUID = segStore.getCheckpoint().segmentUUID;
+
+                    store = segStore;
+
+                    // opened another index segment store.
+                    segmentStoreReopenCount.incrementAndGet();
+
+                }
+
+                /*
+                 * Verify the resource UUID.
+                 */
+                if (!actualUUID.equals(uuid)) {
+
+                    // close the resource.
+                    store.close();
+
+                    throw new RuntimeException("Wrong UUID: file=" + file
+                            + ", expecting=" + uuid + ", actual=" + actualUUID);
+
+                }
+
+                assert store != null;
+
+                assert store.isOpen();
+
+                assert store.isStable();
 
             }
 
-            /*
-             * Verify the resource UUID.
-             */
-            if (!actualUUID.equals(uuid)) {
+            // cache the reference.
+            synchronized(storeCache) {
 
-                // close the resource.
-                store.close();
-
-                throw new RuntimeException("Wrong UUID: file=" + file
-                        + ", expecting=" + uuid + ", actual=" + actualUUID);
-
+                storeCache.put(uuid, store, false/* dirty */);
+                
             }
 
-            assert store != null;
+            // return the reference to the open store.
+            return store;
 
-            assert store.isOpen();
+        } finally {
 
-            assert store.isStable();
+            lock.unlock();
 
         }
-
-        // cache the reference.
-        storeCache.put(uuid, store, false/* dirty */);
-
-        // return the reference to the open store.
-        return store;
-
+        
     }
 
     /**
@@ -2208,7 +2283,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        log.info("Removing: " + f);
+        if (INFO)
+            log.info("Removing: " + f);
 
         if (f.exists() && !f.delete()) {
 
@@ -2232,8 +2308,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
         assertOpen();
 
-        log.info("Updating the releaseTime: old=" + this.releaseTime + ", new="
-                + this.releaseTime);
+        if (INFO)
+            log.info("Updating the releaseTime: old=" + this.releaseTime
+                    + ", new=" + this.releaseTime);
 
         if (releaseTime < this.releaseTime) {
 
@@ -2317,7 +2394,8 @@ abstract public class StoreManager extends ResourceEvents implements
              * deleted).
              */
 
-            log.info("Immortal database");
+            if (INFO)
+                log.info("Immortal database");
             
             return;
 
@@ -2339,7 +2417,8 @@ abstract public class StoreManager extends ResourceEvents implements
              * immortal).
              */
 
-            log.info("Nothing is old enough to release.");
+            if (INFO)
+                log.info("Nothing is old enough to release.");
 
             return;
 
@@ -2363,8 +2442,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
             releaseTime = maxReleaseTime;
 
-            log.info("releaseTime is not set: using maxReleaseTime="
-                    + maxReleaseTime);
+            if (INFO)
+                log.info("releaseTime is not set: using maxReleaseTime="
+                        + maxReleaseTime);
 
         } else {
 
@@ -2374,9 +2454,10 @@ abstract public class StoreManager extends ResourceEvents implements
 
             releaseTime = Math.min(maxReleaseTime, this.releaseTime);
 
-            log.info("Choosen releaseTime=" + releaseTime
-                    + " : min(maxReleaseTime=" + maxReleaseTime
-                    + ", set releaseTime=" + releaseTime + ")");
+            if (INFO)
+                log.info("Choosen releaseTime=" + releaseTime
+                        + " : min(maxReleaseTime=" + maxReleaseTime
+                        + ", set releaseTime=" + releaseTime + ")");
 
         }
 
@@ -2416,7 +2497,10 @@ abstract public class StoreManager extends ResourceEvents implements
              * [firstCommitTime] on that journal instead.
              */
 
-            log.info("Choosing commitTimeToPreserve as the firstCommitTime for the earliest journal: "+firstCommitTime);
+            if (INFO)
+                log
+                        .info("Choosing commitTimeToPreserve as the firstCommitTime for the earliest journal: "
+                                + firstCommitTime);
             
             commitTimeToPreserve = firstCommitTime;
 
@@ -2430,7 +2514,10 @@ abstract public class StoreManager extends ResourceEvents implements
              * or zero as the [currentTime] can be after the lastCommitTime.
              */
 
-            log.info("Choosing commitTimeToPreserve as the lastCommitTime for the live journal: "+lastCommitTime);
+            if (INFO)
+                log
+                        .info("Choosing commitTimeToPreserve as the lastCommitTime for the live journal: "
+                                + lastCommitTime);
             
             commitTimeToPreserve = lastCommitTime;
 
@@ -2441,13 +2528,16 @@ abstract public class StoreManager extends ResourceEvents implements
              * than the release time.
              */
 
-            log.info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "+releaseTime);
+            if (INFO)
+                log
+                        .info("Choosing commitTimeToPreserve as the first commitTime GT the releaseTime: "+releaseTime);
 
             commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(releaseTime);
         
         }
         
-        log.info("commitTimeToPreserve="+commitTimeToPreserve);
+        if (INFO)
+            log.info("commitTimeToPreserve=" + commitTimeToPreserve);
         
         /*
          * Make a note for reporting purposes.
@@ -2544,7 +2634,8 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                 }
 
-                log.info("Will delete: " + resourceMetadata);
+                if (INFO)
+                    log.info("Will delete: " + resourceMetadata);
 
                 deleteResource(uuid, true/*isJournal*/);
 
@@ -2615,7 +2706,8 @@ abstract public class StoreManager extends ResourceEvents implements
                     
                 }
 
-                log.info("Will delete: " + resourceMetadata);
+                if(INFO)
+                    log.info("Will delete: " + resourceMetadata);
 
                 // delete the backing file.
                 deleteResource(uuid, false/*isJournal*/);
@@ -2640,7 +2732,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        log.info("Given " + resourcesInUse.size()
+        if(INFO)
+            log.info("Given " + resourcesInUse.size()
                 + " resources that are in use as of timestamp="
                 + commitTimeToPreserve + ", deleted " + njournals
                 + " journals and " + nsegments + " segments");
@@ -2653,6 +2746,9 @@ abstract public class StoreManager extends ResourceEvents implements
      * <p>
      * Note: The caller is responsible for removing it from the
      * {@link #journalIndex} or the {@link #segmentIndex} as appropriate.
+     * <p>
+     * Note: This is invoked via {@link #purgeOldResources()} which imposes that
+     * constraint on the caller that they are responsible for synchronization.
      * 
      * @param uuid
      *            The {@link UUID} which identifies the resource.
@@ -2901,8 +2997,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
         assert name2Addr != null;
 
-        log.info("commitTime=" + commitTime + "\njournal="
-                + journal.getResourceMetadata());
+        if (INFO)
+            log.info("commitTime=" + commitTime + "\njournal="
+                    + journal.getResourceMetadata());
 
         final Set<UUID> uuids = new HashSet<UUID>();
 
@@ -2939,8 +3036,9 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        log.info("There are " + uuids.size() + " resources in use: commitTime="
-                + commitTime);
+        if (INFO)
+            log.info("There are " + uuids.size()
+                    + " resources in use: commitTime=" + commitTime);
 
         return uuids;
 
@@ -3007,7 +3105,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        log.info("Created file: " + file);
+        if (INFO)
+            log.info("Created file: " + file);
 
         return file;
 

@@ -166,7 +166,9 @@ public class DefaultSplitHandler implements ISplitHandler {
         
         final boolean shouldJoin = rangeCount <= getMinimumEntryCount();
         
-        log.info("shouldJoin="+shouldJoin+" : rangeCount="+rangeCount+", minimumEntryCount="+getMinimumEntryCount());
+        if (INFO)
+            log.info("shouldJoin=" + shouldJoin + " : rangeCount=" + rangeCount
+                    + ", minimumEntryCount=" + getMinimumEntryCount());
         
         return shouldJoin;
         

@@ -386,7 +386,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
         if(!open) reopen();
 
-        return new SegmentMetadata(file, checkpoint.length,
+        return new SegmentMetadata(file, //checkpoint.length,
                 checkpoint.segmentUUID, checkpoint.commitTime);
         
     }
