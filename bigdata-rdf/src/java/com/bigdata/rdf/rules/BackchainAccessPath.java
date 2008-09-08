@@ -37,6 +37,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
+import com.bigdata.rdf.inf.OwlSameAsPropertiesExpandingIterator;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
@@ -162,12 +163,6 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
             
         }
         
-        // pass the limit and capacity through to the source access path.
-        final IChunkedOrderedIterator<ISPO> src = accessPath.iterator(limit,
-                capacity);
-        
-        final IChunkedOrderedIterator<ISPO> owlSameAsItr;
-
         final IPredicate<ISPO> predicate = accessPath.getPredicate();
 
         final SPO spo = new SPO(predicate);
@@ -182,6 +177,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
         final long owlSameAs = vocab.get(OWL.SAMEAS);
         
+        final IChunkedOrderedIterator<ISPO> owlSameAsItr;
+
         if (!database.getAxioms().isOwlSameAs()) {
             
             // no owl:sameAs entailments.
@@ -201,11 +198,10 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
             } else {
 
-                owlSameAsItr = new BackchainOwlSameAsPropertiesIterator(//
-                        src,//
-                        spo.s, spo.p, spo.o,//
-                        database, //
-                        owlSameAs);
+                owlSameAsItr = new OwlSameAsPropertiesExpandingIterator(
+                        spo.s, spo.p, spo.o,
+                        database, owlSameAs, accessPath.getKeyOrder());
+                
             }
             
         } else {
@@ -231,7 +227,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         final IElementFilter<ISPO> filter = predicate.getConstraint();
         
         IChunkedOrderedIterator<ISPO> itr = (owlSameAsItr == null//
-                ? src //
+                ? accessPath.iterator(limit, capacity) //
                 : new ChunkedWrappedIterator<ISPO>(owlSameAsItr,
                         capacity == 0 ? inf.database.queryBufferCapacity
                                 : capacity, null/* keyOrder */, filter)//
@@ -258,7 +254,105 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         return itr;
         
     }
+    
+    /*
+     * In progress.
+    public IChunkedOrderedIterator<ISPO> iterator2(int limit, int capacity) {
 
+        if (log.isInfoEnabled()) {
+
+            log.info(accessPath.getPredicate().toString());
+            
+        }
+        
+        // pass the limit and capacity through to the source access path.
+        final IChunkedOrderedIterator<ISPO> src = null; 
+            // accessPath.iterator(limit, capacity);
+        
+        final IChunkedOrderedIterator<ISPO> owlSameAsItr;
+
+        final IPredicate<ISPO> predicate = accessPath.getPredicate();
+
+        final SPO spo = new SPO(predicate);
+
+        if (inf.rdfsOnly) {
+            
+            // no owl:sameAs entailments.
+            owlSameAsItr = accessPath.iterator(limit, capacity);
+        
+        } else if(inf.forwardChainOwlSameAsClosure && !inf.forwardChainOwlSameAsProperties) {
+            
+            if (inf.database.getAccessPath(NULL, inf.owlSameAs.get(), NULL)
+                    .rangeCount(false/*exact*//*) == 0L) {
+
+                /*
+                 * No owl:sameAs assertions in the KB, so we do not need to
+                 * backchain owl:sameAs.
+                 *//*
+                
+                owlSameAsItr = accessPath.iterator(limit, capacity);
+
+            } else {
+
+                owlSameAsItr = new OwlSameAsPropertiesExpandingIterator(//
+                        spo.s, spo.p, spo.o,//
+                        inf.database, //
+                        inf.owlSameAs.get(), accessPath.getKeyOrder());
+            }
+            
+        } else {
+            
+            // no owl:sameAs entailments.
+            owlSameAsItr = accessPath.iterator(limit, capacity);
+            
+        }
+        
+        /*
+         * Wrap it up as a chunked iterator.
+         * 
+         * Note: If we are not adding any entailments then we just use the
+         * source iterator directly.
+         * 
+         * @todo why is the filter being passed in here? Can the backchaining
+         * iterators produce entailments that would violate the filter? If so,
+         * then shouldn't the filter be applied by the backchainers themselves
+         * so that they do not overgenerate? (This comment also applies for the
+         * type resource backchainer, below).
+         *//*
+
+        final IElementFilter<ISPO> filter = predicate.getConstraint();
+        
+        IChunkedOrderedIterator<ISPO> itr = (owlSameAsItr instanceof OwlSameAsPropertiesExpandingIterator
+                ? new ChunkedWrappedIterator<ISPO>(owlSameAsItr,
+                        capacity == 0 ? inf.database.queryBufferCapacity
+                                : capacity, null/* keyOrder *//*, filter)//
+                : src
+        );
+
+        if (!inf.forwardChainRdfTypeRdfsResource) {
+            
+            /*
+             * Backchain (x rdf:type rdfs:Resource ).
+             * 
+             * @todo pass the filter in here also.
+             *//*
+            
+            itr = BackchainTypeResourceIterator.newInstance(//
+                    itr,//
+                    accessPath,//
+                    inf.database, //
+                    inf.rdfType.get(), //
+                    inf.rdfsResource.get() //
+                    );
+            
+        }
+
+        return itr;
+        
+    }
+    */
+
+    
     /**
      * When <code>exact == false</code> this does not count the backchained
      * entailments. When <code>exact == true</code> traverses the

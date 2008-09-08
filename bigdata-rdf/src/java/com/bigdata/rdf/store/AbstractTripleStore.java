@@ -2960,6 +2960,14 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    public ISPO[] bulkCompleteStatements(final ISPO[] stmts) {
+        
+        BulkCompleteConverter converter = new BulkCompleteConverter(getSPOIndex());
+        
+        return converter.convert(stmts);
+        
+    }
+    
     public long addStatements(ISPO[] stmts, int numStmts) {
 
         if (numStmts == 0)

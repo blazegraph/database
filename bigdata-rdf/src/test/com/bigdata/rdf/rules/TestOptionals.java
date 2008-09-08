@@ -59,8 +59,6 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Test suite for {@link BackchainOwlSameAsPropertiesIterator}.
- * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */

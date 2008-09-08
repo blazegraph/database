@@ -101,7 +101,7 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
          */
         {
             // join:
-            // ( s sameAs ?sameS ) x ( s ?p o ) x ( o sameAs ?sameO )
+            // ( s sameAs ?sameS ) x ( ?sameS ?p ?sameO ) x ( o sameAs ?sameO )
             // to produce ( s ?p o )
             // all of which might be present in the source iterator already
             // use a buffer so that we can do a more efficient batch contains

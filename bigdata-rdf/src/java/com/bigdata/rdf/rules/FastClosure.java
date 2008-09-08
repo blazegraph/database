@@ -241,10 +241,10 @@ public class FastClosure extends BaseClosure {
                 // reflexive closure over owl:sameAs.
                 program.addClosureOf(new RuleOwlSameAs1(db, vocab));
 
-                if (forwardChainOwlSameAsProperties) {
+                // transitive closure over owl:sameAs.
+                program.addClosureOf(new RuleOwlSameAs1b(db, vocab));
 
-                    // transitive closure over owl:sameAs.
-                    program.addClosureOf(new RuleOwlSameAs1b(db, vocab));
+                if (forwardChainOwlSameAsProperties) {
 
                     /*
                      * Apply properties.
