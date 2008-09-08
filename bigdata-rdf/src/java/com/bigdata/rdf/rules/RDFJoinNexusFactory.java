@@ -49,6 +49,7 @@ package com.bigdata.rdf.rules;
 
 import java.lang.ref.WeakReference;
 import java.util.WeakHashMap;
+import java.util.concurrent.ExecutorService;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.spo.SPORelation;
@@ -85,6 +86,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final boolean justify;
     final boolean backchain;
     final boolean forceSerialExecution;
+    final int maxParallelSubqueries;
     final int mutationBufferCapacity;
     final int queryBufferCapacity;
     final int fullyBufferedReadThreshold;
@@ -112,6 +114,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         sb.append(", backchain="+backchain);
         
         sb.append(", forceSerialExecution="+forceSerialExecution);
+        
+        sb.append(", maxParallelSubqueries="+maxParallelSubqueries);
         
         sb.append(", mutationBufferCapacity="+mutationBufferCapacity);
         
@@ -147,6 +151,11 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      *            When <code>true</code>, rule sets will be forced to execute
      *            sequentially even when they are not flagged as a sequential
      *            program.
+     * @param maxParallelSubqueries
+     *            The maximum #of subqueries for the first join dimension that
+     *            will be issued in parallel. Use ZERO(0) to avoid submitting
+     *            tasks to the {@link ExecutorService} entirely and ONE (1) to
+     *            submit a single task at a time to the {@link ExecutorService}.
      * @param justify
      *            if justifications are required.
      * @param backchain
@@ -180,7 +189,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      *            {@link IRule}s.
      */
 	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
-            long writeTimestamp, long readTimestamp, boolean forceSerialExecution,
+            long writeTimestamp, long readTimestamp,//
+            boolean forceSerialExecution, int maxParallelSubqueries,//
             boolean justify, boolean backchain, int mutationBufferCapacity,
             int queryBufferCapacity, int fullyBufferedReadThreshold,
             int solutionFlags, IElementFilter filter,
@@ -190,6 +200,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
             throw new IllegalArgumentException();
 
         if (action == null)
+            throw new IllegalArgumentException();
+
+        if (maxParallelSubqueries < 0)
             throw new IllegalArgumentException();
 
         if (planFactory == null)
@@ -211,6 +224,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         this.backchain = backchain;
         
         this.forceSerialExecution = forceSerialExecution;
+        
+        this.maxParallelSubqueries = maxParallelSubqueries;
         
         this.mutationBufferCapacity = mutationBufferCapacity;
         

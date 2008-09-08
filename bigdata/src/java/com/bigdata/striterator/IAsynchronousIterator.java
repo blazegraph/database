@@ -28,12 +28,33 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.striterator;
 
+import java.util.concurrent.TimeUnit;
+
 /**
- * Marker interface for iterators that are running asynchronously.
+ * Interface for iterators that are running asynchronously.
  *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
 
+    /**
+     * Wait up to timeout units for the next chunk. The method will return
+     * before the timeout if there are no more elements available from the
+     * producer or if the chunk is full.
+     * 
+     * @param minChunkSize
+     *            The #of elements in the desired chunk. There may be fewer than
+     *            this many elements if the timeout expires first. There may be
+     *            fewer than this many elements if the desired chunks size
+     *            exceeds the internal buffer capacity of the iterator.
+     * @param timeout
+     *            The timeout.
+     * @param unit
+     *            The unit for that timeout.
+     * 
+     * @return The next chunk.
+     */
+    public E[] nextChunk(int minChunkSize,long timeout, TimeUnit unit);
+    
 }

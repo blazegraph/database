@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -39,7 +39,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IIndexStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -48,7 +47,6 @@ import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.ClientIndexView;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -95,10 +93,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     protected final int tailCount;
 
     /**
-     * When <code>true</code>, subqueries for the first join dimension will
-     * be issued in parallel.
+     * The maximum #of subqueries for the first join dimension that will be
+     * issued in parallel. Use ZERO(0) to avoid the use of the
+     * {@link #joinService} entirely and ONE (1) to submit a single task at a
+     * time to the {@link #joinService}.
      */
-    protected final boolean parallelSubqueries;
+    protected final int maxParallelSubqueries;
 
     /**
      * The {@link ExecutorService} to which parallel subqueries are submitted.
@@ -131,19 +131,10 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         
         this.tailCount = rule.getTailCount();
         
-        final IIndexManager im = joinNexus.getIndexManager();
+        this.maxParallelSubqueries = joinNexus.getMaxParallelSubqueries();
         
-        /*
-         * Note: Parallel subqueries provide a 2x multipler for EDS and a 6x
-         * multiplier for JDS (faster closure as measured on LUBM U1).  There
-         * is a slight penalty for LTS (.99x) and LDS (.88x). 
-         */
-        this.parallelSubqueries = (im instanceof IBigdataFederation && ((IBigdataFederation) im)
-                .isScaleOut());
-        
-        this.joinService = (ThreadPoolExecutor) (!parallelSubqueries ? null
-                : useJoinService ? joinNexus.getJoinService() : joinNexus
-                        .getIndexManager().getExecutorService());
+        this.joinService = (ThreadPoolExecutor) (maxParallelSubqueries == 0 ? null
+                : joinNexus.getIndexManager().getExecutorService());
         
     }
     
@@ -438,7 +429,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
          * Those subqueries are just run in the caller's thread.
          */
         
-        if (!parallelSubqueries || orderIndex > 0 || chunk.length <= 1
+        if (maxParallelSubqueries==0 || orderIndex > 0 || chunk.length <= 1
 //                || !useJoinService
 //                || (orderIndex > 2 || joinService.getQueue().size() > 100)
                 ) {
@@ -465,24 +456,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
     }
 
-    private static final boolean reorderChunkToTargetOrder = true;
-    
     /**
-     * Controls which thread pool is used for parallelization of subqueries.
-     * When <code>true</code> uses the {@link IJoinNexus#getJoinService()}
-     * otherwise uses {@link IIndexStore#getExecutorService()}.
-     * <p>
-     * Note: The IJoinNexus#getJoinService() is currently configured to force a
-     * task to run in the caller's thread when it's work queue is full. However,
-     * this is not enough to satisify the liveness constraint (progress halts
-     * when all workers are waiting on subtasks in the work queue).
-     * 
-     * FIXME get rid of {@link IJoinNexus#getJoinService()}? The
-     * {@link IIndexStore#getExecutorService()} appears to be perfectly
-     * sufficient.
+     * Determines whether we will sort the elements in a chunk into the natural
+     * order for the index for the target join dimension.
      */
-    private static final boolean useJoinService = false;
-    
+    private static final boolean reorderChunkToTargetOrder = true;
+        
     /**
      * Runs the subquery in the caller's thread (this was the original
      * behavior).
@@ -552,14 +531,25 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            A chunk of elements from the left-hand side of the join.
      * @param bindingSet
      *            The bindings from the prior joins (if any).
+     * 
+     * @todo Develop a pattern for feeding the {@link ExecutorService} such that
+     *       it maintains at least N threads from a producer and no more than M
+     *       threads overall. We need that pattern here for better sustained
+     *       throughput and in the map/reduce system as well (it exists there
+     *       but needs to be refactored and aligned with the simpler thread pool
+     *       exposed by the {@link IIndexManager}).
      */
     protected void runSubQueriesOnThreadPool(final int orderIndex,
             final Object[] chunk, final IBindingSet bindingSet) {
 
         final int tailIndex = getTailIndex(orderIndex);
 
-        // at most one task per element in this chunk.
-        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+        /*
+         * At most one task per element in this chunk, but never more than
+         * [maxParallelSubqueries] tasks at once.
+         */
+        final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(Math
+                .min(maxParallelSubqueries, chunk.length));
         
         // for each element in the chunk.
         for (Object e : chunk) {
@@ -577,24 +567,50 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
              * violate the constaints on the JOIN).
              */
 
-            ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
+            // clone the binding set.
+            final IBindingSet bset = bindingSet.clone();
+            
+            // Note: not necessary since we are cloning the bindingset.
+//            ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
 
-            if (ruleState.bind(tailIndex, e, bindingSet)) {
+            if (ruleState.bind(tailIndex, e, bset)) {
 
                 // we will run this subquery.
                 ruleStats.subqueryCount[tailIndex]++;
 
                 // create a task for the subquery.
-                tasks.add(new SubqueryTask<Void>(orderIndex + 1, bindingSet
-                        .clone()));
+                tasks.add(new SubqueryTask<Void>(orderIndex + 1, bset));
 
             }
 
+            if (tasks.size() >= maxParallelSubqueries) {
+
+                submitTasks(tasks);
+
+                tasks.clear();
+                
+            }
+            
         }
 
-        /*
-         * Submit subquery tasks and wait until they are done.
-         */
+        // submit any remaining tasks.
+        submitTasks( tasks);
+
+    }
+    
+    /**
+     * Submit subquery tasks, wait until they are done, and verify that all
+     * tasks were executed without error.
+     */
+    protected void submitTasks(final List<Callable<Void>> tasks ) {
+        
+        if (tasks.isEmpty()) {
+            
+            // No tasks.
+            return;
+            
+        }
+        
         final List<Future<Void>> futures;
         try {
 

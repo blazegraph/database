@@ -151,13 +151,13 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
 
         private final String fileStr;
 
-        private final long length;
+//        private final long length;
 
         public ResourceMetadata(File file) {
 
             this.fileStr = file.toString();
 
-            this.length = file.length();
+//            this.length = file.length();
 
         }
 
@@ -201,11 +201,11 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
 
         }
 
-        public long size() {
-
-            return length;
-
-        }
+//        public long size() {
+//
+//            return length;
+//
+//        }
 
     }
 

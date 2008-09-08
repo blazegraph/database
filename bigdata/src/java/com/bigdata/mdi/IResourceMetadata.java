@@ -64,10 +64,17 @@ public interface IResourceMetadata extends Serializable, Cloneable {
      */
     public String getFile();
     
-    /**
-     * The #of bytes in the store file.
+    /*
+     * Note: size() was removed since (a) required a new instance of the
+     * resource metadata object for the ManagedJournal each time we obtained an
+     * iterator reading on a data service; and (b) the resources are the same
+     * regardless of their size.  it is the file and UUID that identify them.
+     * the file in the file system and the UUID in our code.
      */
-    public long size();
+//    /**
+//     * The #of bytes in the store file.
+//     */
+//    public long size();
 
     /**
      * The unique identifier for the resource.

@@ -230,6 +230,20 @@ abstract public class ResourceManager extends OverflowManager implements IResour
                             }
                         });
                 
+                tmp.addCounter("Index Cache Size",
+                        new Instrument<Integer>() {
+                            public void sample() {
+                                setValue(getIndexCacheSize());
+                            }
+                        });
+                
+                tmp.addCounter("Index Cache Capacity",
+                        new Instrument<Integer>() {
+                            public void sample() {
+                                setValue(getIndexCacheCapacity());
+                            }
+                        });
+                
                 tmp.addCounter("Index Segment Cache Size",
                         new Instrument<Integer>() {
                             public void sample() {

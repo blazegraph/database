@@ -17,6 +17,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -1083,28 +1084,44 @@ public class ConcurrencyManager implements IConcurrencyManager {
             final BlockingQueue<Runnable> queue = ((ThreadPoolExecutor) service)
                     .getQueue();
         
-            final int queueCapacity = queue.remainingCapacity();
-            
-            if (queue.size() * 1.10 >= queueCapacity) {
-                
-                try {
-                    
-                    /*
-                     * Note: Any delay here what so ever causes the #of tasks in
-                     * a commit group to be governed primarily by the CORE pool
-                     * size.
-                     */
+            if (!(queue instanceof SynchronousQueue)) {
 
-                    if(INFO) System.err.print("z");
-                    
-                    Thread.sleep(50/*ms*/);
-                    
-                } catch (InterruptedException e) {
-                    
-                    throw new RuntimeException(e);
-                    
-                }
+                /*
+                 * Note: SynchronousQueue is used when there is no limit on the
+                 * #of workers, e.g., when using
+                 * Executors.newCachedThreadPool(). The SynchronousQueue has a
+                 * ZERO capacity. Therefore the logic to test the remaining
+                 * capacity and inject a delay simply does not work for this
+                 * type of queue.
+                 */
                 
+                final int queueRemainingCapacity = queue.remainingCapacity();
+
+                final int queueSize = queue.size();
+
+                if (queue.size() * 1.10 >= queueRemainingCapacity) {
+
+                    try {
+
+                        /*
+                         * Note: Any delay here what so ever causes the #of
+                         * tasks in a commit group to be governed primarily by
+                         * the CORE pool size.
+                         */
+
+                        if (INFO)
+                            System.err.print("z");
+
+                        Thread.sleep(50/* ms */);
+
+                    } catch (InterruptedException e) {
+
+                        throw new RuntimeException(e);
+
+                    }
+
+                }
+
             }
             
         }
@@ -1120,8 +1137,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *       analysis (of queue length vs response time) for the federation
      *       under a variety of workloads (tasks such as rdf data load, rdf data
      *       query, bigdata repository workloads, etc.).
+     *       <p>
+     *       Note that {@link Executors#newCachedThreadPool()} uses a
+     *       {@link SynchronousQueue} and that queue has ZERO capacity.
      */
-    private final boolean backoff = true;
+    static private final boolean backoff = false;
 
     /**
      * Executes the given tasks, returning a list of Futures holding their
@@ -1637,7 +1657,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                             rescs.addCounter("uuid", new OneShotInstrument<String>(resource.getUUID().toString()));
 
-                            rescs.addCounter("size", new OneShotInstrument<String>(""+resource.size()));
+//                            rescs.addCounter("size", new OneShotInstrument<String>(""+resource.size()));
 
                             rescs.addCounter("createTime", new OneShotInstrument<String>(""+resource.getCreateTime()));
 

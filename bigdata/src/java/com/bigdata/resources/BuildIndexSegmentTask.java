@@ -77,7 +77,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         // The source view.
         final ILocalBTreeView src = (ILocalBTreeView)getIndex(name);
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             // note: the mutable btree - accessed here for debugging only.
             final BTree btree = src.getMutableBTree();
@@ -95,7 +95,8 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         final AbstractTask task = new AtomicUpdateBuildIndexSegmentTask(resourceManager,
                 concurrencyManager, name, result);
 
-        log.info("src="+name+", will run atomic update task");
+        if(INFO)
+            log.info("src=" + name + ", will run atomic update task");
 
         // submit task and wait for it to complete @todo config timeout?
         concurrencyManager.submit(task).get();
@@ -223,7 +224,9 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
 
             final SegmentMetadata segmentMetadata = buildResult.segmentMetadata;
 
-            log.info("Begin: name="+getOnlyResource()+", newSegment="+segmentMetadata);
+            if (INFO)
+                log.info("Begin: name=" + getOnlyResource() + ", newSegment="
+                        + segmentMetadata);
 
             /*
              * Open the unisolated B+Tree on the live journal that is absorbing
@@ -261,7 +264,10 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             // The live B+Tree.
             final BTree btree = (BTree)(view instanceof FusedView?((FusedView)view).getSources()[0]:view);
             
-            log.info("src="+getOnlyResource()+",counter="+view.getCounter().get()+",checkpoint="+btree.getCheckpoint());
+            if (INFO)
+                log.info("src=" + getOnlyResource() + ",counter="
+                        + view.getCounter().get() + ",checkpoint="
+                        + btree.getCheckpoint());
 
             assert btree != null : "Expecting index: "+getOnlyResource();
             
@@ -366,8 +372,9 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             // update the metadata associated with the btree
             btree.setIndexMetadata(indexMetadata);
 
-            log.info("Updated view: name=" + getOnlyResource() + ", pmd="
-                    + indexMetadata.getPartitionMetadata());
+            if (INFO)
+                log.info("Updated view: name=" + getOnlyResource() + ", pmd="
+                        + indexMetadata.getPartitionMetadata());
             
             /*
              * Verify that the btree recognizes that it needs to be

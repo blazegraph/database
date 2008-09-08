@@ -152,7 +152,9 @@ abstract public class MetadataService extends DataService implements
             final Integer partitionId = (Integer) getConcurrencyManager().submit(
                     task).get();
         
-            log.info("Assigned partitionId="+partitionId+", name="+name);
+            if (INFO)
+                log.info("Assigned partitionId=" + partitionId + ", name="
+                        + name);
             
             return partitionId.intValue();
             
@@ -378,7 +380,7 @@ abstract public class MetadataService extends DataService implements
                 
                 metadata.setDeleteMarkers(true);
                 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Enabling delete markers: "+metadata.getName());
                 
             }
@@ -395,7 +397,7 @@ abstract public class MetadataService extends DataService implements
             final String metadataIndexName = MetadataService
                     .getMetadataIndexName(scaleOutIndexName);
      
-            final AbstractTask task = new RegisterScaleOutIndexTask(
+            final AbstractTask task = new RegisterScaleOutIndexTask(getFederation(),
                     getConcurrencyManager(), getResourceManager(), metadataIndexName,
                     metadata, separatorKeys, dataServices);
             
@@ -420,7 +422,8 @@ abstract public class MetadataService extends DataService implements
         try {
 
             final AbstractTask task = new DropScaleOutIndexTask(
-                    getConcurrencyManager(), getMetadataIndexName(name));
+                    getFederation(), getConcurrencyManager(),
+                    getMetadataIndexName(name));
             
             getConcurrencyManager().submit(task).get();
         
@@ -513,9 +516,10 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
-            if(INFO)
-            log.info("name=" + getOnlyResource() + ", oldLocator=" + oldLocator
-                    + ", locators=" + Arrays.toString(newLocators));
+            if (INFO)
+                log.info("name=" + getOnlyResource() + ", oldLocator="
+                        + oldLocator + ", locators="
+                        + Arrays.toString(newLocators));
             
             final MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
             
@@ -523,9 +527,10 @@ abstract public class MetadataService extends DataService implements
                     .deserialize(mdi.remove(oldLocator.getLeftSeparatorKey()));
             
             if (pmd == null) {
-                
-                throw new RuntimeException("No such locator: name="+getOnlyResource()+", locator="+oldLocator);
-                
+
+                throw new RuntimeException("No such locator: name="
+                        + getOnlyResource() + ", locator=" + oldLocator);
+
             }
             
             if(!oldLocator.equals(pmd)) {
@@ -538,7 +543,8 @@ abstract public class MetadataService extends DataService implements
                  * are probably not important and might be ignored.
                  */
 
-                throw new RuntimeException("Expected different locator: name="+getOnlyResource()+", oldLocator=" + oldLocator
+                throw new RuntimeException("Expected different locator: name="
+                        + getOnlyResource() + ", oldLocator=" + oldLocator
                         + ", but actual=" + pmd);
                 
             }
@@ -695,8 +701,10 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
-            log.info("name=" + getOnlyResource() + ", oldLocators=" + Arrays.toString(oldLocators)
-                    + ", newLocator=" + newLocator);
+            if (INFO)
+                log.info("name=" + getOnlyResource() + ", oldLocators="
+                        + Arrays.toString(oldLocators) + ", newLocator="
+                        + newLocator);
             
             MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
 
@@ -813,8 +821,9 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
-            log.info("name=" + getOnlyResource() + ", oldLocator=" + oldLocator
-                    + ", newLocator=" + newLocator);
+            if (INFO)
+                log.info("name=" + getOnlyResource() + ", oldLocator="
+                        + oldLocator + ", newLocator=" + newLocator);
 
             final MetadataIndex mdi = (MetadataIndex) getIndex(getOnlyResource());
 
@@ -824,9 +833,10 @@ abstract public class MetadataService extends DataService implements
 
 
             if (pmd == null) {
-                
-                throw new RuntimeException("No such locator: name="+getOnlyResource()+", locator="+oldLocator);
-                
+
+                throw new RuntimeException("No such locator: name="
+                        + getOnlyResource() + ", locator=" + oldLocator);
+
             }
             
             if (!oldLocator.equals(pmd)) {
@@ -879,8 +889,10 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class RegisterScaleOutIndexTask extends AbstractTask {
+    static protected class RegisterScaleOutIndexTask extends AbstractTask {
 
+        /** The federation. */
+        final private IBigdataFederation fed;
         /** The name of the scale-out index. */
         final private String scaleOutIndexName;
         /** The metadata template for the scale-out index. */
@@ -913,12 +925,16 @@ abstract public class MetadataService extends DataService implements
          *            the index paritions will be auto-assigned to data
          *            services.
          */
-        public RegisterScaleOutIndexTask(ConcurrencyManager concurrencyManager,
+        public RegisterScaleOutIndexTask(IBigdataFederation fed,
+                ConcurrencyManager concurrencyManager,
                 IResourceManager resourceManager, String metadataIndexName,
                 final IndexMetadata metadata, byte[][] separatorKeys,
                 UUID[] dataServiceUUIDs) {
 
             super(concurrencyManager, ITx.UNISOLATED, metadataIndexName);
+
+            if (fed == null)
+                throw new IllegalArgumentException();
 
             if (metadata == null)
                 throw new IllegalArgumentException();
@@ -946,7 +962,7 @@ abstract public class MetadataService extends DataService implements
                 try {
 
                     // discover under-utilized data service UUIDs.
-                    dataServiceUUIDs = getFederation().getLoadBalancerService().getUnderUtilizedDataServices(
+                    dataServiceUUIDs = fed.getLoadBalancerService().getUnderUtilizedDataServices(
                             separatorKeys.length, // minCount
                             separatorKeys.length, // maxCount
                             null// exclude
@@ -960,6 +976,8 @@ abstract public class MetadataService extends DataService implements
                 
             }
 
+            this.fed = fed;
+            
             this.scaleOutIndexName = metadata.getName();
 
             this.metadata = metadata;
@@ -1008,7 +1026,7 @@ abstract public class MetadataService extends DataService implements
 
                 }
 
-                IDataService dataService = getFederation().getDataService(uuid);
+                final IDataService dataService = fed.getDataService(uuid);
 
                 if (dataService == null) {
 
@@ -1088,7 +1106,8 @@ abstract public class MetadataService extends DataService implements
                         rightSeparator
                         );
                 
-                log.info("name=" + scaleOutIndexName + ", pmd=" + pmd);
+                if (INFO)
+                    log.info("name=" + scaleOutIndexName + ", pmd=" + pmd);
 
                 /*
                  * Map the initial partition onto that data service. This
@@ -1097,7 +1116,7 @@ abstract public class MetadataService extends DataService implements
                  * partition in order and null iff this is the last partition.
                  */
 
-                IndexMetadata md = metadata.clone();
+                final IndexMetadata md = metadata.clone();
                 
                 // override the partition metadata.
                 md.setPartitionMetadata(new LocalPartitionMetadata(
@@ -1175,17 +1194,25 @@ abstract public class MetadataService extends DataService implements
      *       does not fail over to the next data service for that index
      *       partition.
      */
-    public class DropScaleOutIndexTask extends AbstractTask {
+    static public class DropScaleOutIndexTask extends AbstractTask {
 
+        private final IBigdataFederation fed;
+        
         /**
+         * @parma fed
          * @param journal
          * @param name
          *            The name of the metadata index for some scale-out index.
          */
-        protected DropScaleOutIndexTask(ConcurrencyManager concurrencyManager,
-                String name) {
+        protected DropScaleOutIndexTask(IBigdataFederation fed,
+                ConcurrencyManager concurrencyManager, String name) {
             
             super(concurrencyManager, ITx.UNISOLATED, name);
+            
+            if (fed == null)
+                throw new IllegalArgumentException();
+            
+            this.fed = fed;
 
         }
 
@@ -1213,7 +1240,8 @@ abstract public class MetadataService extends DataService implements
             // name of the scale-out index.
             final String name = ndx.getScaleOutIndexMetadata().getName();
             
-            log.info("Will drop index partitions for "+name);
+            if (INFO)
+                log.info("Will drop index partitions for " + name);
             
 //            final ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
 //                    ndx, null, null, 0/* capacity */, IRangeQuery.VALS, null/* filter */);
@@ -1227,7 +1255,7 @@ abstract public class MetadataService extends DataService implements
                 final ITuple tuple = itr.next();
 
                 // FIXME There is still (5/30/08) a problem with using getValueStream() here!
-                PartitionLocator pmd = (PartitionLocator) SerializerUtil
+                final PartitionLocator pmd = (PartitionLocator) SerializerUtil
                         .deserialize(tuple.getValue());
 //                .deserialize(tuple.getValueStream());
 
@@ -1240,12 +1268,16 @@ abstract public class MetadataService extends DataService implements
                     
                     final UUID serviceUUID = pmd.getDataServices()[0];
                     
-                    final IDataService dataService = getFederation().getDataService(serviceUUID);
-                    
-                    log.info("Dropping index partition: partitionId="+partitionId+", dataService="+dataService);
-                    
-                    dataService.dropIndex(DataService.getIndexPartitionName(name, partitionId));
-                    
+                    final IDataService dataService = fed
+                            .getDataService(serviceUUID);
+
+                    if (INFO)
+                        log.info("Dropping index partition: partitionId="
+                                + partitionId + ", dataService=" + dataService);
+
+                    dataService.dropIndex(DataService.getIndexPartitionName(
+                            name, partitionId));
+
                 }
                 
                 ndropped++;
@@ -1255,7 +1287,9 @@ abstract public class MetadataService extends DataService implements
 //            // flush all delete requests.
 //            itr.flush();
             
-            log.info("Dropped "+ndropped+" index partitions for "+name);
+            if (INFO)
+                log.info("Dropped " + ndropped + " index partitions for "
+                        + name);
 
             // drop the metadata index as well.
             getJournal().dropIndex(getOnlyResource());

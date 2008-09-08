@@ -60,15 +60,15 @@ public class SegmentMetadata extends AbstractResourceMetadata {
 
     }
 
-    public SegmentMetadata(File file, long nbytes, UUID uuid, long commitTime) {
+    public SegmentMetadata(File file, /*long nbytes,*/ UUID uuid, long commitTime) {
         
-        this(file.getName(),nbytes,uuid,commitTime);
+        this(file.getName(),/*nbytes,*/uuid,commitTime);
         
     }
 
-    SegmentMetadata(String filename, long nbytes, UUID uuid, long commitTime) {
+    SegmentMetadata(String filename, /*long nbytes,*/ UUID uuid, long commitTime) {
 
-        super(filename, nbytes, uuid, commitTime);
+        super(filename, /*nbytes,*/ uuid, commitTime);
 
     }
 

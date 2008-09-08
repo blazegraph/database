@@ -30,14 +30,9 @@ package com.bigdata.rdf.rules;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -109,7 +104,6 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.striterator.IRemoteChunkedIterator;
 import com.bigdata.striterator.WrappedRemoteChunkedIterator;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
@@ -132,6 +126,8 @@ public class RDFJoinNexus implements IJoinNexus {
     private final long readTimestamp;
 
     private final boolean forceSerialExecution;
+    
+    private final int maxParallelSubqueries;
     
     private final boolean justify;
     
@@ -348,6 +344,8 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.forceSerialExecution = joinNexusFactory.forceSerialExecution;
         
+        this.maxParallelSubqueries = joinNexusFactory.maxParallelSubqueries;
+        
         this.justify = joinNexusFactory.justify;
  
         this.backchain = joinNexusFactory.backchain;
@@ -391,64 +389,11 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
     
-    /**
-     * @todo configure via the {@link RDFJoinNexusFactory}.
-     */
-    public ExecutorService getJoinService() {
-    
-        if (joinService == null) {
-
-            synchronized (this) {
-
-                if (joinService == null) {
-
-//                    joinService = BigdataExecutors.newCachedThreadPool();
-                    
-                    final int corePoolSize = 5;
-                    final int maximumPoolSize = 20;
-                    final long keepAliveTime = 60;// seconds
-                    final int workQueueCapacity = 1000;//maximumPoolSize * 10;
-                    final BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<Runnable>(
-                            workQueueCapacity);
-                    
-                    joinService = new ThreadPoolExecutor(corePoolSize,
-                            maximumPoolSize, keepAliveTime, TimeUnit.SECONDS,
-                            workQueue, DaemonThreadFactory
-                                    .defaultThreadFactory(),
-                            new ThreadPoolExecutor.CallerRunsPolicy());
-                    
-//                    joinService = (ThreadPoolExecutor)Executors
-//                            .newCachedThreadPool(DaemonThreadFactory
-//                                    .defaultThreadFactory());
-
-                }
-
-            }
-
-        }
-
-        return joinService;
-        
-    }
-    private volatile ThreadPoolExecutor joinService = null;
-    
-    protected void finalize() throws Throwable {
-        
-        if (joinService != null) {
-            
-            log.warn("Shutting down the joinService: #active="
-                    + joinService.getActiveCount() + ", #completed="
-                    + joinService.getCompletedTaskCount() + ", poolSize="
-                    + joinService.getPoolSize() + ", largestPoolSize="
-                    + joinService.getLargestPoolSize());
-            
-            joinService.shutdownNow();
-            
-        }
-        
-        super.finalize();
-        
-    }
+//    protected void finalize() throws Throwable {
+//       
+//        super.finalize();
+//        
+//    }
     
     public IJoinNexusFactory getJoinNexusFactory() {
         
@@ -475,6 +420,12 @@ public class RDFJoinNexus implements IJoinNexus {
 
         return forceSerialExecution;
     	
+    }
+    
+    final public int getMaxParallelSubqueries() {
+        
+        return maxParallelSubqueries;
+        
     }
     
     public ActionEnum getAction() {
@@ -1311,10 +1262,15 @@ public class RDFJoinNexus implements IJoinNexus {
             if (fed instanceof LocalDataServiceFederation) {
                 if(false) {
                     /*
-                     * FIXME Remove this code block. I am using it to examine
-                     * performance penalties due to rules executed using
-                     * ClientIndexView's rather than locally on the data
-                     * service.
+                     * FIXME Make sure that this is disabled except for testing!
+                     * 
+                     * Note: This can be used to examine performance penalties
+                     * due to rules executed against (rather than on) a
+                     * DataService. This is an easy way to track down many of
+                     * the costs associated with the scale-out model. The only
+                     * costs that you will not see this way are those
+                     * specifically associated with the ClientIndexView or the
+                     * the index partition locators (use EDS for that).
                      */ 
                     log.warn("LDS is using distributed program execution!!!");
                     return runDistributedProgram(fed, action, step);

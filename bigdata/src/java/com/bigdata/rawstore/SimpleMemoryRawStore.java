@@ -200,12 +200,12 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
         }
 
-        public long size() {
-
-            // #of bytes not available.
-            return 0L;
-
-        }
+//        public long size() {
+//
+//            // #of bytes not available.
+//            return 0L;
+//
+//        }
 
     }
     

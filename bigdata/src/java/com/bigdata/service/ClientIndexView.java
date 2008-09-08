@@ -222,6 +222,11 @@ public class ClientIndexView implements IClientIndex {
     }
 
     /**
+     * true iff this is a historical read.
+     */
+    private final boolean historicalRead;
+    
+    /**
      * The {@link IndexMetadata} for the {@link MetadataIndex} that manages the
      * scale-out index. The metadata template for the managed scale-out index is
      * available as a field on this object.
@@ -369,6 +374,8 @@ public class ClientIndexView implements IClientIndex {
 
         this.taskTimeout = fed.getClient().getTaskTimeout();
         
+        this.historicalRead = TimestampUtility.isHistoricalRead(timestamp);
+
     }
 
     /**
@@ -565,7 +572,7 @@ public class ClientIndexView implements IClientIndex {
      */
 
     public long rangeCount() {
-
+        
         return rangeCount(null, null);
         
     }

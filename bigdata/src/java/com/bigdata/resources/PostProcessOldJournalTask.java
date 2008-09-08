@@ -509,7 +509,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         // list of tasks that we create (if any).
         final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
 
-        log.info("begin: lastCommitTime=" + lastCommitTime);
+        if (INFO)
+            log.info("begin: lastCommitTime=" + lastCommitTime);
 
         /*
          * Map of the under capacity index partitions for each scale-out index
@@ -621,7 +622,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     tmp.insert(pmd.getLeftSeparatorKey(), SerializerUtil.serialize(pmd));
 
-                    log.info("join candidate: " + name);
+                    if(INFO)
+                        log.info("join candidate: " + name);
 
                     njoin++;
 
@@ -687,7 +689,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // the name of the scale-out index.
                 final String scaleOutIndexName = entry.getKey();
 
-                log.info("Considering join candidates: " + scaleOutIndexName);
+                if (INFO)
+                    log.info("Considering join candidates: "
+                            + scaleOutIndexName);
 
                 // keys := leftSeparator; value := LocalPartitionMetadata
                 final BTree tmp = entry.getValue();
@@ -711,8 +715,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * than any other index partition to recieve new writes.
                  */
 
-                log.info("Formulating rightSiblings query=" + scaleOutIndexName
-                        + ", #underutilized=" + ncandidates);
+                if (INFO)
+                    log.info("Formulating rightSiblings query="
+                            + scaleOutIndexName + ", #underutilized="
+                            + ncandidates);
                 
                 final byte[][] keys = new byte[ncandidates][];
                 
@@ -748,8 +754,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     
                 } // next underutilized index partition.
 
-                log.info("Looking for rightSiblings: name=" + scaleOutIndexName
-                        + ", #underutilized=" + ncandidates);
+                if (INFO)
+                    log.info("Looking for rightSiblings: name="
+                            + scaleOutIndexName + ", #underutilized="
+                            + ncandidates);
 
                 /*
                  * Submit a single batch request to identify rightSiblings for
@@ -828,7 +836,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         // sorry.
                         if(isUsed(resources[1])) continue;
 
-                        log.info("Will JOIN: " + Arrays.toString(resources));
+                        if(INFO)
+                            log.info("Will JOIN: " + Arrays.toString(resources));
                         
                         final AbstractTask task = new JoinIndexPartitionTask(
                                     resourceManager, lastCommitTime, resources);
@@ -957,6 +966,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         if (!highlyUtilizedService || nactive <= minActiveIndexPartitions) {
 
+            if(INFO)
             log.info("Preconditions for move not satisified: highlyUtilized="
                     + highlyUtilizedService + ", nactive=" + nactive
                     + ", minActive=" + minActiveIndexPartitions);
@@ -1043,7 +1053,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * begin moving index partitions off of this data service.
          */
 
-        log.info("Considering index partition moves: #targetServices="
+        if(INFO)
+            log.info("Considering index partition moves: #targetServices="
                 + underUtilizedDataServiceUUIDs.length + ", maxMovesPerTarget="
                 + maxMovesPerTarget + ", maxMoves=" + maxMoves + ", nactive="
                 + nactive);
@@ -1076,7 +1087,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Since it is gone we skip over it here.
                  */
                 
-                log.info("Skipping index: name="+score.name + ", reason="+ reason);
+                if (INFO)
+                    log.info("Skipping index: name=" + score.name + ", reason="
+                            + reason);
                 
                 continue;
                 
@@ -1092,13 +1105,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * over it here.
                  */
                 
-                log.info("Skipping index: name=" + name + ", reason=dropped");
+                if (INFO)
+                    log.info("Skipping index: name=" + name
+                            + ", reason=dropped");
                 
                 continue;
                 
             }
             
-            log.info("Considering move candidate: "+score);
+            if (INFO)
+                log.info("Considering move candidate: " + score);
             
             if (score.drank > .3 && score.drank < .8) {
 
@@ -1110,7 +1126,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
                         % underUtilizedDataServiceUUIDs.length];
 
-                log.info("Will move "+name+" to dataService="+targetDataServiceUUID);
+                if (INFO)
+                    log.info("Will move " + name + " to dataService="
+                            + targetDataServiceUUID);
                 
                 final AbstractTask task = new MoveIndexPartitionTask(
                         resourceManager, lastCommitTime, name,
@@ -1127,7 +1145,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
         
-        log.info("Will move "+nmove+" index partitions based on utilization.");
+        if (INFO)
+            log.info("Will move " + nmove
+                    + " index partitions based on utilization.");
 
         return tasks;
 
@@ -1254,7 +1274,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
-        log.info("begin: lastCommitTime=" + lastCommitTime);
+        if (INFO)
+            log.info("begin: lastCommitTime=" + lastCommitTime);
 
         // the old journal.
         final AbstractJournal oldJournal = resourceManager
@@ -1316,7 +1337,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  */
                 if(isUsed(name)) {
                     
-                    log.info("was  handled: "+name);
+                    if (INFO)
+                        log.info("was  handled: " + name);
                     
                     nskip++;
 
@@ -1378,7 +1400,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     putUsed(name,"willSplit(name="+name+")");
                     
-                    log.info("will split  : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
+                    if (INFO)
+                        log.info("will split  : " + name + ", counter="
+                                + view.getCounter().get() + ", checkpoint="
+                                + btree.getCheckpoint());
 
                     nsplit++;
 
@@ -1391,7 +1416,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     putUsed(name,"wasCopied(name="+name+")");
 
-                    log.info("was  copied : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
+                    if (INFO)
+                        log.info("was  copied : " + name + ", counter="
+                                + view.getCounter().get() + ", checkpoint="
+                                + btree.getCheckpoint());
 
                     nskip++;
 
@@ -1424,7 +1452,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     putUsed(name,"willBuild(name="+name+")");
 
-                    log.info("will build  : " + name+", counter="+view.getCounter().get()+", checkpoint="+btree.getCheckpoint());
+                    if (INFO)
+                        log.info("will build  : " + name + ", counter="
+                                + view.getCounter().get() + ", checkpoint="
+                                + btree.getCheckpoint());
 
                     nbuild++;
 
@@ -1462,7 +1493,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
         }
 
-        log.info("end");
+        if (INFO)
+            log.info("end");
 
         return tasks;
 
@@ -1499,7 +1531,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         try {
 
-            log.info("begin");
+            if (INFO)
+                log.info("begin");
 
             if(Thread.currentThread().isInterrupted()) return null;
             
@@ -1595,7 +1628,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 }
 
-                log.info("end");
+                if(INFO)
+                    log.info("end");
 
             }
             
@@ -1623,7 +1657,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             if(INFO) {
                 
-                log.info("done: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
+                log.info("done: overflowCounter=" + overflowCounter
+                        + ", elapsed=" + elapsed + "ms");
                 
                 // The post-condition views.
                 log.info("\npost-condition views: overflowCounter="

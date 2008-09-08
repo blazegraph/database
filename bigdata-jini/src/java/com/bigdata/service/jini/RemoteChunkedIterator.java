@@ -1,9 +1,11 @@
 package com.bigdata.service.jini;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.striterator.IAsynchronousIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IRemoteChunk;
 import com.bigdata.striterator.IRemoteChunkedIterator;
@@ -145,7 +147,15 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
         } else {
 
-            final E[] a = sourceIterator.nextChunk();
+            // @todo config timeout.
+            final E[] a = sourceIterator instanceof IAsynchronousIterator//
+                ? ((IAsynchronousIterator<E>) sourceIterator).nextChunk(//
+                    1000,// minChunkSize
+                    1000L, // timeout
+                    TimeUnit.MILLISECONDS// unit
+                    )//
+                : sourceIterator.nextChunk()//
+                ;
 
             final boolean sourceExhausted = !sourceIterator.hasNext();
 

@@ -27,9 +27,6 @@ package com.bigdata.service;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
@@ -239,28 +236,12 @@ public interface IBigdataFederation extends IIndexManager {
      */
     public IIndex getIndex(String name, long timestamp);
     
-//    /**
-//     * Return a thread-local {@link IKeyBuilder} configured using the properties
-//     * specified for the {@link IBigdataClient}.
-//     * 
-//     * @see IndexMetadata#getKeyBuilder()
-//     * 
-//     * @deprecated by {@link IndexMetadata#getKeyBuilder()} which provides index
-//     *             specific {@link IKeyBuilder} configurations making indices
-//     *             more portable across machines in a federation (there is no
-//     *             dependency on the machine locale configuration).
-//     */
-//    public IKeyBuilder getKeyBuilder();
-    
     /**
      * Return <code>true</code> iff the federation supports scale-out indices.
      * <p>
      * Note: A <code>false</code> return indicates that
      * {@link #getMetadataService()} WILL NOT return a {@link IMetadataService}
-     * since key-range partitioned indices are NOT supported. Applications can
-     * use this method to decide whether or not to enable delete markers when
-     * registering an index since delete markers are only required for scale-out
-     * indices.
+     * since key-range partitioned indices are NOT supported.
      * 
      * @see IndexMetadata
      */

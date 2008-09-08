@@ -38,7 +38,6 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IsolationEnum;

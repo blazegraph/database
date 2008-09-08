@@ -1690,8 +1690,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 log.info(md.toString());
 
             // save the index segment resource description for the caller.
-            this.segmentMetadata = new SegmentMetadata(outFile, out
-                    .length(), segmentUUID, commitTime);
+            this.segmentMetadata = new SegmentMetadata(outFile, //out.length(),
+                    segmentUUID, commitTime);
             
             return md;
             

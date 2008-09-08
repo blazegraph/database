@@ -74,6 +74,18 @@ public class NT implements Serializable {
 
     public boolean equals(NT o) {
 
+        if (o == null) {
+
+            /*
+             * Note: This handles a case where the other instance was a key in a
+             * WeakHashMap and the reference for the key was cleared. This
+             * arises with the NamedLock class.
+             */
+            
+            return false;
+            
+        }
+        
         if (this == o)
             return true;
 
