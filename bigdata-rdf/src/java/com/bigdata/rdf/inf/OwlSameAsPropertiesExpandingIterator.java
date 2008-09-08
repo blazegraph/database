@@ -306,7 +306,8 @@ public class OwlSameAsPropertiesExpandingIterator implements
         if (chunk == null || i == chunk.length) {
             chunk = nextChunk();
             i = 0;
-            log.info("got a chunk, length = " + chunk.length);
+            if (log.isInfoEnabled()) 
+                log.info("got a chunk, length = " + chunk.length);
         }
         return chunk[i++];
     }
@@ -385,7 +386,8 @@ public class OwlSameAsPropertiesExpandingIterator implements
                 this.spo =
                         s.isConstant() ? new SPO(s.get(), sameAs, constant)
                                 : new SPO(constant, sameAs, o.get());
-                log.info("appending SPO: " + spo.toString(db));
+                if (log.isInfoEnabled()) 
+                    log.info("appending SPO: " + spo.toString(db));
             }
             if (spo != null) {
                 return new ChunkedArrayIterator<ISPO>(1, new SPO[] { spo },
