@@ -261,6 +261,50 @@ public class Rule<E> implements IRule<E> {
     }
 
     /**
+     * Rule ctor.
+     * 
+     * @param name
+     *            A label for the rule.
+     * @param head
+     *            The subset of bindings that are selected by the rule.
+     * @param tail
+     *            The tail (aka body) of the rule.
+     * @param distinct
+     *            <code>true</code> iff a DISTINCT constraint will be applied
+     *            when the {@link IRule} is evaluated as a query.
+     * @param constraints
+     *            An array of constaints on the legal states of the bindings
+     *            materialized for the rule.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>name</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the <i>head</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the <i>tail</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any element of the <i>tail</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any element of the optional <i>constraints</i> is
+     *             <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the <i>tail</i> is empty.
+     * @throws IllegalArgumentException
+     *             if the <i>head</i> declares any variables that are not
+     *             declared in the tail.
+     */
+//    * @throws IllegalArgumentException
+//    *             if the <i>head</i> names more the one relation in its view
+//    *             (tails may name more than one, which is interpreted as a
+//    *             fused view of the named relations).
+    public Rule(String name, IPredicate head, IPredicate[] tail, 
+            final boolean distinct, IConstraint[] constraints) {
+
+        this(name, head, tail, distinct, constraints, null/* task */);
+        
+    }
+
+    /**
      * Fully specified ctor.
      * 
      * @param name

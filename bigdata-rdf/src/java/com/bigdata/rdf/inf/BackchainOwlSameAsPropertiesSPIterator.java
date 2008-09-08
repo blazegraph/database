@@ -91,6 +91,13 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
          * Collect up additional properties (p and o values) for the known s
          * value by examining the values which are owl:sameAs s. The p might or
          * might not be bound in this access path.
+         * 
+         * construct S ?p ?sameO
+         * where {
+         * ?s ?p ?o .
+         * ?s sameAs S .
+         * ?o sameAs ?sameO 
+         * }
          */
         {
             // join:

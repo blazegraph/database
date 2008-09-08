@@ -98,6 +98,12 @@ public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
             Arrays.sort(chunk, SPOComparator.INSTANCE);
             
         }
+        
+        return convert(chunk);
+        
+    }
+    
+    public ISPO[] convert(ISPO[] chunk) {
 
 //        // Thread-local key builder.
 //        final RdfKeyBuilder keyBuilder = getKeyBuilder();

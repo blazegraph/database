@@ -334,8 +334,12 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      *          the join cardinality
      */
     protected long computeJoinCardinality(IJoinDimension d1, IJoinDimension d2) {
-        if (d1.isOptional() || d2.isOptional()) {
+        // two optionals is worse than one
+        if (d1.isOptional() && d2.isOptional()) {
             return Long.MAX_VALUE-1;
+        }
+        if (d1.isOptional() || d2.isOptional()) {
+            return Long.MAX_VALUE-2;
         }
         final boolean sharedVars = hasSharedVars(d1, d2);
         final boolean unsharedVars = hasUnsharedVars(d1, d2);

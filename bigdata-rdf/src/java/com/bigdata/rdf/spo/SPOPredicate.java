@@ -121,6 +121,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param s
      * @param p
      * @param o
+     * @param optional
      */
     public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
             IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
@@ -128,6 +129,47 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
         this(new String[] { relationName }, s, p, o, null/* c */,
                 optional, null/* constraint */, null/* expander */);
+        
+    }
+    
+    /**
+     * Partly specified ctor. The context will be <code>null</code>. 
+     * No constraint is specified. No expander is specified.
+     * 
+     * @param relationName
+     * @param s
+     * @param p
+     * @param o
+     * @param expander
+     *            MAY be <code>null</code>.
+     */
+    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
+            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
+            ISolutionExpander<ISPO> expander) {
+
+        this(new String[] { relationName }, s, p, o, null/* c */,
+                false/* optional */, null/* constraint */, expander);
+        
+    }
+    
+    /**
+     * Partly specified ctor. The context will be <code>null</code>. 
+     * No constraint is specified. 
+     * 
+     * @param relationName
+     * @param s
+     * @param p
+     * @param o
+     * @param optional
+     * @param expander
+     *            MAY be <code>null</code>.
+     */
+    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
+            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
+            final boolean optional, ISolutionExpander<ISPO> expander) {
+
+        this(new String[] { relationName }, s, p, o, null/* c */,
+                optional, null/* constraint */, expander);
         
     }
     
