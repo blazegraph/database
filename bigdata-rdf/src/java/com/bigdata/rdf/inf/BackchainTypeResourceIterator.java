@@ -44,6 +44,8 @@ import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedOrderedStriterator;
 import com.bigdata.striterator.ClosableSingleItemIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -242,15 +244,15 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
              * Backchain will generate exactly one statement: (s rdf:type
              * rdfs:Resource).
              */
-
+/*
             resourceIds = new PushbackIterator<Long>(
                     new ClosableSingleItemIterator<Long>(spo.s));
-
+*/
             /*
              * Reading a single point (s type resource), so this will actually
              * use the SPO index.
              */
-
+/*
             posItr = new PushbackIterator<Long>(new Striterator(db
                     .getAccessPath(spo.s, rdfType, rdfsResource,
                             ExplicitSPOFilter.INSTANCE).iterator())
@@ -261,6 +263,10 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
                             return Long.valueOf(((SPO) obj).s);
                         }
             }));
+*/            
+            return new BackchainSTypeResourceIterator
+                ( _src, accessPath, db, rdfType, rdfsResource
+                  );
 
         }
         
@@ -932,6 +938,104 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
             
         }
 
+    }
+    
+    private static class BackchainSTypeResourceIterator 
+        implements IChunkedOrderedIterator<ISPO> {
+
+        private final IChunkedOrderedIterator<ISPO> _src;
+        private final IAccessPath<ISPO> accessPath;
+        private final AbstractTripleStore db;
+        private final long rdfType;
+        private final long rdfsResource;
+        private final long s;
+        private IChunkedOrderedIterator<ISPO> appender;
+        private boolean canRemove;
+        
+        public BackchainSTypeResourceIterator(
+            final IChunkedOrderedIterator<ISPO> _src,
+            final IAccessPath<ISPO> accessPath, final AbstractTripleStore db,
+            final long rdfType, final long rdfsResource) {
+            this._src = _src;
+            this.accessPath = accessPath;
+            this.db = db;
+            this.rdfType = rdfType;
+            this.rdfsResource = rdfsResource;
+            this.s = (Long) accessPath.getPredicate().get(0).get();
+            SPO spo = new SPO(s, rdfType, rdfsResource, StatementEnum.Inferred);
+            this.appender = new ChunkedArrayIterator<ISPO>
+                ( 1, new SPO[] { spo }, SPOKeyOrder.SPO
+                  );
+        }
+        
+        private void testSPO(ISPO spo) {
+            // do not need to append if we see it in the data
+            if (spo.s() == s && spo.p() == rdfType && spo.o() == rdfsResource) {
+                appender = null;
+            }
+        }
+        
+        public boolean hasNext() {
+            return _src.hasNext() || (appender != null && appender.hasNext()); 
+        }
+
+        public IKeyOrder<ISPO> getKeyOrder() {
+            return _src.getKeyOrder();
+        }
+
+        public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
+            if (_src.hasNext()) {
+                ISPO[] chunk = _src.nextChunk(keyOrder);
+                for (ISPO spo : chunk) {
+                    testSPO(spo);
+                }
+                canRemove = true;
+                return chunk;
+            } else if (appender != null) {
+                canRemove = false;
+                return appender.nextChunk(keyOrder);
+            }
+            return null;
+        }
+
+        public ISPO next() {
+            if (_src.hasNext()) {
+                ISPO spo = _src.next();
+                testSPO(spo);
+                canRemove = true;
+                return spo;
+            } else if (appender != null) {
+                canRemove = false;
+                return appender.next();
+            }
+            return null;
+        }
+
+        public ISPO[] nextChunk() {
+            if (_src.hasNext()) {
+                ISPO[] chunk = _src.nextChunk();
+                for (ISPO spo : chunk) {
+                    testSPO(spo);
+                }
+                canRemove = true;
+                return chunk;
+            } else if (appender != null) {
+                canRemove = false;
+                return appender.nextChunk();
+            }
+            return null;
+        }
+
+        public void remove() {
+            if (canRemove) {
+                _src.remove();
+            }
+        }
+
+        public void close() {
+            _src.close();
+        }
+        
     }
 
 }
