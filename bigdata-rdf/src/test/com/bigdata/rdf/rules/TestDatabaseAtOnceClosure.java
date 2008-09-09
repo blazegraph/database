@@ -153,34 +153,39 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
         doFixedPointTest(file, FastClosure.class);
     
     }
+
+    /*
+     * Commented out because these are a bit slow for unit tests and have
+     * never identified any problems.
+     */
     
-    public void test_fixedPoint_LUBM_U1_As_Full() throws Exception {
-
-        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
-                new FilenameFilter() {
-
-                    public boolean accept(File dir, String name) {
-                        return name.endsWith(".owl");
-                    }
-                });
-
-        doFixedPointTest(files, FullClosure.class);
-
-    }
-
-    public void test_fixedPoint_LUBM_U1_As_Fast() throws Exception {
-
-        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
-                new FilenameFilter() {
-
-                    public boolean accept(File dir, String name) {
-                        return name.endsWith(".owl");
-                    }
-                });
-
-        doFixedPointTest(files, FastClosure.class);
-
-    }
+//    public void test_fixedPoint_LUBM_U1_As_Full() throws Exception {
+//
+//        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
+//                new FilenameFilter() {
+//
+//                    public boolean accept(File dir, String name) {
+//                        return name.endsWith(".owl");
+//                    }
+//                });
+//
+//        doFixedPointTest(files, FullClosure.class);
+//
+//    }
+//
+//    public void test_fixedPoint_LUBM_U1_As_Fast() throws Exception {
+//
+//        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
+//                new FilenameFilter() {
+//
+//                    public boolean accept(File dir, String name) {
+//                        return name.endsWith(".owl");
+//                    }
+//                });
+//
+//        doFixedPointTest(files, FastClosure.class);
+//
+//    }
 
     /**
      * Reads files matching the filter from the directory.
