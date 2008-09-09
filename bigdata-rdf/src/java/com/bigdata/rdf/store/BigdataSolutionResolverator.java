@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
@@ -40,6 +41,18 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
     final protected static Logger log = Logger.getLogger(BigdataSolutionResolverator.class);
 
     /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+    /**
      * The database whose lexicon will be used to resolve term identifiers to
      * terms.
      */
@@ -68,7 +81,7 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
     private Map<Long, BigdataValue> terms = null;
     
     /**
-     * The elapsed time spend in this class.
+     * The elapsed time for the iterator instance.
      */
     private long elapsed = 0L;
     
@@ -82,7 +95,7 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
      */
     public BigdataSolutionResolverator(AbstractTripleStore db,
             IChunkedOrderedIterator<ISolution> src) {
-
+        
         if (db == null)
             throw new IllegalArgumentException();
 
@@ -93,7 +106,7 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
         
         this.src = src;
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Resolving solutions: db="+db+", src="+src);
             
@@ -109,7 +122,7 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
             
         }
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Testing source iterator.");
             
@@ -124,8 +137,10 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
         } finally {
 
             final long tmp = System.currentTimeMillis() - begin;
+            
             elapsed += (tmp);
-            if (log.isInfoEnabled())
+            
+            if (INFO)
                 log.info("source hasNext: time=" + tmp + "ms");
 
         }
@@ -134,14 +149,14 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
 
     public IBindingSet next() {
 
+        final long begin = System.currentTimeMillis();
+        
         if (!hasNext())
             throw new NoSuchElementException();
 
         if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
 
-            final long begin = System.currentTimeMillis();
-            
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Fetching next chunk");
             
             // fetch the next chunk of SPOs.
@@ -177,21 +192,18 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
 
             }
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Resolving " + ids.size() + " term identifiers");
             
             // batch resolve term identifiers to terms.
             terms = db.getLexiconRelation().getTerms(ids);
 
-            if (log.isInfoEnabled())
-                log.info("Resolved " + ids.size() + " term identifiers");
-            
             // reset the index.
             lastIndex = 0;
-            
-            final long tmp = System.currentTimeMillis() - begin;
-            elapsed += (tmp);
-            if(log.isInfoEnabled()) log.info("nextChunk ready: time="+tmp+"ms");
+
+            if (INFO)
+                log.info("nextChunk ready: time="
+                        + (System.currentTimeMillis() - begin) + "ms");
                         
         } else {
             
@@ -200,7 +212,7 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
             
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("lastIndex=" + lastIndex + ", chunk.length="
                     + chunk.length);
@@ -213,13 +225,15 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
         // resolve the solution to an IBindingSet containing Values (vs termIds)
         final IBindingSet bindingSet = getBindingSet(solution);
                 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
             
             log.debug("solution=" + solution);
 
             log.debug("bindingSet=" + bindingSet);
 
         }
+
+        elapsed += (System.currentTimeMillis() - begin);
 
         return bindingSet;
 
@@ -301,7 +315,7 @@ public class BigdataSolutionResolverator implements ICloseableIterator<IBindingS
 
     public void close() {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("elapsed=" + elapsed);
         
         src.close();

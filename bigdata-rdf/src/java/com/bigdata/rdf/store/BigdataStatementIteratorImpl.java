@@ -26,8 +26,12 @@ package com.bigdata.rdf.store;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -40,6 +44,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -77,28 +82,26 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
     private final AbstractTripleStore db;
     
     /**
-     * The source iterator (will be closed when this iterator is closed).
-     */
-    private final IChunkedOrderedIterator<ISPO> src;
-    
-    /**
      * The index of the last entry returned in the current {@link #chunk} and
      * <code>-1</code> until the first entry is returned.
      */
     private int lastIndex = -1;
-    
-    /**
-     * The current chunk from the source iterator and initially <code>null</code>.
-     */
-    private ISPO[] chunk = null;
 
     /**
-     * The map that will be used to resolve term identifiers to terms for the
-     * current {@link #chunk} and initially <code>null</code>.
+     * The current chunk of resolved {@link BigdataStatement}s.
      */
-    private Map<Long, BigdataValue> terms = null;
-    
+    private BigdataStatement[] chunk = null;
+
+    /**
+     * Factory for creating {@link BigdataValue}s and {@link BigdataStatement}s
+     * from the {@link ISPO}s visited by the {@link #src} iterator.
+     */
     final private BigdataValueFactory valueFactory;
+
+    /**
+     * Total elapsed time for the iterator instance.
+     */
+    private long elapsed = 0L;
     
     /**
      * 
@@ -119,44 +122,121 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
         this.db = db;
         
-        this.src = src;
-
         this.valueFactory = db.getValueFactory();
+
+        /*
+         * The queue capacity controls how many chunks of SPO[]s can be resolved
+         * to BigdataStatements in advance of visitation by the [resolvedItr].
+         * You can use a SynchronousQueue for NO buffering or a queue with
+         * either a fixed or variable capacity.
+         */
+//        final BlockingQueue<BigdataStatement[]> queue = new SynchronousQueue<BigdataStatement[]>();
+//        final BlockingQueue<BigdataStatement[]> queue = new ArrayBlockingQueue<BigdataStatement[]>(10);
+
+        /*
+         * Create a buffer for chunks of resolved BigdataStatements.
+         */
+        buffer = new BlockingBuffer<BigdataStatement[]>(
+                100,//capacity vs queue,
+                null/* keyOrder */, null/* filter */);
+
+        /*
+         * Create and run a task which reads ISPO chunks from the source
+         * iterator and writes resolved BigdataStatement chunks on the buffer.
+         */
+        final Future f = db.getIndexManager().getExecutorService().submit(
+                new ChunkConsumer(src));
+
+        /*
+         * Set the future for that task on the buffer.
+         */
+        buffer.setFuture(f);
+        
+        /*
+         * This class will read resolved chunks from the [resolvedItr] and then
+         * hand out BigdataStatements from the current [chunk].
+         */
+        resolvedItr = buffer.iterator();
         
     }
+
+    /**
+     * Buffer of {@link BigdataStatement}[] chunks resolved from {@link ISPO}s[]
+     * chunks.
+     */
+    private final BlockingBuffer<BigdataStatement[]> buffer;
     
-    public boolean hasNext() {
+    /**
+     * Iterator draining resolved {@link BigdataStatement}[] chunks from the
+     * {@link #buffer}.
+     */
+    private final Iterator<BigdataStatement[]> resolvedItr;
 
-        if (lastIndex != -1 && lastIndex + 1 < chunk.length) {
+//    /**
+//     * Queue of converted chunks.
+//     */
+//    private SynchronousQueue<BigdataStatement[]> queue = new SynchronousQueue<BigdataStatement[]>();
+
+    /**
+     * Consumes chunks from the source iterator, placing the converted chunks on
+     * a queue.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class ChunkConsumer implements Runnable {
+
+        /**
+         * The source iterator (will be closed when this iterator is closed).
+         */
+        private final IChunkedOrderedIterator<ISPO> src;
+        
+        public ChunkConsumer(IChunkedOrderedIterator<ISPO> src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
             
-            return true;
+            this.src = src;
             
         }
         
-        if(DEBUG) {
-            
-            log.debug("Testing source iterator.");
-            
+        public void run() {
+
+            try {
+
+                if (INFO)
+                    log.info("Start");
+
+                while (src.hasNext()) {
+
+                    buffer.add(resolveNextChunk());
+                        
+                }
+
+                if (INFO)
+                    log.info("Finished");
+
+            } finally {
+
+                src.close();
+
+            }
+
         }
         
-        return src.hasNext();
-        
-    }
-
-    public BigdataStatement next() {
-
-        if (!hasNext())
-            throw new NoSuchElementException();
-
-        if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
-
+        /**
+         * Fetches the next chunk from the source iterator and resolves the term
+         * identifiers, producing a chunk of resolved {@link BigdataStatement}s.
+         */
+        protected BigdataStatement[] resolveNextChunk() {
+            
             if (INFO)
                 log.info("Fetching next chunk");
             
             // fetch the next chunk of SPOs.
-            chunk = src.nextChunk();
+            final ISPO[] chunk = src.nextChunk();
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Fetched chunk: size=" + chunk.length);
 
             /*
@@ -164,6 +244,8 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
              * chunk.
              */
 
+//            LongOpenHashSet ids = new LongOpenHashSet(chunk.length*4);
+            
             final Collection<Long> ids = new HashSet<Long>(chunk.length * 4);
 
             for (ISPO spo : chunk) {
@@ -182,64 +264,104 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
             }
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Resolving " + ids.size() + " term identifiers");
             
-            // batch resolve term identifiers to terms.
-            terms = db.getLexiconRelation().getTerms(ids);
+            /*
+             * Batch resolve term identifiers to BigdataValues, obtaining the
+             * map that will be used to resolve term identifiers to terms for
+             * this chunk.
+             */
+            final Map<Long, BigdataValue> terms = db.getLexiconRelation().getTerms(ids);
 
+            /*
+             * The chunk of resolved statements.
+             */
+            final BigdataStatement[] stmts = new BigdataStatement[chunk.length];
+            
+            int i = 0;
+            for (ISPO spo : chunk) {
+
+                /*
+                 * Resolve term identifiers to terms using the map populated
+                 * when we fetched the current chunk.
+                 */
+                final BigdataResource s = (BigdataResource) terms.get(spo.s());
+                final BigdataURI p = (BigdataURI) terms.get(spo.p());
+                final BigdataValue o = terms.get(spo.o());
+                final BigdataResource c = (spo.hasStatementIdentifier() ? (BigdataResource) terms
+                        .get(spo.getStatementIdentifier())
+                        : null);
+
+                if (spo.hasStatementType() == false) {
+
+                    log.error("statement with no type: "
+                            + valueFactory.createStatement(s, p, o, c, null));
+
+                }
+
+                // the statement.
+                final BigdataStatement stmt = valueFactory.createStatement(s,
+                        p, o, c, spo.getStatementType());
+
+                // save the reference.
+                stmts[i++] = stmt;
+
+            }
+
+            return stmts;
+
+        }
+
+    }
+    
+    public boolean hasNext() {
+
+        if (lastIndex != -1 && lastIndex + 1 < chunk.length) {
+
+            return true;
+            
+        }
+        
+        if(DEBUG) {
+            
+            log.debug("Testing resolved iterator.");
+            
+        }
+        
+        return resolvedItr.hasNext();
+        
+    }
+
+    public BigdataStatement next() {
+
+        final long begin = System.currentTimeMillis();
+        
+        if (!hasNext())
+            throw new NoSuchElementException();
+
+        if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
+
+            // get the next chunk of resolved BigdataStatements.
+            chunk = resolvedItr.next();
+            
             // reset the index.
-            lastIndex = 0;
-            
-        } else {
-            
-            // index of the next SPO in this chunk.
-            lastIndex++;
-            
-        }
+            lastIndex = -1;
 
-        if(DEBUG) {
-            
-            log.debug("lastIndex="+lastIndex+", chunk.length="+chunk.length);
-            
-        }
-        
-        // the current SPO
-        final ISPO spo = chunk[lastIndex];
-
-        if(DEBUG) {
-            
-            log.debug("spo="+spo);
-            
-        }
-                
-        /*
-         * Resolve term identifiers to terms using the map populated when we
-         * fetched the current chunk.
-         */
-        final BigdataResource s = (BigdataResource) terms.get(spo.s());
-        final BigdataURI p = (BigdataURI) terms.get(spo.p());
-        final BigdataValue o = terms.get(spo.o());
-        final BigdataResource c = (spo.hasStatementIdentifier() ? (BigdataResource) terms
-                .get(spo.getStatementIdentifier())
-                : null);
-        
-        if (spo.hasStatementType() == false) {
-
-            log.error("statement with no type: "
-                    + valueFactory.createStatement(s, p, o, c, null));
+            if (INFO)
+                log.info("nextChunk ready: time="
+                        + (System.currentTimeMillis() - begin) + "ms");
 
         }
-        
-        // the statement.
-        final BigdataStatement stmt = valueFactory.createStatement(s, p, o, c,
-                spo.getStatementType());
 
-        if (DEBUG) {
+        // the next resolved statement.
+        final BigdataStatement stmt = chunk[++lastIndex];
             
-            log.debug("stmt=" + stmt);
+        if (DEBUG)
+            log.debug("lastIndex=" + lastIndex + ", chunk.length="
+                    + chunk.length + ", stmt=" + stmt);
 
-        }
+        elapsed += (System.currentTimeMillis() - begin);
 
         return stmt;
 
@@ -260,13 +382,12 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
     public void close() {
 
         if (INFO)
-            log.info("");
-        
-        src.close();
+            log.info("elapsed=" + elapsed);
+
+        // Note: closed by the Consumer.
+//        src.close();
 
         chunk = null;
-        
-        terms = null;
         
     }
 
