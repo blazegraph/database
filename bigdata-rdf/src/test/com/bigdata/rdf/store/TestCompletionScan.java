@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -141,10 +140,10 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
                     final Long tid = itr.next();
                     
                     final Literal lit = (Literal) store.getLexiconRelation()
-                            .getTerms(Arrays.asList(new Long[] { tid })).get(
-                                    tid);
+                            .getTerm(tid);
                     
-                    log.info("Found: "+lit);
+                    if (log.isInfoEnabled())
+                        log.info("Found: " + lit);
                     
                     if(!expected.remove(lit)) {
                         
