@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -88,14 +87,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     private volatile Throwable cause = null;
 
     /**
-     * The queue capacity (from the ctor).
-     */
-    private final int capacity;
-
-    /**
      * Used to coordinate the reader and the writer.
      */
-    private final ArrayBlockingQueue<E> queue;
+    private final BlockingQueue<E> queue;
 
     /**
      * The singleton for the iterator used to read from this buffer.
@@ -107,33 +101,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     private final IKeyOrder<E> keyOrder;
 
-    /** Optional filter to keep elements out of the buffer. */
+    /**
+     * Optional filter to keep elements out of the buffer.
+     */
     private final IElementFilter<E> filter;
-    
-//    private final int minChunkSize;
-//    
-//    private final long chunkTimeout;
     
     /**
      * The default capacity for the internal buffer. Chunks can not be larger
      * than this.
      */
-    public static transient final int DEFAULT_CAPACITY = 5000;
+    protected static transient final int DEFAULT_CAPACITY = 5000;
     
-//    /**
-//     * The default minimum chunk size. If the buffer has fewer than this many
-//     * elements and the buffer has not been {@link #close() closed} then it will
-//     * wait up to {@link #DEFAULT_CHUNK_TIMEOUT} milliseconds before returning
-//     * the next chunk based on what is already in the buffer.
-//     */
-//    public static transient final int DEFAULT_MIN_CHUNK_SIZE = 100;
-    
-//    /**
-//     * The maximum amount of time to wait in
-//     * {@link BlockingIterator#nextChunk()}.
-//     */
-//    public static transient final int DEFAULT_CHUNK_TIMEOUT = 1000/*ms*/;
-
     private volatile Future future;
     
     public void setFuture(Future future) {
@@ -178,69 +156,49 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            The capacity of the buffer.
      * @param keyOrder
      *            The visitation order in which the elements will be
-     *            <em>written</em> onto the buffer and <code>null</code> if
-     *            you do not have a <em>strong</em> guarentee for the write
-     *            order.
+     *            <em>written</em> onto the buffer and <code>null</code>
+     *            unless you have a <em>strong</em> guarentee for the
+     *            visitation order or <code>null</code> if there is no
+     *            inherent order.
      * @param filter
-     *            An optional filter for elements to be kept out of the buffer.
+     *            A filter for elements to be kept out of the buffer (optional).
      */
-    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder, IElementFilter<E> filter) {
-       
-//        this(capacity, keyOrder, filter, DEFAULT_MIN_CHUNK_SIZE);, DEFAULT_CHUNK_TIMEOUT);
-//        
-//    }
-//
-//    /**
-//     * 
-//     * @param capacity
-//     *            The capacity for the internal buffer. Chunks can not be larger
-//     *            than this.
-//     * @param keyOrder
-//     *            The visitation order in which the elements will be
-//     *            <em>written</em> onto the buffer and <code>null</code> if
-//     *            you do not have a <em>strong</em> guarentee for the write
-//     *            order.
-//     * @param filter
-//     *            An optional filter for elements to be kept out of the buffer.
-//     * @param minChunkSize
-//     *            The minimum chunk size. If the buffer has fewer than this many
-//     *            elements and the buffer has not been {@link #close() closed}
-//     *            then {@link #iterator()} will wait up to
-//     *            {@link #DEFAULT_CHUNK_TIMEOUT} milliseconds before returning
-//     *            the next chunk based on what is already in the buffer.
-//     * @param chunkTimeout
-//     *            The maximum amount of time the {@link #iterator()} will wait
-//     *            to satisify the minimum chunk size.
-//     */
-//    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder,
-//            IElementFilter<E> filter, int minChunkSize, long chunkTimeout) {
+    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder,
+            IElementFilter<E> filter) {
 
-        if (capacity <= 0)
+        this(new ArrayBlockingQueue<E>(capacity), keyOrder, filter);
+
+    }
+    
+    /**
+     * Core ctor.
+     * 
+     * @param queue
+     *            The queue on which elements will be buffered. Elements will be
+     *            {@link #add(Object) added} to the queue and drained by the
+     *            {@link #iterator()}.
+     * @param keyOrder
+     *            The visitation order in which the elements will be
+     *            <em>written</em> onto the buffer and <code>null</code>
+     *            unless you have a <em>strong</em> guarentee for the
+     *            visitation order or <code>null</code> if there is no
+     *            inherent order.
+     * @param filter
+     *            A filter for elements to be kept out of the buffer (optional).
+     */
+    public BlockingBuffer(BlockingQueue<E> queue, IKeyOrder<E> keyOrder,
+            IElementFilter<E> filter) {
+    
+        if (queue == null)
             throw new IllegalArgumentException();
-
-//        if (minChunkSize < 0)
-//            throw new IllegalArgumentException();
-//
-//        if (minChunkSize > capacity)
-//            throw new IllegalArgumentException("minChunkSize=" + minChunkSize
-//                    + ", capacity=" + capacity);
         
-//        if (chunkTimeout < 0)
-//            throw new IllegalArgumentException();
-
-        this.capacity = capacity;
-        
-        this.queue = new ArrayBlockingQueue<E>(capacity);
+        this.queue = queue;
         
         this.iterator = new BlockingIterator();
 
         this.keyOrder = keyOrder;
         
         this.filter = filter;
-        
-//        this.minChunkSize = minChunkSize;
-//        
-//        this.chunkTimeout = chunkTimeout;
         
     }
 
@@ -280,9 +238,21 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
         this.open = false;
 
+        notifyIterator();
+        
         if (INFO)
             log.info("closed.");
         
+    }
+    
+    private final void notifyIterator() {
+
+        synchronized(iterator) {
+            
+            iterator.notify();
+            
+        }
+
     }
     
     public void abort(Throwable cause) {
@@ -368,6 +338,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         long timeout = 100;
         // Note: controls time between log messages NOT the wait time.
         final long maxTimeout = 10000;
+
         while (true) {
 
             try {
@@ -389,8 +360,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     timeout = Math.min(maxTimeout, timeout *= 2);
                     
                     log.warn("waiting - queue is full: ntries=" + ntries
-                            + ", elapsed=" + elapsed + ", timeout=" + timeout
-                            + ", capacity=" + capacity);
+                            + ", elapsed=" + elapsed + ", timeout=" + timeout);
 
                     continue;
                     
@@ -409,6 +379,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             if (DEBUG)
                 log.debug("added: " + e.toString());
             
+            notifyIterator();
+            
             return;
             
         }
@@ -424,6 +396,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public void reset() {
         
         queue.clear();
+        
+        // clear nextE on the inner class?
         
     }
     
@@ -477,6 +451,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * The #of chunks delivered so far.
          */
         private long nchunks = 0L;
+        
+        /**
+         * The #of elements delivered so far.
+         */
+        private long nelements = 0L;
         
         /**
          * Create an iterator that reads from the buffer.
@@ -732,9 +711,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             }
 
             if (INFO)
-                log.info("Exhausted: bufferOpen="
-                    + BlockingBuffer.this.open + ", nextE=" + nextE != null
-                    + ", size=" + queue.size());
+                log.info("Exhausted: bufferOpen=" + BlockingBuffer.this.open
+                        + ", nextE=" + nextE != null);
 
             return false;
 
@@ -748,20 +726,18 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             }
 
-//            if (DEBUG)
-//                log.debug("");
-
-//            assert !queue.isEmpty();
-
             assert nextE != null;
             
             // we already have the next element.
             final E e = nextE;
 
             nextE = null;
+ 
+            nelements++;
             
             if (DEBUG)
-                log.debug("next: " + e);
+                log.debug("next: nchunks=" + nchunks + ", nelements="
+                        + nelements + ", " + e);
 
             return e;
 
@@ -770,7 +746,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         public E[] nextChunk() {
 
             return nextChunk(//
-                    Math.min(1000, capacity), // minChunkSize
+//                    Math.min(1000, capacity), // minChunkSize
+                    1000, // minChunkSize
                     500L, // timeout
                     TimeUnit.MILLISECONDS // units.
                     );
@@ -793,6 +770,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             }
 
+            int chunkSize;
+            synchronized(this) {
+                
             // note: timeout when nanos<=0.
             long nanos = unit.toNanos(timeout);
             
@@ -810,7 +790,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
              * 
              * @todo handle asynchronous reset() safely.
              */
-            int chunkSize;
             while (((chunkSize = queue.size() + 1/* nextE */) < minChunkSize)
                     && nanos > 0 && BlockingBuffer.this.open) {
                 
@@ -822,17 +801,19 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 try {
 
-                    /*
-                     * FIXME sleeping here is not the best way to handle this,
-                     * but we lack a means to be notified when another element
-                     * is added to the buffer.
-                     * 
-                     * Perhaps use an explicit Lock and Condition on the
-                     * BlockingBuffer so that we will be awakened if another
-                     * element is added? Or even if the buffer reaches a desired
-                     * size?!?
-                     */
-                    Thread.sleep(1/* ms */);
+//                    /*
+//                     * FIXME sleeping here is not the best way to handle this,
+//                     * but we lack a means to be notified when another element
+//                     * is added to the buffer.
+//                     * 
+//                     * Perhaps use an explicit Lock and Condition on the
+//                     * BlockingBuffer so that we will be awakened if another
+//                     * element is added? Or even if the buffer reaches a desired
+//                     * size?!?
+//                     */
+//                    Thread.sleep(1/* ms */);
+
+                    wait();
                     
                 } catch (InterruptedException ex) {
                     
@@ -840,6 +821,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                 }
                 
+            }
+            
             }
             
 //            final int chunkSize = queue.size() + 1/* nextE */;
@@ -853,7 +836,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 final List<E> drained = new ArrayList<E>(chunkSize << 2);
 
-                int drainCount = queue.drainTo(drained);
+                final int drainCount = queue.drainTo(drained);
 
 //                final E e = (E) drained.get(0);
 
@@ -896,12 +879,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
             nchunks++;
             
+            nelements += chunk.length;
+            
             if (INFO) {
 
                 final long elapsed = System.currentTimeMillis() - begin;
 
-                log.info("#chunks=" + nchunks + ", chunkSize=" + chunk.length
-                        + ", elapsed=" + elapsed + " ms, bufferOpen="
+                log.info("#chunks=" + nchunks + ", #elements=" + nelements
+                        + ", chunkSize=" + chunk.length + ", elapsed="
+                        + elapsed + " ms, bufferOpen="
                         + BlockingBuffer.this.open);
 
             }

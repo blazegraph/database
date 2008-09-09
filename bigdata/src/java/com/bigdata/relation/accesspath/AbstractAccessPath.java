@@ -401,12 +401,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     @SuppressWarnings("unchecked")
     final public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
 
-        if(DEBUG) {
-
-            log.debug(this + " : limit=" + limit + ", capacity=" + capacity);
+        if (DEBUG)
+            log.debug("limit=" + limit + ", capacity=" + capacity
+                    + ", accessPath=" + this);
             
-        }
-
         final boolean fullyBufferedRead;
         
         if(predicate.isFullyBound()) {
@@ -421,7 +419,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             
             fullyBufferedRead = true;
             
-            log.debug("Predicate is fully bound.");
+            if (DEBUG)
+                log.debug("Predicate is fully bound.");
             
         } else if (limit > 0) {
 
@@ -465,11 +464,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             
             final long rangeCount = rangeCount(false/* exact */);
             
-            if (DEBUG) {
-
-                log.debug("rangeCount=" + rangeCount);
-
-            }
+            if (DEBUG)
+                log.debug("rangeCount=" + rangeCount
+                        + ", fullyBufferedReadThreashold="
+                        + fullyBufferedReadThreshold);
                 
             if(rangeCount == 0) {
                 
@@ -613,7 +611,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          * once the elements were materialized on the client.
          */
         final BlockingBuffer<R> buffer = new BlockingBuffer<R>(
-                queryBufferCapacity, keyOrder, null/* filter */);
+                queryBufferCapacity, // 
+                keyOrder, //
+                null // filter
+                );
         
         final Future<Void> future = getRelation().getExecutorService().submit(new Callable<Void>(){
         
