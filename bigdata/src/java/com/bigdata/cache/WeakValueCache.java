@@ -92,17 +92,17 @@ final public class WeakValueCache<K,T>
     implements ICachePolicy<K,T>
 {
 
-    public static final Logger log = Logger.getLogger(WeakValueCache.class);
+    protected static final Logger log = Logger.getLogger(WeakValueCache.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO.toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
 
     /**
      * Default value for the initial capacity (1000).
@@ -339,7 +339,7 @@ final public class WeakValueCache<K,T>
         
         double hitRatio = ((double)_nsuccess/_ntest);
         
-        log.info
+        if(INFO) log.info
            ( "WeakValueCache"+
              ": initialCapacity="+_initialCapacity+
              ", size="+size+

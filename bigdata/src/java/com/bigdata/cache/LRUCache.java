@@ -224,7 +224,8 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
     protected void finalize() throws Throwable
     {
     
-        log.info(getStatistics());
+        if (log.isInfoEnabled())
+            log.info(getStatistics());
         
     }
 
