@@ -41,13 +41,14 @@ public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
     /**
      * Wait up to timeout units for the next chunk. The method will return
      * before the timeout if there are no more elements available from the
-     * producer or if the chunk is full.
+     * producer or if the <i>minChunkSize</i> has been satisified.
      * 
      * @param minChunkSize
      *            The #of elements in the desired chunk. There may be fewer than
      *            this many elements if the timeout expires first. There may be
-     *            fewer than this many elements if the desired chunks size
-     *            exceeds the internal buffer capacity of the iterator.
+     *            fewer than this many elements if the desired chunk size
+     *            exceeds the internal capacity of the iterator (that is, if the
+     *            iterator would block).
      * @param timeout
      *            The timeout.
      * @param unit
@@ -55,6 +56,6 @@ public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
      * 
      * @return The next chunk.
      */
-    public E[] nextChunk(int minChunkSize,long timeout, TimeUnit unit);
-    
+    public E[] nextChunk(int minChunkSize, long timeout, TimeUnit unit);
+
 }
