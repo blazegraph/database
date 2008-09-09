@@ -28,10 +28,9 @@ public class BigdataConstructIterator implements
             final CloseableIteration<? extends BindingSet, QueryEvaluationException> src) {
         assert db != null && src != null;
         this.db = db;
-        stmtIt =
-                new BigdataStatementIteratorImpl(db, db
-                        .bulkCompleteStatements(new ChunkedWrappedIterator<ISPO>(
-                                new SPOConverter(src))));
+        stmtIt = db.asStatementIterator(db
+                .bulkCompleteStatements(new ChunkedWrappedIterator<ISPO>(
+                        new SPOConverter(src))));
     }
 
     public boolean hasNext() throws QueryEvaluationException {
