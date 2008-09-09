@@ -111,9 +111,9 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IPara
         
         while (i < n) {
 
-            ret[i] = (byte[]) ndx.lookup(getKey(i));
+            ret[i] = ndx.lookup(getKey(i));
 
-            i ++;
+            i++;
 
         }
         
