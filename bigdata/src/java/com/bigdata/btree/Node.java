@@ -2087,14 +2087,19 @@ public class Node extends AbstractNode implements INodeData {
      */
     synchronized final protected AbstractNode getChild(int index) {
 
-        if(Thread.interrupted()) {
-            /*
-             * This method is called relatively often - it is used each time we
-             * descend the tree. We check whether or not the thread has been
-             * interrupted so that we can abort running tasks quickly.
-             */
-            throw new RuntimeException(new InterruptedException());
-        }
+        /*
+         * I've take out this test since it turns out to be relatively
+         * expensive!?! The interrupt status of the thread is now checked
+         * exclusively when reading on the store.
+         */
+//        if(Thread.interrupted()) {
+//            /*
+//             * This method is called relatively often - it is used each time we
+//             * descend the tree. We check whether or not the thread has been
+//             * interrupted so that we can abort running tasks quickly.
+//             */
+//            throw new RuntimeException(new InterruptedException());
+//        }
         
         assert index >= 0 && index <= nkeys;
 

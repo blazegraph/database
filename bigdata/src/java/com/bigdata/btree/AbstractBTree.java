@@ -2438,7 +2438,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
             
         }
 
-        if (Thread.currentThread().isInterrupted()) {
+        if (Thread.interrupted()) {
 
             final InterruptedException cause = new InterruptedException();
 
