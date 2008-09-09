@@ -2372,7 +2372,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public String toString(long s, long p, long o) {
+    final public String toString(final long s, final long p, final long o) {
 
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o) + " >");
 
@@ -2397,7 +2397,7 @@ abstract public class AbstractTripleStore extends
      * @return <code>true</code> iff the term identifier is marked as an RDF
      *         {@link Literal}.
      */
-    static final public boolean isLiteral(long termId) {
+    static final public boolean isLiteral(final long termId) {
 
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_LITERAL;
 
@@ -2415,7 +2415,7 @@ abstract public class AbstractTripleStore extends
      * @return <code>true</code> iff the term identifier is marked as an RDF
      *         {@link BNode}.
      */
-    static final public boolean isBNode(long termId) {
+    static final public boolean isBNode(final long termId) {
 
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_BNODE;
 
@@ -2433,7 +2433,7 @@ abstract public class AbstractTripleStore extends
      * @return <code>true</code> iff the term identifier is marked as an RDF
      *         {@link URI}.
      */
-    static final public boolean isURI(long termId) {
+    static final public boolean isURI(final long termId) {
 
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_URI;
 
@@ -2453,7 +2453,7 @@ abstract public class AbstractTripleStore extends
      * @return <code>true</code> iff the term identifier identifies a
      *         statement.
      */
-    static final public boolean isStatement(long termId) {
+    static final public boolean isStatement(final long termId) {
 
         return (termId & TERMID_CODE_MASK) == TERMID_CODE_STATEMENT;
 
