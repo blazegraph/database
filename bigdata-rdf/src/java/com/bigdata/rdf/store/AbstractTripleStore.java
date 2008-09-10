@@ -3634,9 +3634,32 @@ abstract public class AbstractTripleStore extends
             throw new IllegalArgumentException();
         
         /*
+         * Batch resolve BigdataValues with their associated term identifiers
+         * for the given predicates and cls.
+         */
+        final BigdataValue[] terms = new BigdataValue[preds.length + 1/* cls */];
+        {
+
+            final BigdataValueFactory valueFactory = getValueFactory();
+            
+            for(int i=0; i<preds.length; i++) {
+                
+                // pred[i] is in terms[i].
+                terms[i] = valueFactory.asValue(preds[i]); 
+                
+            }
+            
+            // cls is in the last index position.
+            terms[preds.length] = valueFactory.asValue(cls);
+            
+            // batch resolve (readOnly).
+            getLexiconRelation()
+                    .addTerms(terms, terms.length, true/* readOnly */);
+
+        }
+        
+        /*
          * Translate the predicates into term identifiers.
-         * 
-         * FIXME batch translate.
          */
         final long[] _preds = new long[preds.length];
         {
@@ -3645,7 +3668,7 @@ abstract public class AbstractTripleStore extends
             
             for(int i=0; i<preds.length; i++) {
                 
-                final long tid = getTermId(preds[i]);
+                final long tid = terms[i].getTermId();
 
                 if (tid != NULL)
                     nknown++;
@@ -3666,10 +3689,8 @@ abstract public class AbstractTripleStore extends
 
         /*
          * Translate the class constraint into a term identifier.
-         * 
-         * FIXME batch translate with the predicates (above).
          */
-        final long _cls = getTermId(cls);
+        final long _cls = terms[preds.length].getTermId();
 
         if (_cls == NULL) {
 
@@ -3685,14 +3706,13 @@ abstract public class AbstractTripleStore extends
         final IProgram program = getMatchProgram(lits, _preds, _cls);
         
         final int solutionFlags = IJoinNexus.BINDINGS;
-//        final int solutionFlags = IJoinNexus.ELEMENT;
 
-        // @todo any filter to apply here?
-		final IJoinNexus joinNexus = newJoinNexusFactory(
-				RuleContextEnum.HighLevelQuery, 
-				ActionEnum.Query,
-				solutionFlags, null/* filter */)
-				.newInstance(getIndexManager());
+		final IJoinNexus joinNexus = newJoinNexusFactory(//
+				RuleContextEnum.HighLevelQuery,// 
+				ActionEnum.Query,//
+				solutionFlags,//
+                null // filter
+                ).newInstance(getIndexManager());
 
         /*
          * Resolve ISolutions to their binding sets and efficiently resolves
@@ -3703,19 +3723,6 @@ abstract public class AbstractTripleStore extends
             return new BigdataSolutionResolverator(this, joinNexus
                     .runQuery(program));
             
-//            return new BindingSetIterator(//
-//                  new BigdataStatementIteratorImpl(this,
-//                  new ChunkedResolvingIterator<ISPO,ISolution>(joinNexus.runQuery(program)){
-//
-//                    @Override
-//                    protected ISPO resolve(ISolution e) {
-//                        
-//                        return (ISPO) e.get();
-//                        
-//                    }
-//                      
-//                  }));
-    
         } catch(Exception ex) {
             
             // runQuery() throws Exception.
@@ -3787,88 +3794,5 @@ abstract public class AbstractTripleStore extends
         return program;
 
     }
-    
-    /**
-     * Converts what appears to be a set of statements into a binding set for
-     * {@link LocalTripleStore#match(Literal[], URI[], URI)}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo this should be replaced by a general purpose binding set mechanism
-     *       that can supports JOINs on the KB and more general JOINs on bigdata
-     *       indices.
-     */
-    private class BindingSetIterator implements Iterator<Map<String,Value>> {
-
-        private final BigdataStatementIterator src;
-
-        private boolean open = true;
-
-        public BindingSetIterator(BigdataStatementIterator src) {
-            
-            if (src == null)
-                throw new IllegalArgumentException();
-            
-            this.src = src;
-            
-        }
-        
-        public boolean hasNext() {
-
-            try {
-
-                final boolean hasNext = src.hasNext();
-                
-                if(!hasNext && open) {
-                    
-                    open = false;
-                    
-                    src.close();
-                    
-                }
-                
-                return hasNext;
-                
-            } catch (SailException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
-            
-        }
-
-        public Map<String, Value> next() {
-
-            final Statement s;
-//            try {
-
-                s = src.next();
-                
-//            } catch (SailException e) {
-//                
-//                throw new RuntimeException(e);
-//                
-//            }
-            
-            final Map<String,Value> bindings = new HashMap<String,Value>();
-            
-            bindings.put("s",s.getSubject());
-
-            bindings.put("t",s.getPredicate());
-            
-            bindings.put("lit",(Literal)s.getObject());
-            
-            return bindings;
-            
-        }
-
-        public void remove() {
-
-            throw new UnsupportedOperationException();
-
-        }
-        
-    };
     
 }
