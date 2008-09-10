@@ -3636,7 +3636,7 @@ abstract public class AbstractTripleStore extends
         /*
          * Translate the predicates into term identifiers.
          * 
-         * @todo batch translate.
+         * FIXME batch translate.
          */
         final long[] _preds = new long[preds.length];
         {
@@ -3667,7 +3667,7 @@ abstract public class AbstractTripleStore extends
         /*
          * Translate the class constraint into a term identifier.
          * 
-         * @todo batch translate with the predicates (above).
+         * FIXME batch translate with the predicates (above).
          */
         final long _cls = getTermId(cls);
 
@@ -3761,8 +3761,8 @@ abstract public class AbstractTripleStore extends
         final Rule r = new MatchRule(getSPORelation().getNamespace(),
                 getVocabulary(), lit, _preds, new Constant<Long>(_cls));
 
-        // bindings used to specialize the rule for each completed literal.
-        final IBindingSet bindings = new ArrayBindingSet(r.getVariableCount());
+//        // bindings used to specialize the rule for each completed literal.
+//        final IBindingSet bindings = new ArrayBindingSet(r.getVariableCount());
 
         final Program program = new Program("match", true/* parallel */);
         
@@ -3771,10 +3771,15 @@ abstract public class AbstractTripleStore extends
 
             final Long tid = termIdIterator.next();
 
-            bindings.set(lit, new Constant<Long>(tid));
-            
-            final IRule tmp = r.specialize(bindings, null/*constraints*/);
+            final IBindingSet constants = new ArrayBindingSet(1);
 
+            constants.set(lit, new Constant<Long>(tid));
+
+            final IRule tmp = r.specialize(constants, null/* constraints */);
+
+            if (DEBUG)
+                log.debug(tmp.toString());
+            
             program.addStep(tmp);
             
         }

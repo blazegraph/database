@@ -231,9 +231,10 @@ public class TestRule extends AbstractRuleTestCase {
         // set a binding
         bindingSet.set(u, rdfsClass);
 
-        // write on the console.
-        log.info(bindingSet.toString());
-        log.info(r.toString(bindingSet));
+        if (log.isInfoEnabled()) {
+            log.info(bindingSet.toString());
+            log.info(r.toString(bindingSet));
+        }
         
         // verify bindings are Ok.
         assertTrue(r.isConsistent(bindingSet));
@@ -245,9 +246,10 @@ public class TestRule extends AbstractRuleTestCase {
 
         bindingSet.set(x, rdfsResource);
         
-        // write on the console.
-        log.info(bindingSet.toString());
-        log.info(r.toString(bindingSet));
+        if (log.isInfoEnabled()) {
+            log.info(bindingSet.toString());
+            log.info(r.toString(bindingSet));
+        }
         
         // verify bindings are Ok.
         assertTrue(r.isConsistent(bindingSet));
@@ -259,9 +261,10 @@ public class TestRule extends AbstractRuleTestCase {
 
         bindingSet.set(x, rdfsClass);
         
-        // write on the console.
-        log.info(bindingSet.toString());
-        log.info(r.toString(bindingSet));
+        if (log.isInfoEnabled()) {
+            log.info(bindingSet.toString());
+            log.info(r.toString(bindingSet));
+        }
         
         // verify bindings are illegal.
         assertFalse(r.isConsistent(bindingSet));
@@ -277,9 +280,10 @@ public class TestRule extends AbstractRuleTestCase {
         // re-bind [x].
         bindingSet.set(x, new Constant<Long>(rdfsClass.get()));
         
-        // write on the console.
-        log.info(bindingSet.toString());
-        log.info(r.toString(bindingSet));
+        if (log.isInfoEnabled()) {
+            log.info(bindingSet.toString());
+            log.info(r.toString(bindingSet));
+        }
         
         // verify bindings are illegal.
         assertFalse(r.isConsistent(bindingSet));
@@ -289,9 +293,13 @@ public class TestRule extends AbstractRuleTestCase {
          */
         bindingSet.clear(u);
         
-        // write on the console.
-        log.info(bindingSet.toString());
-        log.info(r.toString(bindingSet));
+        if (log.isInfoEnabled()) {
+         
+            log.info(bindingSet.toString());
+            
+            log.info(r.toString(bindingSet));
+            
+        }
         
         // verify bindings are Ok.
         assertTrue(r.isConsistent(bindingSet));
@@ -308,7 +316,8 @@ public class TestRule extends AbstractRuleTestCase {
         // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
         final IRule r = new TestRuleRdfs9(relation);
 
-        log.info(r.toString());
+        if (log.isInfoEnabled())
+            log.info(r.toString());
 
         {
 
@@ -324,7 +333,8 @@ public class TestRule extends AbstractRuleTestCase {
             final IRule r1 = r
                     .specialize("r1", bindingSet, new IConstraint[] {});
 
-            log.info(r1.toString());
+            if (log.isInfoEnabled())
+                log.info(r1.toString());
 
             // verify "v" bound in body[1].
             assertTrue(r1.getTail(1).get(0).isConstant());
@@ -346,7 +356,8 @@ public class TestRule extends AbstractRuleTestCase {
             final IRule r2 = r
                     .specialize("r2", bindingSet, new IConstraint[] {});
 
-            log.info(r2.toString());
+            if (log.isInfoEnabled())
+                log.info(r2.toString());
 
             // verify "x" bound in body[0].
             assertTrue(r2.getTail(0).get(2).isConstant());

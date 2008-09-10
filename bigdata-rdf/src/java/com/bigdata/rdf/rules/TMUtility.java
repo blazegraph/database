@@ -232,7 +232,8 @@ public class TMUtility {
             } // next tail.
 
             final Rule newRule = new Rule(rule.getName() + "[" + i + "]", head,
-                    tail2, rule.isDistinct(), constraints, rule.getTaskFactory());
+                    tail2, rule.isDistinct(), constraints, rule.getConstants(),
+                    rule.getTaskFactory());
 
             rules.add(newRule);
 
