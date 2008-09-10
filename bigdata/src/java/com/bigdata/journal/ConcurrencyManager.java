@@ -864,6 +864,30 @@ public class ConcurrencyManager implements IConcurrencyManager {
     }
     
     /**
+     * Reports the elapsed time since the service was started.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class ServiceElapsedTimeInstrument extends Instrument<Long> {
+     
+        final long serviceStartTime;
+        
+        public ServiceElapsedTimeInstrument(final long serviceStartTime) {
+        
+            this.serviceStartTime = serviceStartTime;
+            
+        }
+        
+        public void sample() {
+            
+            setValue(System.currentTimeMillis() - serviceStartTime);
+            
+        }
+        
+    }
+    
+    /**
      * Return the {@link CounterSet}.
      */
     synchronized public CounterSet getCounters() {
@@ -873,11 +897,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
             countersRoot = new CounterSet();
 
             // elapsed time since the service started (milliseconds).
-            countersRoot.addCounter("elapsed", new Instrument<Long>(){
-                public void sample() {
-                    setValue(System.currentTimeMillis() - serviceStartTime);
-                }
-            });
+            countersRoot.addCounter("elapsed",
+                    new ServiceElapsedTimeInstrument(serviceStartTime));
 
             if (collectQueueStatistics) {
 
