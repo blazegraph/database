@@ -56,7 +56,13 @@ public class Rule<E> implements IRule<E> {
      * @todo it is a good idea to use this factory rather than
      *       {@link Var#var(String)} as the latter MAY be replaced by
      *       per-rule-instance variables rather than globally canonical
-     *       variables.
+     *       variables
+     *       <P>
+     *       the only problem with this is that we need to access the variables
+     *       in a bindingset by name after high-level query since the rule may
+     *       not be available to the caller, e.g., the match rule uses
+     *       dynamically generated rules that are not visible to the caller who
+     *       only sees the binding sets.
      */
     static protected Var var(String name) {
     
@@ -96,6 +102,11 @@ public class Rule<E> implements IRule<E> {
      */
     final private IRuleTaskFactory taskFactory;
     
+    /**
+     * The bound constants (if any).
+     */
+    final private IBindingSet constants;
+
     /**
      * The set of distinct variables declared by the rule.
      */
@@ -164,17 +175,15 @@ public class Rule<E> implements IRule<E> {
         
     }
     
-    public String getName() {
-
-//        if (name == null) {
-//
-//            return getClass().getSimpleName();
-//            
-//        } else {
+    public final IBindingSet getConstants() {
+        
+        return constants;
+        
+    }
+    
+    final public String getName() {
             
         return name;
-            
-//        }
 
     }
     
@@ -213,6 +222,14 @@ public class Rule<E> implements IRule<E> {
             
             sb.append(head.toString(bindingSet));
 
+        }
+
+        if(!(constants instanceof EmptyBindingSet)) {
+            
+            sb.append(", where ");
+            
+            sb.append(constants);
+            
         }
         
         return sb.toString();
@@ -256,7 +273,8 @@ public class Rule<E> implements IRule<E> {
     public Rule(String name, IPredicate head, IPredicate[] tail,
             IConstraint[] constraints) {
 
-        this(name, head, tail, false/* distinct */, constraints, null/* task */);
+        this(name, head, tail, false/* distinct */, constraints,
+                null/* constants */, null/* task */);
         
     }
 
@@ -300,8 +318,9 @@ public class Rule<E> implements IRule<E> {
     public Rule(String name, IPredicate head, IPredicate[] tail, 
             final boolean distinct, IConstraint[] constraints) {
 
-        this(name, head, tail, distinct, constraints, null/* task */);
-        
+        this(name, head, tail, distinct, constraints, null/* constants */,
+                null/* task */);
+
     }
 
     /**
@@ -321,12 +340,15 @@ public class Rule<E> implements IRule<E> {
      *            when the {@link IRule} is evaluated as a query.
      * @param constraints
      *            The constraints on the rule (optional).
+     * @param constants
+     *            Bindings for variables that are bound as constants for the
+     *            rule (optional).
      * @param taskFactory
      *            Optional override for rule evaluation (MAY be
      *            <code>null</code>).
      */
     public Rule(String name, IPredicate head, IPredicate[] tail,
-            boolean distinct, IConstraint[] constraints,
+            boolean distinct, IConstraint[] constraints, IBindingSet constants,
             IRuleTaskFactory taskFactory) {
 
         if (name == null)
@@ -338,6 +360,12 @@ public class Rule<E> implements IRule<E> {
         if (tail == null)
             throw new IllegalArgumentException();
 
+        if (constants == null) {
+            
+            constants = EmptyBindingSet.INSTANCE;
+            
+        }
+        
         this.name = name;
 
         // the predicate declarations for the body.
@@ -419,6 +447,9 @@ public class Rule<E> implements IRule<E> {
             
         }
 
+        // NOT NULL.
+        this.constants = constants;
+        
         // MAY be null
         this.taskFactory = taskFactory;
 
@@ -448,6 +479,10 @@ public class Rule<E> implements IRule<E> {
                 .asBound(bindingSet));
 
         final IPredicate[] newTail = bind(tail, bindingSet);
+        
+//        final IPredicate newHead = head;
+//
+//        final IPredicate[] newTail = tail;
 
         /*
          * Setup the new constraints. We do not test for whether or not two
@@ -481,7 +516,6 @@ public class Rule<E> implements IRule<E> {
 
         }
 
-        
         /*
          * Pass on the task factory - it is up to it to be robust to
          * specialization of the rule.
@@ -490,7 +524,7 @@ public class Rule<E> implements IRule<E> {
         final IRuleTaskFactory taskFactory = getTaskFactory();
 
         final IRule<E> newRule = new Rule<E>(name, newHead, newTail, distinct,
-                newConstraint, taskFactory);
+                newConstraint, bindingSet, taskFactory);
 
         return newRule;
 

@@ -33,6 +33,7 @@ import java.util.Set;
 
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.striterator.DistinctFilter;
 
 /**
@@ -190,6 +191,17 @@ public interface IRule<E> extends IStep {
     public IRule<E> specialize(String name, IBindingSet bindingSet,
             IConstraint[] constraints);
 
+    /**
+     * Returns any variables that were bound to constants when an {@link IRule}
+     * was {@link #specialize(String, IBindingSet, IConstraint[]) specialized}.
+     * <p>
+     * Note: {@link IJoinNexus#newBindingSet(IRule)} MUST apply the constants
+     * before returning the bindings to the caller.
+     * 
+     * @return The bound constants.
+     */
+    public IBindingSet getConstants();
+    
     /**
      * Return the variables in common for two {@link IPredicate}s.
      * 

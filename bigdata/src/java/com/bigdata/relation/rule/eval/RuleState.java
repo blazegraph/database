@@ -167,42 +167,44 @@ public class RuleState {
      */
     public String toString(IBindingSet bindingSet) {
 
-        final StringBuilder sb = new StringBuilder();
+//        final StringBuilder sb = new StringBuilder();
+//
+//        sb.append(rule.getName());
+//
+//        sb.append(" : ");
+//
+//        // write out bindings for the tail.
+//
+//        int i = 0;
+//
+//        for (final Iterator<IPredicate> itr = rule.getTail(); itr.hasNext(); i++) {
+//
+//            final IPredicate pred = itr.next();
+//
+//            sb.append(pred.toString(bindingSet));
+//
+//            sb.append("[" + order[i] + "]");
+//
+//            if (itr.hasNext()) {
+//
+//                sb.append(", ");
+//
+//            }
+//
+//        }
+//
+//        sb.append(" -> ");
+//
+//        // write out bindings for the head.
+//        if (rule.getHead() != null) {
+//
+//            sb.append(rule.getHead().toString(bindingSet));
+//
+//        }
 
-        sb.append(rule.getName());
-
-        sb.append(" : ");
-
-        // write out bindings for the tail.
-
-        int i = 0;
-
-        for (final Iterator<IPredicate> itr = rule.getTail(); itr.hasNext(); i++) {
-
-            final IPredicate pred = itr.next();
-
-            sb.append(pred.toString(bindingSet));
-
-            sb.append("[" + order[i] + "]");
-
-            if (itr.hasNext()) {
-
-                sb.append(", ");
-
-            }
-
-        }
-
-        sb.append(" -> ");
-
-        // write out bindings for the head.
-        if (rule.getHead() != null) {
-
-            sb.append(rule.getHead().toString(bindingSet));
-
-        }
-
-        return sb.toString();
+        return rule.toString(bindingSet) + " order=" + Arrays.toString(order)
+                + ", keyOrder=" + Arrays.toString(keyOrder) + ", depends="
+                + depends;
 
     }
 
@@ -323,6 +325,14 @@ public class RuleState {
 
                     final Var var = (Var) t;
 
+                    if (log.isDebugEnabled()) {
+
+                        log.debug("Propagating binding: pred=" + pred
+                                        + ", var=" + var + ", bindingSet="
+                                        + bindingSet);
+                        
+                    }
+                    
                     bindingSet.set(var, joinNexus.fakeBinding(pred, var));
 
                 }

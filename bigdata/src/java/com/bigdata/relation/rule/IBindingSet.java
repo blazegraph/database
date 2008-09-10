@@ -62,6 +62,12 @@ import com.bigdata.relation.rule.eval.RuleState;
  *       To obtain a {@link Var} you MUST go to the {@link IVariable} factory on
  *       the {@link IRule}.  (It is easy to find violators since all vars are
  *       currently assigned by a single factory.)
+ *       <p>
+ *       Since we sometimes do not have access to the rule that generated the
+ *       bindings, we would also require the ability to retrieve a binding by
+ *       the name of the variable (this case arises when the rule is generated
+ *       dynamically in a manner that is not visible to the consumer of the
+ *       bindings, e.g., the match rule of the RDF DB). 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

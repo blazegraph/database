@@ -220,7 +220,7 @@ public class TestMatch extends AbstractTripleStoreTestCase {
                         }
 
                         final Literal lit = (Literal) actualBindingSet.get(Var
-                                .var("lit"));
+                                .var("lit")).get();
 
                         assertNotNull("lit not bound: "+actualBindingSet, lit);
                         
@@ -234,13 +234,13 @@ public class TestMatch extends AbstractTripleStoreTestCase {
                         }
 
                         assertEquals("s", expectedBindingSet.get("s"),
-                                actualBindingSet.get(Var.var("s")));
+                                (Value)actualBindingSet.get(Var.var("s")).get());
 
                         assertEquals("t", expectedBindingSet.get("t"),
-                                actualBindingSet.get(Var.var("t")));
+                                (Value)actualBindingSet.get(Var.var("t")).get());
 
                         assertEquals("p", expectedBindingSet.get("p"),
-                                actualBindingSet.get(Var.var("p")));
+                                (Value)actualBindingSet.get(Var.var("p")).get());
 
                     }
 

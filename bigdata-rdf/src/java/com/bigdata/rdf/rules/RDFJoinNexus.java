@@ -29,7 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -839,7 +841,35 @@ public class RDFJoinNexus implements IJoinNexus {
 
     public IBindingSet newBindingSet(IRule rule) {
 
-        return new ArrayBindingSet(rule.getVariableCount());
+        final IBindingSet constants = rule.getConstants();
+
+        final int nconstants = constants.size();
+        
+        final IBindingSet bindingSet = new ArrayBindingSet(rule
+                .getVariableCount()
+                + nconstants);
+
+        if (nconstants > 0) {
+        
+            /*
+             * Bind constants declared by the rule before returning the binding
+             * set to the caller.
+             */
+            
+            final Iterator<Map.Entry<IVariable, IConstant>> itr = constants
+                    .iterator();
+            
+            while(itr.hasNext()) {
+                
+                final Map.Entry<IVariable,IConstant> entry = itr.next();
+                
+                bindingSet.set(entry.getKey(), entry.getValue());
+                
+            }
+            
+        }
+        
+        return bindingSet;
         
     }
 

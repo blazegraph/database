@@ -111,6 +111,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 },//
                 false, // distinct
                 null, // constraints
+                null, // constants
                 taskFactory
         );
 

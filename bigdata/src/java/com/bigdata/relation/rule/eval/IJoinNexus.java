@@ -205,6 +205,10 @@ public interface IJoinNexus {
     
     /**
      * Factory for {@link IBindingSet} implementations.
+     * <p>
+     * Note: The factory MUST apply any bound
+     * {@link IRule#getConstants() constants} for the {@link IRule} before
+     * returning the {@link IBindingSet}.
      * 
      * @param rule
      *            The rule whose bindings will be stored in the binding set.

@@ -43,7 +43,6 @@ import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.AbstractResource;
@@ -352,7 +351,28 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     
                 } catch(IllegalStateException t) {
                     
-                    log.warn("Closed? " + indexManager);
+                    if(indexManager instanceof TemporaryStore) {
+
+                        /*
+                         * Note: Asynchronous close is common for temporary
+                         * stores since they can be asynchronously closed
+                         * and removed from the [seeAlso] weak value cache.
+                         */
+                        
+                        if (log.isInfoEnabled())
+                            log.info("Closed? " + indexManager);
+                        
+                    } else {
+                        
+                        /*
+                         * Other stores should more typically remain open, but
+                         * they could be closed asynchronously for valid
+                         * reasons.
+                         */
+                        
+                        log.warn("Closed? " + indexManager);
+                        
+                    }
 
                     continue;
                     
