@@ -66,7 +66,15 @@ public class TestAll extends TestCase {
          * 
          * Note: these are tested in the rdf package for now since they have to
          * be run against some data.
+         * 
+         * FIXME add more unit tests
          */
+       
+        suite.addTestSuite(TestArrayBuffer.class);
+        
+        suite.addTestSuite(TestBlockingBuffer.class);
+        
+        suite.addTestSuite(TestUnsynchronizedArrayBuffer.class);
         
         return suite;
         

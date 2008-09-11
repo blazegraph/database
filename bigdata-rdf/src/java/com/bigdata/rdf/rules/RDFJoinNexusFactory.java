@@ -54,10 +54,10 @@ import java.util.concurrent.ExecutorService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -65,6 +65,7 @@ import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * Factory for {@link RDFJoinNexus} objects.
@@ -87,8 +88,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final boolean backchain;
     final boolean forceSerialExecution;
     final int maxParallelSubqueries;
-    final int mutationBufferCapacity;
-    final int queryBufferCapacity;
+    final int chunkOfChunksCapacity;
+    final int chunkCapacity;
     final int fullyBufferedReadThreshold;
     final int solutionFlags;
     @SuppressWarnings("unchecked")
@@ -117,9 +118,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         sb.append(", maxParallelSubqueries="+maxParallelSubqueries);
         
-        sb.append(", mutationBufferCapacity="+mutationBufferCapacity);
+//        sb.append(", mutationBufferCapacity="+mutationBufferCapacity);
         
-        sb.append(", queryBufferCapacity="+queryBufferCapacity);
+        sb.append(", queryBufferCapacity="+chunkCapacity);
 
         sb.append(", fullyBufferedReadThreshold="+fullyBufferedReadThreshold);
         
@@ -165,12 +166,13 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      *            are included when reading on an {@link IAccessPath} for the
      *            {@link SPORelation} using the {@link InferenceEngine} to
      *            "backchain" any necessary entailments.
-     * @param mutationBufferCapacity
-     *            The capacity of the buffers used to support chunked iterators
-     *            and efficient ordered writes.
-     * @param queryBufferCapacity
-     *            The capacity of the {@link BlockingBuffer} used to support
-     *            asynchronous iterators for high-level query.
+     * @param chunkOfChunksCapacity
+     *            The capacity of the thread-safe {@link IBuffer}s used to
+     *            buffer chunks of {@link ISolution}s, often from concurrent
+     *            producers.
+     * @param chunkCapacity
+     *            The capacity of the {@link UnsynchronizedArrayBuffer}s used
+     *            to buffer a single chunk of {@link ISolution}s.
      * @param fullyBufferedReadThreshold
      *            If the estimated range count for an
      *            {@link IAccessPath#iterator(int, int)} is LTE to this
@@ -191,8 +193,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
             long writeTimestamp, long readTimestamp,//
             boolean forceSerialExecution, int maxParallelSubqueries,//
-            boolean justify, boolean backchain, int mutationBufferCapacity,
-            int queryBufferCapacity, int fullyBufferedReadThreshold,
+            boolean justify, boolean backchain, int chunkOfChunksCapacity,
+            int chunkCapacity, int fullyBufferedReadThreshold,
             int solutionFlags, IElementFilter filter,
             IEvaluationPlanFactory planFactory) {
 
@@ -227,9 +229,9 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         this.maxParallelSubqueries = maxParallelSubqueries;
         
-        this.mutationBufferCapacity = mutationBufferCapacity;
+        this.chunkOfChunksCapacity = chunkOfChunksCapacity;
         
-        this.queryBufferCapacity = queryBufferCapacity;
+        this.chunkCapacity = chunkCapacity;
         
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         

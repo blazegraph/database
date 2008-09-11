@@ -149,7 +149,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
         private final IJoinNexus joinNexus; // Note: Not serializable.
 
-        private final IBuffer<ISolution> buffer; // Note: Not serializable.
+        private final IBuffer<ISolution[]> buffer; // Note: Not serializable.
 
         // private final Set<Long> P;
 
@@ -184,7 +184,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          *            The rule.
          * @param joinNexus
          * @param buffer
-         *            A buffer used to accumulate entailments.
+         *            A buffer used to accumulate chunks of entailments.
          * @param rdfsSubPropertyOf
          *            The {@link Constant} corresponding to the term identifier
          *            for <code>rdfs:subPropertyOf</code>.
@@ -196,7 +196,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 String focusStore,
                 IRule rule,
                 IJoinNexus joinNexus,
-                IBuffer<ISolution> buffer,
+                IBuffer<ISolution[]> buffer,
                 // Set<Long> P,
                 IConstant<Long> rdfsSubPropertyOf,
                 IConstant<Long> propertyId) {
@@ -335,6 +335,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                         }
 
+                        final IBuffer<ISolution> tmp = joinNexus
+                                .newUnsynchronizedBuffer(buffer, chunk.length);
+                        
                         for (ISPO spo : chunk) {
 
                             /*
@@ -355,15 +358,18 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
                             if (rule.isConsistent(bindingSet)) {
 
-                                buffer.add(joinNexus.newSolution(rule,
+                                tmp.add(joinNexus.newSolution(rule,
                                         bindingSet));
 
                                 stats.solutionCount.incrementAndGet();
 
                             }
 
-                        } // next stmt
+                        } // next spo in chunk.
 
+                        // flush onto the chunked solution buffer.
+                        tmp.flush();
+                        
                     } // while(itr2)
 
                 } finally {

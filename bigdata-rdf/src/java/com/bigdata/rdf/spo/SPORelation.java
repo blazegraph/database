@@ -775,12 +775,15 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final AbstractTripleStore container = getContainer();
         
-        final int queryBufferCapacity = container.queryBufferCapacity;
+        final int chunkOfChunksCapacity = container.chunkOfChunksCapacity;
+
+        final int chunkCapacity = container.chunkCapacity;
 
         final int fullyBufferedReadThreshold = container.fullyBufferedReadThreshold;
         
         return new SPOAccessPath(this, predicate, keyOrder, ndx, flags,
-                queryBufferCapacity, fullyBufferedReadThreshold).init();
+                chunkOfChunksCapacity, chunkCapacity,
+                fullyBufferedReadThreshold).init();
         
     }
     

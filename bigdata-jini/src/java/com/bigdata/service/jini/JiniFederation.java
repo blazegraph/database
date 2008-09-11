@@ -34,7 +34,6 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-
 import net.jini.config.Configuration;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
@@ -49,14 +48,15 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniClient.JiniConfig;
-import com.bigdata.striterator.IAsynchronousIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
@@ -528,19 +528,38 @@ public class JiniFederation extends AbstractDistributedFederation {
      * least one JOIN. It DOES NOT get use for simple access path scans. Those
      * use {@link IRangeQuery#rangeIterator()} instead.
      * 
-     * FIXME optimize when an {@link IAsynchronousIterator}. if the iterator
-     * thinks that it can be complete quickly (LT chunkSize elements in LT 5ms)
-     * then return a fully buffered iterator.
-     * 
      * @todo Allow {@link Configuration} of the {@link Exporter} for the proxy
      *       iterators. However, since the {@link Exporter} is paired to a
      *       single object the configuration of the {@link Exporter} will
      *       require an additional level of indirection when compared to the
      *       {@link Configuration} of an {@link AbstractServer}'s
      *       {@link Exporter}.
+     * 
+     * @todo if this is solely used for high-level query then we can probably
+     *       drop the {@link IKeyOrder} from the API here and on
+     *       {@link RemoteChunk}.
      */
     @Override
-    public Object getProxy(IChunkedOrderedIterator sourceIterator) {
+    public Object getProxy(
+            final IAsynchronousIterator<? extends Object[]> sourceIterator,
+            final IKeyOrder<? extends Object> keyOrder) {
+        
+        if (sourceIterator == null)
+            throw new IllegalArgumentException();
+        
+        if(sourceIterator.isFutureDone()) {
+            
+            /*
+             * FIXME Since the producer is done we can materialize all of the
+             * data in a ResultSet or RemoteChunk and send that back.
+             * 
+             * FIXME We need the ability to define the per-Element and
+             * chunk-of-element serializers to make this efficient.
+             */
+            
+            log.warn("Async iterator is done: modify code to send back fully materialized chunk.");
+            
+        }
         
         final long begin = System.currentTimeMillis();
         
@@ -568,7 +587,8 @@ public class JiniFederation extends AbstractDistributedFederation {
                 true/* enableDCG */, false/*keepAlive*/);
         
         // wrap the iterator with an exportable object.
-        final RemoteChunkedIterator impl = new RemoteChunkedIterator(sourceIterator);
+        final RemoteChunkedIterator impl = new RemoteChunkedIterator(
+                sourceIterator, keyOrder);
         
         /*
          * Export and return the proxy.
@@ -591,38 +611,6 @@ public class JiniFederation extends AbstractDistributedFederation {
                 
             }
 
-            if (sourceIterator instanceof IAsynchronousIterator) {
-                
-                /*
-                 * This is an approximation of a spin lock designed to wait for
-                 * some results to buffer up on the source iterator.
-                 * 
-                 * FIXME Make the async iterator expose more state so that we
-                 * can wait until it is either fully buffered (the blocking
-                 * buffer is closed so no more results will be written) or until
-                 * it has a chunk of results for us (if that happens first).
-                 * 
-                 * @todo if we find that the source iterator can not produce
-                 * anything more (because the blocking buffer is closed) then we
-                 * should optimize and just return a single RemoteChunk and we
-                 * do not need to export anything.
-                 * 
-                 * @todo we can also spin lock on each nextChunk() request so
-                 * that we always get back a full chunk.
-                 */
-                
-                try {
-                
-                    Thread.sleep(1/* millis */);
-                    
-                } catch (InterruptedException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
-                
-            }
-            
             // return proxy to caller.
             return proxy;
 

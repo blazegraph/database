@@ -41,11 +41,11 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
     protected static final Logger log = Logger.getLogger(AbstractArrayBuffer.class);
     
-    private final int capacity;
-    private final IElementFilter<E> filter;
+    protected final int capacity;
+    protected final IElementFilter<E> filter;
     
-    private int size;
-    private E[] buffer;
+    protected int size;
+    protected E[] buffer;
     
     /**
      * @param capacity
@@ -65,12 +65,6 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         /*
          * Note: The backing array is allocated once we receive the first
          * element so we can get the array component type right.
-         * 
-         * @todo this could be a problem if the element type was in fact Object
-         * since we should allocate an Object[] but we will in fact allocate an
-         * array of whatever type that first object is. This could in turn cause
-         * runtime errors. If it is a problem then we need to pass in an object
-         * (or an empty array) of the correct type.
          */
         
     }
@@ -160,56 +154,6 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
     }
 
-    @SuppressWarnings("unchecked")
-    public void add(final int n, final E[] a) {
-
-        if (n == 0)
-            return;
-
-        if (a == null)
-            throw new IllegalArgumentException();
-
-        if (a.length < n)
-            throw new IllegalArgumentException();
-
-        if (log.isDebugEnabled()) {
-
-            log.debug("n=" + n + ", a=" + a);
-
-        }
-        
-        synchronized (this) {
-
-            for (int i = 0; i < n; i++) {
-
-                final E e = a[i];
-
-                if (e == null)
-                    throw new IllegalArgumentException("null @ index=" + i);
-
-                if (accept(e)) {
-
-                    if (buffer == null) {
-
-                        buffer = (E[]) java.lang.reflect.Array.newInstance(e
-                                .getClass(), capacity);
-
-                    } else if (size == buffer.length) {
-
-                        flush();
-
-                    }
-
-                    buffer[size++] = e;
-
-                }
-                
-            }
-
-        }
-
-    }
-    
     synchronized public long flush() {
 
         if (size > 0) {
@@ -258,7 +202,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     /** Clear hard references from the buffer for better GC. */
     private void clearBuffer() {
 
-        for(int i=0; i<size; i++) {
+        for (int i = 0; i < size; i++) {
             
             buffer[i] = null;
             

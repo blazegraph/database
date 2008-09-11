@@ -54,12 +54,12 @@ public interface IRuleTaskFactory extends Serializable {
      *            Encapsulates various important information required for join
      *            operations.
      * @param buffer
-     *            The buffer onto which the computed {@link ISolution}s for the
-     *            {@link IRule} must be written.
+     *            The buffer onto which chunks of computed {@link ISolution}s
+     *            for the {@link IRule} must be written.
      * 
      * @return <code>null</code> unless custom evaluation is desired.
      */
     public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-            IBuffer<ISolution> buffer);
+            IBuffer<ISolution[]> buffer);
 
 }

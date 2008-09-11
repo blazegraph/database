@@ -1,51 +1,53 @@
 package com.bigdata.service.jini;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.striterator.IAsynchronousIterator;
-import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.striterator.IRemoteChunk;
 import com.bigdata.striterator.IRemoteChunkedIterator;
 
 /**
- * Wrapper for an {@link IChunkedOrderedIterator} exposing an interface suitable
+ * Wrapper for an {@link IAsynchronousIterator} exposing an interface suitable
  * for export as a proxy object using RMI to communicate back with itself and
  * pull data efficiently from the source iterator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <E>
- *            The generic type of the elements visited by the source iterator.
+ *            The generic type of the component elements visited by the source
+ *            iterator.
  */
 public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
     protected static final transient Logger log = Logger
             .getLogger(RemoteChunkedIterator.class);
 
-    private final IChunkedOrderedIterator<E> sourceIterator;
+    private final IAsynchronousIterator<E[]> sourceIterator;
 
-//    /**
-//     * The {@link Exporter} must be set when the proxy is exported. It will be
-//     * used to unexport the proxy if the iterator is closed.
-//     */
-//    transient Exporter exporter = null;
-
+    private final IKeyOrder<E> keyOrder;
+    
     transient volatile boolean open = true;
     
     /**
      * 
      * @param sourceIterator
      *            The source iterator.
+     * @param keyOrder
+     *            The natural order of the visited elements if known and
+     *            otherwise <code>null</code>.
      */
-    public RemoteChunkedIterator(IChunkedOrderedIterator<E> sourceIterator) {
+    public RemoteChunkedIterator(IAsynchronousIterator<E[]> sourceIterator,
+            IKeyOrder<E> keyOrder) {
 
         if (sourceIterator == null)
             throw new IllegalArgumentException();
 
         this.sourceIterator = sourceIterator;
+
+        this.keyOrder = keyOrder;
         
         if (log.isDebugEnabled()) {
 
@@ -90,31 +92,6 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
                 sourceIterator.close();
 
-//                if (exporter != null) {
-//
-//                    try {
-//
-//                        /*
-//                         * Make the object no longer available for RMI.
-//                         * 
-//                         * Can we do this during an RMI call from the client?
-//                         * (That is what happens if the client closes the proxy
-//                         * since this method is then invoked via RMI on the
-//                         * server).
-//                         */
-//                        exporter.unexport(true/* force */);
-//
-//                        if (log.isInfoEnabled())
-//                            log.info("Unexported proxy");
-//
-//                    } finally {
-//
-//                        exporter = null;
-//
-//                    }
-//
-//                }
-
             } finally {
 
                 open = false;
@@ -142,21 +119,34 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
             }
 
-            chunk = new RemoteChunk<E>(true/* exhausted */, sourceIterator
-                    .getKeyOrder(), null);
+            chunk = new RemoteChunk<E>(true/* exhausted */, keyOrder, null);
 
         } else {
 
-            // @todo config timeout.
-            final E[] a = sourceIterator instanceof IAsynchronousIterator//
-                ? ((IAsynchronousIterator<E>) sourceIterator).nextChunk(//
-                    1000,// minChunkSize
-                    1000L, // timeout
-                    TimeUnit.MILLISECONDS// unit
-                    )//
-                : sourceIterator.nextChunk()//
-                ;
+//            // @todo config timeout.
+//            final E[] a = sourceIterator instanceof IAsynchronousIterator//
+//                ? ((IAsynchronousIterator<E>) sourceIterator).nextChunk(//
+//                    1000,// minChunkSize
+//                    1000L, // timeout
+//                    TimeUnit.MILLISECONDS// unit
+//                    )//
+//                : sourceIterator.nextChunk()//
+//                ;
 
+            final E[] a = sourceIterator.next();
+            
+            /*
+             * FIXME This forces us to wait until there is another chunk
+             * materialized and waiting in the BlockingBuffer's queue or until
+             * the future is done while the queue is empty. That means that we
+             * really wait for two chunks to be ready rather than returning when
+             * the first chunk is available.
+             * 
+             * Change the RemoteChunk semantics to have the flag indicate only
+             * whether the iterator is KNOWN to be exhausted. When not known to
+             * be exhausted the caller must verify whether or not additional
+             * chunks are available by making another RMI request.
+             */
             final boolean sourceExhausted = !sourceIterator.hasNext();
 
             if (log.isInfoEnabled()) {
@@ -166,8 +156,7 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
             }
 
-            chunk = new RemoteChunk<E>(sourceExhausted, sourceIterator
-                    .getKeyOrder(), a);
+            chunk = new RemoteChunk<E>(sourceExhausted, keyOrder, a);
 
         }
 

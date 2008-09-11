@@ -2,6 +2,8 @@ package com.bigdata.relation.accesspath;
 
 import java.util.concurrent.Callable;
 
+import com.bigdata.relation.rule.eval.ISolution;
+
 /**
  * Task invokes {@link IBuffer#flush()} and returns its return value.
  * 
@@ -10,9 +12,9 @@ import java.util.concurrent.Callable;
  */
 public class FlushBufferTask implements Callable<Long> {
     
-    final private IBuffer buffer;
+    final private IBuffer<ISolution[]> buffer;
     
-    public FlushBufferTask(IBuffer buffer) {
+    public FlushBufferTask(IBuffer<ISolution[]> buffer) {
 
         if (buffer == null)
             throw new IllegalArgumentException();

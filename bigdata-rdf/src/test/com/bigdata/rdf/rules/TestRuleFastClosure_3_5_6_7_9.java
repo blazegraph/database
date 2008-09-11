@@ -325,7 +325,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         }
 
         public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-                IBuffer<ISolution> buffer) {
+                IBuffer<ISolution[]> buffer) {
 
             return new FastClosureRuleTask(database, focusStore, rule,
                     joinNexus, buffer, /* P, */

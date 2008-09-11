@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -39,10 +36,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
-import com.bigdata.striterator.IAsynchronousIterator;
-import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * <p>
@@ -65,7 +58,7 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     
-    protected static Logger log = Logger.getLogger(BlockingBuffer.class);
+    protected static final Logger log = Logger.getLogger(BlockingBuffer.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
@@ -94,17 +87,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     /**
      * The singleton for the iterator used to read from this buffer.
      */
-    private final IChunkedOrderedIterator<E> iterator;
-
-    /**
-     * The element write order IFF known.
-     */
-    private final IKeyOrder<E> keyOrder;
-
-    /**
-     * Optional filter to keep elements out of the buffer.
-     */
-    private final IElementFilter<E> filter;
+    private final IAsynchronousIterator<E> iterator;
     
     /**
      * The default capacity for the internal buffer. Chunks can not be larger
@@ -146,27 +129,27 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public BlockingBuffer(int capacity) {
 
-        this(capacity, null/* keyOrder */, null/* filter */);
+//        this(capacity, null/* keyOrder */, null/* filter */);
+//
+//    }
+//    
+//    /**
+//     * 
+//     * @param capacity
+//     *            The capacity of the buffer.
+//     * @param keyOrder
+//     *            The visitation order in which the elements will be
+//     *            <em>written</em> onto the buffer and <code>null</code>
+//     *            unless you have a <em>strong</em> guarentee for the
+//     *            visitation order or <code>null</code> if there is no
+//     *            inherent order.
+//     * @param filter
+//     *            A filter for elements to be kept out of the buffer (optional).
+//     */
+//    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder,
+//            IElementFilter<E> filter) {
 
-    }
-    
-    /**
-     * 
-     * @param capacity
-     *            The capacity of the buffer.
-     * @param keyOrder
-     *            The visitation order in which the elements will be
-     *            <em>written</em> onto the buffer and <code>null</code>
-     *            unless you have a <em>strong</em> guarentee for the
-     *            visitation order or <code>null</code> if there is no
-     *            inherent order.
-     * @param filter
-     *            A filter for elements to be kept out of the buffer (optional).
-     */
-    public BlockingBuffer(int capacity, IKeyOrder<E> keyOrder,
-            IElementFilter<E> filter) {
-
-        this(new ArrayBlockingQueue<E>(capacity), keyOrder, filter);
+        this(new ArrayBlockingQueue<E>(capacity)); //, keyOrder, filter);
 
     }
     
@@ -177,17 +160,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            The queue on which elements will be buffered. Elements will be
      *            {@link #add(Object) added} to the queue and drained by the
      *            {@link #iterator()}.
-     * @param keyOrder
-     *            The visitation order in which the elements will be
-     *            <em>written</em> onto the buffer and <code>null</code>
-     *            unless you have a <em>strong</em> guarentee for the
-     *            visitation order or <code>null</code> if there is no
-     *            inherent order.
-     * @param filter
-     *            A filter for elements to be kept out of the buffer (optional).
      */
-    public BlockingBuffer(BlockingQueue<E> queue, IKeyOrder<E> keyOrder,
-            IElementFilter<E> filter) {
+    public BlockingBuffer(BlockingQueue<E> queue) {
     
         if (queue == null)
             throw new IllegalArgumentException();
@@ -196,10 +170,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
         this.iterator = new BlockingIterator();
 
-        this.keyOrder = keyOrder;
-        
-        this.filter = filter;
-        
     }
 
     /**
@@ -279,27 +249,28 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         }
         
     }
-    
-    /**
-     * May be overriden to filter elements allowed into the buffer. The default
-     * implementation allows all elements into the buffer.
-     * 
-     * @param e
-     *            A element.
-     * 
-     * @return true if the element is allowed into the buffer.
-     */
-    protected boolean accept(E e) {
 
-        if (filter != null) {
-
-            return filter.accept(e);
-
-        }
-        
-        return true;
-        
-    }
+    // Note: Now imposed by the UnsynchronizedArrayBuffer
+//    /**
+//     * May be overriden to filter elements allowed into the buffer. The default
+//     * implementation allows all elements into the buffer.
+//     * 
+//     * @param e
+//     *            A element.
+//     * 
+//     * @return true if the element is allowed into the buffer.
+//     */
+//    protected boolean accept(E e) {
+//
+//        if (filter != null) {
+//
+//            return filter.accept(e);
+//
+//        }
+//        
+//        return true;
+//        
+//    }
 
     /**
      * @todo this is not optimized. see if query is faster when single threaded.
@@ -320,15 +291,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public void add(E e) {
 
         assertOpen();
-
-        if (!accept(e)) {
-
-            if (DEBUG)
-                log.debug("reject: " + e.toString());
-
-            return;
-
-        }
 
         final long begin = System.currentTimeMillis();
         
@@ -402,12 +364,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     }
     
     /**
-     * The returned iterator is NOT thread-safe and does NOT support remove().
-     * It will implement {@link IAsynchronousIterator}.
+     * The iterator is NOT thread-safe and does NOT support remove().
      * 
      * @return The iterator (this is a singleton).
      */
-    public IChunkedOrderedIterator<E> iterator() {
+    public IAsynchronousIterator<E> iterator() {
 
         return iterator;
         
@@ -415,13 +376,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
     /**
      * An inner class that reads from the buffer. This is not thread-safe - it
-     * makes no attempt to be atomic in its operations in {@link #hasNext()},
-     * {@link #next()} or {@link #nextChunk()}.
+     * makes no attempt to be atomic in its operations in {@link #hasNext()} or
+     * {@link #next()}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class BlockingIterator implements IChunkedOrderedIterator<E>, IAsynchronousIterator<E> {
+    private class BlockingIterator implements IAsynchronousIterator<E> {
         
         /**
          * <code>true</code> iff this iterator is open - it is closed when the
@@ -523,17 +484,27 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         }
 
-        private volatile boolean didCheckFuture = false;
+        /**
+         * <code>true</code> iff the {@link Future} has been set and
+         * {@link Future#isDone()} returns <code>true</code>.
+         */
+        public boolean isFutureDone() {
+            
+            return futureIsDone;
+            
+        }
+        
+        private volatile boolean futureIsDone = false;
         
         private final void checkFuture() {
 
-            if (!didCheckFuture && future != null && future.isDone()) {
+            if (!futureIsDone && future != null && future.isDone()) {
 
                 if (INFO)
                     log.info("Future is done");
 
                 // don't re-execute this code.
-                didCheckFuture = true;
+                futureIsDone = true;
 
                 /*
                  * Make sure the buffer is closed. In fact, the caller probably
@@ -711,217 +682,366 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             }
 
             if (INFO)
-                log.info("Exhausted: bufferOpen=" + BlockingBuffer.this.open
-                        + ", nextE=" + nextE != null);
+                log.info("Exhausted");
 
+            assert !BlockingBuffer.this.open;
+
+            assert nextE == null;
+            
             return false;
 
         }
 
         public E next() {
-
+            
             if (!hasNext()) {
 
                 throw new NoSuchElementException();
 
             }
 
-            assert nextE != null;
+            final E e = _next();
+            
+            if (timeout > 0 && e.getClass().getComponentType() != null) {
+                
+                /*
+                 * Combine chunk(s).
+                 */
+                
+                return combineChunks(e, 1/* nchunks */, System.nanoTime());
+                
+            }
+            
+//            if (DEBUG)
+//                log.debug("next: nchunksCombined=" + nchunks + ", nelementsTotal="
+//                        + nelements + ", " + e);
+
+            return e;
+            
+        }
+        
+        /**
+         * Returns the next element (non-blocking).
+         * 
+         * @throws NoSuchElementException
+         *             if {@link #nextE} is <code>null</code> (there is no
+         *             element waiting for us).
+         */
+        private E _next() {
+
+            if (nextE == null)
+                throw new NoSuchElementException();
             
             // we already have the next element.
             final E e = nextE;
 
             nextE = null;
- 
+            
             nelements++;
             
-            if (DEBUG)
-                log.debug("next: nchunks=" + nchunks + ", nelements="
-                        + nelements + ", " + e);
-
             return e;
 
         }
+        
+        /**
+         * Method is invoked IFF <code>E</code> is an array type (a chunk).
+         * The method examines the size of E compared to a desired minimum chunk
+         * size. If we would rather have a larger chunk and the buffer is not
+         * empty, then we immediately take the next chunk and combine it with
+         * the current chunk. This proceeds recursively until either we have a
+         * suitable chunk size or the queue is empty.
+         * <p>
+         * This method is intended to optimize cases where multiple threads
+         * produce small chunks that were flushed onto the buffer. By combining
+         * those chunks we can improve throughput.
+         * 
+         * @param e
+         *            A chunk.
+         * @param nchunks
+         *            The #of chunks that have already been consumed. This is
+         *            ONE (1) the first time this method is invoked by
+         *            {@link #next()}.
+         * @param startTime
+         *            The start time in nanoseconds of the <i>depth==1</i>
+         *            request.
+         * 
+         * @return Either the same chunk or another chunk with additional
+         *         elements.
+         */
+        private E combineChunks( final E e, final int nchunks, final long startTime ) {
+           
+            final Object[] chunk = (Object[]) e;
+            
+            final long elapsed = System.nanoTime() - startTime;
+            
+            final boolean isTimeout = elapsed >= timeout;
+            
+            if (chunk.length < minChunkSize && !isTimeout && hasNext()) {
+                
+                /*
+                 * Note: hasNext() will block until either we have another chunk
+                 * or until the iterator is known to be exhausted.
+                 */
 
-        public E[] nextChunk() {
+                return combineChunks(combineNextChunk(e), nchunks + 1, startTime);
+                
+            }
+            
+            if (chunk.length < minChunkSize && !isTimeout && !queue.isEmpty()) {
+                
+                /*
+                 * Non-blocking case. Once we have satisified the minimum chunk
+                 * size we will only combine chunks that are already waiting in
+                 * the queue.
+                 * 
+                 * Note: required to make sure that _nextE is bound. This is
+                 * non-blocking since we already know that the queue is not
+                 * empty.
+                 */
+                hasNext();
+                
+                return combineChunks(combineNextChunk(e), nchunks + 1, startTime);
 
-            return nextChunk(//
-//                    Math.min(1000, capacity), // minChunkSize
-                    1000, // minChunkSize
-                    500L, // timeout
-                    TimeUnit.MILLISECONDS // units.
-                    );
+            }
+
+            // Done.
+//            if (INFO) // FIXME logging level.
+            log.warn("done:\n" + ">>> #chunks=" + nchunks + ", #elements="
+                    + chunk.length + ", minChunkSize=" + minChunkSize
+                    + ", elapsed=" + elapsed + "ns, isTimeout=" + isTimeout
+                    + ", queueEmpty=" + queue.isEmpty() + ", open="
+                    + BlockingBuffer.this.open);
+            
+            return e;
             
         }
         
-//        @SuppressWarnings("unchecked")
-        public E[] nextChunk(int minChunkSize, long timeout, TimeUnit unit) {
-
-            if (INFO)
-                log.info("minChunkSize=" + minChunkSize + ", timeout="
-                        + timeout + ", unit=" + unit);
+        /**
+         * Combines this chunk with the {@link #_next()} one.
+         * 
+         * @param e
+         *            A chunk that we already have on hand.
+         * 
+         * @return The given chunk combined with the {@link #_next()} chunk.
+         */
+        @SuppressWarnings("unchecked")
+        private E combineNextChunk(final E e) {
             
-            final long begin = System.currentTimeMillis();
-
-            // @todo hasNext() does not respect the timeout.
-            if (!hasNext()) {
-
-                throw new NoSuchElementException();
-
-            }
-
-            int chunkSize;
-            synchronized(this) {
-                
-            // note: timeout when nanos<=0.
-            long nanos = unit.toNanos(timeout);
+            final Object[] e1 = (Object[]) e;
             
-            long lastTime = System.nanoTime();
-
-            /*
-             * [chunkSize] is the current size of the buffer. The buffer size
-             * MAY grow asynchronously but will not shrink outside of the effect
-             * of this method unless it is asynchronously reset().
-             * 
-             * Note: chunkSize = queue.size() + 1 since [nextE] is already on
-             * hand to be read.
-             * 
-             * We stop looking as soon as the BlockingBuffer is closed.
-             * 
-             * @todo handle asynchronous reset() safely.
-             */
-            while (((chunkSize = queue.size() + 1/* nextE */) < minChunkSize)
-                    && nanos > 0 && BlockingBuffer.this.open) {
-                
-                long now = System.nanoTime();
-                
-                nanos -= now - lastTime;
-                
-                lastTime = now;
-                
-                try {
-
-//                    /*
-//                     * FIXME sleeping here is not the best way to handle this,
-//                     * but we lack a means to be notified when another element
-//                     * is added to the buffer.
-//                     * 
-//                     * Perhaps use an explicit Lock and Condition on the
-//                     * BlockingBuffer so that we will be awakened if another
-//                     * element is added? Or even if the buffer reaches a desired
-//                     * size?!?
-//                     */
-//                    Thread.sleep(1/* ms */);
-
-                    wait();
-                    
-                } catch (InterruptedException ex) {
-                    
-                    throw new RuntimeException(ex.getMessage());
-                    
-                }
-                
-            }
+            final Object[] e2 = (Object[]) _next();
             
-            }
+            final int chunkSize = e1.length + e2.length;
             
-//            final int chunkSize = queue.size() + 1/* nextE */;
-
-            final E[] chunk;
-            {
-
-                /*
-                 * Drain everything in the queue.
-                 */
-                
-                final List<E> drained = new ArrayList<E>(chunkSize << 2);
-
-                final int drainCount = queue.drainTo(drained);
-
-//                final E e = (E) drained.get(0);
-
-                chunk = (E[]) java.lang.reflect.Array.newInstance(nextE
-                        .getClass(), drainCount + 1/* nextE */);
-                
-                chunk[0] = nextE;
-                
-                nextE = null;
-
-                for (int i = 0; i < drainCount; i++) {
-
-                    chunk[i + 1] = drained.get(i);
-
-                }
-                
-            }
+            // Dynamic instantiation of array of the same component type.
+            final Object[] a = (E[]) java.lang.reflect.Array.newInstance(e1[0]
+                    .getClass(), chunkSize);
             
-// E[] chunk = null;
+            // copy first chunk onto the new array.
+            System.arraycopy(e, 0, a, 0, e1.length);
+            
+            // copy second chunk onto the new array.
+            System.arraycopy(e2, 0, a, e1.length, e2.length);
+            
+            // return the combined chunk.
+            return (E) a;
+            
+        }
+        
+        // FIXME config from IJoinNexus#getChunkCapacity()
+        private final int chunkSize = 10000;
+        // @todo config
+        private final int minChunkSize = chunkSize/10;
+        /*
+         * @todo config timeout on next() and modify hasNext() to support
+         * timeout and drill timeout through and modify the remote chunked
+         * iterator to use the timeout.
+         * 
+         * Note: pattern converts N ms into nanoseconds.
+         * 
+         * Note: zero (0) disables chunk combiner.
+         */
+        private final long timeout = TimeUnit.NANOSECONDS.convert(1000, TimeUnit.MILLISECONDS);
+
+//        public E[] nextChunk() {
 //
-//            int n = 0;
+//            return nextChunk(//
+////                    Math.min(1000, capacity), // minChunkSize
+//                    1000, // minChunkSize
+//                    500L, // timeout
+//                    TimeUnit.MILLISECONDS // units.
+//                    );
+//            
+//        }
+        
+////        @SuppressWarnings("unchecked")
+//        public E[] nextChunk(int minChunkSize, long timeout, TimeUnit unit) {
 //
-//            while (n < chunkSize) {
+//            if (INFO)
+//                log.info("minChunkSize=" + minChunkSize + ", timeout="
+//                        + timeout + ", unit=" + unit);
+//            
+//            final long begin = System.currentTimeMillis();
 //
-//                final E e = next();
+//            // @todo hasNext() does not respect the timeout.
+//            if (!hasNext()) {
+//
+//                throw new NoSuchElementException();
+//
+//            }
+//
+//            int chunkSize;
+//            synchronized(this) {
 //                
-//                assert e != null;
-//                
-//                if (chunk == null) {
+//            // note: timeout when nanos<=0.
+//            long nanos = unit.toNanos(timeout);
+//            
+//            long lastTime = System.nanoTime();
 //
-//                    chunk = (E[]) java.lang.reflect.Array.newInstance(e
-//                            .getClass(), chunkSize);
+//            /*
+//             * [chunkSize] is the current size of the buffer. The buffer size
+//             * MAY grow asynchronously but will not shrink outside of the effect
+//             * of this method unless it is asynchronously reset().
+//             * 
+//             * Note: chunkSize = queue.size() + 1 since [nextE] is already on
+//             * hand to be read.
+//             * 
+//             * We stop looking as soon as the BlockingBuffer is closed.
+//             * 
+//             * @todo handle asynchronous reset() safely.
+//             */
+//            while (((chunkSize = queue.size() + 1/* nextE */) < minChunkSize)
+//                    && nanos > 0 && BlockingBuffer.this.open) {
+//                
+//                long now = System.nanoTime();
+//                
+//                nanos -= now - lastTime;
+//                
+//                lastTime = now;
+//                
+//                try {
+//
+////                    /*
+////                     * FIXME sleeping here is not the best way to handle this,
+////                     * but we lack a means to be notified when another element
+////                     * is added to the buffer.
+////                     * 
+////                     * Perhaps use an explicit Lock and Condition on the
+////                     * BlockingBuffer so that we will be awakened if another
+////                     * element is added? Or even if the buffer reaches a desired
+////                     * size?!?
+////                     */
+////                    Thread.sleep(1/* ms */);
+//
+//                    wait();
+//                    
+//                } catch (InterruptedException ex) {
+//                    
+//                    throw new RuntimeException(ex.getMessage());
+//                    
+//                }
+//                
+//            }
+//            
+//            }
+//            
+////            final int chunkSize = queue.size() + 1/* nextE */;
+//
+//            final E[] chunk;
+//            {
+//
+//                /*
+//                 * Drain everything in the queue.
+//                 */
+//                
+//                final List<E> drained = new ArrayList<E>(chunkSize << 2);
+//
+//                final int drainCount = queue.drainTo(drained);
+//
+////                final E e = (E) drained.get(0);
+//
+//                chunk = (E[]) java.lang.reflect.Array.newInstance(nextE
+//                        .getClass(), drainCount + 1/* nextE */);
+//                
+//                chunk[0] = nextE;
+//                
+//                nextE = null;
+//
+//                for (int i = 0; i < drainCount; i++) {
+//
+//                    chunk[i + 1] = drained.get(i);
 //
 //                }
 //                
-//                // add to this chunk.
-//                chunk[n++] = e;
-//                
 //            }
-            
-            nchunks++;
-            
-            nelements += chunk.length;
-            
-            if (INFO) {
-
-                final long elapsed = System.currentTimeMillis() - begin;
-
-                log.info("#chunks=" + nchunks + ", #elements=" + nelements
-                        + ", chunkSize=" + chunk.length + ", elapsed="
-                        + elapsed + " ms, bufferOpen="
-                        + BlockingBuffer.this.open);
-
-            }
-            
-            assert chunk != null;
-            
-            return chunk;
-            
-        }
-
-        final public IKeyOrder<E> getKeyOrder() {
-            
-            return keyOrder;
-            
-        }
-        
-        final public E[] nextChunk(IKeyOrder<E> keyOrder) {
-
-            if (keyOrder == null)
-                throw new IllegalArgumentException();
-
-            final E[] chunk = nextChunk();
-
-            if (!keyOrder.equals(getKeyOrder())) {
-
-                // sort into the required order.
-
-                Arrays.sort(chunk, 0, chunk.length, keyOrder.getComparator());
-
-            }
-
-            return chunk;
-
-        }
+//            
+//// E[] chunk = null;
+////
+////            int n = 0;
+////
+////            while (n < chunkSize) {
+////
+////                final E e = next();
+////                
+////                assert e != null;
+////                
+////                if (chunk == null) {
+////
+////                    chunk = (E[]) java.lang.reflect.Array.newInstance(e
+////                            .getClass(), chunkSize);
+////
+////                }
+////                
+////                // add to this chunk.
+////                chunk[n++] = e;
+////                
+////            }
+//            
+//            nchunks++;
+//            
+//            nelements += chunk.length;
+//            
+//            if (INFO) {
+//
+//                final long elapsed = System.currentTimeMillis() - begin;
+//
+//                log.info("#chunks=" + nchunks + ", #elements=" + nelements
+//                        + ", chunkSize=" + chunk.length + ", elapsed="
+//                        + elapsed + " ms, bufferOpen="
+//                        + BlockingBuffer.this.open);
+//
+//            }
+//            
+//            assert chunk != null;
+//            
+//            return chunk;
+//            
+//        }
+//
+//        final public IKeyOrder<E> getKeyOrder() {
+//            
+//            return keyOrder;
+//            
+//        }
+//        
+//        final public E[] nextChunk(IKeyOrder<E> keyOrder) {
+//
+//            if (keyOrder == null)
+//                throw new IllegalArgumentException();
+//
+//            final E[] chunk = nextChunk();
+//
+//            if (!keyOrder.equals(getKeyOrder())) {
+//
+//                // sort into the required order.
+//
+//                Arrays.sort(chunk, 0, chunk.length, keyOrder.getComparator());
+//
+//            }
+//
+//            return chunk;
+//
+//        }
         
         /**
          * The operation is not supported.

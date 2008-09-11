@@ -1002,6 +1002,24 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             log.info("Started server.");
 
         /*
+         * Name the thread for the class of server that it is running.
+         * 
+         * Note: This is generally the thread that ran main(). The thread does
+         * not really do any work - it just waits until the server is terminated
+         * and then returns to the caller where main() will exit.
+         */
+        try {
+
+            Thread.currentThread().setName(getClass().getName());
+            
+        } catch(SecurityException ex) {
+            
+            // ignore.
+            log.warn("Could not set thread name: " + ex);
+            
+        }
+        
+        /*
          * Note: I have found the Runtime shutdown hook to be much more robust
          * than attempting to install a signal handler.  It is installed by
          * the server constructor rather than here so that it will be used 

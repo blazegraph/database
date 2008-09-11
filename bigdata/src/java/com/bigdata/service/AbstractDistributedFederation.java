@@ -44,7 +44,9 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.striterator.IRemoteChunkedIterator;
 
 /**
  * This class encapsulates access to the services for a remote bigdata
@@ -496,9 +498,16 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
      * return a "thick" iterator that fully buffers the results. A "thick"
      * iterator is generally better if the results would fit within a single
      * "chunk" since you avoid additional RMI calls.
+     * <p>
+     * Note: The elements visited by the source iterator are an array type. Each
+     * visited element corresponds to a single chunk of elements of the
+     * component type of the array.
      * 
      * @param itr
      *            The source iterator.
+     * @param keyOrder
+     *            The natural order in which the elements will be visited iff
+     *            known and otherwise <code>null</code>.
      * 
      * @return Either a thick iterator (when the results would fit within a
      *         single chunk) or an {@link IRemoteChunkedIterator} (when multiple
@@ -507,6 +516,8 @@ abstract public class AbstractDistributedFederation extends AbstractFederation {
      * @throws IllegalArgumentException
      *             if the iterator is <code>null</code>.
      */
-    public abstract Object getProxy(IChunkedOrderedIterator itr);
+    public abstract Object getProxy(
+            IAsynchronousIterator<? extends Object[]> itr,
+            IKeyOrder<? extends Object> keyOrder);
 
 }

@@ -63,17 +63,17 @@ public interface IBuffer<E> {
      */
     public void add(E e);
 
-    /**
-     * Add a set of elements to the buffer. This operation is potentially more
-     * efficient than invoking {@link #add(Object)} for each element in turn.
-     * 
-     * @param n
-     *            The #of elements in the set.
-     * 
-     * @param a
-     *            The set of elements.
-     */
-    public void add(int n, E[] a);
+//    /**
+//     * Add a set of elements to the buffer. This operation is potentially more
+//     * efficient than invoking {@link #add(Object)} for each element in turn.
+//     * 
+//     * @param n
+//     *            The #of elements in the set.
+//     * 
+//     * @param a
+//     *            The set of elements.
+//     */
+//    public void add(int n, E[] a);
     
     /**
      * Flush the buffer and return the #of elements written on the backing

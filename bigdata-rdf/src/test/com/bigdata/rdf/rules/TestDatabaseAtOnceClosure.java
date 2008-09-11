@@ -556,6 +556,11 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 final long mutationCount = joinNexusFactory.newInstance(
                         store.getIndexManager()).runMutation(program);
 
+                /*
+                 * FIXME This assertion is failing. The problem is how the
+                 * mutation count is being reported the closure of the rule. The
+                 * compute closure is correct.
+                 */
                 assertEquals("mutationCount", 3, mutationCount);
 
                 assertEquals("statementCount", 6, store.getStatementCount());
