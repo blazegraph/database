@@ -29,8 +29,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Level;
@@ -135,10 +133,12 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
 
         /*
          * Create a buffer for chunks of resolved BigdataStatements.
+         * 
+         * FIXME Configuration for [chunkOfChunksCapacity] but also test with
+         * a SynchronousQueue.
          */
-        buffer = new BlockingBuffer<BigdataStatement[]>(
-                100,//capacity vs queue,
-                null/* keyOrder */, null/* filter */);
+        final int chunkOfChunksCapacity = 100;
+        buffer = new BlockingBuffer<BigdataStatement[]>(chunkOfChunksCapacity);
 
         /*
          * Create and run a task which reads ISPO chunks from the source
@@ -219,6 +219,8 @@ public class BigdataStatementIteratorImpl implements BigdataStatementIterator {
             } finally {
 
                 src.close();
+                
+                buffer.close();
 
             }
 

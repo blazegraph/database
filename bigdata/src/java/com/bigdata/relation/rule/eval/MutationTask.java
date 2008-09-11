@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.FlushBufferTask;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -69,6 +70,18 @@ public class MutationTask extends AbstractStepTask {
 
     /**
      * Run the task.
+     * <p>
+     * Note: We can create the individual tasks that we need to execute now that
+     * we are in the correct execution context.
+     * <P>
+     * Note: The mutation tasks write on {@link IBuffer}s and those buffers
+     * flush to indices in the {@link IMutableRelation}s. We have to defer the
+     * creation of those buffers until we are in the execution context and have
+     * access to the correct indices. In turn, this means that we can not create
+     * the tasks that we are going to execute until we have those buffers on
+     * hand. Hence everything gets deferred until we are in the correct
+     * execution context and have the actual {@link IIndexManager} with which
+     * the tasks will execute.
      */
     public RuleStats call() throws Exception {
         
@@ -80,20 +93,6 @@ public class MutationTask extends AbstractStepTask {
         final IJoinNexus joinNexus = joinNexusFactory.newInstance(indexManager);
 
         /*
-         * Create the individual tasks that we need to execute now that we are
-         * in the correct execution context.
-         * 
-         * Note: The mutation tasks write on buffers and those buffers flush to
-         * indices in the mutable relations. We have to defer the creation of
-         * those buffers until we are in the execution context and have access
-         * to the correct indices. In turn, this means that we can not create
-         * the tasks that we are going to execute until we have those buffers on
-         * hand. Hence everything gets deferred until we are in the correct
-         * execution context and have the actual IIndexManager with which the
-         * tasks will execute.
-         */
-
-        /*
          * Note: This assumes that we are using the same write timestamp for
          * each relation....  True for now, but consider if two transactions
          * were being written on in conjunction.
@@ -103,7 +102,7 @@ public class MutationTask extends AbstractStepTask {
 
         assert !relations.isEmpty();
 
-        final Map<String, IBuffer<ISolution>> buffers = getMutationBuffers(
+        final Map<String, IBuffer<ISolution[]>> buffers = getMutationBuffers(
                 joinNexus, relations);
 
         assert !buffers.isEmpty();
@@ -124,36 +123,69 @@ public class MutationTask extends AbstractStepTask {
 
             totals = runParallel(joinNexus, step, tasks);
 
-            flushBuffers(joinNexus, totals, buffers);
-
+            /*
+             * Note: buffers MUST be flushed!!!
+             */
+            flushBuffers(joinNexus, buffers);
+            
         } else {
 
-            // Note: flushes buffer after each step.
+            /*
+             * Note: flushes buffer after each step.
+             * 
+             * Note: strictly speaking, a parallel program where
+             * [forceSerialExecution] is specified does not need to flush the
+             * buffer after each step since parallel programs do not have
+             * sequential dependencies between the rules in the rule set.
+             * 
+             * @todo not flushing the buffer when [forceSerialExecution] is
+             * specified _AND_ the program is parallel would improve
+             * performance. Since this is relatively common when computing
+             * closure it makes sense to implement this tweak.
+             * 
+             * @todo replace [forceSerialExecution] with [maxRuleParallelism] or
+             * add the latter and give the former the semantics of a debug
+             * switch?
+             */
             totals = runSequential(joinNexus, step, tasks);
 
         }
 
-        if (log.isDebugEnabled())
-            log.debug("done: program=" + step.getName());
+        /*
+         * Note: This gets the mutationCount onto [totals]. If a given buffer is
+         * empty (either because nothing was written onto it or because it was
+         * already flushed above) then this will have very little overhead
+         * beyond getting the current mutationCount back from flush(). You
+         * SHOULD NOT rely on this to flush the buffers since it does not
+         * parallelize that operation and flushing large buffers can be a high
+         * latency operation!
+         */
 
+        getMutationCountFromBuffers(totals, buffers);
+
+        if(INFO) {
+            
+            log.info(totals);
+            
+        }
+        
         return totals;
         
     }
 
     /**
-     * Flush the buffer(s).
+     * Flush the buffer(s) and aggregate the mutation count from each buffer.
+     * This is the actual mutation count for the step(s) executed by the
+     * {@link MutationTask} (no double-counting).
      * 
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    protected void flushBuffers(IJoinNexus joinNexus, RuleStats totals,
-            Map<String, IBuffer<ISolution>> buffers)
+    protected void flushBuffers(IJoinNexus joinNexus, 
+            Map<String, IBuffer<ISolution[]>> buffers)
             throws InterruptedException, ExecutionException {
 
         if (joinNexus == null)
-            throw new IllegalArgumentException();
-        
-        if (totals == null)
             throw new IllegalArgumentException();
         
         if (buffers == null)
@@ -163,7 +195,7 @@ public class MutationTask extends AbstractStepTask {
 
         if (n == 0) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("No buffers.");
 
             return;
@@ -176,14 +208,12 @@ public class MutationTask extends AbstractStepTask {
              * One buffer, so flush it in this thread.
              */
             
-            final IBuffer<ISolution> buffer = buffers.values().iterator().next();
+            final IBuffer<ISolution[]> buffer = buffers.values().iterator().next();
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Flushing one buffer: size="+buffer.size());
 
-            final long mutationCount = buffer.flush();
-
-            totals.mutationCount.addAndGet(mutationCount);
+            buffer.flush();
 
         } else {
 
@@ -193,29 +223,33 @@ public class MutationTask extends AbstractStepTask {
              * them in parallel.
              */
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Flushing " + n +" buffers.");
 
             final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>( n );
             
-            final Iterator<IBuffer<ISolution>> itr = buffers.values().iterator();
+            final Iterator<IBuffer<ISolution[]>> itr = buffers.values().iterator();
             
             while(itr.hasNext()) {
                 
-                final IBuffer<ISolution> buffer = itr.next();
+                final IBuffer<ISolution[]> buffer = itr.next();
                 
                 tasks.add(new FlushBufferTask(buffer));
                 
             }
-            
-            final List<Future<Long>> futures = indexManager.getExecutorService().invokeAll(tasks);
-            
-            for( Future<Long> f : futures ) {
+
+            final List<Future<Long>> futures = indexManager
+                    .getExecutorService().invokeAll(tasks);
+
+            for (Future<Long> f : futures) {
+
+                // verify task executed Ok.
+                f.get();
                 
-                final long mutationCount = f.get(); 
-                
-                totals.mutationCount.addAndGet(mutationCount);
-                
+//                mutationCount += f.get();
+
+                // totals.mutationCount.addAndGet(mutationCount);
+
             }
             
         }
@@ -223,11 +257,60 @@ public class MutationTask extends AbstractStepTask {
         // make the write sets visible.
         joinNexus.makeWriteSetsVisible();
         
-        if(log.isInfoEnabled()) {
-            
-            log.info(totals);
+    }
+    
+    /**
+     * This just reads off and aggregates the mutationCount from each buffer as
+     * reported by {@link IBuffer#flush()}. This is the actual mutation count
+     * for the step(s) executed by the {@link MutationTask} (no
+     * double-counting).
+     * <p>
+     * Note: The buffers SHOULD already have been flushed as this does NOT
+     * parallelise the writes on the {@link IMutableRelation}s. See
+     * {@link #flushBuffers(IJoinNexus, RuleStats, Map)}, which does
+     * parallelize those writes.
+     * 
+     * @return The mutation count, which was also set as a side-effect on
+     *         <i>totals</i>.
+     */
+    protected long getMutationCountFromBuffers(RuleStats totals,
+            Map<String, IBuffer<ISolution[]>> buffers) {
+        
+        if (totals == null)
+            throw new IllegalArgumentException();
+        
+        if (buffers == null)
+            throw new IllegalArgumentException();
+
+        /*
+         * Aggregate the mutationCount from each buffer.
+         */
+
+        long mutationCount = 0L;
+
+        final Iterator<IBuffer<ISolution[]>> itr = buffers.values().iterator();
+
+        while (itr.hasNext()) {
+
+            final IBuffer<ISolution[]> buffer = itr.next();
+
+            mutationCount += buffer.flush();
             
         }
+
+        /*
+         * Atomic set of the total mutation count for all buffers on which the
+         * set of step(s) were writing.
+         */
+
+        if (!totals.mutationCount.compareAndSet(0L, mutationCount)) {
+
+            throw new AssertionError("Already set: mutationCount="
+                    + mutationCount+", task="+this);
+            
+        }
+
+        return mutationCount;
         
     }
     
@@ -239,9 +322,9 @@ public class MutationTask extends AbstractStepTask {
      * @return
      */
     protected List<Callable<RuleStats>> newMutationTasks(IStep step,
-            IJoinNexus joinNexus, Map<String, IBuffer<ISolution>> buffers) {
+            IJoinNexus joinNexus, Map<String, IBuffer<ISolution[]>> buffers) {
 
-        if (log.isDebugEnabled())
+        if (DEBUG)
             log.debug("program=" + step.getName());
 
         final List<Callable<RuleStats>> tasks;
@@ -258,16 +341,10 @@ public class MutationTask extends AbstractStepTask {
 
             final IRule rule = (IRule) step;
 
-            final IBuffer<ISolution> sharedBuffer = buffers.get(rule.getHead().getOnlyRelationName());
+            final IBuffer<ISolution[]> buffer = buffers.get(rule.getHead().getOnlyRelationName());
             
-//            final IBuffer<ISolution> localBuffer = new UnsynchronizedArrayBuffer<ISolution>(
-//                    1000, sharedBuffer);
-            
-            final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(false/*parallel*/,
-                    rule).newTask(rule, joinNexus, 
-//                            localBuffer
-                            sharedBuffer
-                            );
+            final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(
+                    false/* parallel */, rule).newTask(rule, joinNexus, buffer);
    
             tasks.add(task);
 
@@ -292,18 +369,40 @@ public class MutationTask extends AbstractStepTask {
 
                 }
 
-                final IBuffer<ISolution> buffer = buffers.get(rule.getHead().getOnlyRelationName());
+                final IBuffer<ISolution[]> buffer = buffers.get(rule.getHead()
+                        .getOnlyRelationName());
+
+                final IStepTask task = joinNexus.getRuleTaskFactory(parallel,
+                        rule).newTask(rule, joinNexus, buffer);
+
+                if (!parallel || joinNexus.forceSerialExecution()) {
+
+                    /*
+                     * Tasks for sequential mutation steps are always wrapped to
+                     * ensure that the thread-safe buffer is flushed onto the
+                     * mutable relation after each rule executes. This is
+                     * necessary in order for the results of one rule in a
+                     * sequential program to be visible to the next rule in that
+                     * sequential program.
+                     */
+
+                    tasks.add(new RunRuleAndFlushBufferTask(task, buffer));
+
+                } else {
+
+                    /*
+                     * Add the task.
+                     */
+
+                    tasks.add(task);
+
+                }
                 
-                final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(parallel, rule)
-                        .newTask(rule, joinNexus, buffer);
-
-                tasks.add(task);
-
             }
 
         }
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("Created " + tasks.size() + " mutation tasks: action="
                     + action);

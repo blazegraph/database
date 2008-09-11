@@ -60,6 +60,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
@@ -76,6 +77,7 @@ import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultRangeCountFactory;
+import com.bigdata.relation.rule.eval.DefaultRuleTaskFactory;
 import com.bigdata.relation.rule.eval.EmptyProgramTask;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
@@ -85,12 +87,11 @@ import com.bigdata.relation.rule.eval.IProgramTask;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.IStepTask;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTaskFactory;
 import com.bigdata.relation.rule.eval.Solution;
+import com.bigdata.relation.rule.eval.SolutionFilter;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
@@ -139,17 +140,41 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     private final boolean backchain;
 
-    private final int mutationBufferCapacity;
+    private final int chunkOfChunksCapacity;
 
-    private final int queryBufferCapacity;
+    public int getChunkOfChunksCapacity() {
+
+        return chunkOfChunksCapacity;
+        
+    }
+    
+    private final int chunkCapacity;
+
+    public int getChunkCapacity() {
+
+        return chunkCapacity;
+        
+    }
     
     private final int fullyBufferedReadThreshold;
+
+    public int getFullyBufferedReadThreshold() {
+        
+        return fullyBufferedReadThreshold;
+        
+    }
     
     private final int solutionFlags;
     
     @SuppressWarnings("unchecked")
 	private final IElementFilter filter;
 
+    public IElementFilter<ISolution> getSolutionFilter() {
+        
+        return filter == null ? null : new SolutionFilter(filter);
+        
+    }
+    
     /**
      * The default factory for rule evaluation.
      */
@@ -352,9 +377,9 @@ public class RDFJoinNexus implements IJoinNexus {
  
         this.backchain = joinNexusFactory.backchain;
         
-        this.mutationBufferCapacity = joinNexusFactory.mutationBufferCapacity;
+        this.chunkOfChunksCapacity = joinNexusFactory.chunkOfChunksCapacity;
         
-        this.queryBufferCapacity = joinNexusFactory.queryBufferCapacity;
+        this.chunkCapacity = joinNexusFactory.chunkCapacity;
 
         this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
         
@@ -368,35 +393,6 @@ public class RDFJoinNexus implements IJoinNexus {
    
     }
 
-    /**
-     * Default factory for tasks to execute {@link IRule}s.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class DefaultRuleTaskFactory implements IRuleTaskFactory {
-        
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -6751546625682021618L;
-
-        public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-                IBuffer<ISolution> buffer) {
-
-//            return new NestedSubqueryTask(rule, joinNexus, buffer);
-            return new NestedSubqueryWithJoinThreadsTask(rule, joinNexus, buffer);
-
-        }
-
-    }
-    
-//    protected void finalize() throws Throwable {
-//       
-//        super.finalize();
-//        
-//    }
-    
     public IJoinNexusFactory getJoinNexusFactory() {
         
         return joinNexusFactory;
@@ -888,16 +884,19 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
-        if (!parallel || forceSerialExecution()) {
-
-            /*
-             * Tasks for sequential steps are always wrapped to ensure that the
-             * buffer is flushed when the task completes.
-             */
-            
-            taskFactory = new RunRuleAndFlushBufferTaskFactory(taskFactory);
-
-        }
+//        if (getAction().isMutation() && (!parallel || forceSerialExecution())) {
+//
+//            /*
+//             * Tasks for sequential mutation steps are always wrapped to ensure
+//             * that the thread-safe buffer is flushed onto the mutable relation
+//             * after each rule executes. This is necessary in order for the
+//             * results of one rule in a sequential program to be visible to the
+//             * next rule in that sequential program.
+//             */
+//            
+//            taskFactory = new RunRuleAndFlushBufferTaskFactory(taskFactory);
+//
+//        }
 
         return taskFactory;
 
@@ -914,24 +913,36 @@ public class RDFJoinNexus implements IJoinNexus {
         return indexManager.getResourceLocator();
         
     }
+
+    public IBuffer<ISolution> newUnsynchronizedBuffer(
+            IBuffer<ISolution[]> targetBuffer, int chunkCapacity) {
+
+        // MAY be null.
+        final IElementFilter<ISolution> filter = getSolutionFilter();
+        
+        return new UnsynchronizedArrayBuffer<ISolution>(targetBuffer,
+                chunkCapacity, filter);
+        
+    }
     
     /**
-     * Note: {@link ISolution} elements (not {@link SPO}s) will be written on
-     * the buffer concurrently by different rules so there is no natural order
-     * for the elements in the buffer.
+     * Note: {@link ISolution} (not relation elements) will be written on the
+     * buffer concurrently by different rules so there is no natural order for
+     * the elements in the buffer.
      * <p>
      * Note: the {@link BlockingBuffer} can not deliver a chunk larger than its
      * internal queue capacity.
      */
-    @SuppressWarnings("unchecked")
-    public IBlockingBuffer<ISolution> newQueryBuffer() {
+    public IBlockingBuffer<ISolution[]> newQueryBuffer() {
 
         if (getAction().isMutation())
             throw new IllegalStateException();
         
-        return new BlockingBuffer<ISolution>(queryBufferCapacity,
-                null/* keyOrder */, filter == null ? null
-                        : new SolutionFilter(filter));
+        return new BlockingBuffer<ISolution[]>(chunkOfChunksCapacity);
+        
+//        return new BlockingBuffer<ISolution>(queryBufferCapacity,
+//                null/* keyOrder */, filter == null ? null
+//                        : new SolutionFilter(filter));
         
     }
     
@@ -949,10 +960,9 @@ public class RDFJoinNexus implements IJoinNexus {
          * @param capacity
          * @param relation
          */
-        public InsertSPOAndJustificationBuffer(int capacity, IMutableRelation<E> relation,
-                IElementFilter<ISolution<E>> filter) {
+        public InsertSPOAndJustificationBuffer(int capacity, IMutableRelation<E> relation) {
 
-            super(capacity, relation, filter);
+            super(capacity, relation);
             
         }
 
@@ -1089,8 +1099,13 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
     
+    /**
+     * Note: {@link #getSolutionFilter()} is applied by
+     * {@link #newUnsynchronizedBuffer(IBuffer, int)} and NOT by the buffer
+     * returned by this method.
+     */
     @SuppressWarnings("unchecked")
-    public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
+    public IBuffer<ISolution[]> newInsertBuffer(IMutableRelation relation) {
 
         if (getAction() != ActionEnum.Insert)
             throw new IllegalStateException();
@@ -1109,39 +1124,40 @@ public class RDFJoinNexus implements IJoinNexus {
              * indices.
              */
             
-            return new InsertSPOAndJustificationBuffer(
-                    mutationBufferCapacity, relation, filter == null ? null
-                            : new SolutionFilter(filter));
-            
+            return new InsertSPOAndJustificationBuffer(chunkOfChunksCapacity,
+                    relation);
+
         }
-        
+
         /*
          * Buffer resolves the computed elements and writes them on the
          * statement indices.
          */
-        
+
         return new AbstractSolutionBuffer.InsertSolutionBuffer(
-                mutationBufferCapacity, relation, filter == null ? null
-                        : new SolutionFilter(filter));
+                chunkOfChunksCapacity, relation);
 
     }
-    
+
+    /**
+     * Note: {@link #getSolutionFilter()} is applied by
+     * {@link #newUnsynchronizedBuffer(IBuffer, int)} and NOT by the buffer
+     * returned by this method.
+     */
     @SuppressWarnings("unchecked")
-    public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
+    public IBuffer<ISolution[]> newDeleteBuffer(IMutableRelation relation) {
 
         if (getAction() != ActionEnum.Delete)
             throw new IllegalStateException();
 
+        if (log.isDebugEnabled()) {
 
-        if(log.isDebugEnabled()) {
-            
-            log.debug("relation="+relation);
-            
+            log.debug("relation=" + relation);
+
         }
 
         return new AbstractSolutionBuffer.DeleteSolutionBuffer(
-                mutationBufferCapacity, relation, filter == null ? null
-                        : new SolutionFilter(filter));
+                chunkOfChunksCapacity, relation);
 
     }
 

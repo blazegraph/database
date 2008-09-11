@@ -1,17 +1,14 @@
 package com.bigdata.relation.rule.eval;
 
-import java.util.Iterator;
-
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractArrayBuffer;
+import com.bigdata.relation.accesspath.ChunkConsumerIterator;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.ChunkedOrderedStriterator;
 import com.bigdata.striterator.ChunkedResolvingIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 
 /**
@@ -29,7 +26,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @see IMutableRelation
  */
 abstract public class AbstractSolutionBuffer<R> extends
-        AbstractArrayBuffer<ISolution<R>> {
+        AbstractArrayBuffer<ISolution<R>[]> {
 
     private final IMutableRelation<R> relation;
     
@@ -42,10 +39,9 @@ abstract public class AbstractSolutionBuffer<R> extends
     /**
      * @param capacity
      */
-    protected AbstractSolutionBuffer(int capacity,
-            IMutableRelation<R> relation, IElementFilter<ISolution<R>> filter) {
+    protected AbstractSolutionBuffer(int capacity, IMutableRelation<R> relation) {
 
-        super(capacity, filter);
+        super(capacity, null/*filter*/);
 
         if (relation == null)
             throw new IllegalArgumentException();
@@ -58,12 +54,51 @@ abstract public class AbstractSolutionBuffer<R> extends
      * Delegates to {@link #flush(IChunkedOrderedIterator)}.
      */
     @Override
-    final protected long flush(int n, ISolution<R>[] a) {
+    final protected long flush(int n, ISolution<R>[][] a) {
 
-        final IChunkedOrderedIterator<ISolution<R>> itr = new ChunkedArrayIterator<ISolution<R>>(
-                n, a, null/* keyOrder(unknown) */);
+        final IChunkedOrderedIterator<ISolution<R>> itr = new ChunkConsumerIterator<ISolution<R>>(
+                new ArrayIterator<ISolution<R>[]>(n, a), null/* keyOrder(unknown) */);
 
         return flush(itr);
+        
+    }
+    
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    private static class ArrayIterator<E> implements ICloseableIterator<E> {
+
+        private final int n;
+        private final E[] a;
+        
+        private int i = 0;
+        
+        public ArrayIterator(int n, E[] a) {
+            
+            this.n = n;
+            
+            this.a = a;
+            
+        }
+        
+        public void close() {
+            // NOP.
+        }
+
+        public boolean hasNext() {
+            return i < n;
+        }
+
+        public E next() {
+            return a[i++];
+        }
+
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
         
     }
 
@@ -97,10 +132,9 @@ abstract public class AbstractSolutionBuffer<R> extends
          * @param capacity
          * @param relation
          */
-        public InsertSolutionBuffer(int capacity, IMutableRelation<E> relation,
-                IElementFilter<ISolution<E>> filter) {
+        public InsertSolutionBuffer(int capacity, IMutableRelation<E> relation) {
 
-            super(capacity, relation, filter);
+            super(capacity, relation);
 
         }
 
@@ -139,10 +173,9 @@ abstract public class AbstractSolutionBuffer<R> extends
          * @param capacity
          * @param relation
          */
-        public DeleteSolutionBuffer(int capacity, IMutableRelation<E> relation,
-                IElementFilter<ISolution<E>> filter) {
+        public DeleteSolutionBuffer(int capacity, IMutableRelation<E> relation) {
 
-            super(capacity,relation, filter);
+            super(capacity,relation);
 
         }
 

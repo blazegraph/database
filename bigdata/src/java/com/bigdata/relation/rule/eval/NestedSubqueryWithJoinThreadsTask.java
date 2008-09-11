@@ -87,7 +87,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      */
     protected final IRule rule;
     protected final IJoinNexus joinNexus;
-    protected final IBuffer<ISolution> buffer;
+    protected final IBuffer<ISolution[]> buffer;
     protected final RuleState ruleState;
     protected final RuleStats ruleStats;
     protected final int tailCount;
@@ -105,8 +105,18 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      */
     protected final ThreadPoolExecutor joinService;
     
+    /**
+     * 
+     * @param rule
+     *            The rule to be executed.
+     * @param joinNexus
+     *            The {@link IJoinNexus}.
+     * @param buffer
+     *            A thread-safe buffer onto which chunks of {@link ISolution}
+     *            will be flushed during rule execution.
+     */
     public NestedSubqueryWithJoinThreadsTask(final IRule rule,
-            final IJoinNexus joinNexus, final IBuffer<ISolution> buffer) {
+            final IJoinNexus joinNexus, final IBuffer<ISolution[]> buffer) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -143,9 +153,9 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      */
     final public RuleStats call() {
 
-        if(INFO) {
+        if(DEBUG) {
             
-            log.info("begin:\nruleState=" + ruleState + "\nplan="
+            log.debug("begin:\nruleState=" + ruleState + "\nplan="
                     + ruleState.plan);
             
         }
@@ -163,14 +173,18 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
-        apply( 0, bindingSet );
-        
+        apply(0/* orderIndex */, bindingSet);
+
         ruleStats.elapsed += System.currentTimeMillis() - begin;
-        
-        if(DEBUG) {
+
+        if(INFO) {
             
-            log.debug("done: ruleState=" + ruleState + ", ruleStats="
-                    + ruleStats);
+            log.info("done:"
+                    + "\nmaxParallelSubqueries="+maxParallelSubqueries
+                    + "\nruleState=" + ruleState 
+                    + ruleStats
+//                    +"\nbufferClass="+buffer.getClass().getName()
+                    );
             
         }
         
@@ -199,7 +213,11 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     }
     
     /**
-     * Evaluate a join dimension.
+     * Evaluate a join dimension. A private <em>non-thread-safe</em>
+     * {@link IBuffer} will allocated and used to buffer a chunk of results. The
+     * buffer will be flushed when it overflows and regardless when
+     * {@link #apply(int, IBindingSet)} is done. When flushed, it will emit a
+     * single chunk onto the thread-safe {@link #buffer}.
      * 
      * @param orderIndex
      *            The current index in the evaluation order[] that is being
@@ -207,7 +225,43 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      * @param bindingSet
      *            The bindings from the prior join(s) (if any).
      */
-    final protected void apply(final int orderIndex, final IBindingSet bindingSet) {
+    protected void apply(final int orderIndex, IBindingSet bindingSet) {
+        
+        /*
+         * Per-subquery buffer : NOT thread-safe (for better performance).
+         * 
+         * Note: parallel subquery MUST use distinct buffer instances for each
+         * task executing in parallel.
+         */
+        final IBuffer<ISolution> tmp = joinNexus.newUnsynchronizedBuffer(
+                buffer, joinNexus.getChunkCapacity());
+
+        // run the (sub-)query.
+        apply(orderIndex, bindingSet, tmp);
+
+        // flush buffer onto the chunked buffer.
+        tmp.flush();
+
+    }
+    
+    /**
+     * Evaluate a join dimension.
+     * 
+     * @param orderIndex
+     *            The current index in the evaluation order[] that is being
+     *            scanned.
+     * @param bindingSet
+     *            The bindings from the prior join(s) (if any).
+     * @param buffer
+     *            The buffer onto which {@link ISolution}s will be written.
+     *            <p>
+     *            Note: For performance reasons, this buffer is NOT thread-safe.
+     *            Therefore parallel subquery MUST use distinct buffer instances
+     *            each of which flushes a chunk at a time onto the thread-safe
+     *            buffer specified to the ctor.
+     */
+    final protected void apply(final int orderIndex,
+            final IBindingSet bindingSet, final IBuffer<ISolution> buffer) {
 
         // Obtain the iterator for the current join dimension.
         final IChunkedOrderedIterator itr = getAccessPath(orderIndex,
@@ -260,7 +314,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                     ruleStats.chunkCount[tailIndex]++;
 
                     // Issue the nested subquery.
-                    runSubQueries(orderIndex, chunk, bindingSet);
+                    runSubQueries(orderIndex, chunk, bindingSet, buffer);
 
                 } else {
 
@@ -276,7 +330,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                     ruleStats.chunkCount[tailIndex]++;
 
                     // evaluate the chunk and emit any solutions.
-                    emitSolutions(orderIndex, chunk, bindingSet);
+                    emitSolutions(orderIndex, chunk, bindingSet, buffer);
                     
                 }
 
@@ -286,7 +340,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
             if (nsolutions == 0L) {
                 
-                applyOptional(orderIndex, bindingSet);
+                applyOptional(orderIndex, bindingSet, buffer);
                 
             }
             
@@ -310,9 +364,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            The index into the evaluation order.
      * @param bindingSet
      *            The bindings from the prior join(s) (if any).
+     * @param buffer
+     *            A buffer onto which {@link ISolution}s will be written - this
+     *            object is NOT thread-safe.
      */
     protected void applyOptional(final int orderIndex,
-            final IBindingSet bindingSet) {
+            final IBindingSet bindingSet, IBuffer<ISolution> buffer) {
 
         final int tailIndex = getTailIndex(orderIndex);
         
@@ -321,7 +378,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             if (orderIndex + 1 < tailCount) {
 
                 // ignore optional with no solutions in the data.
-                apply(orderIndex + 1, bindingSet);
+                apply(orderIndex + 1, bindingSet, buffer);
 
             } else {
 
@@ -384,9 +441,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            A chunk of elements from the left-hand side of the join.
      * @param bindingSet
      *            The bindings from the prior joins (if any).
+     * @param buffer
+     *            A buffer onto which {@link ISolution}s will be written - this
+     *            object is NOT thread-safe.
      */
     protected void runSubQueries(final int orderIndex, final Object[] chunk,
-            final IBindingSet bindingSet) {
+            final IBindingSet bindingSet, IBuffer<ISolution> buffer) {
         
         /*
          * Note: At this stage all we want to do is build the subquery tasks.
@@ -439,7 +499,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
              * allocate a task, just runs the subqueries directly).
              */
             
-            runSubQueriesInCallersThread(orderIndex, chunk, bindingSet);
+            runSubQueriesInCallersThread(orderIndex, chunk, bindingSet, buffer);
             
         } else {
 
@@ -472,9 +532,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            A chunk of elements from the left-hand side of the join.
      * @param bindingSet
      *            The bindings from the prior joins (if any).
+     * @param buffer
+     *            A buffer onto which {@link ISolution}s will be written - this
+     *            object is NOT thread-safe.
      */
     protected void runSubQueriesInCallersThread(final int orderIndex,
-            final Object[] chunk, final IBindingSet bindingSet) {
+            final Object[] chunk, final IBindingSet bindingSet,
+            final IBuffer<ISolution> buffer) {
 
         final int tailIndex = getTailIndex(orderIndex);
         
@@ -501,7 +565,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
                 ruleStats.subqueryCount[tailIndex]++;
 
-                apply(orderIndex + 1, bindingSet);
+                apply(orderIndex + 1, bindingSet, buffer);
 
             }
 
@@ -547,9 +611,15 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         /*
          * At most one task per element in this chunk, but never more than
          * [maxParallelSubqueries] tasks at once.
+         * 
+         * Note: We are not allowed to modify this while the tasks are being
+         * executed so we create a new instance of the array each time we submit
+         * some tasks for execution!
          */
-        final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(Math
-                .min(maxParallelSubqueries, chunk.length));
+        List<Callable<Void>> tasks = null;
+        
+        // #of elements remaining in the chunk.
+        int nremaining = chunk.length;
         
         // for each element in the chunk.
         for (Object e : chunk) {
@@ -578,23 +648,46 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 // we will run this subquery.
                 ruleStats.subqueryCount[tailIndex]++;
 
+                if (tasks == null) {
+
+                    // maximum #of subqueries to issue.
+                    final int capacity = Math.min(maxParallelSubqueries,
+                            nremaining);
+
+                    // allocate for the new task(s).
+                    tasks = new ArrayList<Callable<Void>>(capacity);
+                    
+                }
+                
                 // create a task for the subquery.
                 tasks.add(new SubqueryTask<Void>(orderIndex + 1, bset));
 
+                if (tasks.size() == maxParallelSubqueries) {
+
+                    submitTasks(tasks);
+
+                    tasks = null;
+                    
+                }
+
             }
 
-            if (tasks.size() >= maxParallelSubqueries) {
-
-                submitTasks(tasks);
-
-                tasks.clear();
-                
-            }
+            /*
+             * Note: one more element from the chunk has been consumed. This is
+             * true regardless of whether the binding was allowed and a subquery
+             * resulted.
+             */
+            nremaining--;
             
         }
 
-        // submit any remaining tasks.
-        submitTasks( tasks);
+        if (tasks != null) {
+
+            // submit any remaining tasks.
+
+            submitTasks(tasks);
+            
+        }
 
     }
     
@@ -637,10 +730,10 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     }
     
     /**
-     * Inner task uses
-     * {@link NestedSubqueryWithJoinThreadsTask#apply(int, IBindingSet)} to
-     * evaluate a subquery. This class is used when we want to evaluate the
-     * subqueries in parallel.
+     * This class is used when we want to evaluate the subqueries in parallel.
+     * The inner task uses
+     * {@link NestedSubqueryWithJoinThreadsTask#apply(int, IBindingSet, IBuffer)}
+     * to evaluate a subquery.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -650,7 +743,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         protected final int orderIndex;
         protected final IBindingSet bindingSet;
         
-        public SubqueryTask(int orderIndex, IBindingSet bindingSet) {
+        public SubqueryTask(final int orderIndex, final IBindingSet bindingSet) {
             
             this.orderIndex = orderIndex;
             
@@ -658,8 +751,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             
         }
         
+        /**
+         * Run the subquery - it will use a private {@link IBuffer} for better
+         * throughput and thread safety.
+         */
         public E call() throws Exception {
-            
+
             apply(orderIndex, bindingSet);
 
             return null;
@@ -678,9 +775,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      *            A chunk of elements from the right-most join dimension.
      * @param bindingSet
      *            The bindings from the prior joins.
+     * @param buffer
+     *            A buffer onto which the solutions will be written - this
+     *            object is NOT thread-safe.
      */
     protected void emitSolutions(final int orderIndex, final Object[] chunk,
-            final IBindingSet bindingSet) {
+            final IBindingSet bindingSet, final IBuffer<ISolution> buffer) {
 
         final int tailIndex = getTailIndex(orderIndex);
 

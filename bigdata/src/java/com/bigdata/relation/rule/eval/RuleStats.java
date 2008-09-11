@@ -219,10 +219,19 @@ public class RuleStats {
      * critical to the correct termination of the fix point of some rule set.
      * <p>
      * Note: This value is ONLY incremented when the {@link IBuffer} is flushed.
-     * Since evaluation can multiple the rules writing on a buffer and since
-     * more than one rule may be run (in parallel or in sequence) before the
-     * {@link IBuffer} is flushed, the mutation count will often be non-zero
-     * except for the top-level {@link IProgram} that is being executed.
+     * <p>
+     * Note: Each {@link IRule} will have its own {@link RuleStats} on which it
+     * reports its mutation count. However, since evaluation of {@link IRule}s
+     * MAY proceed in parallel and since multiple {@link IRule}s can write on
+     * the same {@link IBuffer}, the mutation counts can not be credited
+     * unambiguously to any given rule when rules run in parallel.
+     * <p>
+     * Note: {@link IBuffer#flush()} maintains a running mutationCount.
+     * Therefore only the end state of that counter should be set on
+     * {@link #mutationCount}. Otherwise the reported {@link #mutationCount}
+     * may overreport the actual mutation count.
+     * 
+     * @see #add(RuleStats)
      */
     public AtomicLong mutationCount = new AtomicLong();
     
@@ -640,8 +649,20 @@ public class RuleStats {
     
     /**
      * Aggregates statistics.
+     * <p>
+     * Note: since the mutation count as reported by each buffer is cumulative
+     * we DO NOT aggregate the mutation counts from sub-steps as it would cause
+     * double-counting when steps are executed in parallel.
+     * <p>
+     * Instead, once the total program is finished, the total mutation count is
+     * computed as the value reported by {@link IBuffer#flush()} for each buffer
+     * on which the program writes.
      * 
-     * @param o Statistics for another rule.
+     * @param o
+     *            Statistics for another rule.
+     *            
+     * @see ProgramTask#executeMutation(IStep)
+     * @see MutationTask#flushBuffers(IJoinNexus, RuleStats, java.util.Map)
      */
     synchronized public void add(RuleStats o) {
     
@@ -669,8 +690,9 @@ public class RuleStats {
         }
         
         solutionCount.addAndGet( o.solutionCount.get() );
-        
-        mutationCount.addAndGet(o.mutationCount.get());
+
+        // See javadoc above.
+//        mutationCount.addAndGet(o.mutationCount.get());
     
         elapsed += o.elapsed;
     

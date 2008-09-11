@@ -39,8 +39,11 @@ import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
@@ -105,6 +108,35 @@ public interface IJoinNexus {
      * time to the {@link ExecutorService}.
      */
     int getMaxParallelSubqueries();
+    
+    /**
+     * The #of elements in a chunk for query or mutation. This is normally a
+     * relatively large value on the order of <code>10,000</code> or better.
+     */
+    int getChunkCapacity();
+    
+    /**
+     * The #of chunks that can be held by an {@link IBuffer} that is the target
+     * or one or more {@link UnsynchronizedArrayBuffer}s. This is generally a
+     * small value on the order of the #of parallel producers that might be
+     * writing on the {@link IBuffer} since the capacity of the
+     * {@link UnsynchronizedArrayBuffer}s is already quite large (10k or better
+     * elements, defining a single "chunk" from a single producer).
+     * 
+     * @see #getMaxParallelSubqueries()
+     * @see #getChunkCapacity()
+     */
+    int getChunkOfChunksCapacity();
+        
+    /**
+     * The #of elements that will be materialized in a fully buffered read by an
+     * {@link IAccessPath}. When this threshold is exceeded the
+     * {@link IAccessPath} will use an {@link IAsynchronousIterator} instead.
+     * This value should on the order of {@link #getChunkCapacity()}.
+     * 
+     * @see IAccessPath#iterator(int, int)
+     */
+    int getFullyBufferedReadThreshold();
     
     /**
      * Copy values the values from the visited element corresponding to the
@@ -219,8 +251,11 @@ public interface IJoinNexus {
    
     /**
      * Return the effective {@link IRuleTaskFactory} for the rule. When the rule
-     * is a step of a sequential program, then the returned {@link IStepTask}
-     * must automatically flush the buffer after the rule executes.
+     * is a step of a sequential program writing on one or more
+     * {@link IMutableRelation}s, then the returned {@link IStepTask} must
+     * automatically flush the buffer after the rule executes in order to ensure
+     * that the state of the {@link IMutableRelation}(s) are updated before the
+     * next {@link IRule} is executed.
      * 
      * @param parallel
      *            <code>true</code> unless the rule is a step is a sequential
@@ -359,36 +394,80 @@ public interface IJoinNexus {
     long runMutation(IStep step) throws Exception;
     
     /**
-     * Return a thread-safe buffer onto which the computed {@link ISolution}s
-     * will be written. The client will drain {@link ISolution}s from buffer
-     * using {@link IBlockingBuffer#iterator()}.
+     * Return a thread-safe buffer onto which chunks of computed
+     * {@link ISolution}s will be written. The client will drain
+     * {@link ISolution}s from buffer using {@link IBlockingBuffer#iterator()}.
      */
-    IBlockingBuffer<ISolution> newQueryBuffer();
+    IBlockingBuffer<ISolution[]> newQueryBuffer();
 
     /**
-     * Return a thread-safe buffer onto which the computed {@link ISolution}s
-     * will be written. When the buffer is {@link IBuffer#flush() flushed} the
-     * {@link ISolution}s will be inserted into the {@link IMutableRelation}.
+     * Return a thread-safe buffer onto which chunks of computed
+     * {@link ISolution}s will be written. When the buffer is
+     * {@link IBuffer#flush() flushed} the chunked {@link ISolution}s will be
+     * inserted into the {@link IMutableRelation}.
      * 
      * @param relation
      *            The relation.
      * 
      * @return The buffer.
      */
-    IBuffer<ISolution> newInsertBuffer(IMutableRelation relation);
+    IBuffer<ISolution[]> newInsertBuffer(IMutableRelation relation);
 
     /**
-     * Return a thread-safe buffer onto which the computed {@link ISolution}s
-     * will be written. When the buffer is {@link IBuffer#flush() flushed} the
-     * {@link ISolution}s will be deleted from the {@link IMutableRelation}.
+     * Return a thread-safe buffer onto which chunks of computed
+     * {@link ISolution}s will be written. When the buffer is
+     * {@link IBuffer#flush() flushed} the chunks of {@link ISolution}s will be
+     * deleted from the {@link IMutableRelation}.
      * 
      * @param relation
      *            The relation.
      * 
      * @return The buffer.
      */
-    IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation);
+    IBuffer<ISolution[]> newDeleteBuffer(IMutableRelation relation);
 
+    /**
+     * Return a buffer suitable for a single-threaded writer that flushes onto
+     * the specified <i>targetBuffer</i>.
+     * <p>
+     * The returned buffer MUST apply the optional filter value returned by
+     * {@link #getSolutionFilter()} in order to keep individual
+     * {@link ISolution}s out of the buffer. Filtering is done at this level
+     * since the <i>targetBuffer</i> contains chunks of solutions.
+     * 
+     * @param targetBuffer
+     *            A thread-safe buffer for chunks of {@link ISolution}s that
+     *            was allocated with {@link #newQueryBuffer()},
+     *            {@link #newInsertBuffer(IMutableRelation)}, or
+     *            {@link #newDeleteBuffer(IMutableRelation)}.
+     * @param chunkCapacity
+     *            The capacity of the new buffer. This should be maximum chunk
+     *            size that will be produced or {@link #getChunkCapacity()} if
+     *            you do not have better information.
+     * 
+     * @return A non-thread-safe buffer.
+     */
+    IBuffer<ISolution> newUnsynchronizedBuffer(
+            IBuffer<ISolution[]> targetBuffer, int chunkCapacity);
+    
+    /**
+     * Return the {@link IElementFilter} that will be used to reject solutions
+     * based on the bindings for the head of the rule -or- <code>null</code>
+     * if no filter will be imposed. This may be used for query or mutation.
+     * 
+     * @return The optional filter.
+     * 
+     * @todo Normally the {@link IElementFilter} is specified in terms of the
+     *       elements of some {@link IRelation} and then wrapped as a
+     *       {@link SolutionFilter}.
+     *       <p>
+     *       The return type here should be strongly typed. The generic argument
+     *       is not a sufficient guarentee and the compiler can be fooled by
+     *       passing an {@link IElementFilter} that is already defined in terms
+     *       of an {@link ISolution} rather than element of an {@link IRelation}.
+     */
+    IElementFilter<ISolution> getSolutionFilter();
+    
     /**
      * Make the write sets visible, eg, by committing the store(s) having
      * buffered write sets.

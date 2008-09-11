@@ -42,6 +42,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
@@ -68,7 +69,19 @@ import com.bigdata.service.DataService.IDataServiceAwareProcedure;
 abstract public class AbstractStepTask implements IStepTask, IDataServiceAwareProcedure, Cloneable {
 
     protected static final transient Logger log = Logger.getLogger(AbstractStepTask.class);
-    
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     protected final ActionEnum action;
     protected final IJoinNexusFactory joinNexusFactory;
     protected /*final*/ IIndexManager indexManager;
@@ -81,8 +94,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
         if (dataService == null)
             throw new IllegalArgumentException();
 
-        if (log.isInfoEnabled())
-            log.info("Running on data service: dataService="+dataService);
+        if (INFO)
+            log.info("Running on data service: dataService=" + dataService);
         
         this.dataService = dataService;
 
@@ -181,8 +194,9 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
     
-        if (log.isInfoEnabled())
-            log.info("program=" + program.getName()+", #tasks="+tasks.size());
+        if (INFO)
+            log.info("program=" + program.getName() + ", #tasks="
+                    + tasks.size());
         
         if (indexManager == null)
             throw new IllegalStateException();
@@ -203,8 +217,9 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     
         }
     
-        if (log.isInfoEnabled())
-            log.info("program=" + program.getName()+", #tasks="+tasks.size()+" - done");
+        if (INFO)
+            log.info("program=" + program.getName() + ", #tasks="
+                    + tasks.size() + " - done");
     
         return totals;
     
@@ -226,8 +241,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
     
         final int ntasks = tasks.size();
         
-        if (log.isInfoEnabled())
-            log.info("program=" + program.getName()+", #tasks="+ntasks);
+        if (INFO)
+            log.info("program=" + program.getName() + ", #tasks=" + ntasks);
     
         if (indexManager == null)
             throw new IllegalStateException();
@@ -251,8 +266,8 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
              * flush the buffer so that all solutions are available for the next
              * step of the program. This is critical for programs that have
              * dependencies between their steps.
-             * 
-             * Note: This is handled by the task factory.
+//             * 
+//             * Note: This is handled by the task factory.
              */
             final RuleStats tmp = service.submit(task).get();
     
@@ -260,7 +275,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
             n++;
 
-            if (log.isDebugEnabled()) {
+            if (DEBUG) {
 
                 log.debug("program=" + program.getName() + ", finished " + n
                         + " of " + ntasks + " seqential tasks.");
@@ -269,7 +284,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         }
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("program=" + program.getName() + ", #tasks=" + ntasks
                     + " - done");
     
@@ -298,7 +313,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             Callable<RuleStats> task) throws InterruptedException,
             ExecutionException {
     
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("program=" + program.getName());
     
         if (indexManager == null)
@@ -323,7 +338,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             throw new ExecutionException(ex);
         }
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("program=" + program.getName() + " - done");
     
         return stats;
@@ -355,7 +370,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         if (dataService == null) {
 
-            if(log.isInfoEnabled()) {
+            if(INFO) {
 
                 log.info("running w/o concurrency control: " + this);
                 
@@ -395,7 +410,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         }
         
-        if(log.isInfoEnabled()) {
+        if(INFO) {
 
             log.info("running w/ concurrency control: " + this);
             
@@ -518,7 +533,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
              // The set of indices that the task will declare.
             resource = indexNames.toArray(new String[] {});
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("resource=" + Arrays.toString(resource));
 
@@ -554,7 +569,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
                 
             }
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("timestamp=" + timestamp + ", task=" + this);
 
@@ -580,7 +595,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             @Override
             protected Object doTask() throws Exception {
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Executing inner task: " + this);
 
                 /*
@@ -597,7 +612,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         };
 
-        if(log.isInfoEnabled()) {
+        if(INFO) {
 
             log.info("running on concurrencyManager: " + this);
             
@@ -637,13 +652,14 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      */
     protected Set<String> getWriteRelationNames(IStep step) {
 
-        Set<String> c = new HashSet<String>();
+        final Set<String> c = new HashSet<String>();
         
         getWriteRelationNames(step, c);
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
-            log.debug("Found "+c.size()+" relations, program="+step.getName());
+            log.debug("Found " + c.size() + " relations, program="
+                    + step.getName());
             
         }
 
@@ -698,7 +714,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         getWriteRelations(indexManager, step, c, timestamp);
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("Located " + c.size()
                     + " relations in the head(s), program=" + step.getName());
@@ -761,7 +777,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         getReadRelations(indexManager, step, c, timestamp);
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("Located " + c.size()
                     + " relations in the tail(s), program=" + step.getName());
@@ -833,7 +849,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      *             the relation) and the corresponding entry in the map does not
      *             implement {@link IMutableRelation}.
      */
-    protected Map<String, IBuffer<ISolution>> getMutationBuffers(
+    protected Map<String, IBuffer<ISolution[]>> getMutationBuffers(
             IJoinNexus joinNexus, Map<String, IRelation> relations) {
 
         if (!action.isMutation()) {
@@ -842,13 +858,13 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("");
             
         }
 
-        final Map<String, IBuffer<ISolution>> c = new HashMap<String, IBuffer<ISolution>>(
+        final Map<String, IBuffer<ISolution[]>> c = new HashMap<String, IBuffer<ISolution[]>>(
                 relations.size());
 
         final Iterator<Map.Entry<String, IRelation>> itr = relations
@@ -862,7 +878,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
             final IRelation relation = entry.getValue();
 
-            final IBuffer<ISolution> buffer;
+            final IBuffer<ISolution[]> buffer;
 
             switch (action) {
             
@@ -888,7 +904,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
             
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Created "+c.size()+" mutation buffers: action="+action);
             

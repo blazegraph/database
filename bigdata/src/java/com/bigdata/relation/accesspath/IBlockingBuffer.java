@@ -30,25 +30,62 @@ package com.bigdata.relation.accesspath;
 
 import java.util.concurrent.Future;
 
-import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.IRelation;
+import com.bigdata.striterator.IChunkedIterator;
 
 /**
- * An interface that provides an iterator to drain the {@link IBuffer}. This
- * interface is useful where one (or more) processes will write asynchronously
- * on the {@link IBuffer} while another drains it via the {@link #iterator()}.
+ * <p>
+ * Interface provides an iterator to drain chunks from an {@link IBuffer}.
+ * </p>
+ * <h2>CONOPS</h2>
+ * <p>
+ * This interface is useful where one (or more) processes will write
+ * asynchronously on the {@link IBuffer} while another drains it via the
+ * {@link #iterator()}. For better performance in a multi-threaded environment,
+ * each thread is given an {@link UnsynchronizedArrayBuffer} of some capacity.
+ * The threads populate their {@link UnsynchronizedArrayBuffer}s in parallel
+ * using non-blocking operations. The {@link UnsynchronizedArrayBuffer}s in
+ * turn are configured to flush <em>chunks</em> of elements onto an either an
+ * {@link IBuffer} whose generic type is <code>E[]</code>. Each element in
+ * the target {@link IBuffer} is therefore a chunk of elements from one of the
+ * source {@link UnsynchronizedArrayBuffer}s.
+ * </p>
+ * <p>
+ * There are two families of synchronized {@link IBuffer}s
+ * </p>
+ * <ol>
+ * <li>An {@link IBuffer} that targets a mutable {@link IRelation};</li>
+ * and
+ * <li>An {@link IBlockingBuffer} that exposes an {@link IAsynchronousIterator}
+ * for reading chunks of elements.</li>
+ * </ol>
+ * <p>
+ * This design means that blocking operations are restricted to chunk-at-a-time
+ * operations, primarily when an {@link UnsynchronizedArrayBuffer}<code>&lt;E&gt;</code>
+ * overflows onto an {@link IBuffer}<<code>&lt;E[]&gt;</code> and when the
+ * {@link IBuffer}<<code>&lt;E[]&gt;</code> either is flushed onto an
+ * {@link IMutableRelation} or drained by an {@link IChunkedIterator}.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <E>
+ *            The generic type of the elements in the chunks.
  */
 public interface IBlockingBuffer<E> extends IBuffer<E> {
 
     /**
-     * Return an iterator reading from the buffer. The elements will be visited
-     * in the order in which they were written on the buffer.
+     * Return an iterator reading from the buffer. It is NOT safe for concurrent
+     * processes to consume the iterator. The iterator will visit elements in
+     * the order in which they were written on the buffer, but note that the
+     * elements may be written onto the {@link IBlockingBuffer} by concurrent
+     * processes in which case the order is not predictable without additional
+     * synchronization.
      * 
      * @return The iterator.
      */
-    public IChunkedOrderedIterator<E> iterator();
+    public IAsynchronousIterator<E> iterator();
     
     /**
      * Signal that no more data will be written on this buffer (this is required

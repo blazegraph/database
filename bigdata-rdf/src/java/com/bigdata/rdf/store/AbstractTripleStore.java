@@ -119,10 +119,11 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.RelationSchema;
@@ -262,20 +263,18 @@ abstract public class AbstractTripleStore extends
     final protected boolean statementIdentifiers;
     
     /**
-     * The capacity of the buffers used when computing entailments (for insert
-     * or query).
+     * The capacity of the buffers accumulating chunks from concurrent producers.
      * 
-     * @see Options#MUTATION_BUFFER_CAPACITY
+     * @see Options#CHUNK_OF_CHUNKS_CAPACITY
      */
-    final public int mutationBufferCapacity;
+    final public int chunkOfChunksCapacity;
 
     /**
-     * The capacity of the buffers used when computing entailments (for insert
-     * or query).
+     * The target chunk size.
      * 
-     * @see Options#QUERY_BUFFER_CAPACITY
+     * @see Options#CHUNK_CAPACITY
      */
-    final public int queryBufferCapacity;
+    final public int chunkCapacity;
 
     /**
      * If the estimated range count for an
@@ -681,9 +680,9 @@ abstract public class AbstractTripleStore extends
         
         /**
          * <p>
-         * Sets the capacity of the buffers used by the chunked iterators for
-         * mutation operations (insert and delete on a relation) (default
-         * {@value #MUTATION_BUFFER_CAPACITY}). These buffers make it possible
+         * Sets the capacity of the {@link UnsynchronizedArrayBuffer}s used to
+         * accumulate a chunk of {@link ISolution}s when evaluating rules, etc
+         * (default {@value #CHUNK_CAPACITY}). These buffers make it possible
          * to perform efficient ordered writes using the batch API.
          * </p>
          * <p>
@@ -705,29 +704,32 @@ abstract public class AbstractTripleStore extends
          * ontology, especially how it influences the #of entailments generated
          * by each rule.
          * </p>
+         * 
+         * @todo update the data above since the architecuture has changed more
+         *       than a little.
          */
-        String MUTATION_BUFFER_CAPACITY = "mutationBufferCapacity";
+        String CHUNK_CAPACITY = "chunkCapacity";
 
         /**
-         * Default for {@link #MUTATION_BUFFER_CAPACITY} 
+         * Default for {@link #CHUNK_CAPACITY} 
          */
-        String DEFAULT_MUTATION_BUFFER_CAPACITY = ""+20*Bytes.kilobyte32;
+        String DEFAULT_CHUNK_CAPACITY = ""+20*Bytes.kilobyte32;
 
         /**
          * <p>
-         * Sets the capacity of the buffers used by the {@link BlockingBuffer}
-         * to support asynchronous iterators for query operations ({@value #QUERY_BUFFER_CAPACITY}).
-         * This controls the maximum chunk size for the asynchronous iterator
-         * and places an upper bound on the #of elements which can be written
-         * into the buffer's queue before it will block.
+         * Set the maximum #of chunks from concurrent producers that can be
+         * buffered before an {@link IBuffer} containing chunks of
+         * {@link ISolution}s would block. The best value may be more than the
+         * #of concurrent producers if the producers are generating small
+         * chunks, e.g., because there are few solutions for a join subquery.
          * </p>
          */
-        String QUERY_BUFFER_CAPACITY = "queryBufferCapacity";
+        String CHUNK_OF_CHUNKS_CAPACITY = "chunkOfChunksCapacity";
 
         /**
-         * Default for {@link #QUERY_BUFFER_CAPACITY} 
+         * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY} 
          */
-        String DEFAULT_QUERY_BUFFER_CAPACITY = ""+20*Bytes.kilobyte32;
+        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "1000";
 
         /**
          * If the estimated rangeCount for an
@@ -986,34 +988,34 @@ abstract public class AbstractTripleStore extends
         
         {
 
-            mutationBufferCapacity = Integer.parseInt(properties.getProperty(
-                    Options.MUTATION_BUFFER_CAPACITY,
-                    Options.DEFAULT_MUTATION_BUFFER_CAPACITY));
+            chunkOfChunksCapacity = Integer.parseInt(properties.getProperty(
+                    Options.CHUNK_OF_CHUNKS_CAPACITY,
+                    Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY));
 
-            if (mutationBufferCapacity <= 0) {
+            if (chunkOfChunksCapacity <= 0) {
                 throw new IllegalArgumentException(
-                        Options.MUTATION_BUFFER_CAPACITY + " must be positive");
+                        Options.CHUNK_OF_CHUNKS_CAPACITY + " must be positive");
             }
 
-            if(INFO) log.info(Options.MUTATION_BUFFER_CAPACITY + "="
-                    + mutationBufferCapacity);
+            if (INFO)
+                log.info(Options.CHUNK_OF_CHUNKS_CAPACITY + "="
+                        + chunkOfChunksCapacity);
 
         }
 
         {
 
-            queryBufferCapacity = Integer.parseInt(properties.getProperty(
-                    Options.QUERY_BUFFER_CAPACITY,
-                    Options.DEFAULT_QUERY_BUFFER_CAPACITY));
+            chunkCapacity = Integer.parseInt(properties.getProperty(
+                    Options.CHUNK_CAPACITY,
+                    Options.DEFAULT_CHUNK_CAPACITY));
 
-            if (queryBufferCapacity <= 0) {
+            if (chunkCapacity <= 0) {
                 throw new IllegalArgumentException(
-                        Options.QUERY_BUFFER_CAPACITY + " must be positive");
+                        Options.CHUNK_CAPACITY + " must be positive");
             }
 
             if (INFO)
-                log.info(Options.QUERY_BUFFER_CAPACITY + "="
-                        + queryBufferCapacity);
+                log.info(Options.CHUNK_CAPACITY + "=" + chunkCapacity);
             
         }
 
@@ -3507,9 +3509,11 @@ abstract public class AbstractTripleStore extends
      *            Optional filter.
      * @return
      */
-    public IJoinNexusFactory newJoinNexusFactory(RuleContextEnum ruleContext,
-            ActionEnum action, int solutionFlags, IElementFilter filter,
-            boolean justify, boolean backchain, IEvaluationPlanFactory planFactory) {
+    public IJoinNexusFactory newJoinNexusFactory(
+            final RuleContextEnum ruleContext, final ActionEnum action,
+            final int solutionFlags, final IElementFilter filter,
+            final boolean justify, final boolean backchain,
+            final IEvaluationPlanFactory planFactory) {
         
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -3575,7 +3579,7 @@ abstract public class AbstractTripleStore extends
                 writeTimestamp, readTimestamp, //
                 forceSerialExecution, maxParallelSubqueries, //
                 justify, backchain,
-                mutationBufferCapacity, queryBufferCapacity,
+                chunkOfChunksCapacity, chunkCapacity,
                 fullyBufferedReadThreshold, solutionFlags,
                 filter, planFactory);
         

@@ -4,50 +4,39 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * Asynchronous task writes {@link ISolution}s for an {@link IRule} or
- * {@link IProgram} onto an {@link IBlockingBuffer}. When there are no more
- * solutions, the buffer will be {@link IBlockingBuffer#close()}ed and the
- * iterator will report that is has been exhausted once it finishes draining the
- * {@link IBlockingBuffer}'s internal queue.
- * <p>
- * Note: If the iterator is {@link ICloseableIterator#close()}ed then it MUST
- * cause the backing {@link IBlockingBuffer} to also be closed (you have to wrap
- * up the iterator before returning it to the client).  {@link BlockingBuffer}
- * handles this automatically.
- * <p>
- * Note: This task can not be submitted to a remote service since the
- * {@link IBlockingBuffer} is a purely local object. Instead, an instance of
- * this task must be created on the remote service and a proxy must be created
- * for the iterator returned by the {@link IBlockingBuffer}. That proxy is then
- * returned to the client.
- * 
- * @see BlockingBuffer
+ * A task that executes a query operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class QueryTask extends AbstractStepTask {
-    
-    private final IBlockingBuffer<ISolution> buffer;
+
+    /**
+     * The {@link IBlockingBuffer} on which the {@link ISolution}s will be
+     * written.
+     */
+    private final IBlockingBuffer<ISolution[]> buffer;
 
     /**
      * 
      * @param buffer
-     *            The buffer on which the {@link ISolution}s will be written.
+     *            The {@link IBlockingBuffer} on which the {@link ISolution}s
+     *            will be written.
      */
     public QueryTask(IStep step, IJoinNexusFactory joinNexusFactory,
-            IBlockingBuffer<ISolution> buffer, IIndexManager indexManager,
+            IBlockingBuffer<ISolution[]> buffer, IIndexManager indexManager,
             DataService dataService) {
 
         super(ActionEnum.Query, joinNexusFactory, step, indexManager,
@@ -61,10 +50,7 @@ public class QueryTask extends AbstractStepTask {
     }
     
     /**
-     * Run the task.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link #executorService} is <code>null</code>.
+     * Run the task (invoked once we are in the target execution context).
      */
     public RuleStats call() throws Exception {
 
@@ -84,47 +70,27 @@ public class QueryTask extends AbstractStepTask {
         final List<Callable<RuleStats>> tasks = newQueryTasks(step, joinNexus,
                 buffer);
 
-        /*
-         * Run those tasks.
-         */
-
-        assert tasks != null;
-        assert !tasks.isEmpty();
-
         try {
 
-            final RuleStats totals;
-
-            if (tasks.size() == 1) {
-
-                totals = runOne(joinNexus, step, tasks.get(0));
-
-            } else if (!joinNexus.forceSerialExecution() && !step.isRule()
-					&& ((IProgram) step).isParallel()) {
-
-                totals = runParallel(joinNexus, step, tasks);
-
-            } else {
-
-                totals = runSequential(joinNexus, step, tasks);
-
-            }
+            // run those tasks and wait for them to complete.
+            final RuleStats totals = runTasks(joinNexus, tasks);
 
             /*
-             * Nothing more will be written on the buffer so we close it.
-             * The iterator will drain anything in the queue from the buffer
-             * and then hasNext() will report false.
+             * Nothing more will be written on the buffer so we close it. The
+             * iterator will drain anything in the queue from the buffer and
+             * then hasNext() will report false.
              */
-            
-            if(log.isDebugEnabled()) {
-                
+
+            if (DEBUG) {
+
                 log.debug("done - closing the blocking buffer");
-                
+
             }
-            
+
+            // producer is done : close the BlockingBuffer.
             buffer.close();
-            
-            if(log.isInfoEnabled()) {
+
+            if (INFO) {
                 
                 log.info(totals);
                 
@@ -134,15 +100,23 @@ public class QueryTask extends AbstractStepTask {
 
         } catch (Throwable t) {
             
-            log.error("Problem running query: "+t, t);
+            try {
+                
+                log.error("Problem running query: " + t, t);
+                
+            } catch (Throwable ignored) {
+                
+                // ignored : logging system problem.
+                
+            }
 
             /*
-             * Note: This will close the buffer. It will also cause the
-             * iterator to throw the [cause] from hasNext() (or next(),
-             * which invokes hasNext()).
+             * Note: This will close the buffer. It will also cause the iterator
+             * to throw the [cause] from hasNext() (or next(), which invokes
+             * hasNext()).
              */
-            
-            buffer.abort(t/*cause*/);
+
+            buffer.abort(t/* cause */);
         
             throw new RuntimeException(t);
             
@@ -151,17 +125,62 @@ public class QueryTask extends AbstractStepTask {
     }
 
     /**
-     * Builds a set of tasks for the program.
+     * Run the task(s) and wait for them to complete.
      * 
+     * @return The {@link RuleStats}
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    protected RuleStats runTasks(final IJoinNexus joinNexus,
+            final List<Callable<RuleStats>> tasks) throws InterruptedException,
+            ExecutionException {
+        
+        assert tasks != null;
+        assert !tasks.isEmpty();
+
+        final RuleStats totals;
+
+        if (tasks.size() == 1) {
+
+            totals = runOne(joinNexus, step, tasks.get(0));
+
+        } else if (!joinNexus.forceSerialExecution() && !step.isRule()
+                && ((IProgram) step).isParallel()) {
+
+            totals = runParallel(joinNexus, step, tasks);
+
+        } else {
+
+            totals = runSequential(joinNexus, step, tasks);
+
+        }
+
+        return totals;
+
+    }
+    
+    /**
+     * Builds a set of tasks for the program. Each task is assigned its own
+     * {@link UnsynchronizedArrayBuffer}. Each task will flush that
+     * {@link UnsynchronizedArrayBuffer} onto the given {@link IBuffer} when it
+     * completes.
+     * 
+     * @param step
+     *            The {@link IStep}.
+     * @param joinNexus
+     *            The {@link IJoinNexus}.
      * @param buffer
+     *            The thread-safe buffer onto which the individual tasks emit
+     *            chunks.
      * 
-     * @return
+     * @return The list of tasks to run.
      */
     protected List<Callable<RuleStats>> newQueryTasks(IStep step,
-            IJoinNexus joinNexus, IBlockingBuffer<ISolution> buffer) {
+            IJoinNexus joinNexus, IBlockingBuffer<ISolution[]> buffer) {
 
-        if (log.isDebugEnabled())
-            log.debug("program=" + step.getName());
+        if (DEBUG)
+            log.debug("step=" + step.getName());
 
         final List<Callable<RuleStats>> tasks;
 
@@ -172,8 +191,8 @@ public class QueryTask extends AbstractStepTask {
             final IRule rule = (IRule) step;
 
             final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(
-                    false/* parallel */, rule)
-                    .newTask(rule, joinNexus, buffer);
+                    false/* parallel */, rule).newTask(rule, joinNexus,
+                    buffer);
             
             tasks.add(task);
 
@@ -192,8 +211,8 @@ public class QueryTask extends AbstractStepTask {
                 // @todo handle sub-programs.
                 final IRule rule = (IRule) itr.next();
 
-                final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(parallel, rule)
-                        .newTask(rule, joinNexus, buffer);
+                final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(
+                        parallel, rule).newTask(rule, joinNexus, buffer);
 
                 tasks.add(task);
 
@@ -201,7 +220,7 @@ public class QueryTask extends AbstractStepTask {
 
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Created "+tasks.size()+" query tasks");
             

@@ -39,7 +39,6 @@ import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.Justification.VisitedSPOSet;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -155,7 +154,7 @@ public class TestJustifications extends AbstractRuleTestCase {
              * The buffer that accepts solutions and causes them to be written
              * onto the statement indices and the justifications index.
              */
-            final IBuffer<ISolution> insertBuffer = joinNexus.newInsertBuffer(
+            final IBuffer<ISolution[]> insertBuffer = joinNexus.newInsertBuffer(
                     store.getSPORelation());
             
             // the expected justification (setup and verified below).
@@ -219,7 +218,7 @@ public class TestJustifications extends AbstractRuleTestCase {
                 }
                 
                 // insert solution into the buffer.
-                insertBuffer.add(solution);
+                insertBuffer.add(new ISolution[]{solution});
                 
             }
             

@@ -1,7 +1,6 @@
-package com.bigdata.rdf.rules;
+package com.bigdata.relation.rule.eval;
 
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * Resolves an {@link ISolution} to its element and delegates the filter

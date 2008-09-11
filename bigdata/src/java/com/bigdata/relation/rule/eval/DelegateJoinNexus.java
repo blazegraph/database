@@ -28,14 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
-import java.util.concurrent.ExecutorService;
-
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
@@ -75,15 +74,15 @@ public class DelegateJoinNexus implements IJoinNexus {
         return delegate.newBindingSet(rule);
     }
 
-    public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
+    public IBuffer<ISolution[]> newDeleteBuffer(IMutableRelation relation) {
         return delegate.newDeleteBuffer(relation);
     }
 
-    public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
+    public IBuffer<ISolution[]> newInsertBuffer(IMutableRelation relation) {
         return delegate.newInsertBuffer(relation);
     }
 
-    public IBlockingBuffer<ISolution> newQueryBuffer() {
+    public IBlockingBuffer<ISolution[]> newQueryBuffer() {
         return delegate.newQueryBuffer();
     }
 
@@ -165,6 +164,26 @@ public class DelegateJoinNexus implements IJoinNexus {
 
     public int getMaxParallelSubqueries() {
         return delegate.getMaxParallelSubqueries();
+    }
+
+    public int getChunkOfChunksCapacity() {
+        return delegate.getChunkOfChunksCapacity();
+    }
+
+    public int getFullyBufferedReadThreshold() {
+        return delegate.getFullyBufferedReadThreshold();
+    }
+
+    public int getChunkCapacity() {
+        return delegate.getChunkCapacity();
+    }
+
+    public IElementFilter<ISolution> getSolutionFilter() {
+        return delegate.getSolutionFilter();
+    }
+
+    public IBuffer<ISolution> newUnsynchronizedBuffer(IBuffer<ISolution[]> targetBuffer, int chunkCapacity) {
+        return delegate.newUnsynchronizedBuffer(targetBuffer, chunkCapacity);
     }
 
 }

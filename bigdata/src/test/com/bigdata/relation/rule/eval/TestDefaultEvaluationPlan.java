@@ -31,7 +31,6 @@ package com.bigdata.relation.rule.eval;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 
 import junit.framework.TestCase2;
 
@@ -41,6 +40,7 @@ import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
@@ -298,17 +298,17 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
-        public IBuffer<ISolution> newDeleteBuffer(IMutableRelation relation) {
+        public IBuffer<ISolution[]> newDeleteBuffer(IMutableRelation relation) {
 
             return null;
         }
 
-        public IBuffer<ISolution> newInsertBuffer(IMutableRelation relation) {
+        public IBuffer<ISolution[]> newInsertBuffer(IMutableRelation relation) {
 
             return null;
         }
 
-        public IBlockingBuffer<ISolution> newQueryBuffer() {
+        public IBlockingBuffer<ISolution[]> newQueryBuffer() {
 
             return null;
         }
@@ -355,6 +355,31 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         public int getMaxParallelSubqueries() {
             // TODO Auto-generated method stub
             return 0;
+        }
+
+        public int getChunkOfChunksCapacity() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public int getFullyBufferedReadThreshold() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public int getChunkCapacity() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public IElementFilter<ISolution> getSolutionFilter() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IBuffer<ISolution> newUnsynchronizedBuffer(IBuffer<ISolution[]> targetBuffer, int chunkCapacity) {
+            // TODO Auto-generated method stub
+            return null;
         }
 
     }

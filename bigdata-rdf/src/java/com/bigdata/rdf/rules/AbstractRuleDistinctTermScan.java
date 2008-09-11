@@ -172,7 +172,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
         }
         
         public IStepTask newTask(IRule rule, IJoinNexus joinNexus,
-                IBuffer<ISolution> buffer) {
+                IBuffer<ISolution[]> buffer) {
 
             return new DistinctTermScan(rule, joinNexus, buffer, h,
                     keyOrder);
@@ -199,7 +199,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
         private static final long serialVersionUID = -7570511260700545025L;
         
         private final IJoinNexus joinNexus;
-        private final IBuffer<ISolution> buffer;
+        private final IBuffer<ISolution[]> buffer;
         
         private final IRule rule;
         
@@ -229,7 +229,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
          *            unbound variable reference from the head.
          */
         public DistinctTermScan(IRule rule, IJoinNexus joinNexus,
-                IBuffer<ISolution> buffer, IVariable<Long> h,
+                IBuffer<ISolution[]> buffer, IVariable<Long> h,
                 SPOKeyOrder keyOrder) {
         
             if (rule == null)
@@ -281,7 +281,8 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
 //                    .getIndexManager().getResourceLocator().locate(
 //                            relationName, timestamp);
 
-            final SPORelation relation = (SPORelation)joinNexus.getTailRelationView(rule.getTail(0));
+            final SPORelation relation = (SPORelation) joinNexus
+                    .getTailRelationView(rule.getTail(0));
             
 //            final SPOAccessPath accessPath = relation.getAccessPath(
 //                    keyOrder, rule.getTail(0));
@@ -308,6 +309,9 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
 
                     ruleStats.elementCount[0] += chunk.length;
 
+                    final IBuffer<ISolution> tmp = joinNexus
+                            .newUnsynchronizedBuffer(buffer, chunk.length);
+                    
                     for (Long id : chunk) {
 
                         // [id] is a distinct term identifier for the selected
@@ -325,13 +329,16 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
 
                         if (rule.isConsistent(bindingSet)) {
 
-                            buffer.add(joinNexus.newSolution(rule, bindingSet));
+                            tmp.add(joinNexus.newSolution(rule, bindingSet));
 
                             ruleStats.solutionCount.incrementAndGet();
 
                         }
 
                     }
+                    
+                    // flush results onto the chunked solution buffer.
+                    tmp.flush();
                     
                 }
 

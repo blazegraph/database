@@ -777,15 +777,15 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
         
     }
 
-    public void add(int n, Statement[] a) {
-        
-        for(int i=0; i<n; i++) {
-            
-            add(a[i]);
-            
-        }
-        
-    }
+//    public void add(int n, Statement[] a) {
+//        
+//        for(int i=0; i<n; i++) {
+//            
+//            add(a[i]);
+//            
+//        }
+//        
+//    }
 
     /**
      * Adds the statements to each index (batch api, NO truth maintenance).

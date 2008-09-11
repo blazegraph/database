@@ -347,15 +347,15 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
         
     }
     
-    public void add(int n, F[] a) {
-
-        for (int i = 0; i < n; i++) {
-
-            add(a[i]);
-
-        }
-
-    }
+//    public void add(int n, F[] a) {
+//
+//        for (int i = 0; i < n; i++) {
+//
+//            add(a[i]);
+//
+//        }
+//
+//    }
 
     /**
      * Imposes a canonical mapping on the subject, predicate, and objects of the

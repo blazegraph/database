@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.accesspath;
 
 import java.util.Iterator;
-import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
@@ -49,6 +48,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -86,7 +86,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     protected final IKeyOrder<R> keyOrder;
     protected final IIndex ndx;
     protected final int flags;
-    private final int queryBufferCapacity;
+    private final int chunkOfChunksCapacity;
+    private final int chunkCapacity;
     private final int fullyBufferedReadThreshold;
     
     /**
@@ -188,10 +189,16 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      *            The index on which the access path is reading.
      * @param flags
      *            The default {@link IRangeQuery} flags.
-     * @param queryBufferCapacity
-     *            The capacity for the internal {@link Queue} for the
-     *            {@link BlockingBuffer} used by the
-     *            {@link #asynchronousIterator(Iterator)}.
+     * @param chunkOfChunksCapacity
+     *            The #of chunks that can be held by an {@link IBuffer} that is
+     *            the target or one or more producers. This is generally a small
+     *            number on the order of the #of parallel producers that might
+     *            be writing on the {@link IBuffer} since the capacity of the
+     *            {@link UnsynchronizedArrayBuffer}s is already quite large
+     *            (10k or better elements, defining a single "chunk" from a
+     *            single producer).
+     * @param chunkCapacity
+     *            The maximum size for a single chunk (generally 10k or better).
      * @param fullyBufferedReadThreshold
      *            If the estimated rangeCount for an {@link #iterator(int, int)}
      *            is LTE this threshold then we will do a fully buffered
@@ -207,7 +214,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             final IKeyOrder<R> keyOrder,  //
             final IIndex ndx,//
             final int flags, //
-            final int queryBufferCapacity,
+            final int chunkOfChunksCapacity,
+            final int chunkCapacity,
             final int fullyBufferedReadThreshold
             ) {
 
@@ -233,7 +241,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         this.flags = flags;
 
-        this.queryBufferCapacity = queryBufferCapacity;
+        this.chunkOfChunksCapacity = chunkOfChunksCapacity;
+
+        this.chunkCapacity = chunkCapacity;
 
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
@@ -610,23 +620,32 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
          * evaluated close to the data, not here where it would be evaluated
          * once the elements were materialized on the client.
          */
-        final BlockingBuffer<R> buffer = new BlockingBuffer<R>(
-                queryBufferCapacity, // 
-                keyOrder, //
-                null // filter
-                );
+        final BlockingBuffer<R[]> buffer = new BlockingBuffer<R[]>(
+                chunkOfChunksCapacity);
         
         final Future<Void> future = getRelation().getExecutorService().submit(new Callable<Void>(){
         
             public Void call() {
                 
+                /*
+                 * Chunked iterator reading from the ITupleIterator. The filter
+                 * was already applied by the ITupleIterator so we do not use it
+                 * here.
+                 */
+                final IChunkedOrderedIterator<R> itr = new ChunkedWrappedIterator<R>(
+                                src, chunkCapacity, keyOrder, null/*filter*/);
+                
                 try {
                     
                     while(src.hasNext()) {
                      
-                        final R e = src.next();
+                        /*
+                         * Note: The chunk size is determined by the source
+                         * iterator.
+                         */
+                        final R[] chunk = itr.nextChunk();
                         
-                        buffer.add( e );
+                        buffer.add( chunk );
                         
                     }
                     
@@ -636,6 +655,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                         log.debug("Closing buffer: " + AbstractAccessPath.this);
                     
                     buffer.close();
+                    
+                    itr.close();
                     
                 }
                 
@@ -647,7 +668,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         buffer.setFuture(future);
         
-        return buffer.iterator();
+        return new ChunkConsumerIterator<R>(buffer.iterator(), keyOrder);
             
     }
 
