@@ -46,4 +46,9 @@ public interface IKeyOrder<E> {
      */
     public Comparator<E> getComparator();
 
+    /**
+     * The base name for the index.
+     */
+    public String getIndexName();
+    
 }

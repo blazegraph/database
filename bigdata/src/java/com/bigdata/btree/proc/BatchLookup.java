@@ -36,7 +36,8 @@ import com.bigdata.btree.IIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IParallelizableIndexProcedure {
+public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
+        IParallelizableIndexProcedure {
 
     /**
      * 

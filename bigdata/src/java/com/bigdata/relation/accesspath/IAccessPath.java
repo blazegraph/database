@@ -38,7 +38,9 @@ import com.bigdata.striterator.IKeyOrder;
 
 /**
  * An abstraction for efficient reads on an {@link IRelation} using the index
- * selected by an {@link IPredicate} constraint.
+ * selected by an {@link IPredicate} constraint. Like their {@link #iterator()},
+ * implementations of this interface are NOT required to be thread-safe. They
+ * are designed for a single-threaded consumer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

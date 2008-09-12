@@ -35,11 +35,13 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.cache.WeakValueCache;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
@@ -89,7 +91,6 @@ import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RuleStats;
-import com.bigdata.relation.rule.eval.RunRuleAndFlushBufferTaskFactory;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.relation.rule.eval.SolutionFilter;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -117,6 +118,10 @@ import com.bigdata.striterator.WrappedRemoteChunkedIterator;
 public class RDFJoinNexus implements IJoinNexus {
 
     protected final static transient Logger log = Logger.getLogger(RDFJoinNexus.class);
+    
+    protected final static transient boolean INFO = log.isInfoEnabled();
+
+    protected final static transient boolean DEBUG = log.isDebugEnabled();
     
     private final RDFJoinNexusFactory joinNexusFactory;
     
@@ -155,6 +160,13 @@ public class RDFJoinNexus implements IJoinNexus {
         return chunkCapacity;
         
     }
+    
+    private final long chunkTimeout;
+
+    /**
+     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
+     */
+    private final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
     
     private final int fullyBufferedReadThreshold;
 
@@ -381,6 +393,8 @@ public class RDFJoinNexus implements IJoinNexus {
         
         this.chunkCapacity = joinNexusFactory.chunkCapacity;
 
+        this.chunkTimeout = joinNexusFactory.chunkTimeout;
+        
         this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
         
         this.solutionFlags = joinNexusFactory.solutionFlags;
@@ -413,7 +427,7 @@ public class RDFJoinNexus implements IJoinNexus {
     
     final public boolean forceSerialExecution() {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("forceSerialExecution="+forceSerialExecution);
 
         return forceSerialExecution;
@@ -563,7 +577,7 @@ public class RDFJoinNexus implements IJoinNexus {
         final IRelation relation = (IRelation) getIndexManager()
                 .getResourceLocator().locate(relationName, timestamp);
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("predicate: "+pred+", head relation: "+relation);
             
@@ -618,7 +632,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("predicate: "+pred+", tail relation: "+relation);
             
@@ -819,7 +833,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         final Solution solution = new Solution(this, rule, bindingSet);
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug(solution.toString());
             
@@ -883,7 +897,10 @@ public class RDFJoinNexus implements IJoinNexus {
             taskFactory = defaultTaskFactory;
 
         }
-
+        
+        /*
+         * Note: Now handled by the MutationTask itself.
+         */
 //        if (getAction().isMutation() && (!parallel || forceSerialExecution())) {
 //
 //            /*
@@ -938,7 +955,8 @@ public class RDFJoinNexus implements IJoinNexus {
         if (getAction().isMutation())
             throw new IllegalStateException();
         
-        return new BlockingBuffer<ISolution[]>(chunkOfChunksCapacity);
+        return new BlockingBuffer<ISolution[]>(chunkOfChunksCapacity,
+                chunkCapacity,chunkTimeout,chunkTimeoutUnit);
         
 //        return new BlockingBuffer<ISolution>(queryBufferCapacity,
 //                null/* keyOrder */, filter == null ? null
@@ -1110,7 +1128,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (getAction() != ActionEnum.Insert)
             throw new IllegalStateException();
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("relation="+relation);
             
@@ -1150,7 +1168,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (getAction() != ActionEnum.Delete)
             throw new IllegalStateException();
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("relation=" + relation);
 
@@ -1168,7 +1186,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (step == null)
             throw new IllegalArgumentException();
 
-        if(log.isInfoEnabled())
+        if(INFO)
             log.info("program="+step.getName());
 
         if(isEmptyProgram(step)) {
@@ -1239,7 +1257,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
         
-        if(log.isInfoEnabled())
+        if(INFO)
             log.info("action=" + action + ", program=" + step.getName());
         
         if(isEmptyProgram(step)) {
@@ -1348,7 +1366,7 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     protected Object runLocalProgram(ActionEnum action, IStep step) throws Exception {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Running local program: action=" + action + ", program="
                     + step.getName());
 
@@ -1378,7 +1396,7 @@ public class RDFJoinNexus implements IJoinNexus {
     protected Object runDistributedProgram(final IBigdataFederation fed,
             final ActionEnum action, final IStep step) throws Exception {
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("Running distributed program: action=" + action
                     + ", program=" + step.getName());
@@ -1420,7 +1438,7 @@ public class RDFJoinNexus implements IJoinNexus {
             ActionEnum action, IStep step) throws InterruptedException,
             ExecutionException {
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("Submitting program to data service: action=" + action
                     + ", program=" + step.getName() + ", dataService="

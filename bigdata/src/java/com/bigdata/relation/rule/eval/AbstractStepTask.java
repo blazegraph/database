@@ -370,12 +370,6 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
 
         if (dataService == null) {
 
-            if(INFO) {
-
-                log.info("running w/o concurrency control: " + this);
-                
-            }
-            
             return indexManager.getExecutorService().submit(this);
 
         }

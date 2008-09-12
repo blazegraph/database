@@ -3,9 +3,9 @@ package com.bigdata.relation.rule.eval;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -27,6 +27,18 @@ import com.bigdata.striterator.IKeyOrder;
 public class RuleState {
 
     protected static final Logger log = Logger.getLogger(RuleState.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * The {@link Rule} being evaluated.
@@ -260,7 +272,7 @@ public class RuleState {
 
         }
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("dependenyGraph=" + depends);
 
@@ -307,7 +319,7 @@ public class RuleState {
             final IKeyOrder keyOrder = joinNexus.getTailAccessPath(
                     pred.asBound(bindingSet)).getKeyOrder();
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
                         + ", tailIndex=" + orderIndex + ", pred=" + pred
                         + ", bindingSet=" + bindingSet + ", rule=" + rule);
@@ -325,7 +337,7 @@ public class RuleState {
 
                     final Var var = (Var) t;
 
-                    if (log.isDebugEnabled()) {
+                    if (DEBUG) {
 
                         log.debug("Propagating binding: pred=" + pred
                                         + ", var=" + var + ", bindingSet="
@@ -341,7 +353,7 @@ public class RuleState {
 
         }
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("keyOrder[]=" + Arrays.toString(a) + ", rule=" + rule);
 
@@ -504,7 +516,7 @@ public class RuleState {
      */
     protected void clearDownstreamBindings(final int index, final IBindingSet bindingSet) {
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("index=" + index + ", bindingSet=" + bindingSet);
 
@@ -528,7 +540,7 @@ public class RuleState {
 
                     if (k >= index) {
 
-                        if(log.isDebugEnabled()) {
+                        if(DEBUG) {
                             
                             log.debug("Clearing: "+t);
                             

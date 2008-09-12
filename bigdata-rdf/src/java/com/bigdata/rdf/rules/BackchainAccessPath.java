@@ -34,8 +34,6 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.OwlSameAsPropertiesExpandingIterator;
 import com.bigdata.rdf.spo.ISPO;
@@ -67,6 +65,10 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
     protected static transient final Logger log = Logger
             .getLogger(BackchainAccessPath.class);
+
+    protected final static boolean INFO = log.isInfoEnabled();
+
+    protected final static boolean DEBUG = log.isDebugEnabled();
 
     private final static transient long NULL = IRawTripleStore.NULL;
 
@@ -157,7 +159,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
      */
     public IChunkedOrderedIterator<ISPO> iterator(int limit, int capacity) {
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info(accessPath.getPredicate().toString());
             
@@ -186,8 +188,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
         } else if(inf.forwardChainOwlSameAsClosure && !inf.forwardChainOwlSameAsProperties) {
             
-            if (inf.database.getAccessPath(NULL, owlSameAs, NULL).rangeCount(
-                    false/* exact */) == 0L) {
+            if (inf.database.getAccessPath(NULL, owlSameAs, NULL).isEmpty()) {
 
                 /*
                  * No owl:sameAs assertions in the KB, so we do not need to

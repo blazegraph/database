@@ -110,6 +110,10 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
     protected static final transient Logger log = Logger
             .getLogger(DefaultResourceLocator.class);
+    
+    protected static final boolean INFO = log.isDebugEnabled();
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     protected final transient IIndexManager indexManager;
 
@@ -145,7 +149,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         if (namespace == null)
             throw new IllegalArgumentException();
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("namespace=" + namespace+", timestamp="+timestamp);
 
@@ -161,7 +165,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             if (resource != null) {
 
-                if (log.isDebugEnabled()) {
+                if (DEBUG) {
 
                     log.debug("cache hit: " + resource);
 
@@ -171,7 +175,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             }
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("cache miss: namespace=" + namespace + ", timestamp="
                         + timestamp);
           
@@ -194,7 +198,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                      * resolve this request.
                      */
                     
-                    if(log.isInfoEnabled()) {
+                    if(INFO) {
                         
                         log.info("Not found - passing to delegate: namespace="
                                 + namespace + ", timestamp=" + timestamp);
@@ -206,7 +210,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     
                     if (resource != null) {
 
-                        if (log.isInfoEnabled()) {
+                        if (INFO) {
 
                             log.info("delegate answered: " + resource);
 
@@ -223,7 +227,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             }
 
-            if (log.isDebugEnabled()) {
+            if (DEBUG) {
 
                 log.debug(properties.toString());
 
@@ -250,7 +254,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             }
 
-            if (log.isDebugEnabled()) {
+            if (DEBUG) {
 
                 log.debug("Implementation class=" + cls.getName());
 
@@ -298,7 +302,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 //                if (timestamp != ITx.READ_COMMITTED)
                 {
 
-                    if (log.isDebugEnabled()) {
+                    if (DEBUG) {
 
                         log.debug("Caching: namespace=" + namespace
                                 + ", timestamp=" + timestamp);
@@ -359,7 +363,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                          * and removed from the [seeAlso] weak value cache.
                          */
                         
-                        if (log.isInfoEnabled())
+                        if (INFO)
                             log.info("Closed? " + indexManager);
                         
                     } else {
@@ -386,7 +390,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
                 if (properties != null) {
 
-                    if (log.isInfoEnabled()) {
+                    if (INFO) {
 
                         log.info("Found: namespace=" + namespace + " on "
                                 + indexManager);
@@ -413,7 +417,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         if (properties != null) {
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("Found: namespace=" + namespace + " on "
                         + indexManager);
@@ -451,7 +455,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     protected Properties locateResourceOn(IIndexManager indexManager,
             String namespace) {
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("indexManager="+indexManager+", namespace=" + namespace);
 
@@ -467,7 +471,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         if (map == null) {
 
-            if (log.isDebugEnabled()) {
+            if (DEBUG) {
 
                 log.debug("No properties: indexManager=" + indexManager
                         + ", namespace=" + namespace);
@@ -482,7 +486,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         properties.putAll(map);
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("Read properties: indexManager=" + indexManager
                     + ", namespace=" + namespace + " :: " + properties);
@@ -550,7 +554,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     properties //
                     });
 
-            if(log.isInfoEnabled()) {
+            if(INFO) {
                 
                 log.info("new instance: "+r);
                 
@@ -585,7 +589,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         
         final long timestamp = instance.getTimestamp();
         
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("namespace=" + namespace+", timestamp="+timestamp);
 
@@ -600,7 +604,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             
             if (tmp != null) {
 
-                if(log.isInfoEnabled()) {
+                if(INFO) {
                     
                     log.info("Existing instance already in cache: "+tmp);
                     
@@ -612,7 +616,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
             
             put(instance);
             
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("Instance added to cache: " + instance);
                 
@@ -644,7 +648,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
         
         final long timestamp = instance.getTimestamp();
         
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("namespace=" + namespace+", timestamp="+timestamp);
 
@@ -657,7 +661,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
             final boolean found = clear(namespace, timestamp);
             
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("instance=" + instance + ", found=" + found);
                 
@@ -706,7 +710,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
              */
             seeAlso.put(indexManager, null);
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("size=" + seeAlso.size() + ", added indexManager="
                         + indexManager);

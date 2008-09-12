@@ -32,7 +32,6 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
@@ -69,17 +68,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     protected static final Logger log = Logger.getLogger(IAccessPath.class);
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     protected final IRelation<R> relation;
     protected final IPredicate<R> predicate;
@@ -107,10 +98,14 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     private final boolean historicalRead;
     
     /**
-     * The range count is cached once it is computed.
+     * For {@link #historicalRead}s only, the range count is cached once it is
+     * computed. It is also set if we discover using {@link #isEmpty()} or
+     * {@link #iterator(int, int)} that the {@link IAccessPath} is empty.
+     * Likewise, those methods test this flag to see if we have proven the
+     * {@link IAccessPath} to be empty.
      */
     private long rangeCount = -1L;
-
+    
     /**
      * The filter derived from the {@link IElementFilter}.
      */
@@ -345,7 +340,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         didInit = true;
         
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug(toString());
             
@@ -382,7 +377,18 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         assertInitialized();
         
-        if(log.isDebugEnabled()) {
+        if (historicalRead && rangeCount != -1) {
+
+            /*
+             * Optimization for a historical read in which we have already
+             * proven that the access path is empty.
+             */
+            
+            return rangeCount == 0;
+            
+        }
+        
+        if(DEBUG) {
             
             log.debug(toString());
             
@@ -392,7 +398,17 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
         try {
             
-            return ! itr.hasNext();
+            final boolean empty = ! itr.hasNext();
+            
+            if (empty && historicalRead) {
+
+                // the access path is known to be empty.
+                
+                rangeCount = 0;
+                
+            }
+            
+            return empty;
             
         } finally {
             
@@ -411,10 +427,20 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
     @SuppressWarnings("unchecked")
     final public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
 
+        if (historicalRead && rangeCount == 0) {
+
+            /*
+             * The access path has already been proven to be empty.
+             */
+            
+            return new EmptyChunkedIterator<R>(keyOrder);
+            
+        }
+        
         if (DEBUG)
             log.debug("limit=" + limit + ", capacity=" + capacity
                     + ", accessPath=" + this);
-            
+        
         final boolean fullyBufferedRead;
         
         if(predicate.isFullyBound()) {
@@ -582,7 +608,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         }
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("Fully buffered: read " + nread + " elements, limit="
                             + limit);
@@ -693,13 +719,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                 
                 if (rangeCount == -1L) {
             
-                    synchronized(this) {
+                    // do query and cache the result.
+                    n = rangeCount = ndx.rangeCount(fromKey, toKey);
 
-                        // do query and cache the result.
-                        n = rangeCount = ndx.rangeCount(fromKey, toKey);
-                    
-                    }
-                    
                 } else {
                     
                     // cached value.
@@ -759,7 +781,7 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         assertInitialized();
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug(this.toString());
             

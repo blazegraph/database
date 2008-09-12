@@ -49,11 +49,14 @@ package com.bigdata.rdf.rules;
 
 import java.lang.ref.WeakReference;
 import java.util.WeakHashMap;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -90,6 +93,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final int maxParallelSubqueries;
     final int chunkOfChunksCapacity;
     final int chunkCapacity;
+    final long chunkTimeout;
     final int fullyBufferedReadThreshold;
     final int solutionFlags;
     @SuppressWarnings("unchecked")
@@ -118,9 +122,11 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         
         sb.append(", maxParallelSubqueries="+maxParallelSubqueries);
         
-//        sb.append(", mutationBufferCapacity="+mutationBufferCapacity);
+        sb.append(", chunkOfChunksCapacity="+chunkOfChunksCapacity);
         
-        sb.append(", queryBufferCapacity="+chunkCapacity);
+        sb.append(", chunkCapacity="+chunkCapacity);
+
+        sb.append(", chunkTimeout="+chunkTimeout);
 
         sb.append(", fullyBufferedReadThreshold="+fullyBufferedReadThreshold);
         
@@ -169,10 +175,16 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      * @param chunkOfChunksCapacity
      *            The capacity of the thread-safe {@link IBuffer}s used to
      *            buffer chunks of {@link ISolution}s, often from concurrent
-     *            producers.
+     *            producers. This may be zero to use a {@link SynchronousQueue}
+     *            instead of a {@link BlockingQueue} of the given capacity.
      * @param chunkCapacity
      *            The capacity of the {@link UnsynchronizedArrayBuffer}s used
      *            to buffer a single chunk of {@link ISolution}s.
+     * @param chunkTimeout
+     *            The timeout in milliseconds that the {@link BlockingBuffer}
+     *            will wait for another chunk to combine with the current chunk
+     *            before returning the current chunk. This may be ZERO (0) to
+     *            disable the chunk combiner.
      * @param fullyBufferedReadThreshold
      *            If the estimated range count for an
      *            {@link IAccessPath#iterator(int, int)} is LTE to this
@@ -194,7 +206,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
             long writeTimestamp, long readTimestamp,//
             boolean forceSerialExecution, int maxParallelSubqueries,//
             boolean justify, boolean backchain, int chunkOfChunksCapacity,
-            int chunkCapacity, int fullyBufferedReadThreshold,
+            int chunkCapacity, long chunkTimeout, int fullyBufferedReadThreshold,
             int solutionFlags, IElementFilter filter,
             IEvaluationPlanFactory planFactory) {
 
@@ -232,6 +244,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         this.chunkOfChunksCapacity = chunkOfChunksCapacity;
         
         this.chunkCapacity = chunkCapacity;
+        
+        this.chunkTimeout = chunkTimeout;
         
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         

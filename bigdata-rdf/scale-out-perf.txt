@@ -2368,14 +2368,6 @@ x. misc tests, performance problems and improvements for the RDF DB.
 
   - performance testing for owl:sameAs processing at scale.
 
-  - performance testing for distinct term scan
-
-  - TruthMaintenance performance should be vetted.  Handling TM at
-    scale is its own issue and might be best solved using: (a) a magic
-    sets integration; and (b) periodic map/reduce style updates with
-    closure.  (Or database at once closure on a new data set, which is
-    similar to how scale-out text indices are built.)
-
 - Performance testing of Fast vs Full and then set the default closure
   method appropriately.
 
@@ -2924,7 +2916,7 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 	   also why JDS is slow -- a thread scheduling problem arises
 	   each time an element is added to a buffer.
 
-	   We can reduce this problem by allocating a distinct buffer
+       *** We can reduce this problem by allocating a distinct buffer
 	   to each task.  The task collects a 'chunk' in the buffer.
 	   When full, the buffer propagates onto a thread-safe buffer
 	   of chunks targetting either the target relation (mutation)
@@ -2968,7 +2960,7 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 	   subqueries.  We can test the same thing with EDS and JDS,
 	   but there will be additional overhead involved.
 
-****	 * EDS and JDS need to cache read-historical range counts and
+       *** EDS and JDS need to cache read-historical range counts and
 	   locator scans.  (EDS might need to be refactored to share a
 	   common abstract class with JDS.)
 
@@ -2990,9 +2982,9 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
            TestTruthMaintenance.  Maybe problem with read-committed
            BTree semantics?
 
-	 - Closure times are now good (~2x the LTS or LDS times).
+	 - JDS Closure times are now good (~2x the LTS or LDS times).
 
-	 - Query times are NOT so good.  So look at the iterator
+	 - JDS query times are NOT so good.  So look at the iterator
            proxy and serialization costs.
 
          - Spin lock waiting for full chunks for the proxied iterator
@@ -3001,13 +2993,12 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
 
          - Modify SerializerUtil to optionally collect a histogram of
            serialization size/time by class.  That will be useful for
-           examining JDS costs attributable to Serialization.
+           examining JDS costs attributable to Serialization.  Tune
+           serialization for elements materialized by high-level query
+           (it is using java default serialization).
 
-         - Tune serialization for elements materialized by high-level
-           query (it is using java default serialization).
-
-	 - See if there are optimizations for type resource expansion
-           that are not in place yet.
+	 - Done. See if there are optimizations for type resource
+           expansion that are not in place yet.
 
          - A scale-out join may have to ignore the backchain expanders
            (they are only enabled for query in any case). Depending on
@@ -3061,10 +3052,115 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
        asReadCommittedView() is a singleton so the view never
        advances.
 
-** Refactor CDL to use IndexManager as its service, to use a
-   map/reduce style, and to allow easy distribution of the load tasks
-   across a federation.
-
 ** Concurrent programming and Java.
 
    http://www.ibm.com/developerworks/forums/forum.jspa?forumID=176&start=0       
+
+============================================================
+
+*** TruthMaintenance performance should be optimized and vetted.
+
+    - Remove use of deprecated classes.
+
+    - Use ordered reads and writes for operations on the temporary
+      stores.
+
+    - Ordered operations for statements identifiers.
+
+    - Replace the use of fully buffered iterators with incremental
+      chunked iterators.
+
+    - Handling TM at scale is its own issue and might be best solved
+      using: (a) a magic sets integration; and (b) periodic map/reduce
+      style updates with closure.  (Or database at once closure on a
+      new data set, which is similar to how scale-out text indices are
+      built.)
+
+    - Test w/ APSTARs data set (incremental loads).
+
+   * Review performance for sameAs processing during query.  Note that
+     transitive for owl:same1b was moved to forward closure.  Test
+     with the old classes and owl:sameAs1b backward vs the new
+     rule-based expander and the owl:sameAs1b forward.
+
+    - Defer. tune up justifications.
+
+*** Get a SYSTAP (~100 documents) and NGA benchmark (~1000+) data set
+    and queries from MikeP.  Add to the lubm test harness in CVS.  Add
+    delete test for (a) delete specific entities; and (b) delete
+    specific documents.
+    
+    - delete entity is an ELM command so I really need the generated
+      delete sets or I need to capture the code for that command and
+      run it and then run the delete.
+
+*** Get scaling numbers for LTS (1B) and JDS (3 servers, 2+B).
+
+    * Fix JDS performance for high-level query.
+
+*** Annotator as first class KB citizen.
+
+  - Map/reduce processing:
+
+    * Parallel KB load (CDL refactor).  Allows easy distribution of
+      the load tasks across a federation.
+
+    - harvest and extractor.
+
+*** Global "do not extract" and mention level false positive handling,
+    plus dropping data structures no longer required in the content
+    repository.
+
+  - defer content repository change over.
+
+============================================================
+
+4. Test and performance test for LTS, LDS, EDS, and of course JDS.
+   See if high-level query is now fast for JDS.
+
+   Closure appears to be much faster (2x for LTS).  This does not
+   effect the total time for load+close much for U1 since it is now
+   ~.75 seconds rather than ~1.4 seconds.
+
+   - Query is somewhat slower for LTS, but JDS query is faster even
+     though some JDS queries are still slow.
+
+   - Query 8 and 9 are slow for JDS.
+
+     In Query 9, given (?y ub:teacherOf ?z) we can infer (?z rdf:type
+     ub:Course) from the ontology and thereby eliminate one join from
+     the query.  With this change the evaluation time is ~40 - ~60
+     seconds.
+
+   * Mutation count is busted.  
+
+     1. Modify flush() to either reset the counter or to accept a
+        boolean parameter to optionally reset the counter (if the
+        StatementBuffer is otherwise unhappy).
+
+     2. Modify RuleStats#add() to be transparent - it just rolls up
+        the mutation counter.
+
+     3. The per-round mutation delta should still be correct.
+
+   * Modify the sub-query joins to allocate their buffer based on the
+     expected cardinality of the largest sub-join.  This should wind
+     up being a lot smaller than 20k for most joins and will help to
+     reduce allocation that drives GC in the nursery.
+
+   Note: BlockingBuffer should be used (a) for access path iterators
+   that will exceed the chunkSize; (b) for high-level query with at
+   least one join; (c) by the BigdataStatementIteratorImpl; and by
+   the BigdataSolutionResolverator.
+
+   - Try closure performance again with rule level parallelism
+     enabled.  Perhaps use maxParallelRules to limit the actual rule
+     level parallelism.  For scale-out, the rule execution itself
+     should be distributed.
+
+   - Modify RemoteChunkedIterator. It requires us to wait until the
+     next chunk is available or the iterator is exhausted before
+     returning.  This could reduce latency.  This will require
+     hasNext(timeout) and next(timeout) on the IAsynchronousIterator
+     and a corresponding update to BlockingBuffer's combineChunks()
+     method.

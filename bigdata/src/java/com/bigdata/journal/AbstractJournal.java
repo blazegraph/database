@@ -38,7 +38,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -48,10 +47,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.BTree.Counter;
-import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.btree.keys.ThreadLocalKeyBuilderFactory;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -211,17 +206,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     protected static final Logger log = Logger.getLogger(IJournal.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The index of the root address containing the address of the persistent
@@ -523,7 +510,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     Options.minimumInitialExtent,
                     Options.minimumWriteCacheCapacity);
 
-            log.info(Options.WRITE_CACHE_CAPACITY + "=" + capacity);
+            if(INFO) log.info(Options.WRITE_CACHE_CAPACITY + "=" + capacity);
             
             if (capacity > 0 && capacity < minWriteCacheCapacity) {
 
@@ -615,7 +602,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         final BufferMode bufferMode = BufferMode.valueOf(properties.getProperty(
                 Options.BUFFER_MODE, "" + Options.DEFAULT_BUFFER_MODE));
 
-        log.info(Options.BUFFER_MODE + "=" + bufferMode);
+        if (INFO)
+            log.info(Options.BUFFER_MODE + "=" + bufferMode);
 
         /*
          * historicalIndexCacheCapacity
@@ -625,6 +613,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     Options.HISTORICAL_INDEX_CACHE_CAPACITY,
                     Options.DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY));
 
+            if (INFO)
             log.info(Options.HISTORICAL_INDEX_CACHE_CAPACITY+"="+historicalIndexCacheCapacity);
 
             if (historicalIndexCacheCapacity <= 0)
@@ -645,6 +634,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                     Options.LIVE_INDEX_CACHE_CAPACITY,
                     Options.DEFAULT_LIVE_INDEX_CACHE_CAPACITY));
 
+            if (INFO)
             log.info(Options.LIVE_INDEX_CACHE_CAPACITY+"="+liveIndexCacheCapacity);
 
             if (liveIndexCacheCapacity <= 0)
@@ -661,6 +651,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 .getProperty(Options.USE_DIRECT_BUFFERS, ""
                         + Options.DEFAULT_USE_DIRECT_BUFFERS));
             
+        if (INFO)
         log.info(Options.USE_DIRECT_BUFFERS+"="+useDirectBuffers);
 
         /*
@@ -678,6 +669,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         }
 
+        if (INFO)
         log.info(Options.INITIAL_EXTENT + "=" + initialExtent);           
 
         /*
@@ -695,6 +687,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         }
 
+        if (INFO)
         log.info(Options.MAXIMUM_EXTENT + "=" + maximumExtent); 
 
         /*
@@ -706,6 +699,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         WormAddressManager.assertOffsetBits(offsetBits);
 
+        if (INFO)
         log.info(Options.OFFSET_BITS + "=" + offsetBits);
 
         /*
@@ -715,6 +709,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 Options.READ_CACHE_CAPACITY,
                 Options.DEFAULT_READ_CACHE_CAPACITY));
 
+        if (INFO)
         log.info(Options.READ_CACHE_CAPACITY + "=" + readCacheCapacity);
 
         if (readCacheCapacity < 0)
@@ -728,6 +723,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 Options.READ_CACHE_MAX_RECORD_SIZE,
                 Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE));
 
+        if (INFO)
         log.info(Options.READ_CACHE_MAX_RECORD_SIZE + "=" + readCacheMaxRecordSize);
 
         if (readCacheMaxRecordSize <= 0)
@@ -742,6 +738,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 .getProperty(Options.CREATE_TEMP_FILE, ""
                         + Options.DEFAULT_CREATE_TEMP_FILE));
 
+        if (INFO)
         log.info(Options.CREATE_TEMP_FILE + "=" + createTempFile);
 
         if (createTempFile) {
@@ -780,6 +777,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
             if(val!=null) {
                 
+                if (INFO)
                 log.info(Options.TMP_DIR+"="+tmpDir); 
                 
             }
@@ -794,6 +792,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 .getProperty(Options.VALIDATE_CHECKSUM, ""
                         + Options.DEFAULT_VALIDATE_CHECKSUM));
 
+        if (INFO)
         log.info(Options.VALIDATE_CHECKSUM+"="+validateChecksum);
 
         /*
@@ -809,6 +808,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         }
         
+        if (INFO)
         log.info(Options.READ_ONLY+"="+readOnly);
 
         /*
@@ -818,6 +818,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         final ForceEnum forceWrites = ForceEnum.parse(properties.getProperty(
                 Options.FORCE_WRITES, "" + Options.DEFAULT_FORCE_WRITES));
 
+        if (INFO)
         log.info(Options.FORCE_WRITES + "=" + forceWrites);
 
         /*
@@ -827,6 +828,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         forceOnCommit = ForceEnum.parse(properties.getProperty(
                 Options.FORCE_ON_COMMIT, "" + Options.DEFAULT_FORCE_ON_COMMIT));
 
+        if (INFO)
         log.info(Options.FORCE_ON_COMMIT+"="+forceOnCommit);
 
         /*
@@ -836,6 +838,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         doubleSync = Boolean.parseBoolean(properties.getProperty(
                 Options.DOUBLE_SYNC, "" + Options.DEFAULT_DOUBLE_SYNC));
 
+        if (INFO)
         log.info(Options.DOUBLE_SYNC + "=" + doubleSync);
 
         /*
@@ -845,6 +848,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         deleteOnClose = Boolean.parseBoolean(properties.getProperty(
                 Options.DELETE_ON_CLOSE, "" + Options.DEFAULT_DELETE_ON_CLOSE));
 
+        if (INFO)
         log.info(Options.DELETE_ON_CLOSE + "=" + deleteOnClose);
 
         /*
@@ -855,6 +859,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 .getProperty(Options.DELETE_ON_EXIT, ""
                         + Options.DEFAULT_DELETE_ON_EXIT));
 
+        if (INFO)
         log.info(Options.DELETE_ON_EXIT + "=" + deleteOnExit);
         
         /*
@@ -871,6 +876,7 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
             
         }
         
+        if (INFO)
         log.info(Options.BRANCHING_FACTOR+"="+defaultBranchingFactor);
         
         /*
@@ -932,8 +938,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
                 
             }
             
-            
-            log.info(Options.FILE+"="+val);
+            if (INFO)
+                log.info(Options.FILE + "=" + val);
 
         }
 
@@ -1175,12 +1181,14 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // Note: per contract for shutdown.
         if(!isOpen()) return;
 
-        log.info("");
+        if (INFO)
+            log.info("");
 
         // close immediately.
         _close();
         
-        log.info("Shutdown complete.");
+        if (INFO)
+            log.info("Shutdown complete.");
 
     }
 
@@ -1195,12 +1203,14 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // Note: per contract for shutdownNow()
         if(!isOpen()) return;
 
-        log.info("");
+        if (INFO)
+            log.info("");
 
         // close immediately.
         _close();
 
-        log.info("Shutdown complete.");
+        if (INFO)
+            log.info("Shutdown complete.");
 
     }
 
@@ -1317,7 +1327,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public CounterSet getNamedIndexCounters() {
 
-        log.info("Refreshing index counter set.");
+        if (INFO)
+            log.info("Refreshing index counter set.");
 
         synchronized (name2Addr) {
 
@@ -1340,7 +1351,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         
         assertOpen();
 
-        log.info("file="+getFile());
+        if (INFO)
+            log.info("file="+getFile());
         
         _bufferStrategy.close();
 
@@ -1374,7 +1386,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         if(isOpen()) throw new IllegalStateException();
 
-        log.info("");
+        if (INFO)
+            log.info("");
         
         _bufferStrategy.deleteResources();
 
@@ -1411,12 +1424,13 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public void closeForWrites(long closeTime) {
         
-        if(INFO)
-        log.info("Closing journal for further writes: closeTime=" + closeTime
-                + ", lastCommitTime=" + _rootBlock.getLastCommitTime());
+        if (INFO)
+            log.info("Closing journal for further writes: closeTime="
+                    + closeTime + ", lastCommitTime="
+                    + _rootBlock.getLastCommitTime());
 
-        if(DEBUG)
-        log.debug("before: "+_rootBlock);
+        if (DEBUG)
+            log.debug("before: " + _rootBlock);
         
         final IRootBlockView old = _rootBlock;
 
@@ -1465,7 +1479,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // replace the root block reference.
         _rootBlock = newRootBlock;
 
-        if(DEBUG)log.debug("after: "+_rootBlock);
+        if (DEBUG)
+            log.debug("after: " + _rootBlock);
 
         // discard current commit record - can be re-read from the store.
         _commitRecord = null;
@@ -1482,7 +1497,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // Note: per contract for close().
         if(!isOpen()) throw new IllegalStateException();
         
-        log.info("");
+        if (INFO)
+            log.info("");
         
         shutdownNow();
 
@@ -1493,7 +1509,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // Note: per contract for close().
         if(!isOpen()) throw new IllegalStateException();
 
-        log.info("");
+        if (INFO)
+            log.info("");
         
         shutdownNow();
         
@@ -1663,7 +1680,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
      */
     public void abort() {
 
-        log.info("start");
+        if (INFO)
+            log.info("start");
         
         /*
          * Discard hard references to any indices. The Name2Addr reference will
@@ -1706,7 +1724,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
         // setup new committers, e.g., by reloading from their last root addr.
         setupCommitters();
         
-        log.info("done");
+        if (INFO)
+            log.info("done");
         
     }
 
@@ -1748,7 +1767,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         assertOpen();
 
-        log.info("commitTime="+commitTime);
+        if (INFO)
+            log.info("commitTime="+commitTime);
         
         /*
          * First, run each of the committers accumulating the updated root
@@ -1885,9 +1905,10 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         }
 
-        if(INFO)
-        log.info("Done: commitTime="+commitTime+", nextOffset="+nextOffset);
-        
+        if (INFO)
+            log.info("Done: commitTime=" + commitTime + ", nextOffset="
+                    + nextOffset);
+
         return commitTime;
 
     }
@@ -2048,7 +2069,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
              * exception on the journal.
              */
 
-            if(INFO) log.info("New "+Name2Addr.class.getName());
+            if (INFO)
+                log.info("New " + Name2Addr.class.getName());
             
             name2Addr = Name2Addr
                     .create((isReadOnly() ? new SimpleMemoryRawStore() : this));
@@ -2063,7 +2085,9 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
              * anyone else to have access to this same instance of the B+Tree.
              */
 
-            if(INFO) log.info("Loading "+Name2Addr.class.getName()+" from "+addr);
+            if (INFO)
+                log.info("Loading " + Name2Addr.class.getName() + " from "
+                        + addr);
 
             name2Addr = (Name2Addr) BTree.load(this, addr);
 
@@ -2204,7 +2228,8 @@ public abstract class AbstractJournal implements IJournal, ITimestampService {
 
         if (commitRecord == null) {
 
-            log.info("No commit record for timestamp=" + commitTime);
+            if (INFO)
+                log.info("No commit record for timestamp=" + commitTime);
 
             return null;
 

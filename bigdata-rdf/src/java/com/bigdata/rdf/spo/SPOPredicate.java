@@ -524,18 +524,4 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-//    public boolean equals(SPOPredicate other) {
-//        
-//        if(this == other) return true;
-//        
-//        if(!s.equals(other.s)) return false;
-//        
-//        if(!p.equals(other.p)) return false;
-//        
-//        if(!o.equals(other.o)) return false;
-//        
-//        return true;
-//        
-//    }
-
 }
