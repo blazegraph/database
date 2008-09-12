@@ -668,7 +668,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public void setReleaseTime(long timestamp) {
 
-        log.info("Request ignored for Journal: timestamp="+timestamp);
+        if (INFO)
+            log.info("Request ignored for Journal: timestamp="+timestamp);
         
     }
 

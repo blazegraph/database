@@ -232,6 +232,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
          * 
          * Note: parallel subquery MUST use distinct buffer instances for each
          * task executing in parallel.
+         * 
+         * FIXME allocate chunkSize based on expected maxCardinality, or perhaps
+         * the subqueryCount #of the left-hand join dimension divided into the
+         * range count of the right hand join dimension (assuming that there is
+         * a shared variable) with a floor 1000 elements and otherwise the
+         * default from IJoinNexus? The goal is to reduce the churn in the
+         * nursery.
          */
         final IBuffer<ISolution> tmp = joinNexus.newUnsynchronizedBuffer(
                 buffer, joinNexus.getChunkCapacity());

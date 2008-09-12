@@ -90,12 +90,6 @@ public class QueryTask extends AbstractStepTask {
             // producer is done : close the BlockingBuffer.
             buffer.close();
 
-            if (INFO) {
-                
-                log.info(totals);
-                
-            }
-            
             return totals;
 
         } catch (Throwable t) {

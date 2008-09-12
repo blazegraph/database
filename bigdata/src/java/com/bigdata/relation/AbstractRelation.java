@@ -75,7 +75,9 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * 
      * @return The index name.
      */
-    abstract public String getFQN(IKeyOrder<? extends E> keyOrder);
+    public String getFQN(IKeyOrder<? extends E> keyOrder) {
+        return getNamespace() + keyOrder.getIndexName();
+    }
     
     /**
      * Return the index for the {@link IKeyOrder} the timestamp for this view of
@@ -88,6 +90,11 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      *         as of the timestamp for this view of the relation.
      * 
      * @see #getIndex(String)
+     * 
+     * FIXME For efficiency the concrete implementations need to override this
+     * saving a hard reference to the index and then using a switch like
+     * construct to return the correct hard reference. This behavior should be
+     * encapsulated.
      */
     public IIndex getIndex(IKeyOrder<? extends E> keyOrder) {
 

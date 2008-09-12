@@ -32,8 +32,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
 
 /**
  * An {@link IBindingSet} backed by an dense array (no gaps). This
@@ -53,6 +53,18 @@ public class ArrayBindingSet implements IBindingSet {
     
     protected static final Logger log = Logger.getLogger(ArrayBindingSet.class);
     
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     private final IVariable[] vars;
     private final IConstant[] vals;
 
@@ -293,7 +305,7 @@ public class ArrayBindingSet implements IBindingSet {
         if (val == null)
             throw new IllegalArgumentException();
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("var=" + var + ", val=" + val + ", nbound=" + nbound+", capacity="+vars.length);
             

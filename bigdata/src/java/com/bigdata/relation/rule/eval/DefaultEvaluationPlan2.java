@@ -130,7 +130,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         
         this.tailCount = rule.getTailCount();
     
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("rule=" + rule);
             

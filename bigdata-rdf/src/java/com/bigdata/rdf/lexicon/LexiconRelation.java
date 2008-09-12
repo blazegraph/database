@@ -4,10 +4,6 @@
 
 package com.bigdata.rdf.lexicon;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.ref.SoftReference;
@@ -30,7 +26,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.CognitiveWeb.extser.LongPacker;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -56,7 +51,6 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.IIndexManager;
@@ -77,6 +71,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
@@ -143,19 +138,11 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
-    protected static Logger log = Logger.getLogger(LexiconRelation.class);
+    final protected static Logger log = Logger.getLogger(LexiconRelation.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     private final Set<String> indexNames;
 
@@ -240,9 +227,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         }
 
-        term2id = getIndex(LexiconKeyOrder.TERM2ID);
+        /*
+         * cache hard references to the indices.
+         */
 
-        id2term = getIndex(LexiconKeyOrder.ID2TERM);
+        term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+
+        id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
 
         if(textIndex) {
             
@@ -290,9 +281,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             indexManager.registerIndex(id2TermMetadata);
 
-            term2id = getIndex(LexiconKeyOrder.TERM2ID);
+            term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
 
-            id2term = getIndex(LexiconKeyOrder.ID2TERM);
+            id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
 
             if (textIndex) {
 
@@ -363,6 +354,28 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         
     }
     
+    /**
+     * Overriden to return the hard reference for the index.
+     */
+    @Override
+    public IIndex getIndex(IKeyOrder<? extends BigdataValue> keyOrder) {
+
+        if (keyOrder == LexiconKeyOrder.ID2TERM) {
+     
+            return getId2TermIndex();
+            
+        } else if (keyOrder == LexiconKeyOrder.TERM2ID) {
+            
+            return getTerm2IdIndex();
+            
+        } else {
+            
+            throw new AssertionError("keyOrder=" + keyOrder);
+            
+        }
+
+    }
+
     final public IIndex getTerm2IdIndex() {
 
         if (term2id == null)
@@ -472,12 +485,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     }
 
-    @Override
-    public String getFQN(IKeyOrder<? extends BigdataValue> keyOrder) {
-
-        return getNamespace() + ((LexiconKeyOrder)keyOrder).getIndexName();
-        
-    }
+//    @Override
+//    public String getFQN(IKeyOrder<? extends BigdataValue> keyOrder) {
+//
+//        return getNamespace() + ((LexiconKeyOrder)keyOrder).getIndexName();
+//        
+//    }
 
     public Set<String> getIndexNames() {
 
@@ -779,9 +792,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     public void addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG)
             log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
-        }
         
         if (numTerms == 0)
             return;
@@ -883,7 +895,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                         if (b[i].obj.getTermId() != IRawTripleStore.NULL) {
                             
-                            if (log.isDebugEnabled())
+                            if (DEBUG)
                                 log.debug("term identifier already assigned: "
                                         + b[i].obj);
                             
@@ -894,7 +906,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                         
                         if (i > 0 && b[i - 1].obj == b[i].obj) {
 
-                            if (log.isDebugEnabled())
+                            if (DEBUG)
                                 log.debug("duplicate term reference: "
                                         + b[i].obj);
                             
@@ -1419,7 +1431,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (n > 1000 || elapsed > 3000) {
+        if (INFO && n > 1000 || elapsed > 3000) {
 
             log.info("Wrote " + n + " in " + elapsed + "ms; keygen="
                     + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
@@ -1508,7 +1520,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *         entry for that term identifier.
      * 
      * FIXME write unit tests getTerms(ids) - it's mainly used by the
-     *       {@link BigdataStatementIteratorImpl}
+     * {@link BigdataStatementIteratorImpl} and
+     * {@link BigdataSolutionResolverator}.
      */
     final public Map<Long,BigdataValue> getTerms(final Collection<Long> ids) {
 

@@ -65,6 +65,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     protected static final Logger log = Logger
             .getLogger(BigdataEvaluationStrategyImpl.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * The magic predicate for text search.
      * 
@@ -267,11 +271,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             return super.evaluate(join, bindings);
         }
         
-        if (log.isInfoEnabled()) log.info("evaluating native join");
+        if (INFO) log.info("evaluating native join");
         Collection<StatementPattern> stmtPatterns = 
             new LinkedList<StatementPattern>();
         collectStatementPatterns(join, stmtPatterns);
-        if (log.isInfoEnabled()) {
+        if (INFO) {
             for (StatementPattern stmtPattern : stmtPatterns) {
                 log.info(stmtPattern);
             }
@@ -432,18 +436,12 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         /*
          * Efficiently resolve term identifiers in Bigdata ISolutions to RDF
-         * Values in Sesame 2 BindingSets.
+         * Values in Sesame 2 BindingSets and align the resulting iterator with
+         * the Sesame 2 API.
          */
-        final BigdataSolutionResolverator itr2 = new BigdataSolutionResolverator(
-                database, itr1);
-
-        /*
-         * Align the iterator with the Sesame 2 API.
-         */
-        final Bigdata2Sesame2BindingSetIterator<QueryEvaluationException> itr3 = new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-                itr2);
-        
-        return itr3;
+        return new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+                new BigdataSolutionResolverator(database, itr1).start(database
+                        .getExecutorService()));
         
     }
 

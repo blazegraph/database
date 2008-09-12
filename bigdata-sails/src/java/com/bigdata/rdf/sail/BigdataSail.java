@@ -74,7 +74,6 @@ import java.util.Properties;
 import java.util.Vector;
 import java.util.concurrent.Semaphore;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -264,17 +263,9 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final protected static Logger log = Logger.getLogger(BigdataSail.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The equivilent of a null identifier for an internal RDF Value.
@@ -468,8 +459,9 @@ public class BigdataSail extends SailBase implements Sail {
                     BigdataSail.Options.TRUTH_MAINTENANCE,
                     BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
 
-            log.info(BigdataSail.Options.TRUTH_MAINTENANCE + "="
-                    + truthMaintenance);
+            if (INFO)
+                log.info(BigdataSail.Options.TRUTH_MAINTENANCE + "="
+                        + truthMaintenance);
             
         }
         
@@ -480,9 +472,9 @@ public class BigdataSail extends SailBase implements Sail {
                     BigdataSail.Options.BUFFER_CAPACITY,
                     BigdataSail.Options.DEFAULT_BUFFER_CAPACITY));
 
-            log
-                    .info(BigdataSail.Options.BUFFER_CAPACITY + "="
-                            + bufferCapacity);
+            if (INFO)
+                log.info(BigdataSail.Options.BUFFER_CAPACITY + "="
+                        + bufferCapacity);
 
         }
 
@@ -493,9 +485,8 @@ public class BigdataSail extends SailBase implements Sail {
                     BigdataSail.Options.NATIVE_JOINS,
                     BigdataSail.Options.DEFAULT_NATIVE_JOINS));
 
-            log
-                    .info(BigdataSail.Options.NATIVE_JOINS + "="
-                            + nativeJoins);
+            if (INFO)
+                log.info(BigdataSail.Options.NATIVE_JOINS + "=" + nativeJoins);
 
         }
 
@@ -506,9 +497,9 @@ public class BigdataSail extends SailBase implements Sail {
                     BigdataSail.Options.QUERY_TIME_EXPANDER,
                     BigdataSail.Options.DEFAULT_QUERY_TIME_EXPANDER));
 
-            log
-                    .info(BigdataSail.Options.QUERY_TIME_EXPANDER+ "="
-                            + queryTimeExpander);
+            if (INFO)
+                log.info(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
+                        + queryTimeExpander);
 
         }
 
@@ -518,7 +509,7 @@ public class BigdataSail extends SailBase implements Sail {
         
         // NOP (nothing to invoke in the SailBase).
         
-        if(log.isInfoEnabled()) {
+        if(INFO) {
             
             log.info("closeOnShutdown=" + closeOnShutdown);
             
@@ -536,7 +527,8 @@ public class BigdataSail extends SailBase implements Sail {
         
         if(database.isOpen()) {
             
-            log.info("");
+            if (INFO)
+                log.info("");
             
             shutDown();
             
@@ -554,7 +546,8 @@ public class BigdataSail extends SailBase implements Sail {
         
         if (closeOnShutdown) {
 
-            log.info("Closing the backing database");
+            if (INFO)
+                log.info("Closing the backing database");
             
             database.close();
             
@@ -897,7 +890,8 @@ public class BigdataSail extends SailBase implements Sail {
          
             if (database.isReadOnly()) {
                 
-                log.info("Read-only view");
+                if (INFO)
+                    log.info("Read-only view");
                 
                 tm = null;
                 
@@ -905,7 +899,8 @@ public class BigdataSail extends SailBase implements Sail {
                 
             } else {
 
-                log.info("Read-write view");
+                if (INFO)
+                    log.info("Read-write view");
 
                 bnodes = new HashMap<String,BigdataBNodeImpl>(bufferCapacity);
                 
@@ -948,34 +943,6 @@ public class BigdataSail extends SailBase implements Sail {
             return queryTimeExpander;
             
         }
-        
-//        /**
-//         * A {@link BigdataSailConnection} local {@link TemporaryStore}.
-//         * 
-//         * @todo explicitly close with the {@link BigdataSailConnection}? I
-//         *       believe that some connection instances may be reused (for read
-//         *       historical views and for the read-committed view).
-//         */
-//        protected TemporaryStore getTemporaryStore() {
-//
-//            if (tempStore == null) {
-//                
-//                synchronized (this) {
-//                
-//                    if (tempStore == null) {
-//                    
-//                        tempStore = new TemporaryStore();
-//                        
-//                    }
-//                    
-//                }
-//                
-//            }
-//            
-//            return tempStore;
-//            
-//        }
-//        private volatile TemporaryStore tempStore = null; 
         
         /*
          * SailConnectionListener support.

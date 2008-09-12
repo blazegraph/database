@@ -40,10 +40,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
@@ -119,6 +121,7 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -276,6 +279,15 @@ abstract public class AbstractTripleStore extends
      */
     final public int chunkCapacity;
 
+    /**
+     * The timeout in milliseconds that the {@link BlockingBuffer} will wait for
+     * another chunk to combine with the current chunk before returning the
+     * current chunk. This may be ZERO (0) to disable the chunk combiner.
+     * 
+     * @see Options#CHUNK_TIMEOUT
+     */
+    final public long chunkTimeout;
+    
     /**
      * If the estimated range count for an
      * {@link IAccessPath#iterator(int, int)} is LTE this threshold then do a
@@ -680,6 +692,26 @@ abstract public class AbstractTripleStore extends
         
         /**
          * <p>
+         * Set the maximum #of chunks from concurrent producers that can be
+         * buffered before an {@link IBuffer} containing chunks of
+         * {@link ISolution}s would block (default
+         * {@link #DEFAULT_CHUNK_OF_CHUNKS_CAPACITY}). This is used to
+         * provision a {@link BlockingQueue} for {@link BlockingBuffer}. A
+         * value of ZERO(0) indicates that a {@link SynchronousQueue} should be
+         * used instead. The best value may be more than the #of concurrent
+         * producers if the producers are generating small chunks, e.g., because
+         * there are few solutions for a join subquery.
+         * </p>
+         */
+        String CHUNK_OF_CHUNKS_CAPACITY = "chunkOfChunksCapacity";
+
+        /**
+         * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY} 
+         */
+        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "1000";
+
+        /**
+         * <p>
          * Sets the capacity of the {@link UnsynchronizedArrayBuffer}s used to
          * accumulate a chunk of {@link ISolution}s when evaluating rules, etc
          * (default {@value #CHUNK_CAPACITY}). These buffers make it possible
@@ -716,21 +748,18 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_CHUNK_CAPACITY = ""+20*Bytes.kilobyte32;
 
         /**
-         * <p>
-         * Set the maximum #of chunks from concurrent producers that can be
-         * buffered before an {@link IBuffer} containing chunks of
-         * {@link ISolution}s would block. The best value may be more than the
-         * #of concurrent producers if the producers are generating small
-         * chunks, e.g., because there are few solutions for a join subquery.
-         * </p>
+         * The timeout in milliseconds that the {@link BlockingBuffer} will wait
+         * for another chunk to combine with the current chunk before returning
+         * the current chunk (default {@link #DEFAULT_CHUNK_TIMEOUT}). This may
+         * be ZERO (0) to disable the chunk combiner.
          */
-        String CHUNK_OF_CHUNKS_CAPACITY = "chunkOfChunksCapacity";
-
+        String CHUNK_TIMEOUT = "chunkTimeout";
+        
         /**
-         * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY} 
+         * The default for {@link #CHUNK_TIMEOUT}.
          */
-        String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "1000";
-
+        String DEFAULT_CHUNK_TIMEOUT = "1000";
+        
         /**
          * If the estimated rangeCount for an
          * {@link IAccessPath#iterator(int, int)} is LTE this threshold then use
@@ -1016,6 +1045,22 @@ abstract public class AbstractTripleStore extends
 
             if (INFO)
                 log.info(Options.CHUNK_CAPACITY + "=" + chunkCapacity);
+            
+        }
+
+        {
+
+            chunkTimeout = Long.parseLong(properties.getProperty(
+                    Options.CHUNK_TIMEOUT,
+                    Options.DEFAULT_CHUNK_TIMEOUT));
+
+            if (chunkTimeout < 0) {
+                throw new IllegalArgumentException(
+                        Options.CHUNK_TIMEOUT + " must be non-negative");
+            }
+
+            if (INFO)
+                log.info(Options.CHUNK_TIMEOUT + "=" + chunkTimeout);
             
         }
 
@@ -2127,7 +2172,7 @@ abstract public class AbstractTripleStore extends
 
     public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<ISPO> src) {
 
-        return new BigdataStatementIteratorImpl(this, src);
+        return new BigdataStatementIteratorImpl(this, src).start(getExecutorService());
 
     }
 
@@ -3579,7 +3624,7 @@ abstract public class AbstractTripleStore extends
                 writeTimestamp, readTimestamp, //
                 forceSerialExecution, maxParallelSubqueries, //
                 justify, backchain,
-                chunkOfChunksCapacity, chunkCapacity,
+                chunkOfChunksCapacity, chunkCapacity, chunkTimeout,
                 fullyBufferedReadThreshold, solutionFlags,
                 filter, planFactory);
         
@@ -3725,7 +3770,7 @@ abstract public class AbstractTripleStore extends
         try {
         
             return new BigdataSolutionResolverator(this, joinNexus
-                    .runQuery(program));
+                    .runQuery(program)).start(getExecutorService());
             
         } catch(Exception ex) {
             

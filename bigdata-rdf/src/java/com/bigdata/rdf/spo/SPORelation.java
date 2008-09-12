@@ -57,6 +57,8 @@ import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchRemove;
 import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -123,6 +125,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     protected static final Logger log = Logger.getLogger(SPORelation.class);
     
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     private transient final long NULL = IRawTripleStore.NULL;
     
     private final Set<String> indexNames;
@@ -144,7 +150,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             this.justify = Boolean.parseBoolean(properties.getProperty(
                     Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
 
-            log.info(Options.JUSTIFY + "=" + justify);
+            if(INFO) log.info(Options.JUSTIFY + "=" + justify);
             
         }
         
@@ -153,7 +159,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             this.oneAccessPath = Boolean.parseBoolean(properties.getProperty(
                     Options.ONE_ACCESS_PATH, Options.DEFAULT_ONE_ACCESS_PATH));
 
-            log.info(Options.ONE_ACCESS_PATH + "=" + oneAccessPath);
+            if(INFO) log.info(Options.ONE_ACCESS_PATH + "=" + oneAccessPath);
             
         }
 
@@ -163,7 +169,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 .getProperty(Options.STATEMENT_IDENTIFIERS,
                         Options.DEFAULT_STATEMENT_IDENTIFIERS));
 
-            log.info(Options.STATEMENT_IDENTIFIERS + "=" + statementIdentifiers);
+            if(INFO) log.info(Options.STATEMENT_IDENTIFIERS + "=" + statementIdentifiers);
             
         }
 
@@ -180,7 +186,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             }
 
-            log.info(Options.BRANCHING_FACTOR + "=" + branchingFactor);
+            if(INFO) log.info(Options.BRANCHING_FACTOR + "=" + branchingFactor);
 
         }
 
@@ -451,7 +457,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
     /**
      * Overriden to return the hard reference for the index.
      */
-    public IIndex getIndex(SPOKeyOrder keyOrder) {
+    @Override
+    public IIndex getIndex(IKeyOrder<? extends ISPO> keyOrder) {
 
         if (keyOrder == SPOKeyOrder.SPO) {
      
@@ -518,11 +525,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
     
-    public String getFQN(IKeyOrder<? extends ISPO> keyOrder) {
-        
-        return getNamespace() + ((SPOKeyOrder)keyOrder).getIndexName();
-        
-    }
+//    public String getFQN(IKeyOrder<? extends ISPO> keyOrder) {
+//        
+//        return getNamespace() + ((SPOKeyOrder)keyOrder).getIndexName();
+//        
+//    }
     
     /**
      * Shared {@link IndexMetadata} configuration.
@@ -689,6 +696,15 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (predicate == null)
             throw new IllegalArgumentException();
         
+        synchronized (accessPathCache) {
+
+            final IAccessPath<ISPO> accessPath = accessPathCache.get(predicate);
+
+            if (accessPath != null)
+                return accessPath;
+
+        }
+        
         final long s = predicate.get(0).isVar() ? NULL : (Long) predicate.get(0).get();
         final long p = predicate.get(1).isVar() ? NULL : (Long) predicate.get(1).get();
         final long o = predicate.get(2).isVar() ? NULL : (Long) predicate.get(2).get();
@@ -730,15 +746,25 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
         
-        if (log.isDebugEnabled()) {
-
+        if (DEBUG)
             log.debug(accessPath.toString());
+
+        synchronized (accessPathCache) {
+
+            if(accessPathCache.get(predicate)==null) {
+
+                accessPathCache.put(predicate, accessPath, false/* dirty */);
+                
+            }
             
         }
         
         return accessPath;
         
     }
+    // @todo config cache capacity.
+    private WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>> accessPathCache = new WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>>(
+            new LRUCache<IPredicate<ISPO>, IAccessPath<ISPO>>(1000));
 
     /**
      * Core impl.
@@ -905,11 +931,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         
-        if(log.isDebugEnabled()) {
-            
+        if(DEBUG)
             log.debug(spo.toString());
-            
-        }
         
         return spo;
         
@@ -1060,7 +1083,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final long begin = System.currentTimeMillis();
 
-        if(log.isDebugEnabled()) {
+        if(DEBUG) {
             
             log.debug("indexManager="+getIndexManager());
             
@@ -1126,7 +1149,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (numStmts > 1000) {
+        if (INFO && numStmts > 1000) {
 
             log.info("Wrote " + numStmts + " statements (mutationCount="
                     + mutationCount + ") in " + elapsed + "ms" //
@@ -1252,7 +1275,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         long elapsed = System.currentTimeMillis() - begin;
 
-        if (numStmts > 1000) {
+        if (INFO && numStmts > 1000) {
 
             log.info("Removed " + numStmts + " in " + elapsed
                     + "ms; sort=" + sortTime + "ms, keyGen+delete="
@@ -1350,8 +1373,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            log.info("Wrote " + nwritten + " justifications in " + elapsed
-                    + " ms");
+            if (INFO)
+                log.info("Wrote " + nwritten + " justifications in " + elapsed
+                        + " ms");
 
             return nwritten;
 
@@ -1399,11 +1423,5 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return sb;
 
     }
-
-//    /**
-//     * A constant corresponding to {@link IRawTripleStore#NULL}.
-//     */
-//    private final static transient IConstant<Long> CONST_NULL = new Constant<Long>(
-//            IRawTripleStore.NULL);
 
 }
