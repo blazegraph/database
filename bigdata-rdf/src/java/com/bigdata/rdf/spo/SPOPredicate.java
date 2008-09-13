@@ -495,28 +495,28 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-    public boolean equals(IPredicate<ISPO> other) {
+    public boolean equals(Object other) {
         
         if (this == other)
             return true;
+
+        final IPredicate o = (IPredicate)other;
         
         final int arity = arity();
         
-        if(arity != other.arity()) return false;
+        if(arity != o.arity()) return false;
         
         for(int i=0; i<arity; i++) {
             
-            final IVariableOrConstant<Long> x = get(i);
+            final IVariableOrConstant x = get(i);
             
-            final IVariableOrConstant<Long> y = other.get(i);
+            final IVariableOrConstant y = o.get(i);
             
-            // handles context when null.
-            if (x == null && y != null)
+            if (!(x == y || x.equals(y))) {
+                
                 return false;
             
-            // handles non-null on this predicate.
-            if (!x.equals(y))
-                return false; 
+            }
             
         }
         
@@ -524,4 +524,31 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
+    public int hashCode() {
+        
+        int h = hash;
+
+        if (h == 0) {
+
+            final int n = arity();
+
+            for (int i = 0; i < n; i++) {
+        
+                h = 31 * h + get(i).hashCode();
+                
+            }
+            
+            hash = h;
+            
+        }
+        
+        return h;
+
+    }
+
+    /**
+     * Caches the hash code.
+     */
+    private int hash = 0;
+    
 }
