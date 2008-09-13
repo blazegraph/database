@@ -28,9 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import java.util.HashMap;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.relation.rule.Constant;
+import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Var;
@@ -161,4 +164,79 @@ public class TestSPOPredicate extends TestCase2 {
 
     }
 
+    /**
+     * Note: {@link HashMap} support will breaks unless the {@link IPredicate}
+     * class defines <code>equals(Object o)</code>. If it just defines
+     * <code>equals(IPredicate)</code> then {@link Object#equals(Object)} will
+     * be invoked instead!
+     */
+    public void test_hashMapSameImpl() {
+
+        final Var<Long> u = Var.var("u");
+        
+        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource);
+
+        final Predicate p1b = new Predicate(relation, new IVariableOrConstant[]{u, rdfsSubClassOf, rdfsResource});
+        
+        final SPOPredicate p2 = new SPOPredicate(relation, u, rdfType, rdfsClass);
+
+        final Predicate p2b = new Predicate(relation, new IVariableOrConstant[]{u, rdfType, rdfsClass});
+
+        // p1 and p1b compare as equal.
+        assertTrue(p1.equals(p1));
+        assertTrue(p1.equals(p1b));
+        assertTrue(p1b.equals(p1));
+        assertTrue(p1b.equals(p1b));
+        
+        // {p1,p1b} not equal {p2,p2b}
+        assertFalse(p1.equals(p2));
+        assertFalse(p1.equals(p2b));
+        assertFalse(p1b.equals(p2));
+        assertFalse(p1b.equals(p2b));
+
+        // {p1,p1b} have the same hash code.
+        assertEquals(p1.hashCode(), p1b.hashCode());
+
+        // {p2,p2b} have the same hash code.
+        assertEquals(p2.hashCode(), p2b.hashCode());
+        
+        final HashMap<IPredicate,String> map = new HashMap<IPredicate,String>();
+        
+        assertFalse(map.containsKey(p1));
+        assertFalse(map.containsKey(p2));
+        assertFalse(map.containsKey(p1b));
+        assertFalse(map.containsKey(p2b));
+        
+        assertEquals(0,map.size());
+        assertNull(map.put(p1,"p1"));
+        assertEquals(1,map.size());
+        assertEquals("p1",map.put(p1,"p1"));
+        assertEquals(1,map.size());
+
+        assertTrue(p1.equals(p1b));
+        assertTrue(p1b.equals(p1));
+        assertTrue(p1.hashCode()==p1b.hashCode());
+        assertEquals("p1",map.put(p1b,"p1"));
+        assertEquals(1,map.size());
+        
+        assertTrue(map.containsKey(p1));
+        assertTrue(map.containsKey(p1b));
+        assertFalse(map.containsKey(p2));
+        assertFalse(map.containsKey(p2b));
+
+        assertEquals("p1",map.get(p1));
+        assertEquals("p1",map.get(p1b));
+        
+        map.put(p2,"p2");
+        
+        assertTrue(map.containsKey(p1));
+        assertTrue(map.containsKey(p1b));
+        assertTrue(map.containsKey(p2));
+        assertTrue(map.containsKey(p2b));
+        
+        assertEquals("p2",map.get(p2));
+        assertEquals("p2",map.get(p2b));
+        
+    }
+    
 }

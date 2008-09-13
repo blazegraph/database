@@ -190,13 +190,22 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      * @return true iff the predicate have the same arity and their ordered
      *         bindings are the same. when both predicates have a variable at a
      *         given index, the names of the variables must be the same.
-     * 
-     * @todo this may not be the best definition of equality to use here. it
-     *       intentionally disregards any constraints and the generic type while
-     *       requiring that unbound variables have the same name at a given
-     *       index. This definition was motivated by the unit tests rather than
-     *       any functional use for the behavior.
      */
-    public boolean equals(IPredicate<E> other);
+    public boolean equals(Object other);
 
+    /**
+     * The hash code is defined as
+     * 
+     * <pre>
+     * get(0).hashCode()*31&circ;(n-1) + get(1).hashCode()*31&circ;(n-2) + ... + get(n-1).hashCode()
+     * </pre>
+     * 
+     * using <code>int</code> arithmetic, where <code>n</code> is the
+     * {@link #arity()} of the predicate, and <code>^</code> indicates
+     * exponentiation.
+     * <p>
+     * Note: This is similar to how {@link String#hashCode()} is defined.
+     */
+    public int hashCode();
+    
 }

@@ -375,23 +375,60 @@ public class Predicate<E> implements IPredicate<E> {
 
     }
 
-    public boolean equals(IPredicate<E> other) {
-
+    public boolean equals(Object other) {
+        
         if (this == other)
             return true;
 
+        final IPredicate o = (IPredicate)other;
+        
         final int arity = arity();
         
-        if(arity != other.arity()) return false;
+        if(arity != o.arity()) return false;
         
         for(int i=0; i<arity; i++) {
             
-            if(!get(i).equals(other.get(i))) return false; 
+            final IVariableOrConstant x = get(i);
+            
+            final IVariableOrConstant y = o.get(i);
+            
+            if (!(x == y || x.equals(y))) {
+                
+                return false;
+            
+            }
             
         }
         
         return true;
         
     }
+    
+    public int hashCode() {
+        
+        int h = hash;
+
+        if (h == 0) {
+
+            final int n = arity();
+
+            for (int i = 0; i < n; i++) {
+        
+                h = 31 * h + get(i).hashCode();
+                
+            }
+            
+            hash = h;
+            
+        }
+        
+        return h;
+
+    }
+
+    /**
+     * Caches the hash code.
+     */
+    private int hash = 0;
     
 }

@@ -51,8 +51,6 @@ public interface IVariableOrConstant<E> extends Serializable {
     /**
      * Return <code>true</code> if this is the same variable or if both values
      * are {@link Constant} whose values are the same.
-     * 
-     * @todo if the generic types are different then always return false?
      */
     boolean equals(IVariableOrConstant<E> o);
 
@@ -63,11 +61,7 @@ public interface IVariableOrConstant<E> extends Serializable {
      *             if this is a variable.
      */
     E get();
-    
-    int hashCode();
-    
-    String toString();
-    
+
     /**
      * Return the name of a variable.
      * 

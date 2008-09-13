@@ -29,9 +29,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule;
 
 /**
+ * A constant.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface IConstant<E> extends IVariableOrConstant<E> {
 
+    /**
+     * The hash code of the value that would be returned by
+     * {@link IVariableOrConstant#get()}
+     */
+    int hashCode();
+    
 }

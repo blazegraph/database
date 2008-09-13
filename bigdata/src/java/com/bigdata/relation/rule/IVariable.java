@@ -36,4 +36,10 @@ package com.bigdata.relation.rule;
  */
 public interface IVariable<E> extends IVariableOrConstant<E> {
 
+    /**
+     * The hash code of the name of the variable as reported by
+     * {@link IVariableOrConstant#getName()}
+     */
+    int hashCode();
+    
 }
