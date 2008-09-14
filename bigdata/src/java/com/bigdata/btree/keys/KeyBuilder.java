@@ -36,6 +36,8 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleSerializer;
 
 /**
  * A class that may be used to form multi-component keys but which does not
@@ -65,6 +67,10 @@ import com.bigdata.btree.BytesUtil;
 public class KeyBuilder implements IKeyBuilder {
 
     protected static final Logger log = Logger.getLogger(KeyBuilder.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
+
+//    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The default capacity of the key buffer.
@@ -1341,16 +1347,21 @@ public class KeyBuilder implements IKeyBuilder {
         /**
          * A configuration option to force the interpretation of Unicode text as
          * ASCII (only the low byte is considered). This option can be useful
-         * when you know that your data is not actually Unicode.
+         * when you know that your data is not actually Unicode and offers a
+         * substantial performance benefit in such cases.
          */
         ASCII;
         
     };
     
     /**
-     * Configuration options for the {@link KeyBuilder} factory methods. These
-     * options should be specified as System properties using
-     * <code>-Dproperty=value</code> on the command line.
+     * Configuration options for {@link DefaultKeyBuilderFactory} and the
+     * {@link KeyBuilder} factory methods. <strong>The use of
+     * {@link DefaultKeyBuilderFactory} is highly recommended as it will cause
+     * the configuration to be serialized. In combination with the use of an
+     * {@link ITupleSerializer}, this means that Unicode keys for an index will
+     * be interpreted in the same manner on any machine where {@link ITuple}s
+     * for that index are (de-)materialized. </strong>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1358,14 +1369,19 @@ public class KeyBuilder implements IKeyBuilder {
     public static interface Options {
        
         /**
-         * Optional boolean property specifies whether or not the ICU library is
-         * required. When <code>true</code> the ICU library is required and
-         * MUST be available. When <code>false</code> the ICU library will NOT
-         * be used regardless of whether or not it is available. When this
-         * option is not specified the default behavior is to use the ICU
-         * library IFF it is available on the CLASSPATH.
+         * Optional property specifies the library that will be used to generate
+         * sort keys from Unicode data. The default always supports Unicode, but
+         * the library choice depends on whether or not ICU library is found on
+         * the classpath. When the ICU library is present, it is the default.
+         * Otherwise the JDK library is the default. You may explicitly specify
+         * the library choice using one of the {@link CollatorEnum} values. The
+         * {@link CollatorEnum#ASCII} value may be used to disable Unicode
+         * support entirely, treating the characters as if they were ASCII. If
+         * your data is not actually Unicode then this offers a substantial
+         * performance benefit.
+         * 
+         * @see CollatorEnum
          */
-        public String ICU = "collator.icu";
         public String COLLATOR = "collator";
 
         /**
@@ -1555,7 +1571,8 @@ public class KeyBuilder implements IKeyBuilder {
 
             locale = Locale.getDefault();
 
-            log.info("Using default locale: " + locale.getDisplayName());
+            if(INFO)
+                log.info("Using default locale: " + locale.getDisplayName());
 
         }
 

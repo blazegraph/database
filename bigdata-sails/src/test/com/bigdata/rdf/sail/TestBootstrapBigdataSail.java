@@ -77,7 +77,9 @@ public class TestBootstrapBigdataSail extends TestCase {
      */
     public void test_ctor_1() throws SailException {
         
-        BigdataSail sail = new BigdataSail();
+        final BigdataSail sail = new BigdataSail();
+        
+        sail.initialize();
         
         try {
 
@@ -130,6 +132,8 @@ public class TestBootstrapBigdataSail extends TestCase {
 
         BigdataSail sail = new BigdataSail(properties);
 
+        sail.initialize();
+        
         try {
 
             sail.shutDown();
@@ -180,6 +184,8 @@ public class TestBootstrapBigdataSail extends TestCase {
 
         final BigdataSail sail = new BigdataSail(properties);
 
+        sail.initialize();
+        
         try {
 
             final SailConnection conn = sail.getConnection();
@@ -240,6 +246,8 @@ public class TestBootstrapBigdataSail extends TestCase {
 
         final BigdataSail sail = new BigdataSail(properties);
 
+        sail.initialize();
+        
         final SailConnection conn = sail.getConnection();
         
         final SailConnection readConn = sail.asReadCommittedView();

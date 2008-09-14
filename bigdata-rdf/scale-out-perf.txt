@@ -2348,19 +2348,6 @@ x. misc tests, performance problems and improvements for the RDF DB.
   - (defer) Optimize by assigning variables in a rule a positional
     index and use a long[] for bindings for SPORelation self-joins.
 
-  - Performance for unrolled joins?
-
-  - Refactor the bulk filter, statement buffer, bulk complete,
-    etc. operations as stackable, chunked, ordered, filtering
-    iterators using some stiterator extensions similar to what I have
-    done for the B+Tree.
-
-  - Replace IElementFilter with ITupleFilter or ITupleFilter[].
-       
-    This will allow us to use the prefix scan and distinct term scans
-    directly from an IRule by specifying the appropriate predicate
-    filter(s)!
-
   - Verify that the distinct term scan can correctly advance across
     index partition boundaries.  One way to do this is by setting a
     very small split point and then loading a known data set,
@@ -2553,44 +2540,13 @@ x. ZooKeeper integration for resource lock manager?
 
 	Database: #terms=315059, #stmts=1272953, rate=12355.0 in 103031 ms.
 
-      * Examine the pure access path read rate for LTS, LDS, EDS, and
-        JDS.  This is query6 and query 14.  Both queries produce a lot
-        of tuples.  Tune up the access path read until it is good on
-        all of these configurations.
-
-      * Use a cache in front of the LexiconRelation to quickly resolve
-        terms to their identifiers for commonly seen terms.  This
-        should help to reduce the latency for high-level query since
-        we will avoid hits on the lexicon when converting the query
-        Values into BigdataValues.
+      * Use an LRU cache in front of the LexiconRelation to quickly
+        resolve terms to their identifiers for commonly seen terms.
+        This should help to reduce the latency for high-level query
+        since we will avoid hits on the lexicon when converting the
+        query Values into BigdataValues.
 
       * EDS, JDS
-
-        * Unroll joins and distribute joins.
-
-	   There is a strong relationship between a byte[][] keys
-	   iterator such as the {@link PrefixFilter} and an unrolled
-	   JOIN operator.  This is especially true when the unrolled N
-	   is small, since it is cheap to send the tuples that we want
-	   to JOIN to the target data service.
-
-	   It needs to be modified to (a) unroll to inner loop of the
-	   join; and (b) partition the join such that the outer loop
-	   is split across the data services where the index partition
-	   resides and run each split in parallel.
-	   
-	   This makes the outer loop extremely efficient, distributes
-	   the computation over the cluster, and parallelizes the
-	   inner loop so that we do at most N queries - one query per
-	   index partition spanned by the queries framed for the inner
-	   loop by the bindings selected in the outer loop for a given
-	   chunk.  A large chunk size for the outer loop is also
-	   effective since the reads are local and this reduces the
-	   #of times that we will unroll the inner loop.
-
-	- NestedSubqueryJoin: Compare parallel subquery evaluation
-          with an Advancer populated with a chunk (or split of a
-          chunk).
 
         - Either verify overflow or disable overflow for EDS, JDS.
 

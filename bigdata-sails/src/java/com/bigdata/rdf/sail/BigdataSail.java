@@ -107,6 +107,7 @@ import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 import org.openrdf.sail.helpers.SailBase;
 
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
@@ -139,39 +140,36 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
+ * <p>
  * Sesame <code>2.x</code> integration.
+ * </p>
  * <p>
- * 
- * This SAIL enforces the constraint that there may be at most one writer. This
- * is done in {@link #getConnection()}. If a 2nd thread attempts to obtain a
- * {@link SailConnection} then that thread will block until the open
- * {@link SailConnection} is {@link SailConnection#close()}d.
- * 
- * <h2>Concurrent Query</h2>
- * 
- * While this class, by itself, is NOT safe for readers that run concurrently
- * with a writer, it provides both a read-committed and a read-historical view
- * that are safe for concurrent readers and that are safe to use while a writer
- * is concurrently running a transaction. See {@link #asReadCommittedView()}
- * and {@link #getReadHistoricalView(long)}.
+ * Read-write operations use {@link #getConnection()} to obtain a mutable view.
+ * {@link #getConnection()} uses a {@link Semaphore} to enforce the constraint
+ * that there is only one writable {@link BigdataSailConnection} at a time. SAIL
+ * transactions will be serialized (at most one will run at a time).
+ * </p>
  * <p>
- * In order to use concurrent query you basically have to decide whether an
- * operation is read-only or read-write. A read-only operation should be
- * directed to the {@link #asReadCommittedView()} while read-write operations
- * should obtain a lock on the mutable SAIL using {@link #startTransaction()}
- * before doing any other work. When approached in this manner, you will be able
- * to execute read operations (for example, high-level query) with full
- * concurrency and SAIL transactions will be serialized (at most one will run at
- * a time) but they will not block readers.
- * 
- * @todo update javadoc to describe new concurrency options.
- * 
- * @todo update javadoc to describe the "provenance" mode for the database,
- *       where the context is always a statement identifier and can be bound in
- *       query to recover statements about statements. Also document the
- *       extension required for a client to make use of the resulting RDF/XML,
- *       e.g., if a CONSTRUCT query is used to recover statements about
- *       statements.
+ * Concurrent readers are possible, and can be very efficient. However, readers
+ * MUST use a database commit point corresponding to a desired state of the
+ * store, e.g., after loading some data set and (optionally) after computing the
+ * closure of that data set. Use {@link #getDatabase()} .
+ * {@link AbstractTripleStore#getIndexManager()} .
+ * {@link IIndexStore#getLastCommitTime()} to obtain the commit time and then
+ * {@link #getReadHistoricalView(long)} to obtain a read-only view as of that
+ * commit time. In you are loading data incrementally, then you can use
+ * {@link #asReadCommittedView()} instead.
+ * </p>
+ * <p>
+ * The {@link BigdataSail} provides a triple store with statement-level
+ * provenance using <em>statement identifiers</em>. A statement identifier is
+ * unique identifier for a <em>triple</em> in the database. Statement
+ * identifiers may be used to make statements about statements without using RDF
+ * style reification. The statement identifier is bound to the context position
+ * during high-level query so you can use high-level query (SPARQL) to obtain
+ * statements about statements. See
+ * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS}.
+ * </p>
  * 
  * @todo Is there anything to be done with {@link #setDataDir(java.io.File)}?
  *       With {@link #getDataDir()}?
@@ -321,6 +319,12 @@ public class BigdataSail extends SailBase implements Sail {
     final private boolean queryTimeExpander;
     
     /**
+     * <code>true</code> iff the {@link BigdataSail} has been
+     * {@link #initialize()}d and not {@link #shutDown()}.
+     */
+    private boolean open;
+    
+    /**
      * Set <code>true</code> by ctor variants that open/create the database
      * but not by those that connect to an existing database. This helps to
      * provide the illusion of a dedicated purpose SAIL for those ctor variants.
@@ -353,7 +357,7 @@ public class BigdataSail extends SailBase implements Sail {
         
         Properties properties = new Properties();
         
-        properties.setProperty(Options.FILE,"bigdata"+Options.JNL);
+        properties.setProperty(Options.FILE, "bigdata" + Options.JNL);
         
         return properties;
         
@@ -504,8 +508,38 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
     }
+    
+    /**
+     * 
+     * @throws IllegalStateException
+     *             if the {@link BigdataSail} has not been {@link #initialize()}d
+     *             or has been {@link #shutDown()}.
+     */
+    protected void assertOpen() {
 
+        if (!open)
+            throw new IllegalStateException();
+        
+    }
+
+    /**
+     * Return <code>true</code> if the {@link BigdataSail} has been
+     * {@link #initialize()}d and has not been {@link #shutDown()}.
+     */
+    public boolean isOpen() {
+        
+        return open;
+        
+    }
+    
+    /**
+     * @throws IllegalStateException
+     *             if the sail is already open.
+     */
     public void initialize() throws SailException {
+
+        if (open)
+            throw new IllegalStateException();
         
         // NOP (nothing to invoke in the SailBase).
         
@@ -515,17 +549,16 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
+        open = true;
+        
     }
     
     /**
      * Invokes {@link #shutDown()}.
-     * 
-     * @todo should test a local boolean indicating open vs closed - this tests
-     * the backing database.
      */
     protected void finalize() throws Throwable {
         
-        if(database.isOpen()) {
+        if(isOpen()) {
             
             if (INFO)
                 log.info("");
@@ -537,6 +570,14 @@ public class BigdataSail extends SailBase implements Sail {
         super.finalize();
         
     }
+
+    public void shutDown() throws SailException {
+        
+        assertOpen();
+        
+        super.shutDown();
+        
+    }
     
     /**
      * If the backing database was created/opened by the {@link BigdataSail}
@@ -544,13 +585,25 @@ public class BigdataSail extends SailBase implements Sail {
      */
     protected void shutDownInternal() throws SailException {
         
-        if (closeOnShutdown) {
+        if (open) {
+            
+            try {
+            
+                if (closeOnShutdown) {
 
-            if (INFO)
-                log.info("Closing the backing database");
-            
-            database.close();
-            
+                    if (INFO)
+                        log.info("Closing the backing database");
+
+                    database.close();
+
+                }
+                
+            } finally {
+
+                open = false;
+
+            }
+
         }
         
     }
@@ -717,7 +770,7 @@ public class BigdataSail extends SailBase implements Sail {
      */
     public BigdataSailConnection getConnection() throws SailException {
         
-        return (BigdataSailConnection)super.getConnection();
+        return (BigdataSailConnection) super.getConnection();
         
     }
 
@@ -884,6 +937,8 @@ public class BigdataSail extends SailBase implements Sail {
          */
         protected BigdataSailConnection(AbstractTripleStore database) {
 
+            BigdataSail.this.assertOpen();
+            
             this.database = database;
             
             readOnly = database.isReadOnly();            
@@ -1252,9 +1307,7 @@ public class BigdataSail extends SailBase implements Sail {
             } else {
 
                 /*
-                 * FIXME It is no longer true that there is only one graph per database
-                 * so we have to actually delete the statements in the graph by writing
-                 * those deletes on the database.
+                 * Named graphs are not supported.
                  */
 
                 throw new UnsupportedOperationException();
@@ -1637,8 +1690,7 @@ public class BigdataSail extends SailBase implements Sail {
             }
                 
             /*
-             * FIXME the context is being ignored but it should operate on the
-             * specified contexts.
+             * Note: the context is being ignored.
              */
             
             return getStatements(s, p, o, includeInferred);
