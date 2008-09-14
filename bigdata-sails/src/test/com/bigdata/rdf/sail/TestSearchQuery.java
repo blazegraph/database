@@ -147,6 +147,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
         BigdataSail sail = getSail(properties);
 
+        sail.initialize();
+        
         try {
 
 //            if (!sail.database.getStatementIdentifiers()) {
@@ -195,6 +197,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             // re-open the SAIL.
             sail = reopenSail(sail);
 
+            sail.initialize();
+            
             log.info("#statements after restart: "
                     + sail.database.getExactStatementCount());
 
@@ -364,6 +368,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final BigdataSailRepository repo = new BigdataSailRepository(
                         sail);
 
+                // note: initializes the SAIL.
                 repo.initialize();
 
                 { // load ontology and optionally the entity data.
@@ -418,6 +423,11 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                         for (Statement stmt : results) {
                             log.info(stmt);
                         }
+                        /*
+                         * @todo this test is failing : review with MikeP and
+                         * figure out if it is the test or the system under
+                         * test.
+                         */
                         assertTrue(results.contains(new StatementImpl(SYSTAP,
                                 RDF.TYPE, ENTITY)));
                     } finally {

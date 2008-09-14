@@ -190,6 +190,12 @@ import com.bigdata.striterator.IKeyOrder;
  * @todo Support rules (IF TripleExpr THEN ...) This is basically encapsulating
  *       the rule execution layer.
  * 
+ * @todo Replace IElementFilter with ITupleFilter or ITupleFilter[].
+ *       <p>
+ *       This will allow us to use the prefix scan and distinct term scans
+ *       directly from an IRule by specifying the appropriate predicate
+ *       filter(s)
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -466,6 +472,8 @@ abstract public class AbstractTripleStore extends
          * <code>false</code>, the lexicon indices are not registered. This
          * can be safely turned off for the {@link TempTripleStore} when only
          * the statement indices are to be used.
+         * 
+         * @see LexiconRelation
          */
         String LEXICON = "lexicon";
 

@@ -87,6 +87,8 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
         final BigdataSail sail = getSail();
         
+        sail.initialize();
+        
         try {
         
         if (!((BigdataSail) sail).database.getStatementIdentifiers()) {

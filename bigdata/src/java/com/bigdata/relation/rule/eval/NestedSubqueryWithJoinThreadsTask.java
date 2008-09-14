@@ -35,9 +35,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.proc.BatchContains;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -63,6 +63,23 @@ import com.bigdata.striterator.IKeyOrder;
  *       task will use {@link ClientIndexView}s. All work (other than the
  *       iterator scan) will be performed on the client running the join.
  * 
+ * @todo Once all variables are bound the remaining joins are just point tests
+ *       and can be more effectively expressed as {@link BatchContains}s
+ *       operations. In order to make those batch contains tests effective we
+ *       need to have a chunk on which to operate. This may require
+ *       concentrating join threads back together or reducing their spread. This
+ *       is also a variant on "bushy" joins -- where more than two join
+ *       dimensions can be evaluated at once.
+ *       <p>
+ *       Add the #of unbound variables for each predicate in the eval order to
+ *       the {@link RuleStats}.
+ * 
+ * @todo modify access path to allow us to select specific fields from the
+ *       relation to be returned to the join since not all will be used - we
+ *       only need those that will be bound. this will require more
+ *       generalization of the binding set and its serialization and a mix up of
+ *       that with the iterators on the {@link IAccessPath}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -73,14 +90,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /*
      * from the ctor.
@@ -823,5 +838,104 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         }
 
     }
+
+//    /**
+//     * Evaluation of an {@link IRule} using nested subquery and an {@link Advancer}
+//     * pattern to reduce the #of subqueries to one per chunk materialized for the
+//     * left-hand side of a join.
+//     * <p>
+//     * This (a) unrolls the inner loop of the join; and (b) if the index for the
+//     * right-hand side of the join is key-range partitioned, then partitions the
+//     * join such that the outer loop is split across the {@link DataService}s where
+//     * the index partition resides and runs each split in parallel. We do not
+//     * parallelize subqueries that target the same index partition since a single
+//     * reader on that index partition using an {@link Advancer} pattern will be very
+//     * efficient (it will use an ordered read).
+//     * <p>
+//     * This makes the outer loop extremely efficient, distributes the computation
+//     * over the cluster, and parallelizes the inner loop so that we do at most N
+//     * queries - one query per index partition spanned by the queries framed for the
+//     * inner loop by the bindings selected in the outer loop for a given chunk. A
+//     * large chunk size for the outer loop is also effective since the reads are
+//     * local and this reduces the #of times that we will unroll the inner loop.
+//     * 
+//     * @todo handle key-range partitions and optimize when only one split.
+//     * 
+//     * @todo does jini avoid RMI when the proxy target is local? If not, consider
+//     *       breaking the elements for a split into sub-chunks and parallelizing
+//     *       them.
+//     * 
+//     * @todo This algorithm will work on either a local or a distributed federation.
+//     *       it should be efficient for a local federation.
+//     *       <p>
+//     *       For a distributed federation, the {@link IAccessPath}s uses
+//     *       {@link ClientIndexView}s. The {@link Advancer} pattern sends data from
+//     *       the current chunk along with the iterator to each relevant index and
+//     *       evaluates the intersection on the {@link DataService} hosting that
+//     *       index partition, but all results flow back to the client executing the
+//     *       rules.
+//     *       <p>
+//     *       A more fully distributed join could be accomplished by passing along
+//     *       the buffer on which we are writing the join results to each nested
+//     *       join. This would require that the buffer was an RMI proxy for a buffer
+//     *       on the client executing the program. It would also require that the
+//     *       task executing each join step was decomposed by join index and by chunk
+//     *       such that we in fact run many tasks distributed over the cluster. This
+//     *       should have greater effective parallelism.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    protected static class JoinAdvancer<E> extends Advancer<E> {
+//
+//        private final NestedSubqueryWithJoinThreadsTask task;
+//        private final E[] chunk;
+//        private final int orderIndex;
+//        
+//        public JoinAdvancer(NestedSubqueryWithJoinThreadsTask task, E[] chunk, int orderIndex) {
+//            
+//            this.task = task;
+//            this.chunk = chunk;
+//            this.orderIndex = orderIndex;
+//            
+//        }
+//        
+//        @Override
+//        protected void advance(ITuple tuple) {
+//            
+//            for (Object e : chunk) {
+//
+//                if (log.isDebugEnabled()) {
+//                    log.debug("Considering: " + e.toString()
+//                            + ", tailIndex=" + orderIndex + ", rule="
+//                            + rule.getName());
+//                }
+//
+//                ruleStats.elementCount[order]++;
+//
+//                /*
+//                 * Then bind this statement, which propagates bindings
+//                 * to the next predicate (if the bindings are rejected
+//                 * then the solution would violate the constaints on the
+//                 * JOIN).
+//                 */
+//
+//                ruleState.clearDownstreamBindings(orderIndex + 1, bindingSet);
+//                
+//                if (ruleState.bind(order, e, bindingSet)) {
+//
+//                    // run the subquery.
+//                    
+//                    ruleStats.subqueryCount[order]++;
+//
+//                    NestedSubqueryWithAdvancerTask.this.apply(orderIndex + 1);
+//                    
+//                }
+//
+//            }
+//
+//        }
+//        
+//    };
 
 }

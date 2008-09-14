@@ -163,6 +163,8 @@ public class TestQuery extends ProxyBigdataSailTestCase {
 
         final BigdataSail sail = getSail();
         
+        sail.initialize();
+        
         try {
         
         loadData(sail);

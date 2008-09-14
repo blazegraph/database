@@ -39,6 +39,30 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @todo In fact, RIO also keeps a blank node map so that it can reuse the same
  *       blank node object if it sees the same ID more than once.
  * 
+ * @todo the {@link StatementBuffer} does not appear to correctly canonicalize
+ *       terms when statement identifiers are enabled. Per below, this just
+ *       needs to be rewritten. The code could be simplified dramatically. If
+ *       the value is a BNode, then it goes into a map for canonicalizing blank
+ *       nodes with a life cycle of the document being loaded. If a statement
+ *       uses blank nodes then it must be deferred (this is true whether or not
+ *       statement identifiers are in use) so do NOT make the {s,p,o} canonical
+ *       since the statement and its terms will be processed later. Otherwise it
+ *       goes into a canonicalizing Set (add iff not found and return, otherwise
+ *       return the existing Value). The canonicalized value is used by the
+ *       statement. An incremental write will cause all terms in the Value[] to
+ *       be assigned term identifiers, so they should be BigdataValue objects.
+ *       The statements now have term identifiers and they are written onto the
+ *       DB. When the end of the document is reached, there will be deferred
+ *       statements iff there were blank nodes. Those are then processed per the
+ *       existing code. (If statement identifiers exist, then unify blank nodes
+ *       with statment identifiers otherwise just assign term identifiers to
+ *       blank nodes.) Note that the Value[] should be empty after each
+ *       incremental write. If there are deferred statements, then they already
+ *       have BigdataValue objects binding their term identifiers. When we
+ *       process the deferred statements we should only be assigning term
+ *       identifiers for blank nodes -- everything else should already have its
+ *       term identifier assigned for the deferred statements.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <F>
