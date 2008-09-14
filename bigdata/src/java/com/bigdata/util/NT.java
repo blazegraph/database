@@ -46,7 +46,7 @@ public class NT implements Serializable {
      * @param timestamp
      *            The timestamp associated with the view.
      */
-    public NT(String name, long timestamp) {
+    public NT(final String name, final long timestamp) {
 
         if (name == null)
             throw new IllegalArgumentException();

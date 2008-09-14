@@ -46,9 +46,11 @@ import com.bigdata.resources.StaleLocatorException;
  */
 public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> {
     
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(DataServiceTupleIterator.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /**
      * Used to submit delete requests to the scale-out index in a robust
      * manner.

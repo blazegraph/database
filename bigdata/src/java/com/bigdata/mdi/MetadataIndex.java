@@ -95,9 +95,20 @@ import com.bigdata.service.MetadataService;
  */
 public class MetadataIndex extends BTree implements IMetadataIndex {
 
+    /**
+     * Used to implement find(byte[] key).
+     */
+    private transient final MetadataIndexView view;
+    
+    public MetadataIndexMetadata getIndexMetadata() {
+        
+        return (MetadataIndexMetadata) super.getIndexMetadata();
+        
+    }
+    
     public IndexMetadata getScaleOutIndexMetadata() {
         
-        return ((MetadataIndexMetadata) getIndexMetadata()).scaleOutIndexMetadata;
+        return getIndexMetadata().getManagedIndexMetadata();
         
     }
     
@@ -191,6 +202,8 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
          */
 
         nextPartitionId = ((MetadataIndexCheckpoint)checkpoint).getNextPartitionId();
+        
+        view = new MetadataIndexView(this);
         
     }
     
@@ -409,8 +422,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     public PartitionLocator find(byte[] key) {
 
-        // @todo could retain the view reference.
-        return new MetadataIndexView(this).find(key);
+        return view.find(key);
         
     }
 

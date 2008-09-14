@@ -281,24 +281,27 @@ public class JiniFederation extends AbstractDistributedFederation {
     synchronized public void shutdown() {
         
         final long begin = System.currentTimeMillis();
-        
-        log.info("begin");
+
+        if (INFO)
+            log.info("begin");
 
         super.shutdown();
-        
+
         terminateDiscoveryProcesses();
 
         final long elapsed = System.currentTimeMillis() - begin;
-        
-        if(INFO) log.info("Done: elapsed="+elapsed+"ms");
-        
+
+        if (INFO)
+            log.info("Done: elapsed=" + elapsed + "ms");
+
     }
-    
+
     synchronized public void shutdownNow() {
 
         final long begin = System.currentTimeMillis();
-        
-        log.info("begin");
+
+        if (INFO)
+            log.info("begin");
         
         super.shutdownNow();
         

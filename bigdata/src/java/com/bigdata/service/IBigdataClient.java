@@ -39,6 +39,9 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.QueueStatisticsTask;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
+import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
@@ -261,6 +264,11 @@ public interface IBigdataClient {
          * request generates at most this many tasks at a time and new tasks
          * will not be created for that request until the previous set of tasks
          * for the request have completed.
+         * 
+         * @todo use for {@link NestedSubqueryWithJoinThreadsTask} for parallel
+         *       subqueries?
+         * 
+         * @todo use for {@link ProgramTask} for parallel rule evaluation?
          */
         String CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "client.maxParallelTasksPerRequest";
 
@@ -289,6 +297,8 @@ public interface IBigdataClient {
          * 
          * @todo allow override on a per index basis as part of the index
          *       metadata?
+         * 
+         * @todo use on {@link IAccessPath}s for the chunk size?
          */
         String CLIENT_RANGE_QUERY_CAPACITY = "client.rangeIteratorCapacity";
 

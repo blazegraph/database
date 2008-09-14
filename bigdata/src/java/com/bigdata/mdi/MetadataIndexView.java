@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.mdi;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.DelegateIndex;
 import com.bigdata.btree.ILinearList;
@@ -35,6 +37,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.cache.LRUCache;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
@@ -46,7 +49,20 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
  */
 public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
 
+    protected static final Logger log = Logger.getLogger(MetadataIndexView.class);
+    
+//    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     private final AbstractBTree delegate;
+
+    /**
+     * <code>true</code> iff this is a read-only view. this is used to
+     * conditionally enable caching of de-serialized objects in
+     * {@link #getLocatorAtIndex(int)}.  We can't cache those objects if
+     * the view is mutable!
+     */
+    final private boolean readOnly; 
     
     public MetadataIndexView(AbstractBTree delegate) {
         
@@ -54,20 +70,30 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
     
         this.delegate = delegate;
         
+        this.readOnly = delegate.isReadOnly();
+
+    }
+    
+    public MetadataIndexMetadata getIndexMetadata() {
+        
+        return (MetadataIndexMetadata) super.getIndexMetadata();
+        
     }
     
     public IndexMetadata getScaleOutIndexMetadata() {
 
-        return ((MetadataIndexMetadata)getIndexMetadata()).getManagedIndexMetadata();
+        return getIndexMetadata().getManagedIndexMetadata();
         
     }
 
     public PartitionLocator get(byte[] key) {
 
-        // automatic de-serialization using the ITupleSerializer.
-        return (PartitionLocator)delegate.lookup((Object)key);
+        /*
+         * Note: The cast of the key to Object triggers automatic
+         * de-serialization using the ITupleSerializer.
+         */
         
-//        return (PartitionLocator) SerializerUtil.deserialize(lookup(key));
+        return (PartitionLocator) delegate.lookup((Object) key);
 
     }
 
@@ -78,6 +104,7 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
     public PartitionLocator find(byte[] key) {
 
         return find_with_indexOf(key);
+//        return find_with_iterator(key);
         
     }
     
@@ -87,26 +114,42 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      * key-range partitioned metadata index.
      * 
      * @todo test this variant and keep it on hand for the key-range partitioned
-     *       metadata index.
+     *       metadata index (it does not quite work yet).
      */
     private PartitionLocator find_with_iterator(byte[] key) {
 
         final ITupleIterator<PartitionLocator> itr = delegate.rangeIterator(
                 null/* fromKey */, key/* toKey */, 1/* capacity */,
-                IRangeQuery.DEFAULT | IRangeQuery.REVERSE, null/* filter */);
+                IRangeQuery.VALS | IRangeQuery.REVERSE, null/* filter */);
         
+        if (!itr.hasNext()) {
+            
+            /*
+             * There are no index partitions defined since none span the key.
+             * 
+             * Note: This is never a good sign. There should always be at least
+             * one index partition having an empty byte[] as its left separator
+             * and a null as its right separator.
+             */
+            log.warn("No index partitions defined? name="
+                    + getIndexMetadata().getName());
+
+            return null;
+
+        }
+
         return itr.next().getObject();
-        
+
     }
-    
+
     /**
      * This implementation depends on the {@link ILinearList} API and therefore
      * can not be used with a key-range partitioned metadata index.
      */
     private PartitionLocator find_with_indexOf(byte[] key) {
-        
+
         final int index;
-        
+
         if (key == null) {
             
             // use the index of the last partition.
@@ -125,14 +168,68 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
             
         }
 
+        if(readOnly)
+            return getAndCacheLocatorAtIndex(index);
+        else 
+            return getLocatorAtIndex(index);
+        
+    }
+
+    /**
+     * Uses a cache to reduce {@link PartitionLocator} de-serialization costs.
+     * 
+     * @param index
+     * 
+     * @return
+     */
+    private PartitionLocator getAndCacheLocatorAtIndex(final int index) {
+
+        final Integer key = Integer.valueOf(index);
+
+        synchronized (locatorCache) {
+
+            PartitionLocator locator = locatorCache.get(key);
+
+            if (locator == null) {
+
+                locator = getLocatorAtIndex(index);
+
+                locatorCache.put(key, locator, false/* dirty */);
+
+            }
+                        
+            return locator;
+            
+        }
+   
+    }
+
+    /**
+     * {@link #find(byte[])} was a hot spot with the costs being primarily the
+     * the de-serialization of the {@link PartitionLocator} from the
+     * {@link ITuple} so I setup this {@link LRUCache}. The keys are the index
+     * position in the B+Tree. The values are de-serialized
+     * {@link PartitionLocator}s. That seems to do the trick for now, but a
+     * different approach may be required if {@link #find(byte[])} is changed to
+     * use an iterator.
+     */
+    private LRUCache<Integer, PartitionLocator> locatorCache = new LRUCache<Integer, PartitionLocator>(
+            1000);
+    
+    /**
+     * Looks up and de-serializes the {@link PartitionLocator} at the given
+     * index.
+     * 
+     * @param index
+     * 
+     * @return
+     */
+    private PartitionLocator getLocatorAtIndex(int index) {
+
         final ITuple<PartitionLocator> tuple = delegate.valueAt(index,
                 delegate.lookupTuple.get());
 
         return tuple.getObject();
-        
-//        final byte[] val = delegate.valueAt(index);
-//        
-//        return (PartitionLocator) SerializerUtil.deserialize(val);
         
     }
     

@@ -39,6 +39,7 @@ import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.Split;
 
@@ -63,9 +64,9 @@ public class ReadOnlyMetadataIndexView extends MetadataIndexView {
     }
 
     /** {@link IndexMetadata} is cloned to disallow modification. */
-    final public IndexMetadata getIndexMetadata() {
+    final public MetadataIndexMetadata getIndexMetadata() {
 
-        return super.getIndexMetadata().clone();
+        return (MetadataIndexMetadata) super.getIndexMetadata().clone();
         
     }
 

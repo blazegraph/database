@@ -451,12 +451,15 @@ public class RuleStats {
                 
                 final int tailCount = r.getTailCount();
                 
-                for (int i = 0; i < tailCount; i++) {
+                for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
                     
-                    if (i > 0)
+                    if (tailIndex > 0)
                         sb.append("\n"+ruleNameStr+",,,,,");
                     
-                    sb.append(", "+permutation[i]);
+                    final int i = showInEvalOrder?evalOrder[tailIndex]:tailIndex;
+                    final int orderIndex = showInEvalOrder?tailIndex:permutation[i];
+                    
+                    sb.append(", "+orderIndex);
                     
                     sb.append(", "+keyOrder[i]);
                     sb.append(", "+subqueryCount[i]);
@@ -478,6 +481,16 @@ public class RuleStats {
         
     }
 
+    /**
+     * When <code>true</code> {@link #toStringSimple(int, boolean, boolean)}
+     * will show the table view with the predicates in evaluation order rather
+     * than the given order. This view is easier to read when you are examining
+     * the join performance but you have to indirect through the tail index to
+     * relate the predicates back to the original query form (which may already
+     * have been re-ordered so that is not a great loss in many cases).
+     */
+    final private boolean showInEvalOrder = true;
+    
     /**
      * Return a human readable representation of the predicate. Subclasses may
      * be created that know how to externalize the predicate correctly for its

@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.IResourceLockService;
@@ -42,7 +41,6 @@ import com.bigdata.journal.ResourceLockService;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.NT;
 
 /**
  * Integration provides a view of a local {@link DataService} as if it were a
@@ -70,6 +68,10 @@ public class LocalDataServiceFederation extends AbstractFederation {
         super(client);
 
         final Properties properties = client.getProperties();
+        
+        // indexCache
+        indexCache = new DataServiceIndexCache(this, client
+                .getIndexCacheCapacity());
         
         timestampService = new EmbeddedTimestampService(UUID.randomUUID(),
                 properties);
@@ -243,6 +245,14 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
 
+    private final DataServiceIndexCache indexCache;
+    
+    protected DataServiceIndexCache getIndexCache() {
+        
+        return indexCache;
+        
+    }
+    
     public void dropIndex(String name) {
 
         assertOpen();
@@ -251,7 +261,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
             
             dataService.dropIndex(name);
             
-            dropIndexFromCache(name);
+            getIndexCache().dropIndexFromCache(name);
             
         } catch (Exception e) {
 
@@ -261,44 +271,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
 
-    synchronized public IIndex getIndex(String name, long timestamp) {
+    public DataServiceIndex getIndex(String name, long timestamp) {
 
-        assertOpen();
-
-        final NT nt = new NT(name, timestamp);
-
-        // check the cache.
-        IClientIndex ndx = indexCache.get(nt);
-
-        if (ndx == null) {
-
-            try {
-
-                // test for existence.
-                dataService.getIndexMetadata(name, timestamp);
-
-            } catch (Exception ex) {
-
-                if (InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
-
-                    return null;
-
-                }
-
-                throw new RuntimeException(ex);
-                
-            }
-            
-            // exists, so create view.
-            ndx = new DataServiceIndex( this, name, timestamp );
-            
-            // put view in the cache.
-            indexCache.put(nt,ndx,false/*dirty*/);
-
-        }
-        
-        // return view.
-        return ndx;
+        return (DataServiceIndex) super.getIndex(name, timestamp);
         
     }
 
@@ -400,6 +375,8 @@ public class LocalDataServiceFederation extends AbstractFederation {
     synchronized public void shutdown() {
         
         super.shutdown();
+
+        indexCache.shutdown();
         
         if (dataService != null) {
 
@@ -442,6 +419,8 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         super.shutdownNow();
 
+        indexCache.shutdown();
+
         if (dataService != null) {
 
             dataService.shutdownNow();
@@ -483,6 +462,8 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         assertOpen();
 
+        indexCache.shutdown();
+        
         try {
             
             dataService.destroy();
@@ -520,6 +501,63 @@ public class LocalDataServiceFederation extends AbstractFederation {
         return dataService.getResourceManager().getLiveJournal()
                 .getRootBlockView().getLastCommitTime();
 
+    }
+    
+    /**
+     * Concrete implementation for a {@link LocalDataServiceFederation}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class DataServiceIndexCache extends AbstractIndexCache<DataServiceIndex> {
+
+        private final LocalDataServiceFederation fed;
+        
+        /**
+         * @param fed
+         * @param capacity
+         */
+        protected DataServiceIndexCache(LocalDataServiceFederation fed, int capacity) {
+           
+            super(capacity);
+
+            if (fed == null)
+                throw new IllegalArgumentException();
+            
+            this.fed = fed;
+
+        }
+
+        @Override
+        protected DataServiceIndex newView(String name, long timestamp) {
+            
+            try {
+
+                // test for existence.
+                fed.getDataService().getIndexMetadata(name, timestamp);
+
+            } catch (Exception ex) {
+
+                if (InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
+
+                    // No such index.
+                    return null;
+
+                }
+
+                throw new RuntimeException(ex);
+                
+            }
+            
+            // exists, so create view.
+            /*
+             * @todo this double-fetches the IndexMetadata. optimize per
+             * IndexCache variant of this class.
+             */
+            return new DataServiceIndex(fed, name, timestamp);
+            
+        }
+        
     }
     
 }

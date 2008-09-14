@@ -39,9 +39,8 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.LookupDiscovery;
-import net.jini.export.Exporter;
 
-import com.bigdata.service.AbstractClient;
+import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.util.NV;
 
 /**
@@ -56,7 +55,7 @@ import com.bigdata.util.NV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniClient extends AbstractClient {
+public class JiniClient extends AbstractScaleOutClient {
 
     /**
      * The federation and <code>null</code> iff not connected.

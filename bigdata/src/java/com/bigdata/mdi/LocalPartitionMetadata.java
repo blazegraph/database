@@ -412,13 +412,13 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         leftSeparatorKey = new byte[leftLen];
 
-        in.read(leftSeparatorKey);
+        in.readFully(leftSeparatorKey);
 
         if (rightLen != 0) {
 
             rightSeparatorKey = new byte[rightLen];
 
-            in.read(rightSeparatorKey);
+            in.readFully(rightSeparatorKey);
 
         } else {
 
