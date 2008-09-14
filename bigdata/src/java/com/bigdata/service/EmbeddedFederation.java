@@ -38,19 +38,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
-
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.ResourceLockService;
-import com.bigdata.journal.TimestampUtility;
-import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.service.EmbeddedClient.Options;
 
 /**
@@ -65,9 +58,7 @@ import com.bigdata.service.EmbeddedClient.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedFederation extends AbstractFederation {
-
-    protected static final Logger log = Logger.getLogger(EmbeddedFederation.class);
+public class EmbeddedFederation extends AbstractScaleOutFederation {
 
     /**
      * The #of data service instances.
@@ -257,7 +248,7 @@ public class EmbeddedFederation extends AbstractFederation {
         isTransient = BufferMode.Transient.toString().equals(
                 properties.getProperty(Options.BUFFER_MODE));
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("federation is "+(isTransient?"not ":"")+"persistent");
         
         // true if temp files are being requested.
@@ -337,7 +328,8 @@ public class EmbeddedFederation extends AbstractFederation {
                 
             }
 
-            log.info(Options.DATA_DIR + "=" + dataDir);
+            if (INFO)
+                log.info(Options.DATA_DIR + "=" + dataDir);
 
             if (!dataDir.exists()) {
 
@@ -376,7 +368,8 @@ public class EmbeddedFederation extends AbstractFederation {
                     
                     if(!pathname.isDirectory()) {
                         
-                        log.info("Ignoring normal file: "+pathname);
+                        if(INFO)
+                            log.info("Ignoring normal file: "+pathname);
                         
                         return false;
                         
@@ -388,18 +381,20 @@ public class EmbeddedFederation extends AbstractFederation {
                         
                         UUID.fromString(name);
 
-                        log.info("Found service directory: "+pathname);
-                        
+                        if (INFO)
+                            log.info("Found service directory: " + pathname);
+
                         return true;
-                        
-                    } catch(IllegalArgumentException ex) {
-                        
-                        log.info("Ignoring directory: "+pathname);
-                        
+
+                    } catch (IllegalArgumentException ex) {
+
+                        if (INFO)
+                            log.info("Ignoring directory: " + pathname);
+
                         return false;
-                        
+
                     }
-                    
+
                 }
                 
             });
@@ -584,16 +579,12 @@ public class EmbeddedFederation extends AbstractFederation {
 
                 }
 
-                /*
-                 * Note: Use DATA_DIR if the metadata service is using a
-                 * ResourceManager and FILE if it is using a simple Journal.
-                 */
                 p.setProperty(Options.DATA_DIR, serviceDir.toString());
-//                p.setProperty(Options.FILE, new File(serviceDir,"journal"+Options.JNL).toString());
 
             }
             
-            metadataService = new EmbeddedMetadataService(this, serviceUUID, p).start();
+            metadataService = new EmbeddedMetadataService(this, serviceUUID, p)
+                    .start();
             
         }
         
@@ -618,17 +609,18 @@ public class EmbeddedFederation extends AbstractFederation {
                     serviceDir.mkdirs();
 
                     p.setProperty(Options.DATA_DIR, serviceDir.toString());
-                    
+
                 }
 
-                dataService[i] = new EmbeddedDataServiceImpl(serviceUUID, p).start();
+                dataService[i] = new EmbeddedDataServiceImpl(serviceUUID, p)
+                        .start();
 
                 dataServiceByUUID.put(serviceUUID, dataService[i]);
 
             }
-            
+
         }
-        
+
         return ndataServices;
 
     }
@@ -655,60 +647,61 @@ public class EmbeddedFederation extends AbstractFederation {
         public EmbeddedFederation getFederation() {
 
             return EmbeddedFederation.this;
-            
-        }
-        
-    }
-    
-    public IMetadataIndex getMetadataIndex(String name,long timestamp) {
 
-        assertOpen();
-
-        // The name of the metadata index.
-        final String metadataName = MetadataService.getMetadataIndexName(name);
-
-        // The metadata service.
-        final MetadataService metadataService = (MetadataService) getMetadataService();
-        
-        /*
-         * The sources for the view as of that timestamp.
-         * 
-         * Note: We force READ-COMMITTED semantics if the request was
-         * UNISOLATED.
-         */
-        final AbstractBTree[] sources = metadataService
-                .getResourceManager()
-                .getIndexSources(
-                        metadataName,
-                        TimestampUtility.isUnisolated(timestamp) ? ITx.READ_COMMITTED
-                                : timestamp);
-        
-        if (sources.length != 1) {
-            
-            throw new UnsupportedOperationException(
-                    "Metadata index must not be a view: name=" + name
-                            + ", #sources=" + sources);
-            
         }
 
-        // Read only view.
-        return new ReadOnlyMetadataIndexView( sources[0] );
-
     }
+
+//    public IMetadataIndex getMetadataIndex(String name, long timestamp) {
+//
+//        assertOpen();
+//
+//        // The name of the metadata index.
+//        final String metadataName = MetadataService.getMetadataIndexName(name);
+//
+//        // The metadata service.
+//        final MetadataService metadataService = (MetadataService) getMetadataService();
+//
+//        /*
+//         * The sources for the view as of that timestamp.
+//         * 
+//         * Note: We force READ-COMMITTED semantics if the request was
+//         * UNISOLATED.
+//         */
+//        final AbstractBTree[] sources = metadataService
+//                .getResourceManager()
+//                .getIndexSources(
+//                        metadataName,
+//                        TimestampUtility.isUnisolated(timestamp) ? ITx.READ_COMMITTED
+//                                : timestamp);
+//        
+//        if (sources.length != 1) {
+//            
+//            throw new UnsupportedOperationException(
+//                    "Metadata index must not be a view: name=" + name
+//                            + ", #sources=" + sources);
+//            
+//        }
+//
+//        // Read only view.
+//        return new ReadOnlyMetadataIndexView( sources[0] );
+//
+//    }
     
     /**
      * Normal shutdown of the services in the federation.
      */
     synchronized public void shutdown() {
         
-        if(INFO) log.info("begin");
-        
+        if (INFO)
+            log.info("begin");
+
         super.shutdown();
         
-        for(int i=0; i<dataService.length; i++) {
-            
+        for (int i = 0; i < dataService.length; i++) {
+
             DataService ds = this.dataService[i];
-            
+
             ds.shutdownNow();
             
         }
@@ -739,21 +732,23 @@ public class EmbeddedFederation extends AbstractFederation {
 
         }
         
-        if(INFO) log.info("done");
+        if (INFO)
+            log.info("done");
 
     }
-    
+
     /**
      * Immediate shutdown of the services in the embedded federation.
      */
     synchronized public void shutdownNow() {
-        
-        if(INFO) log.info("begin");
+
+        if (INFO)
+            log.info("begin");
 
         super.shutdownNow();
-        
-        for(int i=0; i<dataService.length; i++) {
-            
+
+        for (int i = 0; i < dataService.length; i++) {
+
             DataService ds = this.dataService[i];
             
             ds.shutdownNow();
@@ -786,15 +781,17 @@ public class EmbeddedFederation extends AbstractFederation {
 
         }
         
-        if(INFO) log.info("done");
-        
+        if (INFO)
+            log.info("done");
+
     }
-    
+
     public void destroy() {
 
-        if(INFO) log.info("");
+        if (INFO)
+            log.info("");
 
-        for (int i=0; i<dataService.length; i++) {
+        for (int i = 0; i < dataService.length; i++) {
 
             IDataService ds = dataService[i];
             
@@ -838,15 +835,6 @@ public class EmbeddedFederation extends AbstractFederation {
         
     }
     
-    /**
-     * Return <code>true</code>.
-     */
-    final public boolean isScaleOut() {
-        
-        return true;
-        
-    }
-
     /**
      * Return <code>false</code>.
      */

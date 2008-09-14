@@ -237,11 +237,13 @@ public interface IBigdataFederation extends IIndexManager {
     public IIndex getIndex(String name, long timestamp);
     
     /**
-     * Return <code>true</code> iff the federation supports scale-out indices.
-     * <p>
-     * Note: A <code>false</code> return indicates that
-     * {@link #getMetadataService()} WILL NOT return a {@link IMetadataService}
-     * since key-range partitioned indices are NOT supported.
+     * Return <code>true</code> iff the federation supports scale-out indices
+     * (supports key-range partitioned indices). Note that a <code>true</code>
+     * return does NOT imply that the federation is running in a distributed
+     * environment, just that it uses the scale-out index architecture. A
+     * <code>false</code> return indicates that {@link #getMetadataService()}
+     * WILL NOT return a {@link IMetadataService} since key-range partitioned
+     * indices are NOT supported.
      * 
      * @see IndexMetadata
      */

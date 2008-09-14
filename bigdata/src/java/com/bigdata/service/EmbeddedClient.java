@@ -38,7 +38,7 @@ import java.util.Properties;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedClient extends AbstractClient {
+public class EmbeddedClient extends AbstractScaleOutClient {
 
     /**
      * 

@@ -3148,15 +3148,38 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
      up being a lot smaller than 20k for most joins and will help to
      reduce allocation that drives GC in the nursery.
 
-   Note: BlockingBuffer should be used (a) for access path iterators
-   that will exceed the chunkSize; (b) for high-level query with at
-   least one join; (c) by the BigdataStatementIteratorImpl; and by
-   the BigdataSolutionResolverator.
-
    - Try closure performance again with rule level parallelism
      enabled.  Perhaps use maxParallelRules to limit the actual rule
      level parallelism.  For scale-out, the rule execution itself
-     should be distributed.
+     should be distributed.  Note that there is a client property
+     that already has nearly the same semantics so maybe that should
+     be used instead (maxParallelismPerRequest)
+
+   - Verify lexicon cache and try the perf. analyzer on slow U50
+     queries (6 and 14).  These are both statement pattern scans.
+     Also (2), which has 15 results, all of which are present in the
+     first chunk and can therefore benefit from running with full
+     parallelism for the first chunk.
+
+     Try turning off Unicode support.
+
+     Try a larger branching factor (must reload the data).
+
+   - Search on the immutable key buffer is a significant part of the
+     costs for the BTree during query.
+
+Next: Examine JDS; 2x as fast as it used to be.
+
+      query 8 is 8953ms and then nearly doubles in time for most of
+      the runs with an average of 13092.  maybe this is GC?  Check
+      serialization costs.
+
+      query 9 is similar.  both are CPU heavy and disk light, at least
+      for U1.
+
+      x. Serialization histogram
+
+      x. performance analyzer.
 
    - Modify RemoteChunkedIterator. It requires us to wait until the
      next chunk is available or the iterator is exhausted before
@@ -3164,3 +3187,4 @@ Caused by: java.lang.RuntimeException: Child is not persistent: index=6
      hasNext(timeout) and next(timeout) on the IAsynchronousIterator
      and a corresponding update to BlockingBuffer's combineChunks()
      method.
+

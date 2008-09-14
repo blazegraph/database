@@ -59,9 +59,11 @@ import com.bigdata.rawstore.IBlock;
  */
 public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator<E> {
     
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(RawDataServiceTupleIterator.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     /**
      * Error message used by {@link #getKey()} when the iterator was not
      * provisioned to request keys from the data service.
@@ -190,7 +192,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
     protected ResultSet getResultSet(long timestamp, byte[] fromKey, byte[] toKey, int capacity,
             int flags, IFilterConstructor filter) {
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("name=" + name + ", fromKey="
                     + BytesUtil.toString(fromKey) + ", toKey="
                     + BytesUtil.toString(toKey) + ", dataService="

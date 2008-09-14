@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ICounter;
@@ -79,7 +80,15 @@ public class DataServiceIndex implements IClientIndex {
      * they result in an application that can not scale efficiently to
      * partitioned indices.
      */
-    protected static final Logger log = Logger.getLogger(DataServiceIndex.class);
+    protected static final Logger log = Logger
+            .getLogger(DataServiceIndex.class);
+
+    final protected static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+            .toInt();
+
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     private final String name;
     private final long timestamp;
@@ -275,7 +284,7 @@ public class DataServiceIndex implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][] { key };
         
@@ -308,7 +317,7 @@ public class DataServiceIndex implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][] { key };
         final byte[][] vals = new byte[][] { value };
@@ -338,7 +347,7 @@ public class DataServiceIndex implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][]{key};
         
@@ -367,7 +376,7 @@ public class DataServiceIndex implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][]{key};
         

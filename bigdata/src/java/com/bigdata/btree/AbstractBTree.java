@@ -699,7 +699,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree, ILinearLis
      * 
      * @return The metadata record for this btree and never <code>null</code>.
      */
-    final public IndexMetadata getIndexMetadata() {
+    public IndexMetadata getIndexMetadata() {
 
         if(isReadOnly()) {
             

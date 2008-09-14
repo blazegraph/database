@@ -56,6 +56,10 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     protected static final transient Logger log = Logger
             .getLogger(PartitionedTupleIterator.class);
     
+    protected static final boolean INFO = log.isInfoEnabled();
+    
+//    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     /**
      * The index on which the range query is being performed.
      */
@@ -395,7 +399,8 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
         
         if (!locatorItr.hasNext()) {
 
-            log.info("No more locators");
+            if(INFO)
+                log.info("No more locators");
 
             return false;
             
@@ -403,7 +408,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
        
         locator = locatorItr.next().getObject();
         
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("locator=" + locator);
         
         // submit query to the next partition.
@@ -449,7 +454,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
             
             final int partitionId = locator.getPartitionId();
             
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("name=" + ndx.getName() //
                         + ", tx=" + timestamp //
                         + ", reverseScan=" + reverseScan //
@@ -498,7 +503,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                         
                         currentToKey = tmp.getLastKey();
 
-                        if (log.isInfoEnabled())
+                        if (INFO)
                             log.info("New exclusive upper bound: "
                                     + currentToKey);
 
@@ -515,7 +520,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
                         currentFromKey = tmp.getLastKey();
 
-                        if (log.isInfoEnabled())
+                        if (INFO)
                             log.info("New inclusive lower bound: "
                                     + currentFromKey);
 

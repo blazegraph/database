@@ -764,7 +764,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
     }
     // @todo config cache capacity.
     private WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>> accessPathCache = new WeakValueCache<IPredicate<ISPO>, IAccessPath<ISPO>>(
-            new LRUCache<IPredicate<ISPO>, IAccessPath<ISPO>>(1000));
+            new LRUCache<IPredicate<ISPO>, IAccessPath<ISPO>>(100));
 
     /**
      * Core impl.

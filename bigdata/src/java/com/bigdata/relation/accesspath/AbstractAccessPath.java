@@ -711,27 +711,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         } else {
 
             if (historicalRead) {
-                
-                /*
-                 * Note: the range count is cached for a historical read to
-                 * reduce round trips to the DataService.
-                 */
-                
-                if (rangeCount == -1L) {
-            
-                    // do query and cache the result.
-                    n = rangeCount = ndx.rangeCount(fromKey, toKey);
 
-                } else {
-                    
-                    // cached value.
-                    n = rangeCount;
-                    
-                }
+                // cachable.
+                n = historicalRangeCount(fromKey,toKey);
                 
             } else {
                 
-                // not cached.
+                // not cachable.
                 n = ndx.rangeCount(fromKey, toKey);
                 
             }
@@ -748,6 +734,26 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
+    /**
+     * Note: the range count is cached for a historical read to reduce round
+     * trips to the DataService.
+     */
+    final private long historicalRangeCount(byte[] fromKey,byte[] toKey) {
+        
+        if (rangeCount == -1L) {
+    
+            // do query and cache the result.
+            return rangeCount = ndx.rangeCount(fromKey, toKey);
+
+        } else {
+            
+            // cached value.
+            return rangeCount;
+            
+        }
+
+    }
+    
     final public ITupleIterator<R> rangeIterator() {
 
         return rangeIterator(0/* capacity */, flags, filter);

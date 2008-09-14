@@ -53,6 +53,14 @@ import org.apache.log4j.Logger;
  * and throw out the exception from the {@link Future} back to the client.
  * Failure to do this can lead to the iterator not terminating!</strong>
  * </p>
+ * <p>
+ * Note: {@link BlockingBuffer} is used (a) for {@link IAccessPath} iterators
+ * that exceed the fully-buffered read threashold; (b) for high-level query with
+ * at least one join; (c) by the BigdataStatementIteratorImpl, which is used by
+ * the RDF DB for high-level query with no joins; and by the
+ * BigdataSolutionResolverator, which is used by the RDF DB high-level query
+ * that produces binding sets.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

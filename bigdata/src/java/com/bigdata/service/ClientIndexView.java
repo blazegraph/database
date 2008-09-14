@@ -143,9 +143,19 @@ import com.bigdata.util.InnerCause;
  */
 public class ClientIndexView implements IClientIndex {
 
+    /**
+     * Note: Invocations of the non-batch API are logged at the WARN level since
+     * they result in an application that can not scale-out efficiently.
+     */
     protected static final transient Logger log = Logger
             .getLogger(ClientIndexView.class);
     
+    /**
+     * True iff the {@link #log} level is WARN or less.
+     */
+    final protected static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+            .toInt();
+
     /**
      * True iff the {@link #log} level is INFO or less.
      */
@@ -227,6 +237,11 @@ public class ClientIndexView implements IClientIndex {
     private final boolean historicalRead;
     
     /**
+     * The {@link IMetadataIndex} for this scale-out index.
+     */
+    private final IMetadataIndex metadataIndex;
+    
+    /**
      * The {@link IndexMetadata} for the {@link MetadataIndex} that manages the
      * scale-out index. The metadata template for the managed scale-out index is
      * available as a field on this object.
@@ -249,7 +264,7 @@ public class ClientIndexView implements IClientIndex {
      */
     final protected IMetadataIndex getMetadataIndex() {
         
-        return fed.getMetadataIndex(name, timestamp);
+        return metadataIndex;
         
     }
     
@@ -343,13 +358,14 @@ public class ClientIndexView implements IClientIndex {
      *            {@link ITx#READ_COMMITTED} for a read-committed view, or
      *            <code>-timestamp</code> for a historical view no later than
      *            the specified timestamp.
-     * @param metadataIndexMetadata
-     *            The metadata for the {@link MetadataIndex} as of that
-     *            timestamp. This also contains the template
-     *            {@link IndexMetadata} for the scale-out index partitions.
+     * @param metadataIndex
+     *            The {@link IMetadataIndex} for the named scale-out index as of
+     *            that timestamp. Note that the {@link IndexMetadata} on this
+     *            object contains the template {@link IndexMetadata} for the
+     *            scale-out index partitions.
      */
     public ClientIndexView(IBigdataFederation fed, String name, long timestamp,
-            MetadataIndexMetadata metadataIndexMetadata) {
+            IMetadataIndex metadataIndex) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -357,7 +373,7 @@ public class ClientIndexView implements IClientIndex {
         if (name == null)
             throw new IllegalArgumentException();
         
-        if (metadataIndexMetadata == null)
+        if (metadataIndex == null)
             throw new IllegalArgumentException();
         
         this.fed = (AbstractFederation) fed;
@@ -366,7 +382,9 @@ public class ClientIndexView implements IClientIndex {
 
         this.timestamp = timestamp;
         
-        this.metadataIndexMetadata = metadataIndexMetadata;
+        this.metadataIndex = metadataIndex;
+        
+        this.metadataIndexMetadata = metadataIndex.getIndexMetadata();
         
         this.capacity = fed.getClient().getDefaultRangeQueryCapacity();
         
@@ -461,7 +479,7 @@ public class ClientIndexView implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][] { key };
         
@@ -494,7 +512,7 @@ public class ClientIndexView implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][] { key };
         final byte[][] vals = new byte[][] { value };
@@ -524,7 +542,7 @@ public class ClientIndexView implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][]{key};
         
@@ -553,7 +571,7 @@ public class ClientIndexView implements IClientIndex {
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
         else
-            log.warn(NON_BATCH_API);
+            if(WARN) log.warn(NON_BATCH_API);
 
         final byte[][] keys = new byte[][]{key};
         
@@ -785,7 +803,8 @@ public class ClientIndexView implements IClientIndex {
          * The iterator uses a read-consistent view of the MDI as of the
          * caller specified timestamp.
          */
-        final IMetadataIndex mdi = fed.getMetadataIndex(name, timestamp);
+        final IMetadataIndex mdi = timestamp == getTimestamp() ? getMetadataIndex()
+                : fed.getMetadataIndex(name, timestamp);
         
         final ITupleIterator<PartitionLocator> itr;
 
@@ -1259,7 +1278,8 @@ public class ClientIndexView implements IClientIndex {
      */
     protected void runInCallersThread(ArrayList<Callable<Void>> tasks) {
         
-        log.warn("Running " + tasks.size()
+        if(WARN)
+            log.warn("Running " + tasks.size()
                 + " tasks in caller's thread: recursionDepth="
                 + getRecursionDepth().get() + "(#active="
                 + getThreadPool().getActiveCount() + ", queueSize="

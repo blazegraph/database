@@ -31,6 +31,7 @@ package com.bigdata.mdi;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.IMetadataService;
 
 /**
@@ -56,6 +57,15 @@ import com.bigdata.service.IMetadataService;
  */
 public interface IMetadataIndex extends IRangeQuery { //extends IIndex {
 
+    /**
+     * The metadata for the metadata index itself. Note that the
+     * {@link MetadataIndexMetadata#getManagedIndexMetadata()} returns the
+     * template {@link IndexMetadata} for the scale-out index partitions.
+     * 
+     * @see #getScaleOutIndexMetadata()
+     */
+    public MetadataIndexMetadata getIndexMetadata();
+    
     /**
      * The metadata template for the scale-out index managed by this metadata
      * index.
