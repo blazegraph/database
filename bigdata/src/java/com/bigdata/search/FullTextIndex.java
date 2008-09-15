@@ -1270,9 +1270,9 @@ public class FullTextIndex extends AbstractRelation {
         throw new UnsupportedOperationException();
     }
 
-    public long getElementCount(boolean exact) {
-        throw new UnsupportedOperationException();
-    }
+//    public long getElementCount(boolean exact) {
+//        throw new UnsupportedOperationException();
+//    }
 
     public Set getIndexNames() {
         throw new UnsupportedOperationException();

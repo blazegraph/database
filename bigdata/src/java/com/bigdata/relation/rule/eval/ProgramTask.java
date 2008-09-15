@@ -323,7 +323,8 @@ public class ProgramTask implements IProgramTask,
                      */
                     
                     return ((AbstractDistributedFederation) indexManager)
-                            .getProxy(ret, null/* keyOrder */);
+                            .getProxy(ret, joinNexusFactory.newInstance(
+                                    indexManager).getSolutionSerializer(), null/* keyOrder */);
 
                 }
 

@@ -926,7 +926,7 @@ public class KeyBuilder implements IKeyBuilder {
      * different locals at different times or for different indices then you
      * MUST provision and apply your own {@link KeyBuilder}.
      * 
-     * @param key
+     * @param val
      *            An application key.
      * 
      * @return The unsigned byte[] equivilent of that key. This will be
@@ -934,17 +934,18 @@ public class KeyBuilder implements IKeyBuilder {
      *         If the <i>key</i> is a byte[], then the byte[] itself will be
      *         returned.
      */
-    public static final byte[] asSortKey(Object key) {
+    @SuppressWarnings("unchecked")
+    public static final byte[] asSortKey(Object val) {
         
-        if (key == null) {
+        if (val == null) {
 
             return null;
             
         }
 
-        if (key instanceof byte[]) {
+        if (val instanceof byte[]) {
 
-            return (byte[]) key;
+            return (byte[]) val;
             
         }
 
@@ -954,17 +955,29 @@ public class KeyBuilder implements IKeyBuilder {
          */
 
         synchronized (_keyBuilder) {
-    
-            _keyBuilder.reset();
 
-            _keyBuilder.append( key );
-
-            return _keyBuilder.getKey();
+            return _keyBuilder.getSortKey(val);
+            
+//            _keyBuilder.reset();
+//
+//            _keyBuilder.append( key );
+//
+//            return _keyBuilder.getKey();
     
         }
     
     }
 
+    public byte[] getSortKey(Object val) {
+        
+        reset();
+        
+        append( val );
+        
+        return getKey();
+        
+    }
+    
     public IKeyBuilder append(Object val) {
         
         if (val == null) {

@@ -40,6 +40,7 @@ import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.MetadataIndexView;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
@@ -174,6 +175,12 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *       proviso that some cache entries represent missing partition
      *       definitions (aka the lower bounds for known partitions where the
      *       left sibling partition is not known to the client).
+     *       <p>
+     *       With even a modest #of partitions, a locator scan against the MDS
+     *       will be cheaper than attempting to fill multiple "gaps" in a local
+     *       locator cache, so such a cache might be reserved for point tests.
+     *       Such point tests are used by the sparse row store for its row local
+     *       operations (vs scans) but are less common for JOINs.
      */
     public IMetadataIndex getMetadataIndex(String name, long timestamp) {
 
@@ -196,6 +203,9 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      *         is no such scale-out index.
      * 
      * FIXME Just create cache view when MDI is large and then cache on demand.
+     * 
+     * @todo the cache should contain de-serialized locators. I work around this
+     * using an LRU cache internal to the {@link MetadataIndexView}.
      */
     private MetadataIndex cacheMetadataIndex(String name, long timestamp,
             MetadataIndexMetadata mdmd) {

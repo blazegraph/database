@@ -67,27 +67,27 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
 
-    /**
-     * Note: You can not compute the exact element count for a fused view since
-     * there may be duplicate elements in the two source {@link IRelation}s
-     * (well, you could merge the data in the views into a temporary view but
-     * that is hardly efficient).
-     * 
-     * @throws UnsupportedOperationException
-     *             if <code>exact == true</code>.
-     */
-    public long getElementCount(boolean exact) {
-
-        if (exact) {
-
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        return relation1.getElementCount(exact)
-                + relation2.getElementCount(exact);
-        
-    }
+//    /**
+//     * Note: You can not compute the exact element count for a fused view since
+//     * there may be duplicate elements in the two source {@link IRelation}s
+//     * (well, you could merge the data in the views into a temporary view but
+//     * that is hardly efficient).
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if <code>exact == true</code>.
+//     */
+//    public long getElementCount(boolean exact) {
+//
+//        if (exact) {
+//
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//        
+//        return relation1.getElementCount(exact)
+//                + relation2.getElementCount(exact);
+//        
+//    }
 
     public Set<String> getIndexNames() {
         

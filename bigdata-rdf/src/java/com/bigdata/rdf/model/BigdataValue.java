@@ -59,7 +59,7 @@ import com.bigdata.rdf.store.TempTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BigdataValue extends Value {
+public interface BigdataValue extends Value {//, Comparable<BigdataValue> {
 
     /**
      * A value which corresponds to an unassigned term identifier.

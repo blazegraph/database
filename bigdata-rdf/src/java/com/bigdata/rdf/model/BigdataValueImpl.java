@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.model;
 
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -134,4 +135,26 @@ public abstract class BigdataValueImpl implements BigdataValue {
         
     }
 
+//    /**
+//     * Imposes a total ordering over {@link BigdataValue}s. The different
+//     * classes of {@link BigdataValue} are ordered as follows:
+//     * 
+//     * <ol>
+//     * <li>URI, by its externalized form</li>
+//     * <li>plain literals, by their data</li>
+//     * <li>language code literals, by language code and then their data.</li>
+//     * <li>data type literals</li>
+//     * <li>blank nodes</li>
+//     * </ol>
+//     * 
+//     * which is the same ordering imposed by {@link ITermIndexCodes}s. Within
+//     * each class, the data are ordered as indicated, which is the same order
+//     * that is imposed by the {@link Term2IdTupleSerializer}.
+//     */
+//    public int compareTo(BigdataValue o) {
+//        
+//        return 0;
+//        
+//    }
+    
 }

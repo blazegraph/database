@@ -29,7 +29,7 @@ package com.bigdata.relation.rule;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class Constant<E> implements IConstant<E> {
+final public class Constant<E/* extends Comparable<E>*/> implements IConstant<E> {
     
     /**
      * 
@@ -114,5 +114,11 @@ final public class Constant<E> implements IConstant<E> {
         throw new UnsupportedOperationException();
         
     }
+
+//    public int compareTo(IConstant<E> o) {
+//    
+//        return value.compareTo(o.get());
+//        
+//    }
 
 }

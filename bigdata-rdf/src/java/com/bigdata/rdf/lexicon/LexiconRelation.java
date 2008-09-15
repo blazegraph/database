@@ -493,17 +493,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         
     }
 
-    /**
-     * @todo Not implemented yet. Exact counts are not very useful on this
-     *       relation.
-     * 
-     * @throws UnsupportedOperationException
-     */
-    public long getElementCount(boolean exact) {
-
-        throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * @todo Not implemented yet. Exact counts are not very useful on this
+//     *       relation.
+//     * 
+//     * @throws UnsupportedOperationException
+//     */
+//    public long getElementCount(boolean exact) {
+//
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
     /**
      * Note : this method is part of the mutation api. it is primarily (at this

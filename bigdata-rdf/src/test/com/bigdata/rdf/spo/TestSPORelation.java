@@ -389,7 +389,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 }
 
-                assertEquals(3, spoRelation.getElementCount(true/* exact */));
+                assertEquals(3, spoRelation.getAccessPath(NULL, NULL, NULL)
+                        .rangeCount(true/*exact*/));
 
             }
 
@@ -589,7 +590,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 }
 
-                assertEquals(3, spoRelation.getElementCount(true/* exact */));
+                assertEquals(3, spoRelation.getAccessPath(NULL, NULL, NULL)
+                        .rangeCount(true/*exact*/));
 
             }
 

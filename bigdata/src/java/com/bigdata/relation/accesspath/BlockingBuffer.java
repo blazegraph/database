@@ -419,7 +419,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class BlockingIterator implements IAsynchronousIterator<E> {
+    protected class BlockingIterator implements IAsynchronousIterator<E> {
         
         /**
          * <code>true</code> iff this iterator is open - it is closed when the
@@ -601,33 +601,21 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             return hasNext(Long.MAX_VALUE, TimeUnit.SECONDS);
             
         }
+        
+        public boolean isExhausted() {
+            
+            if (!BlockingBuffer.this.open && nextE == null && queue.isEmpty()) {
 
-        /**
-         * Return <code>true</code> iff there is at least one element that can
-         * be visited. If the buffer is empty then this will block until: (a) an
-         * element appears in the buffer; (b) the buffer is
-         * {@link BlockingBuffer#close()}ed; or (c) the timeout expires.
-         * <p>
-         * Note that a <code>false</code> return DOES NOT signify that the
-         * iterator is exhausted. However, if you specify an infinite timeout
-         * using {@link Long#MAX_VALUE} {@link TimeUnit#SECONDS} then you MAY
-         * safely interpret a <code>false</code> return as an indication that
-         * the iterator is exhausted.
-         * 
-         * @param timeout
-         *            The length of time that the method may block awaiting an
-         *            element to appear.
-         * @param unit
-         *            The units in which the <i>timeout</i> is expressed.
-         * @return <code>true</code> iff there is an element available.
-         * 
-         * @throws RuntimeException
-         *             if the current thread is interrupted while waiting for
-         *             the buffer to be {@link BlockingBuffer#flush()}ed.
-         * 
-         * @todo add to {@link IAsynchronousIterator} and modify
-         *       JiniFederation#getProxy() to use this.
-         */
+                // iterator is known to be exhausted.
+                return true;
+
+            }
+
+            // iterator might visit more elements (might not also).
+            return false;
+            
+        }
+
         public boolean hasNext(final long timeout, final TimeUnit unit) {
             
             if (nextE != null) {
@@ -803,6 +791,54 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         }
 
+        public E next(long timeout, TimeUnit unit) {
+
+            final long startTime = System.nanoTime();
+            
+            // timeout in nanoseconds.
+            long nanos = TimeUnit.NANOSECONDS.convert(timeout, unit);
+            
+            if (!hasNext(nanos, TimeUnit.NANOSECONDS)) {
+
+                // nothing available within timeout.
+                final long elapsed = System.nanoTime() - startTime;
+                
+                final boolean isTimeout = elapsed >= timeout;
+                
+                if (isTimeout) {
+
+                    /*
+                     * Since the timeout was exceeded we can not know whether
+                     * or not the buffer was exhausted,
+                     */ 
+                    
+                    return null;
+                    
+                }
+
+                throw new NoSuchElementException();
+
+            }
+
+            final E e = _next();
+
+            // remaining nanos until timeout.
+            nanos = System.nanoTime() - startTime;
+            
+            if (nanos > 0 && e.getClass().getComponentType() != null) {
+                
+                /*
+                 * Combine chunk(s).
+                 */
+                
+                return combineChunks(e, 1/* nchunks */, System.nanoTime(), nanos);
+                
+            }
+
+            return e;
+
+        }
+        
         public E next() {
             
             if (!hasNext()) {
@@ -819,7 +855,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * Combine chunk(s).
                  */
                 
-                return combineChunks(e, 1/* nchunks */, System.nanoTime());
+                return combineChunks(e, 1/* nchunks */, System.nanoTime(), chunkTimeout);
                 
             }
 
@@ -871,17 +907,20 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * @param startTime
          *            The start time in nanoseconds of the <i>depth==1</i>
          *            request.
+         * @param timeout
+         *            The timeout in nanoseconds.
          * 
          * @return Either the same chunk or another chunk with additional
          *         elements.
          */
-        private E combineChunks( final E e, final int nchunks, final long startTime ) {
-           
+        private E combineChunks(final E e, final int nchunks,
+                final long startTime, final long timeout) {
+
             final Object[] chunk = (Object[]) e;
             
             final long elapsed = System.nanoTime() - startTime;
             
-            final boolean isTimeout = elapsed >= chunkTimeout;
+            final boolean isTimeout = elapsed >= timeout;
             
             // remaining nanos until timeout.
             final long nanos = chunkTimeout - elapsed;
@@ -894,7 +933,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * or until the iterator is known to be exhausted.
                  */
 
-                return combineChunks(combineNextChunk(e), nchunks + 1, startTime);
+                return combineChunks(combineNextChunk(e), nchunks + 1, startTime, timeout);
                 
             }
             
@@ -911,7 +950,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  */
                 hasNext();
                 
-                return combineChunks(combineNextChunk(e), nchunks + 1, startTime);
+                return combineChunks(combineNextChunk(e), nchunks + 1, startTime, timeout);
 
             }
 

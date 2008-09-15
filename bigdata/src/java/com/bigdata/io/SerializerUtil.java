@@ -35,24 +35,40 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.IStoreSerializer;
-
 /**
  * Helper utilities for (de-)serialization of {@link Serializable} objects using
- * the Java serialization mechanisms. This class MUST NOT be used when the
- * objects require access to the {@link IRawStore} reference during
- * de-serialization, e.g., when it is necessary to de-serialize an address into
- * the store and the coding of the address depends on the bit split for the
- * store.
- * 
- * @see IStoreSerializer 
+ * the Java serialization mechanisms.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class SerializerUtil {
 
+    /**
+     * An {@link ISerializer} wrapper for the static methods declared by the
+     * {@link SerializerUtil}.
+     */
+    public static final ISerializer INSTANCE = new ISerializer() {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -2625456835905636703L;
+
+        public Object deserialize(byte[] data) {
+            
+            return SerializerUtil.deserialize(data);
+            
+        }
+
+        public byte[] serialize(Object obj) {
+            
+            return SerializerUtil.serialize(obj);
+            
+        }
+        
+    };
+    
     /**
      * Serialize an object using the Java serialization mechansims.
      * 
