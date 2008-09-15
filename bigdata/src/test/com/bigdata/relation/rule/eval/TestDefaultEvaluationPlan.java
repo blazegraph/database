@@ -34,6 +34,8 @@ import java.util.Map;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.keys.ISortKeyBuilder;
+import com.bigdata.io.ISerializer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -348,37 +350,38 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         }
 
         public IConstant fakeBinding(IPredicate predicate, Var var) {
-            // TODO Auto-generated method stub
             return null;
         }
 
         public int getMaxParallelSubqueries() {
-            // TODO Auto-generated method stub
             return 0;
         }
 
         public int getChunkOfChunksCapacity() {
-            // TODO Auto-generated method stub
             return 0;
         }
 
         public int getFullyBufferedReadThreshold() {
-            // TODO Auto-generated method stub
             return 0;
         }
 
         public int getChunkCapacity() {
-            // TODO Auto-generated method stub
             return 0;
         }
 
         public IElementFilter<ISolution> getSolutionFilter() {
-            // TODO Auto-generated method stub
             return null;
         }
 
         public IBuffer<ISolution> newUnsynchronizedBuffer(IBuffer<ISolution[]> targetBuffer, int chunkCapacity) {
-            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public ISerializer<ISolution[]> getSolutionSerializer() {
+            return null;
+        }
+
+        public ISortKeyBuilder<IBindingSet> newBindingSetSortKeyBuilder(IRule rule) {
             return null;
         }
 

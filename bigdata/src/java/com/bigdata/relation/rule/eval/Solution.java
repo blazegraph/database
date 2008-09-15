@@ -30,7 +30,6 @@ package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -38,9 +37,6 @@ import com.bigdata.relation.rule.IRule;
 
 /**
  * Flyweight implementation.
- * 
- * FIXME smart and compact serialization! Reuse the {@link ITupleSerializer} for
- * the elements and provide compact serialization for the binding sets as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -32,6 +32,8 @@ import java.io.Serializable;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.btree.keys.ISortKeyBuilder;
+import com.bigdata.io.ISerializer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
@@ -205,9 +207,22 @@ public interface IJoinNexus {
     ISolution newSolution(IRule rule, IBindingSet bindingSet);
 
     /**
+     * Return an {@link ISortKeyBuilder} for an {@link IBindingSet}. The sort
+     * key may be used to SORT {@link IBindingSet}s or to impose a DISTINCT
+     * filter on {@link ISolution}s, etc.
+     * 
+     * @param rule
+     *            The rule that will determine the order imposed amoung the
+     *            bound variables (which variable is 1st, 2nd, 3rd, etc.).
+     * 
+     * @return The sort key builder (NOT thread-safe).
+     */
+    ISortKeyBuilder<IBindingSet> newBindingSetSortKeyBuilder(IRule rule); 
+    
+    /**
      * The flags that effect the behavior of {@link #newSolution(IRule, IBindingSet)}.
      */
-    public int solutionFlags();
+    int solutionFlags();
     
     /**
      * Bit flag indicating that {@link #newSolution(IRule, IBindingSet)} should
@@ -247,7 +262,7 @@ public interface IJoinNexus {
      * 
      * @return A new binding set suitable for that rule.
      */
-    public IBindingSet newBindingSet(IRule rule);
+    IBindingSet newBindingSet(IRule rule);
    
     /**
      * Return the effective {@link IRuleTaskFactory} for the rule. When the rule
@@ -273,14 +288,14 @@ public interface IJoinNexus {
      * @see RunRuleAndFlushBufferTaskFactory
      * @see RunRuleAndFlushBufferTask
      */
-    public IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule);
+    IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule);
     
     /**
      * Return the factory for {@link IEvaluationPlan}s.
      * 
      * @return The factory.
      */
-    public IEvaluationPlanFactory getPlanFactory();
+    IEvaluationPlanFactory getPlanFactory();
     
 //    /**
 //     * The timestamp used when an {@link IBuffer} is flushed against an
@@ -467,6 +482,12 @@ public interface IJoinNexus {
      *       of an {@link ISolution} rather than element of an {@link IRelation}.
      */
     IElementFilter<ISolution> getSolutionFilter();
+    
+    /**
+     * Return the object that is responsible for (de-)serializing chunks of
+     * {@link ISolution}s.
+     */
+    ISerializer<ISolution[]> getSolutionSerializer();
     
     /**
      * Make the write sets visible, eg, by committing the store(s) having

@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.ISerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.striterator.IRemoteChunk;
@@ -25,8 +26,14 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
     protected static final transient Logger log = Logger
             .getLogger(RemoteChunkedIterator.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
     private final IAsynchronousIterator<E[]> sourceIterator;
 
+    private final ISerializer<E[]> serializer;
+    
     private final IKeyOrder<E> keyOrder;
     
     transient volatile boolean open = true;
@@ -35,23 +42,32 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
      * 
      * @param sourceIterator
      *            The source iterator.
+     * @param serializer
+     *            The object that will be used to (de-)serialize the elements.
      * @param keyOrder
      *            The natural order of the visited elements if known and
      *            otherwise <code>null</code>.
      */
     public RemoteChunkedIterator(IAsynchronousIterator<E[]> sourceIterator,
+            ISerializer<E[]> serializer,
             IKeyOrder<E> keyOrder) {
 
         if (sourceIterator == null)
             throw new IllegalArgumentException();
 
+        if (serializer == null)
+            throw new IllegalArgumentException();
+
         this.sourceIterator = sourceIterator;
 
+        this.serializer = serializer;
+        
         this.keyOrder = keyOrder;
         
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
-            log.debug("sourceIterator=" + sourceIterator);
+            log.debug("sourceIterator=" + sourceIterator + ", serializer="
+                    + serializer);
 
         }
 
@@ -82,7 +98,7 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
         if (open) {
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("Closing iterator.");
 
@@ -113,13 +129,14 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
 
         if (!sourceIterator.hasNext()) {
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("nchunks=" + nchunks + " : source is exhausted");
 
             }
 
-            chunk = new RemoteChunk<E>(true/* exhausted */, keyOrder, null);
+            chunk = new RemoteChunk<E>(true/* exhausted */, serializer,
+                    keyOrder, null);
 
         } else {
 
@@ -149,14 +166,14 @@ public class RemoteChunkedIterator<E> implements IRemoteChunkedIterator<E> {
              */
             final boolean sourceExhausted = !sourceIterator.hasNext();
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
 
                 log.info("nchunks=" + nchunks + ", elementsInChunk=" + a.length
                         + ", sourceExhausted=" + sourceExhausted);
 
             }
 
-            chunk = new RemoteChunk<E>(sourceExhausted, keyOrder, a);
+            chunk = new RemoteChunk<E>(sourceExhausted, serializer, keyOrder, a);
 
         }
 

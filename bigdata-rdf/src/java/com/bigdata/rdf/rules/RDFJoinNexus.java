@@ -39,32 +39,37 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.keys.DelegateSortKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.cache.WeakValueCache;
+import com.bigdata.io.ISerializer;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.spo.SPOSortKeyBuilder;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.ArrayBindingSet;
+import com.bigdata.relation.rule.BindingSetSortKeyBuilder;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
@@ -111,6 +116,67 @@ import com.bigdata.striterator.WrappedRemoteChunkedIterator;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
+ * <p>
+ * The rules have potential parallelism when performing closure. Each join has
+ * potential parallelism as well for subqueries. We could even define a PARALLEL
+ * iterator flag and have parallelism across index partitions for a
+ * read-historical iterator since the data service locators are immutable for
+ * historical reads.
+ * <p>
+ * Rule-level parallelism (for fix point closure of a rule set) and join
+ * subquery-level parallelism could be distributed to available workers in a
+ * cluster. In a similar way, high-level queries could be distributed to workers
+ * in a cluster to evaluation. Such distribution would increase the practical
+ * parallelism beyond what a single machine could support as long as the total
+ * parallelism does not overload the cluster.
+ * <p>
+ * There is a pragmatic limit on the #of concurrent threads for a single host.
+ * When those threads target a blocking queue, then thread contention becomes
+ * very high and throughput drops drammatically. We can reduce this problem by
+ * allocating a distinct {@link UnsynchronizedArrayBuffer} to each task. The
+ * task collects a 'chunk' in the {@link UnsynchronizedArrayBuffer}. When full,
+ * the buffer propagates onto a thread-safe buffer of chunks which flushes
+ * either on an {@link IMutableRelation} (mutation) or feeding an
+ * {@link IAsynchronousIterator} (high-level query). It is chunks themselves
+ * that accumulate in this thread-safe buffer, so each add() on that buffer may
+ * cause the thread to yield, but the return for yielding is an entire chunk in
+ * the buffer, not just a single element.
+ * <p>
+ * There is one high-level buffer factory corresponding to each of the kinds of
+ * {@link ActionEnum}: {@link #newQueryBuffer()};
+ * {@link #newInsertBuffer(IMutableRelation)}; and
+ * {@link #newDeleteBuffer(IMutableRelation)}. In addition there is one for
+ * {@link UnsynchronizedArrayBuffer}s -- this is a buffer that is NOT
+ * thread-safe and that is designed to store a single chunk of elements, e.g.,
+ * in an array E[N]).
+ * 
+ * @todo We can already run a LDS program (IStep) on a DataService.
+ *       <P>
+ *       This capability should be generalized so that we can easily run an
+ *       IStep on any DataService in a cluster, thereby parallelizing the
+ *       execution of rules in a massive fix point closure operation across a
+ *       cluster.
+ *       <p>
+ *       While all JOINs for a given rule will begin their evaluation on the
+ *       DataService (or client) choosen to evaluate the rule, but subqueries
+ *       MAY be distributed to other DataServices for execution. Therefore, the
+ *       subquery JOIN capability should be generalized so that we can easily
+ *       run a JOIN subquery on any DataService.
+ *       <p>
+ *       For LDS, of course, we will always choose to run the program inside of
+ *       the DataService as an AbstractTask since there are no additional
+ *       computational resources to be leveraged.
+ *       <p>
+ *       However, we can disable the LDS "smart" program execution and test
+ *       distributed execution of parallel rules and JOIN subqueries. We can
+ *       test the same thing with EDS and JDS, but there will be additional
+ *       overhead involved.
+ * 
+ * @todo Factor out an abstract base class for general purpose rule execution
+ *       over arbitrary relations.
+ * 
+ * @todo add an {@link IBindingSet} serializer and drive through with the
+ *       {@link IAsynchronousIterator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -849,6 +915,70 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
+    /**
+     * FIXME unit tests for DISTINCT with a head and ELEMENT, with bindings and
+     * a head, with bindings but no head, and with a head but no bindings
+     * (error). See {@link #runQuery(IStep)}
+     * 
+     * FIXME unit tests for SORT with and without DISTINCT and with the various
+     * combinations used in the unit tests for DISTINCT. Note that SORT, unlike
+     * DISTINCT, requires that all solutions are materialized before any
+     * solutions can be returned to the caller. A lot of optimization can be
+     * done for SORT implementations, including merge sort of large blocks (ala
+     * map/reduce), using compressed sort keys or word sort keys with 2nd stage
+     * disambiguation, etc.
+     * 
+     * FIXME Add property for sort {ascending,descending,none} to {@link IRule}.
+     * The sort order can also be specified in terms of a sequence of variables.
+     * The choice of the variable order should be applied here.
+     * 
+     * FIXME The properties that govern the Unicode collator for the generated
+     * sort keys should be configured by the {@link RDFJoinNexusFactory}. In
+     * particular, Unicode should be handled however it is handled for the
+     * {@link LexiconRelation}.
+     */
+    public ISortKeyBuilder<IBindingSet> newBindingSetSortKeyBuilder(IRule rule) {
+
+        final IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance();
+        
+        final int nvars = rule.getVariableCount();
+        
+        final IVariable[] vars = new IVariable[nvars];
+        
+        {
+
+            final Iterator<IVariable> itr = rule.getVariables();
+
+            int i = 0;
+
+            while (itr.hasNext()) {
+
+                vars[i++] = itr.next();
+                
+            }
+
+        }
+
+        return new BindingSetSortKeyBuilder(keyBuilder, vars);
+        
+    }
+    
+    /**
+     * FIXME Custom serialization for solution sets, especially since there
+     * tends to be a lot of redudency in the data arising from how bindings are
+     * propagated during JOINs.
+     * 
+     * @todo We can sort the {@link ISolution}s much like we already do for
+     *       DISTINCT or intend to do for SORT and use the equivilent of leading
+     *       key compression to reduce IO costs (or when they are SORTed we
+     *       could leverage that to produce a more compact serialization).
+     */
+    public ISerializer<ISolution[]> getSolutionSerializer() {
+        
+        return SerializerUtil.INSTANCE;
+        
+    }
+
     public IBindingSet newBindingSet(IRule rule) {
 
         final IBindingSet constants = rule.getConstants();
@@ -1198,7 +1328,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
-        IChunkedOrderedIterator<ISolution> itr = (IChunkedOrderedIterator<ISolution>) runProgram(
+        final IChunkedOrderedIterator<ISolution> itr = (IChunkedOrderedIterator<ISolution>) runProgram(
                 ActionEnum.Query, step);
 
         if (step.isRule() && ((IRule) step).isDistinct()) {
@@ -1207,33 +1337,79 @@ public class RDFJoinNexus implements IJoinNexus {
              * Impose a DISTINCT constraint based on the variable bindings
              * selected by the head of the rule. The DistinctFilter will be
              * backed by a TemporaryStore if more than one chunk of solutions is
-             * generated. That TemporaryStore will exist on the client where the
-             * query was issued. It will be finalized when it is no longer
-             * referenced.
+             * generated. That TemporaryStore will exist on the client where
+             * this method (runQuery) was executed. The TemporaryStore will be
+             * finalized and deleted when it is no longer referenced.
              */
 
-            final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG
-                    * IRawTripleStore.N);
-            
-            itr = new ChunkedConvertingIterator<ISolution, ISolution>(itr,
-                    new DistinctFilter<ISolution>(indexManager) {
+            final ISortKeyBuilder<ISolution> sortKeyBuilder;
 
-                /**
-                 * Distinct iff the {s:p:o} are distinct.
+            if (((IRule) step).getHead() != null
+                    && (solutionFlags & ELEMENT) != 0) {
+
+                /*
+                 * Head exists and elements are requested, so impose DISTINCT
+                 * based on the materialized elements.
                  * 
-                 * @todo make this more general. It is hardcoded to an
-                 *       {@link ISPO} and can not handle joins on other
-                 *       relations.
+                 * FIXME The SPOSortKeyBuilder should be obtained from the head
+                 * relation. Of course there is one sort key for each access
+                 * path, but for the purposes of DISTINCT we want the sort key
+                 * to correspond to the notion of a "primary key" (the
+                 * distinctions that matter) and it does not matter which sort
+                 * order but the SPO sort order probably has the least factor of
+                 * "surprise".
                  */
-                public byte[] getSortKey(ISolution solution) {
+                
+                sortKeyBuilder = new DelegateSortKeyBuilder<ISolution, ISPO>(
+                        new SPOSortKeyBuilder()) {
 
-                    final ISPO spo = (ISPO)solution.get();
+                    protected ISPO resolve(ISolution solution) {
+
+                        return (ISPO) solution.get();
+
+                    }
+
+                };
+
+            } else {
+
+                if ((solutionFlags & BINDINGS) != 0) {
+
+                    /*
+                     * Bindings were requested so impose DISTINCT based on those
+                     * bindings.
+                     */
                     
-                    return keyBuilder.reset().append(spo.s()).append(
-                                    spo.p()).append(spo.o()).getKey();
-                    
+                    sortKeyBuilder = new DelegateSortKeyBuilder<ISolution, IBindingSet>(
+                            newBindingSetSortKeyBuilder((IRule) step)) {
+
+                        protected IBindingSet resolve(ISolution solution) {
+
+                            return solution.getBindingSet();
+
+                        }
+
+                    };
+
+                } else {
+
+                    throw new UnsupportedOperationException(
+                            "You must specify BINDINGS since the rule does not have a head: "
+                                    + step);
+
                 }
 
+            }
+            
+            return new ChunkedConvertingIterator<ISolution, ISolution>(itr,
+                    new DistinctFilter<ISolution>(indexManager) {
+
+                protected byte[] getSortKey(ISolution e) {
+                    
+                    return sortKeyBuilder.getSortKey(e);
+                    
+                }
+                
             });
 
         }
@@ -1241,7 +1417,7 @@ public class RDFJoinNexus implements IJoinNexus {
         return itr;
 
     }
-
+    
     public long runMutation(IStep step)
             throws Exception {
 
@@ -1536,7 +1712,7 @@ public class RDFJoinNexus implements IJoinNexus {
 //        }
         
     }
-
+    
 //    /**
 //     * Updated each time {@link #makeWriteSetsVisible()} does a commit (which
 //     * only occurs for the local {@link Journal} scenario) and used instead of

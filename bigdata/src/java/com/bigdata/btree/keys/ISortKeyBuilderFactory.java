@@ -23,44 +23,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on May 27, 2008
+ * Created on Sep 15, 2008
  */
 
-package com.bigdata.btree;
+package com.bigdata.btree.keys;
 
 import java.io.Serializable;
 
 /**
- * An abstraction for serializing and de-serializing objects as byte[]s.
+ * A factory for objects that generate unsigned byte[] sort keys.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @param <E>
+ *            The generic type of the objects whose sort keys can be generated.
  */
-public interface ISerializer extends Serializable {
+public interface ISortKeyBuilderFactory<E> extends Serializable {
 
     /**
-     * Serialize an object.
-     * 
-     * @param obj
-     *            A object (optional).
-     * 
-     * @return A byte[] that is the serialization of that object.
+     * Return a thread-local instance (safe for use by a single thread only).
      */
-    byte[] serialize(Object obj);
-
-    /**
-     * De-serialize an object.
-     * <p>
-     * Note: Some serializers use the convention that a <code>null</code> will
-     * be de-serialized as a <code>null</code>. This convention makes it easy
-     * to de-serialize the value and then test to see whether or not the value
-     * was in fact found in the index.
-     * 
-     * @param data
-     *            The data.
-     * 
-     * @return The object for that data.
-     */
-    Object deserialize(byte[] data);
-
+    public ISortKeyBuilder<E> newInstance();
+    
 }

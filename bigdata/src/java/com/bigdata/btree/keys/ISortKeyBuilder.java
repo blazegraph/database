@@ -23,24 +23,29 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jun 19, 2008
+ * Created on Sep 15, 2008
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.btree.keys;
 
 /**
- * A constant.
+ * An interface for generating unsigned byte[] sort keys.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <E>
+ *            The generic type of the object whose sort keys will be generated.
  */
-public interface IConstant<E/* extends Comparable<E>*/> extends
-        IVariableOrConstant<E> { //, Comparable<IConstant<E>> {
+public interface ISortKeyBuilder<E> {
 
     /**
-     * The hash code of the value that would be returned by
-     * {@link IVariableOrConstant#get()}
+     * Return an unsigned byte[] sort key.
+     * 
+     * @param e
+     *            Some object (required).
+     *            
+     * @return The unsigned byte[] sort key.
      */
-    int hashCode();
+    public byte[] getSortKey(E e);
     
 }

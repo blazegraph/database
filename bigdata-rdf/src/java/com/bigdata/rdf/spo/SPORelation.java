@@ -813,21 +813,21 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
     }
     
-    public long getElementCount(boolean exact) {
-
-        final IIndex ndx = getIndex(SPOKeyOrder.SPO);
-        
-        if (exact) {
-        
-            return ndx.rangeCountExact(null/* fromKey */, null/* toKey */);
-            
-        } else {
-            
-            return ndx.rangeCount(null/* fromKey */, null/* toKey */);
-            
-        }
-        
-    }
+//    public long getElementCount(boolean exact) {
+//
+//        final IIndex ndx = getIndex(SPOKeyOrder.SPO);
+//        
+//        if (exact) {
+//        
+//            return ndx.rangeCountExact(null/* fromKey */, null/* toKey */);
+//            
+//        } else {
+//            
+//            return ndx.rangeCount(null/* fromKey */, null/* toKey */);
+//            
+//        }
+//        
+//    }
 
     /**
      * Efficient scan of the distinct term identifiers that appear in the first

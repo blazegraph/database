@@ -53,9 +53,7 @@ public interface IRule<E> extends IStep {
 
     /**
      * <code>true</code> if a {@link DistinctFilter} should be applied when
-     * the rule is evaluated as a <em>query</em>. The {@link IRule} MUST
-     * declare a {@link #getHead() head}. Solutions are considered distinct iff
-     * they have the same bindings for the {@link #getHead() head}.
+     * the rule is evaluated as a <em>query</em>.
      */
     public boolean isDistinct();
     

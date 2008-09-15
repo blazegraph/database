@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.IIndexManager;
@@ -68,16 +67,16 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      */
     public ExecutorService getExecutorService();
     
-    /**
-     * The #of elements in the relation.
-     * 
-     * @param exact
-     *            When <code>true</code> an exact count is reported. An exact
-     *            count will require a key-range scan if delete markers are in
-     *            use, in which case it will be more expensive. See
-     *            {@link IRangeQuery}.
-     */
-    long getElementCount(boolean exact);
+//    /**
+//     * The #of elements in the relation.
+//     * 
+//     * @param exact
+//     *            When <code>true</code> an exact count is reported. An exact
+//     *            count will require a key-range scan if delete markers are in
+//     *            use, in which case it will be more expensive. See
+//     *            {@link IRangeQuery}.
+//     */
+//    long getElementCount(boolean exact);
 
     /**
      * Return the best {@link IAccessPath} for a relation given a predicate with

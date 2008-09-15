@@ -45,9 +45,11 @@ import net.jini.jeri.InvocationLayerFactory;
 import net.jini.jeri.tcp.TcpServerEndpoint;
 
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.io.ISerializer;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.TimestampServiceUtil;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -528,8 +530,8 @@ public class JiniFederation extends AbstractDistributedFederation {
      * object to get back an {@link IChunkedOrderedIterator} interface.
      * <p>
      * Note: This is used for {@link IRule} evaluation in which there is at
-     * least one JOIN. It DOES NOT get use for simple access path scans. Those
-     * use {@link IRangeQuery#rangeIterator()} instead.
+     * least one JOIN. It DOES NOT get used for simple {@link IAccessPath}
+     * scans. Those use {@link IRangeQuery#rangeIterator()} instead.
      * 
      * @todo Allow {@link Configuration} of the {@link Exporter} for the proxy
      *       iterators. However, since the {@link Exporter} is paired to a
@@ -545,24 +547,23 @@ public class JiniFederation extends AbstractDistributedFederation {
     @Override
     public Object getProxy(
             final IAsynchronousIterator<? extends Object[]> sourceIterator,
+            final ISerializer<? extends Object[]> serializer,
             final IKeyOrder<? extends Object> keyOrder) {
         
         if (sourceIterator == null)
             throw new IllegalArgumentException();
         
-        if(sourceIterator.isFutureDone()) {
-            
-            /*
-             * FIXME Since the producer is done we can materialize all of the
-             * data in a ResultSet or RemoteChunk and send that back.
-             * 
-             * FIXME We need the ability to define the per-Element and
-             * chunk-of-element serializers to make this efficient.
-             */
-            
-            log.warn("Async iterator is done: modify code to send back fully materialized chunk.");
-            
-        }
+//        if (sourceIterator.hasNext(1L, TimeUnit.MILLISECONDS)
+//                && sourceIterator.isFutureDone()) {
+//            
+//            /*
+//             * @todo If the producer is done we can materialize all of the data
+//             * in a ResultSet or RemoteChunk and send that back.
+//             */
+//            
+//            log.warn("Async iterator is done: modify code to send back fully materialized chunk.");
+//            
+//        }
         
         final long begin = System.currentTimeMillis();
         
@@ -591,7 +592,7 @@ public class JiniFederation extends AbstractDistributedFederation {
         
         // wrap the iterator with an exportable object.
         final RemoteChunkedIterator impl = new RemoteChunkedIterator(
-                sourceIterator, keyOrder);
+                sourceIterator, serializer, keyOrder);
         
         /*
          * Export and return the proxy.

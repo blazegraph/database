@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
+import com.bigdata.io.ISerializer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.striterator.IRemoteChunkedIterator;
@@ -85,7 +86,11 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
      * component type of the array.
      * 
      * @param itr
-     *            The source iterator.
+     *            The source iterator. Note that the iterator visits elements of
+     *            some array type (chunks).
+     * @param serializer
+     *            The object responsible for (de-)serializing a chunk of
+     *            elements visited by the iterator.
      * @param keyOrder
      *            The natural order in which the elements will be visited iff
      *            known and otherwise <code>null</code>.
@@ -98,7 +103,9 @@ abstract public class AbstractDistributedFederation extends AbstractScaleOutFede
      *             if the iterator is <code>null</code>.
      */
     public abstract Object getProxy(
-            IAsynchronousIterator<? extends Object[]> itr,
-            IKeyOrder<? extends Object> keyOrder);
+            IAsynchronousIterator<? extends Object[]> itr,//
+            ISerializer<? extends Object[]> serializer, //
+            IKeyOrder<? extends Object> keyOrder//
+    );
 
 }
