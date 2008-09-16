@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.Properties;
 
 import com.bigdata.btree.BTree;
@@ -418,6 +419,20 @@ public interface Options {
      *             the hands of the client.
      */
     String BRANCHING_FACTOR = "branchingFactor";
+    
+    /**
+     * When <code>true</code> (default {@value #DEFAULT_FILE_LOCK_ENABLED}) a
+     * {@link FileLock} will be sought for the journal by default. When
+     * <code>false</code> only an advisory lock will be sought. Note that
+     * {@link FileLock} is never used for memory-mapped (causes problems) or
+     * read-only files (does not work) and MAY fail on NFS mounts. If
+     * {@link FileLock} fails then we always back down to an advisory lock.
+     * 
+     * @see FileMetadata#openFile(File, String, boolean)
+     */
+    String FILE_LOCK_ENABLED = "fileLockEnabled";
+    
+    String DEFAULT_FILE_LOCK_ENABLED = "true";
     
     /**
      * The default for the {@link #BUFFER_MODE}.

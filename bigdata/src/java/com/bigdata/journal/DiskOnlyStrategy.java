@@ -1257,7 +1257,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             if (raf != null) {
 
-                raf.close();
+                FileMetadata.closeFile(file,raf);
                 
             }
             
@@ -1616,7 +1616,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         try {
 
-            raf = FileMetadata.openFile(file, fileMode, bufferMode);
+            raf = FileMetadata.openFile(file, fileMode, true/*tryFileLock*/);
         
             log.warn("Re-opened file: "+file);
             
@@ -1953,7 +1953,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             try {
                 
                 // open the file for the first time (create).
-                raf = FileMetadata.openFile(file, fileMode, bufferMode);
+                raf = FileMetadata.openFile(file, fileMode,
+                        bufferMode != BufferMode.Mapped/*useTryLock*/);
                 
                 // note that it has been opened.
                 fileOpened = true;

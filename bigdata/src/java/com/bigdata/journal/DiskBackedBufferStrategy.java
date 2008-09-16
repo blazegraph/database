@@ -132,7 +132,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         try {
 
-            raf.close();
+            FileMetadata.closeFile(file, raf);
             
         } catch( IOException ex ) {
             
@@ -282,7 +282,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         try {
 
-            raf = FileMetadata.openFile(file, fileMode, bufferMode);
+            raf = FileMetadata.openFile(file, fileMode, true/*tryFileLock*/);
         
             log.warn("Re-opened file: "+file);
             
