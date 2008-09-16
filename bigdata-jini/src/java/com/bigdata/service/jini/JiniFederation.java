@@ -245,10 +245,10 @@ public class JiniFederation extends AbstractDistributedFederation {
         while ((System.currentTimeMillis() - begin) < timeout) {
 
             // verify that the client has/can get the metadata service.
-            IMetadataService metadataService = getMetadataService();
+            final IMetadataService metadataService = getMetadataService();
 
             // find all data services.
-            UUID[] dataServiceUUIDs = getDataServiceUUIDs(0/*all*/);
+            final UUID[] dataServiceUUIDs = getDataServiceUUIDs(0/*all*/);
 //            // find at most that many data services.
 //            UUID[] dataServiceUUIDs = getDataServiceUUIDs(minDataServices);
         
