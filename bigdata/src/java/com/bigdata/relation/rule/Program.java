@@ -203,17 +203,31 @@ public class Program implements IProgram {
         final String label;
         if(true) {
             
-            String[] a = new String[rules.length];
+            StringBuilder sb = new StringBuilder();
+            
+            sb.append("closure[");
             
             int i = 0;
             
             for(IRule r : rules) {
                 
-                a[i++] = r.getName();
+                if (i > 0) {
+                
+                    /*
+                     * Note: Do NOT use a comma here - it will break the comma
+                     * delimited format written by RuleStats.
+                     */
+                    sb.append(" ");
+                
+                }
+                
+                sb.append( r.getName() );
                 
             }
             
-            label = "closure" + Arrays.toString(a);
+            sb.append("]");
+            
+            label = sb.toString();
             
         } else {
             
