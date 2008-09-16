@@ -85,6 +85,7 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.TokenBuffer;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.Split;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -258,22 +259,55 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             final IIndexManager indexManager = getIndexManager();
 
-            indexManager.registerIndex(term2IdMetadata);
+            final Properties p = getProperties();
+            
+            if (indexManager instanceof IBigdataFederation
+                    && ((IBigdataFederation) indexManager).isScaleOut() &&
+                    p.getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID)!=null
+                    ) {
 
-            indexManager.registerIndex(id2TermMetadata);
+                // register the indices on the same data service.
+                
+                final IBigdataFederation fed = (IBigdataFederation)indexManager;
+                
+                final UUID dataServiceUUID = UUID.fromString(p
+                        .getProperty(Options.LEXICON_RELATION_DATA_SERVICE_UUID));
 
-            term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+                if (INFO) {
 
-            id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+                    log.info("Allocating LexiconRelation on dataService="
+                            + dataServiceUUID);
+
+                }
+
+                fed.registerIndex(term2IdMetadata, dataServiceUUID);
+
+                fed.registerIndex(id2TermMetadata, dataServiceUUID);
+
+            } else {
+
+                // register the indices.
+                
+                indexManager.registerIndex(term2IdMetadata);
+
+                indexManager.registerIndex(id2TermMetadata);
+
+            }
 
             if (textIndex) {
 
-                FullTextIndex tmp = getSearchEngine();
+                // create the full text index.
+                
+                final FullTextIndex tmp = getSearchEngine();
 
                 tmp.create();
 
             }
 
+            term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+
+            id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+            
         } finally {
 
             unlock(resourceLock);

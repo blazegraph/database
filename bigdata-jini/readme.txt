@@ -9,10 +9,24 @@ JINI
 - jini 2.1 may report errors locating the shared libraries from awk,
   dirname, basename and grep when installing under un*x.  The problem
   is an assumption about the kernel version.  This problem is resolved
-  by editing the installer (with a hex editor) and the launchall
-  script.  See http://www.jini.org/wiki/Category:Getting_Started and
+  by editing the installer and the launchall script. 
+  See http://www.jini.org/wiki/Category:Getting_Started and
   http://www.linuxquestions.org/questions/showthread.php?t=370056 for
-  a resolution.
+  a resolution.  Here is is in case that link goes away:
+  
+  Open the bin installer file in an editor. Look for the line 
+
+   export LD_ASSUME_KERNEL=2.2.5
+   
+   and replace it with 
+
+   #xport LD_ASSUME_KERNEL=2.2.5
+   
+   Save the file and launch. 
+   
+   Once jini is installed, you need to do exactly the same thing for the
+   Launch-All script in the installverify directory - this is the script
+   that you use the start jini.
 
 - Here are some notes on getting things working on a Fedora Core 6 platform.
   The symptom was that ifconfig was reporting MULTICAST for the interface 

@@ -205,25 +205,21 @@ import com.bigdata.sparse.SparseRowStore;
  * </p>
  * 
  * 
- * <h2>{@link IOException}</h2>
+ * <h2>{@link StaleLocatorException}</h2>
  * 
  * <p>
  * 
- * Clients MUST handle this exception by refreshing their cached
- * {@link PartitionLocator} for the key range associated with the index
- * partition which they wished to query and then re-issuing their request. By
+ * {@link IDataService} clients MUST handle this exception by refreshing their
+ * cached {@link PartitionLocator} for the key range associated with the index
+ * partition which they wish to query and then re-issuing their request. By
  * following this simple rule the client will automatically handle index
  * partition splits, joins, and moves without error and in a manner which is
- * completely transparent to the application.
- * 
- * </p>
- * 
- * <p>
- * 
- * This exception is generally (but not always) wrapped. Applications typically
- * DO NOT write directly to the {@link IDataService} interface and therefore DO
- * NOT need to worry about this. See {@link ClientIndexView}, which
- * automatically handles this exception.
+ * completely transparent to the application. Note that splits, joins, and moves
+ * DO NOT alter the {@link PartitionLocator} for historical reads, only for
+ * ongoing writes. This exception is generally (but not always) wrapped.
+ * Applications typically DO NOT write directly to the {@link IDataService}
+ * interface and therefore DO NOT need to worry about this. See
+ * {@link ClientIndexView}, which automatically handles this exception.
  * 
  * </p>
  * 
