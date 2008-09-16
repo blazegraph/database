@@ -47,6 +47,8 @@ public class PIDUtil {
     static protected final Logger log = Logger
             .getLogger(PIDUtil.class);
 
+    static protected final boolean INFO = log.isInfoEnabled();
+    
     /**
      * Return the PID of the Java VM under Linux using bash.
      * 
@@ -98,6 +100,7 @@ public class PIDUtil {
                 
             }
             
+            if(INFO)
             log.info("read: [" + val + "]");
             
             int pid = Integer.parseInt(val);
