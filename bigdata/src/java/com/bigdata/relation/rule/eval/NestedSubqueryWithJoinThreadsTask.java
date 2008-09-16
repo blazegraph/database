@@ -168,9 +168,9 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      */
     final public RuleStats call() {
 
-        if(DEBUG) {
+        if(INFO) {
             
-            log.debug("begin:\nruleState=" + ruleState + "\nplan="
+            log.info("begin:\nruleState=" + ruleState + "\nplan="
                     + ruleState.plan);
             
         }
