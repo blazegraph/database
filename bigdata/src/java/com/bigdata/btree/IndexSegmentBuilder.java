@@ -40,10 +40,10 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -95,10 +95,6 @@ import com.bigdata.rawstore.WormAddressManager;
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
  * 
- * FIXME support efficient prior/next leaf scans (nextAddr and modify the itr to
- * use priorLeaf() and nextLeaf() methods for the scan). See
- * {@link DumpIndexSegment}.
- * 
  * FIXME use the shortest separator key.
  * 
  * @see IndexSegment
@@ -117,14 +113,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected static boolean DEBUG = log.isInfoEnabled();
     
     /**
      * The file mode used to open the file on which the {@link IndexSegment} is
@@ -636,16 +630,17 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * Open the output channel and get an exclusive lock.
              */
             
-            out = new RandomAccessFile(outFile, mode);
-            
+            out = FileMetadata.openFile(outFile, mode, true/*useFileLock*/);
+//            out = new RandomAccessFile(outFile, mode);
+//            
             outChannel = out.getChannel();
-            
-            if (outChannel.tryLock() == null) {
-                
-                throw new IOException("Could not lock file: "
-                        + outFile.getAbsoluteFile());
-                
-            }
+//            
+//            if (outChannel.tryLock() == null) {
+//                
+//                throw new IOException("Could not lock file: "
+//                        + outFile.getAbsoluteFile());
+//                
+//            }
 
             /*
              * Open the leaf buffer. We always do this, but we choose the type
@@ -853,8 +848,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * use.
              */
             outChannel.force(true);
-            out.close(); // also releases the lock.
-//            out = null;
+            FileMetadata.closeFile(outFile, out);
+//            out.close(); // also releases the lock.
+////            out = null;
 
             elapsed_write = System.currentTimeMillis() - begin_write;
             
@@ -868,7 +864,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             mbPerSec = (elapsed == 0 ? 0 : checkpoint.length / Bytes.megabyte32
                     / (elapsed / 1000f));
             
-            if(log.isInfoEnabled()) {
+            if(INFO) {
             
                 final NumberFormat cf = NumberFormat.getNumberInstance();
                 
@@ -950,7 +946,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             try {
             
-                out.close();
+                FileMetadata.closeFile(outFile, out);
+                // out.close();
                 
             } catch (Throwable t) {
              
