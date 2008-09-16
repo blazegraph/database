@@ -83,8 +83,10 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -333,6 +335,23 @@ public class FullTextIndex extends AbstractRelation {
         
         String DEFAULT_INDEXER_TIMEOUT = "1000";
         
+        /**
+         * Optional property gives the {@link UUID} of the {@link IDataService}
+         * on which the indices for the {@link FullTextIndex} will be
+         * registered. This property only used for {@link IBigdataFederation}s
+         * and only when {@link IBigdataFederation#isScaleOut()} is
+         * <code>true</code> (it is ignored for temporary stores created when
+         * the deployment is scale-out since the temporary stores use a
+         * different index manager).
+         * <p>
+         * Note: You can lock the {@link FullTextIndex} onto a specific
+         * {@link IDataService} using this option if you also disable
+         * {@link OverflowManager.Options#MAXIMUM_MOVES_PER_TARGET} or disable
+         * {@link OverflowManager.Options#OVERFLOW_ENABLED} for the specified
+         * {@link IDataService}.
+         */
+        String DATA_SERVICE_UUID = "indexer.dataServiceUUID";
+        
     }
     
     /**
@@ -444,9 +463,6 @@ public class FullTextIndex extends AbstractRelation {
 
         try {
 
-            final IndexMetadata indexMetadata = new IndexMetadata(name, UUID
-                    .randomUUID());
-
             /*
              * FIXME register a tuple serializer that knows how to unpack the
              * values and how to extract the bytes corresponding to the encoded
@@ -456,11 +472,42 @@ public class FullTextIndex extends AbstractRelation {
              * 
              * FIXME put the IKeyBuilderFactory on the index.
              */
+            final IndexMetadata indexMetadata = new IndexMetadata(name, UUID
+                    .randomUUID());
 
-            indexManager.registerIndex(indexMetadata);
+            final Properties p = getProperties();
+            
+            if (indexManager instanceof IBigdataFederation
+                    && ((IBigdataFederation) indexManager).isScaleOut() &&
+                    p.getProperty(Options.DATA_SERVICE_UUID)!=null
+                    ) {
 
-            if(INFO)
-                log.info("Registered new text index: name=" + name);
+                // register the indices on the same data service.
+                
+                final IBigdataFederation fed = (IBigdataFederation)indexManager;
+                
+                final UUID dataServiceUUID = UUID.fromString(p
+                        .getProperty(Options.DATA_SERVICE_UUID));
+
+                if (INFO) {
+
+                    log.info("Allocating on dataService=" + dataServiceUUID);
+
+                }
+
+                fed.registerIndex(indexMetadata, dataServiceUUID);
+
+                if(INFO)
+                    log.info("Registered new text index: name=" + name);
+                
+            } else {
+
+                indexManager.registerIndex(indexMetadata);
+
+                if(INFO)
+                    log.info("Registered new text index: name=" + name);
+
+            }
 
             ndx = getIndex(name);
 

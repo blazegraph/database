@@ -85,6 +85,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientIndex;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -313,12 +314,44 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
                 final IndexMetadata ospMetadata = getStatementIndexMetadata(SPOKeyOrder.OSP);
 
-                // register the index.
-                indexManager.registerIndex(spoMetadata);
+                final Properties p = getProperties();
+                
+                if (indexManager instanceof IBigdataFederation
+                        && ((IBigdataFederation) indexManager).isScaleOut() &&
+                        p.getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID)!=null
+                        ) {
 
-                indexManager.registerIndex(posMetadata);
+                    // register the indices on the same data service.
+                    
+                    final IBigdataFederation fed = (IBigdataFederation)indexManager;
+                    
+                    final UUID dataServiceUUID = UUID.fromString(p
+                            .getProperty(Options.SPO_RELATION_DATA_SERVICE_UUID));
 
-                indexManager.registerIndex(ospMetadata);
+                    if (INFO) {
+
+                        log.info("Allocating SPORelation on dataService="
+                                + dataServiceUUID);
+
+                    }
+
+                    fed.registerIndex(spoMetadata, dataServiceUUID);
+
+                    fed.registerIndex(posMetadata, dataServiceUUID);
+
+                    fed.registerIndex(ospMetadata, dataServiceUUID);
+                    
+                } else {
+
+                    // register the indices.
+                    
+                    indexManager.registerIndex(spoMetadata);
+
+                    indexManager.registerIndex(posMetadata);
+
+                    indexManager.registerIndex(ospMetadata);
+
+                }
 
                 // resolve the index and set the index reference.
                 spo = super.getIndex(SPOKeyOrder.SPO);
