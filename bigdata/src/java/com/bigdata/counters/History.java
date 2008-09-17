@@ -4,7 +4,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 
@@ -23,19 +22,17 @@ import org.apache.log4j.Logger;
  */
 public class History<T> {
 
-    protected static Logger log = Logger.getLogger(History.class);
+    protected static final Logger log = Logger.getLogger(History.class);
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The period in milliseconds between each sample in the buffer. The buffer
