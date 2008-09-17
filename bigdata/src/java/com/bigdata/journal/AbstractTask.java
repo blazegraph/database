@@ -1382,7 +1382,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * <dt>timestamp</dt>
      * <dd>The {@link #timestamp} specified to the ctor.</dd>
      * <dt>resources</dt>
-     * <dd>The named resource(s) specified to the ctor.</dd>
+     * <dd>The named resource(s) specified to the ctor IFF {@link #INFO} is
+     * <code>true</code></dd>
      * </dl>
      */
     protected void setupLoggingContext() {
@@ -1393,7 +1394,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         MDC.put("timestamp", Long.valueOf(timestamp));
         
-        MDC.put("resources", resource);
+        if(INFO)
+        MDC.put("resources", Arrays.toString(resource));
         
     }
 
@@ -1407,6 +1409,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         MDC.remove("timestamp");
 
+        if(INFO)
         MDC.remove("resources");
         
     }
