@@ -40,7 +40,6 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.service.DataService;
@@ -63,14 +62,12 @@ public class DataServicesClient {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
 
@@ -245,7 +242,7 @@ public class DataServicesClient {
 
         if (item == null) {
 
-            log.info("Cache miss.");
+            if(INFO) log.info("Cache miss.");
 
             item = handleCacheMiss(filter);
                         
@@ -291,7 +288,7 @@ public class DataServicesClient {
 
         if (item == null) {
 
-            log.info("Cache miss.");
+            if(INFO) log.info("Cache miss.");
 
             item = handleCacheMiss( filter );
             
@@ -429,7 +426,7 @@ public class DataServicesClient {
 
         } catch (InterruptedException ex) {
 
-            log.info("Interrupted - no match.");
+            if(INFO) log.info("Interrupted - no match.");
 
             return null;
 
@@ -472,14 +469,15 @@ public class DataServicesClient {
                 + " data services : maxCount=" + maxCount);
         
         UUID[] uuids = new UUID[items.length];
-        
-        for(int i=0; i<items.length; i++) {
-            
+
+        for (int i = 0; i < items.length; i++) {
+
             uuids[i] = JiniUtil.serviceID2UUID(items[i].serviceID);
-            
+
         }
 
         return uuids;
 
     }
+
 }
