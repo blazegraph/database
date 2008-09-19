@@ -364,7 +364,18 @@ public class AbstractResourceManagerTestCase extends
 
         }
 
-        public Future submit(Callable proc) throws InterruptedException, ExecutionException, IOException {
+       public Future<? extends Object> submit(Callable<? extends Object> proc)
+                throws InterruptedException, ExecutionException, IOException {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public String getHostname() throws IOException {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public Class getServiceIface() throws IOException {
             // TODO Auto-generated method stub
             return null;
         }
@@ -400,7 +411,7 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public String getClientCounterPathPrefix() {
+        public String getServiceCounterPathPrefix() {
             // TODO Auto-generated method stub
             return null;
         }
@@ -512,6 +523,16 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public TemporaryStore getTempStore() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public String getHttpdURL() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public CounterSet getServiceCounterSet() {
             // TODO Auto-generated method stub
             return null;
         }

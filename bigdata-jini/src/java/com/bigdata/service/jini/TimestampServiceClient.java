@@ -36,6 +36,8 @@ import net.jini.core.lookup.ServiceTemplate;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
+import net.jini.lookup.ServiceDiscoveryEvent;
+import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
@@ -51,9 +53,11 @@ import com.bigdata.journal.ITimestampService;
  */
 public class TimestampServiceClient {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(TimestampServiceClient.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
 
     private LookupCache serviceLookupCache = null;
@@ -68,15 +72,20 @@ public class TimestampServiceClient {
     /**
      * Provides direct cached lookup of services by their {@link ServiceID}.
      */
-    private final ServiceCache serviceMap = new ServiceCache();
+    private final ServiceCache serviceMap;
 
     /**
      * Begins discovery for the {@link ITimestampService}.
      * 
      * @param discoveryManagement
+     * @param listener
+     *            Optional listener will see {@link ServiceDiscoveryEvent}s.
      */
-    public TimestampServiceClient(DiscoveryManagement discoveryManagement) {
+    public TimestampServiceClient(DiscoveryManagement discoveryManagement,
+            ServiceDiscoveryListener listener) {
 
+        serviceMap = new ServiceCache(listener);
+        
         /*
          * Setup a helper class that will be notified as services join or leave
          * the various registrars to which the client is listening.
@@ -144,7 +153,7 @@ public class TimestampServiceClient {
 
         if (item == null) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Cache miss.");
 
             item = handleCacheMiss(null/*filter*/);
@@ -183,7 +192,7 @@ public class TimestampServiceClient {
 
         } catch (InterruptedException ex) {
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Interrupted - no match.");
 
             return null;
@@ -200,7 +209,7 @@ public class TimestampServiceClient {
 
         }
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Found: " + item);
 
         return item;

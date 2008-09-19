@@ -28,11 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.jini;
 
 import java.net.InetAddress;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
-import java.util.UUID;
 
 import net.jini.config.Configuration;
 import net.jini.export.ServerContext;
@@ -43,6 +41,7 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.service.DataService;
+import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.TimestampService;
 
 /**
@@ -106,9 +105,18 @@ public class TimestampServer extends AbstractServer {
     }
    
     @Override
-    protected Remote newService(Properties properties) {
+    protected TimestampService newService(Properties properties) {
         
-        return new AdministrableTimestampService(this, properties);
+        final TimestampService service = new AdministrableTimestampService(
+                this, properties);
+
+        /*
+         * Setup a delegate that let's us customize some of the federation
+         * behaviors on the behalf of the data service.
+         */
+        getClient().setDelegate(new DefaultServiceFederationDelegate<TimestampService>(service));
+
+        return service;
         
     }
 
@@ -123,8 +131,6 @@ public class TimestampServer extends AbstractServer {
 
         protected TimestampServer server;
 
-        private UUID serviceUUID;
-
         public AdministrableTimestampService(TimestampServer server,
                 Properties properties) {
             
@@ -134,6 +140,13 @@ public class TimestampServer extends AbstractServer {
             
         }
         
+        @Override
+        public JiniFederation getFederation() {
+
+            return server.getClient().getFederation();
+            
+        }
+
         public Object getAdmin() throws RemoteException {
 
             if (INFO)
@@ -246,18 +259,6 @@ public class TimestampServer extends AbstractServer {
             
             // jini service and server shutdown.
             server.shutdownNow();
-            
-        }
-
-        public UUID getServiceUUID() {
-
-            if (serviceUUID == null) {
-
-                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-
-            }
-
-            return serviceUUID;
             
         }
 

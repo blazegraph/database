@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Jul 10, 2008
+ * Created on Apr 6, 2008
  */
 
 package com.bigdata.service;
@@ -31,23 +31,20 @@ package com.bigdata.service;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.journal.ResourceLockService;
-
-/** 
+/**
+ * Concrete implementation for an {@link EmbeddedFederation}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedResourceLockManager extends ResourceLockService {
-
+abstract public class AbstractEmbeddedTimestampService extends TimestampService {
+ 
     /**
-     * 
+     * @param properties
      */
-    public EmbeddedResourceLockManager(UUID serviceUUID, Properties properties) {
+    public AbstractEmbeddedTimestampService(UUID serviceUUID, Properties properties) {
 
         super(properties);
-        
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
         
         setServiceUUID(serviceUUID);
         

@@ -66,6 +66,9 @@ public class TestAll extends TestCase {
         
         // test suite for FileChannel IO utility class.
         suite.addTestSuite(TestFileChannelUtility.class);
+
+        // test suite for FileLock and advisory locking class.
+        suite.addTestSuite(TestFileLockUtility.class);
         
         // test suite for locating journal files.
         suite.addTestSuite(TestNameAndExtensionFilter.class);

@@ -241,33 +241,6 @@ abstract public class ResourceLockService extends AbstractService implements
 
     }
 
-    public boolean isOpen() {
-        
-        return open;
-        
-    }
-    private boolean open = true;
-
-    synchronized public void shutdown() {
-
-        if(open) {
-
-            open = false;
-            
-        }
-        
-    }
-
-    synchronized public void shutdownNow() {
-        
-        if(open) {
-            
-            open = false;
-            
-        }
-        
-    }
-
     /**
      * Returns {@link ILoadBalancerService}.
      */
@@ -327,4 +300,34 @@ abstract public class ResourceLockService extends AbstractService implements
         
     }
 
+    @Override
+    public synchronized ResourceLockService start() {
+
+        return this;
+        
+    }
+   
+    public boolean isOpen() {
+        
+        return open;
+        
+    }
+    private boolean open = true;
+
+    synchronized public void shutdown() {
+        
+        if(!isOpen()) return;
+        
+        super.shutdown();
+        
+    }
+    
+    synchronized public void shutdownNow() {
+        
+        if(!isOpen()) return;
+        
+        super.shutdownNow();
+        
+    }
+    
 }

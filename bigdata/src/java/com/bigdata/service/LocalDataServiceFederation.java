@@ -73,17 +73,41 @@ public class LocalDataServiceFederation extends AbstractFederation {
         indexCache = new DataServiceIndexCache(this, client
                 .getIndexCacheCapacity());
         
-        timestampService = new EmbeddedTimestampService(UUID.randomUUID(),
-                properties);
+        timestampService = new AbstractEmbeddedTimestampService(UUID.randomUUID(),
+                properties) {
+            
+            public LocalDataServiceFederation getFederation() {
+                
+                return LocalDataServiceFederation.this;
+                
+            }
+            
+        }.start();
         
-        resourceLockManager = new EmbeddedResourceLockManager(UUID.randomUUID(),
-                properties);
+        resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID.randomUUID(),
+                properties)  {
+            
+            public LocalDataServiceFederation getFederation() {
+                
+                return LocalDataServiceFederation.this;
+                
+            }
+            
+        }.start();
         
         /*
          * Note: This will expose the counters for the local data service.
          */
-        loadBalancerService = new EmbeddedLoadBalancerService(
-                UUID.randomUUID(), properties);
+        loadBalancerService = new AbstractEmbeddedLoadBalancerService(
+                UUID.randomUUID(), properties) {
+            
+            public LocalDataServiceFederation getFederation() {
+                
+                return LocalDataServiceFederation.this;
+                
+            }
+            
+        }.start();
         
         /*
          * Note: The embedded data service does not support scale-out indices.
@@ -99,10 +123,18 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
         // create the embedded data service.
         dataService = new LocalDataServiceImpl(properties).start();
+        
+        // notify service joins.
+        {
+            final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
 
-        // notify join.
-        loadBalancerService.join(dataService.getServiceUUID(),
-                AbstractStatisticsCollector.fullyQualifiedHostName);
+            loadBalancerService.join(dataService.getServiceUUID(), dataService
+                    .getServiceIface(), hostname);
+
+            loadBalancerService.join(dataService.getServiceUUID(),
+                    loadBalancerService.getServiceIface(), hostname);
+
+        }
         
     }
     

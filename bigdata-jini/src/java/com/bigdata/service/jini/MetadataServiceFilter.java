@@ -40,8 +40,12 @@ import com.bigdata.service.IMetadataService;
  */
 public class MetadataServiceFilter implements ServiceItemFilter {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(MetadataServiceFilter.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     public static final transient ServiceItemFilter INSTANCE = new MetadataServiceFilter();
     
@@ -59,13 +63,15 @@ public class MetadataServiceFilter implements ServiceItemFilter {
         
         if (item.service instanceof IMetadataService) {
            
-            log.info("Matched: "+item);
+            if (DEBUG)
+                log.debug("Matched: " + item);
             
             return true;
             
         }
 
-        log.debug("Ignoring: "+item);
+        if (DEBUG)
+            log.debug("Ignoring: " + item);
         
         return false;
         

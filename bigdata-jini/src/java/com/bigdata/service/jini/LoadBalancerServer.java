@@ -1,15 +1,15 @@
 package com.bigdata.service.jini;
 
+import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
+import java.util.UUID;
 
 import net.jini.config.Configuration;
-import net.jini.discovery.DiscoveryManagement;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
@@ -17,9 +17,10 @@ import net.jini.io.context.ClientSubject;
 import org.apache.log4j.MDC;
 
 import com.bigdata.counters.httpd.CounterSetHTTPDServer;
-import com.bigdata.service.DataService;
+import com.bigdata.service.DefaultServiceFederationDelegate;
+import com.bigdata.service.IFederationDelegate;
+import com.bigdata.service.IService;
 import com.bigdata.service.LoadBalancerService;
-import com.bigdata.service.MetadataService;
 
 /**
  * The load balancer server.
@@ -99,10 +100,99 @@ public class LoadBalancerServer extends AbstractServer {
     }
 
     @Override
-    protected Remote newService(Properties properties) {
+    protected LoadBalancerService newService(Properties properties) {
         
-        return new AdministrableLoadBalancer(this, properties);
+        LoadBalancerService service = new AdministrableLoadBalancer(this, properties);
         
+        /*
+         * Setup a delegate that let's us customize some of the federation
+         * behaviors on the behalf of the load balancer.
+         * 
+         * Note: We can't do this with the local or embedded federations since
+         * they have only one client per federation and an attempt to set the
+         * delegate more than once will cause an exception to be thrown!
+         */
+        final JiniClient client = getClient();
+
+        if(client.isConnected()) {
+
+            /*
+             * Note: We need to set the delegate before the client is connected
+             * to the federation. This ensures that the delegate, and hence the
+             * load balancer, will see all join/leave events.
+             */
+
+            throw new IllegalStateException();
+            
+        }
+        
+        client.setDelegate(new LoadBalancerServiceFederationDelegate(service));
+
+        return service;
+        
+    }
+    
+    /**
+     * Overrides the {@link IFederationDelegate} leave/join behavior to notify
+     * the {@link LoadBalancerService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class LoadBalancerServiceFederationDelegate extends
+            DefaultServiceFederationDelegate<LoadBalancerService> {
+
+        /**
+         * @param service
+         */
+        public LoadBalancerServiceFederationDelegate(
+                LoadBalancerService service) {
+
+            super(service);
+
+        }
+        
+        /**
+         * Notifies the {@link LoadBalancerService}.
+         */
+        public void serviceJoin(IService service, UUID serviceUUID) {
+
+            try {
+
+                // Note: This is an RMI request!
+                final Class serviceIface = service.getServiceIface();
+                
+                // Note: This is an RMI request!
+                final String hostname = service.getHostname();
+
+                if (INFO)
+                    log.info("serviceJoin: serviceUUID=" + serviceUUID
+                            + ", serviceIface=" + serviceIface + ", hostname="
+                            + hostname);
+                
+                // this is a local method call.
+                this.service.join(serviceUUID, serviceIface, hostname);
+
+            } catch (IOException ex) {
+
+                log.error(ex.getLocalizedMessage(), ex);
+                
+            }
+            
+        }
+
+        /**
+         * Notifies the {@link LoadBalancerService}.
+         */
+        public void serviceLeave(UUID serviceUUID) {
+
+            if (INFO)
+                log.info("serviceUUID=" + serviceUUID);
+            
+            this.service.leave(serviceUUID);
+            
+        }
+
     }
     
     /**
@@ -124,9 +214,17 @@ public class LoadBalancerServer extends AbstractServer {
             
         }
         
+        @Override
+        public JiniFederation getFederation() {
+
+            return server.getClient().getFederation();
+            
+        }
+
         public Object getAdmin() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            if (INFO)
+                log.info(""+getServiceUUID());
 
             return server.proxy;
             
@@ -142,48 +240,28 @@ public class LoadBalancerServer extends AbstractServer {
          * 
          * <dt>clientname
          * <dt>
-         * <dd>The hostname or IP address of the client making the request.</dd>
+         * <dd>The hostname or IP address of the client making the request (at
+         * {@link #INFO} or better)</dd>
          * 
          * </dl>
-         * 
-         * Note: {@link InetAddress#getHostName()} is used. This method makes a
-         * one-time best effort attempt to resolve the host name from the
-         * {@link InetAddress}.
-         * 
-         * @todo we could pass the class {@link ClientSubject} to obtain the
-         *       authenticated identity of the client (if any) for an incoming
-         *       remote call.
          */
         protected void setupLoggingContext() {
-            
+
             super.setupLoggingContext();
-            
-            try {
-                
-                InetAddress clientAddr = ((ClientHost) ServerContext
-                        .getServerContextElement(ClientHost.class))
-                        .getClientHost();
-                
-                MDC.put("clientname",clientAddr.getHostName());
-                
-            } catch (ServerNotActiveException e) {
-                
-                /*
-                 * This exception gets thrown if the client has made a direct
-                 * (vs RMI) call so we just ignore it.
-                 */
-                
-            }
-            
-            MDC.put("hostname",server.getHostName());
-            
+
+            if (INFO)
+                MDC.put("clientname", getClientHostname());
+
+            MDC.put("hostname", server.getHostName());
+
         }
 
         protected void clearLoggingContext() {
-            
+
             MDC.remove("hostname");
 
-            MDC.remove("clientname");
+            if (INFO)
+                MDC.remove("clientname");
 
             super.clearLoggingContext();
             
@@ -252,40 +330,40 @@ public class LoadBalancerServer extends AbstractServer {
         * @todo we could pass the class {@link ClientSubject} to obtain the
         *       authenticated identity of the client (if any) for an incoming
         *       remote call.
-        */
-       protected String getClientHostname() {
+         */
+        protected String getClientHostname() {
 
-           InetAddress clientAddr;
-           
-           try {
-               
+            InetAddress clientAddr;
+
+            try {
+
                 clientAddr = ((ClientHost) ServerContext
-                       .getServerContextElement(ClientHost.class))
-                       .getClientHost();
-               
-           } catch (ServerNotActiveException e) {
-               
-               /*
-                * This exception gets thrown if the client has made a direct
-                * (vs RMI) call.
-                */
-               
-               try {
-                   
-                   clientAddr = Inet4Address.getLocalHost();
-                   
-               } catch (UnknownHostException ex) {
-                   
-                   return "localhost";
-                   
-               }
-               
-           }
+                        .getServerContextElement(ClientHost.class))
+                        .getClientHost();
 
-           return clientAddr.getCanonicalHostName();
-           
-       }
-       
+            } catch (ServerNotActiveException e) {
+
+                /*
+                 * This exception gets thrown if the client has made a direct
+                 * (vs RMI) call.
+                 */
+
+                try {
+
+                    clientAddr = Inet4Address.getLocalHost();
+
+                } catch (UnknownHostException ex) {
+
+                    return "localhost";
+
+                }
+
+            }
+
+            return clientAddr.getCanonicalHostName();
+
+        }
+
     }
 
 }

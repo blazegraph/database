@@ -40,7 +40,6 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 /**
@@ -60,24 +59,31 @@ import org.apache.log4j.Logger;
  */
 public class ServiceCache implements ServiceDiscoveryListener {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(ServiceCache.class);
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
     
-    private Map<ServiceID, ServiceItem> serviceIdMap = new ConcurrentHashMap<ServiceID, ServiceItem>();
+    protected static final boolean INFO = log.isInfoEnabled();
 
-    public ServiceCache() {
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
+    private ConcurrentHashMap<ServiceID, ServiceItem> serviceIdMap = new ConcurrentHashMap<ServiceID, ServiceItem>();
+
+    /**
+     * An optional delegate listener that will also see the
+     * {@link ServiceDiscoveryEvent}s observed by this class=.
+     */
+    private final ServiceDiscoveryListener listener;
+    
+    /**
+     * 
+     * @param listener
+     *            An optional delegate listener that will also see the
+     *            {@link ServiceDiscoveryEvent}s observed by this class.
+     */
+    public ServiceCache(ServiceDiscoveryListener listener) {
+        
+        // MAY be null;
+        this.listener = listener;
         
     }
 
@@ -95,12 +101,19 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * accessible via the {@link LookupCache}.
      */
     public void serviceAdded(ServiceDiscoveryEvent e) {
-        
-        if(INFO) log.info("" + e + ", class="
-                + e.getPostEventServiceItem().toString());
-        
+
+        if (INFO)
+            log.info("" + e + ", class="
+                    + e.getPostEventServiceItem().toString());
+
         serviceIdMap.put(e.getPostEventServiceItem().serviceID, e
                 .getPostEventServiceItem());
+
+        if (listener != null) {
+
+            listener.serviceAdded(e);
+
+        }
         
     }
 
@@ -109,12 +122,19 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceChanged(ServiceDiscoveryEvent e) {
 
-        if(INFO) log.info(""+e+", class="
-                + e.getPostEventServiceItem().toString());
-        
+        if (INFO)
+            log.info("" + e + ", class="
+                    + e.getPostEventServiceItem().toString());
+
         serviceIdMap.put(e.getPostEventServiceItem().serviceID, e
                 .getPostEventServiceItem());
 
+        if (listener != null) {
+
+            listener.serviceChanged(e);
+
+        }
+        
     }
 
     /**
@@ -122,10 +142,17 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceRemoved(ServiceDiscoveryEvent e) {
 
-        if(INFO) log.info(""+e+", class="
-                + e.getPreEventServiceItem().toString());
+        if (INFO)
+            log.info("" + e + ", class="
+                    + e.getPreEventServiceItem().toString());
 
         serviceIdMap.remove(e.getPreEventServiceItem().serviceID);
+
+        if (listener != null) {
+
+            listener.serviceRemoved(e);
+
+        }
 
     }
 

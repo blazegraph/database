@@ -34,6 +34,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.io.FileLockUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
@@ -428,7 +429,7 @@ public interface Options {
      * read-only files (does not work) and MAY fail on NFS mounts. If
      * {@link FileLock} fails then we always back down to an advisory lock.
      * 
-     * @see FileMetadata#openFile(File, String, boolean)
+     * @see FileLockUtility#openFile(File, String, boolean)
      */
     String FILE_LOCK_ENABLED = "fileLockEnabled";
     

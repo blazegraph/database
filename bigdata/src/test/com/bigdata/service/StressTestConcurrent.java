@@ -148,10 +148,10 @@ public class StressTestConcurrent extends
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
 
         // performance counter sampling interval.
-        properties.setProperty(Options.INTERVAL,"5000");
+        properties.setProperty(Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL,"5000");
         
         // performance counter reporting interval (should be the same as the sampling interval).
-        properties.setProperty(Options.REPORT_DELAY,"5000");
+        properties.setProperty(IBigdataClient.Options.REPORT_DELAY,"5000");
 
         // load balancer update delay
         properties.setProperty(LoadBalancerService.Options.UPDATE_DELAY,"10000");

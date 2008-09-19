@@ -1,6 +1,11 @@
 package com.bigdata.service.jini;
 
+import java.net.MalformedURLException;
+
+import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceID;
+import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.discovery.LookupLocatorDiscovery;
 
 /**
  * A helper class that starts all the necessary services for a Jini federation.
@@ -352,6 +357,82 @@ public class JiniServicesHelper {
             throw new AssertionError();
 
         return serviceID;
+
+    }
+
+    /**
+     * Return <code>true</code> if Jini appears to be running on the
+     * localhost.
+     * 
+     * @throws Exception
+     */
+    public static boolean isJiniRunning() {
+        
+        return isJiniRunning(new String[] { "jini://localhost/" });
+        
+    }
+    
+    /**
+     * @param url
+     *            One or more unicast URIs of the form <code>jini://host/</code>
+     *            or <code>jini://host:port/</code> -or- an empty array if you
+     *            want to use <em>multicast</em> discovery.
+     */
+    public static boolean isJiniRunning(String[] url) {
+        
+        final LookupLocator[] locators = new LookupLocator[url.length];
+
+        for (int i = 0; i < url.length; i++) {
+           
+            try {
+
+                locators[i] = new LookupLocator("jini://localhost/");
+
+            } catch (MalformedURLException e) {
+
+                throw new RuntimeException(e);
+
+            }
+            
+        }
+
+        final LookupLocatorDiscovery discovery = new LookupLocatorDiscovery(
+                locators);
+
+        try {
+
+            final long timeout = 2000; // ms
+
+            final long begin = System.currentTimeMillis();
+
+            long elapsed;
+
+            while ((elapsed = (System.currentTimeMillis() - begin)) < timeout) {
+
+                ServiceRegistrar[] registrars = discovery.getRegistrars();
+
+                if (registrars.length > 0) {
+
+                    System.err.println("Found " + registrars.length
+                            + " registrars in " + elapsed + "ms.");
+
+                    return true;
+
+                }
+
+            }
+
+            System.err
+                    .println("Could not find any service registrars on localhost after "
+                            + elapsed + " ms");
+
+            return false;
+
+        } finally {
+
+            discovery.terminate();
+
+        }
 
     }
 

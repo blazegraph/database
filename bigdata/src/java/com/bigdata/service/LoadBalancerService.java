@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
@@ -83,8 +82,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * for those service(s) which are being swamped by read requests on a host
  * suffering from high IOWAIT.
  * 
- * @todo try writing move tests using a mock version of this service.
- * 
  * @todo we could significantly accelerate overflow events when new hardware is
  *       made available by setting the forceOverflow flag on the highly utilized
  *       data services. we probably don't want to do this for all highly
@@ -99,13 +96,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       client-side rules for those alerts should be configurable / pluggable /
  *       declarative. It would be great if the WARN and URGENT notices were able
  *       to carry some information about the nature of the emergency.
- * 
- * @todo should this service (in its Jini realization) track the discovered data
- *       services or base its decisions solely on reporting by the data
- *       services? note that services will have to
- *       {@link #notify(String, String))} as the first thing they do so that
- *       they quickly become available for assignment unless we are also doing
- *       service discovery.
  * 
  * @todo logging on this {@link LoadBalancerService#log} can provide a single
  *       point for administrators to configure email or other alerts.
@@ -147,16 +137,19 @@ abstract public class LoadBalancerService extends AbstractService
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    static final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    static final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    static final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    static final protected boolean DEBUG = log.isDebugEnabled();
 
     final protected String ps = ICounterSet.pathSeparator;
+    
+    /**
+     * Used to read {@link CounterSet} XML.
+     */
+    final private IInstrumentFactory instrumentFactory = DefaultInstrumentFactory.INSTANCE;
     
     /**
      * Service join timeout in milliseconds - used when we need to wait for a
@@ -190,7 +183,7 @@ abstract public class LoadBalancerService extends AbstractService
     /**
      * The set of active services.
      */
-    protected ConcurrentHashMap<UUID/* serviceUUID */, ServiceScore> activeServices = new ConcurrentHashMap<UUID, ServiceScore>();
+    protected ConcurrentHashMap<UUID/* serviceUUID */, ServiceScore> activeDataServices = new ConcurrentHashMap<UUID, ServiceScore>();
 
     /**
      * Scores for the hosts in ascending order (least utilized to most
@@ -210,16 +203,16 @@ abstract public class LoadBalancerService extends AbstractService
      * by the {@link UpdateTask}. The methods that report service utilization
      * and under-utilized services are all based on the data in this array.
      * Since services can leave at any time, that logic MUST also test for
-     * existence of the service in {@link #activeServices} before assuming that the
+     * existence of the service in {@link #activeDataServices} before assuming that the
      * service is still live.
      */
     protected AtomicReference<ServiceScore[]> serviceScores = new AtomicReference<ServiceScore[]>(null);
     
-    /**
-     * Aggregated performance counters for all hosts and services. The services
-     * are all listed under their host, e.g., <code>hostname/serviceUUID</code>
-     */
-    protected CounterSet counters = new CounterSet();
+//    /**
+//     * Aggregated performance counters for all hosts and services. The services
+//     * are all listed under their host, e.g., <code>hostname/serviceUUID</code>
+//     */
+//    protected CounterSet counters = new CounterSet();
 
     /**
      * The #of {@link UpdateTask}s which have run so far.
@@ -482,9 +475,8 @@ abstract public class LoadBalancerService extends AbstractService
 
     /**
      * Return the canonical hostname of the client in the context of a RMI
-     * request. This is used to determine the host associated with a service in
-     * {@link #notify(String, byte[])}, etc. If the request is not remote then
-     * return the canonical hostname for this host.
+     * request. If the request is not remote then return the canonical hostname
+     * for this host.
      */
     abstract protected String getClientHostname();
     
@@ -492,11 +484,6 @@ abstract public class LoadBalancerService extends AbstractService
      * Runs a periodic {@link UpdateTask}.
      */
     final protected ScheduledExecutorService updateService;
-
-//    /**
-//     * The optional httpd service.
-//     */
-//    private AbstractHTTPD httpd;
 
     /**
      * The delay between writes of the {@link CounterSet} on a log file.
@@ -536,7 +523,7 @@ abstract public class LoadBalancerService extends AbstractService
          * 
          * @see #DEFAULT_UPDATE_DELAY
          * 
-         * @see AbstractStatisticsCollector.Options#INTERVAL
+         * @see AbstractStatisticsCollector.Options#PERFORMANCE_COUNTERS_SAMPLE_INTERVAL
          */
         String UPDATE_DELAY = "updateDelay";
         
@@ -544,18 +531,6 @@ abstract public class LoadBalancerService extends AbstractService
          * The default {@link #UPDATE_DELAY}.
          */
         String DEFAULT_UPDATE_DELAY = ""+(60*1000);
-    
-//        /**
-//         * The port on which the load balancer will run its <code>httpd</code>
-//         * service (default {@value #DEFAULT_HTTPD_PORT}), ZERO (0) to use a
-//         * random port, or <code>-1</code> to NOT start the <code>httpd</code>
-//         * service. This service may be used to view the telemetry reported by
-//         * the various services in the federation that are, or have been, joined
-//         * with the load balancer.
-//         */
-//        String HTTPD_PORT = "httpd.port";
-//        
-//        String DEFAULT_HTTPD_PORT = "8080";
      
         /**
          * The path of the directory where the load balancer will log a copy of
@@ -639,6 +614,7 @@ abstract public class LoadBalancerService extends AbstractService
         }
         
         // setup scheduled runnable for periodic updates of the service scores.
+        // @todo move to start()?
         {
 
             final long delay = Long.parseLong(properties.getProperty(
@@ -665,43 +641,13 @@ abstract public class LoadBalancerService extends AbstractService
                     delay, unit);
 
         }
-
-//        /*
-//         * HTTPD service reporting out statistics. This will be shutdown with
-//         * the load balancer.
-//         */
-//        {
-//            
-//            final int port = Integer.parseInt(properties.getProperty(
-//                    Options.HTTPD_PORT,
-//                    Options.DEFAULT_HTTPD_PORT));
-//
-//            if (INFO)
-//                log.info(Options.HTTPD_PORT + "=" + port);
-//            
-//            if (port < 0 && port != -1)
-//                throw new RuntimeException(Options.HTTPD_PORT
-//                        + " must be zero (random port), -1 (disabled), or positive");
-//            
-//            AbstractHTTPD httpd = null;
-//
-//            if (port != -1) {
-//            
-//                try {
-//                
-//                    httpd = new CounterSetHTTPD(port, counters);
-//                    
-//                } catch (IOException e) {
-//                    
-//                    log.error("Could not start httpd on port=" + port, e);
-//                    
-//                }
-//                
-//            }
-//            
-//            this.httpd = httpd;
-//            
-//        }
+        
+    }
+    
+    @Override
+    synchronized public LoadBalancerService start() {
+        
+        return this;
         
     }
     
@@ -727,17 +673,11 @@ abstract public class LoadBalancerService extends AbstractService
             log.info("begin");
         
         updateService.shutdown();
-        
-//        if (httpd != null) {
-//            
-//            httpd.shutdown();
-//         
-//            httpd = null;
-//            
-//        }
 
         // log the final state of the counters.
         logCounters("final");
+
+        super.shutdown();
         
         if (INFO)
             log.info("done");
@@ -748,62 +688,64 @@ abstract public class LoadBalancerService extends AbstractService
 
         if(!isOpen()) return;
 
-        log.info("begin");
+        if (INFO)
+            log.info("begin");
         
         updateService.shutdownNow();
         
-//        if (httpd != null) {
-//
-//            httpd.shutdownNow();
-//         
-//            httpd = null;
-//            
-//        }
-
         // log the final state of the counters.
         logCounters("final");
 
-        log.info("done");
+        super.shutdownNow();
+        
+        if (INFO)
+            log.info("done");
 
     }
 
-    /**
-     * Extended to setup the generic per-service {@link CounterSet}, but NOT
-     * the per-host counters. This means that the {@link LoadBalancerService}
-     * will report the performance counters for its own service to itself, but
-     * it will not have any history for those counters. Since the counters as
-     * collected from the O/S do not have history, the
-     * {@link LoadBalancerService} does NOT collect the per-host counters
-     * directly from the O/S but relies on the existence of at least one other
-     * service running on the same host as it to collect and report the counters
-     * to the {@link LoadBalancerService}.
-     */
-    public void setServiceUUID(UUID serviceUUID) {
-        
-        super.setServiceUUID(serviceUUID);
-        
-        final String ps = ICounterSet.pathSeparator;
-        
-        final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
-                   
-        final String pathPrefix = ps + hostname + ps + "service" + ps
-                + getServiceIface().getName() + ps + serviceUUID + ps;
-
-        final CounterSet serviceRoot = counters.makePath(pathPrefix);
-
-        /*
-         * Service generic counters. 
-         */
-        
-        AbstractStatisticsCollector.addBasicServiceOrClientCounters(
-                serviceRoot, this, properties);
-
-    }
+//    /**
+//     * Extended to setup the generic per-service {@link CounterSet}, but NOT
+//     * the per-host counters.
+//     * <p>
+//     * This means that the {@link LoadBalancerService} will report the
+//     * performance counters for its own service to itself, but it will not have
+//     * any history for those counters.
+//     * <p>
+//     * Since the counters as collected from the O/S do not have history, the
+//     * {@link LoadBalancerService} does NOT collect the per-host counters
+//     * directly from the O/S but relies on the existence of at least one other
+//     * service running on the same host as it to collect and report the counters
+//     * to the {@link LoadBalancerService}.
+//     * 
+//     * FIXME review? is javadoc correct?
+//     */
+//    public void setServiceUUID(UUID serviceUUID) {
+//        
+//        super.setServiceUUID(serviceUUID);
+//        
+//        final String ps = ICounterSet.pathSeparator;
+//
+//        final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
+//                   
+//        final String pathPrefix = ps + hostname + ps + "service" + ps
+//                + getServiceIface().getName() + ps + serviceUUID + ps;
+//
+//        final CounterSet serviceRoot = counters.makePath(pathPrefix);
+//
+//        /*
+//         * Service generic counters. 
+//         */
+//        
+//        AbstractStatisticsCollector.addBasicServiceOrClientCounters(
+//                serviceRoot, getServiceIface(), properties);
+//
+//    }
     
     /**
      * Returns {@link ILoadBalancerService}.
      */
-    public Class getServiceIface() {
+    @Override
+    final public Class getServiceIface() {
         
         return ILoadBalancerService.class;
         
@@ -911,7 +853,7 @@ abstract public class LoadBalancerService extends AbstractService
             score.score = HostScore.normalize(score.rawScore, totalRawScore);
 
             // update score in global map.
-            activeServices.put(score.serviceUUID, score);
+            activeDataServices.put(score.serviceUUID, score);
 
             if (INFO)
                 log.info(score.toString()); //@todo debug?
@@ -963,7 +905,7 @@ abstract public class LoadBalancerService extends AbstractService
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class UpdateTask implements Runnable {
+    protected class UpdateTask implements Runnable {
 
         /**
          * Note: The logger is named for this class, but since it is an inner
@@ -975,8 +917,7 @@ abstract public class LoadBalancerService extends AbstractService
         /**
          * True iff the {@link #log} level is INFO or less.
          */
-        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-                .toInt();
+        final protected boolean INFO = log.isInfoEnabled();
 
         /** @todo configure how much history to use for averages. */
         final int TEN_MINUTES = 10;
@@ -1032,7 +973,8 @@ abstract public class LoadBalancerService extends AbstractService
             final Vector<HostScore> scores = new Vector<HostScore>();
             
             // For each host
-            final Iterator<ICounterSet> itrh = counters.counterSetIterator();
+            final Iterator<ICounterSet> itrh = getFederation().getCounterSet()
+                    .counterSetIterator();
             
             while(itrh.hasNext()) {
                 
@@ -1111,7 +1053,7 @@ abstract public class LoadBalancerService extends AbstractService
          */
         protected void updateServiceScores() {
             
-            if(activeServices.isEmpty()) {
+            if(activeDataServices.isEmpty()) {
                 
                 log.warn("No active services");
                 
@@ -1128,7 +1070,8 @@ abstract public class LoadBalancerService extends AbstractService
             final Vector<ServiceScore> scores = new Vector<ServiceScore>();
             
             // For each host
-            final Iterator<ICounterSet> itrh = counters.counterSetIterator();
+            final Iterator<ICounterSet> itrh = getFederation().getCounterSet()
+                    .counterSetIterator();
             
             while(itrh.hasNext()) {
                 
@@ -1196,7 +1139,7 @@ abstract public class LoadBalancerService extends AbstractService
                             continue;
                         }
 
-                        if (!activeServices.containsKey(serviceUUID)) {
+                        if (!activeDataServices.containsKey(serviceUUID)) {
 
                             /*
                              * @todo I am seeing some services reported here as
@@ -1232,7 +1175,7 @@ abstract public class LoadBalancerService extends AbstractService
                              * service asynchronously was removed from the set
                              * of active services.
                              */
-                            score = activeServices.get(serviceUUID);
+                            score = activeDataServices.get(serviceUUID);
 
                             if (score == null) {
 
@@ -1259,7 +1202,7 @@ abstract public class LoadBalancerService extends AbstractService
             if (scores.isEmpty()) {
 
                 log.warn("No performance counters for services, but "
-                        + activeServices.size() + " active services");
+                        + activeDataServices.size() + " active services");
                 
                 LoadBalancerService.this.serviceScores.set( null );
                 
@@ -1582,24 +1525,8 @@ abstract public class LoadBalancerService extends AbstractService
          */
         protected void setupCounters() {
             
-            final String ps = ICounterSet.pathSeparator;
-            
-            final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
-
-            final UUID serviceUUID = getServiceUUID();
-
-            if (serviceUUID == null) {
-
-                log.warn("No serviceUUID for this service?");
-                
-                return;
-                
-            }
-            
-            final String pathPrefix = ps + hostname + ps + "service" + ps
-                    + getServiceIface().getName() + ps + serviceUUID + ps;
-
-            final CounterSet serviceRoot = counters.makePath(pathPrefix);
+            final CounterSet serviceRoot = getFederation()
+                    .getServiceCounterSet();
 
             final long now = System.currentTimeMillis();
             
@@ -1654,20 +1581,21 @@ abstract public class LoadBalancerService extends AbstractService
             {
                 
                 if (INFO)
-                    log.info("Will setup counters for " + activeServices.size()
+                    log.info("Will setup counters for " + activeDataServices.size()
                             + " services");
 
                 final CounterSet tmp = serviceRoot.makePath("services");
 
                 synchronized (tmp) {
 
-                    for (ServiceScore ss : activeServices.values()) {
+                    for (ServiceScore ss : activeDataServices.values()) {
 
                         final String uuidStr = ss.serviceUUID.toString();
 
                         if (tmp.getChild(uuidStr) == null) {
 
-                            log.info("Adding counter for service: "+uuidStr);
+                            if(INFO)
+                                log.info("Adding counter for service: "+uuidStr);
 
                             tmp.addCounter(uuidStr, new HistoryInstrument<String>(new String[]{}));
                             
@@ -1680,7 +1608,7 @@ abstract public class LoadBalancerService extends AbstractService
                             final HistoryInstrument<String> inst = (HistoryInstrument<String>) counter
                                     .getInstrument();
 
-                            final ServiceScore score = activeServices
+                            final ServiceScore score = activeDataServices
                                     .get(ss.serviceUUID);
 
                             if (score != null) {
@@ -1714,7 +1642,8 @@ abstract public class LoadBalancerService extends AbstractService
                 
                 final String basename = "" + (logFileCount % logMaxFiles);
 
-                log.info("Writing counters on: "+basename);
+                if(INFO)
+                    log.info("Writing counters on: "+basename);
 
                 LoadBalancerService.this.logCounters(basename);
 
@@ -1750,8 +1679,8 @@ abstract public class LoadBalancerService extends AbstractService
 
             os = new BufferedOutputStream( new FileOutputStream(file) );
             
-            counters.asXML(os, "UTF-8", null/*filter*/);
-        
+            getFederation().getCounterSet().asXML(os, "UTF-8", null/* filter */);
+            
         } catch(Exception ex) {
             
             log.error(ex.getMessage(), ex);
@@ -1779,66 +1708,92 @@ abstract public class LoadBalancerService extends AbstractService
     /**
      * Notify the {@link LoadBalancerService} that a new service is available.
      * <p>
-     * Note: You CAN NOT use this method to handle a Jini service join (where a
-     * client notices the join of some service with a jini registrar) since you
-     * will not have access to the hostname. The hostname is only available when
-     * the service itself uses {@link #notify(String, byte[])}.
+     * Note: Embedded services must invoke this method <em>directly</em> when
+     * they start up.
+     * <p>
+     * Note: Distributed services implementations MUST discover services using a
+     * framework, such as jini, and invoke this method the first time a given
+     * service is discovered.
      * 
      * @param serviceUUID
+     * @param serviceIface
+     * @param hostname
+     * 
+     * @see IFederationDelegate#serviceJoin(IService, UUID)
+     * @see #leave(String, UUID)
      */
-    protected void join(UUID serviceUUID, String hostname) {
-        
+    public void join(final UUID serviceUUID, final Class serviceIface,
+            final String hostname) {
+      
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+
+        if (serviceIface == null)
+            throw new IllegalArgumentException();
+
+        if (hostname == null)
+            throw new IllegalArgumentException();
+
         if (INFO)
-            log.info("serviceUUID=" + serviceUUID + ", hostname=" + hostname);
+            log.info("serviceUUID=" + serviceUUID + ", serviceIface="
+                    + serviceIface + ", hostname=" + hostname);
         
         lock.lock();
-        
+
         try {
 
-            if(activeHosts.putIfAbsent(hostname, new HostScore(hostname))==null) {
+            if (activeHosts.putIfAbsent(hostname, new HostScore(hostname)) == null) {
 
                 if (INFO)
-                    log.info("New host joined: hostname="+hostname);
-                
-            }
-            
-            /*
-             * Add to set of known services.
-             */
-            if(activeServices.putIfAbsent(serviceUUID, new ServiceScore(hostname, serviceUUID))!=null) {
-             
-                if (INFO)
-                    log.info("Already joined: serviceUUID=" + serviceUUID
-                            + ", hostname=" + hostname);
+                    log.info("New host joined: hostname=" + hostname);
 
-                return;
-                
             }
 
-            if (INFO)
-                log.info("New service joined: hostname=" + hostname
-                        + ", serviceUUID=" + serviceUUID);
+            if (IDataService.class == serviceIface) {
 
-            /*
-             * Create history in counters.
-             * 
-             * path: /host/service/iface/serviceUUID.
-             */
-            counters.makePath(//
-                    hostname + //
-                    ICounterSet.pathSeparator + //
-                    "service" + //
-                    ICounterSet.pathSeparator+ //
-                    IDataService.class.getName() + //
-                    ICounterSet.pathSeparator
-                    + serviceUUID);
+                /*
+                 * Add to set of known services.
+                 * 
+                 * Only data services are registered as [activeServices] since
+                 * we only make load balancing decisions for the data services.
+                 */
+                if (activeDataServices.putIfAbsent(serviceUUID,
+                        new ServiceScore(hostname, serviceUUID)) == null) {
+
+                    if (INFO)
+                        log.info("Data service join: hostname=" + hostname
+                                + ", serviceUUID=" + serviceUUID);
+
+                }
+
+            }
+
+            if (getServiceUUID() != null) {
+                
+                /*
+                 * Create node for the joined service's history in the load
+                 * balancer's counter set. This just gives eager feedback in the
+                 * LBS's counter set if you are using the httpd service to watch
+                 * for service joins.
+                 * 
+                 * Note: We can't do this until the load balancer has its own
+                 * serviceUUID. If that is not available now, then the node for
+                 * the joined service will be created when that service
+                 * notify()s the LBS (60 seconds later).
+                 */
+
+                getFederation().getCounterSet().makePath(
+                        AbstractFederation.getServiceCounterPathPrefix(
+                                serviceUUID, serviceIface, hostname));
+                
+            }
 
             joined.signal();
-            
+
         } finally {
-            
+
             lock.unlock();
-            
+
         }
         
     }
@@ -1846,95 +1801,101 @@ abstract public class LoadBalancerService extends AbstractService
     /**
      * Notify the {@link LoadBalancerService} that a service is no longer
      * available.
+     * <p>
+     * Note: Embedded services must invoke this method <em>directly</em> when
+     * they shut down.
+     * <p>
+     * <p>
+     * Note: Distributed services implementations MUST discover services using a
+     * framework, such as jini, and invoke this method when a service is no
+     * longer registered.
      * 
      * @param serviceUUID
+     *            The service {@link UUID}.
+     * 
+     * @see IFederationDelegate#serviceLeave(UUID)
+     * @see #join(UUID, Class, String)
      */
-    public void leave(String msg, UUID serviceUUID) {
+    public void leave(UUID serviceUUID) {
 
         if (INFO)
-            log.info("msg=" + msg + ", serviceUUID=" + serviceUUID);
-
-        lock.lock();
+            log.info("serviceUUID=" + serviceUUID);
 
         try {
 
-            final ServiceScore info = activeServices.get(serviceUUID);
+            lock.lock();
 
-            if (info == null) {
-
-                log.warn("No such service? serviceUUID=" + serviceUUID);
-
-                return;
-                
-            }
-            
             /*
-             * @todo remove history from counters - path is /host/serviceUUID?
-             * Consider scheduling removal after a few hours or just sweeping
-             * periodically for services with no updates in the last N hours so
-             * that people have access to post-mortem data. For the same reason,
-             * we should probably snapshot the data prior to the leave
-             * (especially if there are WARN or URGENT events for the service)
-             * and perhaps periodically snapshot all of the counter data onto
-             * rolling log files.
+             * Note: [activeServices] only contains the DataServices so a null
+             * return means either that this is not a data service -or- that we
+             * do not have a score for that data service yet.
              */
-//            root.deletePath(path);
-            
-            activeServices.remove(serviceUUID);
-            
+            final ServiceScore info = activeDataServices.remove(serviceUUID);
+
+            if (info != null) {
+
+                /*
+                 * @todo remove history from counters - path is
+                 * /host/serviceUUID? Consider scheduling removal after a few
+                 * hours or just sweeping periodically for services with no
+                 * updates in the last N hours so that people have access to
+                 * post-mortem data. For the same reason, we should probably
+                 * snapshot the data prior to the leave (especially if there are
+                 * WARN or URGENT events for the service) and perhaps
+                 * periodically snapshot all of the counter data onto rolling
+                 * log files.
+                 */
+
+                // root.deletePath(path);
+            }
+
         } finally {
-            
+
             lock.unlock();
-            
+
         }
-        
+
     }
 
-    /**
-     * Used to read {@link CounterSet} XML.
-     */
-    final private IInstrumentFactory instrumentFactory = DefaultInstrumentFactory.INSTANCE;
-    
-    /**
-     * Note: Only {@link IDataService}s are entered into the internal tables
-     * for the load balancer. Other kinds of services are noted and the reported
-     * counters are aggregated.
-     */
-    public void notify(final String msg, final UUID serviceUUID,
-            final String serviceIFace, final byte[] data) {
+    public void notify(final UUID serviceUUID, final byte[] data) {
 
         setupLoggingContext();
         
         try {
         
             if (INFO)
-                log.info(msg + " : iface=" + serviceIFace + ", uuid="
-                        + serviceUUID);
+                log.info("serviceUUID=" + serviceUUID);
 
-            if (IDataService.class.getName().equals(serviceIFace)) {
+            if (!getFederation().getServiceUUID().equals(serviceUUID)) {
 
                 /*
-                 * Note: only IDataService gets into the internal tables.
+                 * Don't do this for the load balancer itself!
+                 * 
+                 * @todo the LBS probably should not bother to notify() itself.
                  */
                 
-                join(serviceUUID, getClientHostname());
+                try {
+
+//                    // make sure that the counter set node exists.
+//                    getFederation().getCounterSet().makePath(
+//                            AbstractFederation.getServiceCounterPathPrefix(
+//                                    serviceUUID, serviceIface, hostname));
+
+                    // read the counters into our local history.
+                    getFederation().getCounterSet().readXML(
+                            new ByteArrayInputStream(data), instrumentFactory,
+                            null/* filter */);
+
+                } catch (Exception e) {
+
+                    log.warn(e.getMessage(), e);
+
+                    throw new RuntimeException(e);
+
+                }
 
             }
             
-            try {
-                
-                // read into our local history.
-                counters.readXML(new ByteArrayInputStream(data),
-                        instrumentFactory, null/* filter */);
-                
-            } catch (Exception e) {
-
-                log.warn(e.getMessage(), e);
-                
-                throw new RuntimeException(e);
-                
-            }
-        
         } finally {
             
             clearLoggingContext();
@@ -1993,7 +1954,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
-            final ServiceScore score = activeServices.get(serviceUUID);
+            final ServiceScore score = activeDataServices.get(serviceUUID);
 
             if (score == null) {
 
@@ -2031,7 +1992,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
-            final ServiceScore score = activeServices.get(serviceUUID);
+            final ServiceScore score = activeDataServices.get(serviceUUID);
 
             if (score == null) {
 
@@ -2047,12 +2008,13 @@ abstract public class LoadBalancerService extends AbstractService
         } finally {
             
             clearLoggingContext();
-            
+
         }
-        
+
     }
 
-    protected boolean isHighlyUtilizedDataService(ServiceScore score,ServiceScore[] scores) {
+    protected boolean isHighlyUtilizedDataService(ServiceScore score,
+            ServiceScore[] scores) {
 
         assert score != null;
         assert scores != null;
@@ -2079,12 +2041,13 @@ abstract public class LoadBalancerService extends AbstractService
         return highlyUtilized;
 
     }
-    
-    protected boolean isUnderUtilizedDataService(ServiceScore score,ServiceScore[] scores) {
-        
+
+    protected boolean isUnderUtilizedDataService(ServiceScore score,
+            ServiceScore[] scores) {
+
         assert score != null;
         assert scores != null;
-        
+
         boolean underUtilized = false;
 
         if (score.drank < .2) {
@@ -2108,17 +2071,19 @@ abstract public class LoadBalancerService extends AbstractService
         
     }
     
-    public UUID getUnderUtilizedDataService() throws IOException, TimeoutException, InterruptedException {
-        
+    public UUID getUnderUtilizedDataService() throws IOException,
+            TimeoutException, InterruptedException {
+
         return getUnderUtilizedDataServices(1, 1, null/* exclude */)[0];
-        
+
     }
 
     public UUID[] getUnderUtilizedDataServices(int minCount, int maxCount,
-            UUID exclude) throws IOException, TimeoutException, InterruptedException {
+            UUID exclude) throws IOException, TimeoutException,
+            InterruptedException {
 
         setupLoggingContext();
-        
+
         if (minCount < 0)
             throw new IllegalArgumentException();
 
@@ -2186,7 +2151,7 @@ abstract public class LoadBalancerService extends AbstractService
                         
                         if(exclude.equals(serviceUUID)) continue;
                         
-                        if(!activeServices.containsKey(serviceUUID)) continue;
+                        if(!activeDataServices.containsKey(serviceUUID)) continue;
                         
                         if(knownGood==null) knownGood = serviceUUID;
                         
@@ -2264,7 +2229,7 @@ abstract public class LoadBalancerService extends AbstractService
             }
 
             // all services that we know about right now.
-            final UUID[] knownServiceUUIDs = activeServices.keySet().toArray(
+            final UUID[] knownServiceUUIDs = activeDataServices.keySet().toArray(
                     new UUID[] {});
 
             if (knownServiceUUIDs.length == 0) {
@@ -2294,7 +2259,7 @@ abstract public class LoadBalancerService extends AbstractService
 
                 }
 
-                if (!activeServices.containsKey(knownServiceUUIDs[i])) {
+                if (!activeDataServices.containsKey(knownServiceUUIDs[i])) {
 
                     knownServiceUUIDs[i] = null;
 
@@ -2398,7 +2363,7 @@ abstract public class LoadBalancerService extends AbstractService
                     continue;
 
                 // not active?
-                if (!activeServices.containsKey(score.serviceUUID))
+                if (!activeDataServices.containsKey(score.serviceUUID))
                     continue;
                 
                 if (isUnderUtilizedDataService(score,scores)) {

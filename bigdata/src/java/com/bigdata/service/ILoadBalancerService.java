@@ -40,40 +40,19 @@ import java.util.concurrent.TimeoutException;
  * @version $Id$
  */
 public interface ILoadBalancerService extends IService {
-    
-    /**
-     * Notify the load balancer service that the identified service is shutting
-     * down.
-     * 
-     * @param msg
-     *            A message.
-     * @param serviceUUID
-     *            The service {@link UUID}.
-     */
-    public void leave(String msg, UUID serviceUUID) throws IOException;
-    
+   
     /**
      * Send performance counters. Clients SHOULD invoke this method no less than
      * once every 60 seconds.
      * 
-     * @param msg
-     *            A message.
      * @param serviceUUID
      *            The service {@link UUID} that is self-reporting.
-     * @param serviceIface
-     *            The name of the primary interface which characterizes the
-     *            service as reported by {@link Class#getName()}. For example,
-     *            a {@link DataService} would report {@link IDataService} while
-     *            a {@link MetadataService} would report
-     *            {@link IMetadataService} and a client would report
-     *            {@link IBigdataClient}.
      * @param data
      *            The serialized performance counter data.
      * 
      * @throws IOException
      */
-    public void notify(String msg, UUID serviceUUID, String serviceIface,
-            byte[] data) throws IOException;
+    public void notify(UUID serviceUUID, byte[] data) throws IOException;
 
     /**
      * A warning issued by a client when it is in danger of depleting its

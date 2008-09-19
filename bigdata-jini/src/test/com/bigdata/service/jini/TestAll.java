@@ -26,14 +26,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.jini;
 
-import java.net.MalformedURLException;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-import net.jini.core.discovery.LookupLocator;
-import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.discovery.LookupLocatorDiscovery;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -93,7 +88,7 @@ public class TestAll extends TestCase {
             
         }
         
-        final boolean willRun = !forceSkip && isJiniRunning();
+        final boolean willRun = !forceSkip && JiniServicesHelper.isJiniRunning();
 
         final TestSuite suite = new TestSuite("Jini-based services");
 
@@ -155,74 +150,4 @@ public class TestAll extends TestCase {
         
     }
     
-    /**
-     * Return <code>true</code> if Jini appears to be running on the
-     * localhost.
-     * 
-     * @throws Exception
-     */
-    public static boolean isJiniRunning() {
-        
-        final LookupLocator[] locators;
-        
-        try {
-
-            /*
-             * One or more unicast URIs of the form jini://host/ or jini://host:port/.
-             * This MAY be an empty array if you want to use multicast discovery _and_
-             * you have specified LookupDiscovery.ALL_GROUPS above.
-             */
-
-            locators = new LookupLocator[] {
-                
-                    new LookupLocator("jini://localhost/")
-                    
-            };
-
-        } catch (MalformedURLException e) {
-            
-            throw new RuntimeException(e);
-
-        }
-
-        final LookupLocatorDiscovery discovery = new LookupLocatorDiscovery(
-                locators);
-
-        try {
-
-            final long timeout = 2000; // ms
-
-            final long begin = System.currentTimeMillis();
-
-            long elapsed;
-
-            while ((elapsed = (System.currentTimeMillis() - begin)) < timeout) {
-
-                ServiceRegistrar[] registrars = discovery.getRegistrars();
-
-                if (registrars.length > 0) {
-
-                    System.err.println("Found " + registrars.length
-                            + " registrars in " + elapsed + "ms.");
-
-                    return true;
-
-                }
-
-            }
-
-            System.err
-                    .println("Could not find any service registrars on localhost after "
-                            + elapsed + " ms");
-
-            return false;
-
-        } finally {
-
-            discovery.terminate();
-
-        }
-
-    }
-
 }

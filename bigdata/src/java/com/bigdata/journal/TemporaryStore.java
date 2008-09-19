@@ -39,7 +39,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.service.EmbeddedResourceLockManager;
+import com.bigdata.service.AbstractEmbeddedResourceLockManager;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -370,8 +371,16 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
         if (resourceLockManager == null) {
 
-            resourceLockManager = new EmbeddedResourceLockManager(UUID
-                    .randomUUID(), new Properties());
+            resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID
+                    .randomUUID(), new Properties()) {
+                
+                public AbstractFederation getFederation() {
+                    
+                    throw new UnsupportedOperationException();
+                    
+                }
+                
+            }.start();
             
         }
         

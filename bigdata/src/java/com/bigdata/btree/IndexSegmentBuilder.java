@@ -42,8 +42,8 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.FileLockUtility;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -630,7 +630,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * Open the output channel and get an exclusive lock.
              */
             
-            out = FileMetadata.openFile(outFile, mode, true/*useFileLock*/);
+            out = FileLockUtility.openFile(outFile, mode, true/*useFileLock*/);
 //            out = new RandomAccessFile(outFile, mode);
 //            
             outChannel = out.getChannel();
@@ -848,7 +848,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * use.
              */
             outChannel.force(true);
-            FileMetadata.closeFile(outFile, out);
+            FileLockUtility.closeFile(outFile, out);
 //            out.close(); // also releases the lock.
 ////            out = null;
 
@@ -946,19 +946,22 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             try {
             
-                FileMetadata.closeFile(outFile, out);
+                FileLockUtility.closeFile(outFile, out);
                 // out.close();
                 
             } catch (Throwable t) {
              
                 log.error("Ignoring: " + t, t);
                 
-        
             }
         
         }
 
-        outFile.delete();
+        if(!outFile.delete()) {
+            
+            log.warn("Could not delete: file=" + outFile.getAbsolutePath());
+            
+        }
         
     }
     

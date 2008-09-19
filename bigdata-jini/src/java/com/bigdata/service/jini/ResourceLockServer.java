@@ -3,7 +3,6 @@ package com.bigdata.service.jini;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
@@ -17,6 +16,7 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.counters.httpd.CounterSetHTTPDServer;
 import com.bigdata.journal.ResourceLockService;
+import com.bigdata.service.DefaultServiceFederationDelegate;
 import com.bigdata.service.LoadBalancerService;
 
 /**
@@ -91,9 +91,17 @@ public class ResourceLockServer extends AbstractServer {
     }
 
     @Override
-    protected Remote newService(Properties properties) {
+    protected ResourceLockService newService(Properties properties) {
         
-        return new AdministrableResourceLockService(this, properties);
+        final ResourceLockService service = new AdministrableResourceLockService(this, properties);
+        
+        /*
+         * Setup a delegate that let's us customize some of the federation
+         * behaviors on the behalf of the data service.
+         */
+        getClient().setDelegate(new DefaultServiceFederationDelegate<ResourceLockService>(service));
+
+        return service;
         
     }
 
@@ -117,6 +125,13 @@ public class ResourceLockServer extends AbstractServer {
             
         }
         
+        @Override
+        public JiniFederation getFederation() {
+
+            return server.getClient().getFederation();
+            
+        }
+
         public Object getAdmin() throws RemoteException {
 
             if (INFO)

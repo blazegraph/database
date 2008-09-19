@@ -36,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 import net.jini.core.discovery.LookupLocator;
+import net.jini.core.lookup.ServiceItem;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
@@ -43,6 +44,8 @@ import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
 import net.jini.jeri.InvocationLayerFactory;
 import net.jini.jeri.tcp.TcpServerEndpoint;
+import net.jini.lookup.ServiceDiscoveryEvent;
+import net.jini.lookup.ServiceDiscoveryListener;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.ISerializer;
@@ -56,6 +59,7 @@ import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniClient.JiniConfig;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -67,7 +71,8 @@ import com.sun.jini.admin.DestroyAdmin;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniFederation extends AbstractDistributedFederation {
+public class JiniFederation extends AbstractDistributedFederation implements
+        ServiceDiscoveryListener {
 
     protected DataServicesClient dataServicesClient;
 
@@ -96,6 +101,8 @@ public class JiniFederation extends AbstractDistributedFederation {
 
         super(client);
     
+        open = true;
+        
         if (INFO)
             log.info(jiniConfig.toString());
         
@@ -117,17 +124,17 @@ public class JiniFederation extends AbstractDistributedFederation {
             );
 
             // Start discovery for data and metadata services.
-            dataServicesClient = new DataServicesClient(discoveryManager);
+            dataServicesClient = new DataServicesClient(discoveryManager, this);
 
             // Start discovery for the timestamp service.
             timestampServiceClient = new TimestampServiceClient(
-                    discoveryManager);
+                    discoveryManager, this);
 
             // Start discovery for the load balancer service.
-            loadBalancerClient = new LoadBalancerClient(discoveryManager);
+            loadBalancerClient = new LoadBalancerClient(discoveryManager, this);
 
             // Start discovery for the resource lock manager.
-            resourceLockClient = new ResourceLockClient(discoveryManager);
+            resourceLockClient = new ResourceLockClient(discoveryManager, this);
 
         } catch (Exception ex) {
 
@@ -231,6 +238,12 @@ public class JiniFederation extends AbstractDistributedFederation {
      * @throws InterruptedException
      * @throws TimeoutException
      *             If a timeout occurs.
+     * 
+     * @todo this returns when the desired number of data services have been
+     *       discovered by this client, but the load balancer service might not
+     *       know about those services yet, especially if the LBS is down or
+     *       just starting. this might lead to a problem when trying to register
+     *       new indices.
      */
     public int awaitServices(int minDataServices, long timeout)
             throws InterruptedException, TimeoutException {
@@ -280,7 +293,13 @@ public class JiniFederation extends AbstractDistributedFederation {
         
     }
 
+    private boolean open;
+    
     synchronized public void shutdown() {
+        
+        if(!open) return;
+        
+        open = false;
         
         final long begin = System.currentTimeMillis();
 
@@ -299,6 +318,10 @@ public class JiniFederation extends AbstractDistributedFederation {
     }
 
     synchronized public void shutdownNow() {
+
+        if(!open) return;
+        
+        open = false;
 
         final long begin = System.currentTimeMillis();
 
@@ -623,6 +646,57 @@ public class JiniFederation extends AbstractDistributedFederation {
             throw new RuntimeException("Export error: " + ex, ex);
             
         }
+        
+    }
+
+    /*
+     * ServiceDiscoveryListener.
+     * 
+     * Note: This impl sees all the bigdata service leave/join events. However,
+     * it is only when this service is the LoadBalancerService that those events
+     * are handled by the IFederationDelegate.
+     */
+    
+    /**
+     * Invokes {@link #serviceJoin(com.bigdata.service.IService, UUID, String)}
+     */
+    public void serviceAdded(ServiceDiscoveryEvent e) {
+        
+        final ServiceItem serviceItem = e.getPostEventServiceItem();
+
+        if (serviceItem.service instanceof IService) {
+
+//            System.err.println("serviceAdded: "+serviceItem);
+            
+            final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceItem.serviceID);
+
+            serviceJoin((IService) serviceItem.service, serviceUUID);
+
+        } else {
+            
+            log.warn("Not an " + IService.class);
+            
+        }
+        
+    }
+
+    /** NOP. */
+    public void serviceChanged(ServiceDiscoveryEvent e) {
+        
+    }
+
+    /**
+     * Invokes {@link #serviceLeave(UUID)}
+     */
+    public void serviceRemoved(ServiceDiscoveryEvent e) {
+        
+        final ServiceItem serviceItem = e.getPreEventServiceItem();
+
+        final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceItem.serviceID);
+
+//        System.err.println("serviceRemoved: " + serviceUUID);
+
+        serviceLeave(serviceUUID);
         
     }
 

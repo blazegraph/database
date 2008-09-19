@@ -43,6 +43,7 @@ import org.apache.log4j.MDC;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.service.DataService.DataServiceFederationDelegate;
 
 /**
  * A metadata server.
@@ -114,9 +115,18 @@ public class MetadataServer extends DataServer {
         
     }
     
-    protected Remote newService(Properties properties) {
+    protected MetadataService newService(Properties properties) {
 
-        return new AdministrableMetadataService(this,properties).start();
+        final MetadataService service = new AdministrableMetadataService(
+                this, properties);
+        
+        /*
+         * Setup a delegate that let's us customize some of the federation
+         * behaviors on the behalf of the data service.
+         */
+        getClient().setDelegate(new DataServiceFederationDelegate(service));
+
+        return service;
         
     }
     

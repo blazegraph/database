@@ -42,8 +42,12 @@ import com.bigdata.service.IMetadataService;
  */
 public class DataServiceFilter implements ServiceItemFilter {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(DataServiceFilter.class);
+
+    protected static final boolean INFO = log.isInfoEnabled();
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
 
     public static final transient ServiceItemFilter INSTANCE = new DataServiceFilter();
     
@@ -51,9 +55,9 @@ public class DataServiceFilter implements ServiceItemFilter {
     
     public boolean check(ServiceItem item) {
 
-        if(item.service==null) {
-            
-            log.warn("Service is null: "+item);
+        if (item.service == null) {
+
+            log.warn("Service is null: " + item);
 
             return false;
             
@@ -61,13 +65,15 @@ public class DataServiceFilter implements ServiceItemFilter {
         
         if(!(item.service instanceof IMetadataService)) {
            
-            log.info("Matched: "+item);
+            if (DEBUG)
+                log.debug("Matched: " + item);
             
             return true;
             
         }
 
-        log.debug("Ignoring: "+item);
+        if (DEBUG)
+            log.debug("Ignoring: " + item);
         
         return false;
         

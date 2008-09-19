@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.jini;
 
 import java.net.InetAddress;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
@@ -42,6 +41,7 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.service.DataService;
+import com.bigdata.service.DataService.DataServiceFederationDelegate;
 
 /**
  * The bigdata data server.
@@ -121,9 +121,22 @@ public class DataServer extends AbstractServer {
         
     }
     
-    protected Remote newService(Properties properties) {
+    protected DataService newService(Properties properties) {
 
-        return new AdministrableDataService(this, properties).start();
+        final DataService service = new AdministrableDataService(this,
+                properties);
+        
+        /*
+         * Setup a delegate that let's us customize some of the federation
+         * behaviors on the behalf of the data service.
+         * 
+         * Note: We can't do this with the local or embedded federations since
+         * they have only one client per federation and an attempt to set the
+         * delegate more than once will cause an exception to be thrown!
+         */
+        getClient().setDelegate(new DataServiceFederationDelegate(service));
+        
+        return service;
 
     }
 

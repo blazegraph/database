@@ -43,6 +43,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.FileLockUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.IUpdateStore;
@@ -1257,7 +1258,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             if (raf != null) {
 
-                FileMetadata.closeFile(file,raf);
+                FileLockUtility.closeFile(file,raf);
                 
             }
             
@@ -1616,7 +1617,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         try {
 
-            raf = FileMetadata.openFile(file, fileMode, true/*tryFileLock*/);
+            raf = FileLockUtility.openFile(file, fileMode, true/*tryFileLock*/);
         
             log.warn("Re-opened file: "+file);
             
@@ -1953,7 +1954,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             try {
                 
                 // open the file for the first time (create).
-                raf = FileMetadata.openFile(file, fileMode,
+                raf = FileLockUtility.openFile(file, fileMode,
                         bufferMode != BufferMode.Mapped/*useTryLock*/);
                 
                 // note that it has been opened.

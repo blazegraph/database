@@ -37,6 +37,8 @@ import net.jini.core.lookup.ServiceTemplate;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
+import net.jini.lookup.ServiceDiscoveryEvent;
+import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
@@ -83,7 +85,7 @@ public class DataServicesClient {
     /**
      * Provides direct cached lookup {@link ServiceItem}s by {@link ServiceID}.
      */
-    final ServiceCache serviceMap = new ServiceCache();
+    final ServiceCache serviceMap;
 
     /**
      * When <code>true</code> {@link ServiceItem}s for {@link DataService}s
@@ -99,10 +101,16 @@ public class DataServicesClient {
 
     /**
      * Begins discovery for {@link DataService}s and {@link MetadataService}s.
+     * 
+     * @param discoveryManagement
+     * @para listener An optional listener that will see the
+     *       {@link ServiceDiscoveryEvent}s observed by the internal
+     *       {@link ServiceCache}.
      */
-    public DataServicesClient(DiscoveryManagement discoveryManagement) {
-        
-        this(discoveryManagement, true, true);
+    public DataServicesClient(DiscoveryManagement discoveryManagement,
+            ServiceDiscoveryListener listener) {
+
+        this(discoveryManagement, listener, true, true);
         
     }
     
@@ -123,7 +131,10 @@ public class DataServicesClient {
      * {@link ServiceItem}s are not being cached.
      * 
      * @param discoveryManagement
-     * 
+     * @param listener
+     *            An optional listener that will see the
+     *            {@link ServiceDiscoveryEvent}s observed by the internal
+     *            {@link ServiceCache}.
      * @param cacheDataServices
      *            When <code>true</code> {@link ServiceItem}s for
      *            {@link DataService}s will be cached.
@@ -137,17 +148,23 @@ public class DataServicesClient {
      *             if neither data services nor metadata services are to be
      *             cached.
      */
-    public DataServicesClient(DiscoveryManagement discoveryManagement,
-            boolean cacheDataServices, boolean cacheMetadataServices) {
+    public DataServicesClient(//
+            final DiscoveryManagement discoveryManagement,//
+            final ServiceDiscoveryListener listener,//
+            final boolean cacheDataServices, //
+            final boolean cacheMetadataServices//
+            ) {
 
         if (discoveryManagement == null)
             throw new IllegalArgumentException();
+
+        serviceMap = new ServiceCache(listener);
         
         this.cacheDataServices = cacheDataServices;
-        
+
         this.cacheMetadataServices = cacheMetadataServices;
-        
-        if(!cacheDataServices && !cacheMetadataServices) {
+
+        if (!cacheDataServices && !cacheMetadataServices) {
             
             throw new IllegalArgumentException("Neither data services nor metadata services are being cached?");
             
@@ -242,7 +259,8 @@ public class DataServicesClient {
 
         if (item == null) {
 
-            if(INFO) log.info("Cache miss.");
+            if(INFO)
+                log.info("Cache miss.");
 
             item = handleCacheMiss(filter);
                         
@@ -288,7 +306,8 @@ public class DataServicesClient {
 
         if (item == null) {
 
-            if(INFO) log.info("Cache miss.");
+            if(INFO)
+                log.info("Cache miss.");
 
             item = handleCacheMiss( filter );
             
@@ -426,7 +445,8 @@ public class DataServicesClient {
 
         } catch (InterruptedException ex) {
 
-            if(INFO) log.info("Interrupted - no match.");
+            if(INFO)
+                log.info("Interrupted - no match.");
 
             return null;
 
@@ -461,13 +481,13 @@ public class DataServicesClient {
      */
     public UUID[] getDataServiceUUIDs(int maxCount) {
 
-        ServiceItem[] items = serviceMap.getServiceItems(maxCount,
+        final ServiceItem[] items = serviceMap.getServiceItems(maxCount,
                 DataServiceFilter.INSTANCE);
-        
-        if(INFO)
-        log.info("There are at least " + items.length
-                + " data services : maxCount=" + maxCount);
-        
+
+        if (INFO)
+            log.info("There are at least " + items.length
+                    + " data services : maxCount=" + maxCount);
+
         UUID[] uuids = new UUID[items.length];
 
         for (int i = 0; i < items.length; i++) {
@@ -479,5 +499,5 @@ public class DataServicesClient {
         return uuids;
 
     }
-
+    
 }

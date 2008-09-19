@@ -36,6 +36,8 @@ import net.jini.core.lookup.ServiceTemplate;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
+import net.jini.lookup.ServiceDiscoveryEvent;
+import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
@@ -53,9 +55,11 @@ import com.bigdata.service.LoadBalancerService;
  */
 public class LoadBalancerClient {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(LoadBalancerClient.class);
 
+    protected static final boolean INFO = log.isInfoEnabled();
+    
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
 
     private LookupCache serviceLookupCache = null;
@@ -71,15 +75,20 @@ public class LoadBalancerClient {
      * Provides direct cached lookup of {@link LoadBalancerService}s by their
      * {@link ServiceID}.
      */
-    private final ServiceCache serviceMap = new ServiceCache();
+    private final ServiceCache serviceMap;
 
     /**
      * Begins discovery for the {@link ILoadBalancerService} service.
      * 
      * @param discoveryManagement
+     * @param listener
+     *            Optional listener will see {@link ServiceDiscoveryEvent}s.
      */
-    public LoadBalancerClient(DiscoveryManagement discoveryManagement) {
+    public LoadBalancerClient(DiscoveryManagement discoveryManagement,
+            ServiceDiscoveryListener listener) {
 
+        serviceMap = new ServiceCache(listener);
+        
         /*
          * Setup a helper class that will be notified as services join or leave
          * the various registrars to which the client is listening.
@@ -146,7 +155,7 @@ public class LoadBalancerClient {
 
         if (item == null) {
 
-            log.info("Cache miss.");
+            if(INFO) log.info("Cache miss.");
 
             item = handleCacheMiss(null/*filter*/);
                         
@@ -184,7 +193,8 @@ public class LoadBalancerClient {
 
         } catch (InterruptedException ex) {
 
-            log.info("Interrupted - no match.");
+            if(INFO)
+                log.info("Interrupted - no match.");
 
             return null;
 
@@ -200,7 +210,7 @@ public class LoadBalancerClient {
 
         }
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Found: " + item);
 
         return item;

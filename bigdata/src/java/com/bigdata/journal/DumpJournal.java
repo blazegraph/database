@@ -41,6 +41,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.InnerCause;
 
 /**
  * A utility class that opens the journal in a read-only mode and dumps the root
@@ -315,16 +316,42 @@ public class DumpJournal {
                     + journal.toString(entry.checkpointAddr));
 
             // load B+Tree from its checkpoint record.
-            final BTree ndx = (BTree) journal.getIndex(entry.checkpointAddr);
+            final BTree ndx;
+            try {
+                
+                ndx = (BTree) journal.getIndex(entry.checkpointAddr);
+                
+            } catch (Throwable t) {
+
+                if (InnerCause.isInnerCause(t, ClassNotFoundException.class)) {
+
+                    /*
+                     * This is typically a tuple serializer that has a
+                     * dependency on an application class that is not present in
+                     * the CLASSPATH. Add the necessary dependency(s) and you
+                     * should no longer see this message.
+                     */
+                    
+                    log.warn("Could not load index: "
+                            + InnerCause.getInnerCause(t,
+                                    ClassNotFoundException.class));
+                    
+                    continue;
+                    
+                } else
+                    throw new RuntimeException(t);
+                
+            }
 
             // show checkpoint record.
-            System.err.println("\t"+ndx.getCheckpoint());
+            System.err.println("\t" + ndx.getCheckpoint());
 
             // show metadata record.
-            System.err.println("\t"+ndx.getIndexMetadata());
-            
-            if(dumpIndices) dumpIndex(ndx,showTuples);
-            
+            System.err.println("\t" + ndx.getIndexMetadata());
+
+            if (dumpIndices)
+                dumpIndex(ndx, showTuples);
+
         }
         
     }

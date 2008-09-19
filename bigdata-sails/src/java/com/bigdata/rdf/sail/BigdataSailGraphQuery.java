@@ -50,7 +50,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery {
                     };
             // Convert the BindingSet objects to actual RDF statements
             CloseableIteration<? extends Statement, QueryEvaluationException> stIter;
-            stIter = new BigdataConstructIterator(sailCon.getDatabase(),  bindingsIter);
+            stIter = new BigdataConstructIterator(sailCon.getTripleStore(),  bindingsIter);
             return new GraphQueryResultImpl(getParsedQuery()
                     .getQueryNamespaces(), stIter);
         } catch (SailException e) {

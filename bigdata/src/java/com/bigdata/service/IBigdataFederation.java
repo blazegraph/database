@@ -41,7 +41,9 @@ import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
- * The client-facing interface to a bigdata federation.
+ * The client-facing interface to a bigdata federation. Note that each bigdata
+ * service has an {@link IBigdataFederation} which it uses to communicate with
+ * the other services in the federation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -56,6 +58,15 @@ public interface IBigdataFederation extends IIndexManager {
      *             valid.
      */
     public IBigdataClient getClient();
+    
+    /**
+     * The URL that may be used to access the local httpd service for this
+     * client or service.
+     * 
+     * @return The URL -or- <code>null</code> if the httpd service is not
+     *         running.
+     */
+    public String getHttpdURL();
     
     /**
      * Return the {@link ITimestampService} (or a proxy for that service).
@@ -93,17 +104,25 @@ public interface IBigdataFederation extends IIndexManager {
      * namespace) to the returned {@link CounterSet} in order to report their
      * own performance data to the {@link ILoadBalancerService}.
      * 
-     * @see #getClientCounterPathPrefix()
+     * @see #getServiceCounterSet()
+     * @see #getServiceCounterPathPrefix()
      */
     public CounterSet getCounterSet();
     
     /**
-     * The path prefix under which all of the client's counters are located.
-     * This includes the fully qualified hostname, the word "client', and the
-     * {@link UUID} for the client. The returned path prefix is terminated by
-     * an {@link ICounterSet#pathSeparator}.
+     * The node in {@link #getCounterSet()} corresponding to the root of the
+     * client or service connected using this federation.
      */
-    public String getClientCounterPathPrefix();
+    public CounterSet getServiceCounterSet();
+    
+    /**
+     * The path prefix under which all of the client or service's counters are
+     * located. The returned path prefix is terminated by an
+     * {@link ICounterSet#pathSeparator}.
+     * 
+     * @see #getServiceCounterSet()
+     */
+    public String getServiceCounterPathPrefix();
     
     /**
      * Return an array UUIDs for {@link IDataService}s.

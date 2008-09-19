@@ -45,7 +45,8 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.service.EmbeddedResourceLockManager;
+import com.bigdata.service.AbstractEmbeddedResourceLockManager;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
@@ -99,7 +100,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 null //delegate
                 );
 
-        resourceLockManager = new EmbeddedResourceLockManager(UUID.randomUUID(),properties);
+        resourceLockManager = new AbstractEmbeddedResourceLockManager(UUID.randomUUID(),properties) {
+            
+            public AbstractFederation getFederation() {
+                
+                throw new UnsupportedOperationException();
+                
+            }
+            
+        }.start();
     
         localTransactionManager = new AbstractLocalTransactionManager(this/* resourceManager */) {
 
@@ -110,7 +119,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
 
         };
-
+        
         concurrencyManager = new ConcurrencyManager(properties, this, this);
 
         localTransactionManager.setConcurrencyManager(concurrencyManager);

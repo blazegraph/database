@@ -35,8 +35,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
 import java.util.Properties;
@@ -57,10 +55,10 @@ import net.jini.lookup.DiscoveryAdmin;
 import net.jini.lookup.JoinManager;
 import net.jini.lookup.ServiceIDListener;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
@@ -136,14 +134,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The label in the {@link Configuration} file for the service description
@@ -207,17 +203,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
     protected Remote proxy;
 
     /**
-     * The name of the host on which the server is running.
-     */
-    private final String hostname;
-    
-    /**
      * The name of the host on which the server is running (best effort during
      * startup and unchanging thereafter).
      */
     protected String getHostName() {
         
-        return hostname;
+        return AbstractStatisticsCollector.fullyQualifiedHostName;
         
     }
     
@@ -370,20 +361,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         setSecurityManager();
 
         /*
-         * Resolve the host name (for informational purposes).
-         */
-        {
-            String hostname;
-            try {
-                // DNS lookup
-                hostname = InetAddress.getLocalHost().getCanonicalHostName();
-            } catch (UnknownHostException ex) {
-                hostname = "<unknown>";
-            }
-            this.hostname = hostname;
-        }
-
-        /*
          * Read jini configuration & service properties 
          */
 
@@ -487,8 +464,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
             // read the client configuration.
             client = JiniClient.newInstance(args);
 
-            // connect to the federation (starts service discovery for the client).
-            client.connect();
+//            // connect to the federation (starts service discovery for the client).
+//            client.connect();
             
         } catch(Throwable t) {
             
@@ -524,9 +501,19 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
 
             // init w/ client's properties.
             impl = newService(client.getProperties());
-
+            
             if (INFO)
                 log.info("Service impl is " + impl);
+
+            // Connect to the federation (starts service discovery for client).
+            client.connect();
+            
+            // start the service.
+            if(impl instanceof AbstractService) {
+
+                ((AbstractService)impl).start();
+                
+            }
             
         } catch(Exception ex) {
         
@@ -820,7 +807,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
     /**
      * Shutdown the server, including the service and any jini processing. It
      * SHOULD always be save to invoke this method. The implementation SHOULD be
-     * synchronized and SHOULD conditional handle each class of asynchronous
+     * synchronized and SHOULD conditionally handle each class of asynchronous
      * processing or resource, terminating or releasing it iff it has not
      * already been terminated or released.
      * <p>
@@ -847,6 +834,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
      * request to destroy the service.
      */
     synchronized public void shutdownNow() {
+
+        if (shuttingDown) {
+            
+            // break recursion.
+            return;
+            
+        }
+        
+        shuttingDown = true;
         
         /*
          * Unexport the proxy, making the service no longer available.
@@ -947,6 +943,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener, Service
         }
         
     }
+    private boolean shuttingDown = false;
 
     /**
      * Terminates service management threads.

@@ -260,11 +260,6 @@ import com.bigdata.sparse.SparseRowStore;
 public interface IDataService extends IRemoteTxCommitProtocol, IService {
 
     /**
-     * An XML representation of performance counters for the {@link IDataService}.
-     */
-    public String getStatistics() throws IOException;
-    
-    /**
      * Register a named mutable index on the {@link DataService}.
      * <p>
      * Note: In order to register an index partition the

@@ -141,20 +141,16 @@ public class JiniClient extends AbstractScaleOutClient {
         final Configuration config;
         final String[] groups;
         final LookupLocator[] lookupLocators;
-//        final Exporter exporter;
         final Properties properties;
 
         public JiniConfig(Configuration config, String[] groups,
-                LookupLocator[] lookupLocators, //Exporter exporter,
-                Properties properties) {
+                LookupLocator[] lookupLocators, Properties properties) {
 
             this.config = config;
             
             this.groups = groups;
 
             this.lookupLocators = lookupLocators;
-
-//            this.exporter = exporter;
             
             this.properties = properties;
             
@@ -174,7 +170,6 @@ public class JiniClient extends AbstractScaleOutClient {
                     + ", locators="
                     + (lookupLocators == null ? "N/A" : ""
                             + Arrays.toString(lookupLocators))//
-//                    + ", exporter="+(exporter==null?"N/A":""+exporter)
                     + ", properties="+properties
                     + "}";
             
@@ -210,17 +205,6 @@ public class JiniClient extends AbstractScaleOutClient {
         return new JiniClient(jiniConfig);
         
     }
-
-//    /**
-//     * Return the configured {@link Exporter}
-//     * 
-//     * @return The {@link Exporter}.
-//     */
-//    public Exporter getExporter() {
-//        
-//        return jiniConfig.exporter;
-//        
-//    }
     
     /**
      * Conditionally install a suitable security manager if there is none in
@@ -237,11 +221,12 @@ public class JiniClient extends AbstractScaleOutClient {
 
             System.setSecurityManager(new SecurityManager());
          
-            log.info("Set security manager");
+            if (INFO)
+                log.info("Set security manager");
 
         } else {
-            
-            if (log.isInfoEnabled())
+
+            if (INFO)
                 log.info("Security manager already in place: " + sm.getClass());
 
         }
@@ -269,7 +254,6 @@ public class JiniClient extends AbstractScaleOutClient {
 
         final String[] groups;
         final LookupLocator[] lookupLocators;
-//        final Exporter exporter;
         final Properties properties;
         try {
 
@@ -296,18 +280,6 @@ public class JiniClient extends AbstractScaleOutClient {
                     .getEntry(
                     AbstractServer.ADVERT_LABEL, "unicastLocators",
                     LookupLocator[].class, null/* default */);
-
-//            /*
-//             * Extract how the Exporter will be provisioned from the
-//             * Configuration (MAY be null).
-//             */
-//
-//            // The exporter used to expose proxy objects.
-//            exporter = (Exporter) config.getEntry(//
-//                    AbstractServer.SERVICE_LABEL, // component
-//                    "exporter", // name
-//                    Exporter.class // type (of the return object)
-//                    );
 
             {
                 
@@ -351,20 +323,16 @@ public class JiniClient extends AbstractScaleOutClient {
                 
                 for(NV nv : tmp) {
 
-                    if(log.isInfoEnabled()) {
-                        
+                    if (INFO)
                         log.info(nv.toString());
                         
-                    }
-                    
                     properties.setProperty(nv.getName(), nv.getValue());
                     
                 }
             
             }
 
-            return new JiniConfig(config, groups, lookupLocators, //exporter,
-                    properties);
+            return new JiniConfig(config, groups, lookupLocators, properties);
             
         } catch (Exception ex) {
 
@@ -390,7 +358,7 @@ public class JiniClient extends AbstractScaleOutClient {
     static protected Properties getProperties(File propertyFile)
             throws IOException {
 
-        if(log.isInfoEnabled()) {
+        if(INFO) {
             
             log.info("Reading properties: file="+propertyFile);
             
@@ -406,7 +374,7 @@ public class JiniClient extends AbstractScaleOutClient {
 
             properties.load(is);
 
-            if(log.isInfoEnabled()) {
+            if(INFO) {
                 
                 log.info("Read properties: " + properties);
                 
